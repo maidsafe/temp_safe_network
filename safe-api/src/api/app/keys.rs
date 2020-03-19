@@ -179,21 +179,20 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_api::Safe;
-    /// # use unwrap::unwrap;
     /// let mut safe = Safe::default();
-    /// # unwrap!(safe.connect("", Some("fake-credentials")));
-    /// async_std::task::block_on(async {
-    ///     let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14").await);
-    ///     let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1").await);
-    ///     let current_balance = unwrap!(safe.keys_balance_from_sk(&key_pair1.clone().unwrap().sk).await);
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// # async_std::task::block_on(async {
+    ///     let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("14").await.unwrap();
+    ///     let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1").await.unwrap();
+    ///     let current_balance = safe.keys_balance_from_sk(&key_pair1.clone().unwrap().sk).await.unwrap();
     ///     assert_eq!("14.000000000", current_balance);
     ///
-    ///     unwrap!(safe.keys_transfer( "10", Some(&key_pair1.clone().unwrap().sk), &key2_xorurl, None ).await);
-    ///     let from_balance = unwrap!(safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ).await);
+    ///     safe.keys_transfer( "10", Some(&key_pair1.clone().unwrap().sk), &key2_xorurl, None ).await.unwrap();
+    ///     let from_balance = safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ).await.unwrap();
     ///     assert_eq!("4.000000000", from_balance);
-    ///     let to_balance = unwrap!(safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ).await);
+    ///     let to_balance = safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ).await.unwrap();
     ///     assert_eq!("11.000000000", to_balance);
-    /// });
+    /// # });
     /// ```
     pub async fn keys_transfer(
         &mut self,
@@ -263,59 +262,59 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name, unwrap_key_pair};
 
     #[tokio::test]
-    async fn test_keys_create_preload_test_coins() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", None));
-        let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12.23").await);
+    async fn test_keys_create_preload_test_coins() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, key_pair) = safe.keys_create_preload_test_coins("12.23").await?;
         assert!(xorurl.starts_with("safe://"));
         assert!(key_pair.is_some());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_create() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.23").await);
+    async fn test_keys_create() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_, from_key_pair) = safe.keys_create_preload_test_coins("23.23").await?;
 
-        let (xorurl, key_pair) = unwrap!(
-            safe.keys_create(Some(&unwrap!(from_key_pair).sk), None, None)
-                .await
-        );
+        let (xorurl, key_pair) = safe
+            .keys_create(Some(&unwrap_key_pair(from_key_pair)?.sk), None, None)
+            .await?;
         assert!(xorurl.starts_with("safe://"));
         assert!(key_pair.is_some());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_create_preload() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("543.2312").await);
+    async fn test_keys_create_preload() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_, from_key_pair) = safe.keys_create_preload_test_coins("543.2312").await?;
 
         let preload_amount = "1.800000000";
-        let (xorurl, key_pair) = unwrap!(
-            safe.keys_create(Some(&unwrap!(from_key_pair).sk), Some(preload_amount), None,)
-                .await
-        );
+        let (xorurl, key_pair) = safe
+            .keys_create(
+                Some(&unwrap_key_pair(from_key_pair)?.sk),
+                Some(preload_amount),
+                None,
+            )
+            .await?;
         assert!(xorurl.starts_with("safe://"));
         match key_pair {
-            None => panic!("Key pair was not generated as it was expected"),
+            None => Err(Error::Unexpected(
+                "Key pair was not generated as it was expected".to_string(),
+            )),
             Some(kp) => {
-                let balance = unwrap!(safe.keys_balance_from_sk(&kp.sk).await);
+                let balance = safe.keys_balance_from_sk(&kp.sk).await?;
                 assert_eq!(balance, preload_amount);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_create_preload_invalid_amounts() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_keys_create_preload_invalid_amounts() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         match safe.keys_create_preload_test_coins(".45").await {
             Err(err) => assert_eq!(
                 err,
@@ -323,13 +322,17 @@ mod tests {
                     "Invalid safecoins amount '.45' (Can\'t parse coin units)".to_string()
                 )
             ),
-            Ok(_) => panic!("Key with test-coins was created unexpectedly"),
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Key with test-coins was created unexpectedly".to_string(),
+                ))
+            }
         };
 
-        let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins("12").await);
-        let mut unwrapped_key_pair = unwrap!(key_pair.clone());
+        let (_, kp) = safe.keys_create_preload_test_coins("12").await?;
+        let mut key_pair = unwrap_key_pair(kp.clone())?;
         match safe
-            .keys_create(Some(&unwrapped_key_pair.sk), Some(".003"), None)
+            .keys_create(Some(&key_pair.sk), Some(".003"), None)
             .await
         {
             Err(err) => assert_eq!(
@@ -338,13 +341,17 @@ mod tests {
                     "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
                 )
             ),
-            Ok(_) => panic!("Key was created unexpectedly"),
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Key was created unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test it fails with corrupted secret key
-        unwrapped_key_pair.sk.replace_range(..6, "ababab");
+        key_pair.sk.replace_range(..6, "ababab");
         match safe
-            .keys_create(Some(&unwrapped_key_pair.sk), Some(".003"), None)
+            .keys_create(Some(&key_pair.sk), Some(".003"), None)
             .await
         {
             Err(err) => assert_eq!(
@@ -353,384 +360,400 @@ mod tests {
                     "Invalid safecoins amount '.003' (Can\'t parse coin units)".to_string()
                 )
             ),
-            Ok(_) => panic!("Key was created unexpectedly"),
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Key was created unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test it fails to preload with more than available balance in source (which has only 12 coins)
         match safe
-            .keys_create(Some(&unwrap!(key_pair).sk), Some("12.000000001"), None)
+            .keys_create(Some(&unwrap_key_pair(kp)?.sk), Some("12.000000001"), None)
             .await
         {
-            Err(err) => assert_eq!(
-                err,
-                Error::NotEnoughBalance(
-                    "Not enough balance at 'source' for the operation".to_string()
-                )
-            ),
-            Ok(_) => panic!("Key was created unexpectedly"),
-        };
+            Err(err) => {
+                assert_eq!(
+                    err,
+                    Error::NotEnoughBalance(
+                        "Not enough balance at 'source' for the operation".to_string()
+                    )
+                );
+                Ok(())
+            }
+            Ok(_) => Err(Error::Unexpected(
+                "Key was created unexpectedly".to_string(),
+            )),
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_create_pk() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins("1.1").await);
+    async fn test_keys_create_pk() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_, from_key_pair) = safe.keys_create_preload_test_coins("1.1").await?;
         let pk = pk_to_hex(&SecretKey::random().public_key());
-        let (xorurl, key_pair) = unwrap!(
-            safe.keys_create(Some(&unwrap!(from_key_pair).sk), None, Some(&pk))
-                .await
-        );
+        let (xorurl, key_pair) = safe
+            .keys_create(Some(&unwrap_key_pair(from_key_pair)?.sk), None, Some(&pk))
+            .await?;
         assert!(xorurl.starts_with("safe://"));
         assert!(key_pair.is_none());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_test_coins_balance_pk() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_keys_test_coins_balance_pk() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let preload_amount = "1.154200000";
-        let (_, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount).await);
-        let current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair).sk).await);
+        let (_, key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
+        let current_balance = safe
+            .keys_balance_from_sk(&unwrap_key_pair(key_pair)?.sk)
+            .await?;
         assert_eq!(preload_amount, current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_test_coins_balance_xorurl() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_keys_test_coins_balance_xorurl() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let preload_amount = "0.243000000";
-        let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount).await);
-        let current_balance = unwrap!(
-            safe.keys_balance_from_url(&xorurl, &unwrap!(key_pair).sk)
-                .await
-        );
+        let (xorurl, key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
+        let current_balance = safe
+            .keys_balance_from_url(&xorurl, &unwrap_key_pair(key_pair)?.sk)
+            .await?;
         assert_eq!(preload_amount, current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_test_coins_balance_wrong_url() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0").await);
+    async fn test_keys_test_coins_balance_wrong_url() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("0").await?;
 
         let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
         let current_balance = safe
-            .keys_balance_from_url(&invalid_xorurl, &unwrap!(key_pair).sk)
+            .keys_balance_from_url(&invalid_xorurl, &unwrap_key_pair(key_pair)?.sk)
             .await;
         match current_balance {
             Err(Error::InvalidInput(msg)) => {
-                assert!(msg.contains("The location couldn't be resolved from the NRS URL provided"))
+                assert!(msg.contains("The location couldn't be resolved from the NRS URL provided"));
+                Ok(())
             }
-            Err(err) => panic!("Error returned is not the expected: {:?}", err),
-            Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
-        };
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(balance) => Err(Error::Unexpected(format!(
+                "Unexpected balance obtained: {:?}",
+                balance
+            ))),
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_test_coins_balance_wrong_location() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_keys_test_coins_balance_wrong_location() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let amount = "35312.000000000";
-        let (mut xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins(amount).await);
-        let unwrapped_key_pair = unwrap!(key_pair);
+        let (mut xorurl, kp) = safe.keys_create_preload_test_coins(amount).await?;
+        let key_pair = unwrap_key_pair(kp)?;
 
-        let current_balance = unwrap!(
-            safe.keys_balance_from_url(&xorurl, &unwrapped_key_pair.sk)
-                .await
-        );
+        let current_balance = safe.keys_balance_from_url(&xorurl, &key_pair.sk).await?;
         assert_eq!(amount, current_balance);
 
         // let's corrupt the XOR-URL right where the encoded xorname bytes are in the string
         xorurl.replace_range(13..18, "ccccc");
-        let current_balance = safe
-            .keys_balance_from_url(&xorurl, &unwrapped_key_pair.sk)
-            .await;
+        let current_balance = safe.keys_balance_from_url(&xorurl, &key_pair.sk).await;
         match current_balance {
-            Err(Error::InvalidInput(msg)) => assert!(msg.contains(
+            Err(Error::InvalidInput(msg)) => {
+                assert!(msg.contains(
                 "The URL doesn't correspond to the public key derived from the provided secret key"
-            )),
-            Err(err) => panic!("Error returned is not the expected: {:?}", err),
-            Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
-        };
+            ));
+                Ok(())
+            }
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(balance) => Err(Error::Unexpected(format!(
+                "Unexpected balance obtained: {:?}",
+                balance
+            ))),
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_test_coins_balance_wrong_sk() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("0").await);
-        let mut unwrapped_sk = unwrap!(key_pair).sk;
-        unwrapped_sk.replace_range(..6, "ababab");
-        let current_balance = safe.keys_balance_from_sk(&unwrapped_sk).await;
+    async fn test_keys_test_coins_balance_wrong_sk() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_xorurl, kp) = safe.keys_create_preload_test_coins("0").await?;
+        let mut sk = unwrap_key_pair(kp)?.sk;
+        sk.replace_range(..6, "ababab");
+        let current_balance = safe.keys_balance_from_sk(&sk).await;
         match current_balance {
             Err(Error::ContentNotFound(msg)) => {
-                assert!(msg.contains("No SafeKey found at specified location"))
+                assert!(msg.contains("No SafeKey found at specified location"));
+                Ok(())
             }
-            Err(err) => panic!("Error returned is not the expected: {:?}", err),
-            Ok(balance) => panic!("Unexpected balance obtained: {:?}", balance),
-        };
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(balance) => Err(Error::Unexpected(format!(
+                "Unexpected balance obtained: {:?}",
+                balance
+            ))),
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_balance_pk() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_keys_balance_pk() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let preload_amount = "1743.234";
-        let (_, from_key_pair) = unwrap!(safe.keys_create_preload_test_coins(preload_amount).await);
-        let from_key_pair_unwrapped = unwrap!(from_key_pair);
+        let (_, from_kp) = safe.keys_create_preload_test_coins(preload_amount).await?;
+        let from_key_pair = unwrap_key_pair(from_kp)?;
 
         let amount = "1740.000000000";
-        let (_, to_key_pair) = unwrap!(
-            safe.keys_create(Some(&from_key_pair_unwrapped.sk), Some(amount), None,)
-                .await
-        );
+        let (_, to_key_pair) = safe
+            .keys_create(Some(&from_key_pair.sk), Some(amount), None)
+            .await?;
 
-        let from_current_balance =
-            unwrap!(safe.keys_balance_from_sk(&from_key_pair_unwrapped.sk).await);
+        let from_current_balance = safe.keys_balance_from_sk(&from_key_pair.sk).await?;
         assert_eq!(
             "3.233999999", /*== 1743.234 - 1740 - 0.000000001 (creation cost) */
             from_current_balance
         );
 
-        let to_current_balance = unwrap!(safe.keys_balance_from_sk(&unwrap!(to_key_pair).sk).await);
+        let to_current_balance = safe
+            .keys_balance_from_sk(&unwrap_key_pair(to_key_pair)?.sk)
+            .await?;
         assert_eq!(amount, to_current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_balance_xorname() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_keys_balance_xorname() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let preload_amount = "435.34";
-        let (from_xorname, from_key_pair) =
-            unwrap!(safe.keys_create_preload_test_coins(preload_amount).await);
-        let from_key_pair_unwrapped = unwrap!(from_key_pair);
+        let (from_xorname, from_kp) = safe.keys_create_preload_test_coins(preload_amount).await?;
+        let from_key_pair = unwrap_key_pair(from_kp)?;
 
         let amount = "35.300000000";
-        let (to_xorname, to_key_pair) = unwrap!(
-            safe.keys_create(Some(&from_key_pair_unwrapped.sk), Some(amount), None)
-                .await
-        );
+        let (to_xorname, to_key_pair) = safe
+            .keys_create(Some(&from_key_pair.sk), Some(amount), None)
+            .await?;
 
-        let from_current_balance = unwrap!(
-            safe.keys_balance_from_url(&from_xorname, &from_key_pair_unwrapped.sk)
-                .await
-        );
+        let from_current_balance = safe
+            .keys_balance_from_url(&from_xorname, &from_key_pair.sk)
+            .await?;
         assert_eq!(
             "400.039999999", /*== 435.34 - 35.3 - 0.000000001 (creation cost)*/
             from_current_balance
         );
 
-        let to_current_balance = unwrap!(
-            safe.keys_balance_from_url(&to_xorname, &unwrap!(to_key_pair).sk)
-                .await
-        );
+        let to_current_balance = safe
+            .keys_balance_from_url(&to_xorname, &unwrap_key_pair(to_key_pair)?.sk)
+            .await?;
         assert_eq!(amount, to_current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_validate_sk_for_url() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("23.22").await);
-        let key_pair_unwrapped = unwrap!(key_pair);
-        let pk = unwrap!(
-            safe.validate_sk_for_url(&key_pair_unwrapped.sk, &xorurl)
-                .await
-        );
-        assert_eq!(pk, key_pair_unwrapped.pk);
+    async fn test_validate_sk_for_url() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, kp) = safe.keys_create_preload_test_coins("23.22").await?;
+        let key_pair = unwrap_key_pair(kp)?;
+        let pk = safe.validate_sk_for_url(&key_pair.sk, &xorurl).await?;
+        assert_eq!(pk, key_pair.pk);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_keys_transfer_from_zero_balance() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_from_safekey_xorurl, key_pair1) =
-            unwrap!(safe.keys_create_preload_test_coins("0.0").await);
-        let (to_safekey_xorurl, _key_pair2) =
-            unwrap!(safe.keys_create_preload_test_coins("0.5").await);
+    async fn test_keys_transfer_from_zero_balance() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_from_safekey_xorurl, key_pair1) = safe.keys_create_preload_test_coins("0.0").await?;
+        let (to_safekey_xorurl, _key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
 
         // test it fails to transfer with 0 balance at SafeKey in <from> argument
         match safe
-            .keys_transfer("0", Some(&unwrap!(key_pair1).sk), &to_safekey_xorurl, None)
+            .keys_transfer(
+                "0",
+                Some(&unwrap_key_pair(key_pair1)?.sk),
+                &to_safekey_xorurl,
+                None,
+            )
             .await
         {
-            Err(Error::InvalidAmount(msg)) => assert_eq!(
-                msg,
-                "The amount '0' specified for the transfer is invalid".to_string()
-            ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
-        };
+            Err(Error::InvalidAmount(msg)) => {
+                assert_eq!(
+                    msg,
+                    "The amount '0' specified for the transfer is invalid".to_string()
+                );
+                Ok(())
+            }
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(_) => Err(Error::Unexpected(
+                "Transfer succeeded unexpectedly".to_string(),
+            )),
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_transfer_diff_amounts() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (safekey1_xorurl, key_pair1) =
-            unwrap!(safe.keys_create_preload_test_coins("0.5").await);
-        let (safekey2_xorurl, key_pair2) =
-            unwrap!(safe.keys_create_preload_test_coins("100.5").await);
+    async fn test_keys_transfer_diff_amounts() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (safekey1_xorurl, kp1) = safe.keys_create_preload_test_coins("0.5").await?;
+        let (safekey2_xorurl, kp2) = safe.keys_create_preload_test_coins("100.5").await?;
 
         // test it fails to transfer more than current balance at SafeKey in <from> argument
-        let unwrapped_key_pair1 = unwrap!(key_pair1);
+        let key_pair1 = unwrap_key_pair(kp1)?;
         match safe
-            .keys_transfer(
-                "100.6",
-                Some(&unwrapped_key_pair1.sk),
-                &safekey2_xorurl,
-                None,
-            )
+            .keys_transfer("100.6", Some(&key_pair1.sk), &safekey2_xorurl, None)
             .await
         {
             Err(Error::NotEnoughBalance(msg)) => assert_eq!(
                 msg,
                 "Not enough balance for the transfer at provided source SafeKey".to_string()
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test it fails to transfer as it's a invalid/non-numeric amount
         match safe
-            .keys_transfer(".06", Some(&unwrapped_key_pair1.sk), &safekey2_xorurl, None)
+            .keys_transfer(".06", Some(&key_pair1.sk), &safekey2_xorurl, None)
             .await
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
                 "Invalid safecoins amount '.06' (Can\'t parse coin units)"
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test it fails to transfer less than 1 nano coin
-        let unwrapped_key_pair2 = unwrap!(key_pair2);
+        let key_pair2 = unwrap_key_pair(kp2)?;
         match safe.keys_transfer(
                 "0.0000000009",
-                Some(&unwrapped_key_pair2.sk),
+                Some(&key_pair2.sk),
                 &safekey2_xorurl,
                 None
             ).await {
                     Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '0.0000000009', the minimum possible amount is one nano coin (0.000000001)"),
-                    Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-                    Ok(_) => panic!("Transfer succeeded unexpectedly"),
+                    Err(err) => return Err(Error::Unexpected(format!("Error returned is not the expected: {:?}", err))),
+                    Ok(_) => return Err(Error::Unexpected("Transfer succeeded unexpectedly".to_string())),
             };
 
         // test successful transfer
         match safe
-            .keys_transfer(
-                "100.4",
-                Some(&unwrapped_key_pair2.sk),
-                &safekey1_xorurl,
-                None,
-            )
+            .keys_transfer("100.4", Some(&key_pair2.sk), &safekey1_xorurl, None)
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk).await);
+                let from_current_balance = safe.keys_balance_from_sk(&key_pair2.sk).await?;
                 assert_eq!("0.100000000", from_current_balance);
-                let to_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair1.sk).await);
+                let to_current_balance = safe.keys_balance_from_sk(&key_pair1.sk).await?;
                 assert_eq!("100.900000000", to_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_transfer_to_wallet() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let to_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("10.0").await);
-        let unwrapped_key_pair1 = unwrap!(key_pair1);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrapped_key_pair1.sk,
-            )
-            .await
-        );
+    async fn test_keys_transfer_to_wallet() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let to_wallet_xorurl = safe.wallet_create().await?;
+        let (_, kp1) = safe.keys_create_preload_test_coins("10.0").await?;
+        let key_pair1 = unwrap_key_pair(kp1)?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &key_pair1.sk,
+        )
+        .await?;
 
-        let (_safekey_xorurl, key_pair2) =
-            unwrap!(safe.keys_create_preload_test_coins("4621.45").await);
+        let (_safekey_xorurl, kp2) = safe.keys_create_preload_test_coins("4621.45").await?;
 
         // test successful transfer
-        let unwrapped_key_pair2 = unwrap!(key_pair2);
+        let key_pair2 = unwrap_key_pair(kp2)?;
         match safe
             .keys_transfer(
                 "523.87",
-                Some(&unwrapped_key_pair2.sk),
+                Some(&key_pair2.sk),
                 &to_wallet_xorurl.clone(),
                 None,
             )
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk).await);
+                let from_current_balance = safe.keys_balance_from_sk(&key_pair2.sk).await?;
                 assert_eq!(
                     "4097.580000000", /* 4621.45 - 523.87 */
                     from_current_balance
                 );
-                let wallet_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl).await);
+                let wallet_current_balance = safe.wallet_balance(&to_wallet_xorurl).await?;
                 assert_eq!("533.870000000", wallet_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_keys_transfer_to_nrs_urls() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (_from_safekey_xorurl, key_pair1) =
-            unwrap!(safe.keys_create_preload_test_coins("0.2").await);
-        let (to_safekey_xorurl, key_pair2) =
-            unwrap!(safe.keys_create_preload_test_coins("0.1").await);
-        let unwrapped_key_pair1 = unwrap!(key_pair1);
-        let unwrapped_key_pair2 = unwrap!(key_pair2);
+    async fn test_keys_transfer_to_nrs_urls() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (_from_safekey_xorurl, kp1) = safe.keys_create_preload_test_coins("0.2").await?;
+        let (to_safekey_xorurl, kp2) = safe.keys_create_preload_test_coins("0.1").await?;
+        let key_pair1 = unwrap_key_pair(kp1)?;
+        let key_pair2 = unwrap_key_pair(kp2)?;
 
-        let to_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = unwrap!(
-            safe.nrs_map_container_create(&to_nrsurl, &to_safekey_xorurl, false, true, false)
-                .await
-        );
+        let to_nrsurl = random_nrs_name();
+        let _ = safe
+            .nrs_map_container_create(&to_nrsurl, &to_safekey_xorurl, false, true, false)
+            .await?;
 
         // test successful transfer
         match safe
-            .keys_transfer("0.2", Some(&unwrapped_key_pair1.sk), &to_nrsurl, None)
+            .keys_transfer("0.2", Some(&key_pair1.sk), &to_nrsurl, None)
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair1.sk).await);
+                let from_current_balance = safe.keys_balance_from_sk(&key_pair1.sk).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-                let to_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrapped_key_pair2.sk).await);
+                let to_current_balance = safe.keys_balance_from_sk(&key_pair2.sk).await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, to_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 }

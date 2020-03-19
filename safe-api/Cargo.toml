@@ -47,7 +47,6 @@ app = []
 default = ["authenticator", "authd_client", "app"]
 
 [dev-dependencies]
-unwrap = "~1.2.1"
 tokio = { version = "^0.2.13", features = ["macros"] }
 
 [dev-dependencies.cargo-husky]

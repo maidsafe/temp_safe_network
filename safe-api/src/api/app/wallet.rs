@@ -265,37 +265,36 @@ impl Safe {
     /// ## Example
     /// ```
     /// # use safe_api::Safe;
-    /// # use unwrap::unwrap;
     /// let mut safe = Safe::default();
-    /// # unwrap!(safe.connect("", Some("fake-credentials")));
-    /// async_std::task::block_on(async {
-    ///     let wallet_xorurl = unwrap!(safe.wallet_create().await);
-    ///     let wallet_xorurl2 = unwrap!(safe.wallet_create().await);
-    ///     let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("14").await);
-    ///     let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1").await);
-    ///     unwrap!(safe.wallet_insert(
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// # async_std::task::block_on(async {
+    ///     let wallet_xorurl = safe.wallet_create().await.unwrap();
+    ///     let wallet_xorurl2 = safe.wallet_create().await.unwrap();
+    ///     let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("14").await.unwrap();
+    ///     let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1").await.unwrap();
+    ///     safe.wallet_insert(
     ///         &wallet_xorurl,
     ///         Some("frombalance"),
     ///         true,
     ///         &key_pair1.clone().unwrap().sk,
-    ///     ).await);
-    ///     let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl).await);
+    ///     ).await.unwrap();
+    ///     let current_balance = safe.wallet_balance(&wallet_xorurl).await.unwrap();
     ///     assert_eq!("14.000000000", current_balance);
     ///
-    ///     unwrap!(safe.wallet_insert(
+    ///     safe.wallet_insert(
     ///         &wallet_xorurl2,
     ///         Some("tobalance"),
     ///         true,
     ///         &key_pair2.clone().unwrap().sk,
-    ///     ).await);
+    ///     ).await.unwrap();
     ///
     ///
-    ///     unwrap!(safe.wallet_transfer( "10", Some(&wallet_xorurl), &wallet_xorurl2, None ).await);
-    ///     let from_balance = unwrap!(safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ).await);
+    ///     safe.wallet_transfer( "10", Some(&wallet_xorurl), &wallet_xorurl2, None ).await.unwrap();
+    ///     let from_balance = safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ).await.unwrap();
     ///     assert_eq!("4.000000000", from_balance);
-    ///     let to_balance = unwrap!(safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ).await);
+    ///     let to_balance = safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ).await.unwrap();
     ///     assert_eq!("11.000000000", to_balance);
-    /// });
+    /// # });
     /// ```
     pub async fn wallet_transfer(
         &mut self,
@@ -533,163 +532,144 @@ async fn resolve_wallet_url(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name, unwrap_key_pair};
 
     #[tokio::test]
-    async fn test_wallet_create() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let xorurl = unwrap!(safe.wallet_create().await);
+    async fn test_wallet_create() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let xorurl = safe.wallet_create().await?;
         assert!(xorurl.starts_with("safe://"));
 
-        let current_balance = unwrap!(safe.wallet_balance(&xorurl).await);
+        let current_balance = safe.wallet_balance(&xorurl).await?;
         assert_eq!("0.000000000", current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wallet_insert_and_balance() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23").await);
-        let (_key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1.53").await);
+    async fn test_wallet_insert_and_balance() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let (_key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
+        let (_key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
 
-        unwrap!(
-            safe.wallet_insert(
-                &wallet_xorurl,
-                Some("my-first-balance"),
-                true,
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+        safe.wallet_insert(
+            &wallet_xorurl,
+            Some("my-first-balance"),
+            true,
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl).await);
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!("12.230000000", current_balance);
 
-        unwrap!(
-            safe.wallet_insert(
-                &wallet_xorurl,
-                Some("my-second-balance"),
-                false,
-                &unwrap!(key_pair2).sk,
-            )
-            .await
-        );
+        safe.wallet_insert(
+            &wallet_xorurl,
+            Some("my-second-balance"),
+            false,
+            &unwrap_key_pair(key_pair2)?.sk,
+        )
+        .await?;
 
-        let current_balance = unwrap!(safe.wallet_balance(&wallet_xorurl).await);
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!("13.760000000" /*== 12.23 + 1.53*/, current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wallet_insert_and_get() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("12.23").await);
-        let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("1.53").await);
+    async fn test_wallet_insert_and_get() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
+        let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
 
-        unwrap!(
-            safe.wallet_insert(
-                &wallet_xorurl,
-                Some("my-first-balance"),
-                true,
-                &unwrap!(key_pair1.clone()).sk,
-            )
-            .await
-        );
+        safe.wallet_insert(
+            &wallet_xorurl,
+            Some("my-first-balance"),
+            true,
+            &unwrap_key_pair(key_pair1.clone())?.sk,
+        )
+        .await?;
 
-        unwrap!(
-            safe.wallet_insert(
-                &wallet_xorurl,
-                Some("my-second-balance"),
-                false,
-                &unwrap!(key_pair2.clone()).sk,
-            )
-            .await
-        );
+        safe.wallet_insert(
+            &wallet_xorurl,
+            Some("my-second-balance"),
+            false,
+            &unwrap_key_pair(key_pair2.clone())?.sk,
+        )
+        .await?;
 
-        let wallet_balances = unwrap!(safe.wallet_get(&wallet_xorurl).await);
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert_eq!(wallet_balances["my-first-balance"].0, true);
         assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
         assert_eq!(
             wallet_balances["my-first-balance"].1.sk,
-            unwrap!(key_pair1).sk
+            unwrap_key_pair(key_pair1)?.sk
         );
 
         assert_eq!(wallet_balances["my-second-balance"].0, false);
         assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
         assert_eq!(
             wallet_balances["my-second-balance"].1.sk,
-            unwrap!(key_pair2).sk
+            unwrap_key_pair(key_pair2)?.sk
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wallet_insert_and_set_default() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (key1_xorurl, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("65.82").await);
-        let (key2_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("11.44").await);
+    async fn test_wallet_insert_and_set_default() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("65.82").await?;
+        let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("11.44").await?;
 
-        unwrap!(
-            safe.wallet_insert(
-                &wallet_xorurl,
-                Some("my-first-balance"),
-                true,
-                &unwrap!(key_pair1.clone()).sk,
-            )
-            .await
-        );
+        safe.wallet_insert(
+            &wallet_xorurl,
+            Some("my-first-balance"),
+            true,
+            &unwrap_key_pair(key_pair1.clone())?.sk,
+        )
+        .await?;
 
-        unwrap!(
-            safe.wallet_insert(
-                &wallet_xorurl,
-                Some("my-second-balance"),
-                true,
-                &unwrap!(key_pair2.clone()).sk,
-            )
-            .await
-        );
+        safe.wallet_insert(
+            &wallet_xorurl,
+            Some("my-second-balance"),
+            true,
+            &unwrap_key_pair(key_pair2.clone())?.sk,
+        )
+        .await?;
 
-        let wallet_balances = unwrap!(safe.wallet_get(&wallet_xorurl).await);
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert_eq!(wallet_balances["my-first-balance"].0, false);
         assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
         assert_eq!(
             wallet_balances["my-first-balance"].1.sk,
-            unwrap!(key_pair1).sk
+            unwrap_key_pair(key_pair1)?.sk
         );
 
         assert_eq!(wallet_balances["my-second-balance"].0, true);
         assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
         assert_eq!(
             wallet_balances["my-second-balance"].1.sk,
-            unwrap!(key_pair2).sk
+            unwrap_key_pair(key_pair2)?.sk
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_no_default() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await); // this one won't have a default balance
+    async fn test_wallet_transfer_no_default() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?; // this one won't have a default balance
 
-        let to_wallet_xorurl = unwrap!(safe.wallet_create().await); // we'll insert a default balance
-        let (_key_xorurl, key_pair) = unwrap!(safe.keys_create_preload_test_coins("43523").await);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair).sk,
-            )
-            .await
-        );
+        let to_wallet_xorurl = safe.wallet_create().await?; // we'll insert a default balance
+        let (_key_xorurl, key_pair) = safe.keys_create_preload_test_coins("43523").await?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair)?.sk,
+        )
+        .await?;
 
         // test no default balance at wallet in <from> argument
         match safe
@@ -703,8 +683,17 @@ mod tests {
                     from_wallet_xorurl
                 )
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
         // invert wallets and test no default balance at wallet in <to> argument
@@ -712,36 +701,40 @@ mod tests {
             .wallet_transfer("10", Some(&to_wallet_xorurl), &from_wallet_xorurl, None)
             .await
         {
-            Err(Error::ContentError(msg)) => assert_eq!(
-                msg,
-                format!(
-                    "No default balance found at Wallet \"{}\"",
-                    from_wallet_xorurl
-                )
-            ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
-        };
+            Err(Error::ContentError(msg)) => {
+                assert_eq!(
+                    msg,
+                    format!(
+                        "No default balance found at Wallet \"{}\"",
+                        from_wallet_xorurl
+                    )
+                );
+                Ok(())
+            }
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(_) => Err(Error::Unexpected(
+                "Transfer succeeded unexpectedly".to_string(),
+            )),
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_from_zero_balance() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.0").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_from_zero_balance() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("0.0").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let (to_key_xorurl, _key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5").await);
+        let (to_key_xorurl, _key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
@@ -752,64 +745,73 @@ mod tests {
                 msg,
                 "The amount '0' specified for the transfer is invalid".to_string()
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
-        let to_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("also-my-balance"),
-                true, // set --default
-                &unwrap!(key_pair2).sk,
-            )
-            .await
-        );
+        let to_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("also-my-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair2)?.sk,
+        )
+        .await?;
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
             .wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
             .await
         {
-            Err(Error::InvalidAmount(msg)) => assert_eq!(
-                msg,
-                "The amount '0' specified for the transfer is invalid".to_string()
-            ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
-        };
+            Err(Error::InvalidAmount(msg)) => {
+                assert_eq!(
+                    msg,
+                    "The amount '0' specified for the transfer is invalid".to_string()
+                );
+                Ok(())
+            }
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(_) => Err(Error::Unexpected(
+                "Transfer succeeded unexpectedly".to_string(),
+            )),
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_diff_amounts() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_diff_amounts() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let to_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("also-my-balance"),
-                true, // set --default
-                &unwrap!(key_pair2).sk,
-            )
-            .await
-        );
+        let to_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("also-my-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair2)?.sk,
+        )
+        .await?;
 
         // test fail to transfer more than current balance at wallet in <from> argument
         match safe
@@ -823,8 +825,17 @@ mod tests {
                     from_wallet_xorurl
                 )
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test fail to transfer as it's a invalid/non-numeric amount
@@ -836,8 +847,17 @@ mod tests {
                 msg,
                 "Invalid safecoins amount '.06' (Can\'t parse coin units)"
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test successful transfer
@@ -845,194 +865,187 @@ mod tests {
             .wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl).await);
+                let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!("0.100000000", from_current_balance);
-                let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl).await);
+                let to_current_balance = safe.wallet_balance(&to_wallet_xorurl).await?;
                 assert_eq!("100.900000000", to_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_to_safekey() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("4621.45").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1.clone()).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_to_safekey() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("4621.45").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1.clone())?.sk,
+        )
+        .await?;
 
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("4621.45").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("4621.45").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.0").await);
+        let (key_xorurl, key_pair2) = safe.keys_create_preload_test_coins("10.0").await?;
 
         // test successful transfer
         match safe
             .wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl, None)
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl).await);
+                let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!(
                     "4097.580000000", /* 4621.45 - 523.87 */
                     from_current_balance
                 );
-                let key_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair2).sk).await);
+                let key_current_balance = safe
+                    .keys_balance_from_sk(&unwrap_key_pair(key_pair2)?.sk)
+                    .await?;
                 assert_eq!("533.870000000", key_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_from_safekey() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (safekey_xorurl1, _) = unwrap!(safe.keys_create_preload_test_coins("7").await);
-        let (safekey_xorurl2, _) = unwrap!(safe.keys_create_preload_test_coins("0").await);
+    async fn test_wallet_transfer_from_safekey() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (safekey_xorurl1, _) = safe.keys_create_preload_test_coins("7").await?;
+        let (safekey_xorurl2, _) = safe.keys_create_preload_test_coins("0").await?;
 
         match safe
             .wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2, None)
             .await
         {
-            Ok(_) => panic!("Transfer from SafeKey was expected to fail".to_string()),
+            Ok(_) => Err(Error::Unexpected(
+                "Transfer from SafeKey was expected to fail".to_string(),
+            )),
             Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
                     msg,
                     "The 'from_url' URL doesn't target a Wallet, it is: Raw (SafeKey)"
                 );
+                Ok(())
             }
-            Err(err) => panic!(format!("Error is not the expected one: {:?}", err)),
-        };
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error is not the expected one: {:?}",
+                err
+            ))),
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_with_nrs_urls() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1.clone()).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_with_nrs_urls() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("0.2").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1.clone())?.sk,
+        )
+        .await?;
 
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("0.2").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("0.2").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let from_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = unwrap!(
-            safe.nrs_map_container_create(&from_nrsurl, &from_wallet_xorurl, false, true, false)
-                .await
-        );
+        let from_nrsurl = random_nrs_name();
+        let _ = safe
+            .nrs_map_container_create(&from_nrsurl, &from_wallet_xorurl, false, true, false)
+            .await?;
 
-        let (key_xorurl, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("0.1").await);
-        let to_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = unwrap!(
-            safe.nrs_map_container_create(&to_nrsurl, &key_xorurl, false, true, false)
-                .await
-        );
+        let (key_xorurl, key_pair2) = safe.keys_create_preload_test_coins("0.1").await?;
+        let to_nrsurl = random_nrs_name();
+        let _ = safe
+            .nrs_map_container_create(&to_nrsurl, &key_xorurl, false, true, false)
+            .await?;
 
         // test successful transfer
         match safe
             .wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl, None)
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance = unwrap!(safe.wallet_balance(&from_nrsurl).await);
+                let from_current_balance = safe.wallet_balance(&from_nrsurl).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-                let key_current_balance =
-                    unwrap!(safe.keys_balance_from_sk(&unwrap!(key_pair2).sk).await);
+                let key_current_balance = safe
+                    .keys_balance_from_sk(&unwrap_key_pair(key_pair2)?.sk)
+                    .await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_from_specific_balance() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("from-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_from_specific_balance() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("from-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("200.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("from-second-balance"),
-                false,
-                &unwrap!(key_pair2.clone()).sk,
-            )
-            .await
-        );
+        let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("200.5").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("from-second-balance"),
+            false,
+            &unwrap_key_pair(key_pair2.clone())?.sk,
+        )
+        .await?;
 
-        let to_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("10.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("to-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair3.clone()).sk,
-            )
-            .await
-        );
+        let to_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl3, key_pair3) = safe.keys_create_preload_test_coins("10.5").await?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("to-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair3.clone())?.sk,
+        )
+        .await?;
 
         // test fail to transfer more than current balance at 'from-firstbaance'
-        let mut from_wallet_spendable_balance =
-            unwrap!(XorUrlEncoder::from_url(&from_wallet_xorurl));
+        let mut from_wallet_spendable_balance = XorUrlEncoder::from_url(&from_wallet_xorurl)?;
         from_wallet_spendable_balance.set_path("from-second-balance");
-        let from_spendable_balance = unwrap!(from_wallet_spendable_balance.to_string());
+        let from_spendable_balance = from_wallet_spendable_balance.to_string()?;
         match safe
             .wallet_transfer(
                 "200.6",
@@ -1049,8 +1062,17 @@ mod tests {
                     from_spendable_balance
                 )
             ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
+            Err(err) => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected: {:?}",
+                    err
+                )))
+            }
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Transfer succeeded unexpectedly".to_string(),
+                ))
+            }
         };
 
         // test successful transfer
@@ -1063,73 +1085,66 @@ mod tests {
             )
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_first_current_balance = unwrap!(
-                    safe.wallet_balance(&format!("{}/from-first-balance", from_wallet_xorurl))
-                        .await
-                );
+                let from_first_current_balance = safe
+                    .wallet_balance(&format!("{}/from-first-balance", from_wallet_xorurl))
+                    .await?;
                 assert_eq!("100.500000000", from_first_current_balance);
                 let from_second_current_balance =
-                    unwrap!(safe.wallet_balance(&from_spendable_balance).await);
+                    safe.wallet_balance(&from_spendable_balance).await?;
                 assert_eq!(
                     "100.200000000", /* 200.5 - 100.3 */
                     from_second_current_balance
                 );
-                let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl).await);
+                let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!("200.700000000" /* 301 - 100.3 */, from_current_balance);
-                let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl).await);
+                let to_current_balance = safe.wallet_balance(&to_wallet_xorurl).await?;
                 assert_eq!("110.800000000" /* 10.5 + 100.3 */, to_current_balance);
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_to_specific_balance() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.7").await);
-        unwrap!(
-            safe.wallet_insert(
-                &from_wallet_xorurl,
-                Some("from-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_to_specific_balance() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let from_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.7").await?;
+        safe.wallet_insert(
+            &from_wallet_xorurl,
+            Some("from-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
-        let to_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl2, key_pair2) = unwrap!(safe.keys_create_preload_test_coins("10.2").await);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("to-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair2.clone()).sk,
-            )
-            .await
-        );
+        let to_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("10.2").await?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("to-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair2.clone())?.sk,
+        )
+        .await?;
 
-        let (_key_xorurl3, key_pair3) = unwrap!(safe.keys_create_preload_test_coins("20.2").await);
-        unwrap!(
-            safe.wallet_insert(
-                &to_wallet_xorurl,
-                Some("to-second-balance"),
-                false,
-                &unwrap!(key_pair3.clone()).sk,
-            )
-            .await
-        );
+        let (_key_xorurl3, key_pair3) = safe.keys_create_preload_test_coins("20.2").await?;
+        safe.wallet_insert(
+            &to_wallet_xorurl,
+            Some("to-second-balance"),
+            false,
+            &unwrap_key_pair(key_pair3.clone())?.sk,
+        )
+        .await?;
 
         // test successful transfer to 'to-second-balance'
-        let mut to_wallet_spendable_balance = unwrap!(XorUrlEncoder::from_url(&to_wallet_xorurl));
+        let mut to_wallet_spendable_balance = XorUrlEncoder::from_url(&to_wallet_xorurl)?;
         to_wallet_spendable_balance.set_path("to-second-balance");
-        let to_spendable_balance = unwrap!(to_wallet_spendable_balance.to_string());
+        let to_spendable_balance = to_wallet_spendable_balance.to_string()?;
         match safe
             .wallet_transfer(
                 "100.5",
@@ -1139,119 +1154,102 @@ mod tests {
             )
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => {
+                return Err(Error::Unexpected(format!(
+                    "Transfer was expected to succeed: {}",
+                    msg
+                )))
+            }
             Ok(_) => {
-                let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl).await);
+                let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!("0.200000000" /* 100.7 - 100.5 */, from_current_balance);
-                let to_first_current_balance = unwrap!(
-                    safe.wallet_balance(&format!("{}/to-first-balance", to_wallet_xorurl))
-                        .await
-                );
+                let to_first_current_balance = safe
+                    .wallet_balance(&format!("{}/to-first-balance", to_wallet_xorurl))
+                    .await?;
                 assert_eq!("10.200000000", to_first_current_balance);
-                let to_second_current_balance =
-                    unwrap!(safe.wallet_balance(&to_spendable_balance).await);
+                let to_second_current_balance = safe.wallet_balance(&to_spendable_balance).await?;
                 assert_eq!(
                     "120.700000000", /* 20.2 + 100.5 */
                     to_second_current_balance
                 );
-                let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl).await);
+                let to_current_balance = safe.wallet_balance(&to_wallet_xorurl).await?;
                 assert_eq!("130.900000000", /* 30.4 + 100.5 */ to_current_balance);
             }
         };
 
         // let's also test checking the balance with NRS URL of the destination spendable balances
-        let to_wallet_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = unwrap!(
-            safe.nrs_map_container_create(&to_wallet_nrsurl, &to_wallet_xorurl, false, true, false)
-                .await
-        );
+        let to_wallet_nrsurl = random_nrs_name();
+        let _ = safe
+            .nrs_map_container_create(&to_wallet_nrsurl, &to_wallet_xorurl, false, true, false)
+            .await?;
 
-        let to_first_current_balance = unwrap!(
-            safe.wallet_balance(&format!("{}/to-first-balance", to_wallet_nrsurl))
-                .await
-        );
+        let to_first_current_balance = safe
+            .wallet_balance(&format!("{}/to-first-balance", to_wallet_nrsurl))
+            .await?;
         assert_eq!("10.200000000", to_first_current_balance);
-        let to_second_current_balance = unwrap!(
-            safe.wallet_balance(&format!("{}/to-second-balance", to_wallet_nrsurl))
-                .await
-        );
+        let to_second_current_balance = safe
+            .wallet_balance(&format!("{}/to-second-balance", to_wallet_nrsurl))
+            .await?;
         assert_eq!("120.700000000", to_second_current_balance);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wallet_transfer_specific_balances_with_nrs_urls() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_wallet_transfer_specific_balances_with_nrs_urls() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let from_wallet_xorurl = {
-            let from_wallet_xorurl = unwrap!(safe.wallet_create().await);
-            let (_key_xorurl1, key_pair1) =
-                unwrap!(safe.keys_create_preload_test_coins("10.1").await);
-            unwrap!(
-                safe.wallet_insert(
-                    &from_wallet_xorurl,
-                    Some("from-first-balance"),
-                    true, // set --default
-                    &unwrap!(key_pair1.clone()).sk,
-                )
-                .await
-            );
+            let from_wallet_xorurl = safe.wallet_create().await?;
+            let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("10.1").await?;
+            safe.wallet_insert(
+                &from_wallet_xorurl,
+                Some("from-first-balance"),
+                true, // set --default
+                &unwrap_key_pair(key_pair1.clone())?.sk,
+            )
+            .await?;
 
-            let (_key_xorurl2, key_pair2) =
-                unwrap!(safe.keys_create_preload_test_coins("20.2").await);
-            unwrap!(
-                safe.wallet_insert(
-                    &from_wallet_xorurl,
-                    Some("from-second-balance"),
-                    false,
-                    &unwrap!(key_pair2.clone()).sk,
-                )
-                .await
-            );
+            let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("20.2").await?;
+            safe.wallet_insert(
+                &from_wallet_xorurl,
+                Some("from-second-balance"),
+                false,
+                &unwrap_key_pair(key_pair2.clone())?.sk,
+            )
+            .await?;
             from_wallet_xorurl
         };
 
         let to_wallet_xorurl = {
-            let to_wallet_xorurl = unwrap!(safe.wallet_create().await);
-            let (_key_xorurl3, key_pair3) =
-                unwrap!(safe.keys_create_preload_test_coins("30.3").await);
-            unwrap!(
-                safe.wallet_insert(
-                    &to_wallet_xorurl,
-                    Some("to-first-balance"),
-                    true, // set --default
-                    &unwrap!(key_pair3.clone()).sk,
-                )
-                .await
-            );
+            let to_wallet_xorurl = safe.wallet_create().await?;
+            let (_key_xorurl3, key_pair3) = safe.keys_create_preload_test_coins("30.3").await?;
+            safe.wallet_insert(
+                &to_wallet_xorurl,
+                Some("to-first-balance"),
+                true, // set --default
+                &unwrap_key_pair(key_pair3.clone())?.sk,
+            )
+            .await?;
 
-            let (_key_xorurl4, key_pair4) =
-                unwrap!(safe.keys_create_preload_test_coins("40.4").await);
-            unwrap!(
-                safe.wallet_insert(
-                    &to_wallet_xorurl,
-                    Some("to-second-balance"),
-                    false,
-                    &unwrap!(key_pair4.clone()).sk,
-                )
-                .await
-            );
+            let (_key_xorurl4, key_pair4) = safe.keys_create_preload_test_coins("40.4").await?;
+            safe.wallet_insert(
+                &to_wallet_xorurl,
+                Some("to-second-balance"),
+                false,
+                &unwrap_key_pair(key_pair4.clone())?.sk,
+            )
+            .await?;
             to_wallet_xorurl
         };
 
         // create NRS URLs for both wallets
-        let from_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = unwrap!(
-            safe.nrs_map_container_create(&from_nrsurl, &from_wallet_xorurl, false, true, false)
-                .await
-        );
-        let to_nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = unwrap!(
-            safe.nrs_map_container_create(&to_nrsurl, &to_wallet_xorurl, false, true, false)
-                .await
-        );
+        let from_nrsurl = random_nrs_name();
+        let _ = safe
+            .nrs_map_container_create(&from_nrsurl, &from_wallet_xorurl, false, true, false)
+            .await?;
+        let to_nrsurl = random_nrs_name();
+        let _ = safe
+            .nrs_map_container_create(&to_nrsurl, &to_wallet_xorurl, false, true, false)
+            .await?;
 
         // test successful transfer from 'from-second-balance' to 'to-second-balance'
         let from_spendable_balance = format!("{}/from-second-balance", from_nrsurl);
@@ -1265,82 +1263,86 @@ mod tests {
             )
             .await
         {
-            Err(msg) => panic!(format!("Transfer was expected to succeed: {}", msg)),
+            Err(msg) => Err(Error::Unexpected(format!(
+                "Transfer was expected to succeed: {}",
+                msg
+            ))),
             Ok(_) => {
-                let from_current_balance = unwrap!(safe.wallet_balance(&from_wallet_xorurl).await);
+                let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!(
                     "24.500000000", /* 10.1 + 20.2 - 5.8 */
                     from_current_balance
                 );
-                let from_first_current_balance = unwrap!(
-                    safe.wallet_balance(&format!("{}/from-first-balance", from_wallet_xorurl))
-                        .await
-                );
+                let from_first_current_balance = safe
+                    .wallet_balance(&format!("{}/from-first-balance", from_wallet_xorurl))
+                    .await?;
                 assert_eq!("10.100000000", from_first_current_balance);
                 let from_second_current_balance =
-                    unwrap!(safe.wallet_balance(&from_spendable_balance).await);
+                    safe.wallet_balance(&from_spendable_balance).await?;
                 assert_eq!(
                     "14.400000000", /* 20.2 - 5.8 */
                     from_second_current_balance
                 );
 
-                let to_current_balance = unwrap!(safe.wallet_balance(&to_wallet_xorurl).await);
+                let to_current_balance = safe.wallet_balance(&to_wallet_xorurl).await?;
                 assert_eq!(
                     "76.500000000",
                     /* 30.3 + 40.4 + 5.8 */ to_current_balance
                 );
-                let to_first_current_balance = unwrap!(
-                    safe.wallet_balance(&format!("{}/to-first-balance", to_wallet_xorurl))
-                        .await
-                );
+                let to_first_current_balance = safe
+                    .wallet_balance(&format!("{}/to-first-balance", to_wallet_xorurl))
+                    .await?;
                 assert_eq!("30.300000000", to_first_current_balance);
-                let to_second_current_balance =
-                    unwrap!(safe.wallet_balance(&to_spendable_balance).await);
+                let to_second_current_balance = safe.wallet_balance(&to_spendable_balance).await?;
                 assert_eq!(
                     "46.200000000", /* 40.4 + 5.8 */
                     to_second_current_balance
                 );
+                Ok(())
             }
-        };
+        }
     }
 
     #[tokio::test]
     #[cfg(not(feature = "scl-mock"))]
-    async fn test_wallet_transfer_from_not_owned_wallet() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let account1_wallet_xorurl = unwrap!(safe.wallet_create().await);
-        let (_key_xorurl1, key_pair1) = unwrap!(safe.keys_create_preload_test_coins("100.5").await);
-        unwrap!(
-            safe.wallet_insert(
-                &account1_wallet_xorurl,
-                Some("my-first-balance"),
-                true, // set --default
-                &unwrap!(key_pair1).sk,
-            )
-            .await
-        );
+    async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let account1_wallet_xorurl = safe.wallet_create().await?;
+        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        safe.wallet_insert(
+            &account1_wallet_xorurl,
+            Some("my-first-balance"),
+            true, // set --default
+            &unwrap_key_pair(key_pair1)?.sk,
+        )
+        .await?;
 
         let mut another_safe = Safe::default();
-        unwrap!(another_safe.connect("", Some("another-fake-credentials")));
-        let (key_xorurl, _key_pair) =
-            unwrap!(another_safe.keys_create_preload_test_coins("100.5").await);
+        another_safe.connect("", Some("another-fake-credentials"))?;
+        let (key_xorurl, _key_pair) = another_safe.keys_create_preload_test_coins("100.5").await?;
 
         // test fail to transfer from a not owned wallet in <from> argument
         match another_safe
             .wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl, None)
             .await
         {
-            Err(Error::AccessDenied(msg)) => assert_eq!(
-                msg,
-                format!(
-                    "Couldn't read source Wallet for the transfer at \"{}\"",
-                    account1_wallet_xorurl
-                )
-            ),
-            Err(err) => panic!(format!("Error returned is not the expected: {:?}", err)),
-            Ok(_) => panic!("Transfer succeeded unexpectedly"),
-        };
+            Err(Error::AccessDenied(msg)) => {
+                assert_eq!(
+                    msg,
+                    format!(
+                        "Couldn't read source Wallet for the transfer at \"{}\"",
+                        account1_wallet_xorurl
+                    )
+                );
+                Ok(())
+            }
+            Err(err) => Err(Error::Unexpected(format!(
+                "Error returned is not the expected: {:?}",
+                err
+            ))),
+            Ok(_) => Err(Error::Unexpected(
+                "Transfer succeeded unexpectedly".to_string(),
+            )),
+        }
     }
 }

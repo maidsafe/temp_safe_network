@@ -130,12 +130,12 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap();
     ///     println!("FilesContainer fetched is at version: {}", version);
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
-    /// });
+    /// # });
     /// ```
     pub async fn files_container_get(&self, url: &str) -> Result<(u64, FilesMap)> {
         debug!("Getting files container from: {:?}", url);
@@ -210,13 +210,13 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_sync("../testdata", &xorurl, true, false, false, false).await.unwrap();
     ///     println!("FilesContainer synced up is at version: {}", version);
     ///     println!("The local files that were synced up are: {:?}", new_processed_files);
     ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
-    /// });
+    /// # });
     /// ```
     pub async fn files_container_sync(
         &mut self,
@@ -300,14 +300,14 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add("../testdata/test.md", &new_file_name, false, false, false).await.unwrap();
     ///     println!("FilesContainer is now at version: {}", version);
     ///     println!("The local files that were synced up are: {:?}", new_processed_files);
     ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
-    /// });
+    /// # });
     /// ```
     pub async fn files_container_add(
         &mut self,
@@ -367,14 +367,14 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add_from_raw(b"0123456789", &new_file_name, false, false, false).await.unwrap();
     ///     println!("FilesContainer is now at version: {}", version);
     ///     println!("The local files that were synced up are: {:?}", new_processed_files);
     ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
-    /// });
+    /// # });
     /// ```
     pub async fn files_container_add_from_raw(
         &mut self,
@@ -418,14 +418,14 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let (xorurl, processed_files, files_map) = safe.files_container_create(Some("../testdata/"), None, true, false).await.unwrap();
     ///     let remote_file_path = format!("{}/test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).await.unwrap();
     ///     println!("FilesContainer is now at version: {}", version);
     ///     println!("The files that were removed: {:?}", new_processed_files);
     ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
-    /// });
+    /// # });
     /// ```
     pub async fn files_container_remove_path(
         &mut self,
@@ -552,12 +552,12 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let data = b"Something super good";
     ///     let xorurl = safe.files_put_published_immutable(data, Some("text/plain"), false).await.unwrap();
     ///     let received_data = safe.files_get_published_immutable(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
-    /// });
+    /// # });
     /// ```
     pub async fn files_put_published_immutable(
         &mut self,
@@ -605,12 +605,12 @@ impl Safe {
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
     /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// async_std::task::block_on(async {
+    /// # async_std::task::block_on(async {
     ///     let data = b"Something super good";
     ///     let xorurl = safe.files_put_published_immutable(data, None, false).await.unwrap();
     ///     let received_data = safe.files_get_published_immutable(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
-    /// });
+    /// # });
     /// ```
     pub async fn files_get_published_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
@@ -1308,10 +1308,10 @@ fn files_map_create(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
 
     #[tokio::test]
-    async fn test_files_map_create() {
-        use unwrap::unwrap;
+    async fn test_files_map_create() -> Result<()> {
         let mut processed_files = ProcessedFiles::new();
         processed_files.insert(
             "../testdata/test.md".to_string(),
@@ -1327,7 +1327,7 @@ mod tests {
                 "safe://second_xorurl".to_string(),
             ),
         );
-        let files_map = unwrap!(files_map_create(&processed_files, "../testdata", Some("")));
+        let files_map = files_map_create(&processed_files, "../testdata", Some(""))?;
         assert_eq!(files_map.len(), 2);
         let file_item1 = &files_map["/testdata/test.md"];
         assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
@@ -1338,25 +1338,24 @@ mod tests {
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "text/markdown");
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_empty() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) =
-            unwrap!(safe.files_container_create(None, None, false, false).await);
+    async fn test_files_container_create_empty() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(None, None, false, false)
+            .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 0);
         assert_eq!(files_map.len(), 0);
 
         // let's add a file
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add("../testdata/test.md", &xorurl, false, false, false)
-                .await
-        );
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add("../testdata/test.md", &xorurl, false, false, false)
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -1368,18 +1367,16 @@ mod tests {
             new_processed_files[filename].1,
             new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_file() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_files_container_create_file() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let filename = "../testdata/test.md";
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some(filename), None, false, false)
-                .await
-        );
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some(filename), None, false, false)
+            .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 1);
@@ -1390,18 +1387,16 @@ mod tests {
             processed_files[filename].1,
             files_map[file_path][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_dry_run() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_files_container_create_dry_run() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let filename = "../testdata/";
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some(filename), None, true, true)
-                .await
-        );
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some(filename), None, true, true)
+            .await?;
 
         assert!(xorurl.is_empty());
         assert_eq!(processed_files.len(), 5);
@@ -1438,17 +1433,15 @@ mod tests {
             processed_files[filename4].1,
             files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_folder_without_trailing_slash() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata"), None, true, false)
-                .await
-        );
+    async fn test_files_container_create_folder_without_trailing_slash() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata"), None, true, false)
+            .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1481,17 +1474,15 @@ mod tests {
             processed_files[filename4].1,
             files_map["/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_folder_with_trailing_slash() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_create_folder_with_trailing_slash() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1524,17 +1515,15 @@ mod tests {
             processed_files[filename4].1,
             files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_dest_path_without_trailing_slash() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata"), Some("/myroot"), true, false)
-                .await
-        );
+    async fn test_files_container_create_dest_path_without_trailing_slash() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata"), Some("/myroot"), true, false)
+            .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1567,17 +1556,15 @@ mod tests {
             processed_files[filename4].1,
             files_map["/myroot/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_create_dest_path_with_trailing_slash() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata"), Some("/myroot/"), true, false)
-                .await
-        );
+    async fn test_files_container_create_dest_path_with_trailing_slash() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata"), Some("/myroot/"), true, false)
+            .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 5);
@@ -1610,25 +1597,22 @@ mod tests {
             processed_files[filename4].1,
             files_map["/myroot/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync("../testdata/subfolder/", &xorurl, true, false, false, false)
-                .await
-        );
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_sync("../testdata/subfolder/", &xorurl, true, false, false, false)
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 2);
@@ -1675,32 +1659,29 @@ mod tests {
             new_processed_files[filename6].1,
             new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_dry_run() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_dry_run() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
                 true,
                 false,
                 false,
-                true // set dry_run flag on
+                true, // set dry_run flag on
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 2);
@@ -1749,32 +1730,29 @@ mod tests {
             new_processed_files[filename6].1,
             new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_same_size() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/test.md"), None, false, false)
-                .await
-        );
+    async fn test_files_container_sync_same_size() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/test.md"), None, false, false)
+            .await?;
 
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_sync(
                 "../testdata/.subhidden/test.md",
                 &xorurl,
                 false,
                 false,
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -1802,17 +1780,15 @@ mod tests {
             files_map["/test.md"][FAKE_RDF_PREDICATE_LINK],
             new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_with_versioned_target() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _, _) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_with_versioned_target() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         let versioned_xorurl = format!("{}?v=5", xorurl);
         match safe
@@ -1826,41 +1802,42 @@ mod tests {
             )
             .await
         {
-            Ok(_) => panic!("Sync was unexpectdly successful"),
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidInput(format!(
-                    "The target URL cannot cannot contain a version: {}",
-                    versioned_xorurl
-                ))
-            ),
-        };
+            Ok(_) => Err(Error::Unexpected(
+                "Sync was unexpectedly successful".to_string(),
+            )),
+            Err(err) => {
+                assert_eq!(
+                    err,
+                    Error::InvalidInput(format!(
+                        "The target URL cannot cannot contain a version: {}",
+                        versioned_xorurl
+                    ))
+                );
+                Ok(())
+            }
+        }
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_with_delete() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_with_delete() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
                 true,
                 true, // this sets the delete flag
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 7);
@@ -1902,13 +1879,12 @@ mod tests {
             new_processed_files[filename5].1,
             new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_delete_without_recursive() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_files_container_sync_delete_without_recursive() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         match safe
             .files_container_sync(
                 "../testdata/subfolder/",
@@ -1920,53 +1896,58 @@ mod tests {
             )
             .await
         {
-            Ok(_) => panic!("Sync was unexpectdly successful"),
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidInput(
-                    "'delete' is not allowed if 'recursive' is not set".to_string()
-                )
-            ),
-        };
+            Ok(_) => Err(Error::Unexpected(
+                "Sync was unexpectedly successful".to_string(),
+            )),
+            Err(err) => {
+                assert_eq!(
+                    err,
+                    Error::InvalidInput(
+                        "'delete' is not allowed if 'recursive' is not set".to_string()
+                    )
+                );
+                Ok(())
+            }
+        }
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_update_nrs_unversioned_link() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _, _) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_update_nrs_unversioned_link() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let nrsurl = random_nrs_name();
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(None);
-        let unversioned_link = unwrap!(xorurl_encoder.to_string());
-        match safe.nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false).await {
-            Ok(_) => panic!("NRS create was unexpectdly successful"),
-            Err(err) => assert_eq!(
+        let unversioned_link = xorurl_encoder.to_string()?;
+        match safe
+            .nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false)
+            .await
+        {
+            Ok(_) => Err(Error::Unexpected(
+                "NRS create was unexpectedly successful".to_string(),
+            )),
+            Err(err) => {
+                assert_eq!(
                 err,
                 Error::InvalidInput(format!(
                     "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
                     unversioned_link
                 ))
-            ),
-        };
+            );
+                Ok(())
+            }
+        }
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_update_nrs_with_xorurl() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _, _) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_update_nrs_with_xorurl() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         match safe
             .files_container_sync(
@@ -1979,46 +1960,39 @@ mod tests {
             )
             .await
         {
-            Ok(_) => panic!("Sync was unexpectdly successful"),
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidInput(
-                    "'update-nrs' is not allowed since the URL provided is not an NRS URL"
-                        .to_string()
-                )
-            ),
-        };
+            Ok(_) => Err(Error::Unexpected(
+                "Sync was unexpectedly successful".to_string(),
+            )),
+            Err(err) => {
+                assert_eq!(
+                    err,
+                    Error::InvalidInput(
+                        "'update-nrs' is not allowed since the URL provided is not an NRS URL"
+                            .to_string()
+                    )
+                );
+                Ok(())
+            }
+        }
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_update_nrs_versioned_link() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _, _) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_update_nrs_versioned_link() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let nrsurl = random_nrs_name();
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let _ = unwrap!(
-            safe.nrs_map_container_create(
-                &nrsurl,
-                &unwrap!(xorurl_encoder.to_string()),
-                false,
-                true,
-                false
-            )
-            .await
-        );
+        let _ = safe
+            .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string()?, false, true, false)
+            .await?;
 
-        let _ = unwrap!(
-            safe.files_container_sync(
+        let _ = safe
+            .files_container_sync(
                 "../testdata/subfolder/",
                 &nrsurl,
                 false,
@@ -2026,43 +2000,36 @@ mod tests {
                 true, // this flag requests the update-nrs
                 false,
             )
-            .await
-        );
+            .await?;
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(1));
-        let (new_link, _) = unwrap!(safe.parse_and_resolve_url(&nrsurl).await);
-        assert_eq!(
-            unwrap!(new_link.to_string()),
-            unwrap!(xorurl_encoder.to_string())
-        );
+        let (new_link, _) = safe.parse_and_resolve_url(&nrsurl).await?;
+        assert_eq!(new_link.to_string()?, xorurl_encoder.to_string()?);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_target_path_without_trailing_slash() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_target_path_without_trailing_slash() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_path("path/when/sync");
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_sync(
                 "../testdata/subfolder",
-                &unwrap!(xorurl_encoder.to_string()),
+                &xorurl_encoder.to_string()?,
                 true,
                 false,
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 2);
@@ -2103,33 +2070,30 @@ mod tests {
             new_processed_files[filename5].1,
             new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_target_path_with_trailing_slash() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_sync_target_path_with_trailing_slash() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_path("/path/when/sync/");
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_sync(
                 "../testdata/subfolder",
-                &unwrap!(xorurl_encoder.to_string()),
+                &xorurl_encoder.to_string()?,
                 true,
                 false,
                 false,
                 false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 2);
@@ -2170,19 +2134,17 @@ mod tests {
             new_processed_files[filename5].1,
             new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_get() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_get() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl).await);
+        let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
 
         assert_eq!(version, 0);
         assert_eq!(fetched_files_map.len(), 5);
@@ -2194,23 +2156,21 @@ mod tests {
             fetched_files_map["/subfolder/subexists.md"]
         );
         assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_version() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _, _) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_version() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let (version, _) = unwrap!(safe.files_container_get(&xorurl).await);
+        let (version, _) = safe.files_container_get(&xorurl).await?;
         assert_eq!(version, 0);
 
-        let (version, _, _) = unwrap!(
-            safe.files_container_sync(
+        let (version, _, _) = safe
+            .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
                 true,
@@ -2218,49 +2178,43 @@ mod tests {
                 false,
                 false,
             )
-            .await
-        );
+            .await?;
         assert_eq!(version, 1);
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(None);
-        let (version, _) = unwrap!(
-            safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                .await
-        );
+        let (version, _) = safe
+            .files_container_get(&xorurl_encoder.to_string()?)
+            .await?;
         assert_eq!(version, 1);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_get_with_version() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_get_with_version() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
         // let's create a new version of the files container
-        let (_version, _new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_sync(
+        let (_version, _new_processed_files, new_files_map) = safe
+            .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
                 true,
                 true, // this sets the delete flag
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         // let's fetch version 0
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let (version, v0_files_map) = unwrap!(
-            safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                .await
-        );
+        let (version, v0_files_map) = safe
+            .files_container_get(&xorurl_encoder.to_string()?)
+            .await?;
 
         assert_eq!(version, 0);
         assert_eq!(files_map, v0_files_map);
@@ -2273,10 +2227,9 @@ mod tests {
 
         // let's fetch version 1
         xorurl_encoder.set_content_version(Some(1));
-        let (version, v1_files_map) = unwrap!(
-            safe.files_container_get(&unwrap!(xorurl_encoder.to_string()))
-                .await
-        );
+        let (version, v1_files_map) = safe
+            .files_container_get(&xorurl_encoder.to_string()?)
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_files_map, v1_files_map);
@@ -2291,54 +2244,44 @@ mod tests {
 
         // let's fetch version 2 (invalid)
         xorurl_encoder.set_content_version(Some(2));
-        match safe
-            .files_container_get(&unwrap!(xorurl_encoder.to_string()))
-            .await
-        {
-            Ok(_) => panic!("unexpectdly retrieved verion 3 of container"),
-            Err(Error::VersionNotFound(msg)) => assert_eq!(
-                msg,
-                format!(
-                    "Version '2' is invalid for FilesContainer found at \"{}\"",
-                    xorurl_encoder
-                )
-            ),
-            other => panic!(format!(
-                "error returned is not the expected one: {:?}",
-                other
+        match safe.files_container_get(&xorurl_encoder.to_string()?).await {
+            Ok(_) => Err(Error::Unexpected(
+                "Unexpectedly retrieved verion 3 of container".to_string(),
             )),
-        };
+            Err(Error::VersionNotFound(msg)) => {
+                assert_eq!(
+                    msg,
+                    format!(
+                        "Version '2' is invalid for FilesContainer found at \"{}\"",
+                        xorurl_encoder
+                    )
+                );
+                Ok(())
+            }
+            other => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
+                other
+            ))),
+        }
     }
 
     #[tokio::test]
-    async fn test_files_container_sync_with_nrs_url() {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, _, _) = unwrap!(
-            safe.files_container_create(Some("../testdata/test.md"), None, false, false)
-                .await
-        );
+    async fn test_files_container_sync_with_nrs_url() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _) = safe
+            .files_container_create(Some("../testdata/test.md"), None, false, false)
+            .await?;
 
-        let nrsurl: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let nrsurl = random_nrs_name();
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let _ = unwrap!(
-            safe.nrs_map_container_create(
-                &nrsurl,
-                &unwrap!(xorurl_encoder.to_string()),
-                false,
-                true,
-                false
-            )
-            .await
-        );
+        let _ = safe
+            .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string()?, false, true, false)
+            .await?;
 
-        let _ = unwrap!(
-            safe.files_container_sync(
+        let _ = safe
+            .files_container_sync(
                 "../testdata/subfolder/",
                 &xorurl,
                 false,
@@ -2346,11 +2289,10 @@ mod tests {
                 false,
                 false,
             )
-            .await
-        );
+            .await?;
 
-        let _ = unwrap!(
-            safe.files_container_sync(
+        let _ = safe
+            .files_container_sync(
                 "../testdata/",
                 &nrsurl,
                 false,
@@ -2358,36 +2300,32 @@ mod tests {
                 true, // this flag requests the update-nrs
                 false,
             )
-            .await
-        );
+            .await?;
 
-        let (version, fetched_files_map) = unwrap!(safe.files_container_get(&xorurl).await);
+        let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
         assert_eq!(version, 2);
         assert_eq!(fetched_files_map.len(), 5);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_add() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/subfolder/"), None, false, false)
-                .await
-        );
+    async fn test_files_container_add() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/subfolder/"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 "../testdata/test.md",
                 &format!("{}/new_filename_test.md", xorurl),
                 false,
                 false,
                 false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2413,46 +2351,42 @@ mod tests {
             new_processed_files[filename3].1,
             new_files_map["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_add_dry_run() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/subfolder/"), None, false, false)
-                .await
-        );
+    async fn test_files_container_add_dry_run() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/subfolder/"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 "../testdata/test.md",
                 &format!("{}/new_filename_test.md", xorurl),
                 false,
                 false,
                 true, // dry run
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 3);
 
         // a dry run again should give the exact same results
-        let (version2, new_processed_files2, new_files_map2) = unwrap!(
-            safe.files_container_add(
+        let (version2, new_processed_files2, new_files_map2) = safe
+            .files_container_add(
                 "../testdata/test.md",
                 &format!("{}/new_filename_test.md", xorurl),
                 false,
                 false,
                 true, // dry run
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, version2);
         assert_eq!(new_processed_files.len(), new_processed_files2.len());
@@ -2469,62 +2403,58 @@ mod tests {
             new_processed_files2[filename].1,
             new_files_map2["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_add_dir() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/subfolder/"), None, false, false)
-                .await
-        );
+    async fn test_files_container_add_dir() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/subfolder/"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
-        match safe.files_container_add(
-                "../testdata",
-                &xorurl,
-                false,
-                false,
-                false
-            ).await {
-                Ok(_) => panic!("unexpectdly added a folder to files container"),
-                Err(Error::InvalidInput(msg)) => assert_eq!(
+        match safe
+            .files_container_add("../testdata", &xorurl, false, false, false)
+            .await
+        {
+            Ok(_) => Err(Error::Unexpected(
+                "Unexpectedly added a folder to files container".to_string(),
+            )),
+            Err(Error::InvalidInput(msg)) => {
+                assert_eq!(
                     msg,
                     "'../testdata' is a directory, only individual files can be added. Use files sync operation for uploading folders".to_string(),
-                ),
-                other => panic!(format!(
-                    "error returned is not the expected one: {:?}",
-                    other
-                )),
+                );
+                Ok(())
             }
+            other => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
+                other
+            ))),
+        }
     }
 
     #[tokio::test]
-    async fn test_files_container_add_existing_name() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/subfolder/"), None, false, false)
-                .await
-        );
+    async fn test_files_container_add_existing_name() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/subfolder/"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
         // let's try to add a file with same target name and same content, it should fail
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 "../testdata/subfolder/sub2.md",
                 &format!("{}/sub2.md", xorurl),
                 false,
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2536,16 +2466,15 @@ mod tests {
         assert_eq!(files_map, new_files_map);
 
         // let's try to add a file with same target name but with different content, it should still fail
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 "../testdata/test.md",
                 &format!("{}/sub2.md", xorurl),
                 false,
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2557,16 +2486,15 @@ mod tests {
         assert_eq!(files_map, new_files_map);
 
         // let's now force it
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 "../testdata/test.md",
                 &format!("{}/sub2.md", xorurl),
                 true, //force it
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2579,17 +2507,15 @@ mod tests {
             new_processed_files["../testdata/test.md"].1,
             new_files_map["/sub2.md"]["link"]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_fail_add_or_sync_invalid_path() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/test.md"), None, false, false)
-                .await
-        );
+    async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/test.md"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
 
@@ -2597,15 +2523,21 @@ mod tests {
             .files_container_sync("/non-existing-path", &xorurl, false, false, false, false)
             .await
         {
-            Ok(_) => panic!("unexpectdly added a folder to files container"),
+            Ok(_) => {
+                return Err(Error::Unexpected(
+                    "Unexpectedly added a folder to files container".to_string(),
+                ))
+            }
             Err(Error::FileSystemError(msg)) => {
                 assert!(msg
                     .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
             }
-            other => panic!(format!(
-                "error returned is not the expected one: {:?}",
-                other
-            )),
+            other => {
+                return Err(Error::Unexpected(format!(
+                    "Error returned is not the expected one: {:?}",
+                    other
+                )))
+            }
         }
 
         match safe
@@ -2618,43 +2550,44 @@ mod tests {
             )
             .await
         {
-            Ok(_) => panic!("unexpectdly added a folder to files container"),
+            Ok(_) => Err(Error::Unexpected(
+                "Unexpectedly added a folder to files container".to_string(),
+            )),
             Err(Error::FileSystemError(msg)) => {
                 assert!(msg
-                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
+                    .starts_with("Couldn't read metadata from source path ('/non-existing-path')"));
+                Ok(())
             }
-            other => panic!(format!(
-                "error returned is not the expected one: {:?}",
+            other => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
                 other
-            )),
+            ))),
         }
     }
 
     #[tokio::test]
-    async fn test_files_container_add_a_url() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/subfolder/"), None, false, false)
-                .await
-        );
+    async fn test_files_container_add_a_url() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/subfolder/"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
         let data = b"0123456789";
-        let file_xorurl = unwrap!(safe.files_put_published_immutable(data, None, false).await);
+        let file_xorurl = safe
+            .files_put_published_immutable(data, None, false)
+            .await?;
         let new_filename = "/new_filename_test.md";
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 &file_xorurl,
                 &format!("{}{}", xorurl, new_filename),
                 false,
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2686,18 +2619,18 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let other_file_xorurl =
-            unwrap!(safe.files_put_published_immutable(data, None, false).await);
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add(
+        let other_file_xorurl = safe
+            .files_put_published_immutable(data, None, false)
+            .await?;
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add(
                 &other_file_xorurl,
                 &format!("{}{}", xorurl, new_filename),
                 true, // force to overwrite it with new link
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 1);
@@ -2711,33 +2644,30 @@ mod tests {
             new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
             other_file_xorurl
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_add_from_raw() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/subfolder/"), None, false, false)
-                .await
-        );
+    async fn test_files_container_add_from_raw() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/subfolder/"), None, false, false)
+            .await?;
         assert_eq!(processed_files.len(), 2);
         assert_eq!(files_map.len(), 2);
 
         let data = b"0123456789";
         let new_filename = "/new_filename_test.md";
 
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add_from_raw(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add_from_raw(
                 data,
                 &format!("{}{}", xorurl, new_filename),
                 false,
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2751,16 +2681,15 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_add_from_raw(
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_add_from_raw(
                 data,
                 &format!("{}{}", xorurl, new_filename),
                 true, // force to overwrite it with new link
                 false,
-                false
+                false,
             )
-            .await
-        );
+            .await?;
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 1);
@@ -2770,25 +2699,22 @@ mod tests {
             new_processed_files[new_filename].1,
             new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_files_container_remove_path() {
-        use unwrap::unwrap;
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let (xorurl, processed_files, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_files_container_remove_path() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
         assert_eq!(processed_files.len(), 5);
         assert_eq!(files_map.len(), 5);
 
         // let's remove a file first
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false,)
-                .await
-        );
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_remove_path(&format!("{}/test.md", xorurl), false, false, false)
+            .await?;
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2802,10 +2728,9 @@ mod tests {
         );
 
         // let's remove an entire folder now with recursive flag
-        let (version, new_processed_files, new_files_map) = unwrap!(
-            safe.files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false,)
-                .await
-        );
+        let (version, new_processed_files, new_files_map) = safe
+            .files_container_remove_path(&format!("{}/subfolder", xorurl), true, false, false)
+            .await?;
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 2);
@@ -2824,5 +2749,6 @@ mod tests {
             new_processed_files[filename2].1,
             files_map[filename2][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
     }
 }

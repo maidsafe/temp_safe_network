@@ -81,14 +81,13 @@ impl Safe {
     /// ### Fetch FilesContainer relative path file
     /// ```rust
     /// # use safe_api::{Safe, fetch::SafeData};
-    /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
-    /// # unwrap!(safe.connect("", Some("fake-credentials")));
-    /// async_std::task::block_on(async {
-    ///     let (xorurl, _, _) = unwrap!(safe.files_container_create(Some("../testdata/"), None, true, false).await);
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// # async_std::task::block_on(async {
+    ///     let (xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false).await.unwrap();
     ///
-    ///     let safe_data = unwrap!( safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await );
+    ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
     ///         SafeData::PublishedImmutableData { data, .. } => {
     ///             match String::from_utf8(data) {
@@ -103,7 +102,7 @@ impl Safe {
     ///     };
     ///
     ///     assert!(data_string.starts_with("hello tests!"));
-    /// });
+    /// # });
     /// ```
     pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
         retrieve_from_url(self, url, true, range).await
@@ -120,14 +119,13 @@ impl Safe {
     /// ### Inspect FilesContainer relative path file
     /// ```rust
     /// # use safe_api::{Safe, fetch::SafeData};
-    /// # use unwrap::unwrap;
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
-    /// # unwrap!(safe.connect("", Some("fake-credentials")));
-    /// async_std::task::block_on(async {
-    ///     let (xorurl, _, _) = unwrap!(safe.files_container_create(Some("../testdata/"), None, true, false).await);
+    /// # safe.connect("", Some("fake-credentials")).unwrap();
+    /// # async_std::task::block_on(async {
+    ///     let (xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false).await.unwrap();
     ///
-    ///     let safe_data = unwrap!( safe.inspect( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ) ).await );
+    ///     let safe_data = safe.inspect( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ) ).await.unwrap();
     ///     let data_string = match safe_data {
     ///         SafeData::PublishedImmutableData { data, media_type, .. } => {
     ///             assert_eq!(media_type, Some("text/markdown".to_string()));
@@ -139,7 +137,7 @@ impl Safe {
     ///         )
     ///     };
     ///
-    /// });
+    /// # });
     /// ```
     pub async fn inspect(&self, url: &str) -> Result<SafeData> {
         retrieve_from_url(self, url, false, None).await
@@ -423,6 +421,7 @@ async fn retrieve_immd(
 
     Ok((ResolutionStep::Data(safe_data), None))
 }
+
 fn embed_resolved_from(
     content: SafeData,
     nrs_map_container: NrsMapContainerInfo,
@@ -487,22 +486,20 @@ fn embed_resolved_from(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::app::test_helpers::new_safe_instance;
     use crate::api::xorurl::XorUrlEncoder;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use std::io::Read;
-    use unwrap::unwrap;
 
     #[tokio::test]
-    async fn test_fetch_key() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_fetch_key() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let preload_amount = "1324.12";
-        let (xorurl, _key_pair) =
-            unwrap!(safe.keys_create_preload_test_coins(preload_amount).await);
+        let (xorurl, _key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
 
-        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-        let content = unwrap!(safe.fetch(&xorurl, None).await);
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
         assert!(
             content
                 == SafeData::SafeKey {
@@ -513,18 +510,18 @@ mod tests {
         );
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_url = unwrap!(safe.inspect(&xorurl).await);
+        let inspected_url = safe.inspect(&xorurl).await?;
         assert_eq!(content, inspected_url);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_fetch_wallet() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        let xorurl = unwrap!(safe.wallet_create().await);
+    async fn test_fetch_wallet() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let xorurl = safe.wallet_create().await?;
 
-        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-        let content = unwrap!(safe.fetch(&xorurl, None).await);
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
         assert!(
             content
                 == SafeData::Wallet {
@@ -538,22 +535,20 @@ mod tests {
         );
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_url = unwrap!(safe.inspect(&xorurl).await);
+        let inspected_url = safe.inspect(&xorurl).await?;
         assert_eq!(content, inspected_url);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_fetch_files_container() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
-        safe.connect("", Some("")).unwrap();
-        let (xorurl, _, files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+    async fn test_fetch_files_container() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-        let content = unwrap!(safe.fetch(&xorurl, None).await);
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
 
         assert!(
             content
@@ -582,37 +577,29 @@ mod tests {
         );
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_url = unwrap!(safe.inspect(&xorurl).await);
+        let inspected_url = safe.inspect(&xorurl).await?;
         assert_eq!(content, inspected_url);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_fetch_resolvable_container() {
+    async fn test_fetch_resolvable_container() -> Result<()> {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::default();
-        safe.connect("", Some("")).unwrap();
+        let mut safe = new_safe_instance()?;
 
-        let (xorurl, _, the_files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+        let (xorurl, _, the_files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let (_nrs_map_xorurl, _, _nrs_map) = unwrap!(
-            safe.nrs_map_container_create(
-                &site_name,
-                &unwrap!(xorurl_encoder.to_string()),
-                true,
-                true,
-                false
-            )
-            .await
-        );
+        let (_nrs_map_xorurl, _, _nrs_map) = safe
+            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string()?, true, true, false)
+            .await?;
 
         let nrs_url = format!("safe://{}", site_name);
-        let content = unwrap!(safe.fetch(&nrs_url, None).await);
+        let content = safe.fetch(&nrs_url, None).await?;
 
         // this should resolve to a FilesContainer until we enable prevent resolution.
         match &content {
@@ -625,48 +612,42 @@ mod tests {
                 data_type,
                 ..
             } => {
-                assert_eq!(*xorurl, unwrap!(xorurl_encoder.to_string()));
+                assert_eq!(*xorurl, xorurl_encoder.to_string()?);
                 assert_eq!(*xorname, xorurl_encoder.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, 0);
                 assert_eq!(*data_type, SafeDataType::PublishedSeqAppendOnlyData);
                 assert_eq!(*files_map, the_files_map);
-            }
-            _ => panic!("Nrs map container was not returned."),
-        }
 
-        // let's also compare it with the result from inspecting the URL
-        let inspected_url = unwrap!(safe.inspect(&nrs_url).await);
-        assert_eq!(content, inspected_url);
+                // let's also compare it with the result from inspecting the URL
+                let inspected_url = safe.inspect(&nrs_url).await?;
+                assert_eq!(content, inspected_url);
+                Ok(())
+            }
+            _ => Err(Error::Unexpected(
+                "NRS map container was not returned".to_string(),
+            )),
+        }
     }
 
     #[tokio::test]
-    async fn test_fetch_resolvable_map_data() {
+    async fn test_fetch_resolvable_map_data() -> Result<()> {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        let mut safe = Safe::default();
-        safe.connect("", Some("")).unwrap();
-        let (xorurl, _, _the_files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _, _the_files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let (nrs_map_xorurl, _, the_nrs_map) = unwrap!(
-            safe.nrs_map_container_create(
-                &site_name,
-                &unwrap!(xorurl_encoder.to_string()),
-                true,
-                true,
-                false
-            )
-            .await
-        );
+        let (nrs_map_xorurl, _, the_nrs_map) = safe
+            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string()?, true, true, false)
+            .await?;
 
-        let nrs_xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&nrs_map_xorurl));
+        let nrs_xorurl_encoder = XorUrlEncoder::from_url(&nrs_map_xorurl)?;
         let nrs_url = format!("safe://{}", site_name);
-        let content = unwrap!(safe.fetch(&nrs_url, None).await);
+        let content = safe.fetch(&nrs_url, None).await?;
 
         // this should resolve to a FilesContainer until we enable prevent resolution.
         match &content {
@@ -675,7 +656,7 @@ mod tests {
                 resolved_from: Some(nrs_map_container),
                 ..
             } => {
-                assert_eq!(*xorurl, unwrap!(xorurl_encoder.to_string()));
+                assert_eq!(*xorurl, xorurl_encoder.to_string()?);
                 assert_eq!(nrs_map_container.xorname, nrs_xorurl_encoder.xorname());
                 assert_eq!(nrs_map_container.version, 0);
                 assert_eq!(nrs_map_container.type_tag, 1_500);
@@ -684,27 +665,28 @@ mod tests {
                     SafeDataType::PublishedSeqAppendOnlyData
                 );
                 assert_eq!(nrs_map_container.nrs_map, the_nrs_map);
-            }
-            _ => panic!("Nrs map container was not returned."),
-        }
 
-        // let's also compare it with the result from inspecting the URL
-        let inspected_url = unwrap!(safe.inspect(&nrs_url).await);
-        assert_eq!(content, inspected_url);
+                // let's also compare it with the result from inspecting the URL
+                let inspected_url = safe.inspect(&nrs_url).await?;
+                assert_eq!(content, inspected_url);
+                Ok(())
+            }
+            _ => Err(Error::Unexpected(
+                "Nrs map container was not returned".to_string(),
+            )),
+        }
     }
 
     #[tokio::test]
-    async fn test_fetch_published_immutable_data() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_fetch_published_immutable_data() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let data = b"Something super immutable";
         let xorurl = safe
             .files_put_published_immutable(data, Some("text/plain"), false)
-            .await
-            .unwrap();
+            .await?;
 
-        let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
-        let content = unwrap!(safe.fetch(&xorurl, None).await);
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
         assert!(
             content
                 == SafeData::PublishedImmutableData {
@@ -717,7 +699,7 @@ mod tests {
         );
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_url = unwrap!(safe.inspect(&xorurl).await);
+        let inspected_url = safe.inspect(&xorurl).await?;
         assert!(
             inspected_url
                 == SafeData::PublishedImmutableData {
@@ -728,113 +710,116 @@ mod tests {
                     media_type: Some("text/plain".to_string())
                 }
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_fetch_range_published_immutable_data() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_fetch_range_published_immutable_data() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let saved_data = b"Something super immutable";
         let size = saved_data.len();
         let xorurl = safe
             .files_put_published_immutable(saved_data, Some("text/plain"), false)
-            .await
-            .unwrap();
+            .await?;
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
-        let content = unwrap!(safe.fetch(&xorurl, fetch_first_half).await);
+        let content = safe.fetch(&xorurl, fetch_first_half).await?;
 
-        match &content {
-            SafeData::PublishedImmutableData { data, .. } => {
-                assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
-            }
-            _ => panic!("unable to fetch published immutable data was not returned."),
+        if let SafeData::PublishedImmutableData { data, .. } = &content {
+            assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
+        } else {
+            return Err(Error::Unexpected(format!(
+                "Content fetched is not a PublishedImmutableData: {:?}",
+                content
+            )));
         }
 
         // Fetch second half and match
         let fetch_second_half = Some((Some(size as u64 / 2), Some(size as u64)));
-        let content = unwrap!(safe.fetch(&xorurl, fetch_second_half).await);
+        let content = safe.fetch(&xorurl, fetch_second_half).await?;
 
-        match &content {
-            SafeData::PublishedImmutableData { data, .. } => {
-                assert_eq!(data.clone(), saved_data[size / 2..size].to_vec());
-            }
-            _ => panic!("unable to fetch published immutable data was not returned."),
+        if let SafeData::PublishedImmutableData { data, .. } = &content {
+            assert_eq!(data.clone(), saved_data[size / 2..size].to_vec());
+            Ok(())
+        } else {
+            Err(Error::Unexpected(format!(
+                "Content fetched is not a PublishedImmutableData: {:?}",
+                content
+            )))
         }
     }
 
     #[tokio::test]
-    async fn test_fetch_range_from_files_container() {
+    async fn test_fetch_range_from_files_container() -> Result<()> {
         use std::fs::File;
-        let mut safe = Safe::default();
+        let mut safe = new_safe_instance()?;
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        unwrap!(safe.connect("", Some("fake-credentials")));
 
-        let (xorurl, _, _files_map) = unwrap!(
-            safe.files_container_create(Some("../testdata/"), None, true, false)
-                .await
-        );
+        let (xorurl, _, _files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let (_nrs_map_xorurl, _, _nrs_map) = unwrap!(
-            safe.nrs_map_container_create(
-                &site_name,
-                &unwrap!(xorurl_encoder.to_string()),
-                true,
-                true,
-                false
-            )
-            .await
-        );
+        let (_nrs_map_xorurl, _, _nrs_map) = safe
+            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string()?, true, true, false)
+            .await?;
 
         let nrs_url = format!("safe://{}/test.md", site_name);
 
-        let mut file = File::open("../testdata/test.md").unwrap();
+        let mut file = File::open("../testdata/test.md")
+            .map_err(|err| Error::Unexpected(format!("Failed to open local file: {}", err)))?;
         let mut file_data = Vec::new();
-        file.read_to_end(&mut file_data).unwrap();
+        file.read_to_end(&mut file_data)
+            .map_err(|err| Error::Unexpected(format!("Failed to read local file: {}", err)))?;
         let file_size = file_data.len();
 
         // Fetch full file and match
-        let content = unwrap!(safe.fetch(&nrs_url, None).await);
-        match &content {
-            SafeData::PublishedImmutableData { data, .. } => {
-                assert_eq!(data.clone(), file_data.clone());
-            }
-            _ => panic!("unable to fetch published immutable data was not returned."),
+        let content = safe.fetch(&nrs_url, None).await?;
+        if let SafeData::PublishedImmutableData { data, .. } = &content {
+            assert_eq!(data.clone(), file_data.clone());
+        } else {
+            return Err(Error::Unexpected(format!(
+                "Content fetched is not a PublishedImmutableData: {:?}",
+                content
+            )));
         }
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(file_size as u64 / 2)));
-        let content = unwrap!(safe.fetch(&nrs_url, fetch_first_half).await);
+        let content = safe.fetch(&nrs_url, fetch_first_half).await?;
 
-        match &content {
-            SafeData::PublishedImmutableData { data, .. } => {
-                assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
-            }
-            _ => panic!("unable to fetch published immutable data was not returned."),
+        if let SafeData::PublishedImmutableData { data, .. } = &content {
+            assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
+        } else {
+            return Err(Error::Unexpected(format!(
+                "Content fetched is not a PublishedImmutableData: {:?}",
+                content
+            )));
         }
 
         // Fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
-        let content = unwrap!(safe.fetch(&nrs_url, fetch_second_half).await);
+        let content = safe.fetch(&nrs_url, fetch_second_half).await?;
 
-        match &content {
-            SafeData::PublishedImmutableData { data, .. } => {
-                assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
-            }
-            _ => panic!("unable to fetch published immutable data was not returned."),
+        if let SafeData::PublishedImmutableData { data, .. } = &content {
+            assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
+            Ok(())
+        } else {
+            Err(Error::Unexpected(format!(
+                "Content fetched is not a PublishedImmutableData: {:?}",
+                content
+            )))
         }
     }
 
     #[tokio::test]
-    async fn test_fetch_unsupported() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_fetch_unsupported() -> Result<()> {
+        let safe = new_safe_instance()?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = unwrap!(XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode(
             xorname,
             type_tag,
             SafeDataType::UnpublishedImmutableData,
@@ -842,11 +827,16 @@ mod tests {
             None,
             None,
             None,
-            XorUrlBase::Base32z
-        ));
+            XorUrlBase::Base32z,
+        )?;
 
         match safe.fetch(&xorurl, None).await {
-            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+            Ok(c) => {
+                return Err(Error::Unexpected(format!(
+                    "Unxpected fetched content: {:?}",
+                    c
+                )))
+            }
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
@@ -856,7 +846,12 @@ mod tests {
         };
 
         match safe.inspect(&xorurl).await {
-            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+            Ok(c) => {
+                return Err(Error::Unexpected(format!(
+                    "Unxpected fetched content: {:?}",
+                    c
+                )))
+            }
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
@@ -864,15 +859,15 @@ mod tests {
                 )
             ),
         };
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_fetch_unsupported_with_media_type() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_fetch_unsupported_with_media_type() -> Result<()> {
+        let safe = new_safe_instance()?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = unwrap!(XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode(
             xorname,
             type_tag,
             SafeDataType::UnpublishedImmutableData,
@@ -880,11 +875,16 @@ mod tests {
             None,
             None,
             None,
-            XorUrlBase::Base32z
-        ));
+            XorUrlBase::Base32z,
+        )?;
 
         match safe.fetch(&xorurl, None).await {
-            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+            Ok(c) => {
+                return Err(Error::Unexpected(format!(
+                    "Unxpected fetched content: {:?}",
+                    c
+                )))
+            }
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
@@ -894,7 +894,12 @@ mod tests {
         };
 
         match safe.inspect(&xorurl).await {
-            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+            Ok(c) => {
+                return Err(Error::Unexpected(format!(
+                    "Unxpected fetched content: {:?}",
+                    c
+                )))
+            }
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
@@ -902,23 +907,27 @@ mod tests {
                 )
             ),
         };
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_fetch_published_immutable_data_with_path() {
-        let mut safe = Safe::default();
-        unwrap!(safe.connect("", Some("fake-credentials")));
+    async fn test_fetch_published_immutable_data_with_path() -> Result<()> {
+        let mut safe = new_safe_instance()?;
         let data = b"Something super immutable";
         let xorurl = safe
             .files_put_published_immutable(data, None, false)
-            .await
-            .unwrap();
+            .await?;
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
         xorurl_encoder.set_path(path);
-        match safe.fetch(&unwrap!(xorurl_encoder.to_string()), None).await {
-            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+        match safe.fetch(&xorurl_encoder.to_string()?, None).await {
+            Ok(c) => {
+                return Err(Error::Unexpected(format!(
+                    "Unxpected fetched content: {:?}",
+                    c
+                )))
+            }
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(format!(
@@ -931,13 +940,18 @@ mod tests {
         // test the same but a file with some media type
         let xorurl = safe
             .files_put_published_immutable(data, Some("text/plain"), false)
-            .await
-            .unwrap();
+            .await?;
 
-        let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&xorurl));
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_path("/some_relative_filepath");
-        match safe.fetch(&unwrap!(xorurl_encoder.to_string()), None).await {
-            Ok(c) => panic!(format!("Unxpected fetched content: {:?}", c)),
+        let url_with_path = xorurl_encoder.to_string()?;
+        match safe.fetch(&url_with_path, None).await {
+            Ok(c) => {
+                return Err(Error::Unexpected(format!(
+                    "Unxpected fetched content: {:?}",
+                    c
+                )))
+            }
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(format!(
@@ -946,5 +960,6 @@ mod tests {
                 ))
             ),
         };
+        Ok(())
     }
 }

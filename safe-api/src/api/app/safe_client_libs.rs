@@ -697,32 +697,39 @@ fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Safe;
+    use crate::api::app::test_helpers::new_safe_instance;
+
+    // Helper function to obtain utf8 string from bytes slice
+    fn utf8_str_from_slice(slice: &[u8]) -> Result<String> {
+        let utf8_str = std::str::from_utf8(slice).map_err(|err| {
+            Error::Unexpected(format!("Failed to read data as an utf8 string: {}", err))
+        })?;
+        Ok(utf8_str.to_string())
+    }
 
     #[tokio::test]
-    async fn test_put_and_get_immutable_data() {
-        let mut safe = Safe::default();
-        safe.connect("", Some("fake-credentials")).unwrap();
+    async fn test_put_and_get_immutable_data() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+
         let id1 = b"HELLLOOOOOOO".to_vec();
 
         let xorname = safe
             .safe_app
             .files_put_published_immutable(&id1, false)
-            .await
-            .unwrap();
+            .await?;
         let data = safe
             .safe_app
             .files_get_published_immutable(xorname, None)
-            .await
-            .unwrap();
-        let text = std::str::from_utf8(data.as_slice()).unwrap();
-        assert_eq!(text.to_string(), "HELLLOOOOOOO");
+            .await?;
+        let text = utf8_str_from_slice(data.as_slice())?;
+        assert_eq!(text, "HELLLOOOOOOO");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_put_get_update_seq_append_only_data() {
-        let mut safe = Safe::default();
-        safe.connect("", Some("fake-credentials")).unwrap();
+    async fn test_put_get_update_seq_append_only_data() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+
         let key1 = b"KEY1".to_vec();
         let val1 = b"VALUE1".to_vec();
         let data1 = [(key1, val1)].to_vec();
@@ -731,19 +738,17 @@ mod tests {
         let xorname = safe
             .safe_app
             .put_seq_append_only_data(data1, None, type_tag, None)
-            .await
-            .unwrap();
+            .await?;
 
         let (this_version, (key, value)) = safe
             .safe_app
             .get_latest_seq_append_only_data(xorname, type_tag)
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(this_version, 0);
 
-        assert_eq!(std::str::from_utf8(key.as_slice()).unwrap(), "KEY1");
-        assert_eq!(std::str::from_utf8(value.as_slice()).unwrap(), "VALUE1");
+        assert_eq!(&utf8_str_from_slice(key.as_slice())?, "KEY1");
+        assert_eq!(&utf8_str_from_slice(value.as_slice())?, "VALUE1");
 
         let key2 = b"KEY2".to_vec();
         let val2 = b"VALUE2".to_vec();
@@ -753,57 +758,35 @@ mod tests {
         let updated_version = safe
             .safe_app
             .append_seq_append_only_data(data2, new_version, xorname, type_tag)
-            .await
-            .unwrap();
+            .await?;
         let (the_latest_version, data_updated) = safe
             .safe_app
             .get_latest_seq_append_only_data(xorname, type_tag)
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(updated_version, the_latest_version);
 
-        assert_eq!(
-            std::str::from_utf8(data_updated.0.as_slice()).unwrap(),
-            "KEY2"
-        );
-        assert_eq!(
-            std::str::from_utf8(data_updated.1.as_slice()).unwrap(),
-            "VALUE2"
-        );
+        assert_eq!(&utf8_str_from_slice(data_updated.0.as_slice())?, "KEY2");
+        assert_eq!(&utf8_str_from_slice(data_updated.1.as_slice())?, "VALUE2");
 
         let first_version = 0;
 
         let first_data = safe
             .safe_app
             .get_seq_append_only_data(xorname, type_tag, first_version)
-            .await
-            .unwrap();
+            .await?;
 
-        assert_eq!(
-            std::str::from_utf8(first_data.0.as_slice()).unwrap(),
-            "KEY1"
-        );
-        assert_eq!(
-            std::str::from_utf8(first_data.1.as_slice()).unwrap(),
-            "VALUE1"
-        );
+        assert_eq!(&utf8_str_from_slice(first_data.0.as_slice())?, "KEY1");
+        assert_eq!(&utf8_str_from_slice(first_data.1.as_slice())?, "VALUE1");
 
         let second_version = 1;
         let second_data = safe
             .safe_app
             .get_seq_append_only_data(xorname, type_tag, second_version)
-            .await
-            .unwrap();
+            .await?;
 
-        assert_eq!(
-            std::str::from_utf8(second_data.0.as_slice()).unwrap(),
-            "KEY2"
-        );
-        assert_eq!(
-            std::str::from_utf8(second_data.1.as_slice()).unwrap(),
-            "VALUE2"
-        );
+        assert_eq!(&utf8_str_from_slice(second_data.0.as_slice())?, "KEY2");
+        assert_eq!(&utf8_str_from_slice(second_data.1.as_slice())?, "VALUE2");
 
         // test checking for versions that dont exist
         let nonexistant_version = 2;
@@ -812,19 +795,27 @@ mod tests {
             .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
             .await
         {
-            Ok(_) => panic!("No error thrown when passing an outdated new version"),
-            Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
-                "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
-                nonexistant_version, xorname
+            Ok(_) => Err(Error::Unexpected(
+                "No error thrown when passing an outdated new version".to_string(),
+            )),
+            Err(Error::VersionNotFound(msg)) => {
+                assert!(msg.contains(&format!(
+                    "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+                    nonexistant_version, xorname
+                )));
+                Ok(())
+            }
+            err => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
+                err
             ))),
-            err => panic!(format!("Error returned is not the expected one: {:?}", err)),
         }
     }
 
     #[tokio::test]
-    async fn test_update_seq_append_only_data_error() {
-        let mut safe = Safe::default();
-        safe.connect("", Some("fake-credentials")).unwrap();
+    async fn test_update_seq_append_only_data_error() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+
         let key1 = b"KEY1".to_vec();
         let val1 = b"VALUE1".to_vec();
         let data1 = [(key1, val1)].to_vec();
@@ -833,19 +824,17 @@ mod tests {
         let xorname = safe
             .safe_app
             .put_seq_append_only_data(data1, None, type_tag, None)
-            .await
-            .unwrap();
+            .await?;
 
         let (this_version, (key, value)) = safe
             .safe_app
             .get_latest_seq_append_only_data(xorname, type_tag)
-            .await
-            .unwrap();
+            .await?;
 
         assert_eq!(this_version, 0);
 
-        assert_eq!(std::str::from_utf8(key.as_slice()).unwrap(), "KEY1");
-        assert_eq!(std::str::from_utf8(value.as_slice()).unwrap(), "VALUE1");
+        assert_eq!(&utf8_str_from_slice(key.as_slice())?, "KEY1");
+        assert_eq!(&utf8_str_from_slice(value.as_slice())?, "VALUE1");
 
         let key2 = b"KEY2".to_vec();
         let val2 = b"VALUE2".to_vec();
@@ -857,9 +846,17 @@ mod tests {
             .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
             .await
         {
-            Ok(_) => panic!("No error thrown when passing an outdated new version"),
-            Err(Error::NetDataError(msg)) => assert!(msg.contains("Invalid data successor")),
-            _ => panic!("Error returned is not the expected one"),
+            Ok(_) => Err(Error::Unexpected(
+                "No error thrown when passing an outdated new version".to_string(),
+            )),
+            Err(Error::NetDataError(msg)) => {
+                assert!(msg.contains("Data given is not a valid successor of stored data"));
+                Ok(())
+            }
+            err => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
+                err
+            ))),
         }
     }
 }

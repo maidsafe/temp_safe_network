@@ -15,7 +15,7 @@ safe_cli_install_dir() {
 }
 
 safe_cli_latest_version() {
-  echo "0.9.0"
+  echo "0.10.0"
 }
 
 safe_cli_download() {

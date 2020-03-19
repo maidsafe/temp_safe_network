@@ -533,94 +533,96 @@ impl SafeApp for SafeAppFake {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
-    #[tokio::test]
-    async fn test_allocate_test_coins() {
-        use std::str::FromStr;
-        use threshold_crypto::SecretKey;
-        use unwrap::unwrap;
-
-        let mut mock = SafeAppFake::new();
-
-        let sk_to = SecretKey::random();
-
-        let balance = unwrap!(Coins::from_str("2.345678912"));
-        unwrap!(mock.allocate_test_coins(sk_to.clone(), balance).await);
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk_to).await);
-        assert_eq!(balance, current_balance);
+    // Helper function to instantiate Coins form a string and handle any error
+    fn coins_from_str(str: &str) -> Result<Coins> {
+        Coins::from_str(str).map_err(|err| {
+            Error::Unexpected(format!(
+                "Failed to instantiate Coins from str '{}': {}",
+                str, err
+            ))
+        })
     }
 
     #[tokio::test]
-    async fn test_create_balance() {
-        use std::str::FromStr;
+    async fn test_allocate_test_coins() -> Result<()> {
         use threshold_crypto::SecretKey;
-        use unwrap::unwrap;
 
         let mut mock = SafeAppFake::new();
+        let sk_to = SecretKey::random();
 
+        let balance = coins_from_str("2.345678912")?;
+        mock.allocate_test_coins(sk_to.clone(), balance).await?;
+        let current_balance = mock.get_balance_from_sk(sk_to).await?;
+        assert_eq!(balance, current_balance);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_balance() -> Result<()> {
+        use threshold_crypto::SecretKey;
+
+        let mut mock = SafeAppFake::new();
         let sk = SecretKey::random();
 
-        let balance = unwrap!(Coins::from_str("2.345678912"));
-        unwrap!(mock.allocate_test_coins(sk.clone(), balance).await);
+        let balance = coins_from_str("2.345678912")?;
+        mock.allocate_test_coins(sk.clone(), balance).await?;
 
         let sk_to = SecretKey::random();
         let pk_to = sk_to.public_key();
         assert!(mock
-            .create_balance(Some(sk), pk_to, unwrap!(Coins::from_str("1.234567891")))
+            .create_balance(Some(sk), pk_to, coins_from_str("1.234567891")?)
             .await
             .is_ok());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_check_balance() {
-        use std::str::FromStr;
+    async fn test_check_balance() -> Result<()> {
         use threshold_crypto::SecretKey;
-        use unwrap::unwrap;
 
         let mut mock = SafeAppFake::new();
-
         let sk = SecretKey::random();
 
-        let balance = unwrap!(Coins::from_str("2.3"));
-        unwrap!(mock.allocate_test_coins(sk.clone(), balance).await);
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk.clone()).await);
+        let balance = coins_from_str("2.3")?;
+        mock.allocate_test_coins(sk.clone(), balance).await?;
+        let current_balance = mock.get_balance_from_sk(sk.clone()).await?;
         assert_eq!(balance, current_balance);
 
         let sk_to = SecretKey::random();
         let pk_to = sk_to.public_key();
-        let preload = unwrap!(Coins::from_str("1.234567891"));
-        unwrap!(mock.create_balance(Some(sk.clone()), pk_to, preload).await);
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk_to).await);
+        let preload = coins_from_str("1.234567891")?;
+        mock.create_balance(Some(sk.clone()), pk_to, preload)
+            .await?;
+        let current_balance = mock.get_balance_from_sk(sk_to).await?;
         assert_eq!(preload, current_balance);
 
-        let current_balance = unwrap!(mock.get_balance_from_sk(sk).await);
+        let current_balance = mock.get_balance_from_sk(sk).await?;
         assert_eq!(
-            unwrap!(Coins::from_str("1.065432108")), /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
+            coins_from_str("1.065432108")?, /* == 2.3 - 1.234567891 - 0.000000001 (creation cost) */
             current_balance
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_safecoin_transfer() {
+    async fn test_safecoin_transfer() -> Result<()> {
         use rand_core::RngCore;
-        use std::str::FromStr;
         use threshold_crypto::SecretKey;
-        use unwrap::unwrap;
 
         let mut mock = SafeAppFake::new();
-
         let sk1 = SecretKey::random();
-
         let sk2 = SecretKey::random();
         let pk2 = sk2.public_key();
 
-        let balance1 = unwrap!(Coins::from_str("2.5"));
-        let balance2 = unwrap!(Coins::from_str("5.7"));
-        unwrap!(mock.allocate_test_coins(sk1.clone(), balance1).await);
-        unwrap!(mock.allocate_test_coins(sk2.clone(), balance2).await);
+        let balance1 = coins_from_str("2.5")?;
+        let balance2 = coins_from_str("5.7")?;
+        mock.allocate_test_coins(sk1.clone(), balance1).await?;
+        mock.allocate_test_coins(sk2.clone(), balance2).await?;
 
-        let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1.clone()).await);
-        let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2.clone()).await);
+        let curr_balance1 = mock.get_balance_from_sk(sk1.clone()).await?;
+        let curr_balance2 = mock.get_balance_from_sk(sk2.clone()).await?;
 
         assert_eq!(balance1, curr_balance1);
         assert_eq!(balance2, curr_balance2);
@@ -628,21 +630,22 @@ mod tests {
         let mut rng = rand::thread_rng();
         let tx_id = rng.next_u64();
 
-        let _ = unwrap!(
-            mock.safecoin_transfer_to_xorname(
+        let _ = mock
+            .safecoin_transfer_to_xorname(
                 Some(sk1.clone()),
                 xorname_from_pk(pk2),
                 tx_id,
-                unwrap!(Coins::from_str("1.4"))
+                coins_from_str("1.4")?,
             )
-            .await
-        );
-        unwrap!(mock.get_transaction(tx_id, pk2, sk2.clone()).await);
+            .await?;
 
-        let curr_balance1 = unwrap!(mock.get_balance_from_sk(sk1).await);
-        let curr_balance2 = unwrap!(mock.get_balance_from_sk(sk2).await);
+        mock.get_transaction(tx_id, pk2, sk2.clone()).await?;
 
-        assert_eq!(curr_balance1, unwrap!(Coins::from_str("1.1")));
-        assert_eq!(curr_balance2, unwrap!(Coins::from_str("7.1")));
+        let curr_balance1 = mock.get_balance_from_sk(sk1).await?;
+        let curr_balance2 = mock.get_balance_from_sk(sk2).await?;
+
+        assert_eq!(curr_balance1, coins_from_str("1.1")?);
+        assert_eq!(curr_balance2, coins_from_str("7.1")?);
+        Ok(())
     }
 }
