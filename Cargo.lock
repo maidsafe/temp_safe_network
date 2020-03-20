@@ -2796,7 +2796,7 @@ dependencies = [
 
 [[package]]
 name = "safe-authd"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "cargo-husky 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "daemonize 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "safe-cli"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "assert_cmd 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2859,7 +2859,7 @@ dependencies = [
 
 [[package]]
 name = "safe-ffi"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "async-std 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ffi_utils 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2892,7 +2892,7 @@ dependencies = [
 [[package]]
 name = "safe-nlt"
 version = "0.0.1"
-source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#0c5782b83d04100d05ce6a1968759911f54588b8"
+source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#419cf1ade6347abfeba5c6d7f1cb48d708f96320"
 dependencies = [
  "directories 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
