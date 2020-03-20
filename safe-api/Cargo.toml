@@ -1,6 +1,6 @@
 [package]
 name = "safe-api"
-version = "0.10.0"
+version = "0.10.1"
 description = "SAFE API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
 license = "MIT OR BSD-3-Clause"

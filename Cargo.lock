@@ -2762,7 +2762,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "safe-api"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "async-std 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2808,7 +2808,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quinn 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcgen 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "safe-api 0.10.0",
+ "safe-api 0.10.1",
  "self_update 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2844,7 +2844,7 @@ dependencies = [
  "relative-path 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 4.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "safe-api 0.10.0",
+ "safe-api 0.10.1",
  "safe-nd 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-nlt 0.0.1 (git+https://github.com/maidsafe/safe-network-launch-tool.git)",
  "self_update 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2864,7 +2864,7 @@ dependencies = [
  "async-std 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ffi_utils 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "safe-api 0.10.0",
+ "safe-api 0.10.1",
  "safe-nd 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe_bindgen 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",

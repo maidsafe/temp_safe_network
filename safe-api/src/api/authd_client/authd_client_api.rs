@@ -529,14 +529,7 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
     let path_str = path.display().to_string();
     debug!("Attempting to {} authd from '{}' ...", args[0], path_str);
 
-    let child = Command::new(&path_str).args(args).spawn().map_err(|err| {
-        Error::AuthdClientError(format!(
-            "Failed to execute authd from '{}': {}",
-            path_str, err
-        ))
-    })?;
-
-    let output = child.wait_with_output().map_err(|err| {
+    let output = Command::new(&path_str).args(args).output().map_err(|err| {
         Error::AuthdClientError(format!(
             "Failed to execute authd from '{}': {}",
             path_str, err

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+
+### 0.10.1 (2020-03-20)
+
+### Bug Fixes
+
+* ***api:*** don't spawn the command when invoking authd executable ([f1867af0](https://github.com/maidsafe/safe-api/commit/f1867af021622085c6748951519aa786d9edd322))
+
+
 ### 0.10.0 (2020-03-17)
 
 
