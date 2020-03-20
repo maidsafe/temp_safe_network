@@ -35,6 +35,9 @@ pub enum VaultSubCommands {
         /// Interval in seconds between launching each of the vaults
         #[structopt(short = "i", long, default_value = "1")]
         interval: u64,
+        /// IP to be used to launch the local vaults.
+        #[structopt(long = "ip")]
+        ip: Option<String>,
     },
     /// Shutdown all running vaults processes
     #[structopt(name = "killall")]
@@ -60,11 +63,13 @@ pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
             vault_path,
             verbosity,
             interval,
+            ip,
         }) => vault_run(
             vault_path,
             VAULTS_DATA_FOLDER,
             verbosity,
             &interval.to_string(),
+            ip,
         ),
         Some(VaultSubCommands::Killall { vault_path }) => vault_shutdown(vault_path),
         Some(VaultSubCommands::Update { vault_path }) => vault_update(vault_path),

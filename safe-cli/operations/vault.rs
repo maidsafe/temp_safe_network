@@ -45,6 +45,7 @@ pub fn vault_run(
     vaults_dir: &str,
     verbosity: u8,
     interval: &str,
+    ip: Option<String>,
 ) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
@@ -83,6 +84,11 @@ pub fn vault_run(
         verbosity_arg.push_str(&v);
         nlt_args.push(&verbosity_arg);
     }
+
+    if let Some(ref launch_ip) = ip {
+        nlt_args.push("--ip");
+        nlt_args.push(launch_ip);
+    };
 
     debug!("Running network launch tool with args: {:?}", nlt_args);
 

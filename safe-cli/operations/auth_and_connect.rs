@@ -33,14 +33,9 @@ pub async fn authorise_cli(
         println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth login' command to automatically self authorise the CLI app.");
     }
     println!("Awaiting for authorising response from authd...");
-    let auth_credentials = Safe::auth_app(
-        APP_ID,
-        APP_NAME,
-        APP_VENDOR,
-        endpoint.as_ref().map(String::as_str),
-    )
-    .await
-    .map_err(|err| format!("Application authorisation failed: {}", err))?;
+    let auth_credentials = Safe::auth_app(APP_ID, APP_NAME, APP_VENDOR, endpoint.as_deref())
+        .await
+        .map_err(|err| format!("Application authorisation failed: {}", err))?;
 
     file.write_all(auth_credentials.as_bytes()).map_err(|err| {
         format!(
@@ -88,7 +83,7 @@ pub fn connect(safe: &mut Safe) -> Result<(), String> {
         println!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    safe.connect(APP_ID, auth_credentials.as_ref().map(String::as_str))
+    safe.connect(APP_ID, auth_credentials.as_deref())
         .map_err(|err| format!("Failed to connect: {}", err))
 }
 
