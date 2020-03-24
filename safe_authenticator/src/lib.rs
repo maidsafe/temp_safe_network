@@ -32,18 +32,11 @@
 
 // Public exports. See https://github.com/maidsafe/safe_client_libs/wiki/Export-strategy.
 
-// Export FFI interface
-
-pub use crate::ffi::apps::*;
-pub use crate::ffi::errors::codes::*;
-pub use crate::ffi::ipc::*;
-pub use crate::ffi::logging::*;
-pub use crate::ffi::*;
-
 // Export public auth interface.
 
 pub use self::errors::AuthError;
 pub use client::AuthClient;
+pub use errors::Result as AuthResult;
 
 pub mod access_container;
 pub mod app_auth;
@@ -51,18 +44,19 @@ pub mod app_container;
 pub mod apps;
 pub mod config;
 pub mod errors;
-pub mod ffi;
 pub mod ipc;
 pub mod revocation;
+
+/// default dir
+pub mod std_dirs;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 mod client;
-mod std_dirs;
 #[cfg(test)]
 mod tests;
 
-use crate::ffi::errors::Error;
+use errors::AuthError as Error;
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use futures::{Future, IntoFuture};
@@ -106,7 +100,7 @@ pub struct Authenticator {
 
 impl Authenticator {
     /// Send a message to the authenticator event loop.
-    pub fn send<F>(&self, f: F) -> crate::ffi::errors::Result<()>
+    pub fn send<F>(&self, f: F) -> AuthResult<()>
     where
         F: FnOnce(&AuthClient) -> Option<Box<dyn Future<Item = (), Error = ()>>> + Send + 'static,
     {

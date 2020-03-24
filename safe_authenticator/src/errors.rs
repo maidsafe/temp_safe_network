@@ -9,11 +9,13 @@
 //! Errors thrown by Authenticator routines.
 
 use bincode::Error as SerialisationError;
-use ffi_utils::StringError;
+use ffi_utils::{ErrorCode, StringError};
 use futures::sync::mpsc::SendError;
+use safe_core::ffi::error_codes::*;
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 use safe_core::CoreError;
+use safe_core::{core_error_code, safe_nd_error_core};
 use safe_nd::Error as SndError;
 use std::ffi::NulError;
 use std::fmt::{self, Display, Formatter};
@@ -21,6 +23,9 @@ use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::RecvError;
+
+/// Result type
+pub type Result<T> = std::result::Result<T, AuthError>;
 
 /// Authenticator errors.
 #[allow(clippy::large_enum_variant)]
@@ -47,6 +52,44 @@ pub enum AuthError {
     NoSuchContainer(String),
     /// Couldn't authenticate app that is pending revocation.
     PendingRevocation,
+}
+
+impl ErrorCode for AuthError {
+    fn error_code(&self) -> i32 {
+        match *self {
+            AuthError::CoreError(ref err) => core_error_code(err),
+            AuthError::SndError(ref err) => safe_nd_error_core(err),
+            AuthError::IpcError(ref err) => match *err {
+                IpcError::AuthDenied => ERR_AUTH_DENIED,
+                IpcError::ContainersDenied => ERR_CONTAINERS_DENIED,
+                IpcError::InvalidMsg => ERR_INVALID_MSG,
+                IpcError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
+                IpcError::AlreadyAuthorised => ERR_ALREADY_AUTHORISED,
+                IpcError::UnknownApp => ERR_UNKNOWN_APP,
+                IpcError::Unexpected(_) => ERR_UNEXPECTED,
+                IpcError::StringError(_) => ERR_STRING_ERROR,
+                IpcError::ShareMDataDenied => ERR_SHARE_MDATA_DENIED,
+                IpcError::InvalidOwner(..) => ERR_INVALID_OWNER,
+                IpcError::IncompatibleMockStatus => ERR_INCOMPATIBLE_MOCK_STATUS,
+            },
+            AuthError::NfsError(ref err) => match *err {
+                NfsError::CoreError(ref err) => core_error_code(err),
+                NfsError::FileExists => ERR_FILE_EXISTS,
+                NfsError::FileNotFound => ERR_FILE_NOT_FOUND,
+                NfsError::InvalidRange => ERR_INVALID_RANGE,
+                NfsError::EncodeDecodeError(_) => ERR_ENCODE_DECODE_ERROR,
+                NfsError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
+                NfsError::Unexpected(_) => ERR_UNEXPECTED,
+            },
+            AuthError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
+            AuthError::IoError(_) => ERR_IO_ERROR,
+
+            AuthError::AccountContainersCreation(_) => 1, //TODO ERR_ACCOUNT_CONTAINERS_CREATION,
+            AuthError::NoSuchContainer(_) => ERR_NO_SUCH_CONTAINER,
+            AuthError::PendingRevocation => 2, //TODO
+            AuthError::Unexpected(_) => ERR_UNEXPECTED,
+        }
+    }
 }
 
 impl Display for AuthError {

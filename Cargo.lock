@@ -59,9 +59,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.9"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5e63fd144e18ba274ae7095c0197a870a7b9468abc801dd62f190d80817d2ec"
+checksum = "743ad5a418686aad3b87fd14c43badd828cf26e214a00f92a384291cf22e1811"
 dependencies = [
  "memchr",
 ]
@@ -1543,28 +1543,28 @@ checksum = "74490b50b9fbe561ac330df47c08f3f33073d2d00c150f719147d7c54522fa1b"
 
 [[package]]
 name = "proc-macro-error"
-version = "0.4.11"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7959c6467d962050d639361f7703b2051c43036d03493c36f01d440fdd3138a"
+checksum = "052b3c9af39c7e5e94245f820530487d19eb285faedcb40e0c3275132293f242"
 dependencies = [
  "proc-macro-error-attr",
  "proc-macro2 1.0.9",
  "quote 1.0.2",
+ "rustversion",
  "syn 1.0.16",
- "version_check 0.9.1",
 ]
 
 [[package]]
 name = "proc-macro-error-attr"
-version = "0.4.11"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4002d9f55991d5e019fb940a90e1a95eb80c24e77cb2462dd4dc869604d543a"
+checksum = "d175bef481c7902e63e3165627123fff3502f06ac043d3ef42d08c1246da9253"
 dependencies = [
  "proc-macro2 1.0.9",
  "quote 1.0.2",
+ "rustversion",
  "syn 1.0.16",
  "syn-mid",
- "version_check 0.9.1",
 ]
 
 [[package]]
@@ -1925,9 +1925,9 @@ version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322cf97724bea3ee221b78fe25ac9c46114ebb51747ad5babd51a2fc6a8235a8"
 dependencies = [
- "aho-corasick 0.7.9",
+ "aho-corasick 0.7.8",
  "memchr",
- "regex-syntax 0.6.16",
+ "regex-syntax 0.6.14",
  "thread_local 1.0.1",
 ]
 
@@ -1942,9 +1942,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.16"
+version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1132f845907680735a84409c3bebc64d1364a5683ffbce899550cd09d5eaefc1"
+checksum = "b28dfe3fe9badec5dbf0a79a9cccad2cfc2ab5484bdb3e44cbd1ae8b3ba2be06"
 
 [[package]]
 name = "remove_dir_all"
@@ -2098,6 +2098,7 @@ dependencies = [
  "rand 0.6.5",
  "safe-nd",
  "safe_authenticator",
+ "safe_authenticator_ffi",
  "safe_bindgen",
  "safe_core",
  "self_encryption",
@@ -2135,6 +2136,28 @@ dependencies = [
  "lru-cache",
  "rand 0.6.5",
  "safe-nd",
+ "safe_core",
+ "serde",
+ "threshold_crypto",
+ "tiny-keccak",
+ "tokio 0.1.22",
+ "unwrap",
+]
+
+[[package]]
+name = "safe_authenticator_ffi"
+version = "0.14.1"
+dependencies = [
+ "bincode",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "futures 0.1.29",
+ "jni",
+ "log 0.4.8",
+ "lru-cache",
+ "rand 0.6.5",
+ "safe-nd",
+ "safe_authenticator",
  "safe_bindgen",
  "safe_core",
  "serde",
@@ -2152,7 +2175,7 @@ dependencies = [
  "ffi_utils",
  "jni",
  "log 0.4.8",
- "safe_authenticator",
+ "safe_authenticator_ffi",
  "safe_core",
  "unwrap",
 ]
@@ -2607,6 +2630,7 @@ dependencies = [
  "safe-nd",
  "safe_app",
  "safe_authenticator",
+ "safe_authenticator_ffi",
  "safe_core",
  "serde",
  "serde_derive",
