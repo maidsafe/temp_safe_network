@@ -259,3 +259,38 @@ pub unsafe extern "C" fn files_get_published_immutable(
         Ok(())
     })
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn files_container_remove_path(
+    app: *mut Safe,
+    url: *const c_char,
+    recursive: bool,
+    update_nrs: bool,
+    dry_run: bool,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        version: u64,
+        process_files: *const ProcessedFiles,
+        files_map: *const c_char,
+    ),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
+        let user_data = OpaqueCtx(user_data);
+        let url_str = String::clone_from_repr_c(url)?;
+        let (version, processed_files, files_map) = async_std::task::block_on(
+            (*app).files_container_remove_path(&url_str, recursive, update_nrs, dry_run),
+        )?;
+        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
+        let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            version,
+            &ffi_processed_files,
+            files_map_json.as_ptr(),
+        );
+        Ok(())
+    })
+}
