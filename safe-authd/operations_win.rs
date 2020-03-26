@@ -279,7 +279,7 @@ fn install_authd_service() -> Result<()> {
         account_password: None,
     };
 
-    match service_manager.create_service(service_info, ServiceAccess::empty()) {
+    match service_manager.create_service(&service_info, ServiceAccess::empty()) {
         Ok(_) => {
             println!(
                 "The safe-authd service ('{}') was just installed sucessfully!",

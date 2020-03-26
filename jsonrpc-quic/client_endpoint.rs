@@ -8,12 +8,11 @@
 // Software.
 
 use super::{jsonrpc::parse_jsonrpc_response, Error, JsonRpcRequest, Result, ALPN_QUIC_HTTP};
+use crate::utils;
 use log::debug;
 use serde::de::DeserializeOwned;
 use std::{fs, path::PathBuf, str, sync::Arc, time::Instant};
 use url::Url;
-
-pub type ConnectionDriver = quinn::ConnectionDriver;
 
 // JSON-RPC over QUIC client endpoint
 pub struct ClientEndpoint {
@@ -25,19 +24,7 @@ impl ClientEndpoint {
     // idle_timeout: Optional number of millis before timing out an idle connection
     // keylog: Perform NSS-compatible TLS key logging to the file specified in `SSLKEYLOGFILE`
     pub fn new(cert_base_path: &str, idle_timeout: Option<u64>, keylog: bool) -> Result<Self> {
-        let client_config = if let Some(timeout) = idle_timeout {
-            quinn::ClientConfig {
-                transport: Arc::new(quinn::TransportConfig {
-                    idle_timeout: timeout,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }
-        } else {
-            quinn::ClientConfig::default()
-        };
-
-        let mut client_config = quinn::ClientConfigBuilder::new(client_config);
+        let mut client_config = quinn::ClientConfigBuilder::default();
         client_config.protocols(ALPN_QUIC_HTTP);
 
         if keylog {
@@ -70,11 +57,14 @@ impl ClientEndpoint {
                 ))
             })?;
 
-        let config = client_config.build();
+        let mut config = client_config.build();
+        if let Some(timeout) = idle_timeout {
+            config.transport = Arc::new(utils::new_transport_cfg(timeout)?)
+        };
         Ok(Self { config })
     }
 
-    pub fn bind(&self) -> Result<(quinn::EndpointDriver, OutgoingConn)> {
+    pub fn bind(&self) -> Result<OutgoingConn> {
         let mut quinn_endpoint_builder = quinn::Endpoint::builder();
         quinn_endpoint_builder.default_client_config(self.config.clone());
 
@@ -82,11 +72,11 @@ impl ClientEndpoint {
             Error::ClientError(format!("Invalid client endpoint address: {}", err))
         })?;
 
-        let (driver, endpoint, _) = quinn_endpoint_builder.bind(&socket_addr).map_err(|err| {
+        let (endpoint, _) = quinn_endpoint_builder.bind(&socket_addr).map_err(|err| {
             Error::ClientError(format!("Failed to bind client endpoint: {}", err))
         })?;
 
-        Ok((driver, OutgoingConn::new(endpoint)))
+        Ok(OutgoingConn::new(endpoint))
     }
 }
 
@@ -107,7 +97,7 @@ impl OutgoingConn {
         &mut self,
         dest_endpoint: &str,
         cert_host: Option<&str>,
-    ) -> Result<(ConnectionDriver, OutgoingJsonRpcRequest)> {
+    ) -> Result<OutgoingJsonRpcRequest> {
         let start = Instant::now();
         let url = Url::parse(dest_endpoint)
             .map_err(|_| Error::ClientError("Invalid end point address".to_string()))?;
@@ -141,12 +131,10 @@ impl OutgoingConn {
             start.elapsed()
         );
         let quinn::NewConnection {
-            driver,
-            connection: conn,
-            ..
+            connection: conn, ..
         } = { new_conn };
 
-        Ok((driver, OutgoingJsonRpcRequest::new(conn)))
+        Ok(OutgoingJsonRpcRequest::new(conn))
     }
 }
 

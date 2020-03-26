@@ -9,7 +9,6 @@
 
 use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use jsonrpc_quic::ClientEndpoint;
-use log::error;
 use serde::de::DeserializeOwned;
 use threshold_crypto::SecretKey;
 use tokio::runtime::Builder;
@@ -100,7 +99,7 @@ where
                     Error::AuthdClientError(format!("Failed to create runtime: {}", err))
                 })?;
 
-            let (endpoint_driver, mut outgoing_conn) = {
+            let mut outgoing_conn = {
                 runtime
                     .enter(|| jsonrpc_quic_client.bind())
                     .map_err(|err| {
@@ -108,20 +107,17 @@ where
                     })?
             };
 
-            let handle = runtime.spawn(endpoint_driver);
-
             runtime.block_on(async {
-                let (driver, mut new_conn) = outgoing_conn
-                    .connect(dest_endpoint, None)
-                    .await
-                    .map_err(|err| {
-                        Error::AuthdClientError(format!(
-                            "Failed to establish connection with authd: {}",
-                            err
-                        ))
-                    })?;
-
-                tokio::spawn(driver);
+                let mut new_conn =
+                    outgoing_conn
+                        .connect(dest_endpoint, None)
+                        .await
+                        .map_err(|err| {
+                            Error::AuthdClientError(format!(
+                                "Failed to establish connection with authd: {}",
+                                err
+                            ))
+                        })?;
 
                 let res = new_conn
                     .send(method, params)
@@ -133,16 +129,6 @@ where
 
                 // Allow the endpoint driver to automatically shut down
                 drop(outgoing_conn);
-
-                // Let the connection finish closing gracefully
-                match handle.await {
-                    Ok(_) => {}
-                    Err(err) => error!(
-                        "Failed to close the connection with authd gracefully: {}",
-                        err
-                    ),
-                }
-
                 res
             })
         }

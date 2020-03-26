@@ -26,12 +26,14 @@ structopt = "0.2.15"
 tokio = { version = "^0.2.13", features = ["rt-threaded"] }
 url = "~2.1.1"
 urlencoding = "1.0.0"
+quinn = {version = "~0.6.0", features=["tls-rustls"], default-features = false}
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 daemonize = "^0.4.1"
 
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-service = "^0.2.0"
+[target.'cfg(target_os = "windows")'.dependencies.windows-service]
+git = "https://github.com/mullvad/windows-service-rs"
+branch = "master"
 
 [features]
 mock-network = ["safe-api/mock-network"]
@@ -40,10 +42,6 @@ mock-network = ["safe-api/mock-network"]
 path = "../safe-api"
 default-features = false
 features = ["authenticator", "authd_client"]
-
-[dependencies.quinn]
-version = "^0.5.3"
-default-features = false
 
 [dependencies.self_update]
 version = "^0.13.0"

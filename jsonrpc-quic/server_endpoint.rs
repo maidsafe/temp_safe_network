@@ -10,11 +10,10 @@
 use super::{
     jsonrpc::parse_jsonrpc_request, Error, JsonRpcRequest, JsonRpcResponse, Result, ALPN_QUIC_HTTP,
 };
+use crate::utils;
 use futures::StreamExt;
 use log::{debug, info};
 use std::{fs, io, net::SocketAddr, str, sync::Arc};
-
-pub type ConnectionDriver = quinn::ConnectionDriver;
 
 // JSON-RPC over QUIC server endpoint
 pub struct Endpoint {
@@ -25,14 +24,11 @@ impl Endpoint {
     // cert_base_path: Base path where to locate custom certificate authority to trust, in DER format
     // idle_timeout: Optional number of millis before timing out an idle connection
     pub fn new(cert_base_path: &str, idle_timeout: Option<u64>) -> Result<Self> {
-        let server_config = quinn::ServerConfig {
-            transport: Arc::new(quinn::TransportConfig {
-                idle_timeout: idle_timeout.unwrap_or_else(|| 0),
-                stream_window_uni: 0,
-                ..Default::default()
-            }),
-            ..Default::default()
+        let mut server_config = quinn::ServerConfig::default();
+        if let Some(timeout) = idle_timeout {
+            server_config.transport = Arc::new(utils::new_transport_cfg(timeout)?)
         };
+
         let mut server_config = quinn::ServerConfigBuilder::new(server_config);
         server_config.protocols(ALPN_QUIC_HTTP);
 
@@ -92,18 +88,15 @@ impl Endpoint {
     }
 
     // Bind server endpoint to a socket address to start listening for connections on it
-    pub fn bind(
-        &self,
-        listen_socket_addr: &SocketAddr,
-    ) -> Result<(quinn::EndpointDriver, IncomingConn)> {
+    pub fn bind(&self, listen_socket_addr: &SocketAddr) -> Result<IncomingConn> {
         let mut quinn_endpoint_builder = quinn::Endpoint::builder();
         quinn_endpoint_builder.listen(self.config.clone());
 
-        let (driver, _endpoint, incoming) = quinn_endpoint_builder
+        let (_endpoint, incoming) = quinn_endpoint_builder
             .bind(&listen_socket_addr)
             .map_err(|err| Error::GeneralError(format!("Failed to bind QUIC endpoint: {}", err)))?;
 
-        Ok((driver, IncomingConn::new(incoming)))
+        Ok(IncomingConn::new(incoming))
     }
 }
 
@@ -118,12 +111,12 @@ impl IncomingConn {
     }
 
     // Returns next QUIC connection established by a peer
-    pub async fn get_next(&mut self) -> Option<(ConnectionDriver, IncomingJsonRpcRequest)> {
+    pub async fn get_next(&mut self) -> Option<IncomingJsonRpcRequest> {
         match self.quinn_incoming.next().await {
             Some(quinn_conn) => match quinn_conn.await {
-                Ok(quinn::NewConnection {
-                    driver, bi_streams, ..
-                }) => Some((driver, IncomingJsonRpcRequest::new(bi_streams))),
+                Ok(quinn::NewConnection { bi_streams, .. }) => {
+                    Some(IncomingJsonRpcRequest::new(bi_streams))
+                }
                 Err(_err) => None,
             },
             None => None,

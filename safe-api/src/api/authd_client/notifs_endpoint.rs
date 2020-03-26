@@ -9,8 +9,7 @@
 
 use super::AuthReq;
 use jsonrpc_quic::{
-    ConnectionDriver, Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse,
-    JsonRpcResponseStream,
+    Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseStream,
 };
 use log::{debug, info};
 use serde_json::json;
@@ -43,34 +42,25 @@ pub fn jsonrpc_listen(
         .build()
         .map_err(|err| format!("Failed to create thread scheduler: {}", err))?;
 
-    let (endpoint_driver, mut incoming_conn) = {
-        let (driver, incoming_conn) = runtime
-            .enter(|| jsonrpc_quic_endpoint.bind(&listen_socket_addr))
-            .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
-        (driver, incoming_conn)
-    };
+    let mut incoming_conn = runtime
+        .enter(|| jsonrpc_quic_endpoint.bind(&listen_socket_addr))
+        .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
 
-    runtime.spawn({
+    runtime.block_on({
         async move {
-            while let Some((driver, conn)) = incoming_conn.get_next().await {
-                tokio::spawn(handle_connection(driver, conn, notif_channel.clone()));
+            while let Some(conn) = incoming_conn.get_next().await {
+                tokio::spawn(handle_connection(conn, notif_channel.clone()));
             }
         }
     });
-    runtime
-        .block_on(endpoint_driver)
-        .map_err(|err| format!("Failed to block on thread scheduler: {}", err))?;
 
     Ok(())
 }
 
 async fn handle_connection(
-    driver: ConnectionDriver,
     mut conn: IncomingJsonRpcRequest,
     notif_channel: mpsc::Sender<AuthReq>,
 ) -> Result<(), String> {
-    tokio::spawn(driver);
-
     // Each stream initiated by the client constitutes a new request.
     tokio::spawn(async move {
         // Each stream initiated by the client constitutes a new request.

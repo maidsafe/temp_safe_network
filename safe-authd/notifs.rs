@@ -180,18 +180,15 @@ async fn jsonrpc_send(
     let jsonrpc_quic_client = ClientEndpoint::new(cert_base_path, idle_timeout, false)
         .map_err(|err| format!("Failed to create client endpoint: {}", err))?;
 
-    let (endpoint_driver, mut outgoing_conn) = {
+    let mut outgoing_conn = {
         jsonrpc_quic_client
             .bind()
             .map_err(|err| format!("Failed to bind endpoint: {}", err))?
     };
 
-    let _handle = tokio::spawn(endpoint_driver);
     let url2 = url.to_string();
     let method2 = method.to_string();
-    let (driver, mut new_conn) = outgoing_conn.connect(&url2, None).await?;
-
-    tokio::spawn(driver);
+    let mut new_conn = outgoing_conn.connect(&url2, None).await?;
 
     let response = new_conn.send::<String>(&method2, params).await;
 

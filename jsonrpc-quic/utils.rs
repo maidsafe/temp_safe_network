@@ -7,16 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod client_endpoint;
-mod errors;
-mod jsonrpc;
-mod server_endpoint;
-mod utils;
+use super::errors::Error;
+use super::Result;
+use std::time::Duration;
 
-const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-24"];
-
-pub use client_endpoint::ClientEndpoint;
-pub use errors::{Error, Result};
-pub use server_endpoint::{Endpoint, IncomingConn, IncomingJsonRpcRequest, JsonRpcResponseStream};
-
-pub use jsonrpc::{JsonRpcRequest, JsonRpcResponse};
+pub fn new_transport_cfg(idle_timeout_msec: u64) -> Result<quinn::TransportConfig> {
+    let mut transport_config = quinn::TransportConfig::default();
+    let _ = transport_config
+        .max_idle_timeout(Some(Duration::from_millis(idle_timeout_msec)))
+        .map_err(|e| Error::GeneralError(e.to_string()))?;
+    Ok(transport_config)
+}
