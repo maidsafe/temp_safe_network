@@ -15,13 +15,12 @@ use jsonrpc_quic::{Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResp
 use log::{error, info};
 use safe_api::SafeAuthenticator;
 use std::{collections::BTreeMap, str, sync::Arc};
-use tokio::runtime::Builder;
 use url::Url;
 
 // Number of milliseconds to allow an idle connection before closing it
 const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
 
-pub fn run(
+pub async fn run(
     listen: &str,
     cert_base_path: Option<&str>,
     config_dir_path: Option<&str>,
@@ -54,12 +53,13 @@ pub fn run(
         auth_reqs_handle,
         notif_endpoints_handle,
     )
+    .await
     .map_err(|err| Error::GeneralError(err.to_string()))
 }
 
 // Private helpers
 
-fn start_listening(
+async fn start_listening(
     listen: &str,
     cert_base_path: &str,
     idle_timeout: Option<u64>,
@@ -75,9 +75,8 @@ fn start_listening(
     let jsonrpc_quic_endpoint = Endpoint::new(cert_base_path, idle_timeout)
         .map_err(|err| Error::GeneralError(format!("Failed to create endpoint: {}", err)))?;
 
-    let mut runtime = Builder::new().threaded_scheduler().enable_all().build()?;
-    let mut incoming_conn = runtime
-        .enter(|| jsonrpc_quic_endpoint.bind(&listen_socket_addr))
+    let mut incoming_conn = jsonrpc_quic_endpoint
+        .bind(&listen_socket_addr)
         .map_err(|err| Error::GeneralError(format!("Failed to bind endpoint: {}", err)))?;
     println!("Listening on {}", listen_socket_addr);
 
@@ -85,23 +84,21 @@ fn start_listening(
     // and get them allowed/denied by the user using any of the subcribed endpoints
     let auth_reqs_handle2 = auth_reqs_handle.clone();
     let notif_endpoints_handle2 = notif_endpoints_handle.clone();
-    runtime.spawn(async {
+    tokio::spawn(async {
         monitor_pending_auth_reqs(auth_reqs_handle2, notif_endpoints_handle2).await
     });
 
-    runtime.block_on(async move {
-        while let Some(conn) = incoming_conn.get_next().await {
-            tokio::spawn({
-                handle_connection(
-                    conn,
-                    safe_auth_handle.clone(),
-                    auth_reqs_handle.clone(),
-                    notif_endpoints_handle.clone(),
-                )
-                .unwrap_or_else(move |e| error!("{reason}", reason = e.to_string()))
-            });
-        }
-    });
+    while let Some(conn) = incoming_conn.get_next().await {
+        tokio::spawn({
+            handle_connection(
+                conn,
+                safe_auth_handle.clone(),
+                auth_reqs_handle.clone(),
+                notif_endpoints_handle.clone(),
+            )
+            .unwrap_or_else(move |e| error!("{reason}", reason = e.to_string()))
+        });
+    }
 
     Ok(())
 }
@@ -112,24 +109,19 @@ async fn handle_connection(
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<()> {
-    async {
-        // Each stream initiated by the client constitutes a new request.
-        while let Some((jsonrpc_req, send)) = conn.get_next().await {
-            tokio::spawn(
-                handle_request(
-                    jsonrpc_req,
-                    send,
-                    safe_auth_handle.clone(),
-                    auth_reqs_handle.clone(),
-                    notif_endpoints_handle.clone(),
-                )
-                .unwrap_or_else(move |e| error!("{reason}", reason = e.to_string())),
-            );
-        }
-        Result::<()>::Ok(())
+    // Each stream initiated by the client constitutes a new request.
+    while let Some((jsonrpc_req, send)) = conn.get_next().await {
+        tokio::spawn(
+            handle_request(
+                jsonrpc_req,
+                send,
+                safe_auth_handle.clone(),
+                auth_reqs_handle.clone(),
+                notif_endpoints_handle.clone(),
+            )
+            .unwrap_or_else(move |e| error!("{reason}", reason = e.to_string())),
+        );
     }
-    .await
-    .map_err(|e| Error::GeneralError(format!("Failed to stablish connection: {}", e)))?;
 
     Ok(())
 }

@@ -43,7 +43,7 @@ pub fn start_authd_from_sc() -> Result<()> {
     ))
 }
 
-pub fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
+pub async fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
     let log_path = get_authd_log_path(log_dir)?;
 
     let mut stout_file_path = log_path.clone();
@@ -64,7 +64,7 @@ pub fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> 
 
     if foreground {
         println!("Initialising SAFE Authenticator services...");
-        authd_run(listen, None, None)
+        authd_run(listen, None, None).await
     } else {
         let daemonize = Daemonize::new()
             .pid_file(pid_file_path) // Every method except `new` and `start`
@@ -82,7 +82,7 @@ pub fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> 
         match daemonize.start() {
             Ok(_) => {
                 println!("Initialising SAFE Authenticator services...");
-                authd_run(listen, None, None)?;
+                authd_run(listen, None, None).await?;
                 Ok(())
             }
             Err(err) => {
@@ -128,7 +128,7 @@ pub fn stop_authd(log_dir: Option<PathBuf>) -> Result<()> {
     }
 }
 
-pub fn restart_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
+pub async fn restart_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
     match stop_authd(log_dir.clone()) {
         Ok(()) => {
             // Let's give it a sec so it's properlly stopped
@@ -136,7 +136,7 @@ pub fn restart_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -
         }
         Err(err) => println!("{}", err),
     }
-    start_authd(listen, log_dir, foreground)?;
+    start_authd(listen, log_dir, foreground).await?;
     println!("Success, safe-authd restarted!");
     Ok(())
 }

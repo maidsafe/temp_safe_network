@@ -106,7 +106,8 @@ enum CmdArgs {
     Update {},
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     setup_panic!();
     env_logger::init();
 
@@ -114,13 +115,13 @@ fn main() {
     let opt = CmdArgs::from_args();
     debug!("Running authd with options: {:?}", opt);
 
-    if let Err(err) = process_command(opt) {
+    if let Err(err) = process_command(opt).await {
         error!("safe-authd error: {}", err);
         process::exit(err.error_code());
     }
 }
 
-fn process_command(opt: CmdArgs) -> Result<()> {
+async fn process_command(opt: CmdArgs) -> Result<()> {
     match opt {
         CmdArgs::Update {} => update_commander()
             .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err))),
@@ -131,13 +132,13 @@ fn process_command(opt: CmdArgs) -> Result<()> {
             log_dir,
             fg,
             ..
-        } => start_authd(&listen, log_dir, fg),
+        } => start_authd(&listen, log_dir, fg).await,
         CmdArgs::ScStart {} => start_authd_from_sc(),
         CmdArgs::Stop { log_dir } => stop_authd(log_dir),
         CmdArgs::Restart {
             listen,
             log_dir,
             fg,
-        } => restart_authd(&listen, log_dir, fg),
+        } => restart_authd(&listen, log_dir, fg).await,
     }
 }
