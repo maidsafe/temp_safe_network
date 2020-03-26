@@ -1,6 +1,6 @@
 [package]
 name = "safe-authd"
-version = "0.0.6"
+version = "0.0.7"
 description = "SAFE Authenticator (daemon)"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 publish = false
@@ -26,7 +26,7 @@ structopt = "0.2.15"
 tokio = { version = "^0.2.13", features = ["rt-threaded"] }
 url = "~2.1.1"
 urlencoding = "1.0.0"
-quinn = {version = "~0.6.0", features=["tls-rustls"], default-features = false}
+quinn = {version = "^0.6.0", features=["tls-rustls"], default-features = false}
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 daemonize = "^0.4.1"

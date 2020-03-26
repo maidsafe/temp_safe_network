@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.11.0 (2020-03-26)
+
+### Features
+
+* ***ffi:*** feat/ffi: add files_contains_remove_path API ([a0b2f9c8](https://github.com/maidsafe/safe-api/commit/a0b2f9c8b90ceb0d6b9dbadcebd6992e45ac87e2))
+
 
 ### 0.10.1 (2020-03-20)
 

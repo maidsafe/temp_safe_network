@@ -1,6 +1,6 @@
 [package]
 name = "safe-ffi"
-version = "0.10.1"
+version = "0.11.0"
 description = "SAFE API FFI"
 authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
 publish = false

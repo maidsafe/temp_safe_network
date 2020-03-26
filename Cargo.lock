@@ -1657,7 +1657,7 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-quic"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "directories 2.0.2",
  "futures 0.3.4",
@@ -2966,7 +2966,7 @@ checksum = "535622e6be132bccd223f4bb2b8ac8d53cda3c7a6394944d3b2b33fb974f9d76"
 
 [[package]]
 name = "safe-api"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -3000,7 +3000,7 @@ dependencies = [
 
 [[package]]
 name = "safe-authd"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "cargo-husky",
  "daemonize",
@@ -3026,7 +3026,7 @@ dependencies = [
 
 [[package]]
 name = "safe-cli"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "ansi_term 0.9.0",
  "assert_cmd",
@@ -3063,7 +3063,7 @@ dependencies = [
 
 [[package]]
 name = "safe-ffi"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "async-std",
  "ffi_utils",
@@ -3108,8 +3108,9 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.14.1"
-source = "git+https://github.com/maidsafe/safe_client_libs?branch=fleming#98c72cda107dd950eef37019dc65196d839cbbf4"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd66dd29e771c1e9c02d858357c66320dfa4f017ce2435cf2fdb46cadab3cd6c"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3134,8 +3135,9 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator"
-version = "0.14.1"
-source = "git+https://github.com/maidsafe/safe_client_libs?branch=fleming#98c72cda107dd950eef37019dc65196d839cbbf4"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b59f6c33adb4d528ce64262fb52e7c313706b115a7c92cf40981b13bc75f151c"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3174,8 +3176,9 @@ dependencies = [
 
 [[package]]
 name = "safe_core"
-version = "0.39.1"
-source = "git+https://github.com/maidsafe/safe_client_libs?branch=fleming#98c72cda107dd950eef37019dc65196d839cbbf4"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c75f4996ef92a555ee13d554b45ee48ce27597f7f91bbdd028da7f54ba4e6e90"
 dependencies = [
  "bincode",
  "bytes 0.4.12",
