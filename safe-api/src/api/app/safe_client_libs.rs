@@ -21,9 +21,7 @@ use futures::future::Future;
 use log::{debug, info, warn};
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
-use safe_app::{
-    ffi::errors::Error as SafeAppFfiError, run, App, AppError::CoreError as SafeAppError,
-};
+use safe_app::{run, App, AppError::CoreError as SafeAppError};
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
@@ -68,9 +66,7 @@ impl SafeAppScl {
                 .map_err(SafeAppError)
         })
         .map_err(|err| {
-            if let SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::InvalidEntryActions(_),
-            ))) = err
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::InvalidEntryActions(_))) = err
             {
                 Error::EntryExists(format!("{}: {}", message, err))
             } else {
@@ -146,10 +142,7 @@ impl SafeApp for SafeAppScl {
 
         // Wait for the spawned task to finish
         handle.map_err(|err| {
-            if let SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::InsufficientBalance,
-            ))) = err
-            {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) = err {
                 Error::NotEnoughBalance(amount.to_string())
             } else {
                 Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
@@ -196,15 +189,13 @@ impl SafeApp for SafeAppScl {
                 .map_err(SafeAppError)
         })
         .map_err(|err| match err {
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::ExcessiveValue,
-            )))
-            | SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::InsufficientBalance,
-            ))) => Error::NotEnoughBalance(amount.to_string()),
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::InvalidOperation,
-            ))) => Error::InvalidAmount(amount.to_string()),
+            SafeAppError(SafeCoreError::DataError(SafeNdError::ExcessiveValue))
+            | SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) => {
+                Error::NotEnoughBalance(amount.to_string())
+            }
+            SafeAppError(SafeCoreError::DataError(SafeNdError::InvalidOperation)) => {
+                Error::InvalidAmount(amount.to_string())
+            }
             other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
         })?;
 
@@ -498,10 +489,7 @@ impl SafeApp for SafeAppScl {
                 .map_err(SafeAppError)
         })
         .map_err(|err| {
-            if let SafeAppFfiError(SafeAppError(SafeCoreError::DataError(
-                SafeNdError::NoSuchEntry,
-            ))) = err
-            {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
                 Error::VersionNotFound(format!(
                     "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
                     version, name
@@ -601,16 +589,16 @@ impl SafeApp for SafeAppScl {
                 .map_err(SafeAppError)
         })
         .map_err(|err| match err {
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied))) => {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) => {
                 Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
             }
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData))) => {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData)) => {
                 Error::ContentNotFound(format!(
                     "Sequenced MutableData not found at Xor name: {}",
                     xorname_to_hex(&name)
                 ))
             }
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry))) => {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) => {
                 Error::EntryNotFound(format!(
                     "Entry not found in Sequenced MutableData found at Xor name: {}",
                     xorname_to_hex(&name)
@@ -632,20 +620,20 @@ impl SafeApp for SafeAppScl {
                 .map_err(SafeAppError)
         })
         .map_err(|err| match err {
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied))) => {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) => {
                 Error::AccessDenied(format!(
                     "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
                     name, tag
                 ))
             }
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData))) => {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData)) => {
                 Error::ContentNotFound(format!(
                     "Sequenced MutableData not found at Xor name: {} (type tag: {})",
                     xorname_to_hex(&name),
                     tag
                 ))
             }
-            SafeAppFfiError(SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry))) => {
+            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) => {
                 Error::EntryNotFound(format!(
                     "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
                     xorname_to_hex(&name),
