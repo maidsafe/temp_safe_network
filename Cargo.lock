@@ -3066,11 +3066,13 @@ name = "safe-ffi"
 version = "0.11.0"
 dependencies = [
  "async-std",
+ "bincode",
  "ffi_utils",
  "log 0.4.8",
  "safe-api",
  "safe-nd",
  "safe_bindgen",
+ "safe_core",
  "serde",
  "serde_json",
  "unwrap",

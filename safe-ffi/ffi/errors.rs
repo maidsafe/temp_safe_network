@@ -7,8 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use bincode::Error as SerialisationError;
 use ffi_utils::{ErrorCode, StringError};
 use safe_api::Error as NativeError;
+use safe_core::ipc::IpcError;
 use std::{ffi::NulError, fmt};
 
 mod codes {
@@ -87,6 +89,22 @@ impl ErrorCode for Error {
             Unexpected(ref _error) => ERR_UNEXPECTED_ERROR,
             Unknown(ref _error) => ERR_UNKNOWN_ERROR,
         }
+    }
+}
+
+impl From<IpcError> for Error {
+    fn from(err: IpcError) -> Self {
+        match err {
+            IpcError::EncodeDecodeError => Self(NativeError::AuthdError(format!("{:?}", err))),
+            IpcError::Unexpected(reason) => Self(NativeError::Unexpected(reason)),
+            _ => Self(NativeError::Unexpected(format!("{:?}", err))),
+        }
+    }
+}
+
+impl From<SerialisationError> for Error {
+    fn from(err: SerialisationError) -> Self {
+        Self(NativeError::Unexpected(format!("{:?}", err)))
     }
 }
 
