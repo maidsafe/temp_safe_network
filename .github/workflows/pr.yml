@@ -53,7 +53,6 @@ jobs:
 
   build-ffi-android:
     name: Build FFI Android
-    if: false
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -147,7 +146,6 @@ jobs:
 
   build-ffi-ios:
     name: Build FFI iOS
-    if: false
     runs-on: macos-latest
     env:
       PKG_CONFIG_ALLOW_CROSS: 1
