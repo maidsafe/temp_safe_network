@@ -27,8 +27,9 @@ use errors::Result;
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use helpers::from_c_str_to_str_option;
 use safe_api::Safe;
+use safe_core::config_handler;
 use std::{
-    ffi::CString,
+    ffi::{CString, OsStr},
     os::raw::{c_char, c_void},
 };
 
@@ -75,4 +76,37 @@ pub unsafe extern "C" fn connect_app(
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(safe)));
         Ok(())
     })
+}
+
+/// Sets the path from which the `safe_core.config` file will be read.
+#[no_mangle]
+pub unsafe extern "C" fn app_set_config_dir_path(
+    new_path: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_> {
+        let new_path = String::clone_from_repr_c(new_path)?;
+        config_handler::set_config_dir_path(OsStr::new(&new_path));
+        o_cb(user_data, FFI_RESULT_OK);
+        Ok(())
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn app_is_mock() -> bool {
+    cfg!(feature = "mock-network")
+}
+
+#[test]
+#[cfg(feature = "mock-network")]
+fn test_mock_build() {
+    assert_eq!(app_is_mock(), true);
+}
+
+// Test mock detection when not compiled against mock-routing.
+#[test]
+#[cfg(not(feature = "mock-network"))]
+fn test_not_mock_build() {
+    assert_eq!(app_is_mock(), false);
 }
