@@ -206,7 +206,7 @@ Success, all processes instances of safe_vault were stopped!
 
 ##### Run a local network for testing: `--test`
 
-The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new and account and log in the CLI for test purposes. This requires that the `vault`, `authd` and `cli` themselves be installed in the correct locations on the system
+The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new account and log in the CLI for test purposes. This requires that the `vault`, `authd` and `cli` themselves be installed in the correct locations on the system
 
 #### Switch networks
 

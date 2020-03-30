@@ -17,7 +17,7 @@ done
 if [ -n "$1" ]; then
     vault_version=$Vault_dl_version
 else
-    vault_version="0.21.0"
+    vault_version="0.23.0"
 fi
 
 
