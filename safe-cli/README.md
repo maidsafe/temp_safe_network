@@ -219,33 +219,33 @@ Caching current network connection information into: ~/.config/safe-cli/networks
 Network 'my-network' was added to the list. Connection information is located at '~/.config/safe-cli/networks/my-network_vault_connection_info.config'
 ```
 
-If you also would like to connect to the MaidSafe hosted test network, you'd need to set it up in CLI settings as another network too, specifying the URL where to fetch latest connection information from:
+If you also would like to connect to the MaidSafe hosted test network, you would need to set it up in CLI settings as another network, specifying the URL where to fetch latest connection information from:
 ```shell
-$ safe networks add shared-network https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config
-Network 'shared-network' was added to the list
+$ safe networks add shared-section https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config
+Network 'shared-section' was added to the list
 ```
 
 We can also retrieve the list of the different networks that were set up in the CLI config:
 ```shell
 $ safe networks
-+----------------+------------------------------------------------------------------------------------------------+
-| Networks       |                                                                                                |
-+----------------+------------------------------------------------------------------------------------------------+
-| Network name   | Connection info location                                                                       |
-+----------------+------------------------------------------------------------------------------------------------+
-| my-network     | ~/.config/safe-cli/networks/my-network_vault_connection_info.config                            |
-+----------------+------------------------------------------------------------------------------------------------+
-| shared-network | https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config |
-+----------------+------------------------------------------------------------------------------------------------+
++----------------+--------------------------------------------------------------------------------------------------+
+| Networks       |                                                                                                  |
++----------------+--------------------------------------------------------------------------------------------------+
+| Network name   | Connection info location                                                                         |
++----------------+--------------------------------------------------------------------------------------------------+
+| my-network     | ~/.config/safe-cli/networks/my-network_vault_connection_info.config                              |
++----------------+--------------------------------------------------------------------------------------------------+
+| shared-section | https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config |
++----------------+--------------------------------------------------------------------------------------------------+
 ```
 
-Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it at the right location in the system for SAFE applications to connect to the selected network. E.g. let's switch to the 'shared-network' network we previously configured:
+Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it at the right location in the system for SAFE applications to connect to the selected network. E.g. let's switch to the 'shared-section' network we previously configured:
 ```shell
-$ safe networks switch shared-network
-Switching to 'shared-network' network...
-Fetching 'shared-network' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
-Successfully switched to 'shared-network' network in your system!
-If you need write access to the 'shared-network' network, you'll need to restart authd, login and re-authorise the CLI again
+$ safe networks switch shared-section
+Switching to 'shared-section' network...
+Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+Successfully switched to 'shared-section' network in your system!
+If you need write access to the 'shared-section' network, you'll need to restart authd, login and re-authorise the CLI again
 ```
 
 Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your currently setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
@@ -253,9 +253,9 @@ Remember that every time you launch a local network the connection configuration
 $ safe networks check
 Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/safe-cli/networks/my-network_vault_connection_info.config' ...
-Fetching 'shared-network' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-vault/vault_connection_info.config' ...
+Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
 
-'shared-network' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-network' network as per current config
+'shared-section' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-section' network as per current config
 ```
 
 Note that in the scenario that your current network is set to be the MaidSafe shared network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
