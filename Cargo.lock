@@ -3208,6 +3208,7 @@ dependencies = [
  "log 0.4.8",
  "safe-api",
  "safe-nd",
+ "safe_authenticator_ffi",
  "safe_bindgen",
  "safe_core",
  "serde",
@@ -3247,9 +3248,9 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.15.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3f1eb064d6a2788c7837ca55ce9aca3ec2c87596bba47b405be87040218a625"
+checksum = "bd66dd29e771c1e9c02d858357c66320dfa4f017ce2435cf2fdb46cadab3cd6c"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -3262,7 +3263,6 @@ dependencies = [
  "rand 0.6.5",
  "safe-nd",
  "safe_authenticator",
- "safe_authenticator_ffi",
  "safe_core",
  "self_encryption",
  "serde",
