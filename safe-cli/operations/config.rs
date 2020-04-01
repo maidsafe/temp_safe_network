@@ -133,42 +133,40 @@ pub fn remove_network_from_config(network_name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn get_current_network_conn_info_path() -> Result<PathBuf, String> {
-    match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
-        Some(dirs) => Ok(dirs.config_dir().join("vault_connection_info.config")),
-        None => Err(
-            "Failed to obtain local home directory where to set network connection info"
-                .to_string(),
-        ),
-    }
-}
-
 pub fn read_current_network_conn_info() -> Result<(PathBuf, Vec<u8>), String> {
-    let path = get_current_network_conn_info_path()?;
-    let current_conn_info = fs::read(&path).map_err(|err| {
+    let (_, file_path) = get_current_network_conn_info_path()?;
+    let current_conn_info = fs::read(&file_path).map_err(|err| {
         format!(
             "There doesn't seem to be a any network setup in your system. Unable to read current network connection information from '{}': {}",
-            path.display(), err
+            file_path.display(), err
         )
     })?;
-    Ok((path, current_conn_info))
+    Ok((file_path, current_conn_info))
 }
 
 pub fn write_current_network_conn_info(conn_info: &[u8]) -> Result<(), String> {
-    let path = get_current_network_conn_info_path()?;
-    fs::write(&path, conn_info)
-        .map_err(|err| format!("Unable to write config in {}: {}", path.display(), err))
-}
+    let (base_path, file_path) = get_current_network_conn_info_path()?;
 
-fn get_cli_config_path() -> Result<PathBuf, String> {
-    let project_data_path = ProjectDirs::from(
-        PROJECT_DATA_DIR_QUALIFIER,
-        PROJECT_DATA_DIR_ORGANISATION,
-        PROJECT_DATA_DIR_APPLICATION,
-    )
-    .ok_or_else(|| "Couldn't find user's home directory".to_string())?;
+    if !base_path.exists() {
+        println!(
+            "Creating '{}' folder for network connection info",
+            base_path.display()
+        );
+        create_dir_all(&base_path).map_err(|err| {
+            format!(
+                "Couldn't create folder for network connection info: {}",
+                err
+            )
+        })?;
+    }
 
-    Ok(project_data_path.config_dir().to_path_buf())
+    fs::write(&file_path, conn_info).map_err(|err| {
+        format!(
+            "Unable to write network connection info in {}: {}",
+            base_path.display(),
+            err
+        )
+    })
 }
 
 pub fn config_file_path() -> Result<PathBuf, String> {
@@ -277,4 +275,28 @@ pub fn retrieve_conn_info(name: &str, location: &str) -> Result<Vec<u8>, String>
 #[inline]
 fn is_remote_location(location: &str) -> bool {
     location.starts_with("http")
+}
+
+fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf), String> {
+    match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
+        Some(dirs) => Ok((
+            dirs.config_dir().to_path_buf(),
+            dirs.config_dir().join("vault_connection_info.config"),
+        )),
+        None => Err(
+            "Failed to obtain local home directory where to set network connection info"
+                .to_string(),
+        ),
+    }
+}
+
+fn get_cli_config_path() -> Result<PathBuf, String> {
+    let project_data_path = ProjectDirs::from(
+        PROJECT_DATA_DIR_QUALIFIER,
+        PROJECT_DATA_DIR_ORGANISATION,
+        PROJECT_DATA_DIR_APPLICATION,
+    )
+    .ok_or_else(|| "Couldn't find user's home directory".to_string())?;
+
+    Ok(project_data_path.config_dir().to_path_buf())
 }
