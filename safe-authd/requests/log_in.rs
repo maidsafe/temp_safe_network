@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedSafeAuthenticatorHandle;
+use log::{error, info};
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -21,7 +22,7 @@ pub async fn process_req(
                 params
             ))
         } else {
-            println!("Logging in to SAFE account...");
+            info!("Logging in to SAFE account...");
             let passphrase = args[0].as_str().ok_or_else(|| {
                 format!(
                     "Invalid type for passphrase param for 'login' method: {:?}",
@@ -39,11 +40,11 @@ pub async fn process_req(
             match safe_authenticator.log_in(passphrase, password) {
                 Ok(_) => {
                     let msg = "Logged in successfully!";
-                    println!("{}", msg);
+                    info!("{}", msg);
                     Ok(json!(msg))
                 }
                 Err(err) => {
-                    println!("Error occurred when trying to log in: {}", err);
+                    error!("Error occurred when trying to log in: {}", err);
                     Err(err.to_string())
                 }
             }

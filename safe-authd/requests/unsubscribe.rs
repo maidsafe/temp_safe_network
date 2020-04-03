@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedNotifEndpointsHandle;
+use log::info;
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -15,7 +16,7 @@ pub async fn process_req(
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<Value, String> {
     if let Value::String(notif_endpoint) = params {
-        println!("Unsubscribing from authorisation requests notifications...");
+        info!("Unsubscribing from authorisation requests notifications...");
         let mut notif_endpoints_list = notif_endpoints_handle.lock().await;
         match notif_endpoints_list.remove(&notif_endpoint) {
             Some(_) => {
@@ -23,7 +24,7 @@ pub async fn process_req(
                     "Unsubscription successful. Endpoint '{}' will no longer receive authorisation requests notifications",
                     notif_endpoint
                     );
-                println!("{}", msg);
+                info!("{}", msg);
                 Ok(json!(msg))
             }
             None => {
@@ -31,7 +32,7 @@ pub async fn process_req(
                 "Unsubscription request ignored, no such the endpoint URL ('{}') was found to be subscribed",
                 notif_endpoint
                 );
-                println!("{}", msg);
+                info!("{}", msg);
                 Err(msg)
             }
         }

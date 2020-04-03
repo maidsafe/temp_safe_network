@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::{SharedAuthReqsHandle, SharedSafeAuthenticatorHandle};
+use log::{error, info};
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -21,19 +22,19 @@ pub async fn process_req(
             params
         ))
     } else {
-        println!("Logging out...");
+        info!("Logging out...");
         let mut safe_authenticator = safe_auth_handle.lock().await;
         match safe_authenticator.log_out() {
             Ok(()) => {
                 let msg = "Logged out successfully";
-                println!("{}", msg);
+                info!("{}", msg);
                 let mut auth_reqs_list = auth_reqs_handle.lock().await;
                 auth_reqs_list.clear();
                 Ok(json!(msg))
             }
             Err(err) => {
                 let msg = format!("Failed to log out: {}", err);
-                println!("{}", msg);
+                error!("{}", msg);
                 Err(msg)
             }
         }

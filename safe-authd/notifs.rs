@@ -9,6 +9,7 @@
 
 use super::shared::*;
 use jsonrpc_quic::ClientEndpoint;
+use log::info;
 use serde_json::json;
 use std::{collections::BTreeMap, time::Duration};
 use tokio::time::delay_for;
@@ -53,7 +54,7 @@ pub async fn monitor_pending_auth_reqs(
             let is_timeout = match incoming_auth_req.timestamp.elapsed() {
                 Ok(elapsed) => {
                     if elapsed >= Duration::from_millis(AUTH_REQS_TIMEOUT) {
-                        println!(
+                        info!(
                                 "Removing auth req '{}' from the queue since it timed out (it was received more than {} milliseconds ago)",
                                 req_id, AUTH_REQS_TIMEOUT
                             );
@@ -63,7 +64,7 @@ pub async fn monitor_pending_auth_reqs(
                     }
                 }
                 Err(err) => {
-                    println!("Unexpected error when checking auth req ('{}') elapsed time so it's being removed from the list: {:?}", req_id, err);
+                    info!("Unexpected error when checking auth req ('{}') elapsed time so it's being removed from the list: {:?}", req_id, err);
                     true
                 }
             };
@@ -100,7 +101,7 @@ pub async fn monitor_pending_auth_reqs(
                 }
             }
 
-            println!(
+            info!(
                 "Decision obtained for auth req id: {} - from app id: {}: {:?}",
                 incoming_auth_req.auth_req.req_id, incoming_auth_req.auth_req.app_id, response
             );
@@ -120,9 +121,9 @@ pub async fn monitor_pending_auth_reqs(
 
             if let Some(is_allowed) = response {
                 match incoming_auth_req.tx.try_send(is_allowed) {
-                    Ok(_) => println!("Auth req decision ready to be sent back to the application"),
+                    Ok(_) => info!("Auth req decision ready to be sent back to the application"),
                     Err(_) => {
-                        println!("Auth req decision couldn't be sent, and therefore already denied")
+                        info!("Auth req decision couldn't be sent, and therefore already denied")
                     }
                 };
             }
@@ -137,7 +138,7 @@ async fn send_notification(
     auth_req: &IncomingAuthReq,
     cert_base_path: &str,
 ) -> Option<NotifResponse> {
-    println!("Notifying subscriber: {}", url);
+    info!("Notifying subscriber: {}", url);
     match jsonrpc_send(
         url,
         JSONRPC_METHOD_AUTH_REQ_NOTIF,
@@ -155,13 +156,13 @@ async fn send_notification(
             } else {
                 None
             };
-            println!("Subscriber's response: {}", notif_result);
+            info!("Subscriber's response: {}", notif_result);
             Some(response)
         }
         Err(err) => {
             // Let's unsubscribe it immediately, ... we could be more laxed
             // in the future allowing some unresponsiveness
-            println!(
+            info!(
                 "Subscriber '{}' is being automatically unsubscribed since response to notification couldn't be obtained: {:?}",
                 url, err
             );
@@ -201,7 +202,7 @@ async fn jsonrpc_send(
             jsonrpc_quic::Error::RemoteEndpointError(msg) => {
                 // Subscriber responded but with an error, we won't unsubscribe it, but will
                 // consider this response as a "no decision" for the auth req
-                println!(
+                info!(
                     "Subscriber '{}' responded to the notification with an error: {:?}",
                     url, msg
                 );

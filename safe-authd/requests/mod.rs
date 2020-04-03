@@ -25,6 +25,7 @@ use crate::{
     shared::{SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle},
 };
 use jsonrpc_quic::{JsonRpcRequest, JsonRpcResponse};
+use log::{error, info};
 
 const JSONRPC_AUTH_ERROR: isize = -1;
 
@@ -35,7 +36,7 @@ pub async fn process_jsonrpc_request(
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<JsonRpcResponse, Error> {
-    println!(
+    info!(
         "Processing new incoming request ({}): '{}'",
         jsonrpc_req.id, jsonrpc_req.method
     );
@@ -69,7 +70,7 @@ pub async fn process_jsonrpc_request(
                 "Action '{}' not supported or unknown by the Authenticator daemon",
                 other
             );
-            println!("{}", msg);
+            error!("{}", msg);
             Err(msg)
         }
     };
@@ -78,7 +79,7 @@ pub async fn process_jsonrpc_request(
     match outcome {
         Ok(result) => Ok(JsonRpcResponse::result(result, jsonrpc_req.id)),
         Err(err_msg) => {
-            println!(
+            error!(
                 "Failed processing incoming request {}: {}",
                 jsonrpc_req.id, err_msg
             );

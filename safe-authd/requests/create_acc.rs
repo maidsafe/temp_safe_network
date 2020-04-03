@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedSafeAuthenticatorHandle;
+use log::{error, info};
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -21,7 +22,7 @@ pub async fn process_req(
                 params
             ))
         } else {
-            println!("Creating an account in SAFE...");
+            info!("Creating an account in SAFE...");
             let passphrase = args[0].as_str().ok_or_else(|| {
                 format!(
                     "Invalid type for passphrase param for 'create-acc' method: {:?}",
@@ -45,11 +46,11 @@ pub async fn process_req(
             match safe_authenticator.create_acc(sk, passphrase, password) {
                 Ok(_) => {
                     let msg = "Account created successfully";
-                    println!("{}", msg);
+                    info!("{}", msg);
                     Ok(json!(msg))
                 }
                 Err(err) => {
-                    println!("Error occurred when trying to create SAFE account: {}", err);
+                    error!("Error occurred when trying to create SAFE account: {}", err);
                     Err(err.to_string())
                 }
             }

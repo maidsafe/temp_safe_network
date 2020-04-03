@@ -10,16 +10,11 @@
 mod authd;
 mod errors;
 mod notifs;
+mod operations;
 mod requests;
 mod shared;
 mod update;
 
-#[cfg(not(target_os = "windows"))]
-mod operations;
-#[cfg(target_os = "windows")]
-mod operations_win;
-
-use env_logger;
 use errors::{Error, Result};
 use log::debug;
 use log::error;
@@ -34,25 +29,12 @@ extern crate human_panic;
 #[macro_use]
 extern crate self_update;
 
-#[cfg(not(target_os = "windows"))]
-use operations::{
-    install_authd, restart_authd, start_authd, start_authd_from_sc, stop_authd, uninstall_authd,
-};
-#[cfg(target_os = "windows")]
-use operations_win::{
-    install_authd, restart_authd, start_authd, start_authd_from_sc, stop_authd, uninstall_authd,
-};
+use operations::{restart_authd, start_authd, stop_authd};
 
 #[derive(StructOpt, Debug)]
 /// SAFE Authenticator daemon subcommands
 #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
 enum CmdArgs {
-    /// Install safe-authd as a service. Only for Windows platforms
-    #[structopt(name = "install")]
-    Install {},
-    /// Uninstall safe-authd service. Only for Windows platforms
-    #[structopt(name = "uninstall")]
-    Uninstall {},
     /// Start the safe-authd daemon
     #[structopt(name = "start")]
     Start {
@@ -72,15 +54,12 @@ enum CmdArgs {
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
         /// Path where to store authd log files (default ~/.safe/authd/logs/)
-        #[structopt(long)]
+        #[structopt(long = "log-dir")]
         log_dir: Option<PathBuf>,
         /// Run in foreground instead of daemon mode
-        #[structopt(long = "foreground")]
+        #[structopt(long = "fg")]
         fg: bool,
     },
-    /// To be invoked by Windows Service Control Manager to start the authd service. Only for Windows platforms
-    #[structopt(name = "sc-start")]
-    ScStart {},
     /// Stop a running safe-authd
     #[structopt(name = "stop")]
     Stop {
@@ -95,10 +74,10 @@ enum CmdArgs {
         #[structopt(long = "listen", default_value = "https://localhost:33000")]
         listen: String,
         /// Path where to store authd log files (default ~/.safe/authd/logs/)
-        #[structopt(long)]
+        #[structopt(long = "log-dir")]
         log_dir: Option<PathBuf>,
         /// Run in foreground instead of daemon mode
-        #[structopt(long = "foreground")]
+        #[structopt(long = "fg")]
         fg: bool,
     },
     /// Update the application to the latest available version
@@ -109,7 +88,6 @@ enum CmdArgs {
 #[tokio::main]
 async fn main() {
     setup_panic!();
-    env_logger::init();
 
     // Let's first get all the arguments passed in
     let opt = CmdArgs::from_args();
@@ -125,15 +103,12 @@ async fn process_command(opt: CmdArgs) -> Result<()> {
     match opt {
         CmdArgs::Update {} => update_commander()
             .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err))),
-        CmdArgs::Install {} => install_authd(),
-        CmdArgs::Uninstall {} => uninstall_authd(),
         CmdArgs::Start {
             listen,
             log_dir,
             fg,
             ..
         } => start_authd(&listen, log_dir, fg).await,
-        CmdArgs::ScStart {} => start_authd_from_sc(),
         CmdArgs::Stop { log_dir } => stop_authd(log_dir),
         CmdArgs::Restart {
             listen,

@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::{IncomingAuthReq, SharedAuthReqsHandle, SharedSafeAuthenticatorHandle};
+use log::{error, info};
 use safe_api::{AuthReq, SafeAuthReq};
 use serde_json::{json, Value};
 use std::time::SystemTime;
@@ -52,7 +53,7 @@ async fn handle_authorisation(
     auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<AuthorisationResponse, String> {
     if let Value::String(auth_req_str) = params {
-        println!("Authorising application...");
+        info!("Authorising application...");
         let safe_authenticator = safe_auth_handle.lock().await;
         match safe_authenticator.decode_req(&auth_req_str) {
             Ok((req_id, request)) => {
@@ -60,11 +61,11 @@ async fn handle_authorisation(
                 // let's now treat it according to its type
                 match request {
                     SafeAuthReq::Auth(app_auth_req) => {
-                        println!(
+                        info!(
                             "The following application authorisation request ({}) was received:",
                             req_id
                         );
-                        println!("{:?}", app_auth_req);
+                        info!("{:?}", app_auth_req);
 
                         let mut auth_reqs_list = auth_reqs_handle.lock().await;
 
@@ -104,18 +105,16 @@ async fn handle_authorisation(
                         }
                     }
                     SafeAuthReq::Containers(cont_req) => {
-                        println!(
-                            "The following authorisation request for containers was received:"
-                        );
-                        println!("{:?}", cont_req);
+                        info!("The following authorisation request for containers was received:");
+                        info!("{:?}", cont_req);
                         Err(
                             "Authorisation request for Containers is not yet supported by authd"
                                 .to_string(),
                         )
                     }
                     SafeAuthReq::ShareMData(share_mdata_req) => {
-                        println!("The following authorisation request to share a MutableData was received:");
-                        println!("{:?}", share_mdata_req);
+                        info!("The following authorisation request to share a MutableData was received:");
+                        info!("{:?}", share_mdata_req);
                         Err(
                             "Authorisation request for Share MutableData is not yet supported by authd"
                                 .to_string(),
@@ -125,11 +124,11 @@ async fn handle_authorisation(
                         // We simply allow unregistered authorisation requests
                         match safe_authenticator.authorise_app(&auth_req_str) {
                             Ok(resp) => {
-                                println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
+                                info!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
                                 Ok(AuthorisationResponse::Ready(json!(resp)))
                             }
                             Err(err) => {
-                                println!("Failed to authorise application: {}", err);
+                                error!("Failed to authorise application: {}", err);
                                 Err(err.to_string())
                             }
                         }
@@ -137,7 +136,7 @@ async fn handle_authorisation(
                 }
             }
             Err(err) => {
-                println!("{}", err);
+                error!("{}", err);
                 Err(err.to_string())
             }
         }
@@ -159,24 +158,24 @@ async fn await_authorisation_decision(
     match rx.recv().await {
         Some(is_allowed) => {
             if is_allowed {
-                println!(
+                info!(
                     "Let's request the authenticator lib to authorise the request '{}'...",
                     req_id
                 );
                 let safe_authenticator = safe_auth_handle.lock().await;
                 match safe_authenticator.authorise_app(&auth_req_str) {
                     Ok(resp) => {
-                        println!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
+                        info!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
                         Ok(serde_json::value::Value::String(resp))
                     }
                     Err(err) => {
-                        println!("Failed to authorise application: {}", err);
+                        error!("Failed to authorise application: {}", err);
                         Err(err.to_string())
                     }
                 }
             } else {
                 let msg = format!("Authorisation request ({}) was denied", req_id);
-                println!("{}", msg);
+                info!("{}", msg);
                 Err(msg)
             }
         }

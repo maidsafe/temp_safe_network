@@ -16,6 +16,7 @@ pub enum Error {
     GeneralError(String),
     AuthdAlreadyStarted(String),
     Unexpected(String),
+    Unknown((String, i32)),
 }
 
 impl From<Error> for String {
@@ -42,9 +43,10 @@ impl Error {
         // Don't use any of the reserved exit codes:
         // http://tldp.org/LDP/abs/html/exitcodes.html#AEN23549
         match self {
-            GeneralError(ref _error) => 1,
-            AuthdAlreadyStarted(ref _error) => 10,
-            Unexpected(ref _error) => 20,
+            GeneralError(_) => 1,
+            AuthdAlreadyStarted(_) => 10,
+            Unexpected(_) => 20,
+            Unknown(_) => 1,
         }
     }
 
@@ -54,9 +56,19 @@ impl Error {
             GeneralError(info) => ("GeneralError", info),
             AuthdAlreadyStarted(info) => ("AuthdAlreadyStarted", info),
             Unexpected(info) => ("Unexpected", info),
+            Unknown((info, _code)) => ("Unknown", info),
         };
 
         format!("[Error] {} - {}", error_type, error_msg)
+    }
+
+    pub fn from_code(error_code: i32, msg: String) -> Self {
+        match error_code {
+            1 => Self::GeneralError(msg),
+            10 => Self::AuthdAlreadyStarted(msg),
+            20 => Self::Unexpected(msg),
+            code => Self::Unknown((msg, code)),
+        }
     }
 }
 

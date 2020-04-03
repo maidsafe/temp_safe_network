@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedAuthReqsHandle;
+use log::info;
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -15,7 +16,7 @@ pub async fn process_req(
     auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<Value, String> {
     if let Value::String(auth_req_id) = params {
-        println!("Denying authorisation request...");
+        info!("Denying authorisation request...");
         let req_id = match auth_req_id.parse::<u32>() {
             Ok(id) => id,
             Err(err) => return Err(err.to_string()),
@@ -28,12 +29,12 @@ pub async fn process_req(
                         "Authorisation request ({}) denied successfully",
                         auth_req_id
                     );
-                    println!("{}", msg);
+                    info!("{}", msg);
                     Ok(json!(msg))
                 }
                 Err(_) => {
                     let msg = format!("Authorisation request '{}' was already denied since the response couldn't be sent to the requesting application", auth_req_id);
-                    println!("{}", msg);
+                    info!("{}", msg);
                     Err(msg)
                 }
             },
@@ -42,7 +43,7 @@ pub async fn process_req(
                     "No pending authorisation request found with id '{}'",
                     auth_req_id
                 );
-                println!("{}", msg);
+                info!("{}", msg);
                 Err(msg)
             }
         }

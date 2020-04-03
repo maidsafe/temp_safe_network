@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedSafeAuthenticatorHandle;
+use log::{error, info};
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -15,16 +16,16 @@ pub async fn process_req(
     safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
     if let Value::String(app_id) = params {
-        println!("Revoking application...");
+        info!("Revoking application...");
         let safe_authenticator = safe_auth_handle.lock().await;
         match safe_authenticator.revoke_app(&app_id) {
             Ok(()) => {
                 let msg = "Application revoked successfully";
-                println!("{}", msg);
+                info!("{}", msg);
                 Ok(json!(msg))
             }
             Err(err) => {
-                println!("Failed to revoke application '{}': {}", app_id, err);
+                error!("Failed to revoke application '{}': {}", app_id, err);
                 Err(err.to_string())
             }
         }

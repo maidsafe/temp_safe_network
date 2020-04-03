@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedNotifEndpointsHandle;
+use log::info;
 use serde_json::{json, Value};
 
 // Maximum number of allowed auth reqs notifs subscribers
@@ -34,7 +35,7 @@ pub async fn process_req(
                 }
             };
 
-            println!("Subscribing to authorisation requests notifications...");
+            info!("Subscribing to authorisation requests notifications...");
             let cert_base_path = if args.len() == 2 {
                 match args[1].as_str() {
                     None => return Err(format!(
@@ -60,11 +61,11 @@ pub async fn process_req(
                     "Subscription rejected. Endpoint '{}' is already subscribed",
                     notif_endpoint
                 );
-                println!("{}", msg);
+                info!("{}", msg);
                 Err(msg)
             } else if notif_endpoints_list.len() >= MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS {
                 let msg = format!("Subscription rejected. Maximum number of subscriptions ({}) has been already reached", MAX_NUMBER_OF_NOTIF_SUBSCRIPTIONS);
-                println!("{}", msg);
+                info!("{}", msg);
                 Err(msg)
             } else {
                 notif_endpoints_list.insert(notif_endpoint.clone(), cert_base_path.clone());
@@ -73,7 +74,7 @@ pub async fn process_req(
                         "Subscription successful. Endpoint '{}' will receive authorisation requests notifications (cert base path: {:?})",
                         notif_endpoint, cert_base_path
                     );
-                println!("{}", msg);
+                info!("{}", msg);
                 Ok(json!(msg))
             }
         }

@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedAuthReqsHandle;
+use log::info;
 use safe_api::PendingAuthReqs;
 use serde_json::{json, Value};
 
@@ -21,14 +22,14 @@ pub async fn process_req(
             params
         ))
     } else {
-        println!("Obtaining list of pending authorisation requests...");
+        info!("Obtaining list of pending authorisation requests...");
         let auth_reqs_list = auth_reqs_handle.lock().await;
         let pending_auth_reqs: PendingAuthReqs = auth_reqs_list
             .iter()
             .map(|(_req_id, pending_req)| pending_req.auth_req.clone())
             .collect();
 
-        println!(
+        info!(
             "List of pending authorisation requests sent: {:?}",
             pending_auth_reqs
         );

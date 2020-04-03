@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, str, sync::Arc};
 use url::Url;
 
 // Number of milliseconds to allow an idle connection before closing it
-const CONNECTION_IDLE_TIMEOUT: u64 = 60_000;
+const CONNECTION_IDLE_TIMEOUT: u64 = 120_000;
 
 pub async fn run(
     listen: &str,
@@ -54,7 +54,6 @@ pub async fn run(
         notif_endpoints_handle,
     )
     .await
-    .map_err(|err| Error::GeneralError(err.to_string()))
 }
 
 // Private helpers
@@ -78,7 +77,7 @@ async fn start_listening(
     let mut incoming_conn = jsonrpc_quic_endpoint
         .bind(&listen_socket_addr)
         .map_err(|err| Error::GeneralError(format!("Failed to bind endpoint: {}", err)))?;
-    println!("Listening on {}", listen_socket_addr);
+    info!("Listening on {}", listen_socket_addr);
 
     // Let's spawn a task which will monitor pending auth reqs
     // and get them allowed/denied by the user using any of the subcribed endpoints
@@ -152,6 +151,6 @@ async fn handle_request(
         .await
         .map_err(|e| Error::GeneralError(format!("Failed to shutdown stream: {}", e)))?;
 
-    info!("Request complete");
+    info!("Response sent, request complete");
     Ok(())
 }

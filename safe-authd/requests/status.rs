@@ -10,6 +10,7 @@
 use crate::shared::{
     SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
+use log::info;
 use safe_api::AuthdStatus;
 use serde_json::{json, Value};
 
@@ -25,7 +26,7 @@ pub async fn process_req(
             params
         ))
     } else {
-        println!("Preparing authd status report...");
+        info!("Preparing authd status report...");
 
         let logged_in = {
             let safe_authenticator = safe_auth_handle.lock().await;
@@ -51,7 +52,7 @@ pub async fn process_req(
             authd_version,
         };
 
-        println!("Status report sent: {:?}", status_report);
+        info!("Status report sent: {:?}", status_report);
         Ok(json!(status_report))
     }
 }

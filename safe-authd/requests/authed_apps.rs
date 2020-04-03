@@ -8,6 +8,7 @@
 // Software.
 
 use crate::shared::SharedSafeAuthenticatorHandle;
+use log::{error, info};
 use serde_json::{json, Value};
 
 pub async fn process_req(
@@ -20,15 +21,15 @@ pub async fn process_req(
             params
         ))
     } else {
-        println!("Obtaining list of authorised applications...");
+        info!("Obtaining list of authorised applications...");
         let safe_authenticator = safe_auth_handle.lock().await;
         match safe_authenticator.authed_apps() {
             Ok(authed_apps_list) => {
-                println!("List of authorised apps sent: {:?}", authed_apps_list);
+                info!("List of authorised apps sent: {:?}", authed_apps_list);
                 Ok(json!(authed_apps_list))
             }
             Err(err) => {
-                println!("Failed to get list of authorised apps: {}", err);
+                error!("Failed to get list of authorised apps: {}", err);
                 Err(err.to_string())
             }
         }

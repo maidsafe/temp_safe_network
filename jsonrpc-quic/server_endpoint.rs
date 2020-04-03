@@ -12,7 +12,7 @@ use super::{
 };
 use crate::utils;
 use futures::StreamExt;
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::{fs, io, net::SocketAddr, str, sync::Arc};
 
 // JSON-RPC over QUIC server endpoint
@@ -142,11 +142,11 @@ impl IncomingJsonRpcRequest {
             Some(stream) => {
                 let (send, recv): (quinn::SendStream, quinn::RecvStream) = match stream {
                     Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
-                        info!("Connection terminated");
+                        warn!("Connection terminated");
                         return None;
                     }
                     Err(err) => {
-                        info!("Failed to read incoming request: {}", err);
+                        warn!("Failed to read incoming request: {}", err);
                         return None;
                     }
                     Ok(bi_stream) => bi_stream,
@@ -164,13 +164,13 @@ impl IncomingJsonRpcRequest {
                                 Some((jsonrpc_req, JsonRpcResponseStream::new(send)))
                             }
                             Err(err) => {
-                                info!("Failed to parse request as JSON-RPC: {}", err);
+                                warn!("Failed to parse request as JSON-RPC: {}", err);
                                 None
                             }
                         }
                     }
                     Err(err) => {
-                        info!("Failed reading request's bytes: {}", err);
+                        warn!("Failed reading request's bytes: {}", err);
                         None
                     }
                 }

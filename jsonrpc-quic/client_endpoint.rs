@@ -69,7 +69,7 @@ impl ClientEndpoint {
         quinn_endpoint_builder.default_client_config(self.config.clone());
 
         let socket_addr = "[::]:0".parse().map_err(|err| {
-            Error::ClientError(format!("Invalid client endpoint address: {}", err))
+            Error::ClientError(format!("Failed to parse client endpoint address: {}", err))
         })?;
 
         let (endpoint, _) = quinn_endpoint_builder.bind(&socket_addr).map_err(|err| {
@@ -99,22 +99,23 @@ impl OutgoingConn {
         cert_host: Option<&str>,
     ) -> Result<OutgoingJsonRpcRequest> {
         let start = Instant::now();
-        let url = Url::parse(dest_endpoint)
-            .map_err(|_| Error::ClientError("Invalid end point address".to_string()))?;
+        let url = Url::parse(dest_endpoint).map_err(|_| {
+            Error::ClientError("Failed to parse remote end point address".to_string())
+        })?;
         let remote = url
             .socket_addrs(|| None)
-            .map_err(|_| Error::ClientError("Invalid end point address".to_string()))?[0];
+            .map_err(|_| Error::ClientError("Invalid remote end point address".to_string()))?[0];
         let host = cert_host
             .as_ref()
             .map_or_else(|| url.host_str(), |x| Some(&x))
-            .ok_or_else(|| Error::ClientError("No hostname specified".to_string()))?;
+            .ok_or_else(|| Error::ClientError("No certificate hostname specified".to_string()))?;
 
         let new_conn = self
             .quinn_endpoint
             .connect(&remote, &host)
             .map_err(|err| {
                 Error::ClientError(format!(
-                    "Failed to establish connection with remote QUIC endpoint: {}",
+                    "Failed when attempting to create a connection with remote QUIC endpoint: {}",
                     err
                 ))
             })?
@@ -156,31 +157,33 @@ impl OutgoingJsonRpcRequest {
     where
         T: DeserializeOwned,
     {
-        let (mut send, recv) = self
-            .quinn_connection
-            .open_bi()
-            .await
-            .map_err(|err| Error::ClientError(format!("Failed to open stream: {}", err)))?;
+        let (mut send, recv) = self.quinn_connection.open_bi().await.map_err(|err| {
+            Error::ClientError(format!("Failed to open communication stream: {}", err))
+        })?;
 
         let jsonrpc_req = JsonRpcRequest::new(method, params);
 
-        let serialised_req = serde_json::to_string(&jsonrpc_req)
-            .map_err(|err| Error::ClientError(format!("Failed to serialise request: {}", err)))?;
+        let serialised_req = serde_json::to_string(&jsonrpc_req).map_err(|err| {
+            Error::ClientError(format!("Failed to serialise request to be sent: {}", err))
+        })?;
 
         // Send request over QUIC, and await for JSON-RPC response
         send.write_all(serialised_req.as_bytes())
             .await
             .map_err(|err| Error::ClientError(format!("Failed to send request: {}", err)))?;
 
-        send.finish()
-            .await
-            .map_err(|err| Error::ClientError(format!("Failed to shutdown stream: {}", err)))?;
+        send.finish().await.map_err(|err| {
+            Error::ClientError(format!(
+                "Failed to gracefully shutdown communication stream: {}",
+                err
+            ))
+        })?;
 
         debug!("Request sent to remote endpoint");
         let received_bytes = recv
             .read_to_end(usize::max_value())
             .await
-            .map_err(|err| Error::ClientError(format!("Failed to read response bytes: {}", err)))?;
+            .map_err(|err| Error::ClientError(format!("Response not received: {}", err)))?;
 
         self.quinn_connection.close(0u32.into(), b"");
 

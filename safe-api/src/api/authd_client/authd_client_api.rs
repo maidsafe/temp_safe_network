@@ -24,7 +24,7 @@ use std::{
     collections::HashMap,
     io::{self, Write},
     path::PathBuf,
-    process::Command,
+    process::{Command, Stdio},
     sync::mpsc,
     thread,
 };
@@ -529,12 +529,17 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
     let path_str = path.display().to_string();
     debug!("Attempting to {} authd from '{}' ...", args[0], path_str);
 
-    let output = Command::new(&path_str).args(args).output().map_err(|err| {
-        Error::AuthdClientError(format!(
-            "Failed to execute authd from '{}': {}",
-            path_str, err
-        ))
-    })?;
+    let output = Command::new(&path_str)
+        .args(args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output()
+        .map_err(|err| {
+            Error::AuthdClientError(format!(
+                "Failed to execute authd from '{}': {}",
+                path_str, err
+            ))
+        })?;
 
     if output.status.success() {
         io::stdout()
@@ -551,9 +556,8 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
                    )))
             }
             Some(_) | None => Err(Error::AuthdError(format!(
-                "Failed when invoking safe-authd executable from '{}':\n{}",
+                "Failed when invoking safe-authd executable from '{}'",
                 path_str,
-                String::from_utf8_lossy(&output.stderr)
             ))),
         }
     }
