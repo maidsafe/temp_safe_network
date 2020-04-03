@@ -68,10 +68,18 @@ pub fn connect(safe: &mut Safe) -> Result<(), String> {
         Ok((_, file_path)) => {
             if let Ok(mut file) = File::open(&file_path) {
                 let mut credentials = String::new();
-                file.read_to_string(&mut credentials).map_err(|_| {
-                    format!("Unable to read credentials from {}", file_path.display())
-                })?;
-                Some(credentials)
+                match file.read_to_string(&mut credentials) {
+                    Err(err) => {
+                        debug!(
+                            "Unable to read credentials from {}: {}",
+                            file_path.display(),
+                            err
+                        );
+                        None
+                    }
+                    Ok(_) if credentials.is_empty() => None,
+                    Ok(_) => Some(credentials),
+                }
             } else {
                 None
             }
@@ -84,6 +92,16 @@ pub fn connect(safe: &mut Safe) -> Result<(), String> {
     }
 
     safe.connect(APP_ID, auth_credentials.as_deref())
+        .or_else(|err| {
+            if auth_credentials.is_some() {
+                println!(
+                    "Credentials found for CLI are invalid, connecting with read-only access..."
+                );
+                safe.connect(APP_ID, None)
+            } else {
+                Err(err)
+            }
+        })
         .map_err(|err| format!("Failed to connect: {}", err))
 }
 
