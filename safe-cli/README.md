@@ -290,22 +290,9 @@ Latest release found: safe-authd v0.0.3
 Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
 Installing safe-authd binary at ~/.safe/authd ...
+Setting execution permissions to installed binary '~/.safe/authd/safe-authd'...
 Done!
 ```
-
-**If you on a Windows platform**, the CLI requires administrator permissions to install it, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the install command:
-```shell
-> safe auth install
-Latest release found: safe-authd v0.0.3
-Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-pc-windows-msvc.zip...
-[00:00:19] [========================================] 4.3MB/4.3MB (0s) Done
-Installing safe-authd binary at ~/.safe/authd ...
-Done!
-Registering SAFE Authenticator (safe-authd) as a Windows service...
-The safe-authd service (<'safe-authd.exe' path>) was just installed successfully!
-```
-
-Note that in the case of a Windows platform, the command not only downloads the binary to the system, but it also takes care of setting it up as a Windows service so it's ready to then be started.
 
 #### Auth start
 
@@ -313,13 +300,7 @@ In order to start the `SAFE Authenticator daemon (safe-authd)` so it can start r
 ```shell
 $ safe auth start
 Starting SAFE Authenticator daemon (safe-authd)...
-```
-
-Again, **if you are on a Windows platform**, the CLI requires administrator permissions to be able to start the safe-authd service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
-```shell
-> safe auth start
-Starting SAFE Authenticator service (safe-authd) from command line...
-safe-authd service started successfully!
+safe-authd started (PID: <pid>)
 ```
 
 #### Auth status
@@ -507,7 +488,11 @@ Credentials were stored in <home directory>/.local/share/safe-cli/credentials
 
 #### Auth update
 
-The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the latest available version using the CLI. Running `safe auth update`, the application will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
+The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the latest available version using the CLI:
+```shell
+$ safe auth update
+```
+It will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
 
 After the safe-authd was updated, you'll need to restart it to start using new version:
 ```shell
@@ -515,6 +500,8 @@ $ safe auth restart
 Stopping SAFE Authenticator daemon (safe-authd)...
 Success, safe-authd (PID: <pid>) stopped!
 Starting SAFE Authenticator daemon (safe-authd)...
+safe-authd started (PID: <new pid>)
+Success, safe-authd restarted!
 ```
 
 ### The interactive shell
