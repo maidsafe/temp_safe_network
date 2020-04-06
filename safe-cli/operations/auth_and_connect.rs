@@ -12,7 +12,7 @@ use crate::{
     PROJECT_DATA_DIR_QUALIFIER,
 };
 use directories::ProjectDirs;
-use log::debug;
+use log::{debug, info, warn};
 use safe_api::Safe;
 use std::{
     fs::{create_dir_all, File},
@@ -88,15 +88,13 @@ pub fn connect(safe: &mut Safe) -> Result<(), String> {
     };
 
     if auth_credentials.is_none() {
-        println!("No credentials found for CLI, connecting with read-only access...");
+        info!("No credentials found for CLI, connecting with read-only access...");
     }
 
     safe.connect(APP_ID, auth_credentials.as_deref())
         .or_else(|err| {
             if auth_credentials.is_some() {
-                println!(
-                    "Credentials found for CLI are invalid, connecting with read-only access..."
-                );
+                warn!("Credentials found for CLI are invalid, connecting with read-only access...");
                 safe.connect(APP_ID, None)
             } else {
                 Err(err)

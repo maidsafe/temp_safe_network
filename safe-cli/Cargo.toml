@@ -14,13 +14,16 @@ name = "safe"
 path = "main.rs"
 
 [dependencies]
+ansi_term = "0.9.0"
 async-std = "1.4.0"
 crossbeam = "0.7.3"
 directories = "~2.0.1"
 env_logger = "0.6.0"
 envy = "0.4.0"
 human-panic = "1.0.1"
+isatty = "0.1"
 log = "0.4.6"
+pretty-hex = "0.1.1"
 prettytable-rs = "^0.8"
 rand = "0.6.5"
 relative-path = "0.4.0"
@@ -33,9 +36,6 @@ serde_yaml = "0.8.11"
 shrust = "0.0.7"
 structopt = "~0.3.5"
 tokio = { version = "^0.2.13", features = ["macros"] }
-pretty-hex = "0.1.1"
-ansi_term = "0.9.0"
-isatty = "0.1"
 
 [features]
 mock-network = ["safe-api/mock-network"]
@@ -66,7 +66,7 @@ version = "1"
 default-features = false
 features = ["precommit-hook","user-hooks"]
 
-# Our various benchmakrs. 
+# Our various benchmakrs.
 # Harness=false disables rust baked in bench to use criterion instead.
 [[bench]]
 name = "small-put"
