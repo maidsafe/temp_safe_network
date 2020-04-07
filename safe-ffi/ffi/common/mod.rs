@@ -7,6 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-pub mod app;
-pub mod authenticator;
-pub mod common;
+pub mod errors;
+pub mod helpers;
+pub mod logging;

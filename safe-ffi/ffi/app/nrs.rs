@@ -8,7 +8,7 @@
 // Software.
 
 use super::{
-    errors::Result,
+    common::errors::Result,
     ffi_structs::{processed_entries_into_repr_c, safe_url_into_repr_c, ProcessedEntries, SafeUrl},
 };
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};

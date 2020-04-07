@@ -7,23 +7,22 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+#![allow(clippy::missing_safety_doc)]
+
 #[macro_use]
 extern crate ffi_utils;
 
-#[cfg(feature = "scl-mock")]
-pub use safe_authenticator_ffi::*;
-
 pub mod ffi;
 
-pub use ffi::fetch::*;
-pub use ffi::ffi_structs::*;
-pub use ffi::files::*;
-pub use ffi::helpers::*;
-pub use ffi::ipc::*;
-pub use ffi::keys::*;
-pub use ffi::logging::*;
-pub use ffi::nrs::*;
-pub use ffi::sequence::*;
-pub use ffi::wallet::*;
-pub use ffi::xorurl::*;
-pub use ffi::*;
+pub use ffi::app::fetch::*;
+pub use ffi::app::ffi_structs::*;
+pub use ffi::app::files::*;
+pub use ffi::app::ipc::*;
+pub use ffi::app::keys::*;
+pub use ffi::app::nrs::*;
+pub use ffi::app::wallet::*;
+pub use ffi::app::xorurl::*;
+pub use ffi::app::*;
+
+pub use ffi::authenticator::ffi_types::*;
+pub use ffi::authenticator::*;

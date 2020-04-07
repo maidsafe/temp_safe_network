@@ -8,12 +8,11 @@
 // Software.
 
 use super::{
-    errors::Result,
+    common::{errors::Result, helpers::from_c_str_to_str_option},
     ffi_structs::{
         wallet_spendable_balance_into_repr_c, wallet_spendable_balances_into_repr_c,
         WalletSpendableBalance, WalletSpendableBalances,
     },
-    helpers::from_c_str_to_str_option,
 };
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::Safe;

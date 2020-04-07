@@ -18,7 +18,7 @@ use std::os::raw::{c_char, c_void};
 /// If `output_file_name_override` is provided, then this path will be used for
 /// the log output file.
 #[no_mangle]
-pub unsafe extern "C" fn app_init_logging(
+pub unsafe extern "C" fn init_logging(
     output_file_name_override: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
@@ -38,7 +38,7 @@ pub unsafe extern "C" fn app_init_logging(
 
 /// Returns the path at which the the configuration files are expected.
 #[no_mangle]
-pub unsafe extern "C" fn app_config_dir_path(
+pub unsafe extern "C" fn config_dir_path(
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, log_path: *const c_char),
 ) {
@@ -79,8 +79,8 @@ mod tests {
 
     // Test path where log file is created.
     #[test]
-    fn config_dir_path() {
-        let path: String = unsafe { unwrap!(call_1(|ud, cb| app_config_dir_path(ud, cb),)) };
+    fn test_config_dir_path() {
+        let path: String = unsafe { unwrap!(call_1(|ud, cb| config_dir_path(ud, cb),)) };
         let expected_path = unwrap!(unwrap!(config_dir()).into_os_string().into_string());
 
         assert_eq!(path, expected_path);
@@ -98,11 +98,7 @@ mod tests {
             .into_os_string()
             .into_string())));
         unsafe {
-            unwrap!(call_0(|ud, cb| app_init_logging(
-                file_name.as_ptr(),
-                ud,
-                cb
-            ),));
+            unwrap!(call_0(|ud, cb| init_logging(file_name.as_ptr(), ud, cb),));
         }
 
         let debug_msg = "This is a sample debug message".to_owned();

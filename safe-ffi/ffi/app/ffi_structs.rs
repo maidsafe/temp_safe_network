@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{errors::Result, helpers::string_vec_to_c_str_str};
+use super::{common::errors::Result, common::helpers::string_vec_to_c_str_str};
 use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
 use safe_api::{
     files::{

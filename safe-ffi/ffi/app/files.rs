@@ -8,10 +8,9 @@
 // Software.
 
 use super::{
+    common::{errors::Result, helpers::from_c_str_to_str_option},
     constants::{FILE_READ_FROM_START, FILE_READ_TO_END},
-    errors::Result,
     ffi_structs::{files_map_into_repr_c, processed_files_into_repr_c, FilesMap, ProcessedFiles},
-    helpers::from_c_str_to_str_option,
 };
 use ffi_utils::{
     catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK,

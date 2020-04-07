@@ -96,6 +96,7 @@ mod bindings {
 
         lang.add_const("ulong", "XOR_NAME_LEN", XOR_NAME_LEN);
         lang.add_const("ulong", "BLS_PUBLIC_KEY_LEN", BLS_PUBLIC_KEY_LEN);
+        lang.add_opaque_type("SafeAuthenticator");
         lang.add_opaque_type("Safe");
 
         lang.reset_filter(FilterMode::Blacklist);
@@ -109,13 +110,11 @@ mod bindings {
         lang.set_consts_enabled(false);
         lang.set_types_enabled(false);
         lang.set_utils_enabled(false);
-        lang.add_opaque_type("App");
 
         lang.reset_filter(FilterMode::Whitelist);
 
         outputs.clear();
         bindgen.compile_or_panic(&mut lang, &mut outputs, true);
-        // apply_patches_testing(&mut outputs);
         add_license_headers(&mut outputs);
         bindgen.write_outputs_or_panic(target_dir, &outputs);
     }
@@ -136,28 +135,10 @@ mod bindings {
             insert_using_utilities(content);
             insert_using_obj_c_runtime(content);
             insert_guard(content);
-            insert_resharper_disable_inconsistent_naming(content);
         }
 
         // todo : uncomment when adding structures
         //insert_internals_visible_to(fetch_mut(outputs, "SafeApp.Core/AppTypes.cs"));
-
-        for content in outputs.values_mut() {
-            fix_names(content);
-        }
-    }
-
-    #[allow(dead_code)]
-    fn apply_patches_testing(outputs: &mut HashMap<String, String>) {
-        insert_using_utilities(fetch_mut(
-            outputs,
-            "SafeApp.MockAuthBindings/MockAuthBindings.cs",
-        ));
-
-        insert_using_utilities(fetch_mut(
-            outputs,
-            "SafeApp.MockAuthBindings/IMockAuthBindings.cs",
-        ));
 
         for content in outputs.values_mut() {
             fix_names(content);
@@ -185,13 +166,8 @@ mod bindings {
         *content = content.replace(
             "namespace SafeApp.Core",
             "[assembly: InternalsVisibleTo(\"SafeApp.AppBindings\")]\n\
-             [assembly: InternalsVisibleTo(\"SafeApp.MockAuthBindings\")]\n\n\
              namespace SafeApp.Core",
         );
-    }
-
-    fn insert_resharper_disable_inconsistent_naming(content: &mut String) {
-        content.insert_str(0, "// ReSharper disable InconsistentNaming\n");
     }
 
     fn fix_names(content: &mut String) {

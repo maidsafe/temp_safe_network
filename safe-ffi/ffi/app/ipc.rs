@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::errors::{Error, Result};
+use super::common::errors::{Error, Result};
 use bincode::serialize;
 use ffi_utils::ffi_error;
 use ffi_utils::{

@@ -8,8 +8,8 @@
 // Software.
 
 use super::{
+    common::errors::{Error, Result},
     constants::{FILE_READ_FROM_START, FILE_READ_TO_END},
-    errors::{Error, Result},
     ffi_structs::{
         files_map_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
         NrsMapContainer, PublicImmutableData, SafeKey, SequenceData, Wallet,

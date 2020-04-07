@@ -8,9 +8,9 @@
 // Software.
 
 use super::{
-    errors::Result,
+    common::errors::Result,
+    common::helpers::{c_str_str_to_string_vec, from_c_str_to_str_option},
     ffi_structs::{safe_url_into_repr_c, SafeUrl, XorNameArray},
-    helpers::{c_str_str_to_string_vec, from_c_str_to_str_option},
 };
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::xorurl::{SafeContentType, SafeDataType, SafeUrl as NativeSafeUrl, XorUrlBase};
