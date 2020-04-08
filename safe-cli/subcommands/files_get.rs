@@ -14,6 +14,7 @@ use super::{
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
 use log::{debug, info, trace, warn};
+use percent_encoding::percent_decode;
 use safe_api::{
     fetch::Range,
     files::{FilesMap, ProcessedFiles},
@@ -437,7 +438,7 @@ async fn files_container_get_files(
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
     let xorurl_encoder = XorUrlEncoder::from_url(&url)?;
-    let urlpath = xorurl_encoder.path();
+    let urlpath = url_percent_decode(&xorurl_encoder.path())?;
 
     let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
 
@@ -665,11 +666,24 @@ pub fn filter_files_map_by_xorurl_path(
     mut callback: impl FnMut(&str, &str) -> Option<String>,
 ) -> ApiResult<FilesMap> {
     let xorurl_encoder = Safe::parse_url(target_url)?;
-    let path = xorurl_encoder.path();
 
-    Ok(filter_files_map_by_path(files_map, path, |fmpath| {
+    let path = url_percent_decode(&xorurl_encoder.path())?;
+
+    Ok(filter_files_map_by_path(files_map, &path, |fmpath| {
         callback(&path, &fmpath)
     }))
+}
+
+// percent_decode path. (url_decode)
+fn url_percent_decode(s: &str) -> ApiResult<String> {
+    let bytes: Vec<u8> = s.bytes().collect();
+    match percent_decode(&bytes).decode_utf8() {
+        Ok(c) => Ok(c.into_owned()),
+        Err(e) => Err(Error::InvalidInput(format!(
+            "Could not decode URL: {:#?}",
+            e
+        ))),
+    }
 }
 
 /// # Filter out file items outside of path

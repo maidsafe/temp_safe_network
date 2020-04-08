@@ -39,6 +39,7 @@ isatty = "0.1"
 num-traits = "0.2"
 indicatif = { git="https://github.com/mibac138/indicatif", branch="mpb-tick" }
 console = "0.10.0"
+percent-encoding = "2.1.0"
 
 [features]
 mock-network = ["safe-api/mock-network"]

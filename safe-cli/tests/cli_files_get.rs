@@ -20,8 +20,8 @@ const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
 use common::{
-    get_bin_location, upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash,
-    TEST_FOLDER,
+    get_bin_location, parse_files_put_or_sync_output, upload_testfolder_no_trailing_slash,
+    upload_testfolder_trailing_slash, TEST_FOLDER,
 };
 use multibase::{encode, Base};
 use safe_api::xorurl::XorUrlEncoder;
@@ -216,6 +216,119 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<(), String> {
     // not detected.  So it doesn't appear in our output.  Perhaps later
     // safe-cli adds a flag to override TTY detection.
     // assert!(String::from_utf8_lossy(&cmd_output.stderr).into_owned().contains("Warning: cannot overwrite non-directory"));
+
+    Ok(())
+}
+
+// ----------------------------------------
+// embedded spaces in paths tests.
+// ----------------------------------------
+
+// Test:  safe files get "safe://.../dir with space/file with space" "/tmp/new file"
+//    src is a file, directory and file both contain embedded spaces, not url encoded.
+//    dest does not exist
+//
+//    expected result: /tmp/new file is written without error.
+#[test]
+fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<(), String> {
+    const DIR_WITH_SPACE: &str = "dir with space";
+    const FILE_WITH_SPACE: &str = "file with space";
+    const NEW_FILE_WITH_SPACE: &str = "new file";
+
+    // setup: remove (if existing) and then create "/tmp/dir with space/file with space"
+    // which will be our source dir to PUT, then GET
+    let src_dir = dest_dir(&[DIR_WITH_SPACE]);
+    let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
+    remove_dest(&src_dir);
+    fs::create_dir_all(&src_dir).unwrap();
+    let f = fs::File::create(&src_file).unwrap();
+    drop(f); // close file.
+
+    let files_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        &src_dir,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .map_err(|e| format!("{:#?}", e))?;
+
+    let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
+
+    let src = source_path(&files_container_xor, &[DIR_WITH_SPACE, FILE_WITH_SPACE])?;
+    let dest = dest_dir(&[NEW_FILE_WITH_SPACE]);
+
+    remove_dest(&dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    assert!(Path::new(&dest).is_file());
+    assert_eq!(sum_tree(&dest), sum_tree(&src_file));
+
+    Ok(())
+}
+
+// Test:  safe files get "safe://.../dir%20with%20space/file%20with%20space" "/tmp/new file"
+//    src is a file, directory and file both contain embedded spaces, url-encoded.
+//    dest does not exist
+//
+//    expected result: /tmp/new file is written without error.
+#[test]
+fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<(), String> {
+    const DIR_WITH_SPACE: &str = "dir with space";
+    const DIR_WITH_SPACE_ENCODED: &str = "dir%20with%20space";
+    const FILE_WITH_SPACE: &str = "file with space";
+    const FILE_WITH_SPACE_ENCODED: &str = "file%20with%20space";
+    const NEW_FILE_WITH_SPACE: &str = "new file";
+
+    // setup: remove (if existing) and then create "/tmp/dir with space/file with space"
+    // which will be our source dir to PUT, then GET
+    let src_dir = dest_dir(&[DIR_WITH_SPACE]);
+    let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
+    remove_dest(&src_dir);
+    fs::create_dir_all(&src_dir).unwrap();
+    let f = fs::File::create(&src_file).unwrap();
+    drop(f); // close file.
+
+    let files_container = cmd!(
+        get_bin_location(),
+        "files",
+        "put",
+        &src_dir,
+        "--recursive",
+        "--json"
+    )
+    .read()
+    .map_err(|e| format!("{:#?}", e))?;
+
+    let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
+
+    let src = source_path(
+        &files_container_xor,
+        &[DIR_WITH_SPACE_ENCODED, FILE_WITH_SPACE_ENCODED],
+    )?;
+    let dest = dest_dir(&[NEW_FILE_WITH_SPACE]);
+
+    remove_dest(&dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    assert!(Path::new(&dest).is_file());
+    assert_eq!(sum_tree(&dest), sum_tree(&src_file));
 
     Ok(())
 }
