@@ -14,6 +14,7 @@ extern crate duct;
 
 const TESTDATA: &str = "testdata";
 const NEWNAME: &str = "newname";
+const SUBFOLDER: &str = "subfolder";
 
 const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
@@ -29,6 +30,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tiny_keccak::sha3_256;
 use walkdir::{DirEntry, WalkDir};
 
@@ -219,6 +221,123 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<(), String> {
 
     Ok(())
 }
+
+// ----------------------------------------
+// nrs tests.
+// ----------------------------------------
+
+// Test:  safe files get <nrs_url>
+//    src is an nrs url, linked to a container url, testdata put without slash.
+//    dest is unspecified.  (should default to the current working directory)
+//
+//    expected result: ../testdata matches ./testdata
+#[test]
+fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
+
+    let mut nrs_name = "NRS_NAME".to_string();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros();
+    nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
+
+    cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &nrs_name,
+        "-l",
+        &files_container_xor
+    )
+    .read()
+    .map_err(|e| format!("{:#?}", e))?;
+
+    let src = format!("safe://{}", &nrs_name);
+    let final_dest = Path::new(".").join(TESTDATA).display().to_string();
+
+    remove_dest(&final_dest);
+
+    files_get(
+        &src,
+        None, // dest is not provided!
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+
+    remove_dest(&final_dest);
+
+    Ok(())
+}
+
+// Test:  safe files get <nrs_url>+path concatenated to <xor url>+path
+//    src is an nrs url with a path, linked to an container xor url with a path.
+//       xorurl ==> safe://.../testdata/subfolder
+//       nrsurl ==> safe://nrsname/sub2.md
+//    dest is /tmp/sub2.md
+//
+//    path to sub2.md in FileContainer is /testdata/subfolder/sub2.md
+//
+//    expected result: ../testdata/subfolder/sub2.md matches /tmp/sub2.md
+#[test]
+fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
+
+    const TEST_FILE: &str = "sub2.md";
+
+    // make safe://.../testdata/subfolder
+    let xor_path = join_paths(&[TESTDATA, SUBFOLDER]);
+    let mut e = XorUrlEncoder::from_url(&files_container_xor)?;
+    e.set_path(&xor_path);
+    let xor_url_with_path = e.to_string()?;
+
+    let mut nrs_name = "NRS_NAME".to_string();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros();
+    nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
+
+    cmd!(
+        get_bin_location(),
+        "nrs",
+        "create",
+        &nrs_name,
+        "-l",
+        &xor_url_with_path
+    )
+    .read()
+    .map_err(|e| format!("{:#?}", e))?;
+
+    // make safe://nrsname/sub2.md
+    let src = format!("safe://{}/{}", &nrs_name, TEST_FILE);
+
+    let dest = dest_dir(&[]);
+    let final_dest = dest_dir(&[TEST_FILE]);
+
+    remove_dest(&final_dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    let file_src = join_paths(&[TEST_FOLDER, SUBFOLDER, TEST_FILE]);
+    assert_eq!(sum_tree(&file_src), sum_tree(&final_dest));
+
+    remove_dest(&final_dest);
+
+    Ok(())
+}
+
+// note: there should be additional NRS tests with paths here, but presently
+// NRS and paths do not mix well.
 
 // ----------------------------------------
 // embedded spaces in paths tests.
@@ -1017,6 +1136,12 @@ fn str_to_sha3_256(s: &str) -> String {
 fn dest_dir(path: &[&str]) -> String {
     let pb: PathBuf = path.iter().collect();
     env::temp_dir().join(pb).display().to_string()
+}
+
+// joins path components together.
+fn join_paths(path: &[&str]) -> String {
+    let pb: PathBuf = path.iter().collect();
+    pb.display().to_string()
 }
 
 // sets/appends path in a provided safe URL.  preserves query string.

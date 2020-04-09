@@ -431,14 +431,38 @@ async fn files_container_get_files(
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
 ) -> ApiResult<(u64, ProcessedFiles)> {
-    let (version, files_map) = files_container_get_matching(&safe, &url).await?;
+    let (xorurl_encoder, nrs_encoder) = safe.parse_and_resolve_url(url).await?;
+
+    // if nrs_encoder is not None, then 'url' is an NRS link and
+    // we must append the nrs_url path to the xor_url path
+    // to obtain full path within the FileContainer.
+    // Else we just use the xor_url path.
+    let resolved_url_encoder = match nrs_encoder {
+        Some(p) => {
+            let mut s = xorurl_encoder.path().to_string();
+            s.push_str(p.path());
+            let mut e = xorurl_encoder.clone();
+            e.set_path(&s);
+            e
+        }
+        None => xorurl_encoder.clone(),
+    };
+
+    let resolved_url = resolved_url_encoder.to_string()?;
+
+    // note: files_container_get_matching() also calls safe.parse_and_resolve_url().
+    // We should somehow modify the API so this redundancy can be removed as it requires
+    // unnecessary network requests.
+    let (version, files_map) = files_container_get_matching(&safe, &resolved_url).await?;
 
     debug!("Getting files in container {:?}", url);
+    debug!("resolved url is {:?}", &resolved_url);
 
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
-    let xorurl_encoder = XorUrlEncoder::from_url(&url)?;
-    let urlpath = url_percent_decode(&xorurl_encoder.path())?;
+
+    // let xorurl_encoder = XorUrlEncoder::from_url(&url)?;
+    let urlpath = url_percent_decode(resolved_url_encoder.path())?;
 
     let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
 
