@@ -82,17 +82,10 @@ pub enum AuthSubCommands {
         notifs_endpoint: Option<String>,
     },
     #[structopt(name = "install")]
-    /// Install latest safe-authd released version in the system. On Windows platforms it also installs it as a service
+    /// Install latest safe-authd released version in the system
     Install {
         #[structopt(long = "authd-path")]
         /// Path where to install safe-authd executable (default ~/.safe/authd/)
-        authd_path: Option<String>,
-    },
-    #[structopt(name = "uninstall")]
-    /// Uninstall safe-authd service. Only for Windows platforms
-    Uninstall {
-        #[structopt(long = "authd-path")]
-        /// Path where to uninstall safe-authd executable from (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "update")]
@@ -191,12 +184,7 @@ pub async fn auth_commander(
             authd_unsubscribe(&mut safe_authd, notifs_endpoint).await
         }
         Some(AuthSubCommands::Install {authd_path}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_install(&safe_authd, authd_path)
-        }
-        Some(AuthSubCommands::Uninstall {authd_path}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_uninstall(&safe_authd, authd_path)
+            authd_install(authd_path)
         }
         Some(AuthSubCommands::Update {authd_path}) => {
             let safe_authd = SafeAuthdClient::new(endpoint);

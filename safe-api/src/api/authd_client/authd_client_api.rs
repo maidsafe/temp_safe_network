@@ -104,12 +104,6 @@ const SAFE_AUTHD_METHOD_SUBSCRIBE: &str = "subscribe";
 // Path of authenticator endpoint for unsubscribing from authorisation requests notifications
 const SAFE_AUTHD_METHOD_UNSUBSCRIBE: &str = "unsubscribe";
 
-// authd subcommand to install the daemon
-const SAFE_AUTHD_CMD_INSTALL: &str = "install";
-
-// authd subcommand to uninstall the daemon
-const SAFE_AUTHD_CMD_UNINSTALL: &str = "uninstall";
-
 // authd subcommand to update the binary to new available released version
 const SAFE_AUTHD_CMD_UPDATE: &str = "update";
 
@@ -168,16 +162,6 @@ impl SafeAuthdClient {
             authd_endpoint: endpoint,
             subscribed_endpoint: None,
         }
-    }
-
-    // Install the Authenticator daemon/service
-    pub fn install(&self, authd_path: Option<&str>) -> Result<()> {
-        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_INSTALL])
-    }
-
-    // Uninstall the Authenticator daemon/service
-    pub fn uninstall(&self, authd_path: Option<&str>) -> Result<()> {
-        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_UNINSTALL])
     }
 
     // Update the Authenticator binary to a new released version

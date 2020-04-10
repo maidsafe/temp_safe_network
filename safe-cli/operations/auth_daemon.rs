@@ -41,34 +41,16 @@ struct LoginDetails {
     pub password: String,
 }
 
-pub fn authd_install(
-    safe_authd: &SafeAuthdClient,
-    authd_path: Option<String>,
-) -> Result<(), String> {
+pub fn authd_install(authd_path: Option<String>) -> Result<(), String> {
     let target_path = get_authd_bin_path(authd_path)?;
-    let final_path = download_from_s3_and_install_bin(
+    download_from_s3_and_install_bin(
         target_path,
         "safe-api",
         "safe-authd",
         SAFE_AUTHD_EXECUTABLE,
         None,
     )?;
-    if cfg!(windows) {
-        // On Windows authd must be installed as a service
-        safe_authd
-            .install(Some(&final_path))
-            .map_err(|err| err.to_string())?;
-    }
     Ok(())
-}
-
-pub fn authd_uninstall(
-    safe_authd: &SafeAuthdClient,
-    authd_path: Option<String>,
-) -> Result<(), String> {
-    safe_authd
-        .uninstall(authd_path.as_deref())
-        .map_err(|err| err.to_string())
 }
 
 pub fn authd_update(
