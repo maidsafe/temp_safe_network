@@ -227,7 +227,16 @@ impl XorUrlEncoder {
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&cid_str)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
 
-        // let's do a sanity check before analysing byte by byte
+        let type_tag_offset = XOR_NAME_BYTES_OFFSET + XOR_NAME_LEN; // offset where to find the type tag bytes
+
+        // let's do a couple of sanity checks on length before analysing byte by byte
+        if xorurl_bytes.len() < type_tag_offset {
+            return Err(Error::InvalidXorUrl(format!(
+                "Invalid XOR-URL, encoded string too short: {} bytes",
+                xorurl_bytes.len()
+            )));
+        }
+
         if xorurl_bytes.len() > XOR_URL_STR_MAX_LENGTH {
             return Err(Error::InvalidXorUrl(format!(
                 "Invalid XOR-URL, encoded string too long: {} bytes",
@@ -285,8 +294,6 @@ impl XorUrlEncoder {
                 )))
             }
         };
-
-        let type_tag_offset = XOR_NAME_BYTES_OFFSET + XOR_NAME_LEN; // offset where to find the type tag bytes
 
         let mut xorname = XorName::default();
         xorname
@@ -637,5 +644,57 @@ mod tests {
             xorurl_encoder.content_type()
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_xorurl_too_long() -> Result<()> {
+        let xorurl =
+            "safe://heyyynunctugo4ucp3a8radnctugo4ucp3a8radnctugo4ucp3a8radnctmfp5zq75zq75zq7";
+
+        match XorUrlEncoder::from_url(xorurl) {
+            Ok(_) => Err(Error::Unexpected(
+                "Unexpectedly parsed an invalid (too long) xorurl".to_string(),
+            )),
+            Err(Error::InvalidXorUrl(msg)) => {
+                println!("ERR: {}", msg);
+                assert!(msg.starts_with("Invalid XOR-URL, encoded string too long"));
+                Ok(())
+            }
+            other => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
+                other
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_xorurl_too_short() -> Result<()> {
+        let xorname = XorName(*b"12345678901234567890123456789012");
+        let type_tag: u64 = 0x0;
+        let xorurl = XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::PublishedImmutableData,
+            SafeContentType::MediaType("text/html".to_string()),
+            None,
+            None,
+            None,
+            XorUrlBase::Base32z,
+        )?;
+
+        let len = xorurl.len() - 1;
+        match XorUrlEncoder::from_url(&xorurl[..len]) {
+            Ok(_) => Err(Error::Unexpected(
+                "Unexpectedly parsed an invalid (too short) xorurl".to_string(),
+            )),
+            Err(Error::InvalidXorUrl(msg)) => {
+                assert!(msg.starts_with("Invalid XOR-URL, encoded string too short"));
+                Ok(())
+            }
+            other => Err(Error::Unexpected(format!(
+                "Error returned is not the expected one: {:?}",
+                other
+            ))),
+        }
     }
 }

@@ -1658,6 +1658,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "indicatif"
+version = "0.14.0"
+source = "git+https://github.com/mibac138/indicatif?branch=mpb-tick#564c518e8ddea3f1468cd82e054d596fbf4b4e2a"
+dependencies = [
+ "console",
+ "lazy_static",
+ "number_prefix",
+ "regex 1.3.6",
+]
+
+[[package]]
 name = "iovec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3140,6 +3151,7 @@ dependencies = [
  "assert_cmd",
  "async-std",
  "cargo-husky",
+ "console",
  "criterion",
  "crossbeam",
  "directories 2.0.2",
@@ -3147,8 +3159,12 @@ dependencies = [
  "env_logger 0.6.2",
  "envy",
  "human-panic",
+ "indicatif 0.14.0",
  "isatty",
  "log 0.4.8",
+ "multibase",
+ "num-traits",
+ "percent-encoding 2.1.0",
  "predicates",
  "pretty-hex",
  "pretty_assertions",
@@ -3166,8 +3182,10 @@ dependencies = [
  "serde_yaml",
  "shrust",
  "structopt 0.3.12",
+ "tiny-keccak",
  "tokio 0.2.15",
  "unwrap",
+ "walkdir",
 ]
 
 [[package]]
@@ -3443,7 +3461,7 @@ dependencies = [
  "either",
  "flate2",
  "hyper-old-types",
- "indicatif",
+ "indicatif 0.13.0",
  "quick-xml",
  "regex 1.3.6",
  "reqwest 0.10.4",
@@ -3463,7 +3481,7 @@ dependencies = [
  "either",
  "flate2",
  "hyper-old-types",
- "indicatif",
+ "indicatif 0.13.0",
  "quick-xml",
  "regex 1.3.6",
  "reqwest 0.10.4",
