@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- [ ] Using rust 1.35.0
+- [ ] Using [latest rust stable](https://www.rust-lang.org/)
 - [ ] Using an up-to-date master branch
 - [ ] Link to stacktrace in a Gist (for bugs)
 
