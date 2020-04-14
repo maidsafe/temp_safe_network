@@ -11,6 +11,8 @@
 extern crate duct;
 use criterion::Criterion;
 
+use safe_cmd_test_utilities::get_bin_location;
+
 const SAMPLE_SIZE: usize = 30;
 
 fn custom_criterion() -> Criterion {
@@ -20,14 +22,14 @@ fn custom_criterion() -> Criterion {
 fn main() {
     let mut criterion = custom_criterion();
 
-    bench_cli_put(&mut criterion);
+    bench_cli_keys(&mut criterion);
 }
 
-fn bench_cli_put(c: &mut Criterion) {
+fn bench_cli_keys(c: &mut Criterion) {
     c.bench_function("generating keys", |b| {
         b.iter(|| {
             //  use the safe command, so for bench it has to be installed
-            cmd!("safe", "keys", "create", "--test-coins")
+            cmd!(get_bin_location(), "keys", "create", "--test-coins")
                 .read()
                 .unwrap()
         })

@@ -3174,6 +3174,7 @@ dependencies = [
  "reqwest 0.9.24",
  "rpassword",
  "safe-api",
+ "safe-cmd-test-utilities",
  "safe-nd",
  "safe-nlt",
  "self_update 0.14.0",
@@ -3186,6 +3187,19 @@ dependencies = [
  "tokio 0.2.15",
  "unwrap",
  "walkdir",
+]
+
+[[package]]
+name = "safe-cmd-test-utilities"
+version = "1.0.0"
+dependencies = [
+ "duct",
+ "rand 0.6.5",
+ "safe-api",
+ "safe-nd",
+ "serde",
+ "serde_json",
+ "unwrap",
 ]
 
 [[package]]

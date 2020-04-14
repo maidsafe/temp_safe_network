@@ -7,20 +7,20 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod common;
+extern crate safe_cmd_test_utilities;
 
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{
-    create_preload_and_get_keys, get_bin_location, get_random_nrs_string, parse_cat_wallet_output,
-    parse_files_put_or_sync_output, CLI,
-};
 use predicates::prelude::*;
 use safe_api::{
     fetch::{SafeContentType, SafeDataType, XorUrlEncoder},
     BlsKeyPair,
+};
+use safe_cmd_test_utilities::{
+    create_preload_and_get_keys, get_bin_location, get_random_nrs_string, parse_cat_wallet_output,
+    parse_files_put_or_sync_output, CLI,
 };
 use std::process::Command;
 use unwrap::unwrap;

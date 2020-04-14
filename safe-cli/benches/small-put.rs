@@ -23,6 +23,8 @@ const ONE_MEGABYTE: usize = 250_000;
 const HALF_MEGABYTE: usize = 125_000;
 const TINY_FILE: usize = 10;
 
+use safe_cmd_test_utilities::get_bin_location;
+
 fn custom_criterion() -> Criterion {
     Criterion::default().sample_size(SAMPLE_SIZE)
 }
@@ -46,7 +48,7 @@ fn bench_cli_put(c: &mut Criterion) {
             || put_random_content(TINY_FILE),
             |_| {
                 //  use the safe command, so for bench it has to be installed
-                cmd!("safe", "files", "put", TEST_FILE_RANDOM_CONTENT)
+                cmd!(get_bin_location(), "files", "put", TEST_FILE_RANDOM_CONTENT)
                     .read()
                     .unwrap()
             },
@@ -58,7 +60,7 @@ fn bench_cli_put(c: &mut Criterion) {
             || put_random_content(HALF_MEGABYTE),
             |_| {
                 //  use the safe command, so for bench it has to be installed
-                cmd!("safe", "files", "put", TEST_FILE_RANDOM_CONTENT)
+                cmd!(get_bin_location(), "files", "put", TEST_FILE_RANDOM_CONTENT)
                     .read()
                     .unwrap()
             },
@@ -70,7 +72,7 @@ fn bench_cli_put(c: &mut Criterion) {
             || put_random_content(ONE_MEGABYTE),
             |_| {
                 //  use the safe command, so for bench it has to be installed
-                cmd!("safe", "files", "put", TEST_FILE_RANDOM_CONTENT)
+                cmd!(get_bin_location(), "files", "put", TEST_FILE_RANDOM_CONTENT)
                     .read()
                     .unwrap()
             },
@@ -82,7 +84,7 @@ fn bench_cli_put(c: &mut Criterion) {
             || put_random_content(FOUR_MEGABYTE),
             |_| {
                 //  use the safe command, so for bench it has to be installed
-                cmd!("safe", "files", "put", TEST_FILE_RANDOM_CONTENT)
+                cmd!(get_bin_location(), "files", "put", TEST_FILE_RANDOM_CONTENT)
                     .read()
                     .unwrap()
             },
@@ -94,7 +96,7 @@ fn bench_cli_put(c: &mut Criterion) {
             || put_random_content(EIGHT_MEGABYTE),
             |_| {
                 //  use the safe command, so for bench it has to be installed
-                cmd!("safe", "files", "put", TEST_FILE_RANDOM_CONTENT)
+                cmd!(get_bin_location(), "files", "put", TEST_FILE_RANDOM_CONTENT)
                     .read()
                     .unwrap()
             },

@@ -158,7 +158,7 @@ ifeq ($(UNAME_S),Linux)
 		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
 		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
 		maidsafe/safe-cli-build:cli-x86_64-unknown-linux-gnu-dev \
-		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-tests"
+		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-mock-tests"
 	docker cp "safe-cli-build-${UUID}":/target .
 	docker rm "safe-cli-build-${UUID}"
 else
@@ -166,7 +166,7 @@ else
 	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
 	   ./resources/test-scripts/run-auth-daemon
 	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
-	   ./resources/test-scripts/cli-tests
+	   ./resources/test-scripts/cli-mock-tests
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
@@ -183,7 +183,7 @@ ifeq ($(UNAME_S),Linux)
 		-e RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} \
 		-e SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
 		maidsafe/safe-authd-build:cli-x86_64-unknown-linux-gnu-dev \
-		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-tests"
+		bash -c "./resources/test-scripts/run-auth-daemon && ./resources/test-scripts/cli-mock-tests"
 	docker cp "safe-authd-build-${UUID}":/target .
 	docker rm "safe-authd-build-${UUID}"
 else
@@ -191,7 +191,7 @@ else
 	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
 	   ./resources/test-scripts/run-auth-daemon
 	RANDOM_PORT_NUMBER=${SAFE_AUTH_PORT} SAFE_MOCK_VAULT_PATH=${MOCK_VAULT_PATH} \
-	   ./resources/test-scripts/cli-tests
+	   ./resources/test-scripts/cli-mock-tests
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 

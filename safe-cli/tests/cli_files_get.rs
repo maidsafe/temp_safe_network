@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod common;
+extern crate safe_cmd_test_utilities;
 
 #[macro_use]
 extern crate duct;
@@ -20,12 +20,12 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use common::{
+use multibase::{encode, Base};
+use safe_api::xorurl::XorUrlEncoder;
+use safe_cmd_test_utilities::{
     get_bin_location, parse_files_put_or_sync_output, upload_testfolder_no_trailing_slash,
     upload_testfolder_trailing_slash, TEST_FOLDER,
 };
-use multibase::{encode, Base};
-use safe_api::xorurl::XorUrlEncoder;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};

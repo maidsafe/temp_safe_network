@@ -7,15 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod common;
+extern crate safe_cmd_test_utilities;
 
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{get_bin_location, parse_xorurl_output, CLI, SAFE_PROTOCOL};
 use predicates::prelude::*;
 use safe_api::xorurl::XorUrlEncoder;
+use safe_cmd_test_utilities::{get_bin_location, parse_xorurl_output, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 use unwrap::unwrap;
 

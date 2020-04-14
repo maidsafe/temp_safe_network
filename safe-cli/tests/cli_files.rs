@@ -7,19 +7,19 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod common;
+extern crate safe_cmd_test_utilities;
 
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{
+use predicates::prelude::*;
+use safe_api::xorurl::XorUrlEncoder;
+use safe_cmd_test_utilities::{
     get_bin_location, get_random_nrs_string, parse_files_container_output,
     parse_files_put_or_sync_output, parse_files_tree_output, read_cmd,
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
-use predicates::prelude::*;
-use safe_api::xorurl::XorUrlEncoder;
 use std::{
     fs::{self, OpenOptions},
     io::{prelude::*, Seek, SeekFrom},

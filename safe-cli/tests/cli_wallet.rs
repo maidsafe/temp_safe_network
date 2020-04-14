@@ -7,17 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod common;
+extern crate safe_cmd_test_utilities;
 
 #[macro_use]
 extern crate duct;
 
 use assert_cmd::prelude::*;
-use common::{
+use predicates::prelude::*;
+use safe_cmd_test_utilities::{
     create_preload_and_get_keys, create_wallet_with_balance, get_bin_location,
     get_random_nrs_string, CLI, SAFE_PROTOCOL,
 };
-use predicates::prelude::*;
 use std::process::Command;
 
 const PRETTY_WALLET_CREATION_RESPONSE: &str = "Wallet created at";
