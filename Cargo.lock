@@ -1735,7 +1735,7 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-quic"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "directories 2.0.2",
  "futures 0.3.4",
@@ -3086,7 +3086,7 @@ checksum = "535622e6be132bccd223f4bb2b8ac8d53cda3c7a6394944d3b2b33fb974f9d76"
 
 [[package]]
 name = "safe-api"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -3120,7 +3120,7 @@ dependencies = [
 
 [[package]]
 name = "safe-authd"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "cargo-husky",
  "cluFlock",
@@ -3145,7 +3145,7 @@ dependencies = [
 
 [[package]]
 name = "safe-cli"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "ansi_term 0.9.0",
  "assert_cmd",
@@ -3190,7 +3190,7 @@ dependencies = [
 
 [[package]]
 name = "safe-ffi"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "async-std",
  "bincode",

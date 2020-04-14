@@ -2,11 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.12.0 (2020-04-14)
+
+### Features
+
+* ***cli*** implements 'safe files get' subcommand to copy a remote FilesContainer onto a local path ([361be1fe](https://github.com/maidsafe/safe-api/commit/361be1fe1da78e526f6968e28e34c5b05ef88de0))
+
+* ***authd*** launch authd as a detached process for all platforms using native Rust utilities, plus properly format authd log entries ([605aa9fc](https://github.com/maidsafe/safe-api/commit/605aa9fcd6bbf8a766d98c52b028947f860a438d))
+
+* ***bench*** Setup basic benchmarking. Adds safe vault run-baby-fleming -t command for simpler test setup ([7673d6f6](https://github.com/maidsafe/safe-api/commit/7673d6f6a764f05dd65aa86501fece99671dbd19))
+
+* ***ffi*** expose set_config_dir_path and app_is_mock API ([a3d63952](https://github.com/maidsafe/safe-api/commit/a3d639525c9b027392d6226a8cc0388791a5d72b))
+
+* ***ffi*** expose IPC and logging APIs in safe-ffi ([865fd927](https://github.com/maidsafe/safe-api/commit/865fd927f0713e9797780741f809a489f2c9a59f))
+
+### Bug Fixes
+
+* ***api*** verify in XorUrlEncoder::from_url that the URL provided has the minimum length to be valid before processing it ([2554d738](https://github.com/maidsafe/safe-api/commit/2554d738410436f534685160f73eb32d277cf679))
+
+* ***cli*** info and warning about missing/invalid credentials are now being logged rather than sent to stdout ([73959656](https://github.com/maidsafe/safe-api/commit/739596560384196b9bebcb68ec9da317080ee834))
+
+* ***cli*** connect with read-only access if CLI fails to connect with existing credentials ([54c8d87a](https://github.com/maidsafe/safe-api/commit/54c8d87a355d008440d81aba62863327ee4c4d64))
+
+* ***cli*** create folder for storing network conn info if path doesn't exist ([dc583aad](https://github.com/maidsafe/safe-api/commit/dc583aad07e240ea901a729d0dc1ae14064aab9d))
+
+
 ### 0.11.0 (2020-03-26)
 
 ### Features
 
-* ***ffi:*** feat/ffi: add files_contains_remove_path API ([a0b2f9c8](https://github.com/maidsafe/safe-api/commit/a0b2f9c8b90ceb0d6b9dbadcebd6992e45ac87e2))
+* ***ffi:*** add files_contains_remove_path API ([a0b2f9c8](https://github.com/maidsafe/safe-api/commit/a0b2f9c8b90ceb0d6b9dbadcebd6992e45ac87e2))
 
 
 ### 0.10.1 (2020-03-20)

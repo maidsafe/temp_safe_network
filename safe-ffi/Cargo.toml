@@ -1,6 +1,6 @@
 [package]
 name = "safe-ffi"
-version = "0.11.0"
+version = "0.12.0"
 description = "SAFE API FFI"
 authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
 publish = false
@@ -15,16 +15,16 @@ crate_type = ["staticlib", "rlib", "cdylib"]
 path = "lib.rs"
 
 [dependencies]
-async-std = "1.4.0"
+async-std = "^1.4.0"
 ffi_utils = "~0.16.0"
 # Required by ffi_utils macros.
 log = "~0.4.8"
-safe-nd = "^0.8.0"
-serde = "1.0.91"
-serde_json = "1.0.39"
-safe_core = "0.40.0"
-bincode = "~1.1.4"
-safe_authenticator_ffi = { version = "0.15.0", optional = true }
+safe-nd = "~0.8.0"
+serde = "^1.0.91"
+serde_json = "^1.0.39"
+safe_core = "~0.40.0"
+bincode = "^1.1.4"
+safe_authenticator_ffi = { version = "~0.15.0", optional = true }
 
 [dependencies.safe-api]
 path = "../safe-api"
@@ -32,12 +32,12 @@ default-features = false
 features = ["app", "authd_client"]
 
 [dev-dependencies]
-unwrap = "~1.2.1"
+unwrap = "^1.2.1"
 
 [build-dependencies]
 safe_bindgen = { version = "~0.13.2", optional = true }
-safe-nd = "^0.8.0"
-unwrap = "~1.2.1"
+safe-nd = "~0.8.0"
+unwrap = "^1.2.1"
 
 [features]
 mock-network = ["safe-api/mock-network", "safe_authenticator_ffi/mock-network"]

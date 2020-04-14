@@ -133,28 +133,15 @@ As any other shell application, the `safe-authd` supports the `--help` argument 
 $ safe-authd --help
 ```
 
-This application supports only a few commands which are required to start it as a daemon, stop and restart it. A couple of additional commands are available also for installing/uninstalling it as a service which is required and supported only for Windows platforms.
+This application supports only a few commands which are required to start it as a daemon, stop and restart it.
 
-
-### Start (Linux/Mac)
+### Start
 
 In order to start the SAFE Authenticator daemon (`safe-authd`) we simply need to run the following command:
 ```shell
 $ safe-authd start
 Starting SAFE Authenticator daemon (safe-authd)...
-```
-
-### Start (Windows)
-
-Windows platform requires you to first install `authd` as a Windows service before being able to start it. It also requires administrator permissions to install and start a service, so please open a console with administrator permissions (you can look at [this guide which explains how to do it on Windows 10](https://www.intowindows.com/command-prompt-as-administrator-in-windows-10/)), and then run the following commands:
-```shell
-> safe-authd.exe install
-Registering SAFE Authenticator (safe-authd) as a Windows service...
-The safe-authd service (<'safe-authd.exe' path>) was just installed successfully!
-
-> safe-authd.exe start
-Starting SAFE Authenticator service (safe-authd) from command line...
-safe-authd service started successfully!
+safe-authd started (PID: <pid>)
 ```
 
 ### Stop
