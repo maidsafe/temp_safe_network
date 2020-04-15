@@ -7,8 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{errors::Result, helpers::from_c_str_to_str_option};
-use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts, ReprC};
+use super::{
+    errors::Result,
+    helpers::{c_str_str_to_string_vec, from_c_str_to_str_option, string_vec_to_c_str_str},
+};
+use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
 use safe_api::{
     fetch::NrsMapContainerInfo as NativeNrsMapContainerInfo,
     files::{
@@ -143,6 +146,7 @@ impl Drop for PublishedImmutableData {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct XorUrlEncoder {
     pub encoding_version: u64,
     pub xorname: XorNameArray,
@@ -150,9 +154,8 @@ pub struct XorUrlEncoder {
     pub data_type: u64,
     pub content_type: u16,
     pub path: *const c_char,
-    pub sub_names: *const c_char,
-    // pub sub_names: *const *const c_char, // Todo: update to String Vec
-    // pub sub_names_len: usize,
+    pub sub_names: *const *const c_char,
+    pub sub_names_len: usize,
     pub content_version: u64,
 }
 
@@ -179,7 +182,8 @@ impl XorUrlEncoder {
             data_type: 0,
             content_type: 0,
             path: CString::new(String::new())?.into_raw(),
-            sub_names: CString::new(String::new())?.into_raw(),
+            sub_names: string_vec_to_c_str_str(vec![])?,
+            sub_names_len: 0,
             content_version: 0,
         })
     }
@@ -188,13 +192,11 @@ impl XorUrlEncoder {
 pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
 ) -> Result<XorUrlEncoder> {
-    // let sub_names = string_vec_to_c_str_str(xorurl_encoder.sub_names())?; // Todo: update to String Vec
-    let sub_names = if !xorurl_encoder.sub_names().is_empty() {
-        serde_json::to_string(&xorurl_encoder.sub_names())?
+    let sub_names = if xorurl_encoder.sub_names().is_empty() {
+        std::ptr::null()
     } else {
-        String::new()
+        string_vec_to_c_str_str(xorurl_encoder.sub_names())?
     };
-
     Ok(XorUrlEncoder {
         encoding_version: xorurl_encoder.encoding_version(),
         xorname: xorurl_encoder.xorname().0,
@@ -202,9 +204,8 @@ pub unsafe fn xorurl_encoder_into_repr_c(
         data_type: xorurl_encoder.data_type() as u64,
         content_type: xorurl_encoder.content_type().value()?,
         path: CString::new(xorurl_encoder.path())?.into_raw(),
-        sub_names: CString::new(sub_names)?.into_raw(),
-        // sub_names: sub_names, // Todo: update to String Vec
-        // sub_names_len: xorurl_encoder.sub_names().len(),
+        sub_names,
+        sub_names_len: xorurl_encoder.sub_names().len(),
         content_version: xorurl_encoder.content_version().unwrap_or_else(|| 0),
     })
 }
@@ -212,16 +213,21 @@ pub unsafe fn xorurl_encoder_into_repr_c(
 pub unsafe fn native_xorurl_encoder_from_repr_c(
     encoder: &XorUrlEncoder,
 ) -> Result<NativeXorUrlEncoder> {
-    let sub_names: Vec<String> =
-        serde_json::from_str(&String::clone_from_repr_c(encoder.sub_names)?)?;
+    let sub_names = if encoder.sub_names_len == 0 {
+        None
+    } else {
+        Some(c_str_str_to_string_vec(
+            encoder.sub_names,
+            encoder.sub_names_len,
+        )?)
+    };
     Ok(NativeXorUrlEncoder::new(
         XorName(encoder.xorname),
         encoder.type_tag,
         SafeDataType::from_u64(encoder.data_type)?,
         SafeContentType::from_u16(encoder.content_type)?,
         from_c_str_to_str_option(encoder.path),
-        Some(sub_names),
-        // c_str_str_to_string_vec(encoder.sub_names, encoder.sub_names_len), // Todo: update to String Vec
+        sub_names,
         Some(encoder.content_version),
         None,
         None,

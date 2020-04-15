@@ -10,7 +10,7 @@
 use super::{
     errors::Result,
     ffi_structs::{xorurl_encoder_into_repr_c, XorNameArray, XorUrlEncoder},
-    helpers::from_c_str_to_str_option,
+    helpers::{c_str_str_to_string_vec, from_c_str_to_str_option},
 };
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::xorurl::{
@@ -23,8 +23,6 @@ use std::{
     str::FromStr,
 };
 
-// TODO: Can be convertered to a struct
-
 #[no_mangle]
 pub unsafe extern "C" fn xorurl_encode(
     name: *const XorNameArray,
@@ -32,7 +30,8 @@ pub unsafe extern "C" fn xorurl_encode(
     data_type: u64,
     content_type: u16,
     path: *const c_char,
-    _sub_names: *const c_char, // todo: update this later
+    sub_names: *const *const c_char,
+    sub_names_len: usize,
     content_version: u64,
     base_encoding: *const c_char,
     user_data: *mut c_void,
@@ -48,6 +47,11 @@ pub unsafe extern "C" fn xorurl_encode(
         let data_type_enum = SafeDataType::from_u64(data_type)?;
         let content_type_enum = SafeContentType::from_u16(content_type)?;
         let url_path = from_c_str_to_str_option(path);
+        let sub_names = if sub_names_len == 0 {
+            None
+        } else {
+            Some(c_str_str_to_string_vec(sub_names, sub_names_len)?)
+        };
         let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
         let encoded_xor_url = NativeXorUrlEncoder::encode(
             xor_name,
@@ -55,19 +59,17 @@ pub unsafe extern "C" fn xorurl_encode(
             data_type_enum,
             content_type_enum,
             url_path,
-            Some(vec![]),
+            sub_names,
             Some(content_version),
             None,
             None,
             encoding_base,
-        )?; //todo: update sub_names parameter
+        )?;
         let encoded_string = CString::new(encoded_xor_url)?;
         o_cb(user_data.0, FFI_RESULT_OK, encoded_string.as_ptr());
         Ok(())
     })
 }
-
-// TODO: Can be convertered to a struct
 
 #[no_mangle]
 pub unsafe extern "C" fn xorurl_encoder(
@@ -76,7 +78,8 @@ pub unsafe extern "C" fn xorurl_encoder(
     data_type: u64,
     content_type: u16,
     path: *const c_char,
-    _sub_names: *const c_char, // todo: update this later
+    sub_names: *const *const c_char,
+    sub_names_len: usize,
     content_version: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
@@ -91,17 +94,22 @@ pub unsafe extern "C" fn xorurl_encoder(
         let data_type_enum = SafeDataType::from_u64(data_type)?;
         let content_type_enum = SafeContentType::from_u16(content_type)?;
         let url_path = from_c_str_to_str_option(path);
+        let sub_names = if sub_names_len == 0 {
+            None
+        } else {
+            Some(c_str_str_to_string_vec(sub_names, sub_names_len)?)
+        };
         let encoder = NativeXorUrlEncoder::new(
             xor_name,
             type_tag,
             data_type_enum,
             content_type_enum,
             url_path,
-            Some(vec![]),
+            sub_names,
             Some(content_version),
             None,
             None,
-        )?; //todo: update sub_names parameter
+        )?;
         let ffi_encoder = xorurl_encoder_into_repr_c(encoder)?;
         o_cb(user_data.0, FFI_RESULT_OK, &ffi_encoder);
         Ok(())
