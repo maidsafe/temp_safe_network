@@ -12,7 +12,7 @@ env:
 
 jobs:
   build:
-    name: E2E against real baby
+    name: Build for becnhmarking
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -37,7 +37,7 @@ jobs:
 
 
   benchmark:
-    name: E2E against real baby
+    name: Benchmarking ${{ matrix.benchmark }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
@@ -51,30 +51,47 @@ jobs:
         run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
       - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
 
-      - name: Setup SAFE Cli and PATH etc
+      - name: Setup SAFE Cli and Authd dirs
         run: |
           mkdir -p ~/.safe/safe-cli
           mkdir -p ~/.safe/authd
-          cp ./target/release/safe $HOME/.safe/safe-cli/
-          cp ./target/release/safe-authd $HOME/.safe/authd/
-          ls $HOME/.safe/safe-cli
-          ls $HOME/.safe/authd
-          echo "::add-path::$HOME/.safe/safe-cli"
-          echo "::add-path::$HOME/.safe/authd"
-          echo $PATH
-          chmod +x $HOME/.safe/authd/safe-authd
-          chmod +x $HOME/.safe/safe-cli/safe
-          chmod +x $HOME/.safe/vault/safe_vault
+        
 
       - uses: actions/download-artifact@master
         with:
           name: safe-cli
-          path: $HOME/.safe/safe-cli/
+          path: ./dl
     
       - uses: actions/download-artifact@master
         with:
           name: safe-authd
-          path: $HOME/.safe/authd/
+          path: ./dl
+
+      - run: cp ./dl/safe $HOME/.safe/safe-cli
+      - run: cp ./dl/safe-authd $HOME/.safe/authd
+
+      - run: ls $HOME/.safe/safe-cli
+      - run: ls $HOME/.safe/authd
+      - run: echo "::add-path::$HOME/.safe/safe-cli"
+      - run: echo "::add-path::$HOME/.safe/authd"
+      - run: echo $PATH
+      - run: chmod +x $HOME/.safe/authd/safe-authd
+      - run: chmod +x $HOME/.safe/safe-cli/safe
+
+      - run: chmod +x $HOME/.safe/vault/safe_vault
+
+      
+
+      # - name: Setup SAFE Cli and PATH etc
+      #   run: |
+      #     ls $HOME/.safe/safe-cli
+      #     ls $HOME/.safe/authd
+      #     echo "::add-path::$HOME/.safe/safe-cli"
+      #     echo "::add-path::$HOME/.safe/authd"
+      #     echo $PATH
+      #     chmod +x $HOME/.safe/authd/safe-authd
+      #     chmod +x $HOME/.safe/safe-cli/safe
+      #     chmod +x $HOME/.safe/vault/safe_vault
 
       - name: Setup The Baby
         run : safe vault run-baby-fleming -t
