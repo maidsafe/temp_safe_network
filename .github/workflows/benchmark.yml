@@ -14,6 +14,9 @@ jobs:
   benchmark:
     name: E2E against real baby
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        benchmark: [ keys, wallet, small-put]
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -45,8 +48,10 @@ jobs:
           chmod +x $HOME/.safe/vault/safe_vault
       - name: Setup The Baby
         run : safe vault run-baby-fleming -t
+
+
       - name: Benchmark 
-        run: cargo bench
+        run: cargo bench --bench ${{ matrix.benchmark }}
         shell: bash
       
       - name: Failure logs.

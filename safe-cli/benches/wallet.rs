@@ -15,7 +15,7 @@ extern crate safe_cmd_test_utilities;
 
 use safe_cmd_test_utilities::{create_wallet_with_balance, get_bin_location};
 
-const SAMPLE_SIZE: usize = 30;
+const SAMPLE_SIZE: usize = 10;
 
 fn custom_criterion() -> Criterion {
     Criterion::default().sample_size(SAMPLE_SIZE)
