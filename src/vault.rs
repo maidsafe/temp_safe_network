@@ -10,13 +10,11 @@ use crate::{
     action::{Action, ConsensusAction},
     adult::Adult,
     client_handler::ClientHandler,
-    coins_handler::CoinsHandler,
     data_handler::DataHandler,
     routing::{event::Event as RoutingEvent, NetworkEvent as ClientEvent, Node},
     rpc::Rpc,
     utils, Config, Result,
 };
-use bincode;
 use crossbeam_channel::{Receiver, Select};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -39,7 +37,6 @@ enum State {
     Elder {
         client_handler: ClientHandler,
         data_handler: DataHandler,
-        coins_handler: CoinsHandler,
     },
     // TODO - remove this
     #[allow(unused)]
@@ -119,11 +116,9 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 &total_used_space,
                 init_mode,
             )?;
-            let coins_handler = CoinsHandler::new(id.public_id().clone(), root_dir, init_mode)?;
             State::Elder {
                 client_handler,
                 data_handler,
-                coins_handler,
             }
         } else {
             let _adult = Adult::new(
@@ -357,8 +352,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
         use Action::*;
         match action {
             // Bypass client requests
-            // ConsensusVote(action) => self.vote_for_action(&action),
-            ConsensusVote(action) => self.client_handler_mut()?.handle_consensused_action(action),
+            // VoteFor(action) => self.vote_for_action(&action),
+            VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {
@@ -541,29 +536,6 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 ref mut data_handler,
                 ..
             } => Some(data_handler),
-            State::Adult(_) => None,
-        }
-    }
-
-    // TODO - remove this
-    #[allow(unused)]
-    fn coins_handler(&self) -> Option<&CoinsHandler> {
-        match &self.state {
-            State::Elder {
-                ref coins_handler, ..
-            } => Some(coins_handler),
-            State::Adult(_) => None,
-        }
-    }
-
-    // TODO - remove this
-    #[allow(unused)]
-    fn coins_handler_mut(&mut self) -> Option<&mut CoinsHandler> {
-        match &mut self.state {
-            State::Elder {
-                ref mut coins_handler,
-                ..
-            } => Some(coins_handler),
             State::Adult(_) => None,
         }
     }

@@ -33,7 +33,6 @@ mod action;
 mod adult;
 mod chunk_store;
 mod client_handler;
-mod coins_handler;
 mod config_handler;
 mod data_handler;
 mod error;

@@ -15,21 +15,15 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum ConsensusAction {
     /// Process pay for request and forward request to client.
-    PayAndForward {
+    Forward {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
         cost: Coins,
     },
-    /// Process request that doesn't need a payment and forward request to client.
-    Forward {
-        request: Request,
-        client_public_id: PublicId,
-        message_id: MessageId,
-    },
     /// Process pay for request and proxy the request to a different client's handler.
     /// Only used by `CreateLoginPacketFor`
-    PayAndProxy {
+    Proxy {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
@@ -40,9 +34,9 @@ pub(crate) enum ConsensusAction {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
-    /// Trigger a vote for an event so we can process the deferred action on consensus.
+    /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
-    ConsensusVote(ConsensusAction),
+    VoteFor(ConsensusAction),
     /// Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
     /// Send a request from client handlers of Client A to Client B to then be handled as if Client
