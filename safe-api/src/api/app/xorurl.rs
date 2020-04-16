@@ -8,7 +8,7 @@
 // Software.
 
 use super::{
-    helpers::get_subnames_host_path_and_version,
+    helpers::extract_all_url_parts,
     xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR},
     DEFAULT_XORURL_BASE,
 };
@@ -158,9 +158,11 @@ pub struct XorUrlEncoder {
     path: String,
     sub_names: Vec<String>,
     content_version: Option<u64>,
+    query_params: Vec<String>,
 }
 
 impl XorUrlEncoder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         xorname: XorName,
         type_tag: u64,
@@ -169,6 +171,7 @@ impl XorUrlEncoder {
         path: Option<&str>,
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
+        query_params: Vec<String>,
     ) -> Result<Self> {
         if let SafeContentType::MediaType(ref media_type) = content_type {
             if !Self::is_media_type_supported(media_type) {
@@ -188,6 +191,7 @@ impl XorUrlEncoder {
             path: path.unwrap_or_else(|| "").to_string(),
             sub_names: sub_names.unwrap_or_else(|| vec![]),
             content_version,
+            query_params,
         })
     }
 
@@ -206,6 +210,7 @@ impl XorUrlEncoder {
         path: Option<&str>,
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
+        query_params: Vec<String>,
         base: XorUrlBase,
     ) -> Result<String> {
         let xorurl_encoder = XorUrlEncoder::new(
@@ -216,13 +221,14 @@ impl XorUrlEncoder {
             path,
             sub_names,
             content_version,
+            query_params,
         )?;
         xorurl_encoder.to_base(base)
     }
 
     pub fn from_url(xorurl: &str) -> Result<Self> {
-        let (sub_names, cid_str, path, content_version) =
-            get_subnames_host_path_and_version(&xorurl)?;
+        let (sub_names, cid_str, path, content_version, query_params) =
+            extract_all_url_parts(&xorurl)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&cid_str)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -315,6 +321,7 @@ impl XorUrlEncoder {
             path,
             sub_names,
             content_version,
+            query_params,
         })
     }
 
@@ -360,6 +367,14 @@ impl XorUrlEncoder {
 
     pub fn set_content_version(&mut self, version: Option<u64>) {
         self.content_version = version;
+    }
+
+    pub fn query_params(&self) -> Vec<String> {
+        self.query_params.clone()
+    }
+
+    pub fn set_query_params(&mut self, params: Vec<String>) {
+        self.query_params = params;
     }
 
     // XOR-URL encoding format (var length from 36 to 44 bytes):
@@ -419,12 +434,37 @@ impl XorUrlEncoder {
         };
         let cid_str = encode(base_encoding, cid_vec);
 
-        let xorurl = format!("{}{}{}{}", SAFE_URL_PROTOCOL, sub_names, cid_str, self.path);
+        // construct xorurl with all parts we've built so far
+        let mut xorurl = format!("{}{}{}{}", SAFE_URL_PROTOCOL, sub_names, cid_str, self.path);
 
-        match self.content_version {
-            Some(v) => Ok(format!("{}?v={}", xorurl, v)),
-            None => Ok(xorurl),
+        // let's build query params string
+        let mut query = String::default();
+        for (i, q) in self.query_params.iter().enumerate() {
+            if i > 0 {
+                query.push('&');
+            }
+            query.push_str(q);
         }
+
+        // finally, add query param string to the xorurl as well as the version param
+        xorurl = match self.content_version {
+            Some(v) => {
+                if query.is_empty() {
+                    format!("{}?v={}", xorurl, v)
+                } else {
+                    format!("{}?v={}&{}", xorurl, v, query)
+                }
+            }
+            None => {
+                if query.is_empty() {
+                    xorurl
+                } else {
+                    format!("{}?{}", xorurl, query)
+                }
+            }
+        };
+
+        Ok(xorurl)
     }
 }
 
@@ -450,6 +490,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32,
         )?;
         let base32_xorurl =
@@ -469,6 +510,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
         let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
@@ -487,6 +529,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base64,
         )?;
         let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
@@ -520,6 +563,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             DEFAULT_XORURL_BASE,
         )?;
         assert_eq!(xorurl, base32z_xorurl);
@@ -538,6 +582,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
         )?;
         assert_eq!("", xorurl_encoder.path());
         assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
@@ -563,6 +608,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
 
@@ -602,6 +648,7 @@ mod tests {
             None,
             Some(vec!["sub".to_string()]),
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
 
@@ -635,6 +682,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
 
@@ -679,6 +727,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
 

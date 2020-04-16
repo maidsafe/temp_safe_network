@@ -115,6 +115,7 @@ impl Safe {
                 None,
                 None,
                 None,
+                vec![],
                 self.xorurl_base,
             )?
         };
@@ -593,6 +594,7 @@ impl Safe {
             None,
             None,
             None,
+            vec![],
             self.xorurl_base,
         )
     }

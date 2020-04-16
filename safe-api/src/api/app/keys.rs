@@ -102,6 +102,7 @@ impl Safe {
             None,
             None,
             None,
+            vec![],
             self.xorurl_base,
         )?;
         Ok((xorurl, key_pair))
@@ -129,6 +130,7 @@ impl Safe {
             None,
             None,
             None,
+            vec![],
             self.xorurl_base,
         )?;
         Ok((xorurl, key_pair))

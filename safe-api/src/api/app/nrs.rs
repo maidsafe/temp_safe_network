@@ -9,7 +9,7 @@
 
 use super::{
     consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
-    helpers::{gen_timestamp_nanos, get_subnames_host_path_and_version},
+    helpers::{extract_all_url_parts, gen_timestamp_nanos},
     nrs_map::NrsMap,
     xorurl::{SafeContentType, SafeDataType},
     Safe, SafeApp,
@@ -44,8 +44,8 @@ impl Safe {
                 err
             );
 
-            let (sub_names, host_str, path, version) =
-                get_subnames_host_path_and_version(&sanitised_url)?;
+            let (sub_names, host_str, path, version, query_params) =
+                extract_all_url_parts(&sanitised_url)?;
             let hashed_host = xorname_from_nrs_string(&host_str)?;
 
             let encoded_xor = XorUrlEncoder::new(
@@ -56,6 +56,7 @@ impl Safe {
                 Some(&path),
                 Some(sub_names),
                 version,
+                query_params,
             )?;
 
             Ok(encoded_xor)
@@ -161,7 +162,7 @@ impl Safe {
             if dry_run {
                 Ok(("".to_string(), processed_entries, nrs_map))
             } else {
-                let (_, public_name, _, _) = get_subnames_host_path_and_version(&nrs_url)?;
+                let (_, public_name, _, _, _) = extract_all_url_parts(&nrs_url)?;
                 let nrs_xorname = xorname_from_nrs_string(&public_name)?;
                 debug!(
                     "XorName for \"{:?}\" is \"{:?}\"",
@@ -188,6 +189,7 @@ impl Safe {
                     None,
                     None,
                     None,
+                    vec![],
                     self.xorurl_base,
                 )?;
 

@@ -38,6 +38,7 @@ fn gen_fake_target() -> String {
         None,
         None,
         Some(5),
+        vec![],
         XorUrlBase::Base32
     ))
 }

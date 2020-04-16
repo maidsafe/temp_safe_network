@@ -129,9 +129,10 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
     }
 }
 
-pub fn get_subnames_host_path_and_version(
+#[allow(clippy::type_complexity)]
+pub fn extract_all_url_parts(
     xorurl: &str,
-) -> Result<(Vec<String>, String, String, Option<u64>)> {
+) -> Result<(Vec<String>, String, String, Option<u64>, Vec<String>)> {
     let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
         Error::InvalidXorUrl(format!(
             "Problem parsing the safe:// URL \"{}\": {}",
@@ -151,32 +152,34 @@ pub fn get_subnames_host_path_and_version(
         path = "";
     }
 
-    let version = match parsing_url.query() {
-        Some(query) => {
-            let items: Vec<&str> = query.split('&').collect();
-            match items.iter().find(|q| q.starts_with(URL_VERSION_QUERY_NAME)) {
-                Some(version_item) => {
-                    let version_str = version_item.replace(URL_VERSION_QUERY_NAME, "");
-                    str::parse::<u64>(&version_str).ok()
-                }
-                None => None,
+    let mut version = None;
+    let mut query_params = vec![];
+    if let Some(query) = parsing_url.query() {
+        for p in query.split('&').collect::<Vec<&str>>().iter() {
+            if p.starts_with(URL_VERSION_QUERY_NAME) {
+                let version_str = p.replace(URL_VERSION_QUERY_NAME, "");
+                version = str::parse::<u64>(&version_str).ok()
+            } else {
+                // Let's accumulate the query params which are not the version param
+                query_params.push((*p).to_string());
             }
         }
-        None => None,
     };
 
     debug!(
-        "Data from url: sub names: {:?}, host: {}, path: {}, version: {:?}",
+        "Data from url: sub names: {:?}, host: {}, path: {}, version: {:?}, query_params: {:?}",
         sub_names.to_vec(),
         top_level_name.to_string(),
         path,
-        version
+        version,
+        query_params,
     );
     Ok((
         sub_names.to_vec(),
         top_level_name.to_string(),
         path.to_string(),
         version,
+        query_params,
     ))
 }
 

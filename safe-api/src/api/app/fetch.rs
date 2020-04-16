@@ -7,9 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    files::FilesMap, helpers::get_subnames_host_path_and_version, nrs_map::NrsMap, Safe, XorName,
-};
+use super::{files::FilesMap, helpers::extract_all_url_parts, nrs_map::NrsMap, Safe, XorName};
 pub use super::{
     wallet::WalletSpendableBalances,
     xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder},
@@ -306,10 +304,10 @@ async fn resolve_one_indirection(
                 nrs_map
             );
 
-            let new_target_xorurl = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
-            debug!("Resolved target: {}", new_target_xorurl);
+            let new_target_url = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
+            debug!("Resolved target: {}", new_target_url);
 
-            let mut xorurl_encoder = XorUrlEncoder::from_url(&new_target_xorurl)?;
+            let mut xorurl_encoder = Safe::parse_url(&new_target_url)?;
             if xorurl_encoder.path().is_empty() {
                 xorurl_encoder.set_path(the_xor.path());
             } else if !the_xor.path().is_empty() {
@@ -318,7 +316,7 @@ async fn resolve_one_indirection(
             let url_with_path = xorurl_encoder.to_string()?;
             debug!("Resolving target from resolvable map: {}", url_with_path);
 
-            let (_, public_name, _, _) = get_subnames_host_path_and_version(original_url)?;
+            let (_, public_name, _, _, _) = extract_all_url_parts(original_url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = NrsMapContainerInfo {
                 public_name,
@@ -827,6 +825,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
 
@@ -875,6 +874,7 @@ mod tests {
             None,
             None,
             None,
+            vec![],
             XorUrlBase::Base32z,
         )?;
 
