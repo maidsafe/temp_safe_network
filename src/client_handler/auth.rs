@@ -101,7 +101,7 @@ impl Auth {
     }
 
     // on client request
-    pub fn initiate_auth_key_insert(
+    pub fn initiate_auth_key_insertion(
         &self,
         client: &ClientInfo,
         key: PublicKey,
@@ -122,7 +122,7 @@ impl Auth {
     }
 
     // on consensus
-    pub fn finalize_auth_key_insert(
+    pub fn finalize_auth_key_insertion(
         &mut self,
         client: PublicId,
         key: PublicKey,

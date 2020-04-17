@@ -25,9 +25,9 @@ use std::{
 
 #[derive(Clone)]
 pub(crate) struct ElderData {
-    idata: ElderIData,
-    mdata: ElderMData,
-    adata: ElderAData,
+    pub idata: ElderIData,
+    pub mdata: ElderMData,
+    pub adata: ElderAData,
 }
 
 impl ElderData {
@@ -35,20 +35,8 @@ impl ElderData {
         Self {
             idata: ElderIData::new(id.clone(), responder.clone()),
             mdata: ElderMData::new(id.clone(), responder.clone()),
-            adata: ElderAData::new(id.clone(), responder.clone()),
+            adata: ElderAData::new(id, responder),
         }
-    }
-
-    pub fn idata(self) -> ElderIData {
-        self.idata
-    }
-
-    pub fn mdata(self) -> ElderMData {
-        self.mdata
-    }
-
-    pub fn adata(self) -> ElderAData {
-        self.adata
     }
 }
 
@@ -65,6 +53,20 @@ pub(crate) struct ElderAData {
 impl ElderAData {
     pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
         Self { id, responder }
+    }
+
+    // client query
+    pub fn get_adata(
+        &mut self,
+        client: &ClientInfo,
+        request: Request,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     // on client request
@@ -135,19 +137,6 @@ impl ElderAData {
             cost: COST_OF_PUT,
         }))
     }
-
-    pub fn get_adata(
-        &mut self,
-        client: &ClientInfo,
-        request: Request,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
-    }
 }
 
 impl Display for ElderAData {
@@ -169,6 +158,20 @@ pub(crate) struct ElderIData {
 impl ElderIData {
     pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
         Self { id, responder }
+    }
+
+    // client query
+    pub fn get_idata(
+        &mut self,
+        client: &ClientInfo,
+        address: IDataAddress,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request: Request::GetIData(address),
+            message_id,
+        }))
     }
 
     // on client request
@@ -227,19 +230,6 @@ impl ElderIData {
             cost: Coins::from_nano(0),
         }))
     }
-
-    pub fn get_idata(
-        &mut self,
-        client: &ClientInfo,
-        address: IDataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::GetIData(address),
-            message_id,
-        }))
-    }
 }
 
 impl Display for ElderIData {
@@ -261,6 +251,20 @@ pub(crate) struct ElderMData {
 impl ElderMData {
     pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
         Self { id, responder }
+    }
+
+    // client query
+    pub fn get_mdata(
+        &mut self,
+        request: Request,
+        client: &ClientInfo,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request,
+            message_id,
+        }))
     }
 
     // on client request
@@ -323,19 +327,6 @@ impl ElderMData {
             client_public_id: client.public_id.clone(),
             message_id,
             cost: COST_OF_PUT,
-        }))
-    }
-
-    pub fn get_mdata(
-        &mut self,
-        request: Request,
-        client: &ClientInfo,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
         }))
     }
 }

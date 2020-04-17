@@ -192,7 +192,6 @@ fn create_login_packet_for_other() {
         Request::CreateLoginPacketFor {
             new_owner: *new_client.public_id().public_key(),
             amount,
-            //transaction_id: 1,
             new_login_packet: login_packet.clone(),
         },
         Transaction { id: 1, amount },
@@ -223,7 +222,6 @@ fn create_login_packet_for_other() {
         Request::CreateLoginPacketFor {
             new_owner: *new_client.public_id().public_key(),
             amount: Coins::from_nano(nano_to_transfer),
-            //transaction_id: 2,
             new_login_packet: login_packet.clone(),
         },
         NdError::BalanceExists,
@@ -245,7 +243,6 @@ fn create_login_packet_for_other() {
         Request::CreateLoginPacketFor {
             new_owner: *new_client2.public_id().public_key(),
             amount,
-            //transaction_id: 3,
             new_login_packet: login_packet,
         },
         NdError::LoginPacketExists,

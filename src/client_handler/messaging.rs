@@ -34,7 +34,7 @@ pub(super) struct Messaging {
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
 }
 
-pub struct ClientRequest {
+pub(crate) struct ClientRequest {
     pub client: ClientInfo,
     pub request: Request,
     pub message_id: MessageId,
@@ -53,7 +53,7 @@ impl Messaging {
         }
     }
 
-    pub fn try_initiate_client_request<R: CryptoRng + Rng>(
+    pub fn try_parse_client_request<R: CryptoRng + Rng>(
         &mut self,
         peer_addr: SocketAddr,
         bytes: &Bytes,
@@ -68,7 +68,7 @@ impl Messaging {
                 }) => {
                     if self.shall_handle_request(message_id, peer_addr) {
                         return Some(ClientRequest {
-                            client: client,
+                            client,
                             request,
                             message_id,
                             signature,
@@ -132,13 +132,13 @@ impl Messaging {
 
         if let Entry::Vacant(ve) = self.pending_msg_ids.entry(message_id) {
             let _ = ve.insert(peer_addr);
-            return true;
+            true
         } else {
             info!(
                 "Pending MessageId {:?} reused - ignoring client message.",
                 message_id
             );
-            return false;
+            false
         }
     }
 
@@ -194,6 +194,64 @@ impl Messaging {
                 message_id,
             },
         )
+    }
+
+    /// Relay response from other node to the client.
+    pub fn relay_reponse_to_client(
+        &mut self,
+        data_handlers: XorName,
+        requester: &PublicId,
+        response: Response,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use Response::*;
+        trace!(
+            "{}: Received ({:?} {:?}) to {} from {}",
+            self,
+            response,
+            message_id,
+            requester,
+            data_handlers
+        );
+
+        match response {
+            // Transfer the response from data handlers to clients
+            GetIData(..)
+            | GetAData(..)
+            | GetADataShell(..)
+            | GetADataRange(..)
+            | GetADataIndices(..)
+            | GetADataLastEntry(..)
+            | GetADataOwners(..)
+            | GetPubADataUserPermissions(..)
+            | GetUnpubADataUserPermissions(..)
+            | GetADataPermissions(..)
+            | GetADataValue(..)
+            | GetMData(..)
+            | GetMDataShell(..)
+            | GetMDataVersion(..)
+            | ListMDataEntries(..)
+            | ListMDataKeys(..)
+            | ListMDataValues(..)
+            | ListMDataUserPermissions(..)
+            | ListMDataPermissions(..)
+            | GetMDataValue(..)
+            | Mutation(..)
+            | Transaction(..) => {
+                self.respond_to_client(message_id, response);
+                None
+            }
+            //
+            // ===== Invalid =====
+            //
+            GetLoginPacket(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
+                error!(
+                    "{}: Should not receive {:?} as a client handler.",
+                    self, response
+                );
+                None
+            }
+        }
     }
 
     /// Handles a received challenge response.
@@ -346,64 +404,6 @@ impl Messaging {
                 }
             })
             .collect::<Vec<_>>()
-    }
-
-    /// Handle response from the data handlers.
-    pub fn relay_data_handler_reponse_to_client(
-        &mut self,
-        data_handlers: XorName,
-        requester: &PublicId,
-        response: Response,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        use Response::*;
-        trace!(
-            "{}: Received ({:?} {:?}) to {} from {}",
-            self,
-            response,
-            message_id,
-            requester,
-            data_handlers
-        );
-
-        match response {
-            // Transfer the response from data handlers to clients
-            GetIData(..)
-            | GetAData(..)
-            | GetADataShell(..)
-            | GetADataRange(..)
-            | GetADataIndices(..)
-            | GetADataLastEntry(..)
-            | GetADataOwners(..)
-            | GetPubADataUserPermissions(..)
-            | GetUnpubADataUserPermissions(..)
-            | GetADataPermissions(..)
-            | GetADataValue(..)
-            | GetMData(..)
-            | GetMDataShell(..)
-            | GetMDataVersion(..)
-            | ListMDataEntries(..)
-            | ListMDataKeys(..)
-            | ListMDataValues(..)
-            | ListMDataUserPermissions(..)
-            | ListMDataPermissions(..)
-            | GetMDataValue(..)
-            | Mutation(..)
-            | Transaction(..) => {
-                self.respond_to_client(message_id, response);
-                None
-            }
-            //
-            // ===== Invalid =====
-            //
-            GetLoginPacket(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
-                error!(
-                    "{}: Should not receive {:?} as a client handler.",
-                    self, response
-                );
-                None
-            }
-        }
     }
 
     fn try_bootstrap(&mut self, peer_addr: SocketAddr, client_id: &PublicId) {

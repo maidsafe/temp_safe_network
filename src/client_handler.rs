@@ -21,13 +21,11 @@ use self::{
 };
 use crate::{
     action::{Action, ConsensusAction},
-    chunk_store::LoginPacketDb,
+    chunk_store::LoginPacketChunkStore,
     routing::Node,
     rpc::Rpc,
-    //utils,
     vault::Init,
-    Config,
-    Result,
+    Config, Result,
 };
 use bytes::Bytes;
 use log::{error, trace};
@@ -51,7 +49,7 @@ pub(crate) struct ClientHandler {
     data: ElderData,
 }
 
-pub struct Responder {
+pub(crate) struct Responder {
     messaging: Rc<RefCell<Messaging>>,
 }
 
@@ -74,7 +72,7 @@ impl ClientHandler {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_db = AuthKeysDb::new(root_dir, init_mode)?;
-        let packet_db = LoginPacketDb::new(
+        let packet_db = LoginPacketChunkStore::new(
             root_dir,
             config.max_capacity(),
             Rc::clone(&total_used_space),
@@ -87,11 +85,11 @@ impl ClientHandler {
         }));
         let auth = Auth::new(id.clone(), auth_db, responder.clone());
         let login_packets = LoginPackets::new(id.clone(), packet_db, responder.clone());
-        let data = ElderData::new(id.clone(), responder.clone());
+        let data = ElderData::new(id.clone(), responder);
 
         let client_handler = Self {
-            id: id.clone(),
-            messaging: messaging.clone(),
+            id,
+            messaging,
             auth,
             login_packets,
             data,
@@ -124,7 +122,7 @@ impl ClientHandler {
             } => self
                 .messaging
                 .borrow_mut()
-                .relay_data_handler_reponse_to_client(src, &requester, response, message_id),
+                .relay_reponse_to_client(src, &requester, response, message_id),
         }
     }
 
@@ -161,13 +159,12 @@ impl ClientHandler {
         bytes: &Bytes,
         rng: &mut R,
     ) -> Option<Action> {
-        match self
+        let result = self
             .messaging
-            .clone()
             .borrow_mut()
-            .try_initiate_client_request(peer_addr, bytes, rng)
-        {
-            Some(result) => self.initiate_client_request(
+            .try_parse_client_request(peer_addr, bytes, rng);
+        match result {
+            Some(result) => self.process_client_request(
                 &result.client,
                 result.request,
                 result.message_id,
@@ -179,7 +176,7 @@ impl ClientHandler {
 
     #[allow(clippy::cognitive_complexity)]
     // on client request
-    fn initiate_client_request(
+    fn process_client_request(
         &mut self,
         client: &ClientInfo,
         request: Request,
@@ -207,8 +204,7 @@ impl ClientHandler {
             //
             PutIData(chunk) => self
                 .data
-                .clone()
-                .idata()
+                .idata
                 .initiate_idata_creation(client, chunk, message_id),
             GetIData(address) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
@@ -218,35 +214,28 @@ impl ClientHandler {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                self.data
-                    .clone()
-                    .idata()
-                    .get_idata(client, address, message_id)
+                self.data.idata.get_idata(client, address, message_id)
             }
             DeleteUnpubIData(address) => self
                 .data
-                .clone()
-                .idata()
+                .idata
                 .initiate_unpub_idata_deletion(client, address, message_id),
             //
             // ===== Mutable Data =====
             //
             PutMData(chunk) => self
                 .data
-                .clone()
-                .mdata()
+                .mdata
                 .initiate_mdata_creation(client, chunk, message_id),
             MutateMDataEntries { .. }
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => self
                 .data
-                .clone()
-                .mdata()
+                .mdata
                 .initiate_mdata_mutation(request, client, message_id),
             DeleteMData(..) => self
                 .data
-                .clone()
-                .mdata()
+                .mdata
                 .initiate_mdata_deletion(request, client, message_id),
             GetMData(..)
             | GetMDataVersion(..)
@@ -256,18 +245,13 @@ impl ClientHandler {
             | ListMDataUserPermissions { .. }
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..) => self
-                .data
-                .clone()
-                .mdata()
-                .get_mdata(request, client, message_id),
+            | ListMDataValues(..) => self.data.mdata.get_mdata(request, client, message_id),
             //
             // ===== Append Only Data =====
             //
             PutAData(chunk) => self
                 .data
-                .clone()
-                .adata()
+                .adata
                 .initiate_adata_creation(client, chunk, message_id),
             GetAData(_)
             | GetADataShell { .. }
@@ -278,15 +262,10 @@ impl ClientHandler {
             | GetADataPermissions { .. }
             | GetPubADataUserPermissions { .. }
             | GetUnpubADataUserPermissions { .. }
-            | GetADataValue { .. } => self
-                .data
-                .clone()
-                .adata()
-                .get_adata(client, request, message_id),
+            | GetADataValue { .. } => self.data.adata.get_adata(client, request, message_id),
             DeleteAData(address) => self
                 .data
-                .clone()
-                .adata()
+                .adata
                 .initiate_adata_deletion(client, address, message_id),
             AddPubADataPermissions { .. }
             | AddUnpubADataPermissions { .. }
@@ -294,8 +273,7 @@ impl ClientHandler {
             | AppendSeq { .. }
             | AppendUnseq(..) => self
                 .data
-                .clone()
-                .adata()
+                .adata
                 .initiate_adata_mutation(client, request, message_id),
             //
             // ===== Coins =====
@@ -339,9 +317,10 @@ impl ClientHandler {
                 key,
                 version,
                 permissions,
-            } => self
-                .auth
-                .initiate_auth_key_insert(client, key, version, permissions, message_id),
+            } => {
+                self.auth
+                    .initiate_auth_key_insertion(client, key, version, permissions, message_id)
+            }
             DelAuthKey { key, version } => self
                 .auth
                 .initiate_auth_key_deletion(client, key, version, message_id),
@@ -389,10 +368,13 @@ impl ClientHandler {
                 key,
                 version,
                 permissions,
-            } => {
-                self.auth
-                    .finalize_auth_key_insert(requester, key, version, permissions, message_id)
-            }
+            } => self.auth.finalize_auth_key_insertion(
+                requester,
+                key,
+                version,
+                permissions,
+                message_id,
+            ),
             DelAuthKey { key, version } => self
                 .auth
                 .finalize_auth_key_deletion(requester, key, version, message_id),

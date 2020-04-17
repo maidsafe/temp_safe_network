@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Responder;
-use super::COST_OF_PUT;
+use super::{Responder, COST_OF_PUT};
 use crate::{
     action::{Action, ConsensusAction},
-    chunk_store::{error::Error as ChunkStoreError, LoginPacketDb},
+    chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
     rpc::Rpc,
     utils,
 };
@@ -22,14 +21,14 @@ use std::{cell::RefCell, rc::Rc};
 
 pub(super) struct LoginPackets {
     id: NodePublicId,
-    login_packets: LoginPacketDb,
+    login_packets: LoginPacketChunkStore,
     responder: Rc<RefCell<Responder>>,
 }
 
 impl LoginPackets {
     pub fn new(
         id: NodePublicId,
-        login_packets: LoginPacketDb,
+        login_packets: LoginPacketChunkStore,
         responder: Rc<RefCell<Responder>>,
     ) -> Self {
         Self {
@@ -39,6 +38,7 @@ impl LoginPackets {
         }
     }
 
+    // client query
     pub fn get_login_packet(
         &mut self,
         client_id: &PublicId,
@@ -165,7 +165,7 @@ impl LoginPackets {
                         amount,
                         new_login_packet: login_packet,
                     },
-                    requester: payer.clone(),
+                    requester: payer,
                     message_id,
                 }))
             }
@@ -193,6 +193,7 @@ impl LoginPackets {
         }
     }
 
+    // on client request
     pub fn initiate_login_packet_update(
         &mut self,
         client_id: PublicId,
@@ -207,6 +208,7 @@ impl LoginPackets {
         }))
     }
 
+    // on consensus
     pub fn finalize_login_packet_update(
         &mut self,
         requester: PublicId,
