@@ -32,13 +32,10 @@ pub(crate) struct ElderData {
 
 impl ElderData {
     pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
-        let idata = ElderIData::new(id.clone(), responder.clone());
-        let mdata = ElderMData::new(id.clone(), responder.clone());
-        let adata = ElderAData::new(id.clone(), responder.clone());
         Self {
-            idata,
-            mdata,
-            adata,
+            idata: ElderIData::new(id.clone(), responder.clone()),
+            mdata: ElderMData::new(id.clone(), responder.clone()),
+            adata: ElderAData::new(id.clone(), responder.clone()),
         }
     }
 
@@ -60,7 +57,7 @@ impl ElderData {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub struct ElderAData {
+pub(crate) struct ElderAData {
     id: NodePublicId,
     responder: Rc<RefCell<Responder>>,
 }
@@ -164,7 +161,7 @@ impl Display for ElderAData {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub struct ElderIData {
+pub(crate) struct ElderIData {
     id: NodePublicId,
     responder: Rc<RefCell<Responder>>,
 }
@@ -256,7 +253,7 @@ impl Display for ElderIData {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub struct ElderMData {
+pub(crate) struct ElderMData {
     id: NodePublicId,
     responder: Rc<RefCell<Responder>>,
 }
