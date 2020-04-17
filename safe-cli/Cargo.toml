@@ -77,7 +77,7 @@ features = ["precommit-hook","user-hooks"]
 # Our various benchmakrs.
 # Harness=false disables rust baked in bench to use criterion instead.
 [[bench]]
-name = "small-put"
+name = "put"
 harness = false
 [[bench]]
 name = "keys"

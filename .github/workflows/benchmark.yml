@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        benchmark: [ keys, small-put ]
+        benchmark: [ keys, put ]
     steps:
       - uses: actions/checkout@v1
    
