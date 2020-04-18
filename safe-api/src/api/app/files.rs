@@ -107,15 +107,10 @@ impl Safe {
                 )
                 .await?;
 
-            XorUrlEncoder::encode(
+            XorUrlEncoder::encode_append_only_data(
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
-                SafeDataType::PublishedSeqAppendOnlyData,
                 SafeContentType::FilesContainer,
-                None,
-                None,
-                None,
-                vec![],
                 self.xorurl_base,
             )?
         };
@@ -586,17 +581,7 @@ impl Safe {
             .files_put_published_immutable(&data, dry_run)
             .await?;
 
-        XorUrlEncoder::encode(
-            xorname,
-            0,
-            SafeDataType::PublishedImmutableData,
-            content_type,
-            None,
-            None,
-            None,
-            vec![],
-            self.xorurl_base,
-        )
+        XorUrlEncoder::encode_immutable_data(xorname, content_type, self.xorurl_base)
     }
 
     /// # Get Published ImmutableData

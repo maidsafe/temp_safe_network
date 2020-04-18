@@ -316,7 +316,7 @@ async fn resolve_one_indirection(
             let url_with_path = xorurl_encoder.to_string()?;
             debug!("Resolving target from resolvable map: {}", url_with_path);
 
-            let (_, public_name, _, _, _) = extract_all_url_parts(original_url)?;
+            let (_, public_name, _, _, _, _) = extract_all_url_parts(original_url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = NrsMapContainerInfo {
                 public_name,
@@ -825,7 +825,8 @@ mod tests {
             None,
             None,
             None,
-            vec![],
+            None,
+            None,
             XorUrlBase::Base32z,
         )?;
 
@@ -874,7 +875,8 @@ mod tests {
             None,
             None,
             None,
-            vec![],
+            None,
+            None,
             XorUrlBase::Base32z,
         )?;
 

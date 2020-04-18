@@ -57,7 +57,8 @@ pub unsafe extern "C" fn xorurl_encode(
             url_path,
             Some(vec![]),
             Some(content_version),
-            vec![],
+            None,
+            None,
             encoding_base,
         )?; //todo: update sub_names parameter
         let encoded_string = CString::new(encoded_xor_url)?;
@@ -98,7 +99,8 @@ pub unsafe extern "C" fn xorurl_encoder(
             url_path,
             Some(vec![]),
             Some(content_version),
-            vec![],
+            None,
+            None,
         )?; //todo: update sub_names parameter
         let ffi_encoder = xorurl_encoder_into_repr_c(encoder)?;
         o_cb(user_data.0, FFI_RESULT_OK, &ffi_encoder);

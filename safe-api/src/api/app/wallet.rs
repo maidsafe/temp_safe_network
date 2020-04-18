@@ -45,15 +45,10 @@ impl Safe {
             .put_seq_mutable_data(None, WALLET_TYPE_TAG, None)
             .await?;
 
-        XorUrlEncoder::encode(
+        XorUrlEncoder::encode_mutable_data(
             xorname,
             WALLET_TYPE_TAG,
-            SafeDataType::SeqMutableData,
             SafeContentType::Wallet,
-            None,
-            None,
-            None,
-            vec![],
             self.xorurl_base,
         )
     }
@@ -76,7 +71,8 @@ impl Safe {
             None,
             None,
             None,
-            vec![],
+            None,
+            None,
             self.xorurl_base,
         )?;
         let value = WalletSpendableBalance {

@@ -94,17 +94,7 @@ impl Safe {
             }
         };
 
-        let xorurl = XorUrlEncoder::encode(
-            xorname,
-            0,
-            SafeDataType::SafeKey,
-            SafeContentType::Raw,
-            None,
-            None,
-            None,
-            vec![],
-            self.xorurl_base,
-        )?;
+        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
         Ok((xorurl, key_pair))
     }
 
@@ -122,17 +112,7 @@ impl Safe {
         let (pk, sk) = key_pair.to_hex_key_pair()?;
         let key_pair = Some(BlsKeyPair { pk, sk });
 
-        let xorurl = XorUrlEncoder::encode(
-            xorname,
-            0,
-            SafeDataType::SafeKey,
-            SafeContentType::Raw,
-            None,
-            None,
-            None,
-            vec![],
-            self.xorurl_base,
-        )?;
+        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
         Ok((xorurl, key_pair))
     }
 

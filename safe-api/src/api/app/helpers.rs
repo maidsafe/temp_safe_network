@@ -20,7 +20,7 @@ use std::{
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use url::Url;
 
-const URL_VERSION_QUERY_NAME: &str = "v=";
+const URL_VERSION_QUERY_NAME: &str = "v";
 
 /// The conversion from coin to raw value
 const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
@@ -132,7 +132,7 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
 #[allow(clippy::type_complexity)]
 pub fn extract_all_url_parts(
     xorurl: &str,
-) -> Result<(Vec<String>, String, String, Option<u64>, Vec<String>)> {
+) -> Result<(Vec<String>, String, String, Option<u64>, String, String)> {
     let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
         Error::InvalidXorUrl(format!(
             "Problem parsing the safe:// URL \"{}\": {}",
@@ -153,33 +153,44 @@ pub fn extract_all_url_parts(
     }
 
     let mut version = None;
-    let mut query_params = vec![];
-    if let Some(query) = parsing_url.query() {
-        for p in query.split('&').collect::<Vec<&str>>().iter() {
-            if p.starts_with(URL_VERSION_QUERY_NAME) {
-                let version_str = p.replace(URL_VERSION_QUERY_NAME, "");
-                version = str::parse::<u64>(&version_str).ok()
-            } else {
-                // Let's accumulate the query params which are not the version param
-                query_params.push((*p).to_string());
-            }
+    let mut query_params = String::default();
+    for (key, value) in parsing_url.query_pairs() {
+        if key == URL_VERSION_QUERY_NAME {
+            version = str::parse::<u64>(&value).ok();
+        } else {
+            // Let's accumulate the query query_params which are not the version param
+            query_params.push_str(&format!("&{}={}", key, value));
         }
+    }
+
+    if !query_params.is_empty() {
+        // remove the '&' form the begining
+        query_params.remove(0);
+    };
+
+    let fragment = if let Some(f) = parsing_url.fragment() {
+        f.to_string()
+    } else {
+        String::default()
     };
 
     debug!(
-        "Data from url: sub names: {:?}, host: {}, path: {}, version: {:?}, query_params: {:?}",
+        "Data from url: sub names: {:?}, host: {}, path: {}, version: {:?}, query_params: {}, fragment: {}",
         sub_names.to_vec(),
         top_level_name.to_string(),
         path,
         version,
         query_params,
+        fragment
     );
+
     Ok((
         sub_names.to_vec(),
         top_level_name.to_string(),
         path.to_string(),
         version,
         query_params,
+        fragment,
     ))
 }
 

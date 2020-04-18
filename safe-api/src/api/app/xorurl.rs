@@ -158,7 +158,8 @@ pub struct XorUrlEncoder {
     path: String,
     sub_names: Vec<String>,
     content_version: Option<u64>,
-    query_params: Vec<String>,
+    query_params: String,
+    fragment: String,
 }
 
 impl XorUrlEncoder {
@@ -171,7 +172,8 @@ impl XorUrlEncoder {
         path: Option<&str>,
         sub_names: Option<Vec<String>>,
         content_version: Option<u64>,
-        query_params: Vec<String>,
+        query_params: Option<&str>,
+        fragment: Option<&str>,
     ) -> Result<Self> {
         if let SafeContentType::MediaType(ref media_type) = content_type {
             if !Self::is_media_type_supported(media_type) {
@@ -191,7 +193,8 @@ impl XorUrlEncoder {
             path: path.unwrap_or_else(|| "").to_string(),
             sub_names: sub_names.unwrap_or_else(|| vec![]),
             content_version,
-            query_params,
+            query_params: query_params.unwrap_or_else(|| "").to_string(),
+            fragment: fragment.unwrap_or_else(|| "").to_string(),
         })
     }
 
@@ -200,34 +203,8 @@ impl XorUrlEncoder {
         MEDIA_TYPE_CODES.get(media_type).is_some()
     }
 
-    // A non-member encoder function for convenience in some cases
-    #[allow(clippy::too_many_arguments)]
-    pub fn encode(
-        xorname: XorName,
-        type_tag: u64,
-        data_type: SafeDataType,
-        content_type: SafeContentType,
-        path: Option<&str>,
-        sub_names: Option<Vec<String>>,
-        content_version: Option<u64>,
-        query_params: Vec<String>,
-        base: XorUrlBase,
-    ) -> Result<String> {
-        let xorurl_encoder = XorUrlEncoder::new(
-            xorname,
-            type_tag,
-            data_type,
-            content_type,
-            path,
-            sub_names,
-            content_version,
-            query_params,
-        )?;
-        xorurl_encoder.to_base(base)
-    }
-
     pub fn from_url(xorurl: &str) -> Result<Self> {
-        let (sub_names, cid_str, path, content_version, query_params) =
+        let (sub_names, cid_str, path, content_version, query_params, fragment) =
             extract_all_url_parts(&xorurl)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&cid_str)
@@ -322,6 +299,7 @@ impl XorUrlEncoder {
             sub_names,
             content_version,
             query_params,
+            fragment,
         })
     }
 
@@ -369,12 +347,20 @@ impl XorUrlEncoder {
         self.content_version = version;
     }
 
-    pub fn query_params(&self) -> Vec<String> {
+    pub fn query_params(&self) -> String {
         self.query_params.clone()
     }
 
-    pub fn set_query_params(&mut self, params: Vec<String>) {
+    pub fn set_query_params(&mut self, params: String) {
         self.query_params = params;
+    }
+
+    pub fn fragment(&self) -> String {
+        self.fragment.clone()
+    }
+
+    pub fn set_fragment(&mut self, fragment: String) {
+        self.fragment = fragment;
     }
 
     // XOR-URL encoding format (var length from 36 to 44 bytes):
@@ -437,34 +423,129 @@ impl XorUrlEncoder {
         // construct xorurl with all parts we've built so far
         let mut xorurl = format!("{}{}{}{}", SAFE_URL_PROTOCOL, sub_names, cid_str, self.path);
 
-        // let's build query params string
-        let mut query = String::default();
-        for (i, q) in self.query_params.iter().enumerate() {
-            if i > 0 {
-                query.push('&');
-            }
-            query.push_str(q);
-        }
-
         // finally, add query param string to the xorurl as well as the version param
         xorurl = match self.content_version {
-            Some(v) => {
-                if query.is_empty() {
-                    format!("{}?v={}", xorurl, v)
-                } else {
-                    format!("{}?v={}&{}", xorurl, v, query)
-                }
+            Some(v) if self.query_params.is_empty() => format!("{}?v={}", xorurl, v),
+            Some(v) if !self.query_params.is_empty() => {
+                format!("{}?v={}&{}", xorurl, v, self.query_params)
             }
-            None => {
-                if query.is_empty() {
-                    xorurl
-                } else {
-                    format!("{}?{}", xorurl, query)
-                }
-            }
+            None if !self.query_params.is_empty() => format!("{}?{}", xorurl, self.query_params),
+            _ => xorurl,
         };
 
+        // add fragment if it's set
+        if !self.fragment.is_empty() {
+            xorurl.push('#');
+            xorurl.push_str(&self.fragment);
+        }
+
         Ok(xorurl)
+    }
+
+    // A non-member encoder function for convenience in some cases
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode(
+        xorname: XorName,
+        type_tag: u64,
+        data_type: SafeDataType,
+        content_type: SafeContentType,
+        path: Option<&str>,
+        sub_names: Option<Vec<String>>,
+        content_version: Option<u64>,
+        query_params: Option<&str>,
+        fragment: Option<&str>,
+        base: XorUrlBase,
+    ) -> Result<String> {
+        let xorurl_encoder = XorUrlEncoder::new(
+            xorname,
+            type_tag,
+            data_type,
+            content_type,
+            path,
+            sub_names,
+            content_version,
+            query_params,
+            fragment,
+        )?;
+        xorurl_encoder.to_base(base)
+    }
+
+    // A non-member SafeKey encoder function for convenience
+    pub fn encode_safekey(xorname: XorName, base: XorUrlBase) -> Result<String> {
+        XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeDataType::SafeKey,
+            SafeContentType::Raw,
+            None,
+            None,
+            None,
+            None,
+            None,
+            base,
+        )
+    }
+
+    // A non-member ImmutableData encoder function for convenience
+    pub fn encode_immutable_data(
+        xorname: XorName,
+        content_type: SafeContentType,
+        base: XorUrlBase,
+    ) -> Result<String> {
+        XorUrlEncoder::encode(
+            xorname,
+            0,
+            SafeDataType::PublishedImmutableData,
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+            base,
+        )
+    }
+
+    // A non-member MutableData encoder function for convenience
+    pub fn encode_mutable_data(
+        xorname: XorName,
+        type_tag: u64,
+        content_type: SafeContentType,
+        base: XorUrlBase,
+    ) -> Result<String> {
+        XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::SeqMutableData,
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+            base,
+        )
+    }
+
+    // A non-member AppendOnlyData encoder function for convenience
+    pub fn encode_append_only_data(
+        xorname: XorName,
+        type_tag: u64,
+        content_type: SafeContentType,
+        base: XorUrlBase,
+    ) -> Result<String> {
+        XorUrlEncoder::encode(
+            xorname,
+            type_tag,
+            SafeDataType::PublishedSeqAppendOnlyData,
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+            base,
+        )
     }
 }
 
@@ -490,7 +571,8 @@ mod tests {
             None,
             None,
             None,
-            vec![],
+            None,
+            None,
             XorUrlBase::Base32,
         )?;
         let base32_xorurl =
@@ -502,15 +584,9 @@ mod tests {
     #[test]
     fn test_xorurl_base32z_encoding() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode_immutable_data(
             xorname,
-            0,
-            SafeDataType::PublishedImmutableData,
             SafeContentType::Raw,
-            None,
-            None,
-            None,
-            vec![],
             XorUrlBase::Base32z,
         )?;
         let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
@@ -521,15 +597,10 @@ mod tests {
     #[test]
     fn test_xorurl_base64_encoding() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode_append_only_data(
             xorname,
             4_584_545,
-            SafeDataType::PublishedSeqAppendOnlyData,
             SafeContentType::FilesContainer,
-            None,
-            None,
-            None,
-            vec![],
             XorUrlBase::Base64,
         )?;
         let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
@@ -555,15 +626,9 @@ mod tests {
     fn test_xorurl_default_base_encoding() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
         let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode_immutable_data(
             xorname,
-            0,
-            SafeDataType::PublishedImmutableData,
             SafeContentType::Raw,
-            None,
-            None,
-            None,
-            vec![],
             DEFAULT_XORURL_BASE,
         )?;
         assert_eq!(xorurl, base32z_xorurl);
@@ -574,17 +639,24 @@ mod tests {
     fn test_xorurl_decoding() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl_encoder = XorUrlEncoder::new(
+        let subdirs = "/dir1/dir2";
+        let query_params = "k1=v1&k2=v2";
+        let fragment = "myfragment";
+        let xorurl = XorUrlEncoder::encode(
             xorname,
             type_tag,
             SafeDataType::PublishedImmutableData,
             SafeContentType::Raw,
-            None,
-            None,
-            None,
-            vec![],
+            Some(subdirs),
+            Some(vec!["subname".to_string()]),
+            Some(5),
+            Some(query_params),
+            Some(fragment),
+            XorUrlBase::Base32z,
         )?;
-        assert_eq!("", xorurl_encoder.path());
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+
+        assert_eq!(subdirs, xorurl_encoder.path());
         assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
         assert_eq!(xorname, xorurl_encoder.xorname());
         assert_eq!(type_tag, xorurl_encoder.type_tag());
@@ -593,6 +665,9 @@ mod tests {
             xorurl_encoder.data_type()
         );
         assert_eq!(SafeContentType::Raw, xorurl_encoder.content_type());
+        assert_eq!(Some(5), xorurl_encoder.content_version());
+        assert_eq!(query_params, xorurl_encoder.query_params());
+        assert_eq!(fragment, xorurl_encoder.fragment());
         Ok(())
     }
 
@@ -600,15 +675,10 @@ mod tests {
     fn test_xorurl_decoding_with_path() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode_append_only_data(
             xorname,
             type_tag,
-            SafeDataType::PublishedSeqAppendOnlyData,
             SafeContentType::Wallet,
-            None,
-            None,
-            None,
-            vec![],
             XorUrlBase::Base32z,
         )?;
 
@@ -648,7 +718,8 @@ mod tests {
             None,
             Some(vec!["sub".to_string()]),
             None,
-            vec![],
+            None,
+            None,
             XorUrlBase::Base32z,
         )?;
 
@@ -673,16 +744,9 @@ mod tests {
     #[test]
     fn test_xorurl_encoding_decoding_with_media_type() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
-        let type_tag: u64 = 0x4c2f;
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode_immutable_data(
             xorname,
-            type_tag,
-            SafeDataType::PublishedImmutableData,
             SafeContentType::MediaType("text/html".to_string()),
-            None,
-            None,
-            None,
-            vec![],
             XorUrlBase::Base32z,
         )?;
 
@@ -718,16 +782,9 @@ mod tests {
     #[test]
     fn test_xorurl_too_short() -> Result<()> {
         let xorname = XorName(*b"12345678901234567890123456789012");
-        let type_tag: u64 = 0x0;
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = XorUrlEncoder::encode_immutable_data(
             xorname,
-            type_tag,
-            SafeDataType::PublishedImmutableData,
             SafeContentType::MediaType("text/html".to_string()),
-            None,
-            None,
-            None,
-            vec![],
             XorUrlBase::Base32z,
         )?;
 

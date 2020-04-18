@@ -223,7 +223,8 @@ pub unsafe fn native_xorurl_encoder_from_repr_c(
         Some(sub_names),
         // c_str_str_to_string_vec(encoder.sub_names, encoder.sub_names_len), // Todo: update to String Vec
         Some(encoder.content_version),
-        vec![],
+        None,
+        None,
     )?)
 }
 
