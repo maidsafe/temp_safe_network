@@ -79,6 +79,6 @@ mod tests {
         let str_vec: Vec<u8> = vec![1, 2, 3, 4, 5];
         let (c_vec_ptr, c_vec_len) = vec_into_raw_parts(str_vec.clone());
         let converted_vec: Vec<u8> = unsafe { vec_from_raw_parts(c_vec_ptr, c_vec_len) };
-        assert_eq!(str_vec.clone(), converted_vec);
+        assert_eq!(str_vec, converted_vec);
     }
 }
