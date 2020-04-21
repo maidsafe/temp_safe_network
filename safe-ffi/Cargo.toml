@@ -35,7 +35,7 @@ features = ["app", "authd_client"]
 unwrap = "^1.2.1"
 
 [build-dependencies]
-safe_bindgen = { version = "~0.13.2", optional = true }
+safe_bindgen = { git = "https://github.com/maidsafe/safe_bindgen", optional = true }
 safe-nd = "~0.8.0"
 unwrap = "^1.2.1"
 

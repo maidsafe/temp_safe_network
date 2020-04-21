@@ -3328,8 +3328,7 @@ dependencies = [
 [[package]]
 name = "safe_bindgen"
 version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b682ff3faa44b9208223c453c8eccf41f0b49d63cf72d08b49081cf67c96dbcc"
+source = "git+https://github.com/maidsafe/safe_bindgen#0f883eeb9069cecb74721460c87eda380671cb25"
 dependencies = [
  "Inflector",
  "clap",
