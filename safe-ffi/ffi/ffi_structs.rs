@@ -223,14 +223,15 @@ pub unsafe fn native_xorurl_encoder_from_repr_c(
     };
     Ok(NativeXorUrlEncoder::new(
         XorName(encoder.xorname),
+        None,
         encoder.type_tag,
         SafeDataType::from_u64(encoder.data_type)?,
         SafeContentType::from_u16(encoder.content_type)?,
         from_c_str_to_str_option(encoder.path),
         sub_names,
+        None,
+        None,
         Some(encoder.content_version),
-        None,
-        None,
     )?)
 }
 

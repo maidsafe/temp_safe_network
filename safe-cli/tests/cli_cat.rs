@@ -136,35 +136,35 @@ fn calling_safe_cat_xorurl_url_with_version() {
         "files",
         "sync",
         ANOTHER_FILE,
-        &unwrap!(xorurl_encoder.to_string()),
+        &xorurl_encoder.to_string(),
     ])
     .assert()
     .success();
 
     xorurl_encoder.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string())])
+    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
     xorurl_encoder.set_content_version(Some(0));
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string())])
+    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
     xorurl_encoder.set_content_version(Some(1));
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string())])
+    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
     xorurl_encoder.set_content_version(Some(2));
     let mut cmd = Command::cargo_bin(CLI).unwrap();
-    cmd.args(&vec!["cat", &unwrap!(xorurl_encoder.to_string())])
+    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .failure();
 }
@@ -210,7 +210,7 @@ fn calling_safe_cat_nrsurl_with_version() {
         "files",
         "sync",
         ANOTHER_FILE,
-        &unwrap!(xorurl_encoder.to_string()),
+        &xorurl_encoder.to_string(),
     ])
     .assert()
     .success();

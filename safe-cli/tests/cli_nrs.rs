@@ -31,14 +31,15 @@ fn gen_fake_target() -> String {
     let xorname = XorName(*b"12345678901234567890123456789012");
     unwrap!(XorUrlEncoder::encode(
         xorname,
+        None,
         0x00a5_3cde,
         SafeDataType::PublishedImmutableData,
         SafeContentType::Raw,
         None,
         None,
+        None,
+        None,
         Some(5),
-        None,
-        None,
         XorUrlBase::Base32
     ))
 }
@@ -138,7 +139,7 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
     let (container_xorurl, _map) = upload_test_folder();
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
     xorurl_encoder.set_path("/test.md");
-    let link = unwrap!(xorurl_encoder.to_string());
+    let link = xorurl_encoder.to_string();
     let _nrs_creation = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "nrs",

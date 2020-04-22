@@ -250,7 +250,7 @@ impl Safe {
         xorurl_encoder.set_content_version(None);
 
         let (current_version, current_files_map): (u64, FilesMap) = self
-            .files_container_get(&xorurl_encoder.to_string()?)
+            .files_container_get(&xorurl_encoder.to_string())
             .await?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
@@ -458,7 +458,7 @@ impl Safe {
         xorurl_encoder.set_content_version(None);
 
         let (current_version, files_map): (u64, FilesMap) = self
-            .files_container_get(&xorurl_encoder.to_string()?)
+            .files_container_get(&xorurl_encoder.to_string())
             .await?;
 
         let (processed_files, new_files_map, success_count) =
@@ -527,7 +527,7 @@ impl Safe {
                 // We need to update the link in the NRS container as well,
                 // to link it to the new new_version of the FilesContainer we just generated
                 xorurl_encoder.set_content_version(Some(new_version));
-                let new_link_for_nrs = xorurl_encoder.to_string()?;
+                let new_link_for_nrs = xorurl_encoder.to_string();
                 let _ = self
                     .nrs_map_container_add(url, &new_link_for_nrs, false, true, false)
                     .await?;
@@ -638,7 +638,7 @@ async fn validate_files_add_params(
     xorurl_encoder.set_content_version(None);
 
     let (current_version, current_files_map): (u64, FilesMap) = safe
-        .files_container_get(&xorurl_encoder.to_string()?)
+        .files_container_get(&xorurl_encoder.to_string())
         .await?;
 
     let dest_path = xorurl_encoder.path().to_string();
@@ -1907,7 +1907,7 @@ mod tests {
         let nrsurl = random_nrs_name();
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(None);
-        let unversioned_link = xorurl_encoder.to_string()?;
+        let unversioned_link = xorurl_encoder.to_string();
         match safe
             .nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false)
             .await
@@ -1974,7 +1974,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
         let _ = safe
-            .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string()?, false, true, false)
+            .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string(), false, true, false)
             .await?;
 
         let _ = safe
@@ -1991,7 +1991,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(1));
         let (new_link, _) = safe.parse_and_resolve_url(&nrsurl).await?;
-        assert_eq!(new_link.to_string()?, xorurl_encoder.to_string()?);
+        assert_eq!(new_link.to_string(), xorurl_encoder.to_string());
         Ok(())
     }
 
@@ -2009,7 +2009,7 @@ mod tests {
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
                 "../testdata/subfolder",
-                &xorurl_encoder.to_string()?,
+                &xorurl_encoder.to_string(),
                 true,
                 false,
                 false,
@@ -2073,7 +2073,7 @@ mod tests {
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
                 "../testdata/subfolder",
-                &xorurl_encoder.to_string()?,
+                &xorurl_encoder.to_string(),
                 true,
                 false,
                 false,
@@ -2170,7 +2170,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(None);
         let (version, _) = safe
-            .files_container_get(&xorurl_encoder.to_string()?)
+            .files_container_get(&xorurl_encoder.to_string())
             .await?;
         assert_eq!(version, 1);
         Ok(())
@@ -2199,7 +2199,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
         let (version, v0_files_map) = safe
-            .files_container_get(&xorurl_encoder.to_string()?)
+            .files_container_get(&xorurl_encoder.to_string())
             .await?;
 
         assert_eq!(version, 0);
@@ -2214,7 +2214,7 @@ mod tests {
         // let's fetch version 1
         xorurl_encoder.set_content_version(Some(1));
         let (version, v1_files_map) = safe
-            .files_container_get(&xorurl_encoder.to_string()?)
+            .files_container_get(&xorurl_encoder.to_string())
             .await?;
 
         assert_eq!(version, 1);
@@ -2230,7 +2230,7 @@ mod tests {
 
         // let's fetch version 2 (invalid)
         xorurl_encoder.set_content_version(Some(2));
-        match safe.files_container_get(&xorurl_encoder.to_string()?).await {
+        match safe.files_container_get(&xorurl_encoder.to_string()).await {
             Ok(_) => Err(Error::Unexpected(
                 "Unexpectedly retrieved verion 3 of container".to_string(),
             )),
@@ -2263,7 +2263,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
         let _ = safe
-            .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string()?, false, true, false)
+            .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string(), false, true, false)
             .await?;
 
         let _ = safe
