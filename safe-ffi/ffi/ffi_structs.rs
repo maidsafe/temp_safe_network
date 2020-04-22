@@ -125,8 +125,8 @@ pub struct PublishedImmutableData {
     pub xorname: XorNameArray,
     pub data: *const u8,
     pub data_len: usize,
-    pub resolved_from: NrsMapContainerInfo,
     pub media_type: *const c_char,
+    pub resolved_from: NrsMapContainerInfo,
 }
 
 impl Drop for PublishedImmutableData {

@@ -89,6 +89,9 @@ pub async fn cat_commander(
                 println!("{}", serialise_output(&(url, balances), output_fmt));
             }
         }
+        SafeData::NrsMapContainer { .. } => {
+            println!("No content to show since the URL targets a NrsMapContainer. Use the 'dog' command to obtain additional information about the targeted NrsMapContainer.");
+        }
         SafeData::SafeKey { .. } => {
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }

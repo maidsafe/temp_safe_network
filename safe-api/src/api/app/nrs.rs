@@ -9,6 +9,7 @@
 
 use super::{
     consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
+    fetch::SafeData,
     helpers::gen_timestamp_nanos,
     nrs_map::NrsMap,
     xorurl::SafeContentType,
@@ -44,17 +45,34 @@ impl Safe {
         &self,
         url: &str,
     ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {
-        let xorurl_encoder = Safe::parse_url(url)?;
-        if xorurl_encoder.content_type() == SafeContentType::NrsMapContainer {
-            let (_version, nrs_map) = self.nrs_map_container_get(&url).await.map_err(|_| {
+        let mut resolution_chain = self
+            .retrieve_from_url(url, false, None, None)
+            .await
+            .map_err(|_| {
                 Error::InvalidInput(
                     "The location couldn't be resolved from the NRS URL provided".to_string(),
                 )
             })?;
-            let xorurl = nrs_map.resolve_for_subnames(xorurl_encoder.sub_names_vec())?;
-            Ok((XorUrlEncoder::from_url(&xorurl)?, Some(xorurl_encoder)))
+
+        // Construct return data using the last and first items from the resolution chain
+        let xorurl = match resolution_chain.pop() {
+            Some(SafeData::NrsMapContainer { .. }) => {
+                // weird...last element should not be an NRS Map as it should have been resolved...
+                // it could be a thrid-party app corrupting resolvable content data or format
+                Err(Error::Unexpected(format!("Failed to resolve {}", url)))
+            }
+            None => Err(Error::Unexpected(format!("Failed to resolve {}", url))),
+            Some(other_safe_data) => Ok(other_safe_data.xorurl()),
+        }?;
+
+        if resolution_chain.is_empty() {
+            Ok((XorUrlEncoder::from_url(&xorurl)?, None))
         } else {
-            Ok((xorurl_encoder, None))
+            let nrsmap_xorul_encoder = XorUrlEncoder::from_url(&resolution_chain[0].xorurl())?;
+            Ok((
+                XorUrlEncoder::from_url(&xorurl)?,
+                Some(nrsmap_xorul_encoder),
+            ))
         }
     }
 

@@ -136,6 +136,13 @@ impl Safe {
         debug!("Getting files container from: {:?}", url);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
 
+        self.files_container_fetch(&xorurl_encoder).await
+    }
+
+    pub(crate) async fn files_container_fetch(
+        &self,
+        xorurl_encoder: &XorUrlEncoder,
+    ) -> Result<(u64, FilesMap)> {
         // Check if the URL specifies a specific version of the content or simply the latest available
         let data = match xorurl_encoder.content_version() {
             None => {
@@ -159,7 +166,7 @@ impl Safe {
                         if let Error::VersionNotFound(_) = err {
                             Error::VersionNotFound(format!(
                                 "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                                content_version, url,
+                                content_version, xorurl_encoder,
                             ))
                         } else {
                             err
@@ -183,7 +190,7 @@ impl Safe {
                 Ok((version, files_map))
             }
             Err(Error::EmptyContent(_)) => {
-                warn!("FilesContainer found at \"{:?}\" was empty", url);
+                warn!("FilesContainer found at \"{:?}\" was empty", xorurl_encoder);
                 Ok((0, FilesMap::default()))
             }
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
@@ -601,6 +608,15 @@ impl Safe {
     pub async fn files_get_published_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        self.files_published_immutable_fetch(&xorurl_encoder, range)
+            .await
+    }
+
+    pub(crate) async fn files_published_immutable_fetch(
+        &self,
+        xorurl_encoder: &XorUrlEncoder,
+        range: Range,
+    ) -> Result<Vec<u8>> {
         self.safe_app
             .files_get_published_immutable(xorurl_encoder.xorname(), range)
             .await

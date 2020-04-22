@@ -387,11 +387,18 @@ impl Safe {
 
     pub async fn wallet_get(&self, url: &str) -> Result<WalletSpendableBalances> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        self.wallet_fetch(&xorurl_encoder).await
+    }
+
+    pub(crate) async fn wallet_fetch(
+        &self,
+        xorurl_encoder: &XorUrlEncoder,
+    ) -> Result<WalletSpendableBalances> {
         gen_wallet_spendable_balances_list(
             &self,
             xorurl_encoder.xorname(),
             xorurl_encoder.type_tag(),
-            url,
+            &xorurl_encoder.to_string()?,
         )
         .await
     }
