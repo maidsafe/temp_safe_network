@@ -13,7 +13,6 @@ use super::{
 };
 use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
 use safe_api::{
-    fetch::NrsMapContainerInfo as NativeNrsMapContainerInfo,
     files::{
         FileItem as NativeFileItem, FilesMap as NativeFilesMap,
         ProcessedFiles as NativeProcessedFiles,
@@ -65,7 +64,7 @@ pub fn bls_key_pair_into_repr_c(key_pair: &NativeBlsKeyPair) -> Result<BlsKeyPai
 pub struct SafeKey {
     pub xorurl: *const c_char,
     pub xorname: XorNameArray,
-    pub resolved_from: NrsMapContainerInfo,
+    pub resolved_from: *const c_char,
 }
 
 impl Drop for SafeKey {
@@ -73,6 +72,10 @@ impl Drop for SafeKey {
         unsafe {
             if !self.xorurl.is_null() {
                 let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.resolved_from.is_null() {
+                let _ = CString::from_raw(self.resolved_from as *mut _);
             }
         }
     }
@@ -85,7 +88,7 @@ pub struct Wallet {
     pub type_tag: u64,
     pub balances: WalletSpendableBalances,
     pub data_type: u64,
-    pub resolved_from: NrsMapContainerInfo,
+    pub resolved_from: *const c_char,
 }
 
 impl Drop for Wallet {
@@ -93,6 +96,10 @@ impl Drop for Wallet {
         unsafe {
             if !self.xorurl.is_null() {
                 let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.resolved_from.is_null() {
+                let _ = CString::from_raw(self.resolved_from as *mut _);
             }
         }
     }
@@ -106,7 +113,7 @@ pub struct FilesContainer {
     pub version: u64,
     pub files_map: FilesMap,
     pub data_type: u64,
-    pub resolved_from: NrsMapContainerInfo,
+    pub resolved_from: *const c_char,
 }
 
 impl Drop for FilesContainer {
@@ -114,6 +121,10 @@ impl Drop for FilesContainer {
         unsafe {
             if !self.xorurl.is_null() {
                 let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.resolved_from.is_null() {
+                let _ = CString::from_raw(self.resolved_from as *mut _);
             }
         }
     }
@@ -126,7 +137,7 @@ pub struct PublishedImmutableData {
     pub data: *const u8,
     pub data_len: usize,
     pub media_type: *const c_char,
-    pub resolved_from: NrsMapContainerInfo,
+    pub resolved_from: *const c_char,
 }
 
 impl Drop for PublishedImmutableData {
@@ -140,7 +151,45 @@ impl Drop for PublishedImmutableData {
                 let _ = CString::from_raw(self.media_type as *mut _);
             }
 
+            if !self.resolved_from.is_null() {
+                let _ = CString::from_raw(self.resolved_from as *mut _);
+            }
+
             let _ = vec_from_raw_parts(self.data as *mut u8, self.data_len);
+        }
+    }
+}
+
+#[repr(C)]
+pub struct NrsMapContainer {
+    pub public_name: *const c_char,
+    pub xorurl: *const c_char,
+    pub xorname: XorNameArray,
+    pub type_tag: u64,
+    pub version: u64,
+    pub nrs_map: *const c_char,
+    pub data_type: u64,
+    pub resolved_from: *const c_char,
+}
+
+impl Drop for NrsMapContainer {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.public_name.is_null() {
+                let _ = CString::from_raw(self.public_name as *mut _);
+            }
+
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.nrs_map.is_null() {
+                let _ = CString::from_raw(self.nrs_map as *mut _);
+            }
+
+            if !self.resolved_from.is_null() {
+                let _ = CString::from_raw(self.resolved_from as *mut _);
+            }
         }
     }
 }
@@ -519,64 +568,6 @@ pub unsafe fn processed_entries_into_repr_c(
     Ok(ProcessedEntries {
         processed_entries,
         processed_entries_len,
-    })
-}
-
-#[repr(C)]
-pub struct NrsMapContainerInfo {
-    pub public_name: *const c_char,
-    pub xorurl: *const c_char,
-    pub xorname: XorNameArray,
-    pub type_tag: u64,
-    pub version: u64,
-    pub nrs_map: *const c_char,
-    pub data_type: u64,
-}
-
-impl Drop for NrsMapContainerInfo {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.public_name.is_null() {
-                let _ = CString::from_raw(self.public_name as *mut _);
-            }
-
-            if !self.xorurl.is_null() {
-                let _ = CString::from_raw(self.xorurl as *mut _);
-            }
-
-            if !self.nrs_map.is_null() {
-                let _ = CString::from_raw(self.nrs_map as *mut _);
-            }
-        }
-    }
-}
-
-impl NrsMapContainerInfo {
-    pub fn new() -> Result<Self> {
-        Ok(Self {
-            public_name: CString::new(String::new())?.into_raw(),
-            xorurl: CString::new(String::new())?.into_raw(),
-            xorname: [0; 32],
-            type_tag: 0,
-            version: 0,
-            nrs_map: CString::new(String::new())?.into_raw(),
-            data_type: 0,
-        })
-    }
-}
-
-pub unsafe fn nrs_map_container_info_into_repr_c(
-    nrs_container_info: &NativeNrsMapContainerInfo,
-) -> Result<NrsMapContainerInfo> {
-    let nrs_map_json = serde_json::to_string(&nrs_container_info.nrs_map)?;
-    Ok(NrsMapContainerInfo {
-        public_name: CString::new(nrs_container_info.public_name.clone())?.into_raw(),
-        xorurl: CString::new(nrs_container_info.xorurl.clone())?.into_raw(),
-        xorname: nrs_container_info.xorname.0,
-        type_tag: nrs_container_info.type_tag,
-        version: nrs_container_info.version,
-        nrs_map: CString::new(nrs_map_json)?.into_raw(),
-        data_type: nrs_container_info.data_type.clone() as u64,
     })
 }
 
