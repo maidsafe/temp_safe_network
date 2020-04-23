@@ -271,6 +271,15 @@ pub enum SafeUrlType {
     NrsUrl,
 }
 
+impl SafeUrlType {
+    pub fn value(&self) -> Result<u16> {
+        match &*self {
+            Self::XorUrl => Ok(0),
+            Self::NrsUrl => Ok(1),
+        }
+    }
+}
+
 /// Represents a SafeUrl
 ///
 /// A SafeUrl can be in one of two formats:  nrs or xor.

@@ -9,9 +9,7 @@
 
 use super::{
     errors::Result,
-    ffi_structs::{
-        processed_entries_into_repr_c, xorurl_encoder_into_repr_c, ProcessedEntries, XorUrlEncoder,
-    },
+    ffi_structs::{processed_entries_into_repr_c, safe_url_into_repr_c, ProcessedEntries, SafeUrl},
 };
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::Safe;
@@ -24,18 +22,14 @@ use std::{
 pub unsafe extern "C" fn parse_url(
     url: *const c_char,
     user_data: *mut c_void,
-    o_cb: extern "C" fn(
-        user_data: *mut c_void,
-        result: *const FfiResult,
-        xorurl_encoder: *const XorUrlEncoder,
-    ),
+    o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, safe_url: *const SafeUrl),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = String::clone_from_repr_c(url)?;
-        let encoder = Safe::parse_url(&url_string)?;
-        let ffi_xorurl_encoder = xorurl_encoder_into_repr_c(encoder)?;
-        o_cb(user_data.0, FFI_RESULT_OK, &ffi_xorurl_encoder);
+        let safe_url = Safe::parse_url(&url_string)?;
+        let ffi_safe_url = safe_url_into_repr_c(safe_url)?;
+        o_cb(user_data.0, FFI_RESULT_OK, &ffi_safe_url);
         Ok(())
     })
 }
@@ -48,28 +42,23 @@ pub unsafe extern "C" fn parse_and_resolve_url(
     o_cb: extern "C" fn(
         user_data: *mut c_void,
         result: *const FfiResult,
-        xorurl_encoder: *const XorUrlEncoder,
-        resolved_from: *const XorUrlEncoder,
+        safe_url: *const SafeUrl,
+        resolved_from: *const SafeUrl,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = String::clone_from_repr_c(url)?;
-        let (encoder, resolved_from) =
+        let (safe_url, resolved_from) =
             async_std::task::block_on((*app).parse_and_resolve_url(&url_string))?;
-        let ffi_xorurl_encoder = xorurl_encoder_into_repr_c(encoder)?;
-        let ffi_nrs_xorurl_encoder = if let Some(nrs_xorurl_encoder) = resolved_from {
-            xorurl_encoder_into_repr_c(nrs_xorurl_encoder)?
+        let ffi_safe_url = safe_url_into_repr_c(safe_url)?;
+        let ffi_nrs_safe_url = if let Some(nrs_xorurl_encoder) = resolved_from {
+            &safe_url_into_repr_c(nrs_xorurl_encoder)?
         } else {
-            XorUrlEncoder::new()?
+            std::ptr::null()
         };
 
-        o_cb(
-            user_data.0,
-            FFI_RESULT_OK,
-            &ffi_xorurl_encoder,
-            &ffi_nrs_xorurl_encoder,
-        );
+        o_cb(user_data.0, FFI_RESULT_OK, &ffi_safe_url, ffi_nrs_safe_url);
         Ok(())
     })
 }
