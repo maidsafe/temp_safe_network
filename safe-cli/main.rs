@@ -13,7 +13,6 @@ mod shell;
 mod subcommands;
 
 use cli::run;
-use env_logger;
 use log::{debug, error};
 use std::process;
 

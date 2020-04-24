@@ -23,7 +23,7 @@ const PROGRESS_NONE: &str = "none";
 use multibase::{encode, Base};
 use safe_api::xorurl::XorUrlEncoder;
 use safe_cmd_test_utilities::{
-    get_bin_location, parse_files_put_or_sync_output, upload_testfolder_no_trailing_slash,
+    parse_files_put_or_sync_output, upload_testfolder_no_trailing_slash,
     upload_testfolder_trailing_slash, TEST_FOLDER,
 };
 use std::env;
@@ -243,7 +243,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<(), String> {
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrs_name,
@@ -302,7 +302,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrs_name,
@@ -364,7 +364,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<(), String> {
     drop(f); // close file.
 
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         &src_dir,
@@ -418,7 +418,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<(), String> {
     drop(f); // close file.
 
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         &src_dir,
@@ -1090,7 +1090,7 @@ fn files_get(
     .filter(|a| !a.is_empty())
     .collect();
 
-    let output = duct::cmd(get_bin_location(), &args)
+    let output = duct::cmd(env!("CARGO_BIN_EXE_safe"), &args)
         .stdout_capture()
         .stderr_capture()
         .unchecked()

@@ -24,20 +24,6 @@ pub const TEST_FOLDER: &str = "../testdata/";
 pub const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
 
 #[allow(dead_code)]
-pub fn get_bin_location() -> String {
-    let target_dir = match env::var("CARGO_TARGET_DIR") {
-        Ok(target_dir) => target_dir,
-        Err(_) => "../target".to_string(),
-    };
-
-    if cfg!(debug_assertions) {
-        format!("{}{}", target_dir, "/debug/safe")
-    } else {
-        format!("{}{}", target_dir, "/release/safe")
-    }
-}
-
-#[allow(dead_code)]
 pub fn read_cmd(e: duct::Expression) -> Result<String, String> {
     e.read().map_err(|e| format!("{:#?}", e))
 }
@@ -45,7 +31,7 @@ pub fn read_cmd(e: duct::Expression) -> Result<String, String> {
 #[allow(dead_code)]
 pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
     let pk_command_result = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "create",
         "--test-coins",
@@ -73,7 +59,7 @@ pub fn create_wallet_with_balance(
     let preload_minus_costs = Coins::from_nano(preload_nanos - 1).to_string();
 
     let wallet_create_result = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "create",
         "--pay-with",
@@ -102,7 +88,7 @@ pub fn upload_test_folder_with_result(
         TEST_FOLDER_NO_TRAILING_SLASH
     };
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         path,

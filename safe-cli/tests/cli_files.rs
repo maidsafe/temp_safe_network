@@ -16,9 +16,8 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use safe_api::xorurl::XorUrlEncoder;
 use safe_cmd_test_utilities::{
-    get_bin_location, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_files_tree_output, read_cmd,
-    upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
+    get_random_nrs_string, parse_files_container_output, parse_files_put_or_sync_output,
+    parse_files_tree_output, read_cmd, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
     fs::{self, OpenOptions},
@@ -63,7 +62,7 @@ fn calling_safe_files_put_dry_run() {
     unwrap!(fs::write(TEST_FILE_RANDOM_CONTENT, random_content));
 
     let content = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FILE_RANDOM_CONTENT,
@@ -95,7 +94,7 @@ fn calling_safe_files_put_recursive() {
 #[test]
 fn calling_safe_files_put_recursive_and_set_dest_path() {
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -113,7 +112,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_path("/aha/test.md");
     let file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -123,7 +122,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() {
 
     xorurl_encoder.set_path("/aha/subfolder/subexists.md");
     let subfile_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -169,7 +168,7 @@ fn calling_safe_files_put_emptyfolder() {
 #[test]
 fn calling_safe_files_put_recursive_with_slash() {
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -186,7 +185,7 @@ fn calling_safe_files_put_recursive_with_slash() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_path("/test.md");
     let file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -197,7 +196,7 @@ fn calling_safe_files_put_recursive_with_slash() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_path("/subfolder/subexists.md");
     let subfile_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -209,7 +208,7 @@ fn calling_safe_files_put_recursive_with_slash() {
 #[test]
 fn calling_safe_files_put_recursive_without_slash() {
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER_NO_TRAILING_SLASH,
@@ -226,7 +225,7 @@ fn calling_safe_files_put_recursive_without_slash() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_path("/testdata/test.md");
     let file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -237,7 +236,7 @@ fn calling_safe_files_put_recursive_without_slash() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_path("/testdata/subfolder/subexists.md");
     let subfile_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -249,7 +248,7 @@ fn calling_safe_files_put_recursive_without_slash() {
 #[test]
 fn calling_safe_files_sync() {
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -264,7 +263,7 @@ fn calling_safe_files_sync() {
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace("\"", "");
 
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_FOLDER_SUBFOLDER,
@@ -278,7 +277,7 @@ fn calling_safe_files_sync() {
     xorurl_encoder.set_path("/subexists.md");
     xorurl_encoder.set_content_version(Some(1));
     let synced_file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -289,9 +288,15 @@ fn calling_safe_files_sync() {
 
 #[test]
 fn calling_safe_files_sync_dry_run() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FOLDER, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FOLDER,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
     let mut target = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
@@ -300,7 +305,7 @@ fn calling_safe_files_sync_dry_run() {
     let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
     unwrap!(fs::write(TEST_FILE_RANDOM_CONTENT, random_content));
     let sync_content = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_FILE_RANDOM_CONTENT,
@@ -321,7 +326,7 @@ fn calling_safe_files_sync_dry_run() {
 #[test]
 fn calling_safe_files_removed_sync() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -340,7 +345,7 @@ fn calling_safe_files_removed_sync() {
     xorurl_encoder.set_content_version(None);
     let files_container_no_version = unwrap!(xorurl_encoder.to_string());
     let sync_cmd_output_dry_run = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
@@ -359,16 +364,21 @@ fn calling_safe_files_removed_sync() {
     assert_eq!(target, files_container_v1);
     assert_eq!(processed_files.len(), 5);
 
-    let synced_file_cat = cmd!(get_bin_location(), "cat", &files_container_xor, "--json")
-        .read()
-        .unwrap();
+    let synced_file_cat = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "cat",
+        &files_container_xor,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), 5);
 
     // Now, let's try without --dry-run and they should be effectively removed
     let sync_cmd_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
@@ -387,7 +397,7 @@ fn calling_safe_files_removed_sync() {
     // now all files should be gone
     xorurl_encoder.set_content_version(None);
     let synced_file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string()),
         "--json"
@@ -402,7 +412,7 @@ fn calling_safe_files_removed_sync() {
 #[test]
 fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     let files_container = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER_SUBFOLDER,
@@ -434,7 +444,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
 
     // now sync
     let files_sync_result = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_FOLDER_SUBFOLDER,
@@ -449,7 +459,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
     xorurl_encoder.set_path("/subexists.md");
     xorurl_encoder.set_content_version(None);
     let file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -487,7 +497,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() {
 #[test]
 fn calling_files_sync_and_fetch_with_version() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -505,7 +515,7 @@ fn calling_files_sync_and_fetch_with_version() {
     xorurl_encoder.set_content_version(None);
     let files_container_no_version = unwrap!(xorurl_encoder.to_string());
     let sync_cmd_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
@@ -524,9 +534,14 @@ fn calling_files_sync_and_fetch_with_version() {
     assert_eq!(processed_files.len(), 5);
 
     // now all files should be gone in version 1 of the FilesContainer
-    let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
-        .read()
-        .unwrap();
+    let cat_container_v1 = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "cat",
+        &files_container_v1,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
@@ -534,9 +549,14 @@ fn calling_files_sync_and_fetch_with_version() {
     // but in version 0 of the FilesContainer all files should still be there
     xorurl_encoder.set_content_version(Some(0));
     let files_container_v0 = unwrap!(xorurl_encoder.to_string());
-    let cat_container_v0 = cmd!(get_bin_location(), "cat", &files_container_v0, "--json")
-        .read()
-        .unwrap();
+    let cat_container_v0 = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "cat",
+        &files_container_v0,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v0);
     assert_eq!(xorurl, files_container_v0);
     assert_eq!(files_map.len(), 5);
@@ -545,7 +565,7 @@ fn calling_files_sync_and_fetch_with_version() {
 #[test]
 fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -565,7 +585,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -576,7 +596,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     .unwrap();
 
     let sync_cmd_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
@@ -594,7 +614,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     assert_eq!(processed_files.len(), 5);
 
     // now all files should be gone in version 1 since NRS name was updated to link version 1 of the FilesContainer
-    let cat_nrsurl_v1 = cmd!(get_bin_location(), "cat", &nrsurl, "--json")
+    let cat_nrsurl_v1 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json")
         .read()
         .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v1);
@@ -604,7 +624,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     // but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
     // where all files should still be there
     let nrsurl_v0 = format!("{}?v=0", nrsurl);
-    let cat_nrsurl_v0 = cmd!(get_bin_location(), "cat", &nrsurl_v0, "--json")
+    let cat_nrsurl_v0 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl_v0, "--json")
         .read()
         .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v0);
@@ -615,7 +635,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
 #[test]
 fn calling_files_sync_and_fetch_without_nrs_update() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -634,7 +654,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -645,7 +665,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
     .unwrap();
 
     let sync_cmd_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
         TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
@@ -665,16 +685,21 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = unwrap!(xorurl_encoder.to_string());
-    let cat_container_v1 = cmd!(get_bin_location(), "cat", &files_container_v1, "--json")
-        .read()
-        .unwrap();
+    let cat_container_v1 = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "cat",
+        &files_container_v1,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
 
     // but the NRS name should still link to version 0 of the FilesContainer
     // where all files should still be there
-    let cat_nrsurl = cmd!(get_bin_location(), "cat", &nrsurl, "--json")
+    let cat_nrsurl = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json")
         .read()
         .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl);
@@ -685,7 +710,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
 #[test]
 fn calling_safe_files_add() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -701,7 +726,7 @@ fn calling_safe_files_add() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "add",
         TEST_FILE,
@@ -712,7 +737,7 @@ fn calling_safe_files_add() {
 
     xorurl_encoder.set_path("/new_test.md");
     let synced_file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -724,7 +749,7 @@ fn calling_safe_files_add() {
 #[test]
 fn calling_safe_files_add_dry_run() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -739,7 +764,7 @@ fn calling_safe_files_add_dry_run() {
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "add",
         TEST_FILE,
@@ -759,7 +784,7 @@ fn calling_safe_files_add_dry_run() {
 #[test]
 fn calling_safe_files_add_a_url() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -776,7 +801,7 @@ fn calling_safe_files_add_a_url() {
     xorurl_encoder.set_content_version(None);
     xorurl_encoder.set_path("/new_test.md");
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "add",
         &processed_files[TEST_FILE].1,
@@ -787,7 +812,7 @@ fn calling_safe_files_add_a_url() {
     .unwrap();
 
     let synced_file_cat = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "cat",
         &unwrap!(xorurl_encoder.to_string())
     )
@@ -799,7 +824,7 @@ fn calling_safe_files_add_a_url() {
 #[test]
 fn calling_files_ls() {
     let files_container_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FOLDER,
@@ -817,7 +842,7 @@ fn calling_files_ls() {
     let container_xorurl_no_version = unwrap!(xorurl_encoder.to_string());
 
     let files_ls_output = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "ls",
         &container_xorurl_no_version,
@@ -848,9 +873,15 @@ fn calling_files_ls() {
     assert_eq!(files_map["subfolder/"]["link"], subfolder_path);
 
     // now listing subfolder should show less files
-    let files_ls_output = cmd!(get_bin_location(), "files", "ls", &subfolder_path, "--json")
-        .read()
-        .unwrap();
+    let files_ls_output = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "ls",
+        &subfolder_path,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
     assert_eq!(xorurl, subfolder_path);
@@ -876,7 +907,7 @@ fn calling_files_tree() -> Result<(), String> {
     let container_xorurl_no_version = unwrap!(xorurl_encoder.to_string());
 
     let files_tree_output = read_cmd(cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "tree",
         &container_xorurl_no_version,
@@ -894,7 +925,7 @@ fn calling_files_tree() -> Result<(), String> {
     assert_eq!(root["sub"][3]["name"], "test.md");
 
     let files_tree_output = read_cmd(cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "tree",
         &container_xorurl_no_version
@@ -916,7 +947,7 @@ fn calling_files_tree() -> Result<(), String> {
     assert_eq!(files_tree_output, should_match);
 
     let files_tree_output = read_cmd(cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "tree",
         &container_xorurl_no_version,

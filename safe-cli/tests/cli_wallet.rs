@@ -15,8 +15,8 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use safe_cmd_test_utilities::{
-    create_preload_and_get_keys, create_wallet_with_balance, get_bin_location,
-    get_random_nrs_string, CLI, SAFE_PROTOCOL,
+    create_preload_and_get_keys, create_wallet_with_balance, get_random_nrs_string, CLI,
+    SAFE_PROTOCOL,
 };
 use std::process::Command;
 
@@ -35,7 +35,7 @@ fn calling_safe_wallet_transfer() {
 
     // To got coins?
     let to_starts_with = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_to,
@@ -48,7 +48,7 @@ fn calling_safe_wallet_transfer() {
 
     // From got coins?
     let from_starts_with = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_from,
@@ -75,7 +75,7 @@ fn calling_safe_wallet_transfer() {
 
     // To got coins?
     let to_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_to,
@@ -88,7 +88,7 @@ fn calling_safe_wallet_transfer() {
 
     // from lost coins?
     let from_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_from,
@@ -113,7 +113,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() {
     // To got coins?
     let to_spendable_balance = format!("{}/my-savings", wallet_to);
     let to_starts_with = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &to_spendable_balance,
@@ -127,7 +127,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() {
     // From got coins?
     let from_spendable_balance = format!("{}/one-spendable-balance", wallet_from);
     let from_starts_with = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &from_spendable_balance,
@@ -154,7 +154,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() {
 
     // To got coins?
     let to_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_to,
@@ -167,7 +167,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() {
 
     // from lost coins?
     let from_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_from,
@@ -275,7 +275,7 @@ fn calling_safe_wallet_insert() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
 
     let _wallet_insert_result = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "insert",
         &wallet_xor,
@@ -316,7 +316,7 @@ fn calling_safe_wallet_create_w_preload_has_balance() {
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("55.000000001", None); // we need 1 nano to pay for the costs of creation
 
     let balance = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_xor,
@@ -332,7 +332,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
     let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300");
 
     let wallet_create_result = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "create",
         "--pay-with",
@@ -350,7 +350,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
         .expect("Failed to parse output of `safe wallet create`");
 
     let balance = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_xorurl,
@@ -365,15 +365,22 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() {
 fn calling_safe_wallet_create_w_sk_only() {
     let (_xorurl, sk) = create_preload_and_get_keys("333");
 
-    let wallet_create_result = cmd!(get_bin_location(), "wallet", "create", "--sk", sk, "--json")
-        .read()
-        .unwrap();
+    let wallet_create_result = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "wallet",
+        "create",
+        "--sk",
+        sk,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     let (wallet_xorurl, _): (String, String) = serde_json::from_str(&wallet_create_result)
         .expect("Failed to parse output of `safe wallet create`");
 
     let balance = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_xorurl,
@@ -476,7 +483,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() {
 
     // SafeKey got coins?
     let key_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",
@@ -490,7 +497,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() {
 
     // deducted coins from sending Wallet?
     let from_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_from,
@@ -511,7 +518,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() {
 
     let key_nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &key_nrsurl,
@@ -537,7 +544,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() {
 
     // SafeKey got coins?
     let key_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",
@@ -551,7 +558,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() {
 
     // deducted coins from sending Wallet?
     let from_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_from,
@@ -569,7 +576,7 @@ fn calling_safe_wallet_balance_with_nrsurl() {
         create_wallet_with_balance("1.120000001", Some("for-night-outs")); // we need 1 nano to pay for the costs of creation
     let wallet_nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &wallet_nrsurl,
@@ -581,7 +588,7 @@ fn calling_safe_wallet_balance_with_nrsurl() {
 
     // check wallet balance with NRS url
     let wallet_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_nrsurl,
@@ -595,7 +602,7 @@ fn calling_safe_wallet_balance_with_nrsurl() {
     // check wallet's spendable balance with NRS url with
     let wallet_spendable_balance = format!("{}/for-night-outs", wallet_nrsurl);
     let spendable_balance_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &wallet_spendable_balance,

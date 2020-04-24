@@ -23,7 +23,6 @@ use crate::{
     Error, Result,
 };
 use log::{debug, info, warn};
-use mime_guess;
 use relative_path::RelativePath;
 use std::{collections::BTreeMap, fs, path::Path};
 use walkdir::{DirEntry, WalkDir};

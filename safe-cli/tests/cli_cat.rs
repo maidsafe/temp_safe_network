@@ -19,7 +19,7 @@ use safe_api::{
     BlsKeyPair,
 };
 use safe_cmd_test_utilities::{
-    create_preload_and_get_keys, get_bin_location, get_random_nrs_string, parse_cat_wallet_output,
+    create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
     parse_files_put_or_sync_output, CLI,
 };
 use std::process::Command;
@@ -34,9 +34,15 @@ const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
 fn calling_safe_cat() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -58,9 +64,15 @@ fn calling_safe_cat() {
 
 #[test]
 fn calling_safe_cat_on_relative_file_from_id_fails() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -74,9 +86,15 @@ fn calling_safe_cat_on_relative_file_from_id_fails() {
 
 #[test]
 fn calling_safe_cat_hexdump() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -98,9 +116,15 @@ fn calling_safe_cat_hexdump() {
 
 #[test]
 fn calling_safe_cat_xorurl_url_with_version() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
@@ -147,14 +171,20 @@ fn calling_safe_cat_xorurl_url_with_version() {
 
 #[test]
 fn calling_safe_cat_nrsurl_with_version() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -212,7 +242,7 @@ fn calling_safe_cat_nrsurl_with_version() {
 #[test]
 fn calling_safe_cat_wallet_xorurl() {
     let wallet_create = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "create",
         "--test-coins",
@@ -226,7 +256,7 @@ fn calling_safe_cat_wallet_xorurl() {
 
     let (key_pk_xor, sk) = create_preload_and_get_keys("7");
     let _wallet_insert_result = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "insert",
         &wallet_xorurl,
@@ -238,7 +268,7 @@ fn calling_safe_cat_wallet_xorurl() {
     .read()
     .unwrap();
 
-    let wallet_cat = cmd!(get_bin_location(), "cat", &wallet_xorurl, "--json")
+    let wallet_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &wallet_xorurl, "--json")
         .read()
         .unwrap();
     let (xorurl, balances) = parse_cat_wallet_output(&wallet_cat);
@@ -259,7 +289,7 @@ fn calling_safe_cat_wallet_xorurl() {
 fn calling_safe_cat_safekey() {
     let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
 
-    let cat_output = cmd!(get_bin_location(), "cat", &safekey_xorurl,)
+    let cat_output = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &safekey_xorurl,)
         .read()
         .unwrap();
 

@@ -15,7 +15,7 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use safe_api::xorurl::XorUrlEncoder;
-use safe_cmd_test_utilities::{get_bin_location, parse_xorurl_output, CLI, SAFE_PROTOCOL};
+use safe_cmd_test_utilities::{parse_xorurl_output, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 use unwrap::unwrap;
 
@@ -46,7 +46,7 @@ fn calling_safe_xorurl_recursive() {
 
 #[test]
 fn calling_safe_xorurl_decode() {
-    let content = cmd!(get_bin_location(), "xorurl", TEST_FILE, "--json",)
+    let content = cmd!(env!("CARGO_BIN_EXE_safe"), "xorurl", TEST_FILE, "--json",)
         .read()
         .unwrap();
 
@@ -55,7 +55,7 @@ fn calling_safe_xorurl_decode() {
     let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(file_xorurl));
 
     let xorurl_decoded = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "xorurl",
         "decode",
         &file_xorurl,

@@ -15,8 +15,8 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use safe_cmd_test_utilities::{
-    create_preload_and_get_keys, create_wallet_with_balance, get_bin_location,
-    get_random_nrs_string, CLI, SAFE_PROTOCOL,
+    create_preload_and_get_keys, create_wallet_with_balance, get_random_nrs_string, CLI,
+    SAFE_PROTOCOL,
 };
 use std::process::Command;
 
@@ -125,7 +125,7 @@ fn calling_safe_keys_transfer() {
 
     // To got coins?
     let to_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",
@@ -139,7 +139,7 @@ fn calling_safe_keys_transfer() {
 
     // from lost coins?
     let from_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",
@@ -175,7 +175,7 @@ fn calling_safe_keys_transfer_to_wallet_xorurl() {
 
     // deducted coins from sending SafeKey?
     let safekey_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",
@@ -189,7 +189,7 @@ fn calling_safe_keys_transfer_to_wallet_xorurl() {
 
     // Wallet got coins?
     let to_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "wallet",
         "balance",
         &to_wallet,
@@ -210,7 +210,7 @@ fn calling_safe_keys_transfer_to_key_nrsurl() {
 
     let to_safekey_nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &to_safekey_nrsurl,
@@ -236,7 +236,7 @@ fn calling_safe_keys_transfer_to_key_nrsurl() {
 
     // SafeKey at NRS got coins?
     let key_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",
@@ -250,7 +250,7 @@ fn calling_safe_keys_transfer_to_key_nrsurl() {
 
     // deducted coins from sending SafeKey?
     let from_has = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "keys",
         "balance",
         "--sk",

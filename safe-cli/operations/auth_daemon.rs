@@ -13,7 +13,6 @@ use directories::BaseDirs;
 use envy::from_env;
 use log::info;
 use prettytable::Table;
-use rpassword;
 use safe_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };

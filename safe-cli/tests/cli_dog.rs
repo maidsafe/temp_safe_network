@@ -14,22 +14,27 @@ extern crate duct;
 
 use safe_api::fetch::{SafeData, SafeDataType};
 use safe_cmd_test_utilities::{
-    create_preload_and_get_keys, get_bin_location, get_random_nrs_string,
-    parse_files_put_or_sync_output,
+    create_preload_and_get_keys, get_random_nrs_string, parse_files_put_or_sync_output,
 };
 
 const TEST_FILE: &str = "../testdata/test.md";
 
 #[test]
 fn calling_safe_dog_files_container_nrsurl() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -39,7 +44,7 @@ fn calling_safe_dog_files_container_nrsurl() {
     .read()
     .unwrap();
 
-    let dog_output = cmd!(get_bin_location(), "dog", &nrsurl, "--json",)
+    let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--json",)
         .read()
         .unwrap();
 
@@ -66,7 +71,7 @@ fn calling_safe_dog_files_container_nrsurl() {
 #[test]
 fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
     let content = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "files",
         "put",
         TEST_FILE,
@@ -78,7 +83,7 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -88,9 +93,14 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
     .read()
     .unwrap();
 
-    let dog_output = cmd!(get_bin_location(), "dog", &nrsurl, "--output=jsoncompact",)
-        .read()
-        .unwrap();
+    let dog_output = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "dog",
+        &nrsurl,
+        "--output=jsoncompact",
+    )
+    .read()
+    .unwrap();
 
     let content_info: (String, SafeData) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
@@ -114,14 +124,20 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
 
 #[test]
 fn calling_safe_dog_files_container_nrsurl_yaml() {
-    let content = cmd!(get_bin_location(), "files", "put", TEST_FILE, "--json")
-        .read()
-        .unwrap();
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_FILE,
+        "--json"
+    )
+    .read()
+    .unwrap();
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -131,7 +147,7 @@ fn calling_safe_dog_files_container_nrsurl_yaml() {
     .read()
     .unwrap();
 
-    let dog_output = cmd!(get_bin_location(), "dog", &nrsurl, "--output=yaml",)
+    let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--output=yaml",)
         .read()
         .unwrap();
 
@@ -161,7 +177,7 @@ fn calling_safe_dog_safekey_nrsurl() {
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
-        get_bin_location(),
+        env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
         &nrsurl,
@@ -171,7 +187,7 @@ fn calling_safe_dog_safekey_nrsurl() {
     .read()
     .unwrap();
 
-    let dog_output = cmd!(get_bin_location(), "dog", &nrsurl, "--json",)
+    let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--json",)
         .read()
         .unwrap();
 

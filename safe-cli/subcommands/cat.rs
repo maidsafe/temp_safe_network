@@ -12,7 +12,6 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use pretty_hex;
 use prettytable::Table;
 use safe_api::{fetch::SafeData, Safe};
 use std::io::{self, Write};
