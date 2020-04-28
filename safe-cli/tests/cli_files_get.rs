@@ -1153,7 +1153,7 @@ fn source_path(url: &str, path: &[&str]) -> Result<String, String> {
     let url = format!(
         "{}://{}/{}{}{}",
         x.scheme(),
-        x.host(),
+        x.name(),
         pb.display().to_string(),
         x.query_string_with_separator(),
         x.fragment_with_separator()

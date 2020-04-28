@@ -319,7 +319,7 @@ async fn resolve_one_indirection(
             let nrsurl = XorUrlEncoder::from_nrsurl(&original_url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = NrsMapContainerInfo {
-                public_name: nrsurl.tld(),
+                public_name: nrsurl.top_name(),
                 xorurl: the_xor.to_string(),
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
