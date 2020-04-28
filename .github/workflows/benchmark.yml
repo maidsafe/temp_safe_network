@@ -100,6 +100,10 @@ jobs:
         run: cargo bench --bench ${{ matrix.benchmark }}
         shell: bash
       
+      - name: Stop the network.
+        if: failure()
+        run: safe vault killall || true && safe auth stop || true
+
       - name: Failure logs.
         if: failure()
         run: tail -f $HOME/.safe/vault/baby-fleming-vaults/*/*.log
