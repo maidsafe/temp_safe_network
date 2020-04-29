@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::rpc::Rpc;
-use safe_nd::{Coins, MessageId, PublicId, Request, XorName};
+use safe_nd::{Coins, MessageId, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -57,5 +57,9 @@ pub(crate) enum Action {
         sender: XorName,
         targets: BTreeSet<XorName>,
         rpc: Rpc,
+    },
+    RespondToClient {
+        message_id: MessageId,
+        response: Response,
     },
 }

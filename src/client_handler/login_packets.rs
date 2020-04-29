@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Responder, COST_OF_PUT};
+use super::COST_OF_PUT;
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
@@ -17,25 +17,15 @@ use safe_nd::{
     Coins, Error as NdError, LoginPacket, MessageId, NodePublicId, PublicId, PublicKey, Request,
     Response, Result as NdResult, Transaction, XorName,
 };
-use std::{cell::RefCell, rc::Rc};
 
 pub(super) struct LoginPackets {
     id: NodePublicId,
     login_packets: LoginPacketChunkStore,
-    responder: Rc<RefCell<Responder>>,
 }
 
 impl LoginPackets {
-    pub fn new(
-        id: NodePublicId,
-        login_packets: LoginPacketChunkStore,
-        responder: Rc<RefCell<Responder>>,
-    ) -> Self {
-        Self {
-            id,
-            login_packets,
-            responder,
-        }
+    pub fn new(id: NodePublicId, login_packets: LoginPacketChunkStore) -> Self {
+        Self { id, login_packets }
     }
 
     // client query
@@ -48,10 +38,10 @@ impl LoginPackets {
         let result = self
             .login_packet(utils::own_key(client_id)?, address)
             .map(LoginPacket::into_data_and_signature);
-        self.responder
-            .borrow_mut()
-            .respond_to_client(message_id, Response::GetLoginPacket(result));
-        None
+        Some(Action::RespondToClient {
+            message_id,
+            response: Response::GetLoginPacket(result),
+        })
     }
 
     // on client request
@@ -62,10 +52,10 @@ impl LoginPackets {
         message_id: MessageId,
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
-            self.responder
-                .borrow_mut()
-                .respond_to_client(message_id, Response::Mutation(Err(NdError::ExceededSize)));
-            return None;
+            return Some(Action::RespondToClient {
+                message_id,
+                response: Response::Mutation(Err(NdError::ExceededSize)),
+            });
         }
 
         let request = Request::CreateLoginPacket(login_packet);
@@ -113,11 +103,10 @@ impl LoginPackets {
         message_id: MessageId,
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
-            self.responder.borrow_mut().respond_to_client(
+            return Some(Action::RespondToClient {
                 message_id,
-                Response::Transaction(Err(NdError::ExceededSize)),
-            );
-            return None;
+                response: Response::Transaction(Err(NdError::ExceededSize)),
+            });
         }
         // The requester bears the cost of storing the login packet
         let new_amount = amount.checked_add(COST_OF_PUT)?;

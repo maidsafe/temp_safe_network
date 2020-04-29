@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{auth::ClientInfo, Responder, COST_OF_PUT};
+use super::{auth::ClientInfo, COST_OF_PUT};
 use crate::{
     action::{Action, ConsensusAction},
     rpc::Rpc,
@@ -17,11 +17,7 @@ use safe_nd::{
     AData, ADataAddress, Coins, Error as NdError, IData, IDataAddress, IDataKind, MData, MessageId,
     NodePublicId, Request, Response,
 };
-use std::{
-    cell::RefCell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone)]
 pub(crate) struct ElderData {
@@ -31,11 +27,11 @@ pub(crate) struct ElderData {
 }
 
 impl ElderData {
-    pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
+    pub fn new(id: NodePublicId) -> Self {
         Self {
-            idata: ElderIData::new(id.clone(), responder.clone()),
-            mdata: ElderMData::new(id.clone(), responder.clone()),
-            adata: ElderAData::new(id, responder),
+            idata: ElderIData::new(id.clone()),
+            mdata: ElderMData::new(id.clone()),
+            adata: ElderAData::new(id),
         }
     }
 }
@@ -47,12 +43,11 @@ impl ElderData {
 #[derive(Clone)]
 pub(crate) struct ElderAData {
     id: NodePublicId,
-    responder: Rc<RefCell<Responder>>,
 }
 
 impl ElderAData {
-    pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
-        Self { id, responder }
+    pub fn new(id: NodePublicId) -> Self {
+        Self { id }
     }
 
     // client query
@@ -85,10 +80,10 @@ impl ElderAData {
                 self,
                 client.public_id
             );
-            self.responder
-                .borrow_mut()
-                .respond_to_client(message_id, Response::Mutation(Err(NdError::InvalidOwners)));
-            return None;
+            return Some(Action::RespondToClient {
+                message_id,
+                response: Response::Mutation(Err(NdError::InvalidOwners)),
+            });
         }
 
         let request = Request::PutAData(chunk);
@@ -108,11 +103,10 @@ impl ElderAData {
         message_id: MessageId,
     ) -> Option<Action> {
         if address.is_pub() {
-            self.responder.borrow_mut().respond_to_client(
+            return Some(Action::RespondToClient {
                 message_id,
-                Response::Mutation(Err(NdError::InvalidOperation)),
-            );
-            return None;
+                response: Response::Mutation(Err(NdError::InvalidOperation)),
+            });
         }
 
         Some(Action::VoteFor(ConsensusAction::Forward {
@@ -152,12 +146,11 @@ impl Display for ElderAData {
 #[derive(Clone)]
 pub(crate) struct ElderIData {
     id: NodePublicId,
-    responder: Rc<RefCell<Responder>>,
 }
 
 impl ElderIData {
-    pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
-        Self { id, responder }
+    pub fn new(id: NodePublicId) -> Self {
+        Self { id }
     }
 
     // client query
@@ -193,10 +186,10 @@ impl ElderIData {
                     self,
                     client.public_id
                 );
-                self.responder
-                    .borrow_mut()
-                    .respond_to_client(message_id, Response::Mutation(Err(NdError::InvalidOwners)));
-                return None;
+                return Some(Action::RespondToClient {
+                    message_id,
+                    response: Response::Mutation(Err(NdError::InvalidOwners)),
+                });
             }
         }
 
@@ -217,11 +210,10 @@ impl ElderIData {
         message_id: MessageId,
     ) -> Option<Action> {
         if address.kind() == IDataKind::Pub {
-            self.responder.borrow_mut().respond_to_client(
+            return Some(Action::RespondToClient {
                 message_id,
-                Response::Mutation(Err(NdError::InvalidOperation)),
-            );
-            return None;
+                response: Response::Mutation(Err(NdError::InvalidOperation)),
+            });
         }
         Some(Action::VoteFor(ConsensusAction::Forward {
             request: Request::DeleteUnpubIData(address),
@@ -245,12 +237,11 @@ impl Display for ElderIData {
 #[derive(Clone)]
 pub(crate) struct ElderMData {
     id: NodePublicId,
-    responder: Rc<RefCell<Responder>>,
 }
 
 impl ElderMData {
-    pub fn new(id: NodePublicId, responder: Rc<RefCell<Responder>>) -> Self {
-        Self { id, responder }
+    pub fn new(id: NodePublicId) -> Self {
+        Self { id }
     }
 
     // client query
@@ -314,10 +305,10 @@ impl ElderMData {
                 self,
                 client.public_id
             );
-            self.responder
-                .borrow_mut()
-                .respond_to_client(message_id, Response::Mutation(Err(NdError::InvalidOwners)));
-            return None;
+            return Some(Action::RespondToClient {
+                message_id,
+                response: Response::Mutation(Err(NdError::InvalidOwners)),
+            });
         }
 
         let request = Request::PutMData(chunk);

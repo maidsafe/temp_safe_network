@@ -43,22 +43,10 @@ pub const COST_OF_PUT: Coins = Coins::from_nano(1);
 
 pub(crate) struct ClientHandler {
     id: NodePublicId,
-    messaging: Rc<RefCell<Messaging>>,
+    messaging: Messaging,
     auth: Auth,
     login_packets: LoginPackets,
     data: ElderData,
-}
-
-pub(crate) struct Responder {
-    messaging: Rc<RefCell<Messaging>>,
-}
-
-impl Responder {
-    pub fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
-        self.messaging
-            .borrow_mut()
-            .respond_to_client(message_id, response)
-    }
 }
 
 impl ClientHandler {
@@ -79,13 +67,11 @@ impl ClientHandler {
             init_mode,
         )?;
 
-        let messaging = Rc::new(RefCell::new(Messaging::new(id.clone(), routing_node)));
-        let responder = Rc::new(RefCell::new(Responder {
-            messaging: messaging.clone(),
-        }));
-        let auth = Auth::new(id.clone(), auth_db, responder.clone());
-        let login_packets = LoginPackets::new(id.clone(), packet_db, responder.clone());
-        let data = ElderData::new(id.clone(), responder);
+        let messaging = Messaging::new(id.clone(), routing_node);
+
+        let auth = Auth::new(id.clone(), auth_db);
+        let login_packets = LoginPackets::new(id.clone(), packet_db);
+        let data = ElderData::new(id.clone());
 
         let client_handler = Self {
             id,
@@ -98,14 +84,16 @@ impl ClientHandler {
         Ok(client_handler)
     }
 
+    pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
+        self.messaging.respond_to_client(message_id, response);
+    }
+
     pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
-        self.messaging.borrow_mut().handle_new_connection(peer_addr)
+        self.messaging.handle_new_connection(peer_addr)
     }
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
-        self.messaging
-            .borrow_mut()
-            .handle_connection_failure(peer_addr)
+        self.messaging.handle_connection_failure(peer_addr)
     }
 
     pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
@@ -121,7 +109,6 @@ impl ClientHandler {
                 message_id,
             } => self
                 .messaging
-                .borrow_mut()
                 .relay_reponse_to_client(src, &requester, response, message_id),
         }
     }
@@ -161,7 +148,6 @@ impl ClientHandler {
     ) -> Option<Action> {
         let result = self
             .messaging
-            .borrow_mut()
             .try_parse_client_request(peer_addr, bytes, rng);
         match result {
             Some(result) => self.process_client_request(
@@ -192,11 +178,21 @@ impl ClientHandler {
             client.public_id
         );
 
-        self.auth
-            .verify_signature(&client.public_id, &request, message_id, signature)?;
-        self.auth
-            .authorise_app(&client.public_id, &request, message_id)?;
-        self.auth.verify_consistent_address(&request, message_id)?;
+        if let Some(action) =
+            self.auth
+                .verify_signature(&client.public_id, &request, message_id, signature)
+        {
+            return Some(action);
+        };
+        if let Some(action) = self
+            .auth
+            .authorise_app(&client.public_id, &request, message_id)
+        {
+            return Some(action);
+        }
+        if let Some(action) = self.auth.verify_consistent_address(&request, message_id) {
+            return Some(action);
+        }
 
         match request {
             //
