@@ -14,7 +14,7 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    AData, ADataAddress, Coins, Error as NdError, IData, IDataAddress, IDataKind, MData, MessageId,
+    AData, ADataAddress, Error as NdError, IData, IDataAddress, IDataKind, MData, MessageId,
     NodePublicId, Request, Response,
 };
 use std::fmt::{self, Display, Formatter};
@@ -87,7 +87,7 @@ impl ElderAData {
         }
 
         let request = Request::PutAData(chunk);
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
@@ -113,7 +113,6 @@ impl ElderAData {
             request: Request::DeleteAData(address),
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -124,7 +123,7 @@ impl ElderAData {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
@@ -194,7 +193,7 @@ impl ElderIData {
         }
 
         let request = Request::PutIData(chunk);
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
@@ -219,7 +218,6 @@ impl ElderIData {
             request: Request::DeleteUnpubIData(address),
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 }
@@ -265,7 +263,7 @@ impl ElderMData {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
@@ -284,7 +282,6 @@ impl ElderMData {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -313,7 +310,7 @@ impl ElderMData {
 
         let request = Request::PutMData(chunk);
 
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,

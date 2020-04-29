@@ -15,15 +15,21 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum ConsensusAction {
     /// Process pay for request and forward request to client.
-    Forward {
+    PayAndForward {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
         cost: Coins,
     },
+    /// Process request that doesn't need a payment and forward request to client.
+    Forward {
+        request: Request,
+        client_public_id: PublicId,
+        message_id: MessageId,
+    },
     /// Process pay for request and proxy the request to a different client's handler.
     /// Only used by `CreateLoginPacketFor`
-    Proxy {
+    PayAndProxy {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,

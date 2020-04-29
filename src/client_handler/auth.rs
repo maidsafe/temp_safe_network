@@ -14,7 +14,7 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, Coins, Error as NdError, MessageId, NodePublicId, PublicId,
+    AppPermissions, AppPublicId, Error as NdError, MessageId, NodePublicId, PublicId,
     PublicKey, Request, Response, Signature,
 };
 use std::fmt::{self, Display, Formatter};
@@ -106,7 +106,6 @@ impl Auth {
             },
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -128,6 +127,7 @@ impl Auth {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -147,7 +147,6 @@ impl Auth {
             },
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -168,6 +167,7 @@ impl Auth {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                refund: None,
             },
         })
     }
