@@ -834,7 +834,10 @@ async fn files_map_sync(
         )
         .normalize();
         // Above normalize removes initial slash, and uses '\' if it's on Windows
-        let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()));
+        // here, we trim any trailing '/', as it could be a filename.
+        let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()))
+            .trim_end_matches('/')
+            .to_string();
 
         // Let's update FileItem if there is a change or it doesn't exist in current_files_map
         match current_files_map.get(&normalised_file_name) {
@@ -1282,7 +1285,10 @@ fn files_map_create(
         .normalize();
 
         // Above normalize removes initial slash, and uses '\' if it's on Windows
-        let final_name = format!("/{}", normalise_path_separator(new_file_name.as_str()));
+        // here, we trim any trailing '/', as it could be a filename.
+        let final_name = format!("/{}", normalise_path_separator(new_file_name.as_str()))
+            .trim_end_matches('/')
+            .to_string();
 
         debug!("FileItem item inserted with filename {:?}", &final_name);
         files_map.insert(final_name.to_string(), file_item);
