@@ -14,8 +14,8 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, Error as NdError, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Signature,
+    AppPermissions, AppPublicId, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey,
+    Request, Response, Signature,
 };
 use std::fmt::{self, Display, Formatter};
 
