@@ -51,7 +51,7 @@ impl Safe {
                     "The location couldn't be resolved from the NRS URL provided".to_string(),
                 )
             })?;
-            let xorurl = nrs_map.resolve_for_subnames(xorurl_encoder.sub_names())?;
+            let xorurl = nrs_map.resolve_for_subnames(xorurl_encoder.sub_names_vec())?;
             Ok((XorUrlEncoder::from_url(&xorurl)?, Some(xorurl_encoder)))
         } else {
             Ok((xorurl_encoder, None))
@@ -573,7 +573,7 @@ mod tests {
     async fn test_nrs_no_scheme() -> Result<()> {
         let site_name = random_nrs_name();
         let url = Safe::parse_url(&site_name)?;
-        assert_eq!(url.nrs_name(), site_name);
+        assert_eq!(url.full_name(), site_name);
         Ok(())
     }
 }

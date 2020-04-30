@@ -304,7 +304,7 @@ async fn resolve_one_indirection(
                 nrs_map
             );
 
-            let new_target_url = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
+            let new_target_url = nrs_map.resolve_for_subnames(the_xor.sub_names_vec())?;
             debug!("Resolved target: {}", new_target_url);
 
             let mut xorurl_encoder = Safe::parse_url(&new_target_url)?;
@@ -319,7 +319,7 @@ async fn resolve_one_indirection(
             let nrsurl = XorUrlEncoder::from_nrsurl(&original_url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = NrsMapContainerInfo {
-                public_name: nrsurl.top_name(),
+                public_name: nrsurl.public_name().to_string(),
                 xorurl: the_xor.to_string(),
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),

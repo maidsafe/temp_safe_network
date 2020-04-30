@@ -167,9 +167,10 @@ impl SafeDataType {
 #[derive(Debug, Clone)]
 pub(crate) struct SafeUrlParts {
     pub scheme: String,
-    pub name: String,           // "a.b.name" in "a.b.name"
-    pub sub_names: Vec<String>, // "a.b"      in "a.b.name"
-    pub top_name: String,       // "name"     in "a.b.name"
+    pub full_name: String,   // "a.b.name" in "a.b.name"
+    pub public_name: String, // "name"     in "a.b.name"
+    pub sub_names: String,   // "a.b"      in "a.b.name"
+    pub sub_names_vec: Vec<String>,
     pub path: String,
     pub query_string: String,
     pub fragment: String,
@@ -184,7 +185,7 @@ impl SafeUrlParts {
         })?;
 
         // Validate the url scheme is 'safe'
-        let scheme = parsing_url.scheme();
+        let scheme = parsing_url.scheme().to_string();
         if scheme != SAFE_URL_SCHEME {
             let msg = format!(
                 "invalid scheme: '{}'. expected: '{}'",
@@ -194,8 +195,8 @@ impl SafeUrlParts {
         }
 
         // validate name (url host) is not empty
-        let name = match parsing_url.host_str() {
-            Some(h) => h,
+        let full_name = match parsing_url.host_str() {
+            Some(h) => h.to_string(),
             None => {
                 let msg = format!("Problem parsing the URL \"{}\": {}", url, "missing name");
                 return Err(Error::InvalidXorUrl(msg));
@@ -203,19 +204,26 @@ impl SafeUrlParts {
         };
 
         // validate no empty sub names in name.
-        if name.find("..").is_some() {
+        if full_name.find("..").is_some() {
             let msg = "name contains empty subname".to_string();
             return Err(Error::InvalidXorUrl(msg));
         }
 
-        // parse top_name and sub_names from name
-        let names_vec = Vec::from_iter(name.split('.').map(String::from));
-        let top_name = &names_vec[names_vec.len() - 1];
-        let sub_names = &names_vec[0..names_vec.len() - 1];
+        // validate no spaces in name.
+        if full_name.find(' ').is_some() {
+            let msg = "name cannot contain a space".to_string();
+            return Err(Error::InvalidXorUrl(msg));
+        }
+
+        // parse public_name and sub_names from name
+        let names_vec = Vec::from_iter(full_name.split('.').map(String::from));
+        let public_name = names_vec[names_vec.len() - 1].to_string();
+        let sub_names_vec = (&names_vec[0..names_vec.len() - 1]).to_vec();
+        let sub_names = sub_names_vec.join(".");
 
         // get path, query_params, and fragment
-        let path = parsing_url.path();
-        let query_params = parsing_url.query().unwrap_or("").to_string();
+        let path = parsing_url.path().to_string();
+        let query_string = parsing_url.query().unwrap_or("").to_string();
         let fragment = parsing_url.fragment().unwrap_or("").to_string();
 
         // double-slash is allowed but discouraged in regular URLs.
@@ -227,23 +235,25 @@ impl SafeUrlParts {
         }
 
         debug!(
-            "Parsed url: scheme: {}, name: {}, subnames: {:?}, top_name: {}, path: {}, query_string: {}, fragment: {}",
+            "Parsed url: scheme: {}, full_name: {}, public_name: {}, sub_names: {}, sub_names_vec: {:?}, path: {}, query_string: {}, fragment: {}",
             scheme,
-            name,
-            sub_names.to_vec(),
-            top_name.to_string(),
+            full_name,
+            public_name,
+            sub_names,
+            sub_names_vec,
             path,
-            query_params,
+            query_string,
             fragment,
         );
 
         let s = Self {
-            scheme: scheme.to_string(),
-            name: name.to_string(),
-            sub_names: sub_names.to_vec(),
-            top_name: top_name.to_string(),
-            path: path.to_string(),
-            query_string: query_params,
+            scheme,
+            full_name,
+            sub_names,
+            sub_names_vec,
+            public_name,
+            path,
+            query_string,
             fragment,
         };
 
@@ -255,6 +265,7 @@ impl SafeUrlParts {
 ///
 /// This is the type of safe url itself,
 /// not the content it points to.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SafeUrlType {
     XorUrl,
     NrsUrl,
@@ -265,26 +276,47 @@ pub enum SafeUrlType {
 /// A SafeUrl can be in one of two formats:  nrs or xor.
 ///   aka:  nrsurl or xorurl
 ///
-// if nrs_name is non-empty, it is considered an nrsurl.
-// else an xorurl.  see: SafeUrl::is_nrsurl()
-//
-// note: we presently do not include a field for SafeUrlType
-// because it possible to determine the type via
-//   if is_nrsurl() {NrsUrl} else {XorUrl}
+/// Here is a breakdown of how name terminology is used.
+///
+/// case 1: safe://a.b.shinything:
+///
+///   full_name()    --> a.b.shinything
+///   public_name()  --> shinything
+///   sub_names()    --> a.b
+///
+/// case 2: safe://shinything:
+///
+///   full_name()   --> shinything
+///   public_name() --> shinything
+///   sub_names()   --> None
+///
+/// case 3: safe://a.b.hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///
+///   full_name()   --> a.b.hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   public_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   sub_names()   --> a.b
+///
+/// case 4: safe://hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   full_name()   --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   public_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   sub_names()   --> None
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SafeUrl {
-    encoding_version: u64, // currently only v1 supported
-    xor_name: XorName,     // applies to nrsurl and xorurl
-    nrs_name: String,      // full name, only for nrsurl
+    encoding_version: u64,      // currently only v1 supported
+    xor_name: XorName,          // applies to nrsurl and xorurl
+    full_name: String,          // "a.b.name" in "a.b.name"
+    public_name: String,        // "name" in "a.b.name"
+    sub_names: String,          // "a.b" in "a.b.name"
+    sub_names_vec: Vec<String>, // vec!["a", "b"] in "a.b.name"
     type_tag: u64,
     data_type: SafeDataType,       // See SafeDataType
     content_type: SafeContentType, // See SafeContentTYpe
-    content_type_u16: u16,         // u16 id of content_type
+    content_type_u16: u16,         // validated u16 id of content_type
     path: String,                  // path, no separator, percent-encoded
-    sub_names: Vec<String>,        // only used for xorurl.  tbd: remove?
     query_string: String,          // query-string, no separator, url-encoded
     fragment: String,              // fragment, no separator
     content_version: Option<u64>,  // convenience for ?v=<version
+    safeurl_type: SafeUrlType,     // nrsurl or xorurl
 }
 
 /// This implementation performs semi-rigorous validation,
@@ -335,8 +367,11 @@ impl SafeUrl {
     ) -> Result<Self> {
         let content_type_u16 = content_type.value()?;
 
-        let nrs_name_str: &str;
-        let subnames: Vec<String>;
+        let full_name: String;
+        let public_name: String;
+        let sub_names_str: String;
+        let sub_names_vec: Vec<String>;
+        let safeurl_type: SafeUrlType;
         match nrs_name {
             Some(nh) => {
                 // we have an nrsurl
@@ -347,23 +382,29 @@ impl SafeUrl {
                 // Validate that nrs_name hash matches xor_name
                 let tmpurl = format!("{}{}", SAFE_URL_PROTOCOL, nh);
                 let parts = SafeUrlParts::parse(&tmpurl)?;
-                let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name)?;
+                let hashed_name = Self::xor_name_from_nrs_string(&parts.public_name)?;
                 if hashed_name != xor_name {
                     let msg = format!(
                         "input mis-match. nrs_name `{}` does not hash to xor_name `{}`",
-                        parts.top_name, xor_name
+                        parts.public_name, xor_name
                     );
                     return Err(Error::InvalidInput(msg));
                 }
-                nrs_name_str = nh;
-                subnames = parts.sub_names; // use sub_names from nrs_name, ignoring sub_names arg, in case they do not match.
+                full_name = parts.full_name;
+                public_name = parts.public_name;
+                sub_names_str = parts.sub_names;
+                sub_names_vec = parts.sub_names_vec; // use sub_names from nrs_name, ignoring sub_names arg, in case they do not match.
+                safeurl_type = SafeUrlType::NrsUrl;
             }
             None => {
                 // we have an xorurl
-                nrs_name_str = "";
-                subnames = sub_names.unwrap_or_else(|| vec![]);
+                full_name = String::default(); // set later
+                public_name = String::default(); // set later
+                sub_names_vec = sub_names.unwrap_or_else(|| vec![]);
+                sub_names_str = sub_names_vec.join(".");
+                safeurl_type = SafeUrlType::XorUrl;
 
-                for s in &subnames {
+                for s in &sub_names_vec {
                     if s.is_empty() {
                         let msg = "empty subname".to_string();
                         return Err(Error::InvalidInput(msg));
@@ -376,17 +417,27 @@ impl SafeUrl {
         let mut x = Self {
             encoding_version: XOR_URL_VERSION_1,
             xor_name,
-            nrs_name: nrs_name_str.to_string(),
+            full_name,
+            public_name,
+            sub_names: sub_names_str,
+            sub_names_vec,
             type_tag,
             data_type,
             content_type,
             content_type_u16,
-            path: String::default(), // set below.
-            sub_names: subnames,
+            path: String::default(),         // set below.
             query_string: String::default(), // set below.
             fragment: fragment.unwrap_or("").to_string(),
             content_version: None, // set below.
+            safeurl_type,
         };
+
+        // now we can call ::name_to_base(), to generate the public_name.
+        if x.safeurl_type == SafeUrlType::XorUrl {
+            x.public_name = x.name_to_base(DEFAULT_XORURL_BASE, false);
+            let sep = if x.sub_names.is_empty() { "" } else { "." };
+            x.full_name = format!("{}{}{}", x.sub_names(), sep, x.public_name);
+        }
 
         // we call this to add leading slash if needed
         // but we do NOT want percent-encoding as caller
@@ -435,16 +486,16 @@ impl SafeUrl {
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
         let parts = SafeUrlParts::parse(&nrsurl)?;
 
-        let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name)?;
+        let hashed_name = Self::xor_name_from_nrs_string(&parts.public_name)?;
 
         let x = Self::new(
             hashed_name,
-            Some(&parts.name),
+            Some(&parts.full_name),
             NRS_MAP_TYPE_TAG,
             SafeDataType::PublishedSeqAppendOnlyData,
             SafeContentType::NrsMapContainer,
             Some(&parts.path),
-            Some(parts.sub_names),
+            Some(parts.sub_names_vec),
             Some(&parts.query_string),
             Some(&parts.fragment),
             None,
@@ -461,7 +512,7 @@ impl SafeUrl {
     pub fn from_xorurl(xorurl: &str) -> Result<Self> {
         let parts = SafeUrlParts::parse(&xorurl)?;
 
-        let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&parts.top_name)
+        let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&parts.public_name)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
 
         let type_tag_offset = XOR_NAME_BYTES_OFFSET + XOR_NAME_LEN; // offset where to find the type tag bytes
@@ -551,7 +602,7 @@ impl SafeUrl {
             data_type,
             content_type,
             Some(&parts.path),
-            Some(parts.sub_names),
+            Some(parts.sub_names_vec),
             Some(&parts.query_string),
             Some(&parts.fragment),
             None,
@@ -585,38 +636,45 @@ impl SafeUrl {
         self.xor_name
     }
 
-    /// returns 'name' portion of xorurl using the
+    /// returns full_name portion of xorurl using the
     /// default xorurl encoding.
     ///
-    /// For a different encoding, see name_to_base()
-    pub fn xorurl_name(&self) -> String {
-        self.name_to_base(DEFAULT_XORURL_BASE)
-    }
-
-    /// returns nrs_name
+    /// full_name means sub_names + public_name
     ///
-    /// Will be empty string if is_nrsurl() != true
-    pub fn nrs_name(&self) -> &str {
-        &self.nrs_name
+    /// useful for retrieving xorurl name associated
+    /// with an nrsurl.
+    ///
+    /// For a different encoding, see name_to_base()
+    pub fn xorurl_full_name(&self) -> String {
+        self.name_to_base(DEFAULT_XORURL_BASE, true)
     }
 
-    /// The url name.  Either nrs_name or xor_name.
-    pub fn name(&self) -> String {
-        if self.is_nrsurl() {
-            self.nrs_name.clone()
-        } else {
-            self.xorurl_name()
-        }
+    /// The full_name in url.  Either nrs_name or xor_name.
+    ///
+    /// eg a.b.name --> a.b.name
+    pub fn full_name(&self) -> &str {
+        &self.full_name
     }
 
     /// returns top name of name field.
     ///
-    /// eg: my.sub.name --> name
-    pub fn top_name(&self) -> String {
-        let name = self.name();
-        let parts: Vec<&str> = name.split('.').collect();
-        let default = "";
-        (*parts.last().unwrap_or(&default)).to_string()
+    /// eg: a.b.name --> name
+    pub fn public_name(&self) -> &str {
+        &self.public_name
+    }
+
+    /// returns sub_names
+    ///
+    /// eg: a.b.name --> a.b
+    pub fn sub_names(&self) -> &str {
+        &self.sub_names
+    }
+
+    /// returns sub_names in an array slice
+    ///
+    /// eg: a.b.name --> &["a", "b"]
+    pub fn sub_names_vec(&self) -> &[String] {
+        &self.sub_names_vec
     }
 
     /// returns XorUrl type tag
@@ -642,11 +700,6 @@ impl SafeUrl {
     /// leading slash is automatically added if necessary.
     pub fn set_path(&mut self, path: &str) {
         self.set_path_internal(path, true);
-    }
-
-    /// returns nrs sub_names
-    pub fn sub_names(&self) -> Vec<String> {
-        self.sub_names.to_vec()
     }
 
     /// gets content version
@@ -760,15 +813,15 @@ impl SafeUrl {
     ///
     /// This contains the percent-encoded key/value pairs
     /// as seen in a url.
-    pub fn query_string(&self) -> String {
-        self.query_string.clone()
+    pub fn query_string(&self) -> &str {
+        &self.query_string
     }
 
     /// Retrieves query string, with ? separator if non-empty.
     pub fn query_string_with_separator(&self) -> String {
         let qs = self.query_string();
         if qs.is_empty() {
-            qs
+            qs.to_string()
         } else {
             format!("?{}", qs)
         }
@@ -809,8 +862,8 @@ impl SafeUrl {
     }
 
     /// Retrieves url fragment, without # separator
-    pub fn fragment(&self) -> String {
-        self.fragment.clone()
+    pub fn fragment(&self) -> &str {
+        &self.fragment
     }
 
     /// Retrieves url fragment, with # separator if non-empty.
@@ -824,19 +877,20 @@ impl SafeUrl {
 
     /// returns true if an NrsUrl, false if an XorUrl
     pub fn is_nrsurl(&self) -> bool {
-        !self.nrs_name.is_empty()
+        self.safeurl_type == SafeUrlType::NrsUrl
+    }
+
+    /// returns true if an XorUrl, false if an NrsUrl
+    pub fn is_xorurl(&self) -> bool {
+        self.safeurl_type == SafeUrlType::XorUrl
     }
 
     /// returns type of this SafeUrl.
     ///
     /// for type of the linked content, see
     ///   ::content_type()
-    pub fn safeurl_type(&self) -> SafeUrlType {
-        if self.is_nrsurl() {
-            SafeUrlType::NrsUrl
-        } else {
-            SafeUrlType::XorUrl
-        }
+    pub fn safeurl_type(&self) -> &SafeUrlType {
+        &self.safeurl_type
     }
 
     // XOR-URL encoding format (var length from 36 to 44 bytes):
@@ -868,14 +922,14 @@ impl SafeUrl {
 
         let url = format!(
             "{}{}{}{}{}",
-            SAFE_URL_PROTOCOL, self.nrs_name, self.path, query_string, fragment
+            SAFE_URL_PROTOCOL, self.full_name, self.path, query_string, fragment
         );
         Some(url)
     }
 
     /// serializes entire xorurl using a particular base encoding.
     pub fn to_base(&self, base: XorUrlBase) -> String {
-        let name = self.name_to_base(base);
+        let name = self.name_to_base(base, true);
 
         let query_string = self.query_string_with_separator();
         let fragment = self.fragment_with_separator();
@@ -888,7 +942,7 @@ impl SafeUrl {
     }
 
     /// serializes name portion of xorurl using a particular base encoding.
-    pub fn name_to_base(&self, base: XorUrlBase) -> String {
+    pub fn name_to_base(&self, base: XorUrlBase, include_subnames: bool) -> String {
         // let's set the first byte with the XOR-URL format version
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
 
@@ -910,20 +964,15 @@ impl SafeUrl {
             XorUrlBase::Base32 => Base::Base32,
             XorUrlBase::Base64 => Base::Base64,
         };
-        let top_name = encode(base_encoding, cid_vec);
+        let public_name = encode(base_encoding, cid_vec);
 
-        // TBD: I'd like to get rid of these sub-names for xorurls.
-        // They are ugly and mash 2 distinct concepts together.
-        // I compare it to saying subdomain.196.318.5.189
-        // The mind rebels...
-        let sub_names = if !self.sub_names.is_empty() {
-            format!("{}.", self.sub_names.join("."))
+        if include_subnames {
+            let sub_names = self.sub_names();
+            let sep = if sub_names.is_empty() { "" } else { "." };
+            format!("{}{}{}", sub_names, sep, public_name)
         } else {
-            "".to_string()
-        };
-
-        // serialize xorurl name
-        format!("{}{}", sub_names, top_name)
+            public_name
+        }
     }
 
     /// Utility function to perform url percent decoding.
@@ -1222,7 +1271,7 @@ impl fmt::Display for SafeUrl {
             match self.to_nrsurl_string() {
                 Some(s) => s,
                 None => {
-                    warn!("to_nrsurl_string() return None when is_nrsurl() == true. '{}'.  This should never happen. Please investigate.", self.nrs_name);
+                    warn!("to_nrsurl_string() return None when is_nrsurl() == true. '{}'.  This should never happen. Please investigate.", self.full_name);
                     return Err(fmt::Error);
                 }
             }
@@ -1518,7 +1567,7 @@ mod tests {
         assert_eq!(1, xorurl_encoder_with_subname.encoding_version());
         assert_eq!(xor_name, xorurl_encoder_with_subname.xorname());
         assert_eq!(type_tag, xorurl_encoder_with_subname.type_tag());
-        assert_eq!(vec!("sub"), xorurl_encoder_with_subname.sub_names());
+        assert_eq!(&["sub"], xorurl_encoder_with_subname.sub_names_vec());
         assert_eq!(
             SafeContentType::NrsMapContainer,
             xorurl_encoder_with_subname.content_type()
@@ -1762,11 +1811,23 @@ mod tests {
         assert_eq!(nrs.scheme(), SAFE_URL_SCHEME);
         assert_eq!(xor.scheme(), SAFE_URL_SCHEME);
 
-        assert_eq!(nrs.name(), "my.sub.domain");
+        assert_eq!(nrs.full_name(), "my.sub.domain");
         assert_eq!(
-            xor.name(),
+            xor.full_name(),
             "my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh"
         );
+
+        assert_eq!(nrs.public_name(), "domain");
+        assert_eq!(
+            xor.public_name(),
+            "hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh"
+        );
+
+        assert_eq!(nrs.sub_names(), "my.sub");
+        assert_eq!(xor.sub_names(), "my.sub");
+
+        assert_eq!(nrs.sub_names_vec(), ["my", "sub"]);
+        assert_eq!(xor.sub_names_vec(), ["my", "sub"]);
 
         assert_eq!(nrs.path(), "/path/my%20dir/my%20file.txt");
         assert_eq!(xor.path(), "/path/my%20dir/my%20file.txt");
@@ -1856,13 +1917,24 @@ mod tests {
         // Tests some URL errors that are specific to xorurl
 
         let msg = "Expected error";
-        let wrong_err = "Wrong error type";
+        let wrong_err = "Wrong error type".to_string();
 
         // test: "Failed to decode XOR-URL"
         let result = SafeUrl::from_xorurl("safe://invalidxor").expect_err(msg);
         match result {
             Error::InvalidXorUrl(e) => assert!(e.contains("Failed to decode XOR-URL")),
-            _ => panic!(wrong_err),
+            _ => return Err(Error::Unexpected(wrong_err)),
+        }
+
+        // test: xorurl with a space in it
+        let result = SafeUrl::from_xorurl(
+            "safe://hnyydy iixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh",
+        )
+        .expect_err(msg);
+        println!("{:#?}", result);
+        match result {
+            Error::InvalidXorUrl(e) => assert!(e.contains("invalid domain character")),
+            _ => return Err(Error::Unexpected(wrong_err)),
         }
 
         // note: too long/short have separate tests already.
@@ -1873,6 +1945,24 @@ mod tests {
         // "Invalid or unsupported XOR-URL encoding version: {}",
         // "Invalid content type encoded in the XOR-URL string: {}",
         // "Invalid SAFE data type encoded in the XOR-URL string: {}",
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_safeurl_validate() -> Result<()> {
+        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let trailing_slash = "safe://my.domain/";
+        let double_q = "safe://my.domain/??foo=bar";
+
+        let nrs = SafeUrl::from_url(nrsurl)?;
+        let xor = SafeUrl::from_url(&nrs.to_xorurl_string())?;
+
+        assert!(nrs.validate().is_ok());
+        assert!(xor.validate().is_ok());
+
+        assert!(SafeUrl::from_url(trailing_slash)?.validate().is_ok());
+        assert!(SafeUrl::from_url(double_q)?.validate().is_ok());
 
         Ok(())
     }
