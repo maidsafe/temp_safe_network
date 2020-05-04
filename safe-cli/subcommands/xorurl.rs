@@ -42,9 +42,9 @@ pub async fn xorurl_commander(
                 println!("Information decoded from SafeUrl: {}", url);
                 println!("UrlType: {}", urltype);
                 println!("Xorname: {}", xorname_to_hex(&safeurl.xorname()));
-                println!("Full Name: {}", safeurl.full_name());
+                println!("Public Name: {}", safeurl.public_name());
                 if safeurl.is_nrsurl() {
-                    println!("Public Name: {}", safeurl.public_name());
+                    println!("Top Name: {}", safeurl.top_name());
                 }
                 println!("Sub names: {}", safeurl.sub_names());
                 println!("Type tag: {}", safeurl.type_tag());

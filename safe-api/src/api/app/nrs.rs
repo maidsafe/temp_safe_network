@@ -573,7 +573,7 @@ mod tests {
     async fn test_nrs_no_scheme() -> Result<()> {
         let site_name = random_nrs_name();
         let url = Safe::parse_url(&site_name)?;
-        assert_eq!(url.full_name(), site_name);
+        assert_eq!(url.public_name(), site_name);
         Ok(())
     }
 }
