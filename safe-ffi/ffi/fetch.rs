@@ -116,7 +116,10 @@ unsafe fn invoke_callback(
                     }
                     None => NrsMapContainerInfo::new()?,
                 },
-                media_type: CString::new(media_type.clone().unwrap())?.into_raw(),
+                media_type: match media_type.clone() {
+                    Some(media) => CString::new(media)?.into_raw(),
+                    None => std::ptr::null(),
+                },
             };
             o_published(user_data.0, &published_data);
         }
