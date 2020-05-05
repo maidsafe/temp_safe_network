@@ -10,17 +10,10 @@
 use super::common::{parse_hex, sk_from_hex};
 use crate::{Error, Result};
 use chrono::{SecondsFormat, Utc};
-use log::debug;
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName};
-use std::{
-    iter::FromIterator,
-    str::{self, FromStr},
-};
+use std::str::{self, FromStr};
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
-use url::Url;
-
-const URL_VERSION_QUERY_NAME: &str = "v";
 
 /// The conversion from coin to raw value
 const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
@@ -127,71 +120,6 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
         IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn extract_all_url_parts(
-    xorurl: &str,
-) -> Result<(Vec<String>, String, String, Option<u64>, String, String)> {
-    let parsing_url = Url::parse(&xorurl).map_err(|parse_err| {
-        Error::InvalidXorUrl(format!(
-            "Problem parsing the safe:// URL \"{}\": {}",
-            xorurl, parse_err
-        ))
-    })?;
-
-    let host_str = parsing_url
-        .host_str()
-        .unwrap_or_else(|| "Failed parsing the URL");
-    let names_vec = Vec::from_iter(host_str.split('.').map(String::from));
-    let top_level_name = &names_vec[names_vec.len() - 1];
-    let sub_names = &names_vec[0..names_vec.len() - 1];
-
-    let mut path = parsing_url.path();
-    if path == "/" {
-        path = "";
-    }
-
-    let mut version = None;
-    let mut query_params = String::default();
-    for (key, value) in parsing_url.query_pairs() {
-        if key == URL_VERSION_QUERY_NAME {
-            version = str::parse::<u64>(&value).ok();
-        } else {
-            // Let's accumulate the query query_params which are not the version param
-            query_params.push_str(&format!("&{}={}", key, value));
-        }
-    }
-
-    if !query_params.is_empty() {
-        // remove the '&' form the begining
-        query_params.remove(0);
-    };
-
-    let fragment = if let Some(f) = parsing_url.fragment() {
-        f.to_string()
-    } else {
-        String::default()
-    };
-
-    debug!(
-        "Data from url: sub names: {:?}, host: {}, path: {}, version: {:?}, query_params: {}, fragment: {}",
-        sub_names.to_vec(),
-        top_level_name.to_string(),
-        path,
-        version,
-        query_params,
-        fragment
-    );
-
-    Ok((
-        sub_names.to_vec(),
-        top_level_name.to_string(),
-        path.to_string(),
-        version,
-        query_params,
-        fragment,
-    ))
 }
 
 pub fn gen_timestamp_secs() -> String {

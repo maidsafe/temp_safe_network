@@ -190,7 +190,7 @@ impl Safe {
         let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url).await?;
         let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
             let (to_balance, _) = self
-                .wallet_get_default_balance(&to_xorurl_encoder.to_string()?)
+                .wallet_get_default_balance(&to_xorurl_encoder.to_string())
                 .await?;
             XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
         } else if to_xorurl_encoder.content_type() == SafeContentType::Raw

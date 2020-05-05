@@ -192,10 +192,10 @@ impl XorUrlEncoder {
 pub unsafe fn xorurl_encoder_into_repr_c(
     xorurl_encoder: NativeXorUrlEncoder,
 ) -> Result<XorUrlEncoder> {
-    let sub_names = if xorurl_encoder.sub_names().is_empty() {
+    let sub_names = if xorurl_encoder.sub_names_vec().is_empty() {
         std::ptr::null()
     } else {
-        string_vec_to_c_str_str(xorurl_encoder.sub_names())?
+        string_vec_to_c_str_str(xorurl_encoder.sub_names_vec().to_vec())?
     };
     Ok(XorUrlEncoder {
         encoding_version: xorurl_encoder.encoding_version(),
@@ -205,7 +205,7 @@ pub unsafe fn xorurl_encoder_into_repr_c(
         content_type: xorurl_encoder.content_type().value()?,
         path: CString::new(xorurl_encoder.path())?.into_raw(),
         sub_names,
-        sub_names_len: xorurl_encoder.sub_names().len(),
+        sub_names_len: xorurl_encoder.sub_names_vec().len(),
         content_version: xorurl_encoder.content_version().unwrap_or_else(|| 0),
     })
 }
@@ -223,14 +223,15 @@ pub unsafe fn native_xorurl_encoder_from_repr_c(
     };
     Ok(NativeXorUrlEncoder::new(
         XorName(encoder.xorname),
+        None,
         encoder.type_tag,
         SafeDataType::from_u64(encoder.data_type)?,
         SafeContentType::from_u16(encoder.content_type)?,
         from_c_str_to_str_option(encoder.path),
         sub_names,
+        None,
+        None,
         Some(encoder.content_version),
-        None,
-        None,
     )?)
 }
 

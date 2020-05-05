@@ -292,7 +292,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
     let xor_path = join_paths(&[TESTDATA, SUBFOLDER]);
     let mut e = XorUrlEncoder::from_url(&files_container_xor)?;
     e.set_path(&xor_path);
-    let xor_url_with_path = e.to_string()?;
+    let xor_url_with_path = e.to_string();
 
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
@@ -1148,7 +1148,15 @@ fn join_paths(path: &[&str]) -> String {
 fn source_path(url: &str, path: &[&str]) -> Result<String, String> {
     let pb: PathBuf = path.iter().collect();
 
-    let mut x = XorUrlEncoder::from_url(&url).map_err(|e| format!("{:#?}", e))?;
-    x.set_path(&pb.display().to_string());
-    x.to_string().map_err(|e| format!("{:#?}", e))
+    let x = XorUrlEncoder::from_url(&url).map_err(|e| format!("{:#?}", e))?;
+
+    let url = format!(
+        "{}://{}/{}{}{}",
+        x.scheme(),
+        x.public_name(),
+        pb.display().to_string(),
+        x.query_string_with_separator(),
+        x.fragment_with_separator()
+    );
+    Ok(url)
 }

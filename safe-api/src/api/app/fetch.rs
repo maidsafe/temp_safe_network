@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{files::FilesMap, helpers::extract_all_url_parts, nrs_map::NrsMap, Safe, XorName};
+use super::{files::FilesMap, nrs_map::NrsMap, Safe, XorName};
 pub use super::{
     wallet::WalletSpendableBalances,
     xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder},
@@ -207,7 +207,7 @@ async fn resolve_one_indirection(
     retrieve_data: bool,
     range: Range,
 ) -> Result<(ResolutionStep, Option<XorUrlEncoder>)> {
-    let xorurl = the_xor.to_string()?;
+    let xorurl = the_xor.to_string();
     match the_xor.content_type() {
         SafeContentType::FilesContainer => {
             let (version, files_map) = safe.files_container_get(&xorurl).await?;
@@ -304,7 +304,7 @@ async fn resolve_one_indirection(
                 nrs_map
             );
 
-            let new_target_url = nrs_map.resolve_for_subnames(the_xor.sub_names())?;
+            let new_target_url = nrs_map.resolve_for_subnames(the_xor.sub_names_vec())?;
             debug!("Resolved target: {}", new_target_url);
 
             let mut xorurl_encoder = Safe::parse_url(&new_target_url)?;
@@ -313,14 +313,14 @@ async fn resolve_one_indirection(
             } else if !the_xor.path().is_empty() {
                 xorurl_encoder.set_path(&format!("{}{}", xorurl_encoder.path(), the_xor.path()));
             }
-            let url_with_path = xorurl_encoder.to_string()?;
+            let url_with_path = xorurl_encoder.to_string();
             debug!("Resolving target from resolvable map: {}", url_with_path);
 
-            let (_, public_name, _, _, _, _) = extract_all_url_parts(original_url)?;
+            let nrsurl = XorUrlEncoder::from_nrsurl(&original_url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = NrsMapContainerInfo {
-                public_name,
-                xorurl: the_xor.to_string()?,
+                public_name: nrsurl.public_name().to_string(),
+                xorurl: the_xor.to_string(),
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
                 version,
@@ -593,7 +593,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
-            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string()?, true, true, false)
+            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string(), true, true, false)
             .await?;
 
         let nrs_url = format!("safe://{}", site_name);
@@ -610,7 +610,7 @@ mod tests {
                 data_type,
                 ..
             } => {
-                assert_eq!(*xorurl, xorurl_encoder.to_string()?);
+                assert_eq!(*xorurl, xorurl_encoder.to_string());
                 assert_eq!(*xorname, xorurl_encoder.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, 0);
@@ -640,7 +640,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
         let (nrs_map_xorurl, _, the_nrs_map) = safe
-            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string()?, true, true, false)
+            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string(), true, true, false)
             .await?;
 
         let nrs_xorurl_encoder = XorUrlEncoder::from_url(&nrs_map_xorurl)?;
@@ -654,7 +654,7 @@ mod tests {
                 resolved_from: Some(nrs_map_container),
                 ..
             } => {
-                assert_eq!(*xorurl, xorurl_encoder.to_string()?);
+                assert_eq!(*xorurl, xorurl_encoder.to_string());
                 assert_eq!(nrs_map_container.xorname, nrs_xorurl_encoder.xorname());
                 assert_eq!(nrs_map_container.version, 0);
                 assert_eq!(nrs_map_container.type_tag, 1_500);
@@ -761,7 +761,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
-            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string()?, true, true, false)
+            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string(), true, true, false)
             .await?;
 
         let nrs_url = format!("safe://{}/test.md", site_name);
@@ -819,6 +819,7 @@ mod tests {
         let type_tag = 575_756_443;
         let xorurl = XorUrlEncoder::encode(
             xorname,
+            None,
             type_tag,
             SafeDataType::UnpublishedImmutableData,
             SafeContentType::Raw,
@@ -869,6 +870,7 @@ mod tests {
         let type_tag = 575_756_443;
         let xorurl = XorUrlEncoder::encode(
             xorname,
+            None,
             type_tag,
             SafeDataType::UnpublishedImmutableData,
             SafeContentType::MediaType("text/html".to_string()),
@@ -923,7 +925,7 @@ mod tests {
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
         xorurl_encoder.set_path(path);
-        match safe.fetch(&xorurl_encoder.to_string()?, None).await {
+        match safe.fetch(&xorurl_encoder.to_string(), None).await {
             Ok(c) => {
                 return Err(Error::Unexpected(format!(
                     "Unxpected fetched content: {:?}",
@@ -946,7 +948,7 @@ mod tests {
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_path("/some_relative_filepath");
-        let url_with_path = xorurl_encoder.to_string()?;
+        let url_with_path = xorurl_encoder.to_string();
         match safe.fetch(&url_with_path, None).await {
             Ok(c) => {
                 return Err(Error::Unexpected(format!(

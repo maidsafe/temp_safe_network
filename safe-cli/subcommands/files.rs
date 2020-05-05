@@ -253,7 +253,7 @@ pub async fn files_commander(
                         Ok(mut xorurl_encoder) => {
                             xorurl_encoder.set_content_version(Some(version));
                             xorurl_encoder.set_path("");
-                            xorurl_encoder.to_string()?
+                            xorurl_encoder.to_string()
                         }
                         Err(_) => target,
                     };
@@ -434,7 +434,7 @@ fn print_serialized_output(
     let url = match XorUrlEncoder::from_url(&xorurl) {
         Ok(mut xorurl_encoder) => {
             xorurl_encoder.set_content_version(Some(version));
-            xorurl_encoder.to_string()?
+            xorurl_encoder.to_string()
         }
         Err(_) => xorurl,
     };
@@ -457,7 +457,7 @@ fn output_processed_files_list(
                 Ok(mut xorurl_encoder) => {
                     xorurl_encoder.set_content_version(Some(version));
                     xorurl_encoder.set_path("");
-                    xorurl_encoder.to_string()?
+                    xorurl_encoder.to_string()
                 }
                 Err(_) => target_url,
             };
@@ -710,12 +710,12 @@ fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap), String> {
     let mut filtered_filesmap = FilesMap::default();
     let mut xorurl_encoder = Safe::parse_url(target_url)?;
-    let path = xorurl_encoder.path();
+    let path = xorurl_encoder.path_decoded()?;
 
     let folder_path = if !path.ends_with('/') {
         format!("{}/", path)
     } else {
-        path.to_string()
+        path
     };
 
     let mut total = 0;
@@ -747,9 +747,7 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
                             // then set link to xorurl with path current subfolder
                             let subfolder_path = format!("{}{}", folder_path, subdirs[0]);
                             xorurl_encoder.set_path(&subfolder_path);
-                            let link = xorurl_encoder
-                                .to_string()
-                                .unwrap_or_else(|_| subfolder_path);
+                            let link = xorurl_encoder.to_string();
                             fileitem.insert("link".to_string(), link);
                             fileitem.insert("type".to_string(), "".to_string());
                         }

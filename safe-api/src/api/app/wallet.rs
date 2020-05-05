@@ -65,6 +65,7 @@ impl Safe {
         let xorname = xorname_from_pk(key_pair.pk);
         let xorurl = XorUrlEncoder::encode(
             xorname,
+            None,
             0,
             SafeDataType::SafeKey,
             SafeContentType::Raw,
@@ -1043,7 +1044,7 @@ mod tests {
         // test fail to transfer more than current balance at 'from-firstbaance'
         let mut from_wallet_spendable_balance = XorUrlEncoder::from_url(&from_wallet_xorurl)?;
         from_wallet_spendable_balance.set_path("from-second-balance");
-        let from_spendable_balance = from_wallet_spendable_balance.to_string()?;
+        let from_spendable_balance = from_wallet_spendable_balance.to_string();
         match safe
             .wallet_transfer(
                 "200.6",
@@ -1142,7 +1143,7 @@ mod tests {
         // test successful transfer to 'to-second-balance'
         let mut to_wallet_spendable_balance = XorUrlEncoder::from_url(&to_wallet_xorurl)?;
         to_wallet_spendable_balance.set_path("to-second-balance");
-        let to_spendable_balance = to_wallet_spendable_balance.to_string()?;
+        let to_spendable_balance = to_wallet_spendable_balance.to_string();
         match safe
             .wallet_transfer(
                 "100.5",

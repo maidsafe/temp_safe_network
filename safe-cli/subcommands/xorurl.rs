@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
-use safe_api::{xorurl::XorUrlEncoder, Safe};
+use safe_api::{xorurl::SafeUrl, Safe};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'
@@ -36,28 +36,32 @@ pub async fn xorurl_commander(
     match cmd {
         Some(XorurlSubCommands::Decode { xorurl }) => {
             let url = get_from_arg_or_stdin(xorurl, Some("...awaiting XOR-URL from stdin"))?;
-            let xorurl_encoder = XorUrlEncoder::from_url(&url)?;
+            let safeurl = SafeUrl::from_url(&url)?;
             if OutputFmt::Pretty == output_fmt {
-                println!("Information decoded from XOR-URL: {}", url);
-                println!("Xorname: {}", xorname_to_hex(&xorurl_encoder.xorname()));
-                println!("Type tag: {}", xorurl_encoder.type_tag());
-                println!("Native data type: {}", xorurl_encoder.data_type());
-                let path = if xorurl_encoder.path().is_empty() {
-                    "none"
-                } else {
-                    xorurl_encoder.path()
-                };
-                println!("Path: {}", path);
-                println!("Sub names: {:?}", xorurl_encoder.sub_names());
+                let urltype = if safeurl.is_nrsurl() { "nrs" } else { "xor" };
+                println!("Information decoded from SafeUrl: {}", url);
+                println!("UrlType: {}", urltype);
+                println!("Xorname: {}", xorname_to_hex(&safeurl.xorname()));
+                println!("Public Name: {}", safeurl.public_name());
+                if safeurl.is_nrsurl() {
+                    println!("Top Name: {}", safeurl.top_name());
+                }
+                println!("Sub names: {}", safeurl.sub_names());
+                println!("Type tag: {}", safeurl.type_tag());
+                println!("Native data type: {}", safeurl.data_type());
+                println!("Path: {}", safeurl.path_decoded()?);
+                println!("QueryString: {}", safeurl.query_string());
+                println!("QueryPairs: {:?}", safeurl.query_pairs());
+                println!("Fragment: {}", safeurl.fragment());
                 println!(
                     "Content version: {}",
-                    xorurl_encoder
+                    safeurl
                         .content_version()
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "latest".to_string())
                 );
             } else {
-                println!("{}", serialise_output(&xorurl_encoder, output_fmt));
+                println!("{}", serialise_output(&safeurl, output_fmt));
             }
         }
         None => {

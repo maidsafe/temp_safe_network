@@ -74,7 +74,7 @@ impl NrsMap {
         Ok(&self.default)
     }
 
-    pub fn resolve_for_subnames(&self, mut sub_names: Vec<SubName>) -> Result<XorUrl> {
+    pub fn resolve_for_subnames(&self, sub_names: &[SubName]) -> Result<XorUrl> {
         debug!("NRS: Attempting to resolve for subnames {:?}", sub_names);
         let mut nrs_map = self;
         let dereferenced_link: String;
@@ -90,7 +90,7 @@ impl NrsMap {
                 }
                 DefaultRdf::ExistingRdf(sub_name) => {
                     let sub_names = Vec::from_iter(sub_name.split('.').map(String::from));
-                    dereferenced_link = self.resolve_for_subnames(sub_names)?;
+                    dereferenced_link = self.resolve_for_subnames(&sub_names)?;
                     Some(&dereferenced_link)
                 }
                 DefaultRdf::NotSet => None,
@@ -99,12 +99,8 @@ impl NrsMap {
             None
         };
 
-        while !sub_names.is_empty() {
-            let curr_sub_name = sub_names
-                .pop()
-                .ok_or_else(|| Error::Unexpected("Failed to parse NRS name".to_string()))?;
-
-            match nrs_map.sub_names_map.get(&curr_sub_name) {
+        for curr_sub_name in sub_names.iter().rev() {
+            match nrs_map.sub_names_map.get(curr_sub_name) {
                 Some(SubNameRDF::SubName(nrs_sub_map)) => {
                     if nrs_sub_map.sub_names_map.is_empty() {
                         // we need default one then
@@ -164,7 +160,7 @@ impl NrsMap {
             DefaultRdf::OtherRdf(def_data) => def_data.get(FAKE_RDF_PREDICATE_LINK),
             DefaultRdf::ExistingRdf(sub_name) => {
                 let sub_names = Vec::from_iter(sub_name.split('.').map(String::from));
-                dereferenced_link = self.resolve_for_subnames(sub_names).map_err(|_| Error::ContentError(
+                dereferenced_link = self.resolve_for_subnames(&sub_names).map_err(|_| Error::ContentError(
                     format!("Default found for resolvable map (set to sub names '{}') cannot be resolved.", sub_name),
                 ))?;
                 Some(&dereferenced_link)

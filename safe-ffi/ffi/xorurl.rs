@@ -55,14 +55,15 @@ pub unsafe extern "C" fn xorurl_encode(
         let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
         let encoded_xor_url = NativeXorUrlEncoder::encode(
             xor_name,
+            None,
             type_tag,
             data_type_enum,
             content_type_enum,
             url_path,
             sub_names,
+            None,
+            None,
             Some(content_version),
-            None,
-            None,
             encoding_base,
         )?;
         let encoded_string = CString::new(encoded_xor_url)?;
@@ -101,14 +102,15 @@ pub unsafe extern "C" fn xorurl_encoder(
         };
         let encoder = NativeXorUrlEncoder::new(
             xor_name,
+            None,
             type_tag,
             data_type_enum,
             content_type_enum,
             url_path,
             sub_names,
+            None,
+            None,
             Some(content_version),
-            None,
-            None,
         )?;
         let ffi_encoder = xorurl_encoder_into_repr_c(encoder)?;
         o_cb(user_data.0, FFI_RESULT_OK, &ffi_encoder);
