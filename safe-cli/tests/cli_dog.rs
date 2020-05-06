@@ -12,7 +12,7 @@ extern crate safe_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
-use safe_api::fetch::{SafeData, SafeDataType};
+use safe_api::fetch::SafeData;
 use safe_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_files_put_or_sync_output,
 };
@@ -48,23 +48,14 @@ fn calling_safe_dog_files_container_nrsurl() {
         .read()
         .unwrap();
 
-    let content_info: (String, SafeData) = serde_json::from_str(&dog_output)
-        .expect("Failed to parse output of `safe dog` with -ii on file");
-    assert_eq!(content_info.0, nrsurl);
-    if let SafeData::FilesContainer { resolved_from, .. } = content_info.1 {
-        let unwrapped_resolved_from = resolved_from.unwrap();
-        assert_eq!(
-            unwrapped_resolved_from.public_name,
-            nrsurl.replace("safe://", "")
-        );
-        assert_eq!(unwrapped_resolved_from.type_tag, 1500);
-        assert_eq!(unwrapped_resolved_from.version, 0);
-        assert_eq!(
-            unwrapped_resolved_from.data_type,
-            SafeDataType::PublishedSeqAppendOnlyData
-        );
+    let (url, mut content): (String, Vec<SafeData>) =
+        serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
+    assert_eq!(url, nrsurl);
+
+    if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
+        assert_eq!(resolved_from, container_xorurl);
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content_info);
+        panic!("Content retrieved was unexpected: {:?}", content);
     }
 }
 
@@ -102,23 +93,14 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
     .read()
     .unwrap();
 
-    let content_info: (String, SafeData) =
+    let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
-    assert_eq!(content_info.0, nrsurl);
-    if let SafeData::FilesContainer { resolved_from, .. } = content_info.1 {
-        let unwrapped_resolved_from = resolved_from.unwrap();
-        assert_eq!(
-            unwrapped_resolved_from.public_name,
-            nrsurl.replace("safe://", "")
-        );
-        assert_eq!(unwrapped_resolved_from.type_tag, 1500);
-        assert_eq!(unwrapped_resolved_from.version, 0);
-        assert_eq!(
-            unwrapped_resolved_from.data_type,
-            SafeDataType::PublishedSeqAppendOnlyData
-        );
+    assert_eq!(url, nrsurl);
+
+    if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
+        assert_eq!(resolved_from, container_xorurl);
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content_info);
+        panic!("Content retrieved was unexpected: {:?}", content);
     }
 }
 
@@ -151,23 +133,14 @@ fn calling_safe_dog_files_container_nrsurl_yaml() {
         .read()
         .unwrap();
 
-    let content_info: (String, SafeData) =
+    let (url, mut content): (String, Vec<SafeData>) =
         serde_yaml::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
-    assert_eq!(content_info.0, nrsurl);
-    if let SafeData::FilesContainer { resolved_from, .. } = content_info.1 {
-        let unwrapped_resolved_from = resolved_from.unwrap();
-        assert_eq!(
-            unwrapped_resolved_from.public_name,
-            nrsurl.replace("safe://", "")
-        );
-        assert_eq!(unwrapped_resolved_from.type_tag, 1500);
-        assert_eq!(unwrapped_resolved_from.version, 0);
-        assert_eq!(
-            unwrapped_resolved_from.data_type,
-            SafeDataType::PublishedSeqAppendOnlyData
-        );
+    assert_eq!(url, nrsurl);
+
+    if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
+        assert_eq!(resolved_from, container_xorurl);
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content_info);
+        panic!("Content retrieved was unexpected: {:?}", content);
     }
 }
 
@@ -191,20 +164,13 @@ fn calling_safe_dog_safekey_nrsurl() {
         .read()
         .unwrap();
 
-    let content_info: (String, SafeData) = serde_json::from_str(&dog_output)
-        .expect("Failed to parse output of `safe dog` with -ii on file");
-    assert_eq!(content_info.0, nrsurl);
-    if let SafeData::SafeKey { resolved_from, .. } = content_info.1 {
-        let unwrapped_resolved_from = resolved_from.unwrap();
-        assert_eq!(
-            unwrapped_resolved_from.public_name,
-            nrsurl.replace("safe://", "")
-        );
-        assert_eq!(
-            unwrapped_resolved_from.data_type,
-            SafeDataType::PublishedSeqAppendOnlyData
-        );
+    let (url, mut content): (String, Vec<SafeData>) =
+        serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
+    assert_eq!(url, nrsurl);
+
+    if let Some(SafeData::SafeKey { resolved_from, .. }) = content.pop() {
+        assert_eq!(resolved_from, safekey_xorurl);
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content_info);
+        panic!("Content retrieved was unexpected: {:?}", content);
     }
 }

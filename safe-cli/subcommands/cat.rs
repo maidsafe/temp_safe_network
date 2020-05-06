@@ -8,7 +8,7 @@
 // Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, serialise_output},
+    helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output},
     OutputFmt,
 };
 use log::debug;
@@ -89,8 +89,19 @@ pub async fn cat_commander(
                 println!("{}", serialise_output(&(url, balances), output_fmt));
             }
         }
-        SafeData::NrsMapContainer { .. } => {
-            println!("No content to show since the URL targets a NrsMapContainer. Use the 'dog' command to obtain additional information about the targeted NrsMapContainer.");
+        SafeData::NrsMapContainer {
+            public_name,
+            version,
+            nrs_map,
+            ..
+        } => {
+            // Render NRS Map Container
+            if OutputFmt::Pretty == output_fmt {
+                println!("NRS Map Container (version {}) at \"{}\":", version, url);
+                print_nrs_map(&nrs_map, public_name);
+            } else {
+                println!("{}", serialise_output(&(url, nrs_map), output_fmt));
+            }
         }
         SafeData::SafeKey { .. } => {
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");

@@ -9,7 +9,6 @@
 
 use super::{
     consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
-    fetch::SafeData,
     helpers::gen_timestamp_nanos,
     nrs_map::NrsMap,
     xorurl::SafeContentType,
@@ -39,40 +38,49 @@ impl Safe {
     }
 
     // Parses a safe:// URL and returns all the info in a XorUrlEncoder instance.
-    // It also returns a second XorUrlEncoder if the URL was resolved as NRS-URL,
+    // It also returns a second XorUrlEncoder if the URL was resolved from an NRS-URL,
     // this second XorUrlEncoder instance contains the information of the parsed NRS-URL.
     pub async fn parse_and_resolve_url(
         &self,
         url: &str,
     ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {
-        let mut resolution_chain = self
-            .retrieve_from_url(url, false, None, None)
-            .await
-            .map_err(|_| {
-                Error::InvalidInput(
-                    "The location couldn't be resolved from the NRS URL provided".to_string(),
-                )
-            })?;
+        // We don't want to resolve the path, so let's make sure it's
+        // removed from the URL before trying to resolve it
+        let mut xorurl_encoder = Safe::parse_url(url)?;
+        let orig_path = xorurl_encoder.path_decoded()?;
+        xorurl_encoder.set_path("");
 
-        // Construct return data using the last and first items from the resolution chain
-        let xorurl = match resolution_chain.pop() {
-            Some(SafeData::NrsMapContainer { .. }) => {
-                // weird...last element should not be an NRS Map as it should have been resolved...
-                // it could be a thrid-party app corrupting resolvable content data or format
+        // Obtain the resolution chain up to the point where we find the first
+        // content which is not an NRS Map Container
+        let mut resolution_chain = self
+            .retrieve_from_url(
+                &xorurl_encoder.to_string(),
+                false,
+                None,
+                Some(SafeContentType::NrsMapContainer),
+            )
+            .await?;
+
+        // The resolved content is the last item in the resolution chain we obtained
+        let safe_data = match resolution_chain.pop() {
+            Some(safe_data) => Ok(safe_data),
+            None => {
+                // weird...it didn't fail but it returned an empty list...
                 Err(Error::Unexpected(format!("Failed to resolve {}", url)))
             }
-            None => Err(Error::Unexpected(format!("Failed to resolve {}", url))),
-            Some(other_safe_data) => Ok(other_safe_data.xorurl()),
         }?;
 
+        // If there is still one more item in the chain, that's the NRS Map Container
+        // targeted by the URL and where the whole resolution started from
         if resolution_chain.is_empty() {
-            Ok((XorUrlEncoder::from_url(&xorurl)?, None))
+            let mut xorurl_encoder = XorUrlEncoder::from_url(&safe_data.xorurl())?;
+            xorurl_encoder.set_path(&orig_path);
+            Ok((xorurl_encoder, None))
         } else {
-            let nrsmap_xorul_encoder = XorUrlEncoder::from_url(&resolution_chain[0].xorurl())?;
-            Ok((
-                XorUrlEncoder::from_url(&xorurl)?,
-                Some(nrsmap_xorul_encoder),
-            ))
+            let mut nrsmap_xorul_encoder = XorUrlEncoder::from_url(&resolution_chain[0].xorurl())?;
+            nrsmap_xorul_encoder.set_path(&orig_path);
+            let xorurl_encoder = XorUrlEncoder::from_url(&safe_data.resolved_from())?;
+            Ok((xorurl_encoder, Some(nrsmap_xorul_encoder)))
         }
     }
 

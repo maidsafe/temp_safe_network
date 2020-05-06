@@ -8,11 +8,10 @@
 // Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, serialise_output, xorname_to_hex},
+    helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output, xorname_to_hex},
     OutputFmt,
 };
 use log::debug;
-use prettytable::Table;
 use safe_api::{fetch::SafeData, Safe};
 use structopt::StructOpt;
 
@@ -30,58 +29,45 @@ pub async fn dog_commander(
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running dog for: {:?}", &url);
 
-    let content = safe.inspect(&url).await?;
-    for (i, ref c) in content.iter().enumerate() {
-        println!();
-        println!("== URL resolution step {} ==", i + 1);
-        match c {
-            SafeData::NrsMapContainer {
-                public_name,
-                xorurl,
-                xorname,
-                type_tag,
-                version,
-                nrs_map,
-                data_type,
-                resolved_from,
-            } => {
-                if resolved_from != xorurl {
-                    println!("Resolved from: {}", resolved_from);
+    let resolved_content = safe.inspect(&url).await?;
+    if OutputFmt::Pretty != output_fmt {
+        println!("{}", serialise_output(&(url, resolved_content), output_fmt));
+    } else {
+        for (i, ref content) in resolved_content.iter().enumerate() {
+            println!();
+            println!("== URL resolution step {} ==", i + 1);
+            match content {
+                SafeData::NrsMapContainer {
+                    public_name,
+                    xorurl,
+                    xorname,
+                    type_tag,
+                    version,
+                    nrs_map,
+                    data_type,
+                    resolved_from,
+                } => {
+                    if resolved_from != xorurl {
+                        println!("Resolved from: {}", resolved_from);
+                    }
+                    println!("= NRS Map Container =");
+                    println!("PublicName: \"{}\"", public_name);
+                    println!("XOR-URL: {}", xorurl);
+                    println!("Version: {}", version);
+                    println!("Type tag: {}", type_tag);
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!("Native data type: {}", data_type);
+                    print_nrs_map(&nrs_map, &public_name);
                 }
-                println!("= NRS Map Container =");
-                println!("PublicName: \"{}\"", public_name);
-                println!("XOR-URL: {}", xorurl);
-                println!("Version: {}", version);
-                println!("Type tag: {}", type_tag);
-                println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                println!("Native data type: {}", data_type);
-
-                let mut table = Table::new();
-                table.add_row(
-                    row![bFg->"NRS name/subname", bFg->"Created", bFg->"Modified", bFg->"Link"],
-                );
-
-                let summary = nrs_map.get_map_summary();
-                summary.iter().for_each(|(name, rdf_info)| {
-                    table.add_row(row![
-                        format!("{}{}", name, public_name),
-                        rdf_info["created"],
-                        rdf_info["modified"],
-                        rdf_info["link"],
-                    ]);
-                });
-                table.printstd();
-            }
-            SafeData::FilesContainer {
-                xorurl,
-                xorname,
-                type_tag,
-                version,
-                data_type,
-                resolved_from,
-                ..
-            } => {
-                if OutputFmt::Pretty == output_fmt {
+                SafeData::FilesContainer {
+                    xorurl,
+                    xorname,
+                    type_tag,
+                    version,
+                    data_type,
+                    resolved_from,
+                    ..
+                } => {
                     if resolved_from != xorurl {
                         println!("Resolved from: {}", resolved_from);
                     }
@@ -91,30 +77,14 @@ pub async fn dog_commander(
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
-                // print_resolved_from(100, resolved_from);
-                //} else if resolved_from.is_some() {
-                //    println!("{}", serialise_output(&(url, content), output_fmt));
-                } else {
-                    let jsonv = serde_json::json!([
-                        url,
-                        {
-                            "data_type": data_type,
-                            "version": version,
-                            "type_tag": type_tag,
-                            "xorname": xorname_to_hex(xorname)
-                        }
-                    ]);
-                    println!("{}", serialise_output(&jsonv, output_fmt));
                 }
-            }
-            SafeData::PublishedImmutableData {
-                xorurl,
-                xorname,
-                media_type,
-                resolved_from,
-                ..
-            } => {
-                if OutputFmt::Pretty == output_fmt {
+                SafeData::PublishedImmutableData {
+                    xorurl,
+                    xorname,
+                    media_type,
+                    resolved_from,
+                    ..
+                } => {
                     if resolved_from != xorurl {
                         println!("Resolved from: {}", resolved_from);
                     }
@@ -126,30 +96,15 @@ pub async fn dog_commander(
                         "Media type: {}",
                         media_type.clone().unwrap_or_else(|| "Unknown".to_string())
                     );
-                // print_resolved_from(100, resolved_from);
-                //} else if resolved_from.is_some() {
-                //    println!("{}", serialise_output(&(url, content), output_fmt));
-                } else {
-                    let jsonv = serde_json::json!([
-                        url,
-                        {
-                            "data_type": "PublishedImmutableData",
-                            "media_type": media_type.clone().unwrap_or_else(|| "Unknown".to_string()),
-                            "xorname": xorname_to_hex(xorname)
-                        }
-                    ]);
-                    println!("{}", serialise_output(&jsonv, output_fmt));
                 }
-            }
-            SafeData::Wallet {
-                xorurl,
-                xorname,
-                type_tag,
-                data_type,
-                resolved_from,
-                ..
-            } => {
-                if OutputFmt::Pretty == output_fmt {
+                SafeData::Wallet {
+                    xorurl,
+                    xorname,
+                    type_tag,
+                    data_type,
+                    resolved_from,
+                    ..
+                } => {
                     if resolved_from != xorurl {
                         println!("Resolved from: {}", resolved_from);
                     }
@@ -158,27 +113,12 @@ pub async fn dog_commander(
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
-                // print_resolved_from(100, resolved_from);
-                //} else if resolved_from.is_some() {
-                //    println!("{}", serialise_output(&(url, content), output_fmt));
-                } else {
-                    let jsonv = serde_json::json!([
-                        url,
-                        {
-                            "data_type": data_type,
-                            "type_type": type_tag,
-                            "xorname": xorname_to_hex(xorname)
-                        }
-                    ]);
-                    println!("{}", serialise_output(&jsonv, output_fmt));
                 }
-            }
-            SafeData::SafeKey {
-                xorurl,
-                xorname,
-                resolved_from,
-            } => {
-                if OutputFmt::Pretty == output_fmt {
+                SafeData::SafeKey {
+                    xorurl,
+                    xorname,
+                    resolved_from,
+                } => {
                     if resolved_from != xorurl {
                         println!("Resolved from: {}", resolved_from);
                     }
@@ -186,23 +126,11 @@ pub async fn dog_commander(
                     println!("XOR-URL: {}", xorurl);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: SafeKey");
-                // print_resolved_from(100, resolved_from);
-                //} else if resolved_from.is_some() {
-                //    println!("{}", serialise_output(&(url, content), output_fmt));
-                } else {
-                    let jsonv = serde_json::json!([
-                        url,
-                        {
-                            "data_type": "SafeKey",
-                            "xorname": xorname_to_hex(xorname)
-                        }
-                    ]);
-                    println!("{}", serialise_output(&jsonv, output_fmt));
                 }
             }
         }
+        println!();
     }
 
-    println!();
     Ok(())
 }

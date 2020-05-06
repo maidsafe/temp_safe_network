@@ -136,10 +136,11 @@ impl Safe {
         debug!("Getting files container from: {:?}", url);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
 
-        self.files_container_fetch(&xorurl_encoder).await
+        self.fetch_files_container(&xorurl_encoder).await
     }
 
-    pub(crate) async fn files_container_fetch(
+    /// Fetch a FilesContainer from a XorUrlEncoder without performing any type of URL resolution
+    pub(crate) async fn fetch_files_container(
         &self,
         xorurl_encoder: &XorUrlEncoder,
     ) -> Result<(u64, FilesMap)> {
@@ -256,9 +257,8 @@ impl Safe {
         // the version from it so we can fetch latest version of it for sync-ing
         xorurl_encoder.set_content_version(None);
 
-        let (current_version, current_files_map): (u64, FilesMap) = self
-            .files_container_get(&xorurl_encoder.to_string())
-            .await?;
+        let (current_version, current_files_map): (u64, FilesMap) =
+            self.fetch_files_container(&xorurl_encoder).await?;
 
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files = file_system_dir_walk(self, location, recursive, true).await?;
@@ -464,9 +464,8 @@ impl Safe {
         // the version from it so we can fetch latest version of it
         xorurl_encoder.set_content_version(None);
 
-        let (current_version, files_map): (u64, FilesMap) = self
-            .files_container_get(&xorurl_encoder.to_string())
-            .await?;
+        let (current_version, files_map): (u64, FilesMap) =
+            self.fetch_files_container(&xorurl_encoder).await?;
 
         let (processed_files, new_files_map, success_count) =
             files_map_remove_path(dest_path, files_map, recursive)?;
@@ -608,11 +607,12 @@ impl Safe {
     pub async fn files_get_published_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-        self.files_published_immutable_fetch(&xorurl_encoder, range)
+        self.fetch_published_immutable_data(&xorurl_encoder, range)
             .await
     }
 
-    pub(crate) async fn files_published_immutable_fetch(
+    /// Fetch an ImmutableData from a XorUrlEncoder without performing any type of URL resolution
+    pub(crate) async fn fetch_published_immutable_data(
         &self,
         xorurl_encoder: &XorUrlEncoder,
         range: Range,
@@ -653,9 +653,8 @@ async fn validate_files_add_params(
     // the version from it so we can fetch latest version of it for sync-ing
     xorurl_encoder.set_content_version(None);
 
-    let (current_version, current_files_map): (u64, FilesMap) = safe
-        .files_container_get(&xorurl_encoder.to_string())
-        .await?;
+    let (current_version, current_files_map): (u64, FilesMap) =
+        safe.fetch_files_container(&xorurl_encoder).await?;
 
     let dest_path = xorurl_encoder.path().to_string();
 
@@ -851,9 +850,7 @@ async fn files_map_sync(
         .normalize();
         // Above normalize removes initial slash, and uses '\' if it's on Windows
         // here, we trim any trailing '/', as it could be a filename.
-        let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()))
-            .trim_end_matches('/')
-            .to_string();
+        let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()));
 
         // Let's update FileItem if there is a change or it doesn't exist in current_files_map
         match current_files_map.get(&normalised_file_name) {
@@ -1302,9 +1299,7 @@ fn files_map_create(
 
         // Above normalize removes initial slash, and uses '\' if it's on Windows
         // here, we trim any trailing '/', as it could be a filename.
-        let final_name = format!("/{}", normalise_path_separator(new_file_name.as_str()))
-            .trim_end_matches('/')
-            .to_string();
+        let final_name = format!("/{}", normalise_path_separator(new_file_name.as_str()));
 
         debug!("FileItem item inserted with filename {:?}", &final_name);
         files_map.insert(final_name.to_string(), file_item);

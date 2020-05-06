@@ -1396,11 +1396,19 @@ mod tests {
     }
 
     #[test]
-    fn test_xorurl_base32_encoding() -> Result<()> {
-        let xorname = XorName(*b"12345678901234567890123456789012");
-        let xorurl = XorUrlEncoder::encode_immutable_data(
-            xorname,
+    fn test_safeurl_base32_encoding() -> Result<()> {
+        let xor_name = XorName(*b"12345678901234567890123456789012");
+        let xorurl = SafeUrl::encode(
+            xor_name,
+            None,
+            0xa632_3c4d_4a32,
+            SafeDataType::PublishedImmutableData,
             SafeContentType::Raw,
+            None,
+            None,
+            None,
+            None,
+            None,
             XorUrlBase::Base32,
         )?;
         let base32_xorurl =

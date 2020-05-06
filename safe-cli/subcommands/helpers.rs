@@ -12,7 +12,7 @@ use ansi_term::Style;
 use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::XorName;
+use safe_api::{nrs_map::NrsMap, XorName};
 use serde::ser::Serialize;
 use std::{
     collections::BTreeMap,
@@ -168,6 +168,23 @@ where
             "OutputFmt::Pretty' not handled by caller, in serialise_output()".to_string()
         }
     }
+}
+
+// Pretty print an NRS Map
+pub fn print_nrs_map(nrs_map: &NrsMap, public_name: &str) {
+    let mut table = Table::new();
+    table.add_row(row![bFg->"NRS name/subname", bFg->"Created", bFg->"Modified", bFg->"Link"]);
+
+    let summary = nrs_map.get_map_summary();
+    summary.iter().for_each(|(name, rdf_info)| {
+        table.add_row(row![
+            format!("{}{}", name, public_name),
+            rdf_info["created"],
+            rdf_info["modified"],
+            rdf_info["link"],
+        ]);
+    });
+    table.printstd();
 }
 
 // returns singular or plural version of string, based on count.

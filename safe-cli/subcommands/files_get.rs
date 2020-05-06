@@ -430,24 +430,19 @@ async fn files_container_get_files(
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
 ) -> ApiResult<(u64, ProcessedFiles)> {
-    let (xorurl_encoder, nrs_encoder) = safe.parse_and_resolve_url(url).await?;
+    let (mut xorurl_encoder, nrs_encoder) = safe.parse_and_resolve_url(url).await?;
 
     // if nrs_encoder is not None, then 'url' is an NRS link and
     // we must append the nrs_url path to the xor_url path
     // to obtain full path within the FileContainer.
     // Else we just use the xor_url path.
-    let resolved_url_encoder = match nrs_encoder {
-        Some(p) => {
-            let mut s = xorurl_encoder.path_decoded()?;
-            s.push_str(&p.path_decoded()?);
-            let mut e = xorurl_encoder.clone();
-            e.set_path(&s);
-            e
-        }
-        None => xorurl_encoder.clone(),
-    };
+    if let Some(p) = nrs_encoder {
+        let mut s = xorurl_encoder.path_decoded()?;
+        s.push_str(&p.path_decoded()?);
+        xorurl_encoder.set_path(&s);
+    }
 
-    let resolved_url = resolved_url_encoder.to_string();
+    let resolved_url = xorurl_encoder.to_string();
 
     // note: files_container_get_matching() also calls safe.parse_and_resolve_url().
     // We should somehow modify the API so this redundancy can be removed as it requires
@@ -460,7 +455,7 @@ async fn files_container_get_files(
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
 
-    let urlpath = resolved_url_encoder.path_decoded()?;
+    let urlpath = xorurl_encoder.path_decoded()?;
 
     let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
 
