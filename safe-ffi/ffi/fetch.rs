@@ -15,7 +15,9 @@ use super::{
         NrsMapContainer, PublishedImmutableData, SafeKey, Wallet,
     },
 };
-use ffi_utils::{catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC};
+use ffi_utils::{
+    catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
+};
 use safe_api::{fetch::SafeData, Safe};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
@@ -66,30 +68,23 @@ pub unsafe extern "C" fn inspect(
     app: *mut Safe,
     url: *const c_char,
     user_data: *mut c_void,
-    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
-    o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
-    o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
-    o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
-    o_nrs_map_container: extern "C" fn(user_data: *mut c_void, data: *const NrsMapContainer),
-    o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        inspect_result: *const c_char,
+    ),
 ) {
-    catch_unwind_cb(user_data, o_err, || -> Result<()> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
+        let user_data = OpaqueCtx(user_data);
         let url = String::clone_from_repr_c(url)?;
-        let content = async_std::task::block_on((*app).inspect(&url));
-        // TODO: deal with vec<SafeData> type.
-        invoke_callback(
-            content,
-            user_data,
-            o_published,
-            o_wallet,
-            o_keys,
-            o_container,
-            o_nrs_map_container,
-            o_err,
-        )
+        let content = async_std::task::block_on((*app).inspect(&url))?;
+        let content_json = CString::new(serde_json::to_string(&content)?)?;
+        o_cb(user_data.0, FFI_RESULT_OK, content_json.as_ptr());
+        Ok(())
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 unsafe fn invoke_callback(
     content: safe_api::Result<SafeData>,
     user_data: *mut c_void,
@@ -187,7 +182,7 @@ unsafe fn invoke_callback(
                 xorname: xorname.0,
                 type_tag: *type_tag,
                 version: *version,
-                nrs_map: CString::new(nrs_map_json.clone())?.into_raw(),
+                nrs_map: CString::new(nrs_map_json)?.into_raw(),
                 data_type: (*data_type).clone() as u64,
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
