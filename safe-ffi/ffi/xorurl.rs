@@ -22,7 +22,7 @@ use std::{
 };
 
 #[no_mangle]
-pub unsafe extern "C" fn xorurl_encode(
+pub unsafe extern "C" fn safe_url_encode(
     name: *const XorNameArray,
     nrs_name: *const c_char,
     type_tag: u64,
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn xorurl_encode(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn xorurl_encoder(
+pub unsafe extern "C" fn new_safe_url(
     name: *const XorNameArray,
     nrs_name: *const c_char,
     type_tag: u64,
@@ -125,15 +125,15 @@ pub unsafe extern "C" fn xorurl_encoder(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn xorurl_encoder_from_url(
-    xor_url: *const c_char,
+pub unsafe extern "C" fn safe_url_from_url(
+    safe_url: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, safe_url: *const SafeUrl),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let xor_url = String::clone_from_repr_c(xor_url)?;
-        let safe_url = NativeSafeUrl::from_url(&xor_url)?;
+        let safe_url_str = String::clone_from_repr_c(safe_url)?;
+        let safe_url = NativeSafeUrl::from_url(&safe_url_str)?;
         let ffi_encoder = safe_url_into_repr_c(safe_url)?;
         o_cb(user_data.0, FFI_RESULT_OK, &ffi_encoder);
         Ok(())
