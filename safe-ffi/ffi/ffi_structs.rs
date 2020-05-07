@@ -137,6 +137,7 @@ pub struct PublishedImmutableData {
     pub data: *const u8,
     pub data_len: usize,
     pub media_type: *const c_char,
+    pub metadata: *const c_char,
     pub resolved_from: *const c_char,
 }
 
@@ -149,6 +150,10 @@ impl Drop for PublishedImmutableData {
 
             if !self.media_type.is_null() {
                 let _ = CString::from_raw(self.media_type as *mut _);
+            }
+
+            if !self.metadata.is_null() {
+                let _ = CString::from_raw(self.metadata as *mut _);
             }
 
             if !self.resolved_from.is_null() {

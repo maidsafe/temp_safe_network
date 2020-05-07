@@ -16,6 +16,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, T
 use log::{debug, info, trace, warn};
 use safe_api::{
     fetch::Range,
+    fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
     xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result as ApiResult, Safe,
@@ -407,19 +408,6 @@ fn prompt_yes_no(prompt_msg: &str, default: &str) -> bool {
     }
 }
 
-/// # Downloads files within a FilesContainer that match the xorurl path component and writes them to disk, preserving paths.
-///
-/// TODO: In the future, this will have options for preserving symlinks and
-/// file attributes.
-/// ```
-async fn files_container_get_matching(safe: &Safe, url: &str) -> ApiResult<(u64, FilesMap)> {
-    let (version, files_map) = safe.files_container_get(&url).await?;
-
-    let filtered_filesmap = filter_files_map_by_xorurl_path(&files_map, &url, |_, _| None)?;
-
-    Ok((version, filtered_filesmap))
-}
-
 /// # Downloads all files within a FilesContainer and writes them to disk, preserving paths.
 ///
 /// TODO: In the future, this will have options for preserving symlinks and
@@ -430,35 +418,38 @@ async fn files_container_get_files(
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
 ) -> ApiResult<(u64, ProcessedFiles)> {
-    let (mut xorurl_encoder, nrs_encoder) = safe.parse_and_resolve_url(url).await?;
-
-    // if nrs_encoder is not None, then 'url' is an NRS link and
-    // we must append the nrs_url path to the xor_url path
-    // to obtain full path within the FileContainer.
-    // Else we just use the xor_url path.
-    if let Some(p) = nrs_encoder {
-        let mut s = xorurl_encoder.path_decoded()?;
-        s.push_str(&p.path_decoded()?);
-        xorurl_encoder.set_path(&s);
-    }
-
-    let resolved_url = xorurl_encoder.to_string();
-
-    // note: files_container_get_matching() also calls safe.parse_and_resolve_url().
-    // We should somehow modify the API so this redundancy can be removed as it requires
-    // unnecessary network requests.
-    let (version, files_map) = files_container_get_matching(&safe, &resolved_url).await?;
-
     debug!("Getting files in container {:?}", url);
-    debug!("resolved url is {:?}", &resolved_url);
+    let (version, files_map) = match safe.fetch(url, None).await? {
+        SafeData::FilesContainer {
+            version, files_map, ..
+        } => (version, files_map),
+        SafeData::PublishedImmutableData { metadata, .. } => {
+            if let Some(file_item) = metadata {
+                let mut files_map = FilesMap::new();
+                files_map.insert("".to_string(), file_item);
+                (0, files_map)
+            } else {
+                // TODO: support it even if no stats are shown of the file being downloaded
+                return Err(Error::ContentError(
+                    "You can target files only by providing a FilesContainer with the file's path."
+                        .to_string(),
+                ));
+            }
+        }
+        _other_type => {
+            return Err(Error::ContentError(
+                "Make sure the URL targets a FilesContainer.".to_string(),
+            ))
+        }
+    };
 
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
 
+    let xorurl_encoder = XorUrlEncoder::from_url(&url)?;
     let urlpath = xorurl_encoder.path_decoded()?;
 
     let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
-
     // This is a constraint to verify that parent of dirpath exists.
     // Without this check, files_map_get_files() will happily create
     // any missing dirs, which "might" be ok.  However, unix 'cp'
@@ -466,7 +457,7 @@ async fn files_container_get_files(
     // surprising users.
     ensure_parent_dir_exists(&root)?;
 
-    let processed_files = files_map_get_files(&safe, &files_map, &urlpath, &root, callback).await?;
+    let processed_files = files_map_get_files(&safe, &files_map, &root, callback).await?;
     Ok((version, processed_files))
 }
 
@@ -567,7 +558,6 @@ fn ensure_parent_dir_exists(path: &str) -> ApiResult<()> {
 async fn files_map_get_files(
     safe: &Safe,
     files_map: &FilesMap,
-    sourcepath: &str,
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
 ) -> ApiResult<ProcessedFiles> {
@@ -589,13 +579,9 @@ async fn files_map_get_files(
     for (idx, (path, details)) in files_map.iter().enumerate() {
         // fetch xorurl and write to path.  directory paths created if needed.
 
-        // Here, we rely/assume that the FilesMap has already been filtered
-        // so that only files matching source_relpath prefix are present.
-        let source_relpath = &path[sourcepath.len()..];
-
         let xorurl = &details["link"];
-        let abspath = if !source_relpath.is_empty() {
-            dpath.join(source_relpath.trim_matches('/'))
+        let abspath = if !path.is_empty() {
+            dpath.join(path.trim_matches('/'))
         } else {
             dpath.to_path_buf()
         };
@@ -660,71 +646,6 @@ async fn files_map_get_files(
     }
 
     Ok(processed_files)
-}
-
-/// # Filter out file items outside of xorurl path
-///
-/// This function accepts a callback/closure that can optionally
-/// translate paths in the filtered FilesMap that is returned.
-///
-/// The callback accepts 1: xorurl_path, and 2: path from input FilesMap.
-/// It returns a modified path, or None.
-///
-/// The xorurl_path is the optional path component of an XorUrl, eg in
-/// safe://hnyynyiy3wc3ciagtspu9ntb78rce5r994pjhhbx9jo9cjedkchu6ug9zqbnc/testdata/subfolder
-/// the xorurl_path is /testdata/subfolder
-///
-/// Todo: this API should/will interpret and filter by wildcard, and accept
-/// ranges and sets, as bash does, eg *.txt, photo{1,3,5}.jpg, photo{1-3}.jpg
-///
-pub fn filter_files_map_by_xorurl_path(
-    files_map: &FilesMap,
-    target_url: &str,
-    mut callback: impl FnMut(&str, &str) -> Option<String>,
-) -> ApiResult<FilesMap> {
-    let xorurl_encoder = Safe::parse_url(target_url)?;
-
-    let path = xorurl_encoder.path_decoded()?;
-
-    Ok(filter_files_map_by_path(files_map, &path, |fmpath| {
-        callback(&path, &fmpath)
-    }))
-}
-
-/// # Filter out file items outside of path
-///
-/// This function accepts a callback/closure that can optionally
-/// translate paths in the filtered FilesMap that is returned.
-///
-/// The callback accepts 1: xorurl_path, and 2: path from input FilesMap.
-/// It returns a modified path, or None.
-///
-/// The xorurl_path is the optional path component of an XorUrl, eg in
-/// safe://hnyynyiy3wc3ciagtspu9ntb78rce5r994pjhhbx9jo9cjedkchu6ug9zqbnc/testdata/subfolder
-/// the xorurl_path is /testdata/subfolder
-///
-/// Todo: this API should/will interpret and filter by wildcard, and accept
-/// ranges and sets, as bash does, eg *.txt, photo{1,3,5}.jpg, photo{1-3}.jpg
-fn filter_files_map_by_path(
-    files_map: &FilesMap,
-    path: &str,
-    mut callback: impl FnMut(&str) -> Option<String>,
-) -> FilesMap {
-    let mut filtered_filesmap = FilesMap::default();
-
-    files_map.iter().for_each(|(filepath, fileitem)| {
-        if filepath
-            .trim_end_matches('/')
-            .starts_with(&path.trim_end_matches('/'))
-        {
-            let filtered_path = match callback(&filepath) {
-                Some(p) => p,
-                None => filepath.to_string(),
-            };
-            filtered_filesmap.insert(filtered_path, fileitem.clone());
-        }
-    });
-    filtered_filesmap
 }
 
 // Downloads a file from the network to a given file path

@@ -8,9 +8,7 @@
 // Software.
 
 use super::{
-    files_get::{
-        filter_files_map_by_xorurl_path, process_get_command, FileExistsAction, ProgressIndicator,
-    },
+    files_get::{process_get_command, FileExistsAction, ProgressIndicator},
     helpers::{
         gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, if_tty, notice_dry_run,
         parse_stdin_arg, pluralize, serialise_output,
@@ -18,15 +16,16 @@ use super::{
     OutputFmt,
 };
 use ansi_term::Colour;
+use log::debug;
 use prettytable::{format::FormatBuilder, Table};
 use safe_api::{
+    fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
     xorurl::{XorUrl, XorUrlEncoder},
     Safe,
 };
 use serde::Serialize;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use structopt::StructOpt;
 
 type FileDetails = BTreeMap<String, String>;
@@ -375,32 +374,18 @@ async fn process_tree_command(
 ) -> Result<(), String> {
     let target_url = get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
-    let (_version, files_map) = safe
-        .files_container_get(&target_url)
-        .await
-        .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
-
-    let filtered_filesmap =
-        filter_files_map_by_xorurl_path(&files_map, &target_url, |urlpath, fmpath| {
-            // remove urlpath from translated path
-            // eg, urlpath:  /project/src/module
-            //      fmpath:  /project/src/module/submod/foo.rs
-            //  translated:  /submod/foo.rs
-            if !urlpath.is_empty() {
-                let mut newpath = fmpath.to_string();
-                newpath.replace_range(..urlpath.len(), "");
-                Some(newpath)
-            } else {
-                None
-            }
-        })?;
+    debug!("Getting files in container {:?}", target_url);
+    let files_map = match safe.fetch(&target_url, None).await? {
+        SafeData::FilesContainer { files_map, .. } => files_map,
+        _other_type => return Err("Make sure the URL targets a FilesContainer.".to_string()),
+    };
 
     // Create a top/root node representing `target_url`.
     let mut top = FileTreeNode::new(&target_url, FileTreeNodeType::Directory, Option::None);
     // Transform flat list in `files_map` to a hierarchy in `top`
     let mut files: u64 = 0;
     let mut dirs: u64 = 0;
-    for (name, file_details) in filtered_filesmap.iter() {
+    for (name, file_details) in files_map.iter() {
         let path_parts: Vec<String> = name
             .to_string()
             .trim_matches('/')

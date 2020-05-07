@@ -7,7 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{files::FilesMap, nrs_map::NrsMap, Safe, XorName};
+use super::{
+    files::{FileItem, FilesMap},
+    nrs_map::NrsMap,
+    Safe, XorName,
+};
 pub use super::{
     wallet::WalletSpendableBalances,
     xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder},
@@ -50,6 +54,7 @@ pub enum SafeData {
         xorname: XorName,
         data: Vec<u8>,
         media_type: Option<String>,
+        metadata: Option<FileItem>,
         resolved_from: String,
     },
     NrsMapContainer {
@@ -198,9 +203,9 @@ impl Safe {
         // Let's create a list keeping track each of the resolution hops we go through
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         let mut resolution_chain = Vec::<SafeData>::default();
-        let mut next_to_resolve = Some((current_xorurl_encoder, url.to_string()));
+        let mut next_to_resolve = Some((current_xorurl_encoder, url.to_string(), None));
         let mut indirections_count = 0;
-        while let Some((next_xorurl_encoder, next_url)) = next_to_resolve {
+        while let Some((next_xorurl_encoder, next_url, metadata)) = next_to_resolve {
             if indirections_count == INDIRECTION_LIMIT {
                 return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
             }
@@ -210,6 +215,7 @@ impl Safe {
                 &self,
                 &next_url,
                 next_xorurl_encoder,
+                metadata,
                 retrieve_data,
                 range,
             )
@@ -231,13 +237,18 @@ impl Safe {
     }
 }
 
+// This contains information for the next step to be made
+// in each iteration of the resolution process
+type NextStepInfo = (XorUrlEncoder, String, Option<FileItem>);
+
 async fn resolve_one_indirection(
     safe: &Safe,
     url: &str,
     mut the_xor: XorUrlEncoder,
+    metadata: Option<FileItem>,
     retrieve_data: bool,
     range: Range,
-) -> Result<(SafeData, Option<(XorUrlEncoder, String)>)> {
+) -> Result<(SafeData, Option<NextStepInfo>)> {
     let xorurl = the_xor.to_string();
     debug!("Going into a new step in the URL resolution for {}", xorurl);
     match the_xor.content_type() {
@@ -250,17 +261,20 @@ async fn resolve_one_indirection(
                 files_map
             );
 
-            let path = the_xor.path();
+            let path = the_xor.path_decoded()?;
             let (files_map, next) = if path != "/" && !path.is_empty() {
                 // TODO: Move this logic (resolver) to the FilesMap struct
-                match &files_map.get(path) {
+                match &files_map.get(&path) {
                     Some(file_item) => {
                         let (new_target_xorurl, new_target_url) = match file_item.get("link") {
-                            Some(path_data) => (XorUrlEncoder::from_url(path_data)?, path_data.to_string()),
+                            Some(link) => (XorUrlEncoder::from_url(link)?, link.to_string()),
                             None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
                         };
-
-                        (files_map, Some((new_target_xorurl, new_target_url)))
+                        let metadata = (*file_item).clone();
+                        (
+                            files_map,
+                            Some((new_target_xorurl, new_target_url, Some(metadata))),
+                        )
                     }
                     None => {
                         let mut filtered_filesmap = FilesMap::default();
@@ -323,15 +337,16 @@ async fn resolve_one_indirection(
             debug!("Resolved target: {}", target_url);
 
             let mut target_xorurl_encoder = Safe::parse_url(&target_url)?;
-            // Let's concatenate the path correspnding to the URL we are processing
+            // Let's concatenate the path corresponding to the URL we are processing
             // to the URL we resolved from NRS Map
+            let url_path = the_xor.path_decoded()?;
             if target_xorurl_encoder.path().is_empty() {
-                target_xorurl_encoder.set_path(the_xor.path());
+                target_xorurl_encoder.set_path(&url_path);
             } else if !the_xor.path().is_empty() {
                 target_xorurl_encoder.set_path(&format!(
                     "{}{}",
-                    target_xorurl_encoder.path(),
-                    the_xor.path()
+                    target_xorurl_encoder.path_decoded()?,
+                    url_path
                 ));
             }
 
@@ -353,7 +368,10 @@ async fn resolve_one_indirection(
                 resolved_from: url.to_string(),
             };
 
-            Ok((nrs_map_container, Some((target_xorurl_encoder, target_url))))
+            Ok((
+                nrs_map_container,
+                Some((target_xorurl_encoder, target_url, None)),
+            ))
         }
         SafeContentType::Raw => match the_xor.data_type() {
             SafeDataType::SafeKey => {
@@ -365,7 +383,17 @@ async fn resolve_one_indirection(
                 Ok((safe_data, None))
             }
             SafeDataType::PublishedImmutableData => {
-                retrieve_immd(safe, url, the_xor, xorurl, retrieve_data, None, range).await
+                retrieve_immd(
+                    safe,
+                    url,
+                    the_xor,
+                    xorurl,
+                    retrieve_data,
+                    None,
+                    metadata,
+                    range,
+                )
+                .await
             }
             other => Err(Error::ContentError(format!(
                 "Data type '{:?}' not supported yet",
@@ -381,6 +409,7 @@ async fn resolve_one_indirection(
                     xorurl,
                     retrieve_data,
                     Some(media_type_str),
+                    metadata,
                     range,
                 )
                 .await
@@ -411,6 +440,7 @@ async fn resolve_one_indirection(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn retrieve_immd(
     safe: &Safe,
     url: &str,
@@ -418,12 +448,13 @@ async fn retrieve_immd(
     xorurl: String,
     retrieve_data: bool,
     media_type: Option<String>,
+    metadata: Option<FileItem>,
     range: Range,
-) -> Result<(SafeData, Option<(XorUrlEncoder, String)>)> {
+) -> Result<(SafeData, Option<NextStepInfo>)> {
     if !the_xor.path().is_empty() {
         return Err(Error::ContentError(format!(
             "Cannot get relative path of Immutable Data {:?}",
-            the_xor.path()
+            the_xor.path_decoded()?
         )));
     };
 
@@ -438,6 +469,7 @@ async fn retrieve_immd(
         xorname: the_xor.xorname(),
         data,
         media_type,
+        metadata,
         resolved_from: url.to_string(),
     };
 
@@ -653,7 +685,8 @@ mod tests {
                     xorname: xorurl_encoder.xorname(),
                     data: data.to_vec(),
                     resolved_from: xorurl.clone(),
-                    media_type: Some("text/plain".to_string())
+                    media_type: Some("text/plain".to_string()),
+                    metadata: None,
                 }
         );
 
@@ -666,7 +699,8 @@ mod tests {
                     xorname: xorurl_encoder.xorname(),
                     data: vec![],
                     resolved_from: xorurl,
-                    media_type: Some("text/plain".to_string())
+                    media_type: Some("text/plain".to_string()),
+                    metadata: None,
                 }
         );
         Ok(())

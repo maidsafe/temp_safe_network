@@ -21,11 +21,12 @@ const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
 use multibase::{encode, Base};
-use safe_api::xorurl::XorUrlEncoder;
+use safe_api::{xorurl::XorUrlEncoder, Safe};
 use safe_cmd_test_utilities::{
-    parse_files_put_or_sync_output, upload_testfolder_no_trailing_slash,
-    upload_testfolder_trailing_slash, TEST_FOLDER,
+    create_nrs_link, get_random_nrs_string, parse_files_put_or_sync_output,
+    upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, TEST_FOLDER,
 };
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -40,6 +41,46 @@ const NOEXTENSION_PATH: &str = "../testdata/noextension";
 // ----------------------------------------
 // Container URL (without url path) Tests
 // ----------------------------------------
+
+#[test]
+fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
+
+    let td = get_random_nrs_string();
+    let mut xor_url = Safe::parse_url(&files_container_xor)?;
+    xor_url.set_path("/testdata");
+    let td_url = format!("safe://{}", td);
+    println!(
+        "creating testdata nrs link: {} --> {}",
+        td,
+        xor_url.to_string()
+    );
+    let _ = create_nrs_link(&td, &xor_url.to_string())?;
+
+    let sf = get_random_nrs_string();
+    let target = format!("{}/subfolder?v=0", td_url);
+    println!("creating subfolder nrs link: {} --> {}", sf, target);
+    let src = create_nrs_link(&sf, &target)?;
+
+    let dest = dest_dir(&[SUBFOLDER]);
+
+    remove_dest(&dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    let src_subfolder = Path::new(TEST_FOLDER).join(SUBFOLDER).display().to_string();
+    println!("src: {}", src_subfolder);
+    println!("dest: {}", dest);
+    assert_eq!(sum_tree(&src_subfolder), sum_tree(&dest));
+
+    Ok(())
+}
 
 // Test:  safe files get <url> /tmp/testdata
 //    src is a container url
@@ -560,7 +601,7 @@ fn files_get_src_path_is_invalid() -> Result<(), String> {
 
     assert!(String::from_utf8_lossy(&cmd_output.stderr)
         .into_owned()
-        .contains("Path not found"));
+        .contains("No data found for path \"/path/is/invalid/\" on the FilesContainer"));
 
     Ok(())
 }

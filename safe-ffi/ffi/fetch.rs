@@ -102,6 +102,7 @@ unsafe fn invoke_callback(
             data,
             xorname,
             media_type,
+            metadata,
             resolved_from,
         }) => {
             let (data, data_len) = vec_into_raw_parts(data.to_vec());
@@ -110,8 +111,10 @@ unsafe fn invoke_callback(
                 xorname: xorname.0,
                 data,
                 data_len,
-                resolved_from: CString::new(resolved_from.clone())?.into_raw(),
                 media_type: CString::new(media_type.clone().unwrap())?.into_raw(),
+                metadata: CString::new(serde_json::to_string(&metadata.clone().unwrap())?)?
+                    .into_raw(),
+                resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
             o_published(user_data.0, &published_data);
         }
