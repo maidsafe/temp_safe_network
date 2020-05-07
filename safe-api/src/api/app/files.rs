@@ -8,13 +8,9 @@
 // Software.
 
 use super::{
-    consts::{
-        CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN, CONTENT_ERROR_SIGN, CONTENT_UPDATED_SIGN,
-        FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
-        FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
-    },
+    consts::*,
     fetch::Range,
-    helpers::{gen_timestamp_nanos, gen_timestamp_secs},
+    helpers::{gen_timestamp_nanos, gen_timestamp_secs, systemtime_to_rfc3339},
     xorurl::{SafeContentType, SafeDataType},
     Safe, SafeApp,
 };
@@ -27,6 +23,9 @@ use relative_path::RelativePath;
 use std::{collections::BTreeMap, fs, path::Path};
 use walkdir::{DirEntry, WalkDir};
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 // Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL
 pub type FileItem = BTreeMap<String, String>;
 
@@ -35,6 +34,185 @@ pub type FilesMap = BTreeMap<String, FileItem>;
 
 // List of files uploaded with details if they were added, updated or deleted from FilesContainer
 pub type ProcessedFiles = BTreeMap<String, (String, String)>;
+
+// Represents file metadata.  Simplifies passing it around.
+// note: all values are String or Option<String>
+// to facilitate use with FileItem.
+pub(crate) struct FileMeta {
+    created: String,
+    modified: String,
+    file_size: String,
+    file_type: String,
+    readonly: Option<String>,
+    mode_bits: Option<String>,
+    original_created: Option<String>,
+    original_modified: Option<String>,
+}
+
+impl FileMeta {
+    // Instantiates FileMeta from a local filesystem path.
+    pub(crate) fn from_path(path: &str) -> Result<Self> {
+        let metadata = fs::metadata(path).map_err(|e| {
+            Error::FileSystemError(format!("Could not read metadata for {}.  {:#?}", path, e))
+        })?;
+
+        // created and modified may not be available on all platforms/filesystems.
+        let original_created = if let Ok(time) = metadata.created() {
+            Some(systemtime_to_rfc3339(&time))
+        } else {
+            None
+        };
+        let original_modified = if let Ok(time) = metadata.modified() {
+            Some(systemtime_to_rfc3339(&time))
+        } else {
+            None
+        };
+        let readonly = Some(metadata.permissions().readonly().to_string());
+
+        // We use 0 as file_size for metadata such as directories, symlinks.
+        let file_size = if metadata.file_type().is_file() {
+            metadata.len().to_string()
+        } else {
+            "0".to_string()
+        };
+
+        #[cfg(windows)]
+        let mode_bits = None; // Todo:  what does git do for windows?
+
+        #[cfg(not(windows))]
+        let mode_bits = Some(metadata.permissions().mode().to_string());
+
+        let s = Self {
+            created: gen_timestamp_secs(),
+            modified: gen_timestamp_secs(),
+            file_size,
+            file_type: get_media_type(Path::new(path), &metadata),
+            readonly,
+            mode_bits,
+            original_created,
+            original_modified,
+        };
+        Ok(s)
+    }
+
+    // Instantiates FileMeta from a FileItem
+    pub(crate) fn from_file_item(file_item: &FileItem) -> Self {
+        // The first 4 must be present, else a crash.
+        // lots of other code relies on this, so big refactor
+        // would be needed to change it.
+        let created = file_item[FAKE_RDF_PREDICATE_CREATED].to_string();
+        let modified = file_item[FAKE_RDF_PREDICATE_MODIFIED].to_string();
+        let file_size = file_item[FAKE_RDF_PREDICATE_SIZE].to_string();
+        let file_type = file_item[FAKE_RDF_PREDICATE_TYPE].to_string();
+
+        // These are all Option<String>
+        let original_created = file_item
+            .get(FAKE_RDF_PREDICATE_ORIGINAL_CREATED)
+            .map(ToOwned::to_owned);
+        let original_modified = file_item
+            .get(FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED)
+            .map(ToOwned::to_owned);
+        let readonly = file_item
+            .get(FAKE_RDF_PREDICATE_READONLY)
+            .map(ToOwned::to_owned);
+        let mode_bits = file_item
+            .get(FAKE_RDF_PREDICATE_MODE_BITS)
+            .map(ToOwned::to_owned);
+
+        Self {
+            created,
+            modified,
+            file_size,
+            file_type,
+            readonly,
+            mode_bits,
+            original_created,
+            original_modified,
+        }
+    }
+
+    // Instantiates FileMeta from just type and size properties.
+    pub(crate) fn from_type_and_size(file_type: &str, file_size: &str) -> Self {
+        Self {
+            created: gen_timestamp_secs(),
+            modified: gen_timestamp_secs(),
+            file_size: file_size.to_string(),
+            file_type: file_type.to_string(),
+            readonly: None,
+            mode_bits: None,
+            original_created: None,
+            original_modified: None,
+        }
+    }
+
+    // converts Self to FileItem
+    pub(crate) fn to_file_item(&self) -> FileItem {
+        let mut file_item = FileItem::new();
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_CREATED,
+            Some(self.created.clone()),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_MODIFIED,
+            Some(self.modified.clone()),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_SIZE,
+            Some(self.file_size.clone()),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_TYPE,
+            Some(self.file_type.clone()),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_READONLY,
+            self.readonly.clone(),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_MODE_BITS,
+            self.mode_bits.clone(),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_ORIGINAL_CREATED,
+            self.original_created.clone(),
+        );
+        Self::add_to_fileitem(
+            &mut file_item,
+            FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED,
+            self.original_modified.clone(),
+        );
+
+        file_item
+    }
+
+    // returns false if a directory or symlink, true if anything else (a file).
+    pub(crate) fn filetype_is_file(file_type: &str) -> bool {
+        match file_type {
+            MIMETYPE_FILESYSTEM_DIR => false,
+            MIMETYPE_FILESYSTEM_SYMLINK => false,
+            _ => true,
+        }
+    }
+
+    // returns false if a directory or symlink, true if anything else (a file).
+    pub(crate) fn is_file(&self) -> bool {
+        Self::filetype_is_file(&self.file_type)
+    }
+
+    // helper: adds property to FileItem if val.is_some()
+    fn add_to_fileitem(file_item: &mut FileItem, key: &str, val: Option<String>) {
+        if let Some(v) = val {
+            file_item.insert(key.to_string(), v);
+        }
+    }
+}
 
 // Type tag to use for the FilesContainer stored on AppendOnlyData
 const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
@@ -73,7 +251,7 @@ impl Safe {
                 // The FilesContainer is created as a AppendOnlyData with a single entry containing the
                 // timestamp as the entry's key, and the serialised FilesMap as the entry's value
                 // TODO: use RDF format
-                let files_map = files_map_create(&processed_files, path, dest)?;
+                let files_map = files_map_create(&processed_files, path, dest).await?;
                 (processed_files, files_map)
             }
             None => (ProcessedFiles::default(), FilesMap::default()),
@@ -728,25 +906,18 @@ fn get_base_paths(location: &str, dest_path: Option<&str>) -> Result<(String, St
 async fn gen_new_file_item(
     safe: &mut Safe,
     file_path: &Path,
-    file_type: &str,
-    file_size: &str,
-    file_created: Option<&str>,
+    file_meta: &FileMeta,
     link: Option<&str>,
     dry_run: bool,
 ) -> Result<FileItem> {
-    let now = gen_timestamp_secs();
-    let mut file_item = FileItem::new();
-    let xorurl = match link {
-        None => upload_file_to_net(safe, file_path, dry_run).await?,
-        Some(link) => link.to_string(),
-    };
-    file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl);
-    file_item.insert(FAKE_RDF_PREDICATE_TYPE.to_string(), file_type.to_string());
-    file_item.insert(FAKE_RDF_PREDICATE_SIZE.to_string(), file_size.to_string());
-    file_item.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
-    let created = file_created.unwrap_or_else(|| &now);
-    file_item.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), created.to_string());
-
+    let mut file_item = file_meta.to_file_item();
+    if file_meta.is_file() {
+        let xorurl = match link {
+            None => upload_file_to_net(safe, file_path, dry_run).await?,
+            Some(link) => link.to_string(),
+        };
+        file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), xorurl);
+    }
     Ok(file_item)
 }
 
@@ -757,9 +928,7 @@ async fn add_or_update_file_item(
     file_name: &str,
     file_name_for_map: &str,
     file_path: &Path,
-    file_type: &str,
-    file_size: &str,
-    file_created: Option<&str>,
+    file_meta: &FileMeta,
     file_link: Option<&str>,
     name_exists: bool,
     dry_run: bool,
@@ -767,17 +936,7 @@ async fn add_or_update_file_item(
     processed_files: &mut ProcessedFiles,
 ) -> bool {
     // We need to add a new FileItem, let's generate the FileItem first
-    match gen_new_file_item(
-        safe,
-        file_path,
-        file_type,
-        file_size,
-        file_created,
-        file_link,
-        dry_run,
-    )
-    .await
-    {
+    match gen_new_file_item(safe, file_path, file_meta, file_link, dry_run).await {
         Ok(new_file_item) => {
             let content_added_sign = if name_exists {
                 CONTENT_UPDATED_SIGN.to_string()
@@ -788,11 +947,17 @@ async fn add_or_update_file_item(
             debug!("New FileItem item: {:?}", new_file_item);
             debug!("New FileItem item inserted as {:?}", file_name);
             files_map.insert(file_name_for_map.to_string(), new_file_item.clone());
+
             processed_files.insert(
                 file_name.to_string(),
                 (
                     content_added_sign,
-                    new_file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+                    // note: files have link property,
+                    //       dirs and symlinks do not
+                    new_file_item
+                        .get(FAKE_RDF_PREDICATE_LINK)
+                        .unwrap_or(&String::default())
+                        .to_string(),
                 ),
             );
 
@@ -839,8 +1004,6 @@ async fn files_map_sync(
         .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
     {
         let file_path = Path::new(&local_file_name);
-        let (metadata, file_type) = get_metadata(&file_path)?;
-        let file_size = metadata.len().to_string();
 
         let file_name = RelativePath::new(
             &local_file_name
@@ -850,7 +1013,13 @@ async fn files_map_sync(
         .normalize();
         // Above normalize removes initial slash, and uses '\' if it's on Windows
         // here, we trim any trailing '/', as it could be a filename.
-        let normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()));
+        let mut normalised_file_name = format!("/{}", normalise_path_separator(file_name.as_str()))
+            .trim_end_matches('/')
+            .to_string();
+
+        if normalised_file_name.is_empty() {
+            normalised_file_name = "/".to_string();
+        }
 
         // Let's update FileItem if there is a change or it doesn't exist in current_files_map
         match current_files_map.get(&normalised_file_name) {
@@ -861,10 +1030,8 @@ async fn files_map_sync(
                     &local_file_name,
                     &normalised_file_name,
                     &file_path,
-                    &file_type,
-                    &file_size,
-                    None,
-                    None,
+                    &FileMeta::from_path(&local_file_name)?,
+                    None, // no xorurl link
                     false,
                     dry_run,
                     &mut updated_files_map,
@@ -873,11 +1040,29 @@ async fn files_map_sync(
                 .await
                 {
                     success_count += 1;
+
+                    // We remove self and any parent directories
+                    // from the current list so we know it has been processed
+                    let mut trail = Vec::<&str>::new();
+                    for part in normalised_file_name.split('/') {
+                        trail.push(part);
+                        let ancestor = if trail.len() > 1 {
+                            trail.join("/")
+                        } else {
+                            "/".to_string()
+                        };
+                        if ancestor != normalised_file_name {
+                            if let Some(fi) = current_files_map.get(&ancestor) {
+                                updated_files_map.insert(ancestor.clone(), fi.clone());
+                                current_files_map.remove(&ancestor);
+                            }
+                        }
+                    }
                 }
             }
             Some(file_item) => {
                 let is_modified =
-                    is_file_modified(safe, &Path::new(local_file_name), file_item).await;
+                    is_file_item_modified(safe, &Path::new(local_file_name), file_item).await;
                 if force || (compare_file_content && is_modified) {
                     // We need to update the current FileItem
                     if add_or_update_file_item(
@@ -885,10 +1070,8 @@ async fn files_map_sync(
                         &local_file_name,
                         &normalised_file_name,
                         &file_path,
-                        &file_type,
-                        &file_size,
-                        Some(&file_item[FAKE_RDF_PREDICATE_CREATED]),
-                        None,
+                        &FileMeta::from_path(&local_file_name)?,
+                        None, // no xorurl link
                         true,
                         dry_run,
                         &mut updated_files_map,
@@ -920,6 +1103,24 @@ async fn files_map_sync(
 
                 // let's now remove it from the current list so we now it has been processed
                 current_files_map.remove(&normalised_file_name);
+
+                // We also remove any parent directories
+                // from the current list, so they will not be deleted.
+                let mut trail = Vec::<&str>::new();
+                for part in normalised_file_name.split('/') {
+                    trail.push(part);
+                    let ancestor = if trail.len() > 1 {
+                        trail.join("/")
+                    } else {
+                        "/".to_string()
+                    };
+                    if ancestor != normalised_file_name {
+                        if let Some(fi) = current_files_map.get(&ancestor) {
+                            updated_files_map.insert(ancestor.clone(), fi.clone());
+                            current_files_map.remove(&ancestor);
+                        }
+                    }
+                }
             }
         }
     }
@@ -934,7 +1135,12 @@ async fn files_map_sync(
                 file_name.to_string(),
                 (
                     CONTENT_DELETED_SIGN.to_string(),
-                    file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+                    // note: files have link property,
+                    //       dirs and symlinks do not
+                    file_item
+                        .get(FAKE_RDF_PREDICATE_LINK)
+                        .unwrap_or(&String::default())
+                        .to_string(),
                 ),
             );
             success_count += 1;
@@ -944,10 +1150,24 @@ async fn files_map_sync(
     Ok((processed_files, updated_files_map, success_count))
 }
 
-async fn is_file_modified(safe: &mut Safe, local_filename: &Path, file_item: &FileItem) -> bool {
-    match upload_file_to_net(safe, local_filename, true /* dry-run */).await {
-        Ok(local_xorurl) => file_item[FAKE_RDF_PREDICATE_LINK] != local_xorurl,
-        Err(_err) => false,
+async fn is_file_item_modified(
+    safe: &mut Safe,
+    local_filename: &Path,
+    file_item: &FileItem,
+) -> bool {
+    if FileMeta::filetype_is_file(&file_item[FAKE_RDF_PREDICATE_TYPE]) {
+        match upload_file_to_net(safe, local_filename, true /* dry-run */).await {
+            Ok(local_xorurl) => file_item[FAKE_RDF_PREDICATE_LINK] != local_xorurl,
+            Err(_err) => false,
+        }
+    } else {
+        // for now, we just return false if a symlink or directory.
+        // In the future, should check if symlink has been modified.
+        // Also, could check if ctime or mtime is different, though that
+        // could apply to files as well, and some use-cases would not want to
+        // sync remotely if actual content has not changed.  So it should
+        // probably be a user flag to enable.
+        false
     }
 }
 
@@ -980,16 +1200,26 @@ async fn files_map_add_link(
             // Let's update FileItem if the link is different or it doesn't exist in the files_map
             match files_map.get(file_name) {
                 Some(current_file_item) => {
-                    if current_file_item[FAKE_RDF_PREDICATE_LINK] != file_link {
+                    let mut file_meta = FileMeta::from_file_item(&current_file_item);
+                    file_meta.file_type = file_type;
+                    file_meta.file_size = file_size.to_string();
+
+                    let is_modified = if file_meta.is_file() {
+                        current_file_item[FAKE_RDF_PREDICATE_LINK] != file_link
+                    } else {
+                        // directory: nothing to check.
+                        // symlink: TODO: check if sym-link path has changed.
+                        false
+                    };
+
+                    if is_modified {
                         if force {
                             if add_or_update_file_item(
                                 safe,
                                 file_name,
                                 file_name,
                                 &file_path,
-                                &file_type,
-                                &file_size,
-                                None,
+                                &file_meta,
                                 Some(file_link),
                                 true,
                                 true,
@@ -1024,9 +1254,7 @@ async fn files_map_add_link(
                         file_name,
                         file_name,
                         &file_path,
-                        &file_type,
-                        &file_size,
-                        None,
+                        &FileMeta::from_type_and_size(&file_type, &file_size),
                         Some(file_link),
                         false,
                         true,
@@ -1068,7 +1296,12 @@ fn files_map_remove_path(
                     file_path.to_string(),
                     (
                         CONTENT_DELETED_SIGN.to_string(),
-                        file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+                        // note: files have link property,
+                        //       dirs and symlinks do not
+                        file_item
+                            .get(FAKE_RDF_PREDICATE_LINK)
+                            .unwrap_or(&String::default())
+                            .to_string(),
                     ),
                 );
                 success_count += 1;
@@ -1088,7 +1321,12 @@ fn files_map_remove_path(
             dest_path.to_string(),
             (
                 CONTENT_DELETED_SIGN.to_string(),
-                file_item[FAKE_RDF_PREDICATE_LINK].clone(),
+                // note: files have link property,
+                //       dirs and symlinks do not
+                file_item
+                    .get(FAKE_RDF_PREDICATE_LINK)
+                    .unwrap_or(&String::default())
+                    .to_string(),
             ),
         );
         (1, files_map)
@@ -1132,9 +1370,22 @@ fn get_metadata(path: &Path) -> Result<(fs::Metadata, String)> {
     })?;
     debug!("Metadata for location: {:?}", metadata);
 
+    let media_type = get_media_type(path, &metadata);
+    Ok((metadata, media_type))
+}
+
+fn get_media_type(path: &Path, meta: &fs::Metadata) -> String {
+    // see: https://stackoverflow.com/questions/18869772/mime-type-for-a-directory
+    // We will use the FreeDesktop standard for directories and symlinks.
+    //   https://specifications.freedesktop.org/shared-mime-info-spec/shared-mime-info-spec-latest.html#idm140625828597376
+    if meta.file_type().is_dir() {
+        return MIMETYPE_FILESYSTEM_DIR.to_string();
+    } else if meta.file_type().is_symlink() {
+        return MIMETYPE_FILESYSTEM_SYMLINK.to_string();
+    }
     let mime_type = mime_guess::from_path(&path);
     let media_type = mime_type.first_raw().unwrap_or("Raw");
-    Ok((metadata, media_type.to_string()))
+    media_type.to_string()
 }
 
 // Walk the local filesystem starting from `location`, creating a list of files paths,
@@ -1160,16 +1411,39 @@ async fn file_system_dir_walk(
             .filter_entry(|e| not_hidden_and_valid_depth(e, max_depth))
             .filter_map(|v| v.ok());
 
-        for child in children_to_process {
+        for (idx, child) in children_to_process.enumerate() {
             let current_file_path = child.path();
             let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
             info!("Processing {}...", current_path_str);
             let normalised_path = normalise_path_separator(&current_path_str);
             match fs::metadata(&current_file_path) {
                 Ok(metadata) => {
-                    if metadata.is_dir() {
+                    if metadata.file_type().is_dir() {
+                        if idx == 0 && normalised_path.ends_with('/') {
+                            // If the first directory ends with '/' then it is
+                            // the root, and we are only interested in the children,
+                            // so we skip it.
+                            continue;
+                        }
                         // Everything is in the iter. We dont need to recurse.
-                        // so what do we do with dirs? decide if we want to support empty dirs also
+                        //
+                        // so what do we do with dirs? We don't upload them as immutable data.
+                        // They are only a type of metadata in the FileContainer.
+                        // Empty dirs are not reflected in the paths of uploaded files.
+                        // We include dirs with an empty xorurl.
+                        // Callers can inspect the file's metadata.
+                        processed_files.insert(
+                            normalised_path,
+                            (CONTENT_ADDED_SIGN.to_string(), String::default()),
+                        );
+                    } else if metadata.file_type().is_symlink() {
+                        // TODO: allow storing relative symlinks within the uploaded tree
+                        // but disallow symlinks outside the tree, including all absolute symlinks.
+                        // anyway, this code shouldn't exec until follow_links becomes a flag.
+                        processed_files.insert(
+                            normalised_path,
+                            (CONTENT_ADDED_SIGN.to_string(), String::default()),
+                        );
                     } else {
                         match upload_file_to_net(safe, &current_file_path, dry_run).await {
                             Ok(xorurl) => {
@@ -1260,13 +1534,12 @@ async fn file_system_single_file(
 
 // From the provided list of local files paths and corresponding files XOR-URLs,
 // create a FilesMap with file's metadata and their corresponding links
-fn files_map_create(
+async fn files_map_create(
     content: &ProcessedFiles,
     location: &str,
     dest_path: Option<&str>,
 ) -> Result<FilesMap> {
     let mut files_map = FilesMap::default();
-    let now = gen_timestamp_secs();
 
     let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
     for (file_name, (_change, link)) in content
@@ -1274,20 +1547,15 @@ fn files_map_create(
         .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
     {
         debug!("FileItem item name:{:?}", &file_name);
-        let mut file_item = FileItem::new();
-        let file_path = Path::new(&file_name);
-        let (metadata, file_type) = get_metadata(&file_path)?;
+        let file_meta = FileMeta::from_path(&file_name)?;
+        let mut file_item = file_meta.to_file_item();
 
-        file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
-
-        file_item.insert(FAKE_RDF_PREDICATE_TYPE.to_string(), file_type);
-
-        let file_size = &metadata.len().to_string();
-        file_item.insert(FAKE_RDF_PREDICATE_SIZE.to_string(), file_size.to_string());
-
-        // file_item.insert("permissions", metadata.permissions().to_string());
-        file_item.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
-        file_item.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now.clone());
+        if file_meta.is_file() {
+            // parse the link xorurl to validate it.
+            // note: xor-url only, no nrs-url.
+            let _xorurl = XorUrlEncoder::from_xorurl(link)?;
+            file_item.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
+        }
 
         debug!("FileItem item: {:?}", file_item);
         let new_file_name = RelativePath::new(
@@ -1299,9 +1567,11 @@ fn files_map_create(
 
         // Above normalize removes initial slash, and uses '\' if it's on Windows
         // here, we trim any trailing '/', as it could be a filename.
-        let final_name = format!("/{}", normalise_path_separator(new_file_name.as_str()));
+        let final_name = format!("/{}", normalise_path_separator(new_file_name.as_str()))
+            .trim_end_matches('/')
+            .to_string();
 
-        debug!("FileItem item inserted with filename {:?}", &final_name);
+        debug!("FileItem item inserted with path {:?}", &final_name);
         files_map.insert(final_name.to_string(), file_item);
     }
 
@@ -1313,32 +1583,36 @@ mod tests {
     use super::*;
     use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
 
+    // make some constants for these, in case entries in the
+    // testdata folder change.
+    const TESTDATA_PUT_FILEITEM_COUNT: usize = 7;
+    const TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT: usize = 8;
+    const SUBFOLDER_PUT_FILEITEM_COUNT: usize = 2;
+    const SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT: usize = 3;
+
     #[tokio::test]
     async fn test_files_map_create() -> Result<()> {
         let mut processed_files = ProcessedFiles::new();
+        let first_xorurl = XorUrlEncoder::from_url("safe://top_xorurl")?.to_xorurl_string();
+        let second_xorurl = XorUrlEncoder::from_url("safe://second_xorurl")?.to_xorurl_string();
+
         processed_files.insert(
             "../testdata/test.md".to_string(),
-            (
-                CONTENT_ADDED_SIGN.to_string(),
-                "safe://top_xorurl".to_string(),
-            ),
+            (CONTENT_ADDED_SIGN.to_string(), first_xorurl.clone()),
         );
         processed_files.insert(
             "../testdata/subfolder/subexists.md".to_string(),
-            (
-                CONTENT_ADDED_SIGN.to_string(),
-                "safe://second_xorurl".to_string(),
-            ),
+            (CONTENT_ADDED_SIGN.to_string(), second_xorurl.clone()),
         );
-        let files_map = files_map_create(&processed_files, "../testdata", Some(""))?;
+        let files_map = files_map_create(&processed_files, "../testdata", Some("")).await?;
         assert_eq!(files_map.len(), 2);
         let file_item1 = &files_map["/testdata/test.md"];
-        assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], "safe://top_xorurl");
+        assert_eq!(file_item1[FAKE_RDF_PREDICATE_LINK], first_xorurl);
         assert_eq!(file_item1[FAKE_RDF_PREDICATE_TYPE], "text/markdown");
         assert_eq!(file_item1[FAKE_RDF_PREDICATE_SIZE], "12");
 
         let file_item2 = &files_map["/testdata/subfolder/subexists.md"];
-        assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], "safe://second_xorurl");
+        assert_eq!(file_item2[FAKE_RDF_PREDICATE_LINK], second_xorurl);
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_TYPE], "text/markdown");
         assert_eq!(file_item2[FAKE_RDF_PREDICATE_SIZE], "23");
         Ok(())
@@ -1402,8 +1676,8 @@ mod tests {
             .await?;
 
         assert!(xorurl.is_empty());
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1447,8 +1721,8 @@ mod tests {
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1488,8 +1762,8 @@ mod tests {
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1529,8 +1803,8 @@ mod tests {
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1570,8 +1844,8 @@ mod tests {
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1610,8 +1884,8 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
 
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync("../testdata/subfolder/", &xorurl, true, false, false, false)
@@ -1619,7 +1893,10 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 2);
-        assert_eq!(new_files_map.len(), 7);
+        assert_eq!(
+            new_files_map.len(),
+            TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
+        );
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1672,8 +1949,8 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
 
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
@@ -1688,7 +1965,10 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 2);
-        assert_eq!(new_files_map.len(), 7);
+        assert_eq!(
+            new_files_map.len(),
+            TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
+        );
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -1828,8 +2108,8 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
 
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
@@ -1843,8 +2123,11 @@ mod tests {
             .await?;
 
         assert_eq!(version, 1);
-        assert_eq!(new_processed_files.len(), 7);
-        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_processed_files.len(),
+            TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
+        );
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         // first check all previous files were removed
         let file_path1 = "/test.md";
@@ -2019,8 +2302,8 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
 
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_path("path/when/sync");
         let (version, new_processed_files, new_files_map) = safe
@@ -2035,8 +2318,14 @@ mod tests {
             .await?;
 
         assert_eq!(version, 1);
-        assert_eq!(new_processed_files.len(), 2);
-        assert_eq!(new_files_map.len(), 7);
+        assert_eq!(
+            new_processed_files.len(),
+            SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
+        );
+        assert_eq!(
+            new_files_map.len(),
+            TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
+        );
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -2083,8 +2372,8 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
 
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_path("/path/when/sync/");
         let (version, new_processed_files, new_files_map) = safe
@@ -2099,8 +2388,14 @@ mod tests {
             .await?;
 
         assert_eq!(version, 1);
-        assert_eq!(new_processed_files.len(), 2);
-        assert_eq!(new_files_map.len(), 7);
+        assert_eq!(
+            new_processed_files.len(),
+            SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
+        );
+        assert_eq!(
+            new_files_map.len(),
+            TESTDATA_PUT_FILEITEM_COUNT + SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
+        );
 
         let filename1 = "../testdata/test.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -2150,7 +2445,7 @@ mod tests {
         let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
 
         assert_eq!(version, 0);
-        assert_eq!(fetched_files_map.len(), 5);
+        assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), fetched_files_map.len());
         assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
         assert_eq!(files_map["/another.md"], fetched_files_map["/another.md"]);
@@ -2269,6 +2564,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_files_container_create_get_empty_folder() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let (xorurl, _processed_files, files_map) = safe
+            .files_container_create(Some("../testdata/"), None, true, false)
+            .await?;
+
+        let (_version, files_map_get) = safe.files_container_get(&xorurl.to_string()).await?;
+
+        assert_eq!(files_map, files_map_get);
+        assert_eq!(files_map_get["/emptyfolder"], files_map["/emptyfolder"]);
+        assert_eq!(
+            files_map_get["/emptyfolder"]["type"],
+            MIMETYPE_FILESYSTEM_DIR
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_files_container_sync_with_nrs_url() -> Result<()> {
         let mut safe = new_safe_instance()?;
         let (xorurl, _, _) = safe
@@ -2307,7 +2621,7 @@ mod tests {
 
         let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
         assert_eq!(version, 2);
-        assert_eq!(fetched_files_map.len(), 5);
+        assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
         Ok(())
     }
 
@@ -2317,8 +2631,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
-        assert_eq!(processed_files.len(), 2);
-        assert_eq!(files_map.len(), 2);
+        assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
@@ -2332,7 +2646,7 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
         let filename1 = "../testdata/subfolder/subexists.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -2363,8 +2677,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
-        assert_eq!(processed_files.len(), 2);
-        assert_eq!(files_map.len(), 2);
+        assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
@@ -2378,7 +2692,7 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
         // a dry run again should give the exact same results
         let (version2, new_processed_files2, new_files_map2) = safe
@@ -2415,8 +2729,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
-        assert_eq!(processed_files.len(), 2);
-        assert_eq!(files_map.len(), 2);
+        assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT); // root "/" + 2 files
+        assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         match safe
             .files_container_add("../testdata", &xorurl, false, false, false)
@@ -2445,8 +2759,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
-        assert_eq!(processed_files.len(), 2);
-        assert_eq!(files_map.len(), 2);
+        assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         // let's try to add a file with same target name and same content, it should fail
         let (version, new_processed_files, new_files_map) = safe
@@ -2461,7 +2775,7 @@ mod tests {
 
         assert_eq!(version, 0);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(
             new_processed_files["../testdata/subfolder/sub2.md"].1,
             "File named \"/sub2.md\" with same content already exists on target. Use the \'force\' flag to replace it"
@@ -2481,7 +2795,7 @@ mod tests {
 
         assert_eq!(version, 0);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(
             new_processed_files["../testdata/test.md"].1,
             "File named \"/sub2.md\" with different content already exists on target. Use the \'force\' flag to replace it"
@@ -2501,7 +2815,7 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(
             new_processed_files["../testdata/test.md"].0,
             CONTENT_UPDATED_SIGN
@@ -2574,8 +2888,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
-        assert_eq!(processed_files.len(), 2);
-        assert_eq!(files_map.len(), 2);
+        assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let data = b"0123456789";
         let file_xorurl = safe
             .files_put_published_immutable(data, None, false)
@@ -2594,7 +2908,7 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
         let filename1 = "../testdata/subfolder/subexists.md";
         assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
@@ -2637,7 +2951,7 @@ mod tests {
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
         assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
         assert_eq!(
             new_processed_files[new_filename].1,
@@ -2656,8 +2970,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
-        assert_eq!(processed_files.len(), 2);
-        assert_eq!(files_map.len(), 2);
+        assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         let data = b"0123456789";
         let new_filename = "/new_filename_test.md";
@@ -2674,7 +2988,7 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
         assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
         assert_eq!(
@@ -2696,7 +3010,7 @@ mod tests {
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 3);
+        assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
         assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
         assert_eq!(
             new_processed_files[new_filename].1,
@@ -2711,8 +3025,8 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
-        assert_eq!(processed_files.len(), 5);
-        assert_eq!(files_map.len(), 5);
+        assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
 
         // let's remove a file first
         let (version, new_processed_files, new_files_map) = safe
@@ -2721,7 +3035,7 @@ mod tests {
 
         assert_eq!(version, 1);
         assert_eq!(new_processed_files.len(), 1);
-        assert_eq!(new_files_map.len(), 4);
+        assert_eq!(new_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT - 1);
 
         let filepath = "/test.md";
         assert_eq!(new_processed_files[filepath].0, CONTENT_DELETED_SIGN);
@@ -2737,7 +3051,10 @@ mod tests {
 
         assert_eq!(version, 2);
         assert_eq!(new_processed_files.len(), 2);
-        assert_eq!(new_files_map.len(), 2);
+        assert_eq!(
+            new_files_map.len(),
+            TESTDATA_PUT_FILEITEM_COUNT - SUBFOLDER_PUT_FILEITEM_COUNT - 1
+        );
 
         let filename1 = "/subfolder/subexists.md";
         assert_eq!(new_processed_files[filename1].0, CONTENT_DELETED_SIGN);

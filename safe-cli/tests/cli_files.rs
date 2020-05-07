@@ -34,6 +34,8 @@ const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
 const TEST_FOLDER_SUBFOLDER: &str = "../testdata/subfolder/";
 const TEST_EMPTY_FOLDER: &str = "../testdata/emptyfolder/";
 
+const EXPECT_TESTDATA_PUT_CNT: usize = 7; // 5 files, plus 2 directories
+
 #[test]
 fn calling_safe_files_put_pretty() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
@@ -84,7 +86,7 @@ fn calling_safe_files_put_recursive() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(6))
+        .stdout(predicate::str::contains(r#"+"#).count(EXPECT_TESTDATA_PUT_CNT))
         .stdout(predicate::str::contains("../testdata/test.md").count(1))
         .stdout(predicate::str::contains("../testdata/another.md").count(1))
         .stdout(predicate::str::contains("../testdata/subfolder/subexists.md").count(1))
@@ -338,7 +340,7 @@ fn calling_safe_files_removed_sync() {
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     // let's first try with --dry-run and they should not be removed
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
@@ -362,7 +364,7 @@ fn calling_safe_files_removed_sync() {
     let files_container_v1 = xorurl_encoder.to_string();
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output_dry_run);
     assert_eq!(target, files_container_v1);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     let synced_file_cat = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -374,7 +376,7 @@ fn calling_safe_files_removed_sync() {
     .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
     assert_eq!(xorurl, files_container_xor);
-    assert_eq!(files_map.len(), 5);
+    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
 
     // Now, let's try without --dry-run and they should be effectively removed
     let sync_cmd_output = cmd!(
@@ -392,9 +394,9 @@ fn calling_safe_files_removed_sync() {
 
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_v1);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
-    // now all files should be gone
+    // now all file items should be gone
     xorurl_encoder.set_content_version(None);
     let synced_file_cat = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -509,7 +511,7 @@ fn calling_files_sync_and_fetch_with_version() {
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(None);
@@ -531,9 +533,9 @@ fn calling_files_sync_and_fetch_with_version() {
     let files_container_v1 = xorurl_encoder.to_string();
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_v1);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
-    // now all files should be gone in version 1 of the FilesContainer
+    // now all file items should be gone in version 1 of the FilesContainer
     let cat_container_v1 = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "cat",
@@ -559,7 +561,7 @@ fn calling_files_sync_and_fetch_with_version() {
     .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v0);
     assert_eq!(xorurl, files_container_v0);
-    assert_eq!(files_map.len(), 5);
+    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
 }
 
 #[test]
@@ -577,7 +579,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(0));
@@ -613,9 +615,10 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     println!("{}", sync_cmd_output);
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, nrsurl_v1);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
-    // now all files should be gone in version 1 since NRS name was updated to link version 1 of the FilesContainer
+    // now everything should be gone in version 1
+    // since NRS name was updated to link version 1 of the FilesContainer
     let cat_nrsurl_v1 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json")
         .read()
         .unwrap();
@@ -631,7 +634,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
         .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v0);
     assert_eq!(xorurl, nrsurl_v0);
-    assert_eq!(files_map.len(), 5);
+    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
 }
 
 #[test]
@@ -649,7 +652,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(0));
     let files_container_v0 = xorurl_encoder.to_string();
@@ -682,9 +685,9 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
 
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, nrsurl_v1);
-    assert_eq!(processed_files.len(), 5);
+    assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
-    // now all files should be gone in version 1 of the FilesContainer
+    // now all file items should be gone in version 1 of the FilesContainer
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&files_container_xor));
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = xorurl_encoder.to_string();
@@ -707,7 +710,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
         .unwrap();
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl);
     assert_eq!(xorurl, nrsurl);
-    assert_eq!(files_map.len(), 5);
+    assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
 }
 
 #[test]
@@ -899,9 +902,51 @@ fn calling_files_ls() {
         processed_files[&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER)].1
     );
     assert_eq!(files_map["subexists.md"]["size"], "23");
+
+    // test ls'ing an individual file.
+    xorurl_encoder.set_path("subfolder/sub2.md");
+    let single_file_path = xorurl_encoder.to_string();
+
+    let files_ls_output = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "ls",
+        &single_file_path,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(xorurl, single_file_path);
+    assert_eq!(files_map.len(), 1);
+    assert_eq!(
+        files_map["sub2.md"]["link"],
+        processed_files[&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER)].1
+    );
+    assert_eq!(files_map["sub2.md"]["size"], "4");
+
+    // test ls'ing a partial path that should not match anything.
+    xorurl_encoder.set_path("subfold");
+    let partial_path = xorurl_encoder.to_string();
+
+    let files_ls_output = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "ls",
+        &partial_path,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(xorurl, partial_path);
+    assert_eq!(files_map.len(), 0);
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn calling_files_tree() -> Result<(), String> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
@@ -919,13 +964,14 @@ fn calling_files_tree() -> Result<(), String> {
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
-    assert_eq!(root["sub"].as_array().unwrap().len(), 4);
+    assert_eq!(root["sub"].as_array().unwrap().len(), 5);
     assert_eq!(root["sub"][0]["name"], "another.md");
-    assert_eq!(root["sub"][1]["name"], "noextension");
-    assert_eq!(root["sub"][2]["name"], "subfolder");
-    assert_eq!(root["sub"][2]["sub"][0]["name"], "sub2.md");
-    assert_eq!(root["sub"][2]["sub"][1]["name"], "subexists.md");
-    assert_eq!(root["sub"][3]["name"], "test.md");
+    assert_eq!(root["sub"][1]["name"], "emptyfolder");
+    assert_eq!(root["sub"][2]["name"], "noextension");
+    assert_eq!(root["sub"][3]["name"], "subfolder");
+    assert_eq!(root["sub"][3]["sub"][0]["name"], "sub2.md");
+    assert_eq!(root["sub"][3]["sub"][1]["name"], "subexists.md");
+    assert_eq!(root["sub"][4]["name"], "test.md");
 
     let files_tree_output = read_cmd(cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -939,13 +985,14 @@ fn calling_files_tree() -> Result<(), String> {
         container_xorurl_no_version,
         "\
 ├── another.md
+├── emptyfolder
 ├── noextension
 ├── subfolder
 │   ├── sub2.md
 │   └── subexists.md
 └── test.md
 
-1 directory, 5 files"
+2 directories, 5 files"
     );
     assert_eq!(files_tree_output, should_match);
 
@@ -960,16 +1007,19 @@ fn calling_files_tree() -> Result<(), String> {
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
-    assert_eq!(root["sub"].as_array().unwrap().len(), 4);
+    assert_eq!(root["sub"].as_array().unwrap().len(), 5);
     assert_eq!(root["sub"][0]["name"], "another.md");
     assert_eq!(root["sub"][0]["details"]["size"], "6");
     assert_eq!(root["sub"][0]["details"]["type"], "text/markdown");
-    assert_eq!(root["sub"][1]["name"], "noextension");
+    assert_eq!(root["sub"][1]["name"], "emptyfolder");
     assert_eq!(root["sub"][1]["details"]["size"], "0");
-    assert_eq!(root["sub"][1]["details"]["type"], "Raw");
-    assert_eq!(root["sub"][2]["name"], "subfolder");
-    assert_eq!(root["sub"][2]["sub"][0]["name"], "sub2.md");
-    assert_eq!(root["sub"][2]["sub"][1]["name"], "subexists.md");
-    assert_eq!(root["sub"][3]["name"], "test.md");
+    assert_eq!(root["sub"][1]["details"]["type"], "inode/directory");
+    assert_eq!(root["sub"][2]["name"], "noextension");
+    assert_eq!(root["sub"][2]["details"]["size"], "0");
+    assert_eq!(root["sub"][2]["details"]["type"], "Raw");
+    assert_eq!(root["sub"][3]["name"], "subfolder");
+    assert_eq!(root["sub"][3]["sub"][0]["name"], "sub2.md");
+    assert_eq!(root["sub"][3]["sub"][1]["name"], "subexists.md");
+    assert_eq!(root["sub"][4]["name"], "test.md");
     Ok(())
 }

@@ -22,3 +22,16 @@ pub const FAKE_RDF_PREDICATE_TYPE: &str = "type";
 pub const FAKE_RDF_PREDICATE_SIZE: &str = "size";
 pub const FAKE_RDF_PREDICATE_MODIFIED: &str = "modified";
 pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
+pub const FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED: &str = "o_modified";
+pub const FAKE_RDF_PREDICATE_ORIGINAL_CREATED: &str = "o_created";
+pub const FAKE_RDF_PREDICATE_READONLY: &str = "readonly";
+pub const FAKE_RDF_PREDICATE_MODE_BITS: &str = "mode_bits";
+
+// see: https://stackoverflow.com/questions/18869772/mime-type-for-a-directory
+// We will use the FreeDesktop standard for directories and symlinks.
+//   https://specifications.freedesktop.org/shared-mime-info-spec/shared-mime-info-spec-latest.html#idm140625828597376
+//
+// TBD: is there a better location for these?
+//      maybe files.rs or xorurl_media_types.rs?
+pub const MIMETYPE_FILESYSTEM_DIR: &str = "inode/directory";
+pub const MIMETYPE_FILESYSTEM_SYMLINK: &str = "inode/symlink";

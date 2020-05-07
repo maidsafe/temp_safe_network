@@ -8,7 +8,7 @@
 // Software.
 
 use super::{
-    files::{FileItem, FilesMap},
+    files::{FileItem, FileMeta, FilesMap},
     nrs_map::NrsMap,
     Safe, XorName,
 };
@@ -258,38 +258,30 @@ async fn resolve_one_indirection(
             let (files_map, next) = if resolve_path && path != "/" && !path.is_empty() {
                 // TODO: Move this logic (path resolver) to the FilesMap struct
                 match &files_map.get(&path) {
-                    Some(file_item) => {
-                        let new_target_xorurl = match file_item.get("link") {
-                            Some(link) => XorUrlEncoder::from_url(link)?,
-                            None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
-                        };
-                        let metadata = (*file_item).clone();
-                        (files_map, Some((new_target_xorurl, Some(metadata))))
-                    }
-                    None => {
-                        let mut filtered_filesmap = FilesMap::default();
-                        let folder_path = if !path.ends_with('/') {
-                            format!("{}/", path)
-                        } else {
-                            path.to_string()
-                        };
-                        files_map.iter().for_each(|(filepath, fileitem)| {
-                            if filepath.starts_with(&folder_path) {
-                                let mut new_path = filepath.clone();
-                                new_path.replace_range(..folder_path.len(), "");
-                                filtered_filesmap.insert(new_path, fileitem.clone());
+                    Some(file_item) => match file_item.get("type") {
+                        Some(file_type) => {
+                            if FileMeta::filetype_is_file(&file_type) {
+                                match file_item.get("link") {
+                                    Some(link) => {
+                                        let new_target_xorurl = XorUrlEncoder::from_url(link)?;
+                                        let metadata = (*file_item).clone();
+                                        (files_map, Some((new_target_xorurl, Some(metadata))))
+                                    }
+                                    None => {
+                                        let msg = format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl);
+                                        return Err(Error::ContentError(msg));
+                                    }
+                                }
+                            } else {
+                                (gen_filtered_filesmap(&path, &files_map, &xorurl)?, None)
                             }
-                        });
-
-                        if filtered_filesmap.is_empty() {
-                            return Err(Error::ContentError(format!(
-                                "No data found for path \"{}\" on the FilesContainer at \"{}\"",
-                                folder_path, xorurl
-                            )));
                         }
-
-                        (filtered_filesmap, None)
-                    }
+                        None => {
+                            let msg = format!("FileItem is corrupt. It is missing a \"type\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl);
+                            return Err(Error::ContentError(msg));
+                        }
+                    },
+                    None => (gen_filtered_filesmap(&path, &files_map, &xorurl)?, None),
                 }
             } else {
                 (files_map, None)
@@ -445,6 +437,31 @@ async fn retrieve_immd(
     };
 
     Ok((safe_data, None))
+}
+
+fn gen_filtered_filesmap(urlpath: &str, files_map: &FilesMap, xorurl: &str) -> Result<FilesMap> {
+    let mut filtered_filesmap = FilesMap::default();
+    let folder_path = if !urlpath.ends_with('/') {
+        format!("{}/", urlpath)
+    } else {
+        urlpath.to_string()
+    };
+    files_map.iter().for_each(|(filepath, fileitem)| {
+        if filepath.starts_with(&folder_path) {
+            let mut new_path = filepath.clone();
+            new_path.replace_range(..folder_path.len(), "");
+            filtered_filesmap.insert(new_path, fileitem.clone());
+        }
+    });
+
+    if filtered_filesmap.is_empty() {
+        Err(Error::ContentError(format!(
+            "No data found for path \"{}\" on the FilesContainer at \"{}\"",
+            folder_path, xorurl
+        )))
+    } else {
+        Ok(filtered_filesmap)
+    }
 }
 
 #[cfg(test)]
