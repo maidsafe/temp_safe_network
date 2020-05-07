@@ -77,6 +77,15 @@ impl XorUrlBase {
             _other => Err(Error::InvalidInput("Invalid XOR URL base encoding code. Supported values are 0=base32z, 1=base32, and 2=base64".to_string())),
         }
     }
+
+    pub fn from_u16(value: u16) -> Result<Self> {
+        match value {
+            0 => Ok(Self::Base32z),
+            1 => Ok(Self::Base32),
+            2 => Ok(Self::Base64),
+            _other => Err(Error::InvalidInput("Invalid XOR URL base encoding code. Supported values are 0=base32z, 1=base32, and 2=base64".to_string())),
+        }
+    }
 }
 
 // We encode the content type that a XOR-URL is targetting, this allows the consumer/user to

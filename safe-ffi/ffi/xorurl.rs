@@ -18,7 +18,6 @@ use safe_nd::XorName;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
-    str::FromStr,
 };
 
 #[no_mangle]
@@ -34,7 +33,7 @@ pub unsafe extern "C" fn safe_url_encode(
     query_string: *const c_char,
     fragment: *const c_char,
     content_version: u64,
-    base_encoding: *const c_char,
+    base_encoding: u16,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -56,7 +55,7 @@ pub unsafe extern "C" fn safe_url_encode(
         } else {
             Some(c_str_str_to_string_vec(sub_names, sub_names_len)?)
         };
-        let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
+        let encoding_base = XorUrlBase::from_u16(base_encoding)?;
         let encoded_safe_url = NativeSafeUrl::encode(
             xor_name,
             nrs_name,
@@ -143,7 +142,7 @@ pub unsafe extern "C" fn safe_url_from_url(
 #[no_mangle]
 pub unsafe extern "C" fn encode_safekey(
     name: *const XorNameArray,
-    base_encoding: *const c_char,
+    base_encoding: u16,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -154,7 +153,7 @@ pub unsafe extern "C" fn encode_safekey(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let xor_name = XorName(*name);
-        let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
+        let encoding_base = XorUrlBase::from_u16(base_encoding)?;
         let encoded_safe_url = NativeSafeUrl::encode_safekey(xor_name, encoding_base)?;
         let encoded_string = CString::new(encoded_safe_url)?;
         o_cb(user_data.0, FFI_RESULT_OK, encoded_string.as_ptr());
@@ -166,7 +165,7 @@ pub unsafe extern "C" fn encode_safekey(
 pub unsafe extern "C" fn encode_immutable_data(
     name: *const XorNameArray,
     content_type: u16,
-    base_encoding: *const c_char,
+    base_encoding: u16,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -178,7 +177,7 @@ pub unsafe extern "C" fn encode_immutable_data(
         let user_data = OpaqueCtx(user_data);
         let xor_name = XorName(*name);
         let content_type_enum = SafeContentType::from_u16(content_type)?;
-        let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
+        let encoding_base = XorUrlBase::from_u16(base_encoding)?;
         let encoded_safe_url =
             NativeSafeUrl::encode_immutable_data(xor_name, content_type_enum, encoding_base)?;
         let encoded_string = CString::new(encoded_safe_url)?;
@@ -192,7 +191,7 @@ pub unsafe extern "C" fn encode_mutable_data(
     name: *const XorNameArray,
     type_tag: u64,
     content_type: u16,
-    base_encoding: *const c_char,
+    base_encoding: u16,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -204,7 +203,7 @@ pub unsafe extern "C" fn encode_mutable_data(
         let user_data = OpaqueCtx(user_data);
         let xor_name = XorName(*name);
         let content_type_enum = SafeContentType::from_u16(content_type)?;
-        let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
+        let encoding_base = XorUrlBase::from_u16(base_encoding)?;
         let encoded_safe_url = NativeSafeUrl::encode_mutable_data(
             xor_name,
             type_tag,
@@ -222,7 +221,7 @@ pub unsafe extern "C" fn encode_append_only_data(
     name: *const XorNameArray,
     type_tag: u64,
     content_type: u16,
-    base_encoding: *const c_char,
+    base_encoding: u16,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -234,7 +233,7 @@ pub unsafe extern "C" fn encode_append_only_data(
         let user_data = OpaqueCtx(user_data);
         let xor_name = XorName(*name);
         let content_type_enum = SafeContentType::from_u16(content_type)?;
-        let encoding_base = XorUrlBase::from_str(&String::clone_from_repr_c(base_encoding)?)?;
+        let encoding_base = XorUrlBase::from_u16(base_encoding)?;
         let encoded_safe_url = NativeSafeUrl::encode_append_only_data(
             xor_name,
             type_tag,
