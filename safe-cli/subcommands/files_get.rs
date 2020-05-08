@@ -450,6 +450,7 @@ async fn files_container_get_files(
     let urlpath = xorurl_encoder.path_decoded()?;
 
     let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
+
     // This is a constraint to verify that parent of dirpath exists.
     // Without this check, files_map_get_files() will happily create
     // any missing dirs, which "might" be ok.  However, unix 'cp'

@@ -142,6 +142,11 @@ async fn run_in_foreground(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
     }
     .map_err(|err| Error::GeneralError(format!("Error when initialising logger: {}", err)))?;
 
+    info!(
+        "Running authd instance from executable at \"{}\"",
+        authd_exec.display()
+    );
+
     let pid = process::id();
     info!("authd instance starting (PID: {})...", pid);
     let mut pid_file_path = log_path.clone();
