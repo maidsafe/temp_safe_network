@@ -40,7 +40,8 @@ impl Safe {
     // Parses a safe:// URL and returns all the info in a XorUrlEncoder instance.
     // It also returns a second XorUrlEncoder if the URL was resolved from an NRS-URL,
     // this second XorUrlEncoder instance contains the information of the parsed NRS-URL.
-    pub async fn parse_and_resolve_url(
+    // *Note* this is not part of the public API, but an internal helper function used by API impl.
+    pub(crate) async fn parse_and_resolve_url(
         &self,
         url: &str,
     ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {

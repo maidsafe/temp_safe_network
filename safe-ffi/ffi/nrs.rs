@@ -35,35 +35,6 @@ pub unsafe extern "C" fn parse_url(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn parse_and_resolve_url(
-    app: *mut Safe,
-    url: *const c_char,
-    user_data: *mut c_void,
-    o_cb: extern "C" fn(
-        user_data: *mut c_void,
-        result: *const FfiResult,
-        safe_url: *const SafeUrl,
-        resolved_from: *const SafeUrl,
-    ),
-) {
-    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
-        let user_data = OpaqueCtx(user_data);
-        let url_string = String::clone_from_repr_c(url)?;
-        let (safe_url, resolved_from) =
-            async_std::task::block_on((*app).parse_and_resolve_url(&url_string))?;
-        let ffi_safe_url = safe_url_into_repr_c(safe_url)?;
-        let ffi_nrs_safe_url = if let Some(nrs_xorurl_encoder) = resolved_from {
-            &safe_url_into_repr_c(nrs_xorurl_encoder)?
-        } else {
-            std::ptr::null()
-        };
-
-        o_cb(user_data.0, FFI_RESULT_OK, &ffi_safe_url, ffi_nrs_safe_url);
-        Ok(())
-    })
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn nrs_map_container_create(
     app: *mut Safe,
     name: *const c_char,
