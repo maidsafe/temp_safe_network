@@ -45,20 +45,16 @@ impl Safe {
         &self,
         url: &str,
     ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {
-        // We don't want to resolve the path, so let's make sure it's
-        // removed from the URL before trying to resolve it
-        let mut xorurl_encoder = Safe::parse_url(url)?;
+        let xorurl_encoder = Safe::parse_url(url)?;
         let orig_path = xorurl_encoder.path_decoded()?;
-        xorurl_encoder.set_path("");
 
-        // Obtain the resolution chain up to the point where we find the first
-        // content which is not an NRS Map Container
+        // Obtain the resolution chain without resolving the URL's path
         let mut resolution_chain = self
             .retrieve_from_url(
                 &xorurl_encoder.to_string(),
                 false,
                 None,
-                Some(SafeContentType::NrsMapContainer),
+                false, // don't resolve the URL's path
             )
             .await?;
 
@@ -71,16 +67,17 @@ impl Safe {
             }
         }?;
 
-        // If there is still one more item in the chain, that's the NRS Map Container
+        // Set the original path so we return the XorUrlEncoder with it
+        let mut xorurl_encoder = XorUrlEncoder::from_url(&safe_data.xorurl())?;
+        xorurl_encoder.set_path(&orig_path);
+
+        // If there is still one item in the chain, the first item is the NRS Map Container
         // targeted by the URL and where the whole resolution started from
         if resolution_chain.is_empty() {
-            let mut xorurl_encoder = XorUrlEncoder::from_url(&safe_data.xorurl())?;
-            xorurl_encoder.set_path(&orig_path);
             Ok((xorurl_encoder, None))
         } else {
-            let mut nrsmap_xorul_encoder = XorUrlEncoder::from_url(&resolution_chain[0].xorurl())?;
-            nrsmap_xorul_encoder.set_path(&orig_path);
-            let xorurl_encoder = XorUrlEncoder::from_url(&safe_data.resolved_from())?;
+            let nrsmap_xorul_encoder =
+                XorUrlEncoder::from_url(&resolution_chain[0].resolved_from())?;
             Ok((xorurl_encoder, Some(nrsmap_xorul_encoder)))
         }
     }

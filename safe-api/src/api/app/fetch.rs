@@ -125,7 +125,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
-        let mut resolution_chain = self.retrieve_from_url(url, true, range, None).await?;
+        let mut resolution_chain = self.retrieve_from_url(url, true, range, true).await?;
         // Construct return data using the last and first items from the resolution chain
         match resolution_chain.pop() {
             Some(other_safe_data) => Ok(other_safe_data),
@@ -177,7 +177,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn inspect(&self, url: &str) -> Result<Vec<SafeData>> {
-        self.retrieve_from_url(url, false, None, None).await
+        self.retrieve_from_url(url, false, None, true).await
     }
 
     // Retrieves all pieces of data that resulted from resolving the given URL.
@@ -188,7 +188,7 @@ impl Safe {
         url: &str,
         retrieve_data: bool,
         range: Range,
-        while_is: Option<SafeContentType>,
+        resolve_path: bool,
     ) -> Result<Vec<SafeData>> {
         let current_xorurl_encoder = Safe::parse_url(url)?;
         info!(
@@ -210,19 +210,17 @@ impl Safe {
                 return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
             }
 
-            let cur_content_type = next_xorurl_encoder.content_type();
-            let (step, next) =
-                resolve_one_indirection(&self, next_xorurl_encoder, metadata, retrieve_data, range)
-                    .await?;
+            let (step, next) = resolve_one_indirection(
+                &self,
+                next_xorurl_encoder,
+                metadata,
+                retrieve_data,
+                range,
+                resolve_path,
+            )
+            .await?;
 
             resolution_chain.push(step);
-
-            // Check if we should continue resolving
-            match &while_is {
-                Some(content_type) if *content_type != cur_content_type => break,
-                _ => {}
-            }
-
             next_to_resolve = next;
             indirections_count += 1;
         }
@@ -241,6 +239,7 @@ async fn resolve_one_indirection(
     metadata: Option<FileItem>,
     retrieve_data: bool,
     range: Range,
+    resolve_path: bool,
 ) -> Result<(SafeData, Option<NextStepInfo>)> {
     let url = the_xor.to_string();
     let xorurl = the_xor.to_xorurl_string();
@@ -256,7 +255,7 @@ async fn resolve_one_indirection(
             );
 
             let path = the_xor.path_decoded()?;
-            let (files_map, next) = if path != "/" && !path.is_empty() {
+            let (files_map, next) = if resolve_path && path != "/" && !path.is_empty() {
                 // TODO: Move this logic (path resolver) to the FilesMap struct
                 match &files_map.get(&path) {
                     Some(file_item) => {
