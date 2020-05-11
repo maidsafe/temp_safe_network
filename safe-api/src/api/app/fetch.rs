@@ -203,23 +203,17 @@ impl Safe {
         // Let's create a list keeping track each of the resolution hops we go through
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         let mut resolution_chain = Vec::<SafeData>::default();
-        let mut next_to_resolve = Some((current_xorurl_encoder, url.to_string(), None));
+        let mut next_to_resolve = Some((current_xorurl_encoder, None));
         let mut indirections_count = 0;
-        while let Some((next_xorurl_encoder, next_url, metadata)) = next_to_resolve {
+        while let Some((next_xorurl_encoder, metadata)) = next_to_resolve {
             if indirections_count == INDIRECTION_LIMIT {
                 return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
             }
 
             let cur_content_type = next_xorurl_encoder.content_type();
-            let (step, next) = resolve_one_indirection(
-                &self,
-                &next_url,
-                next_xorurl_encoder,
-                metadata,
-                retrieve_data,
-                range,
-            )
-            .await?;
+            let (step, next) =
+                resolve_one_indirection(&self, next_xorurl_encoder, metadata, retrieve_data, range)
+                    .await?;
 
             resolution_chain.push(step);
 
@@ -239,17 +233,17 @@ impl Safe {
 
 // This contains information for the next step to be made
 // in each iteration of the resolution process
-type NextStepInfo = (XorUrlEncoder, String, Option<FileItem>);
+type NextStepInfo = (XorUrlEncoder, Option<FileItem>);
 
 async fn resolve_one_indirection(
     safe: &Safe,
-    url: &str,
     mut the_xor: XorUrlEncoder,
     metadata: Option<FileItem>,
     retrieve_data: bool,
     range: Range,
 ) -> Result<(SafeData, Option<NextStepInfo>)> {
-    let xorurl = the_xor.to_string();
+    let url = the_xor.to_string();
+    let xorurl = the_xor.to_xorurl_string();
     debug!("Going into a new step in the URL resolution for {}", xorurl);
     match the_xor.content_type() {
         SafeContentType::FilesContainer => {
@@ -263,18 +257,15 @@ async fn resolve_one_indirection(
 
             let path = the_xor.path_decoded()?;
             let (files_map, next) = if path != "/" && !path.is_empty() {
-                // TODO: Move this logic (resolver) to the FilesMap struct
+                // TODO: Move this logic (path resolver) to the FilesMap struct
                 match &files_map.get(&path) {
                     Some(file_item) => {
-                        let (new_target_xorurl, new_target_url) = match file_item.get("link") {
-                            Some(link) => (XorUrlEncoder::from_url(link)?, link.to_string()),
+                        let new_target_xorurl = match file_item.get("link") {
+                            Some(link) => XorUrlEncoder::from_url(link)?,
                             None => return Err(Error::ContentError(format!("FileItem is corrupt. It is missing a \"link\" property at path, \"{}\" on the FilesContainer at: {} ", path, xorurl))),
                         };
                         let metadata = (*file_item).clone();
-                        (
-                            files_map,
-                            Some((new_target_xorurl, new_target_url, Some(metadata))),
-                        )
+                        (files_map, Some((new_target_xorurl, Some(metadata))))
                     }
                     None => {
                         let mut filtered_filesmap = FilesMap::default();
@@ -309,13 +300,13 @@ async fn resolve_one_indirection(
             // just the FilesContainer XOR-URL and version
             the_xor.set_path("");
             let safe_data = SafeData::FilesContainer {
-                xorurl: the_xor.to_string(),
+                xorurl: the_xor.to_xorurl_string(),
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
                 version,
                 files_map,
                 data_type: the_xor.data_type(),
-                resolved_from: url.to_string(),
+                resolved_from: url,
             };
 
             Ok((safe_data, next))
@@ -355,45 +346,31 @@ async fn resolve_one_indirection(
                 target_xorurl_encoder
             );
 
-            let nrsurl = XorUrlEncoder::from_nrsurl(&url)?;
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = SafeData::NrsMapContainer {
-                public_name: nrsurl.public_name().to_string(),
-                xorurl: the_xor.to_string(),
+                public_name: the_xor.public_name().to_string(),
+                xorurl: the_xor.to_xorurl_string(),
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),
                 version,
                 nrs_map,
                 data_type: the_xor.data_type(),
-                resolved_from: url.to_string(),
+                resolved_from: url,
             };
 
-            Ok((
-                nrs_map_container,
-                Some((target_xorurl_encoder, target_url, None)),
-            ))
+            Ok((nrs_map_container, Some((target_xorurl_encoder, None))))
         }
         SafeContentType::Raw => match the_xor.data_type() {
             SafeDataType::SafeKey => {
                 let safe_data = SafeData::SafeKey {
                     xorurl,
                     xorname: the_xor.xorname(),
-                    resolved_from: url.to_string(),
+                    resolved_from: url,
                 };
                 Ok((safe_data, None))
             }
             SafeDataType::PublishedImmutableData => {
-                retrieve_immd(
-                    safe,
-                    url,
-                    the_xor,
-                    xorurl,
-                    retrieve_data,
-                    None,
-                    metadata,
-                    range,
-                )
-                .await
+                retrieve_immd(safe, &the_xor, retrieve_data, None, &metadata, range).await
             }
             other => Err(Error::ContentError(format!(
                 "Data type '{:?}' not supported yet",
@@ -404,12 +381,10 @@ async fn resolve_one_indirection(
             SafeDataType::PublishedImmutableData => {
                 retrieve_immd(
                     safe,
-                    url,
-                    the_xor,
-                    xorurl,
+                    &the_xor,
                     retrieve_data,
                     Some(media_type_str),
-                    metadata,
+                    &metadata,
                     range,
                 )
                 .await
@@ -432,7 +407,7 @@ async fn resolve_one_indirection(
                 type_tag: the_xor.type_tag(),
                 balances,
                 data_type: the_xor.data_type(),
-                resolved_from: url.to_string(),
+                resolved_from: url,
             };
 
             Ok((safe_data, None))
@@ -440,15 +415,12 @@ async fn resolve_one_indirection(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn retrieve_immd(
     safe: &Safe,
-    url: &str,
-    the_xor: XorUrlEncoder,
-    xorurl: String,
+    the_xor: &XorUrlEncoder,
     retrieve_data: bool,
     media_type: Option<String>,
-    metadata: Option<FileItem>,
+    metadata: &Option<FileItem>,
     range: Range,
 ) -> Result<(SafeData, Option<NextStepInfo>)> {
     if !the_xor.path().is_empty() {
@@ -459,18 +431,18 @@ async fn retrieve_immd(
     };
 
     let data = if retrieve_data {
-        safe.fetch_published_immutable_data(&the_xor, range).await?
+        safe.fetch_published_immutable_data(the_xor, range).await?
     } else {
         vec![]
     };
 
     let safe_data = SafeData::PublishedImmutableData {
-        xorurl,
+        xorurl: the_xor.to_xorurl_string(),
         xorname: the_xor.xorname(),
         data,
         media_type,
-        metadata,
-        resolved_from: url.to_string(),
+        metadata: metadata.clone(),
+        resolved_from: the_xor.to_string(),
     };
 
     Ok((safe_data, None))

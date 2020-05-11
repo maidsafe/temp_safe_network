@@ -47,9 +47,7 @@ pub async fn dog_commander(
                     data_type,
                     resolved_from,
                 } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
+                    println!("Resolved from: {}", resolved_from);
                     println!("= NRS Map Container =");
                     println!("PublicName: \"{}\"", public_name);
                     println!("XOR-URL: {}", xorurl);
@@ -68,9 +66,7 @@ pub async fn dog_commander(
                     resolved_from,
                     ..
                 } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
+                    println!("Resolved from: {}", resolved_from);
                     println!("= FilesContainer =");
                     println!("XOR-URL: {}", xorurl);
                     println!("Version: {}", version);
@@ -85,9 +81,7 @@ pub async fn dog_commander(
                     resolved_from,
                     ..
                 } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
+                    println!("Resolved from: {}", resolved_from);
                     println!("= File =");
                     println!("XOR-URL: {}", xorurl);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
@@ -105,9 +99,7 @@ pub async fn dog_commander(
                     resolved_from,
                     ..
                 } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
+                    println!("Resolved from: {}", resolved_from);
                     println!("= Wallet =");
                     println!("XOR-URL: {}", xorurl);
                     println!("Type tag: {}", type_tag);
@@ -119,9 +111,7 @@ pub async fn dog_commander(
                     xorname,
                     resolved_from,
                 } => {
-                    if resolved_from != xorurl {
-                        println!("Resolved from: {}", resolved_from);
-                    }
+                    println!("Resolved from: {}", resolved_from);
                     println!("= SafeKey =");
                     println!("XOR-URL: {}", xorurl);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
