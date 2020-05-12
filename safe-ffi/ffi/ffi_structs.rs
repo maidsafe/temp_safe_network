@@ -7,10 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    errors::Result,
-    helpers::{c_str_str_to_string_vec, from_c_str_to_str_option, string_vec_to_c_str_str},
-};
+use super::{errors::Result, helpers::string_vec_to_c_str_str};
 use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
 use safe_api::{
     files::{
@@ -22,10 +19,10 @@ use safe_api::{
         WalletSpendableBalance as NativeWalletSpendableBalance,
         WalletSpendableBalances as NativeWalletSpendableBalances,
     },
-    xorurl::{SafeContentType, SafeDataType, SafeUrl as NativeSafeUrl},
+    xorurl::SafeUrl as NativeSafeUrl,
     BlsKeyPair as NativeBlsKeyPair, ProcessedEntries as NativeProcessedEntries,
 };
-use safe_nd::{XorName, XOR_NAME_LEN};
+use safe_nd::XOR_NAME_LEN;
 use std::ffi::CString;
 use std::os::raw::c_char;
 
@@ -277,29 +274,6 @@ pub unsafe fn safe_url_into_repr_c(safe_url: NativeSafeUrl) -> Result<SafeUrl> {
         content_version: safe_url.content_version().unwrap_or_else(|| 0),
         safeurl_type: safe_url.safeurl_type().value()?,
     })
-}
-
-pub unsafe fn native_safe_url_from_repr_c(encoder: &SafeUrl) -> Result<NativeSafeUrl> {
-    let sub_names = if encoder.sub_names_list_len == 0 {
-        None
-    } else {
-        Some(c_str_str_to_string_vec(
-            encoder.sub_names_list,
-            encoder.sub_names_list_len,
-        )?)
-    };
-    Ok(NativeSafeUrl::new(
-        XorName(encoder.xorname),
-        None,
-        encoder.type_tag,
-        SafeDataType::from_u64(encoder.data_type)?,
-        SafeContentType::from_u16(encoder.content_type)?,
-        from_c_str_to_str_option(encoder.path),
-        sub_names,
-        None,
-        None,
-        Some(encoder.content_version),
-    )?)
 }
 
 #[repr(C)]
