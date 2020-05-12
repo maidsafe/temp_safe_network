@@ -111,9 +111,16 @@ unsafe fn invoke_callback(
                 xorname: xorname.0,
                 data,
                 data_len,
-                media_type: CString::new(media_type.clone().unwrap())?.into_raw(),
-                metadata: CString::new(serde_json::to_string(&metadata.clone().unwrap())?)?
-                    .into_raw(),
+                media_type: match media_type {
+                    Some(media_value) => CString::new(media_value.clone())?.into_raw(),
+                    None => std::ptr::null(),
+                },
+                metadata: match metadata {
+                    Some(metadata_value) => {
+                        CString::new(serde_json::to_string(metadata_value)?)?.into_raw()
+                    }
+                    None => std::ptr::null(),
+                },
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
             o_published(user_data.0, &published_data);
