@@ -94,7 +94,6 @@ impl IDataHandler {
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
@@ -410,6 +409,7 @@ impl IDataHandler {
             metadata.holders.len()
         );
 
+<<<<<<< HEAD
         // We're acting as data handler, received request from client handlers
         let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
 
@@ -424,6 +424,7 @@ impl IDataHandler {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
 
+<<<<<<< HEAD
         // Should we wait for multiple responses
         Some(Action::RespondToClientHandlers {
             sender: *idata_address.name(),
@@ -435,6 +436,36 @@ impl IDataHandler {
                 proof: None,
             },
         })
+=======
+        if is_idata_copy_op {
+            trace!("Duplication operation completed for : {:?}", idata_address);
+            let _ = self.idata_elder_ops.remove(&message_id);
+            let _ = self.remove_idata_op_if_concluded(&message_id);
+            None
+        } else {
+            self.remove_idata_op_if_concluded(&message_id)
+                .map(|idata_op| Action::RespondToClientHandlers {
+                    sender: *idata_address.name(),
+                    rpc: Rpc::Response {
+                        requester: idata_op.client().clone(),
+                        response: Response::Mutation(Ok(())),
+                        message_id,
+                        refund: None,
+                    },
+                })
+        }
+=======
+        self.remove_idata_op_if_concluded(&message_id)
+            .map(|idata_op| Action::RespondToClientHandlers {
+                sender: *idata_address.name(),
+                rpc: Rpc::Response {
+                    requester: idata_op.client().clone(),
+                    response: Response::Mutation(Ok(())),
+                    message_id,
+                },
+            })
+>>>>>>> add initial at2-inspired parts
+>>>>>>> add initial at2-inspired parts
     }
 
     pub(super) fn handle_delete_unpub_idata_resp(
@@ -498,6 +529,7 @@ impl IDataHandler {
             };
         }
 
+<<<<<<< HEAD
         // TODO: Different responses from adults?
         Some(Action::RespondToClientHandlers {
             sender: *idata_address.name(),
@@ -511,6 +543,31 @@ impl IDataHandler {
                 proof: None,
             },
         })
+=======
+        self.remove_idata_op_if_concluded(&message_id)
+            .map(|idata_op| {
+                let response = {
+                    let errors_for_req = idata_op.get_any_errors();
+                    assert!(
+                        errors_for_req.len() <= 1,
+                        "Handling more than one response is not implemented."
+                    );
+                    if let Some(response) = errors_for_req.values().next() {
+                        Err(response.clone())
+                    } else {
+                        Ok(())
+                    }
+                };
+                Action::RespondToClientHandlers {
+                    sender: *idata_address.name(),
+                    rpc: Rpc::Response {
+                        requester: idata_op.client().clone(),
+                        response: Response::Mutation(response),
+                        message_id,
+                    },
+                }
+            })
+>>>>>>> add initial at2-inspired parts
     }
 
     pub(super) fn handle_get_idata_resp(

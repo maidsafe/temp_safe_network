@@ -24,7 +24,7 @@ use routing::{
     TransportEvent as ClientEvent,
 };
 use safe_nd::{
-    ClientRequest, LoginPacketRequest, NodeFullId, PublicId, Request, Response, XorName,
+    ClientRequest, LoginPacketRequest, MoneyRequest, NodeFullId, PublicId, Request, Response, XorName,
 };
 use std::borrow::Cow;
 use std::{
@@ -98,11 +98,11 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
         #[cfg(feature = "mock_parsec")]
         {
-            trace!(
-                "creating vault {:?} with routing_id {:?}",
-                id.public_id().name(),
-                routing_node.id()
-            );
+            // trace!(
+            //     "creating vault {:?} with routing_id {:?}",
+            //     id.public_id().name(),
+            //     routing_node.id()
+            // );
         }
 
         let root_dir = config.root_dir()?;
@@ -656,23 +656,39 @@ impl<R: CryptoRng + Rng> Vault<R> {
         if self.self_is_handler_for(&dst_address) {
             // TODO - We need a better way for determining which handler should be given the
             //        message.
-            if let Rpc::Request { request, .. } = &rpc {
-                match request {
-                    Request::LoginPacket(_) | Request::Coins(_) | Request::Client(_) => self
-                        .client_handler_mut()?
-                        .handle_vault_rpc(requester_name, rpc),
-                    _data_request => self.data_handler_mut()?.handle_vault_rpc(
-                        SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                        rpc,
-                        None,
-                    ),
+            return match rpc {
+                Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::Create(_)),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::Money(MoneyRequest::ValidateTransfer { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::Money(MoneyRequest::RegisterTransfer { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
+                    ..
+                } => self
+                .client_handler_mut()?
+                .handle_vault_rpc(requester_name, rpc),
+                _data_request => self.data_handler_mut()?.handle_vault_rpc(
+                SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
+                rpc,
+                None,
+            ),
                 }
             } else {
                 error!("{}: Logic error - unexpected RPC.", self);
                 None
             }
-        } else {
-            None
         }
     }
 

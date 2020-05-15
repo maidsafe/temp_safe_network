@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{auth::ClientInfo, Balances, COST_OF_PUT};
+use super::{auth::ClientInfo, Transfers, COST_OF_PUT};
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
@@ -15,8 +15,8 @@ use crate::{
 };
 use log::error;
 use safe_nd::{
-    Coins, Error as NdError, LoginPacket, LoginPacketRequest, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Result as NdResult, Transaction, TransactionId, XorName,
+    Error as NdError, LoginPacket, LoginPacketRequest, MessageId, Money, NodePublicId, PublicId,
+    PublicKey, Request, Response, Result as NdResult, TransferId, XorName,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -46,12 +46,12 @@ impl LoginPackets {
                 new_owner,
                 amount,
                 new_login_packet,
-                transaction_id,
+                transfer_id,
             } => self.initiate_proxied_creation(
                 &client.public_id,
                 new_owner,
                 amount,
-                transaction_id,
+                transfer_id,
                 new_login_packet,
                 message_id,
             ),
@@ -109,7 +109,7 @@ impl LoginPackets {
         requester: PublicId,
         request: LoginPacketRequest,
         message_id: MessageId,
-        balances: &mut Balances,
+        _transfers: &mut Transfers,
     ) -> Option<Action> {
         use LoginPacketRequest::*;
         match request {
@@ -118,43 +118,51 @@ impl LoginPackets {
                 new_owner,
                 amount,
                 new_login_packet,
-                transaction_id,
+                transfer_id,
             } => {
                 if &src == requester.name() {
-                    // Create balance and forward login_packet.
-                    match balances.create(&requester, new_owner, amount) {
-                        Ok(()) => Some(Action::ForwardClientRequest(Rpc::Request {
-                            request: Request::LoginPacket(CreateFor {
-                                new_owner,
-                                amount,
-                                new_login_packet,
-                                transaction_id,
-                            }),
-                            requester,
-                            message_id,
-                            signature: None,
-                        })),
-                        Err(error) => {
-                            // Refund amount (Including the cost of creating the balance)
-                            let refund = Some(amount.checked_add(COST_OF_PUT)?);
+                    Some(Action::ForwardClientRequest(Rpc::Request {
+                        request: Request::LoginPacket(CreateFor {
+                            new_owner,
+                            amount,
+                            new_login_packet,
+                            transfer_id,
+                        }),
+                        requester,
+                        message_id,
+                    }))
+                // // Create balance and forward login_packet.
+                // match banking.create(&requester, new_owner, amount) {
+                //     Ok(()) => Some(Action::ForwardClientRequest(Rpc::Request {
+                //         request: Request::LoginPacket(CreateFor {
+                //             new_owner,
+                //             amount,
+                //             new_login_packet,
+                //             transfer_id,
+                //         }),
+                //         requester,
+                //         message_id,
+                //     })),
+                //     Err(error) => {
+                //         // Refund amount (Including the cost of creating the balance)
+                //         let refund = Some(amount.checked_add(COST_OF_PUT)?);
 
-                            Some(Action::RespondToClientHandlers {
-                                sender: XorName::from(new_owner),
-                                rpc: Rpc::Response {
-                                    response: Response::Transaction(Err(error)),
-                                    requester,
-                                    message_id,
-                                    refund,
-                                    proof: None,
-                                },
-                            })
-                        }
-                    }
+                //         Some(Action::RespondToClientHandlers {
+                //             sender: XorName::from(new_owner),
+                //             rpc: Rpc::Response {
+                //                 response: Response::TransferRegistration(Err(error)),
+                //                 requester,
+                //                 message_id,
+                //                 refund,
+                //             },
+                //         })
+                //     }
+                // }
                 } else {
                     self.finalise_proxied_creation(
                         requester,
                         amount,
-                        transaction_id,
+                        transfer_id,
                         new_login_packet,
                         message_id,
                     )
@@ -187,7 +195,6 @@ impl LoginPackets {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
-        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
@@ -206,15 +213,15 @@ impl LoginPackets {
         &mut self,
         payer: &PublicId,
         new_owner: PublicKey,
-        amount: Coins,
-        transaction_id: TransactionId,
+        amount: Money,
+        transfer_id: TransferId,
         login_packet: LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
             return Some(Action::RespondToClient {
                 message_id,
-                response: Response::Transaction(Err(NdError::ExceededSize)),
+                response: Response::TransferRegistration(Err(NdError::ExceededSize)),
             });
         }
         // The requester bears the cost of storing the login packet
@@ -224,7 +231,7 @@ impl LoginPackets {
                 new_owner,
                 amount,
                 new_login_packet: login_packet,
-                transaction_id,
+                transfer_id,
             }),
             client_public_id: payer.clone(),
             message_id,
@@ -238,35 +245,32 @@ impl LoginPackets {
     fn finalise_proxied_creation(
         &mut self,
         payer: PublicId,
-        amount: Coins,
-        transaction_id: TransactionId,
+        amount: Money,
+        transfer_id: TransferId,
         login_packet: LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
-        // Step three - store login_packet.
-        let result = if self.login_packets.has(login_packet.destination()) {
-            Err(NdError::LoginPacketExists)
-        } else {
-            self.login_packets
-                .put(&login_packet)
-                .map(|_| Transaction {
-                    id: transaction_id,
-                    amount,
-                })
-                .map_err(|error| error.to_string().into())
-        };
-        Some(Action::RespondToClientHandlers {
-            sender: *login_packet.destination(),
-            rpc: Rpc::Response {
-                response: Response::Transaction(result),
-                requester: payer,
-                message_id,
-                // A new balance is already created as
-                // a part of the flow. So no refund is processed.
-                refund: None,
-                proof: None,
-            },
-        })
+        unimplemented!("conundrum..")
+        // // Step three - store login_packet.
+        // let result = if self.login_packets.has(login_packet.destination()) {
+        //     Err(NdError::LoginPacketExists)
+        // } else {
+        //     self.login_packets
+        //         .put(&login_packet)
+        //         .map(|_| TransferRegistered {
+        //             id: transfer_id,
+        //             amount,
+        //         })
+        //         .map_err(|error| error.to_string().into())
+        // };
+        // Some(Action::RespondToClientHandlers {
+        //     sender: *login_packet.destination(),
+        //     rpc: Rpc::Response {
+        //         response: Response::TransferRegistration(result),
+        //         requester: payer,
+        //         message_id,
+        //     },
+        // })
     }
 
     // on client request

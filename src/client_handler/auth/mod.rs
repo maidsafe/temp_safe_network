@@ -74,18 +74,22 @@ impl Auth {
             RequestAuthKind::GetPub => Ok(()),
             RequestAuthKind::GetPriv => self.check_app_permissions(app_id, |_| true),
             RequestAuthKind::GetBalance => {
-                self.check_app_permissions(app_id, |perms| perms.get_balance)
+                self.check_app_permissions(app_id, |perms| perms.read_balance)
+            }
+            RequestAuthKind::GetHistory => {
+                self.check_app_permissions(app_id, |perms| perms.read_transfer_history)
             }
             RequestAuthKind::Mutation => {
-                self.check_app_permissions(app_id, |perms| perms.perform_mutations)
+                self.check_app_permissions(app_id, |perms| perms.data_mutations)
             }
-            RequestAuthKind::TransferCoins => {
-                self.check_app_permissions(app_id, |perms| perms.transfer_coins)
+            RequestAuthKind::TransferMoney => {
+                self.check_app_permissions(app_id, |perms| perms.transfer_money)
             }
-            RequestAuthKind::MutAndTransferCoins => self.check_app_permissions(app_id, |perms| {
-                perms.transfer_coins && perms.perform_mutations
+            RequestAuthKind::MutAndTransferMoney => self.check_app_permissions(app_id, |perms| {
+                perms.transfer_money && perms.data_mutations
             }),
             RequestAuthKind::ManageAppKeys => Err(NdError::AccessDenied),
+            RequestAuthKind::None => Err(NdError::AccessDenied),
         };
 
         if let Err(error) = result {

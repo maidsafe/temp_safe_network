@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::rpc::Rpc;
-use safe_nd::{Coins, MessageId, PublicId, Request, Response, XorName};
+use safe_nd::{MessageId, Money, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -19,7 +19,7 @@ pub(crate) enum ConsensusAction {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
-        cost: Coins,
+        cost: Money,
     },
     /// Process request that doesn't need a payment and forward request to client.
     Forward {
@@ -33,7 +33,7 @@ pub(crate) enum ConsensusAction {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
-        cost: Coins,
+        cost: Money,
     },
 }
 

@@ -23,10 +23,12 @@ use mock_quic_p2p::{self as quic_p2p, Event, Network, OurType, Peer, QuicP2p};
 #[cfg(feature = "mock_parsec")]
 use routing::{self, Node, NodeConfig, TransportConfig as NetworkConfig};
 use safe_nd::{
-    AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, CoinsRequest, Error,
-    HandshakeRequest, HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey,
-    Request, Response, Signature, Transaction, TransactionId,
+    AppFullId, AppPublicId, ClientFullId, ClientPublicId, Error, HandshakeRequest,
+    HandshakeResponse, Message, MessageId, Money, MoneyRequest, PublicId, PublicKey, Request,
+    Response, Signature, TransferId, TransferNotification, TransferRegistered,
 };
+#[cfg(feature = "mock")]
+use safe_vault::mock_routing::{ConsensusGroup, ConsensusGroupRef};
 use safe_vault::{Command, Config, Vault};
 use serde::Serialize;
 use std::{
@@ -440,7 +442,7 @@ pub trait TestClientTrait {
         }
     }
 
-    fn expect_notification(&mut self, env: &mut Environment) -> Notification {
+    fn expect_notification(&mut self, env: &mut Environment) -> TransferNotification {
         // expect notifications from all connected vaults.
         let connected_vaults = self.connected_vaults().len();
         let mut received_notifications = Vec::new();
@@ -464,7 +466,7 @@ pub trait TestClientTrait {
         &mut self,
         env: &mut Environment,
         expected_message_id: MessageId,
-    ) -> (Notification, Response) {
+    ) -> (TransferNotification, Response) {
         // expect notifications and responses from all connected vaults.
         let connected_vaults = self.connected_vaults().len();
         let mut received_notifications = Vec::new();
@@ -717,24 +719,24 @@ pub fn create_balance(
     env: &mut Environment,
     src_client: &mut TestClient,
     dst_client: Option<&mut TestClient>,
-    amount: impl IntoCoins,
+    amount: impl IntoMoney,
 ) {
     let new_balance_owner = match dst_client {
         Some(ref dst_client) => *dst_client.public_id().public_key(),
         None => *src_client.public_id().public_key(),
     };
-    let amount = amount.into_coins();
-    let transaction_id = 0;
+    let amount = amount.into_money();
+    let transfer_id = 0;
 
-    let message_id = src_client.send_request(Request::Coins(CoinsRequest::CreateBalance {
+    let message_id = src_client.send_request(Request::Money(MoneyRequest::CreateBalance {
         new_balance_owner,
         amount,
-        transaction_id,
+        transfer_id,
     }));
     env.poll();
 
-    let expected = Transaction {
-        id: transaction_id,
+    let expected = TransferRegistered {
+        id: transfer_id,
         amount,
     };
 
@@ -746,38 +748,38 @@ pub fn create_balance(
     } else {
         src_client.expect_notification_and_response(env, message_id)
     };
-    assert_eq!(notification, Notification(expected));
+    assert_eq!(notification, TransferNotification(expected));
 
-    let actual = unwrap!(Transaction::try_from(response));
+    let actual = unwrap!(TransferRegistered::try_from(response));
     assert_eq!(actual, expected);
 }
 
-pub fn transfer_coins(
+pub fn transfer_money(
     env: &mut Environment,
     src_client: &mut impl TestClientTrait,
     dst_client: &mut TestClient,
-    amount: impl IntoCoins,
-    transaction_id: TransactionId,
+    amount: impl IntoMoney,
+    transfer_id: TransferId,
 ) {
-    let amount = amount.into_coins();
+    let amount = amount.into_money();
 
-    let message_id = src_client.send_request(Request::Coins(CoinsRequest::Transfer {
+    let message_id = src_client.send_request(Request::Money(MoneyRequest::TransferMoney {
         destination: *dst_client.public_id().name(),
         amount,
-        transaction_id,
+        transfer_id,
     }));
     env.poll();
 
-    let expected = Transaction {
-        id: transaction_id,
+    let expected = TransferRegistered {
+        id: transfer_id,
         amount,
     };
 
     let notification = dst_client.expect_notification(env);
-    assert_eq!(notification, Notification(expected));
+    assert_eq!(notification, TransferNotification(expected));
 
     let response = src_client.expect_response(message_id, env);
-    let actual = unwrap!(Transaction::try_from(response));
+    let actual = unwrap!(TransferRegistered::try_from(response));
     assert_eq!(actual, expected);
 }
 
@@ -785,22 +787,22 @@ pub fn gen_public_key(rng: &mut TestRng) -> PublicKey {
     *ClientFullId::new_ed25519(rng).public_id().public_key()
 }
 
-pub trait IntoCoins {
-    fn into_coins(self) -> Coins;
+pub trait IntoMoney {
+    fn into_money(self) -> Money;
 }
 
-impl IntoCoins for Coins {
-    fn into_coins(self) -> Coins {
+impl IntoMoney for Money {
+    fn into_money(self) -> Money {
         self
     }
 }
 
-impl IntoCoins for u64 {
-    fn into_coins(self) -> Coins {
-        Coins::from_nano(self)
+impl IntoMoney for u64 {
+    fn into_money(self) -> Money {
+        Money::from_nano(self)
     }
 }
 
-pub fn multiply_coins(coins: Coins, factor: u64) -> Coins {
-    Coins::from_nano(coins.as_nano() * factor)
+pub fn multiply_money(money: Money, factor: u64) -> Money {
+    Money::from_nano(money.as_nano() * factor)
 }

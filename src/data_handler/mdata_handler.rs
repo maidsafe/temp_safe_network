@@ -164,7 +164,6 @@ impl MDataHandler {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
-        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
@@ -192,7 +191,6 @@ impl MDataHandler {
                 .map_err(|error| error.to_string().into())
         };
 
-        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {

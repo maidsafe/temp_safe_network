@@ -8,6 +8,7 @@
 
 //! Implementation of the "Vault" node for the SAFE Network.
 
+#![feature(vec_remove_item)]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",

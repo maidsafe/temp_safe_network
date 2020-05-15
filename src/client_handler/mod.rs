@@ -11,13 +11,14 @@ mod balances;
 mod data_requests;
 mod login_packets;
 mod messaging;
+mod transfers;
 
 use self::{
     auth::{Auth, AuthKeysDb, ClientInfo},
-    balances::{Balances, BalancesDb},
     data_requests::Evaluation,
     login_packets::LoginPackets,
     messaging::Messaging,
+    transfers::{Replica as TransfersReplica, Transfers},
 };
 use crate::{
     action::{Action, ConsensusAction},
@@ -31,7 +32,7 @@ use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
 use routing::Node;
-use safe_nd::{Coins, MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName};
+use safe_nd::{MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName, Money, PublicKey};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -40,12 +41,12 @@ use std::{
 };
 
 /// The cost to Put a chunk to the network.
-pub const COST_OF_PUT: Coins = Coins::from_nano(1);
+pub const COST_OF_PUT: Money = Money::from_nano(1);
 
 pub(crate) struct ClientHandler {
     id: NodePublicId,
     messaging: Messaging,
-    balances: Balances,
+    transfers: Transfers,
     auth: Auth,
     login_packets: LoginPackets,
     data: Evaluation,
@@ -62,25 +63,26 @@ impl ClientHandler {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
-        let balances_db = BalancesDb::new(root_dir, init_mode)?;
         let login_packets_db = LoginPacketChunkStore::new(
             root_dir,
             config.max_capacity(),
             Rc::clone(&total_used_space),
             init_mode,
         )?;
+        //let bank = Bank::new(id.clone(), root_dir, init_mode)?;
+        let replica = TransfersReplica::new(PublicKey::Ed25519(*id.clone().ed25519_public_key()));
 
         let messaging = Messaging::new(id.clone(), routing_node);
 
         let auth = Auth::new(id.clone(), auth_keys_db);
-        let balances = Balances::new(id.clone(), balances_db);
+        let transfers = Transfers::new(id.clone(), replica);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = Evaluation::new(id.clone());
 
         let client_handler = Self {
             id,
             messaging,
-            balances,
+            transfers,
             auth,
             login_packets,
             data,
@@ -99,6 +101,27 @@ impl ClientHandler {
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
         self.messaging.handle_connection_failure(peer_addr)
+    }
+
+    pub fn handle_client_message<R: CryptoRng + Rng>(
+        &mut self,
+        peer_addr: SocketAddr,
+        bytes: &Bytes,
+        rng: &mut R,
+    ) -> Option<Action> {
+        let result = self
+            .messaging
+            .try_parse_client_request(peer_addr, bytes, rng);
+        if let Some(result) = result {
+            self.process_client_request(
+                &result.client,
+                result.request,
+                result.message_id,
+                result.signature,
+            )
+        } else {
+            None
+        }
     }
 
     pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
@@ -144,13 +167,10 @@ impl ClientHandler {
                 cost,
             } => {
                 let owner = utils::owner(&client_public_id)?;
-                if let Some(action) = self.balances.pay(
-                    &client_public_id,
-                    owner.public_key(),
-                    &request,
-                    message_id,
-                    cost,
-                ) {
+                if let Some(action) =
+                    self.transfers
+                        .pay_section(cost, *owner.public_key(), &request, message_id)
+                {
                     return Some(action);
                 }
 
@@ -178,14 +198,10 @@ impl ClientHandler {
                 cost,
             } => {
                 let owner = utils::owner(&client_public_id)?;
-
-                if let Some(action) = self.balances.pay(
-                    &client_public_id,
-                    owner.public_key(),
-                    &request,
-                    message_id,
-                    cost,
-                ) {
+                if let Some(action) =
+                    self.transfers
+                        .pay_section(cost, *owner.public_key(), &request, message_id)
+                {
                     return Some(action);
                 }
 
@@ -196,27 +212,6 @@ impl ClientHandler {
                     signature: None,
                 }))
             }
-        }
-    }
-
-    pub fn handle_client_message<R: CryptoRng + Rng>(
-        &mut self,
-        peer_addr: SocketAddr,
-        bytes: &Bytes,
-        rng: &mut R,
-    ) -> Option<Action> {
-        let result = self
-            .messaging
-            .try_parse_client_request(peer_addr, bytes, rng);
-        if let Some(result) = result {
-            self.process_client_request(
-                &result.client,
-                result.request,
-                result.message_id,
-                result.signature,
-            )
-        } else {
-            None
         }
     }
 
@@ -263,12 +258,9 @@ impl ClientHandler {
                 .data
                 .sequence
                 .process_client_request(client, sdata_req, message_id),
-            Coins(coins_req) => self.balances.process_client_request(
-                client,
-                coins_req,
-                message_id,
-                &mut self.messaging,
-            ),
+            Money(money_req) => self
+                .transfers
+                .process_client_request(client, money_req, message_id),
             LoginPacket(login_packet_req) => {
                 self.login_packets
                     .process_client_request(client, login_packet_req, message_id)
@@ -302,9 +294,9 @@ impl ClientHandler {
                 requester,
                 req,
                 message_id,
-                &mut self.balances,
+                &mut self.transfers,
             ),
-            Coins(req) => self.balances.finalise_client_request(
+            Money(req) => self.transfers.finalise_client_request(
                 requester,
                 req,
                 message_id,
