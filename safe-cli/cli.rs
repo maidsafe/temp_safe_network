@@ -16,7 +16,7 @@ use crate::{
     subcommands::{
         auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
         files::files_commander, keys::key_commander, networks::networks_commander,
-        nrs::nrs_commander, setup::setup_commander, update::update_commander,
+        nrs::nrs_commander, seq::seq_commander, setup::setup_commander, update::update_commander,
         vault::vault_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
         SubCommands,
     },
@@ -133,6 +133,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<
                     files_commander(cmd, output_fmt, args.dry, &mut safe).await
                 }
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, &mut safe).await,
+                SubCommands::Seq(cmd) => seq_commander(cmd, output_fmt, &mut safe).await,
                 _ => Err("Unknown safe subcommand".to_string()),
             }
         }

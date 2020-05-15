@@ -51,7 +51,7 @@ pub enum VaultSubCommands {
         /// Path where to run safe-vault executable from (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can also be used to set the path
         #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
         vault_path: Option<PathBuf>,
-        /// Vebosity level for vaults logs
+        /// Vebosity level for vaults logs (default = INFO, -y = DEBUG, -yy = TRACE)
         #[structopt(short = "y", parse(from_occurrences))]
         verbosity: u8,
         /// Interval in seconds between launching each of the vaults

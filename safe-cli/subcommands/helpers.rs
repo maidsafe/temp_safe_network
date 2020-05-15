@@ -29,6 +29,17 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
     xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+// Converts a hex encoded string to XOR name bytes
+pub fn hex_to_xorname(hex_str: &str) -> Result<XorName, String> {
+    if hex_str.len() != 32 {
+        Err("Invalid hex encoded XorName string".to_string())
+    } else {
+        let mut xorname = XorName::default();
+        xorname.0.copy_from_slice(hex_str[0..32].as_bytes());
+        Ok(xorname)
+    }
+}
+
 // Read the argument string from the STDIN if is not an arg provided
 pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Result<String, String> {
     match arg {

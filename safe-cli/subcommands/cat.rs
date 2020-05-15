@@ -107,6 +107,22 @@ pub async fn cat_commander(
         SafeData::SafeKey { .. } => {
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
+        SafeData::PublicSequence { data, version, .. } => {
+            if OutputFmt::Pretty == output_fmt {
+                println!("Sequence (version {}) at \"{}\":", version, url);
+                if cmd.hexdump {
+                    // Render hex representation of Sequence content
+                    println!("{}", pretty_hex::pretty_hex(data));
+                } else {
+                    // Render Sequence content
+                    io::stdout().write_all(data).map_err(|err| {
+                        format!("Failed to print out the content of the file: {}", err)
+                    })?
+                }
+            } else {
+                println!("{}", serialise_output(&(url, data), output_fmt));
+            }
+        }
     }
 
     Ok(())

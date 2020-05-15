@@ -26,13 +26,13 @@ use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
     ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, ClientFullId, Coins,
     Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
-    MDataSeqValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction,
-    TransactionId, XorName,
+    MDataSeqValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SData, SDataAddress,
+    SDataAppendOperation, SDataIndex, SDataPermissions, SDataPubPermissions,
+    SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction, TransactionId, XorName,
 };
+use std::collections::BTreeMap;
 
 pub use threshold_crypto::{PublicKey, SecretKey};
-
-use std::collections::BTreeMap;
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
@@ -418,8 +418,12 @@ impl SafeApp for SafeAppScl {
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
             .await
-            .map_err(|e| {
-                Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
+            .map_err(|err| match err {
+                Error::EmptyContent(_) => err,
+                _ => Error::NetDataError(format!(
+                    "Failed to get Sequenced Append Only Data: {:?}",
+                    err
+                )),
             })?;
 
         let data_entry = client
@@ -453,7 +457,14 @@ impl SafeApp for SafeAppScl {
                 ))
             })?;
 
-        Ok(data_returned.entries_index() - 1)
+        if data_returned.entries_index() > 0 {
+            Ok(data_returned.entries_index() - 1)
+        } else {
+            Err(Error::EmptyContent(format!(
+                "Empty Sequenced AppendOnlyData found at Xor name {}",
+                xorname_to_hex(&name)
+            )))
+        }
     }
 
     async fn get_seq_append_only_data(
@@ -493,6 +504,150 @@ impl SafeApp for SafeAppScl {
         Ok((this_version.key, this_version.value))
     }
 
+    // === Sequence Data operations ===
+    async fn store_sequence_data(
+        &mut self,
+        data: &[u8],
+        name: Option<XorName>,
+        tag: u64,
+        _permissions: Option<String>,
+    ) -> Result<XorName> {
+        debug!(
+            "Storing Sequence data w/ type: {:?}, xorname: {:?}",
+            tag, name
+        );
+
+        let safe_app: &App = self.get_safe_app()?;
+        let xorname = name.unwrap_or_else(rand::random);
+        info!("Xorname for storage: {:?}", &xorname);
+
+        let public_key = SafeNdPublicKey::Bls(get_public_bls_key(safe_app)?);
+        let mut pub_sequence = SData::new_pub(public_key, xorname, tag);
+        pub_sequence.append(vec![data.to_vec()]).map_err(|e| {
+            Error::Unexpected(format!(
+                "Failed to set the initial data to the Sequence data: {:?}",
+                e
+            ))
+        })?;
+
+        let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
+        let user_perms = SDataPubUserPermissions::new(true, true);
+        let usr_app = SDataUser::Key(public_key);
+        let _ = perms.insert(usr_app, user_perms);
+        pub_sequence
+            .set_permissions(&SDataPermissions::Pub(SDataPubPermissions {
+                permissions: perms,
+                entries_index: 1,
+                owners_index: 0,
+            }))
+            .map_err(|e| {
+                Error::Unexpected(format!(
+                    "Failed to set permissions for the Sequence data: {:?}",
+                    e
+                ))
+            })?;
+
+        let usr_acc_owner = get_owner_pk(safe_app)?;
+        pub_sequence.set_owner(usr_acc_owner);
+
+        run(safe_app, move |client, _app_context| {
+            client
+                .store_sdata(pub_sequence.clone())
+                .map_err(SafeAppError)
+                .map(move |_| xorname)
+        })
+        .map_err(|e| Error::NetDataError(format!("Failed to store Sequence data: {:?}", e)))
+    }
+
+    async fn get_sequence_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)> {
+        debug!(
+            "Fetching Sequence data w/ type: {:?}, xorname: {:?}",
+            tag, name
+        );
+
+        let safe_app: &App = self.get_safe_app()?;
+
+        let sequence_address = SDataAddress::Public { name, tag };
+        let res = run(safe_app, move |client, _app_context| {
+            client
+                .get_sdata_last_entry(sequence_address)
+                .map_err(SafeAppError)
+        })
+        .map_err(|err| {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
+                Error::EmptyContent(format!("Empty Sequence found at XoR name {}", name))
+            } else {
+                Error::NetDataError(format!(
+                    "Failed to retrieve last entry from Sequence data: {:?}",
+                    err
+                ))
+            }
+        })?;
+
+        Ok(res)
+    }
+
+    async fn get_sequence_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>> {
+        debug!(
+            "Fetching Sequence data w/ type: {:?}, xorname: {:?}",
+            tag, name
+        );
+
+        let safe_app: &App = self.get_safe_app()?;
+
+        let sequence_address = SDataAddress::Public { name, tag };
+        let start = SDataIndex::FromStart(index);
+        let end = SDataIndex::FromStart(index + 1);
+        let res = run(safe_app, move |client, _app_context| {
+            client
+                .get_sdata_range(sequence_address, (start, end))
+                .map_err(SafeAppError)
+        })
+        .map_err(|err| {
+            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
+                Error::VersionNotFound(format!(
+                    "Invalid version ({}) for Sequence found at XoR name {}",
+                    index, name
+                ))
+            } else {
+                Error::NetDataError(format!(
+                    "Failed to retrieve entry at index {} from Sequence data: {:?}",
+                    index, err
+                ))
+            }
+        })?;
+
+        let entry = res.get(0).ok_or_else(|| {
+            Error::EmptyContent(format!(
+                "Empty Sequence found at Xor name {}",
+                xorname_to_hex(&name)
+            ))
+        })?;
+
+        Ok(entry.to_vec())
+    }
+
+    async fn sequence_append(&mut self, data: &[u8], name: XorName, tag: u64) -> Result<()> {
+        debug!(
+            "Appending to Sequence data w/ type: {:?}, xorname: {:?}",
+            tag, name
+        );
+
+        let safe_app: &App = self.get_safe_app()?;
+
+        let address = SDataAddress::Public { name, tag };
+        let append_op = SDataAppendOperation {
+            address,
+            values: vec![data.to_vec()],
+        };
+
+        run(safe_app, move |client, _app_context| {
+            client.sdata_append(append_op).map_err(SafeAppError)
+        })
+        .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
+    }
+
+    // === MutableData operations ===
     async fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,

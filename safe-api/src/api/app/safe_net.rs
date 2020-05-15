@@ -98,6 +98,22 @@ pub trait SafeApp {
         version: u64,
     ) -> Result<AppendOnlyDataRawData>;
 
+    // === Sequence ===
+    async fn store_sequence_data(
+        &mut self,
+        data: &[u8],
+        name: Option<XorName>,
+        tag: u64,
+        permissions: Option<String>,
+    ) -> Result<XorName>;
+
+    async fn get_sequence_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)>;
+
+    async fn get_sequence_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>>;
+
+    async fn sequence_append(&mut self, data: &[u8], name: XorName, tag: u64) -> Result<()>;
+
+    // === MutableData ===
     async fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,

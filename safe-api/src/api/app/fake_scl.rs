@@ -38,12 +38,14 @@ type AppendOnlyDataFake = Vec<(Vec<u8>, Vec<u8>)>;
 type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
 type SeqMutableDataFake = BTreeMap<String, MDataSeqValue>;
+type SequenceDataFake = Vec<Vec<u8>>;
 
 #[derive(Default, Serialize, Deserialize)]
 struct FakeData {
     coin_balances: BTreeMap<XorNameStr, SafeKey>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
     published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataFake>, // keep a versioned map of data per xorname
+    public_sequence: BTreeMap<XorNameStr, SequenceDataFake>,
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataFake>,
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
@@ -341,7 +343,11 @@ impl SafeApp for SafeAppFake {
 
         match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
             Some(seq_append_only) => {
-                let latest_index = seq_append_only.len() - 1;
+                let latest_index = if seq_append_only.is_empty() {
+                    0
+                } else {
+                    seq_append_only.len() - 1
+                };
                 let last_entry = seq_append_only.get(latest_index).ok_or_else(|| {
                     Error::EmptyContent(format!(
                         "Empty Sequenced AppendOnlyData found at Xor name {}",
@@ -411,6 +417,100 @@ impl SafeApp for SafeAppFake {
         }
     }
 
+    // === Sequence data operations ===
+    async fn store_sequence_data(
+        &mut self,
+        data: &[u8],
+        name: Option<XorName>,
+        _tag: u64,
+        _permissions: Option<String>,
+    ) -> Result<XorName> {
+        let xorname = name.unwrap_or_else(rand::random);
+        let initial_data = vec![data.to_vec()];
+        self.fake_vault
+            .public_sequence
+            .insert(xorname_to_hex(&xorname), initial_data);
+
+        Ok(xorname)
+    }
+
+    async fn get_sequence_last_entry(&self, name: XorName, _tag: u64) -> Result<(u64, Vec<u8>)> {
+        let xorname_hex = xorname_to_hex(&name);
+        debug!("Attempting to locate Sequence in scl mock: {}", xorname_hex);
+
+        match self.fake_vault.public_sequence.get(&xorname_hex) {
+            Some(seq) => {
+                if seq.is_empty() {
+                    Err(Error::EmptyContent(format!(
+                        "Empty Sequence found at Xor name {}",
+                        xorname_hex
+                    )))
+                } else {
+                    let latest_index = seq.len() - 1;
+                    let last_entry = seq.get(latest_index).ok_or_else(|| {
+                        Error::Unexpected(format!(
+                            "Failed to get latest entry from Sequence found at Xor name {}",
+                            xorname_hex
+                        ))
+                    })?;
+                    Ok((latest_index as u64, last_entry.clone()))
+                }
+            }
+            None => Err(Error::ContentNotFound(format!(
+                "Sequence not found at Xor name: {}",
+                xorname_hex
+            ))),
+        }
+    }
+
+    async fn get_sequence_entry(&self, name: XorName, _tag: u64, index: u64) -> Result<Vec<u8>> {
+        let xorname_hex = xorname_to_hex(&name);
+        debug!("Attempting to locate Sequence in scl mock: {}", xorname_hex);
+
+        match self.fake_vault.public_sequence.get(&xorname_hex) {
+            Some(seq) => {
+                if seq.is_empty() {
+                    Err(Error::EmptyContent(format!(
+                        "Empty Sequence found at Xor name {}",
+                        xorname_hex
+                    )))
+                } else {
+                    let last_entry = seq.get(index as usize).ok_or_else(|| {
+                        Error::VersionNotFound(format!(
+                            "Failed to get entry (index: {}) from Sequence found at Xor name {}",
+                            index, xorname_hex
+                        ))
+                    })?;
+                    Ok(last_entry.clone())
+                }
+            }
+            None => Err(Error::ContentNotFound(format!(
+                "Sequence not found at Xor name: {}",
+                xorname_hex
+            ))),
+        }
+    }
+
+    async fn sequence_append(&mut self, data: &[u8], name: XorName, _tag: u64) -> Result<()> {
+        let xorname_hex = xorname_to_hex(&name);
+        debug!(
+            "Attempting to append to Sequence in scl mock: {}",
+            xorname_hex
+        );
+
+        match self.fake_vault.public_sequence.get_mut(&xorname_hex) {
+            Some(seq) => {
+                seq.push(data.to_vec());
+                Ok(())
+            }
+            None => Err(Error::ContentNotFound(format!(
+                "Sequence not found at Xor name: {}",
+                xorname_hex
+            ))),
+        }
+    }
+
+    // === MutableData operations ===
     async fn put_seq_mutable_data(
         &mut self,
         name: Option<XorName>,

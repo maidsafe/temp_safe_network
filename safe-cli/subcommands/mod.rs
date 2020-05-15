@@ -18,6 +18,7 @@ pub mod keys;
 pub mod networks;
 pub mod nrs;
 pub mod safe_id;
+pub mod seq;
 pub mod setup;
 pub mod update;
 pub mod vault;
@@ -113,6 +114,9 @@ pub enum SubCommands {
         #[structopt(short = "l", long = "follow-links")]
         follow_links: bool,
     },
+    #[structopt(name = "seq")]
+    /// Manage Sequences on the SAFE Network
+    Seq(seq::SeqSubCommands),
     // #[structopt(name = "safe-id")]
     // /// Manage identities on the SAFE Network
     // SafeId(safe_id::SafeIdSubCommands),

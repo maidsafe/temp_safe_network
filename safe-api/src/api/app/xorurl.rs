@@ -13,7 +13,7 @@ use super::{
     DEFAULT_XORURL_BASE,
 };
 use crate::{Error, Result};
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use multibase::{decode, encode, Base};
 use safe_nd::{XorName, XOR_NAME_LEN};
 use serde::{Deserialize, Serialize};
@@ -145,6 +145,8 @@ pub enum SafeDataType {
     PublishedUnseqAppendOnlyData = 0x06,
     UnpublishedSeqAppendOnlyData = 0x07,
     UnpublishedUnseqAppendOnlyData = 0x08,
+    PublicSequence = 0x09,
+    PrivateSequence = 0x0a,
 }
 
 impl std::fmt::Display for SafeDataType {
@@ -165,6 +167,8 @@ impl SafeDataType {
             6 => Ok(Self::PublishedUnseqAppendOnlyData),
             7 => Ok(Self::UnpublishedSeqAppendOnlyData),
             8 => Ok(Self::UnpublishedUnseqAppendOnlyData),
+            9 => Ok(Self::PublicSequence),
+            10 => Ok(Self::PrivateSequence),
             _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
@@ -600,9 +604,10 @@ impl SafeUrl {
             },
         };
 
-        debug!(
+        trace!(
             "Attempting to match content type of URL: {}, {:?}",
-            &xorurl, content_type
+            &xorurl,
+            content_type
         );
 
         let data_type = match xorurl_bytes[3] {
@@ -615,6 +620,8 @@ impl SafeUrl {
             6 => SafeDataType::PublishedUnseqAppendOnlyData,
             7 => SafeDataType::UnpublishedSeqAppendOnlyData,
             8 => SafeDataType::UnpublishedUnseqAppendOnlyData,
+            9 => SafeDataType::PublicSequence,
+            10 => SafeDataType::PrivateSequence,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid SAFE data type encoded in the XOR-URL string: {}",
@@ -819,7 +826,7 @@ impl SafeUrl {
         }
 
         self.query_string = pairs.finish();
-        debug!("Set query_string: {}", self.query_string);
+        trace!("Set query_string: {}", self.query_string);
 
         if key == URL_VERSION_QUERY_NAME {
             self.set_content_version_internal(val)?;
@@ -1154,6 +1161,28 @@ impl SafeUrl {
         )
     }
 
+    // A non-member Sequence data URL encoder function for convenience
+    pub fn encode_sequence_data(
+        xor_name: XorName,
+        type_tag: u64,
+        content_type: SafeContentType,
+        base: XorUrlBase,
+    ) -> Result<String> {
+        SafeUrl::encode(
+            xor_name,
+            None,
+            type_tag,
+            SafeDataType::PublicSequence,
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+            base,
+        )
+    }
+
     // utility to generate a dummy url from a query string.
     fn query_string_to_url(query_str: &str) -> Result<Url> {
         let dummy = format!("file://dummy?{}", query_str);
@@ -1204,7 +1233,7 @@ impl SafeUrl {
         } else {
             self.content_version = None;
         }
-        debug!("Set version: {:#?}", self.content_version);
+        trace!("Set version: {:#?}", self.content_version);
         Ok(())
     }
 

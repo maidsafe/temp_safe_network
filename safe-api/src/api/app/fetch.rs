@@ -69,6 +69,14 @@ pub enum SafeData {
         data_type: SafeDataType,
         resolved_from: String,
     },
+    PublicSequence {
+        xorurl: String,
+        xorname: XorName,
+        type_tag: u64,
+        version: u64,
+        data: Vec<u8>,
+        resolved_from: String,
+    },
 }
 
 impl SafeData {
@@ -79,7 +87,8 @@ impl SafeData {
             | Wallet { xorurl, .. }
             | FilesContainer { xorurl, .. }
             | PublishedImmutableData { xorurl, .. }
-            | NrsMapContainer { xorurl, .. } => xorurl.clone(),
+            | NrsMapContainer { xorurl, .. }
+            | PublicSequence { xorurl, .. } => xorurl.clone(),
         }
     }
 
@@ -90,7 +99,8 @@ impl SafeData {
             | Wallet { resolved_from, .. }
             | FilesContainer { resolved_from, .. }
             | PublishedImmutableData { resolved_from, .. }
-            | NrsMapContainer { resolved_from, .. } => resolved_from.clone(),
+            | NrsMapContainer { resolved_from, .. }
+            | PublicSequence { resolved_from, .. } => resolved_from.clone(),
         }
     }
 }
@@ -378,6 +388,20 @@ async fn resolve_one_indirection(
             SafeDataType::PublishedImmutableData => {
                 retrieve_immd(safe, &the_xor, retrieve_data, None, &metadata, range).await
             }
+            SafeDataType::PublicSequence => {
+                let (version, data) = safe.fetch_sequence(&the_xor).await?;
+                debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
+                let safe_data = SafeData::PublicSequence {
+                    xorurl,
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
+                    version,
+                    data: if retrieve_data { data } else { vec![] },
+                    resolved_from: url.to_string(),
+                };
+
+                Ok((safe_data, None))
+            }
             other => Err(Error::ContentError(format!(
                 "Data type '{:?}' not supported yet",
                 other
@@ -556,7 +580,7 @@ mod tests {
                     type_tag: 1_100,
                     version: 0,
                     files_map,
-                    data_type: SafeDataType::PublishedSeqAppendOnlyData,
+                    data_type: SafeDataType::PublicSequence,
                     resolved_from: xorurl.clone(),
                 }
         );
@@ -615,7 +639,7 @@ mod tests {
                 assert_eq!(*xorname, xorurl_encoder.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, 0);
-                assert_eq!(*data_type, SafeDataType::PublishedSeqAppendOnlyData);
+                assert_eq!(*data_type, SafeDataType::PublicSequence);
                 assert_eq!(*files_map, the_files_map);
 
                 // let's also compare it with the result from inspecting the URL
@@ -808,6 +832,42 @@ mod tests {
                 content
             )))
         }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_public_sequence() -> Result<()> {
+        let mut safe = new_safe_instance()?;
+        let data = b"Something super immutable";
+        let xorurl = safe.sequence_create(data, None, 25_000).await?;
+
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
+        assert!(
+            content
+                == SafeData::PublicSequence {
+                    xorurl: xorurl.clone(),
+                    xorname: xorurl_encoder.xorname(),
+                    type_tag: xorurl_encoder.type_tag(),
+                    version: 0,
+                    data: data.to_vec(),
+                    resolved_from: xorurl.clone(),
+                }
+        );
+
+        // let's also compare it with the result from inspecting the URL
+        let inspected_url = safe.inspect(&xorurl).await?;
+        assert!(
+            inspected_url[0]
+                == SafeData::PublicSequence {
+                    xorurl: xorurl.clone(),
+                    xorname: xorurl_encoder.xorname(),
+                    type_tag: xorurl_encoder.type_tag(),
+                    version: 0,
+                    data: vec![],
+                    resolved_from: xorurl,
+                }
+        );
+        Ok(())
     }
 
     #[tokio::test]
