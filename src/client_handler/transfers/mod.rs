@@ -85,21 +85,28 @@ impl Transfers {
             MoneyRequest::PropagateTransfer { payload } => {
                 self.propagate_transfer(payload, &requester, message_id, messaging)
             }
-            MoneyRequest::GetBalance(_) => {
-                let balance = self
-                    .replica
-                    .balance(&requester.public_key())
-                    .ok_or(NdError::NoSuchBalance);
-                let response = Response::GetBalance(balance);
+            MoneyRequest::GetBalance(xorname) => {
+                let authorized = xorname == requester.public_key().into();
+                let result = if !authorized {
+                    Err(NdError::NoSuchBalance)
+                } else {
+                    self.replica
+                        .balance(&requester.public_key())
+                        .ok_or(NdError::NoSuchBalance)
+                };
+                let response = Response::GetBalance(result);
                 messaging.respond_to_client(message_id, response);
                 None
             }
-            MoneyRequest::GetHistory(_) => {
-                let history = self.replica.history(&requester.public_key());
-                let result = if history.len() > 0 {
-                    Ok(history)
-                } else {
+            MoneyRequest::GetHistory { at, since } => {
+                let authorized = at == requester.public_key().into();
+                let result = if !authorized {
                     Err(NdError::NoSuchBalance)
+                } else {
+                    match self.replica.history(&requester.public_key(), since) {
+                        None => Err(NdError::NoSuchBalance),
+                        Some(history) => Ok(history),
+                    }
                 };
                 let response = Response::GetHistory(result);
                 messaging.respond_to_client(message_id, response);

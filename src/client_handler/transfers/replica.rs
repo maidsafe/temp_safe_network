@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use safe_nd::{
-    Error, Money, ProofOfAgreement, RegisterTransfer, Result, Signature, Transfer,
+    Error, Money, ProofOfAgreement, RegisterTransfer, Result, Signature, Transfer, TransferIndices,
     TransferRegistered, TransferValidated, ValidateTransfer,
 };
 use threshold_crypto::SignatureShare;
@@ -21,7 +21,7 @@ pub struct Replica {
     // /// The PK Set of the section
     // pk_set: threshold_crypto::PublicKeySet, // temporary exclude
     /// Set of all transfers impacting a given identity
-    history: HashMap<Identity, Vec<Transfer>>,
+    histories: HashMap<Identity, History>,
     /// Ensures that invidual actors' transfer
     /// initiations (ValidateTransfer cmd) are sequential.
     pending_transfers: VClock<Identity>,
@@ -56,7 +56,7 @@ impl Replica {
         Replica {
             id,
             // pk_set, // temporary exclude
-            history: Default::default(),
+            histories: Default::default(),
             pending_transfers: VClock::new(),
         }
     }
@@ -71,36 +71,29 @@ impl Replica {
             return Err(Error::InvalidSignature);
         }
         // genesis must be the first
-        if self.history.len() > 0 {
+        if self.histories.len() > 0 {
             return Err(Error::InvalidOperation);
         }
         Ok(TransferPropagated { proof })
     }
 
-    pub fn history(&self, identity: &Identity) -> Vec<Transfer> {
-        self.history.get(&identity).cloned().unwrap_or_default()
+    pub fn history(
+        &self,
+        identity: &Identity,
+        since_indices: TransferIndices,
+    ) -> Option<(Vec<Transfer>, Vec<Transfer>)> {
+        match self.histories.get(&identity).cloned() {
+            None => None,
+            Some(history) => Some(history.new_since(since_indices)),
+        }
     }
 
     pub fn balance(&self, identity: &Identity) -> Option<Money> {
-        // todo: cache
-        let h = self.history(identity);
-
-        let outgoing = h
-            .iter()
-            .filter(|t| &t.id.actor == identity)
-            .map(|t| t.amount.as_nano())
-            .sum();
-        let incoming = h
-            .iter()
-            .filter(|t| &t.to == identity)
-            .map(|t| t.amount.as_nano())
-            .sum();
-
-        // We compute differences in a larger space since we need to move to signed numbers
-        // and hence we lose a bit.
-        let balance = Money::from_nano(incoming).checked_sub(Money::from_nano(outgoing));
-
-        balance
+        let result = self.histories.get(identity);
+        match result {
+            None => None,
+            Some(history) => Some(history.balance()),
+        }
     }
 
     /// For now, with test money there is no from account.., money is created from thin air.
@@ -131,7 +124,7 @@ impl Replica {
         if transfer.id.actor == transfer.to {
             return Err(Error::InvalidOperation); // "Sender and recipient are the same"
         }
-        if !self.history.contains_key(&transfer.id.actor) {
+        if !self.histories.contains_key(&transfer.id.actor) {
             // println!(
             //     "{} sender does not exist (trying to transfer {} to {}).",
             return Err(Error::NoSuchSender);
@@ -165,7 +158,7 @@ impl Replica {
             return Err(Error::InvalidSignature);
         }
         let transfer = &proof.transfer_cmd.transfer;
-        if !self.history.contains_key(&transfer.id.actor) {
+        if !self.histories.contains_key(&transfer.id.actor) {
             // this check could be redundant..
             return Err(Error::NoSuchSender); // ..also, if we actually reach here, there's probably some problem with the logic, that needs to be solved
         }
@@ -206,7 +199,14 @@ impl Replica {
     // Extend the history for the key.
     fn append(&mut self, key: Identity, transfer: Transfer) {
         // Creates if not exists.
-        let _ = self.history.entry(key).or_default().push(transfer.clone());
+        match self.histories.get_mut(&key) {
+            Some(history) => history.append(transfer),
+            None => {
+                let _ = self
+                    .histories
+                    .insert(key, History::new(key, transfer.clone()));
+            }
+        }
     }
 
     fn sign(&self, _cmd: &ValidateTransfer) -> SignatureShare {
@@ -221,15 +221,73 @@ impl Replica {
         unimplemented!()
     }
 
+    // zero based indexing, first (outgoing) transfer will be nr 0
     fn is_sequential(&self, transfer: &Transfer) -> bool {
         let id = transfer.id;
-        let result = self.history.get(&id.actor);
+        let result = self.histories.get(&id.actor);
         match result {
-            None => return id.counter == 0, // zero based indexing, first transfer will be nr 0
-            Some(sequence) => match sequence.last() {
+            None => return id.counter == 0, // if no history exists, transfer counter must be 0
+            Some(history) => match history.outgoing.last() {
+                None => id.counter == 0, // if not outgoing transfers have been made, transfer counter must be 0
                 Some(previous) => previous.id.counter + 1 == id.counter,
-                None => panic!("This would be a bug, we don't add empty collections here!"),
             },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct History {
+    id: Identity,
+    balance: Money,
+    incoming: Vec<Transfer>,
+    outgoing: Vec<Transfer>,
+}
+
+impl History {
+    fn new(id: Identity, first: Transfer) -> Self {
+        Self {
+            id,
+            balance: Money::zero(),
+            incoming: vec![first],
+            outgoing: Default::default(),
+        }
+    }
+
+    fn balance(&self) -> Money {
+        self.balance
+    }
+
+    fn new_since(&self, indices: TransferIndices) -> (Vec<Transfer>, Vec<Transfer>) {
+        let in_include_index = indices.incoming + 1;
+        let out_include_index = indices.outgoing + 1;
+        let new_incoming = if self.incoming.len() > in_include_index {
+            self.incoming.split_at(in_include_index).1.to_vec()
+        } else {
+            vec![]
+        };
+        let new_outgoing = if self.incoming.len() > out_include_index {
+            self.incoming.split_at(out_include_index).1.to_vec()
+        } else {
+            vec![]
+        };
+        (new_incoming, new_outgoing)
+    }
+
+    fn append(&mut self, transfer: Transfer) {
+        if self.id == transfer.id.actor {
+            match self.balance.checked_sub(transfer.amount) {
+                Some(amount) => self.balance = amount,
+                None => panic!(),
+            }
+            self.outgoing.push(transfer);
+        } else if self.id == transfer.to {
+            match self.balance.checked_add(transfer.amount) {
+                Some(amount) => self.balance = amount,
+                None => panic!(),
+            }
+            self.incoming.push(transfer);
+        } else {
+            panic!()
         }
     }
 }
