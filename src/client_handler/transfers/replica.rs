@@ -1,3 +1,4 @@
+use super::history::History;
 use super::Identity;
 use crdts::{CmRDT, VClock};
 use serde::{Deserialize, Serialize};
@@ -158,14 +159,21 @@ impl Replica {
             return Err(Error::InvalidSignature);
         }
         let transfer = &proof.transfer_cmd.transfer;
-        if !self.histories.contains_key(&transfer.id.actor) {
-            // this check could be redundant..
-            return Err(Error::NoSuchSender); // ..also, if we actually reach here, there's probably some problem with the logic, that needs to be solved
+        let id = transfer.id;
+        let sender = self.histories.get(&id.actor);
+        match sender {
+            None => Err(Error::NoSuchSender),
+            Some(history) => match history.is_sequential(transfer) {
+                Ok(is_seq) => {
+                    if is_seq {
+                        Ok(TransferRegistered { proof })
+                    } else {
+                        Err(Error::InvalidOperation) // "Non-sequential operation"
+                    }
+                }
+                Err(_) => Err(Error::InvalidOperation), // from this place this code won't happen, but history validates the transfer is actually outgoing from it's owner.
+            },
         }
-        if !self.is_sequential(transfer) {
-            return Err(Error::InvalidOperation); // "Non-sequential operation"
-        }
-        Ok(TransferRegistered { proof })
     }
 
     /// Validation of agreement.
@@ -219,75 +227,5 @@ impl Replica {
 
     fn verify_proof(&self, _proof: &ProofOfAgreement) -> bool {
         unimplemented!()
-    }
-
-    // zero based indexing, first (outgoing) transfer will be nr 0
-    fn is_sequential(&self, transfer: &Transfer) -> bool {
-        let id = transfer.id;
-        let result = self.histories.get(&id.actor);
-        match result {
-            None => return id.counter == 0, // if no history exists, transfer counter must be 0
-            Some(history) => match history.outgoing.last() {
-                None => id.counter == 0, // if not outgoing transfers have been made, transfer counter must be 0
-                Some(previous) => previous.id.counter + 1 == id.counter,
-            },
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct History {
-    id: Identity,
-    balance: Money,
-    incoming: Vec<Transfer>,
-    outgoing: Vec<Transfer>,
-}
-
-impl History {
-    fn new(id: Identity, first: Transfer) -> Self {
-        Self {
-            id,
-            balance: Money::zero(),
-            incoming: vec![first],
-            outgoing: Default::default(),
-        }
-    }
-
-    fn balance(&self) -> Money {
-        self.balance
-    }
-
-    fn new_since(&self, indices: TransferIndices) -> (Vec<Transfer>, Vec<Transfer>) {
-        let in_include_index = indices.incoming + 1;
-        let out_include_index = indices.outgoing + 1;
-        let new_incoming = if self.incoming.len() > in_include_index {
-            self.incoming.split_at(in_include_index).1.to_vec()
-        } else {
-            vec![]
-        };
-        let new_outgoing = if self.incoming.len() > out_include_index {
-            self.incoming.split_at(out_include_index).1.to_vec()
-        } else {
-            vec![]
-        };
-        (new_incoming, new_outgoing)
-    }
-
-    fn append(&mut self, transfer: Transfer) {
-        if self.id == transfer.id.actor {
-            match self.balance.checked_sub(transfer.amount) {
-                Some(amount) => self.balance = amount,
-                None => panic!(),
-            }
-            self.outgoing.push(transfer);
-        } else if self.id == transfer.to {
-            match self.balance.checked_add(transfer.amount) {
-                Some(amount) => self.balance = amount,
-                None => panic!(),
-            }
-            self.incoming.push(transfer);
-        } else {
-            panic!()
-        }
     }
 }
