@@ -75,13 +75,13 @@ impl Transfers {
     ) -> Option<Action> {
         match request {
             MoneyRequest::ValidateTransfer { payload } => {
-                self.validate_transfer(payload, &requester, message_id)
+                self.validate(payload, &requester, message_id)
             }
             MoneyRequest::RegisterTransfer { payload } => {
-                self.register_transfer(payload, &requester, message_id, messaging)
+                self.register(payload, &requester, message_id, messaging)
             }
             MoneyRequest::PropagateTransfer { payload } => {
-                self.propagate_transfer(payload, &requester, message_id, messaging)
+                self.propagate(payload, &requester, message_id, messaging)
             }
             MoneyRequest::GetBalance(xorname) => {
                 let authorized = xorname == requester.public_key().into();
@@ -116,7 +116,7 @@ impl Transfers {
     /// This validation will render a signature over the
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
-    fn validate_transfer(
+    fn validate(
         &mut self,
         payload: ValidateTransfer,
         requester: &PublicId,
@@ -128,7 +128,7 @@ impl Transfers {
             // .. so for now, this will create money out of thin air!
             self.replica.test_validate_transfer(payload)
         } else {
-            self.replica.validate_transfer(payload)
+            self.replica.validate(payload)
         };
 
         Some(Action::RespondToClientHandlers {
@@ -143,7 +143,7 @@ impl Transfers {
 
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
-    fn register_transfer(
+    fn register(
         &mut self,
         payload: RegisterTransfer,
         requester: &PublicId,
@@ -151,7 +151,7 @@ impl Transfers {
         messaging: &mut Messaging,
     ) -> Option<Action> {
         let transfer = &payload.proof.transfer_cmd.transfer;
-        let result = self.replica.register_transfer(payload.clone());
+        let result = self.replica.register(payload.proof.clone());
 
         match result {
             Ok(event) => {
@@ -159,7 +159,7 @@ impl Transfers {
                     .apply(TransferEvent::TransferRegistered(event.clone()));
 
                 // sender is notified with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from(transfer.id.actor), payload.clone().proof);
+                messaging.notify_client(&XorName::from(transfer.id.actor), payload.proof.clone());
 
                 // the transfer is then propagated, and will reach the recipient section
                 Some(Action::ForwardClientRequest(Rpc::Request {
@@ -183,7 +183,7 @@ impl Transfers {
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destionation.
-    fn propagate_transfer(
+    fn propagate(
         &mut self,
         payload: RegisterTransfer,
         requester: &PublicId,
@@ -192,7 +192,7 @@ impl Transfers {
     ) -> Option<Action> {
         // We will just validate the proofs and then apply the event.
         let transfer = &payload.proof.transfer_cmd.transfer;
-        let result = self.replica.propagate_transfer(payload.clone());
+        let result = self.replica.propagate(payload.proof.clone());
 
         match result {
             Ok(event) => {
