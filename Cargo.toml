@@ -47,7 +47,7 @@ routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" 
 crdts = "4.1.0"
 ed25519-dalek = { version = "0.9.1", features = ["serde"] }
 sha2 = "0.8.1"
-
+safe-transfers = { git = "https://github.com/oetyng/safe-transfers.git", rev="fb39ece" }
 
 [dev_dependencies]
 maplit = "1.0.1"

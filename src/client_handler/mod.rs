@@ -18,7 +18,7 @@ use self::{
     data_requests::Evaluation,
     login_packets::LoginPackets,
     messaging::Messaging,
-    transfers::{Replica as TransfersReplica, Transfers},
+    transfers::Transfers,
 };
 use crate::{
     action::{Action, ConsensusAction},
@@ -31,8 +31,10 @@ use crate::{
 use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
-use routing::Node;
-use safe_nd::{MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName, Money, PublicKey};
+use safe_nd::{
+    MessageId, Money, NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
+};
+use safe_transfers::TransferReplica;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -69,8 +71,7 @@ impl ClientHandler {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
-        //let bank = Bank::new(id.clone(), root_dir, init_mode)?;
-        let replica = TransfersReplica::new(PublicKey::Ed25519(*id.clone().ed25519_public_key()));
+        let replica = TransferReplica::new(PublicKey::Ed25519(*id.clone().ed25519_public_key()));
 
         let messaging = Messaging::new(id.clone(), routing_node);
 

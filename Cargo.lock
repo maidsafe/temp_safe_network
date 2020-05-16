@@ -2252,6 +2252,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "safe-transfers"
+version = "0.1.0"
+source = "git+https://github.com/oetyng/safe-transfers.git?rev=fb39ece#fb39ece1457932ac61da60aa9377a47db342076d"
+dependencies = [
+ "bincode 1.1.4",
+ "crdts",
+ "safe-nd",
+ "serde",
+ "threshold_crypto",
+]
+
+[[package]]
 name = "safe_vault"
 version = "0.24.0"
 dependencies = [
@@ -2279,6 +2291,7 @@ dependencies = [
  "rand_core 0.5.1",
  "routing",
  "safe-nd",
+ "safe-transfers",
  "self_update",
  "serde",
  "serde_json",

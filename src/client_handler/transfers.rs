@@ -6,11 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod history;
-mod replica;
-
-pub type Identity = PublicKey;
-pub use self::replica::{Replica, TransferEvent};
 use super::{auth::ClientInfo, messaging::Messaging};
 use crate::{action::Action, rpc::Rpc};
 //use log::{error, trace};
@@ -19,6 +14,8 @@ use safe_nd::{
     RegisterTransfer, Request, Response, ValidateTransfer, XorName,
 };
 use std::fmt::{self, Display, Formatter};
+
+use safe_transfers::{TransferReplica as Replica, TransferReplicaEvent as TransferEvent};
 
 /*
 Transfers is the layer that manages
