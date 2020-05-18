@@ -10,7 +10,7 @@
 use super::{
     constants::{FILE_READ_FROM_START, FILE_READ_TO_END},
     errors::Result,
-    ffi_structs::{processed_files_into_repr_c, ProcessedFiles},
+    ffi_structs::{files_map_into_repr_c, processed_files_into_repr_c, FilesMap, ProcessedFiles},
     helpers::from_c_str_to_str_option,
 };
 use ffi_utils::{
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn files_container_create(
         result: *const FfiResult,
         xorurl: *const c_char,
         process_files: *const ProcessedFiles,
-        files_map: *const c_char,
+        files_map: *const FilesMap,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
@@ -44,14 +44,14 @@ pub unsafe extern "C" fn files_container_create(
             (*app).files_container_create(location_opt, destination, recursive, dry_run),
         )?;
         let xorurl_string = CString::new(xorurl)?;
-        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
+        let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
             xorurl_string.as_ptr(),
             &ffi_processed_files,
-            files_map_json.as_ptr(),
+            &files_map,
         );
         Ok(())
     })
@@ -66,15 +66,15 @@ pub unsafe extern "C" fn files_container_get(
         user_data: *mut c_void,
         result: *const FfiResult,
         version: u64,
-        files_map: *const c_char,
+        files_map: *const FilesMap,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
         let (version, files_map) = async_std::task::block_on((*app).files_container_get(&url_str))?;
-        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
-        o_cb(user_data.0, FFI_RESULT_OK, version, files_map_json.as_ptr());
+        let files_map = files_map_into_repr_c(&files_map)?;
+        o_cb(user_data.0, FFI_RESULT_OK, version, &files_map);
         Ok(())
     })
 }
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn files_container_sync(
         result: *const FfiResult,
         version: u64,
         process_files: *const ProcessedFiles,
-        files_map: *const c_char,
+        files_map: *const FilesMap,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
@@ -110,14 +110,14 @@ pub unsafe extern "C" fn files_container_sync(
                 update_nrs,
                 dry_run,
             ))?;
-        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
+        let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
             version,
             &ffi_processed_files,
-            files_map_json.as_ptr(),
+            &files_map,
         );
         Ok(())
     })
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn files_container_add(
         result: *const FfiResult,
         version: u64,
         process_files: *const ProcessedFiles,
-        files_map: *const c_char,
+        files_map: *const FilesMap,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
@@ -147,14 +147,14 @@ pub unsafe extern "C" fn files_container_add(
         let (version, processed_files, files_map) = async_std::task::block_on(
             (*app).files_container_add(&source_str, &url_str, force, update_nrs, dry_run),
         )?;
-        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
+        let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
             version,
             &ffi_processed_files,
-            files_map_json.as_ptr(),
+            &files_map,
         );
         Ok(())
     })
@@ -175,7 +175,7 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         result: *const FfiResult,
         version: u64,
         process_files: *const ProcessedFiles,
-        files_map: *const c_char,
+        files_map: *const FilesMap,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
@@ -185,14 +185,14 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         let (version, processed_files, files_map) = async_std::task::block_on(
             (*app).files_container_add_from_raw(&data_vec, &url_str, force, update_nrs, dry_run),
         )?;
-        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
+        let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
             version,
             &ffi_processed_files,
-            files_map_json.as_ptr(),
+            &files_map,
         );
         Ok(())
     })
@@ -273,7 +273,7 @@ pub unsafe extern "C" fn files_container_remove_path(
         result: *const FfiResult,
         version: u64,
         process_files: *const ProcessedFiles,
-        files_map: *const c_char,
+        files_map: *const FilesMap,
     ),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
@@ -282,14 +282,14 @@ pub unsafe extern "C" fn files_container_remove_path(
         let (version, processed_files, files_map) = async_std::task::block_on(
             (*app).files_container_remove_path(&url_str, recursive, update_nrs, dry_run),
         )?;
-        let files_map_json = CString::new(serde_json::to_string(&files_map)?)?;
+        let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
             version,
             &ffi_processed_files,
-            files_map_json.as_ptr(),
+            &files_map,
         );
         Ok(())
     })
