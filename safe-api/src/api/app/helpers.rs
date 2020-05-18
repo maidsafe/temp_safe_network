@@ -131,7 +131,3 @@ pub fn systemtime_to_rfc3339(t: &time::SystemTime) -> String {
 pub fn gen_timestamp_secs() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
-
-pub fn gen_timestamp_nanos() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
-}

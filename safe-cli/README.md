@@ -864,7 +864,7 @@ Success. TX_ID: 277748716389078887
 
 Uploading files and folders onto the network is also possible with the CLI application, and as we'll see here it's extremely simple to not just upload them but also keep them in sync with any modifications made locally to the folders and files.
 
-Files are uploaded on the Network and stored as `Published ImmutableData` files, and the folders and sub-folders hierarchy is flattened out and stored in a container mapping each file's path with the corresponding `ImmutableData` XOR-URL. This map is maintained on the Network in a special container called `FilesContainer`, which is stored as `Published AppendOnlyData` data. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and the corresponding `FilesContainer` RFC will be submitted, but at this stage this is being done only using a simple serialised structure.
+Files are uploaded on the Network and stored as `Published ImmutableData` files, and the folders and sub-folders hierarchy is flattened out and stored in a container mapping each file's path with the corresponding `ImmutableData` XOR-URL. This map is maintained on the Network in a special container called `FilesContainer`, which is stored as `Public Sequence` data. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and the corresponding `FilesContainer` RFC will be submitted, but at this stage this is being done only using a simple serialised structure.
 
 #### Files Put
 
@@ -997,7 +997,7 @@ The `files get` command copies file(s) from the network to the local filesystem.
 This command works similarly to unix `cp` or `scp` or the windows `copy` command.  It accepts two arguments:
 
 ```shell
-<source>  The target FilesContainer to retrieve from, optionally including path to directory or file within 
+<source>  The target FilesContainer to retrieve from, optionally including path to directory or file within
 <dest>    The local destination path for the retrieved files and folders (default is '.')
 ```
 
@@ -1196,7 +1196,7 @@ $ safe xorurl decode safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wja
 Information decoded from XOR-URL: safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
 Xorname: e02b282430f7d544ec93441969c63c387a261d7d553d2f9a8b3dda270fcb37ab
 Type tag: 1100
-Native data type: PublishedSeqAppendOnlyData
+Native data type: PublicSequence
 Path: none
 Sub names: []
 Content version: latest
@@ -1319,7 +1319,7 @@ In this section we will explore the CLI commands which allow users to generate, 
 
 #### NRS Create
 
-Creating a friendly name on the Network can be achieved with the `nrs create` subcommand. This subcommand generates an NRS Container automatically linking it to any data we decide to link the friendly name to. An NRS Container is stored on the Network as a `Published AppendOnlyData` data, and it contains an NRS Map using RDF for its data representation (since this is still under development, pseudo-RDF data is now being used temporarily). This Map has a list of subnames and where each of them are being linked to, e.g. `mysubname` can be created as a subname of `mywebsite` NRS name by having `mysubname` linked to a particular `FilesContainer` XOR-URL so that it can be fetched with `safe://mysubname.mywebsite`.
+Creating a friendly name on the Network can be achieved with the `nrs create` subcommand. This subcommand generates an NRS Container automatically linking it to any data we decide to link the friendly name to. An NRS Container is stored on the Network as a `Public Sequence` data, and it contains an NRS Map using RDF for its data representation (since this is still under development, pseudo-RDF data is now being used temporarily). This Map has a list of subnames and where each of them are being linked to, e.g. `mysubname` can be created as a subname of `mywebsite` NRS name by having `mysubname` linked to a particular `FilesContainer` XOR-URL so that it can be fetched with `safe://mysubname.mywebsite`.
 
 Let's imagine we have uploaded the files and folders of a website we want to publish on the SAFE Network with `files put` command:
 ```shell
@@ -1442,14 +1442,14 @@ Using the `cat` command is a very straightforward way of retrieving any type of 
 The most basic case for the `dog` command is to get information about the native data type holding a content found with a XOR-URL:
 ```shell
 $ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
-Native data type: PublishedSeqAppendOnlyData
+Native data type: PublicSequence
 Version: 0
 Type tag: 1100
 XOR name: 0x231a809e8972e51e520e49187f1779f7dff3fb45036cd5546b22f1f22e459741
 XOR-URL: safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
 ```
 
-In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (`PublishedSeqAppendOnlyData`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
+In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native SAFE Network data type where this data is being held on (`PublicSequence`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
 
 Of course the `safe dog` command can be used also with other type of content like files (`ImmutableData`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
 ```shell
@@ -1471,7 +1471,7 @@ Media type: text/html
 Resolved using NRS Map:
 PublicName: "mywebsite"
 Container XOR-URL: safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh
-Native data type: PublishedSeqAppendOnlyData
+Native data type: PublicSequence
 Type tag: 1500
 XOR name: 0xfb3887c26c7ea3670ab1a042d16a6f1113ccf7cc09a15a6716429382a86eb1f9
 Version: 3

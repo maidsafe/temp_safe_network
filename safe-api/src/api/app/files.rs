@@ -10,7 +10,7 @@
 use super::{
     consts::*,
     fetch::Range,
-    helpers::{gen_timestamp_nanos, gen_timestamp_secs, systemtime_to_rfc3339},
+    helpers::{gen_timestamp_secs, systemtime_to_rfc3339},
     xorurl::{SafeContentType, SafeDataType},
     Safe, SafeApp,
 };
@@ -246,7 +246,7 @@ impl FileMeta {
     }
 }
 
-// Type tag to use for the FilesContainer stored on AppendOnlyData
+// Type tag to use for the FilesContainer stored on Sequence
 const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
 
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
@@ -284,7 +284,7 @@ impl Safe {
                 let mut processed_files =
                     file_system_dir_walk(self, path, recursive, follow_links, dry_run).await?;
 
-                // The FilesContainer is created as a AppendOnlyData with a single entry containing the
+                // The FilesContainer is created as a Sequence with a single entry containing the
                 // timestamp as the entry's key, and the serialised FilesMap as the entry's value
                 // TODO: use RDF format
                 let files_map = files_map_create(
@@ -311,24 +311,18 @@ impl Safe {
                 ))
             })?;
 
-            let now = gen_timestamp_nanos();
-            let files_container_data = vec![(
-                now.into_bytes().to_vec(),
-                serialised_files_map.as_bytes().to_vec(),
-            )];
-
-            // Store the FilesContainer in a Published AppendOnlyData
+            // Store the FilesContainer in a Public Sequence
             let xorname = self
                 .safe_app
-                .put_seq_append_only_data(
-                    files_container_data,
+                .store_sequence_data(
+                    serialised_files_map.as_bytes(),
                     None,
                     FILES_CONTAINER_TYPE_TAG,
                     None,
                 )
                 .await?;
 
-            XorUrlEncoder::encode_append_only_data(
+            XorUrlEncoder::encode_sequence_data(
                 xorname,
                 FILES_CONTAINER_TYPE_TAG,
                 SafeContentType::FilesContainer,
@@ -367,44 +361,14 @@ impl Safe {
         xorurl_encoder: &XorUrlEncoder,
     ) -> Result<(u64, FilesMap)> {
         // Check if the URL specifies a specific version of the content or simply the latest available
-        let data = match xorurl_encoder.content_version() {
-            None => {
-                self.safe_app
-                    .get_latest_seq_append_only_data(
-                        xorurl_encoder.xorname(),
-                        xorurl_encoder.type_tag(),
-                    )
-                    .await
-            }
-            Some(content_version) => {
-                let (key, value) = self
-                    .safe_app
-                    .get_seq_append_only_data(
-                        xorurl_encoder.xorname(),
-                        xorurl_encoder.type_tag(),
-                        content_version,
-                    )
-                    .await
-                    .map_err(|err| {
-                        if let Error::VersionNotFound(_) = err {
-                            Error::VersionNotFound(format!(
-                                "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                                content_version, xorurl_encoder,
-                            ))
-                        } else {
-                            err
-                        }
-                    })?;
-                Ok((content_version, (key, value)))
-            }
-        };
-
-        match data {
-            Ok((version, (_key, value))) => {
+        match self.fetch_sequence(xorurl_encoder).await {
+            Ok((version, serialised_files_map)) => {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
-                let files_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
-                    .map_err(|err| {
+                let files_map = serde_json::from_str(&String::from_utf8_lossy(
+                    &serialised_files_map.as_slice(),
+                ))
+                .map_err(|err| {
                     Error::ContentError(format!(
                         "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
                         err
@@ -419,7 +383,11 @@ impl Safe {
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 ERROR_MSG_NO_FILES_CONTAINER_FOUND.to_string(),
             )),
-            Err(Error::VersionNotFound(msg)) => Err(Error::VersionNotFound(msg)),
+            Err(Error::VersionNotFound(_)) => Err(Error::VersionNotFound(format!(
+                "Version '{}' is invalid for FilesContainer found at \"{}\"",
+                xorurl_encoder.content_version().unwrap_or_else(|| 0),
+                xorurl_encoder,
+            ))),
             Err(err) => Err(Error::NetDataError(format!(
                 "Failed to get current version: {}",
                 err
@@ -506,7 +474,7 @@ impl Safe {
             .await?;
 
         let version = self
-            .append_version_to_nrs_map_container(
+            .append_version_to_files_container(
                 success_count,
                 current_version,
                 &new_files_map,
@@ -575,7 +543,7 @@ impl Safe {
         };
 
         let version = self
-            .append_version_to_nrs_map_container(
+            .append_version_to_files_container(
                 success_count,
                 current_version,
                 &new_files_map,
@@ -626,7 +594,7 @@ impl Safe {
         let (processed_files, new_files_map, success_count) =
             files_map_add_link(self, current_files_map, &new_file_xorurl, dest_path, force).await?;
         let version = self
-            .append_version_to_nrs_map_container(
+            .append_version_to_files_container(
                 success_count,
                 current_version,
                 &new_files_map,
@@ -699,7 +667,7 @@ impl Safe {
             files_map_remove_path(dest_path, files_map, recursive)?;
 
         let version = self
-            .append_version_to_nrs_map_container(
+            .append_version_to_files_container(
                 success_count,
                 current_version,
                 &new_files_map,
@@ -713,9 +681,10 @@ impl Safe {
         Ok((version, processed_files, new_files_map))
     }
 
-    // Private helper function to append new version of the FilesMap to the NRS Container
+    // Private helper function to append new version of the FilesMap to the Files Container
+    // It flagged with `update_nrs`, it will also update the link in the corresponding NRS Map Container
     #[allow(clippy::too_many_arguments)]
-    async fn append_version_to_nrs_map_container(
+    async fn append_version_to_files_container(
         &mut self,
         success_count: u64,
         current_version: u64,
@@ -739,23 +708,13 @@ impl Safe {
                 ))
             })?;
 
-            let now = gen_timestamp_nanos();
-            let files_container_data = vec![(
-                now.into_bytes().to_vec(),
-                serialised_files_map.as_bytes().to_vec(),
-            )];
-
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
-            let new_version = self
-                .safe_app
-                .append_seq_append_only_data(
-                    files_container_data,
-                    current_version + 1,
-                    xorname,
-                    type_tag,
-                )
+            self.safe_app
+                .sequence_append(serialised_files_map.as_bytes(), xorname, type_tag)
                 .await?;
+
+            let new_version = current_version + 1;
 
             if update_nrs {
                 // We need to update the link in the NRS container as well,

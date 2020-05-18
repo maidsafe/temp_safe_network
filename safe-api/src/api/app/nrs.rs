@@ -9,7 +9,6 @@
 
 use super::{
     consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
-    helpers::gen_timestamp_nanos,
     nrs_map::NrsMap,
     xorurl::SafeContentType,
     Safe, SafeApp,
@@ -21,13 +20,10 @@ use crate::{
 use log::{debug, info, warn};
 use std::collections::BTreeMap;
 
-// Type tag to use for the NrsMapContainer stored on AppendOnlyData
+// Type tag to use for the NrsMapContainer stored on Sequence
 pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
-
-// Raw data stored in the SAFE native data type for a NRS Map Container
-type NrsMapRawData = Vec<(Vec<u8>, Vec<u8>)>;
 
 // List of public names uploaded with details if they were added, updated or deleted from NrsMaps
 pub type ProcessedEntries = BTreeMap<String, (String, String)>;
@@ -103,12 +99,11 @@ impl Safe {
 
         debug!("The new NRS Map: {:?}", nrs_map);
         if !dry_run {
-            // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+            // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
             let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
             self.safe_app
-                .append_seq_append_only_data(
-                    nrs_map_raw_data,
-                    version + 1,
+                .sequence_append(
+                    &nrs_map_raw_data,
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
                 )
@@ -163,12 +158,12 @@ impl Safe {
                 let nrs_xorname = XorUrlEncoder::from_nrsurl(&nrs_url)?.xorname();
                 debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
 
-                // Store the NrsMapContainer in a Published AppendOnlyData
+                // Store the NrsMapContainer in a Public Sequence
                 let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
                 let xorname = self
                     .safe_app
-                    .put_seq_append_only_data(
-                        nrs_map_raw_data,
+                    .store_sequence_data(
+                        &nrs_map_raw_data,
                         Some(nrs_xorname),
                         NRS_MAP_TYPE_TAG,
                         None,
@@ -208,12 +203,11 @@ impl Safe {
 
         debug!("The new NRS Map: {:?}", nrs_map);
         if !dry_run {
-            // Append new version of the NrsMap in the Published AppendOnlyData (NRS Map Container)
+            // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
             let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
             self.safe_app
-                .append_seq_append_only_data(
-                    nrs_map_raw_data,
-                    version + 1,
+                .sequence_append(
+                    &nrs_map_raw_data,
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
                 )
@@ -250,17 +244,13 @@ impl Safe {
         let data = match xorurl_encoder.content_version() {
             None => {
                 self.safe_app
-                    .get_latest_seq_append_only_data(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
+                    .get_sequence_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
                     .await
             }
             Some(content_version) => {
-                let (key, value) = self
+                let serialised_nrs_map = self
                     .safe_app
-                    .get_seq_append_only_data(
-                        xorurl_encoder.xorname(),
-                        NRS_MAP_TYPE_TAG,
-                        content_version,
-                    )
+                    .get_sequence_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, content_version)
                     .await
                     .map_err(|_| {
                         Error::VersionNotFound(format!(
@@ -268,21 +258,23 @@ impl Safe {
                             content_version, url,
                         ))
                     })?;
-                Ok((content_version, (key, value)))
+
+                Ok((content_version, serialised_nrs_map))
             }
         };
 
         match data {
-            Ok((version, (_key, value))) => {
-                debug!("Nrs map retrieved.... v{:?}, value {:?} ", &version, &value);
-                // TODO: use RDF format and deserialise it
-                let nrs_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
-                    .map_err(|err| {
-                        Error::ContentError(format!(
-                            "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
-                            err
-                        ))
-                    })?;
+            Ok((version, serialised_nrs_map)) => {
+                debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
+                let nrs_map =
+                    serde_json::from_str(&String::from_utf8_lossy(&serialised_nrs_map.as_slice()))
+                        .map_err(|err| {
+                            Error::ContentError(format!(
+                                "Couldn't deserialise the NrsMap stored in the NrsContainer: {:?}",
+                                err
+                            ))
+                        })?;
+
                 Ok((version, nrs_map))
             }
             Err(Error::EmptyContent(_)) => {
@@ -318,9 +310,9 @@ fn sanitised_url(name: &str) -> String {
     format!("safe://{}", name.replace("safe://", ""))
 }
 
-fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<NrsMapRawData> {
-    // The NrsMapContainer is an AppendOnlyData where each NRS Map version is an entry containing
-    // the timestamp as the entry's key, and the serialised NrsMap as the entry's value
+fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<Vec<u8>> {
+    // The NrsMapContainer is a Sequence where each NRS Map version is
+    // an entry containing the serialised NrsMap
     // TODO: use RDF format
     let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
         Error::Unexpected(format!(
@@ -328,12 +320,8 @@ fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<NrsMapRawData> {
             err
         ))
     })?;
-    let now = gen_timestamp_nanos();
 
-    Ok(vec![(
-        now.into_bytes().to_vec(),
-        serialised_nrs_map.as_bytes().to_vec(),
-    )])
+    Ok(serialised_nrs_map.as_bytes().to_vec())
 }
 
 #[cfg(test)]
