@@ -17,8 +17,8 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, ClientRequest, Error as NdError, MessageId, NodePublicId,
-    PublicId, PublicKey, Request, RequestAuthKind, Response, Signature,
+    AppPermissions, AppPublicId, ClientRequest, Error as NdError, MessageId, MiscAuthKind, MoneyAuthKind, 
+    NodePublicId, PublicId, PublicKey, Request, RequestAuthKind, Response, Signature
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -71,24 +71,27 @@ impl Auth {
         };
 
         let result = match request.authorisation_kind() {
-            RequestAuthKind::GetPub => Ok(()),
-            RequestAuthKind::GetPriv => self.check_app_permissions(app_id, |_| true),
-            RequestAuthKind::GetBalance => {
+            RequestAuthKind::Data(DataAuthKind::GetPublic) => Ok(()),
+            RequestAuthKind::Data(DataAuthKind::GetPrivate) => {
+                self.check_app_permissions(app_id, |_| true)
+            }
+            RequestAuthKind::Money(MoneyAuthKind::GetBalance) => {
                 self.check_app_permissions(app_id, |perms| perms.read_balance)
             }
-            RequestAuthKind::GetHistory => {
+            RequestAuthKind::Money(MoneyAuthKind::GetHistory) => {
                 self.check_app_permissions(app_id, |perms| perms.read_transfer_history)
             }
-            RequestAuthKind::Mutation => {
+            RequestAuthKind::Data(DataAuthKind::Mutation) => {
                 self.check_app_permissions(app_id, |perms| perms.data_mutations)
             }
-            RequestAuthKind::TransferMoney => {
+            RequestAuthKind::Money(MoneyAuthKind::TransferMoney) => {
                 self.check_app_permissions(app_id, |perms| perms.transfer_money)
             }
-            RequestAuthKind::MutAndTransferMoney => self.check_app_permissions(app_id, |perms| {
-                perms.transfer_money && perms.data_mutations
-            }),
-            RequestAuthKind::ManageAppKeys => Err(NdError::AccessDenied),
+            RequestAuthKind::Misc(MiscAuthKind::MutAndTransferMoney) => self
+                .check_app_permissions(app_id, |perms| {
+                    perms.transfer_money && perms.data_mutations
+                }),
+            RequestAuthKind::Misc(MiscAuthKind::ManageAppKeys) => Err(NdError::AccessDenied),
             RequestAuthKind::None => Err(NdError::AccessDenied),
         };
 
@@ -238,7 +241,7 @@ impl Auth {
         signature: Option<Signature>,
     ) -> Option<Action> {
         match request.authorisation_kind() {
-            RequestAuthKind::GetPub => None,
+            RequestAuthKind::Data(DataAuthKind::GetPublic) => None,
             _ => {
                 let valid = if let Some(signature) = signature {
                     self.is_valid_client_signature(public_id, request, &message_id, &signature)

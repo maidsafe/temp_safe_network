@@ -2236,7 +2236,7 @@ checksum = "ed3d612bc64430efeb3f7ee6ef26d590dce0c43249217bddc62112540c7941e1"
 [[package]]
 name = "safe-nd"
 version = "0.9.0"
-source = "git+https://github.com/oetyng/safe-nd.git?rev=2c16b8c#2c16b8c570b50946f861cc217781d4075e14d651"
+source = "git+https://github.com/oetyng/safe-nd.git?rev=92c78e1#92c78e1ab2433a01fb4403658e111668ee4a0461"
 dependencies = [
  "bincode 1.1.4",
  "crdts",
@@ -2254,7 +2254,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-transfers.git?rev=b1750af#b1750afb595b7fc36e27405334b12a1703257c82"
+source = "git+https://github.com/oetyng/safe-transfers.git?rev=e3079bd#e3079bdf34fe68720695fe81324fcfb6fa2f3a4a"
 dependencies = [
  "bincode 1.1.4",
  "crdts",

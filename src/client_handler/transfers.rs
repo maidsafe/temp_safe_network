@@ -23,11 +23,10 @@ interaction with an AT2 Replica.
 
 Flow overview:
 1. Client-to-Elders: Request::ValidateTransfer
-2. Elders-to-ResponseManager: Response::TransferValidation
-3. ResponseManager-to-Client: Response::TransferProofOfAgreement
-4. Client-to-Elders: Request::RegisterTransfer
-5. Elders-to-Client: Response::TransferRegistration
-6. Elders-to-Elders: Request::PropagateTransfer
+2. Elders-to-Client: Response::TransferValidation
+3. Client-to-Elders: Request::RegisterTransfer
+4. Elders-to-Client: Response::TransferRegistration
+5. Elders-to-Elders: Request::PropagateTransfer
 
 The Replica is the part of an AT2 system
 that forms validating groups, and signs individual
@@ -96,14 +95,32 @@ impl Transfers {
                 messaging.respond_to_client(message_id, response);
                 None
             }
-            MoneyRequest::GetHistory { at, since } => {
+            MoneyRequest::GetHistory {
+                at,
+                since_version,
+                incoming_only,
+            } => {
                 let authorized = at == requester.public_key().into();
                 let result = if !authorized {
                     Err(NdError::NoSuchBalance)
                 } else {
-                    match self.replica.history(&requester.public_key(), since) {
+                    let outgoing = if incoming_only {
+                        vec![]
+                    } else {
+                        match self
+                            .replica
+                            .outgoing_since(&requester.public_key(), since_version)
+                        {
+                            None => vec![],
+                            Some(history) => history,
+                        }
+                    };
+                    match self
+                        .replica
+                        .incoming_since(&requester.public_key(), since_version)
+                    {
                         None => Err(NdError::NoSuchBalance),
-                        Some(history) => Ok(history),
+                        Some(incoming) => Ok([&outgoing[..], &incoming[..]].concat()),
                     }
                 };
                 let response = Response::GetHistory(result);
