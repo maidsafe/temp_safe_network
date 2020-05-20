@@ -38,9 +38,9 @@ fn calling_safe_xorurl_recursive() {
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec!["xorurl", TEST_FOLDER, "--recursive"])
         .assert()
-        .stdout(predicate::str::contains("7 file/s processed"))
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(5))
-        .stdout(predicate::str::contains(TEST_FOLDER).count(7))
+        .stdout(predicate::str::contains("11 file/s processed"))
+        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(8))
+        .stdout(predicate::str::contains(TEST_FOLDER).count(11))
         .success();
 }
 

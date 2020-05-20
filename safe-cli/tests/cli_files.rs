@@ -20,6 +20,7 @@ use safe_cmd_test_utilities::{
     parse_files_tree_output, read_cmd, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
+    env,
     fs::{self, OpenOptions},
     io::{prelude::*, Seek, SeekFrom},
     process::Command,
@@ -32,9 +33,8 @@ const TEST_FILE_RANDOM_CONTENT: &str = "test_file_random_content.txt";
 const TEST_FOLDER: &str = "../testdata/";
 const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
 const TEST_FOLDER_SUBFOLDER: &str = "../testdata/subfolder/";
-const TEST_EMPTY_FOLDER: &str = "../testdata/emptyfolder/";
 
-const EXPECT_TESTDATA_PUT_CNT: usize = 7; // 5 files, plus 2 directories
+const EXPECT_TESTDATA_PUT_CNT: usize = 11; // 8 files, plus 3 directories
 
 #[test]
 fn calling_safe_files_put_pretty() {
@@ -153,11 +153,13 @@ fn calling_safe_files_put_recursive_subfolder() {
 
 #[test]
 fn calling_safe_files_put_emptyfolder() {
+    let emptyfolder_paths = mk_emptyfolder().unwrap();
+
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec![
         "files",
         "put",
-        TEST_EMPTY_FOLDER,
+        &emptyfolder_paths.1,
         "--recursive",
         "--json",
     ])
@@ -165,6 +167,9 @@ fn calling_safe_files_put_emptyfolder() {
     .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
     .stdout(predicate::str::contains("../testdata/emptyfolder/").count(0))
     .success();
+
+    // cleanup
+    fs::remove_dir_all(&emptyfolder_paths.0).unwrap();
 }
 
 #[test]
@@ -338,6 +343,8 @@ fn calling_safe_files_removed_sync() {
     .read()
     .unwrap();
 
+    let emptyfolder_paths = mk_emptyfolder().unwrap();
+
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -350,7 +357,7 @@ fn calling_safe_files_removed_sync() {
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
-        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
         &files_container_no_version,
         "--recursive",
         "--delete",
@@ -383,7 +390,7 @@ fn calling_safe_files_removed_sync() {
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
-        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
         &files_container_no_version,
         "--recursive",
         "--delete",
@@ -391,6 +398,9 @@ fn calling_safe_files_removed_sync() {
     )
     .read()
     .unwrap();
+
+    // cleanup
+    fs::remove_dir_all(&emptyfolder_paths.0).unwrap();
 
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, files_container_v1);
@@ -509,6 +519,8 @@ fn calling_files_sync_and_fetch_with_version() {
     .read()
     .unwrap();
 
+    let emptyfolder_paths = mk_emptyfolder().unwrap();
+
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -520,7 +532,7 @@ fn calling_files_sync_and_fetch_with_version() {
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
-        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
         &files_container_no_version,
         "--recursive",
         "--delete",
@@ -528,6 +540,9 @@ fn calling_files_sync_and_fetch_with_version() {
     )
     .read()
     .unwrap();
+
+    // cleanup
+    fs::remove_dir_all(&emptyfolder_paths.0).unwrap();
 
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = xorurl_encoder.to_string();
@@ -598,11 +613,13 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     .read()
     .unwrap();
 
+    let emptyfolder_paths = mk_emptyfolder().unwrap();
+
     let sync_cmd_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
-        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        &emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
         &nrsurl,
         "--recursive",
         "--delete",
@@ -611,6 +628,9 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     )
     .read()
     .unwrap();
+
+    // cleanup
+    fs::remove_dir_all(&emptyfolder_paths.0).unwrap();
 
     println!("{}", sync_cmd_output);
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
@@ -670,11 +690,13 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
     .read()
     .unwrap();
 
+    let emptyfolder_paths = mk_emptyfolder().unwrap();
+
     let sync_cmd_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "sync",
-        TEST_EMPTY_FOLDER, // rather than removing the files we pass an empty folder path
+        emptyfolder_paths.1, // rather than removing the files we pass an empty folder path
         &nrsurl,
         "--recursive",
         "--delete",
@@ -682,6 +704,9 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
     )
     .read()
     .unwrap();
+
+    // cleanup
+    fs::remove_dir_all(&emptyfolder_paths.0).unwrap();
 
     let (target, processed_files) = parse_files_put_or_sync_output(&sync_cmd_output);
     assert_eq!(target, nrsurl_v1);
@@ -857,9 +882,26 @@ fn calling_files_ls() {
     .read()
     .unwrap();
 
+    // Sample output:
+    //
+    // Files of FilesContainer (version 0) at "safe://<xorurl>":
+    // Files: 4   Size: 41   Total Files: 8   Total Size: 80
+    // SIZE  CREATED               MODIFIED              NAME
+    // 23    2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  .hidden.txt
+    // 12    2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  .subhidden/
+    // 6     2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  another.md
+    // 0     2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  emptyfolder/
+    // 0     2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  noextension
+    // 27    2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  subfolder/
+    // 12    2020-05-20T19:55:26Z  2020-05-20T19:55:26Z  test.md
+
     let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
     assert_eq!(xorurl, container_xorurl_no_version);
-    assert_eq!(files_map.len(), 4);
+    assert_eq!(files_map.len(), 7);
+    assert_eq!(
+        files_map[".hidden.txt"]["link"],
+        processed_files[&format!("{}.hidden.txt", TEST_FOLDER)].1
+    );
     assert_eq!(
         files_map["another.md"]["link"],
         processed_files[&format!("{}another.md", TEST_FOLDER)].1
@@ -964,14 +1006,18 @@ fn calling_files_tree() -> Result<(), String> {
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
-    assert_eq!(root["sub"].as_array().unwrap().len(), 5);
-    assert_eq!(root["sub"][0]["name"], "another.md");
-    assert_eq!(root["sub"][1]["name"], "emptyfolder");
-    assert_eq!(root["sub"][2]["name"], "noextension");
-    assert_eq!(root["sub"][3]["name"], "subfolder");
-    assert_eq!(root["sub"][3]["sub"][0]["name"], "sub2.md");
-    assert_eq!(root["sub"][3]["sub"][1]["name"], "subexists.md");
-    assert_eq!(root["sub"][4]["name"], "test.md");
+    assert_eq!(root["sub"].as_array().unwrap().len(), 7);
+    assert_eq!(root["sub"][0]["name"], ".hidden.txt");
+    assert_eq!(root["sub"][1]["name"], ".subhidden");
+    assert_eq!(root["sub"][1]["sub"][0]["name"], "test.md");
+    assert_eq!(root["sub"][2]["name"], "another.md");
+    assert_eq!(root["sub"][3]["name"], "emptyfolder");
+    assert_eq!(root["sub"][3]["sub"][0]["name"], ".gitkeep");
+    assert_eq!(root["sub"][4]["name"], "noextension");
+    assert_eq!(root["sub"][5]["name"], "subfolder");
+    assert_eq!(root["sub"][5]["sub"][0]["name"], "sub2.md");
+    assert_eq!(root["sub"][5]["sub"][1]["name"], "subexists.md");
+    assert_eq!(root["sub"][6]["name"], "test.md");
 
     let files_tree_output = read_cmd(cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -984,15 +1030,19 @@ fn calling_files_tree() -> Result<(), String> {
         "{}\n{}",
         container_xorurl_no_version,
         "\
+├── .hidden.txt
+├── .subhidden
+│   └── test.md
 ├── another.md
 ├── emptyfolder
+│   └── .gitkeep
 ├── noextension
 ├── subfolder
 │   ├── sub2.md
 │   └── subexists.md
 └── test.md
 
-2 directories, 5 files"
+3 directories, 8 files"
     );
     assert_eq!(files_tree_output, should_match);
 
@@ -1007,19 +1057,38 @@ fn calling_files_tree() -> Result<(), String> {
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
-    assert_eq!(root["sub"].as_array().unwrap().len(), 5);
-    assert_eq!(root["sub"][0]["name"], "another.md");
-    assert_eq!(root["sub"][0]["details"]["size"], "6");
-    assert_eq!(root["sub"][0]["details"]["type"], "text/markdown");
-    assert_eq!(root["sub"][1]["name"], "emptyfolder");
-    assert_eq!(root["sub"][1]["details"]["size"], "0");
+    assert_eq!(root["sub"].as_array().unwrap().len(), 7);
+    assert_eq!(root["sub"][0]["name"], ".hidden.txt");
+    assert_eq!(root["sub"][0]["details"]["type"], "text/plain");
+    assert_eq!(root["sub"][1]["name"], ".subhidden");
     assert_eq!(root["sub"][1]["details"]["type"], "inode/directory");
-    assert_eq!(root["sub"][2]["name"], "noextension");
-    assert_eq!(root["sub"][2]["details"]["size"], "0");
-    assert_eq!(root["sub"][2]["details"]["type"], "Raw");
-    assert_eq!(root["sub"][3]["name"], "subfolder");
-    assert_eq!(root["sub"][3]["sub"][0]["name"], "sub2.md");
-    assert_eq!(root["sub"][3]["sub"][1]["name"], "subexists.md");
-    assert_eq!(root["sub"][4]["name"], "test.md");
+    assert_eq!(root["sub"][1]["sub"][0]["name"], "test.md");
+    assert_eq!(root["sub"][2]["name"], "another.md");
+    assert_eq!(root["sub"][2]["details"]["size"], "6");
+    assert_eq!(root["sub"][2]["details"]["type"], "text/markdown");
+    assert_eq!(root["sub"][3]["name"], "emptyfolder");
+    assert_eq!(root["sub"][3]["details"]["size"], "0");
+    assert_eq!(root["sub"][3]["details"]["type"], "inode/directory");
+    assert_eq!(root["sub"][4]["name"], "noextension");
+    assert_eq!(root["sub"][4]["details"]["size"], "0");
+    assert_eq!(root["sub"][4]["details"]["type"], "Raw");
+    assert_eq!(root["sub"][5]["name"], "subfolder");
+    assert_eq!(root["sub"][5]["sub"][0]["name"], "sub2.md");
+    assert_eq!(root["sub"][5]["sub"][1]["name"], "subexists.md");
+    assert_eq!(root["sub"][6]["name"], "test.md");
     Ok(())
+}
+
+// We create a folder named "emptyfolder" inside a randomly
+// named folder in system temp dir, and return both paths.
+fn mk_emptyfolder() -> Result<(String, String), String> {
+    let name = get_random_nrs_string();
+    let path_random = env::temp_dir().join(name);
+    let path_emptyfolder = path_random.join("emptyfolder");
+    fs::create_dir_all(&path_emptyfolder).map_err(|e| format!("{:?}", e))?;
+    let empty_folder_path_trailing_slash = format!("{}/", path_emptyfolder.display().to_string());
+    Ok((
+        path_random.display().to_string(),
+        empty_folder_path_trailing_slash,
+    ))
 }

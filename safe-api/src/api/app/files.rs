@@ -1401,14 +1401,14 @@ async fn file_system_dir_walk(
     info!("Reading files from {}", file_path.display());
     let (metadata, _) = get_metadata(&file_path)?;
     if metadata.is_dir() || !recursive {
-        // TODO: option to enable following symlinks and hidden files?
+        // TODO: option to enable following symlinks?
         // We now compare both FilesMaps to upload the missing files
         let max_depth = if recursive { MAX_RECURSIVE_DEPTH } else { 1 };
         let mut processed_files = BTreeMap::new();
         let children_to_process = WalkDir::new(file_path)
             .follow_links(true)
             .into_iter()
-            .filter_entry(|e| not_hidden_and_valid_depth(e, max_depth))
+            .filter_entry(|e| valid_depth(e, max_depth))
             .filter_map(|v| v.ok());
 
         for (idx, child) in children_to_process.enumerate() {
@@ -1423,6 +1423,10 @@ async fn file_system_dir_walk(
                             // If the first directory ends with '/' then it is
                             // the root, and we are only interested in the children,
                             // so we skip it.
+                            continue;
+                        }
+                        if !recursive {
+                            // We do not include sub-dirs unless recursing.
                             continue;
                         }
                         // Everything is in the iter. We dont need to recurse.
@@ -1486,12 +1490,12 @@ async fn file_system_dir_walk(
     }
 }
 
-// Checks if a path is not a hidden file or if the depth in the dir hierarchy is under a threshold
-fn not_hidden_and_valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
+// Checks if the depth in the dir hierarchy is under a threshold
+fn valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| entry.depth() <= max_depth && (entry.depth() == 0 || !s.starts_with('.')))
+        .map(|_| entry.depth() <= max_depth)
         .unwrap_or(false)
 }
 
@@ -1585,8 +1589,8 @@ mod tests {
 
     // make some constants for these, in case entries in the
     // testdata folder change.
-    const TESTDATA_PUT_FILEITEM_COUNT: usize = 7;
-    const TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT: usize = 8;
+    const TESTDATA_PUT_FILEITEM_COUNT: usize = 11;
+    const TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT: usize = 12;
     const SUBFOLDER_PUT_FILEITEM_COUNT: usize = 2;
     const SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT: usize = 3;
 
@@ -2619,9 +2623,19 @@ mod tests {
             )
             .await?;
 
+        // now it should look like:
+        // safe://<nrs>
+        // ├── .hidden.txt
+        // ├── another.md
+        // ├── noextension
+        // ├── sub2.md
+        // ├── subexists.md
+        // └── test.md
+        //
+        // So, we have 6 items.
         let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
         assert_eq!(version, 2);
-        assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        assert_eq!(fetched_files_map.len(), 6);
         Ok(())
     }
 
