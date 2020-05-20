@@ -290,7 +290,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
     const TEST_FILE: &str = "sub2.md";
 
     // make safe://.../testdata/subfolder
-    let xor_path = join_paths(&[TESTDATA, SUBFOLDER]);
+    let xor_path = join_url_paths(&[TESTDATA, SUBFOLDER]);
     let mut e = XorUrlEncoder::from_url(&files_container_xor)?;
     e.set_path(&xor_path);
     let xor_url_with_path = e.to_string();
@@ -1183,9 +1183,13 @@ fn join_paths(path: &[&str]) -> String {
     pb.display().to_string()
 }
 
+fn join_url_paths(path: &[&str]) -> String {
+    path.join("/")
+}
+
 // sets/appends path in a provided safe URL.  preserves query string.
 fn source_path(url: &str, path: &[&str]) -> Result<String, String> {
-    let pb: PathBuf = path.iter().collect();
+    let pb = path.join("/");
 
     let x = XorUrlEncoder::from_url(&url).map_err(|e| format!("{:#?}", e))?;
 
@@ -1193,7 +1197,7 @@ fn source_path(url: &str, path: &[&str]) -> Result<String, String> {
         "{}://{}/{}{}{}",
         x.scheme(),
         x.public_name(),
-        pb.display().to_string(),
+        pb,
         x.query_string_with_separator(),
         x.fragment_with_separator()
     );
