@@ -1066,7 +1066,7 @@ fn not_hidden_or_empty(entry: &DirEntry, max_depth: usize) -> bool {
 
 // generates a sha3_256 digest/hash of a directory tree.
 //
-// Note: hidden files or empty directories are not included.
+// Note: hidden files or directories are not included.
 //  this is necessary for comparing ../testdata with
 //  dest dir since `safe files put` presently ignores hidden
 //  files.  The hidden files can be included once
@@ -1082,9 +1082,6 @@ fn sum_tree(path: &str) -> String {
 
     let mut digests = String::new();
     for p in paths {
-        if p.path().is_dir() && dir_is_empty(&p.path()) {
-            continue;
-        }
         let relpath = p.path().strip_prefix(path).unwrap().display().to_string();
         digests.push_str(&str_to_sha3_256(&relpath));
         if p.path().is_file() {
@@ -1092,23 +1089,6 @@ fn sum_tree(path: &str) -> String {
         }
     }
     str_to_sha3_256(&digests)
-}
-
-// checks if a directory is empty, ignoring hidden files.
-// ie, a dir containing only hidden files is considered empty.
-//
-// Note: this is necessary for comparing ../testdata with
-// dest dir since `safe files put` presently ignores hidden
-// files.  The hidden files can be included once
-// 'safe files put' is fixed to include them.
-fn dir_is_empty(path: &Path) -> bool {
-    let entries = path.read_dir().unwrap();
-    for e in entries {
-        if !e.unwrap().file_name().to_str().unwrap().starts_with('.') {
-            return false;
-        }
-    }
-    true
 }
 
 // returns sha3_256 digest/hash of a file as a string.

@@ -47,15 +47,16 @@ pub async fn cat_commander(
                 );
                 let mut table = Table::new();
                 table.add_row(
-                    row![bFg->"Name", bFg->"Size", bFg->"Created", bFg->"Modified", bFg->"Link"],
+                    row![bFg->"Name", bFg->"Type", bFg->"Size", bFg->"Created", bFg->"Modified", bFg->"Link"],
                 );
                 files_map.iter().for_each(|(name, file_item)| {
                     table.add_row(row![
                         name,
+                        file_item["type"],
                         file_item["size"],
                         file_item["created"],
                         file_item["modified"],
-                        file_item["link"],
+                        file_item.get("link").unwrap_or(&String::default()),
                     ]);
                 });
                 table.printstd();

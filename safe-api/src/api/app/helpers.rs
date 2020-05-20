@@ -9,10 +9,11 @@
 
 use super::common::{parse_hex, sk_from_hex};
 use crate::{Error, Result};
-use chrono::{SecondsFormat, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName};
 use std::str::{self, FromStr};
+use std::time;
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 
 /// The conversion from coin to raw value
@@ -120,6 +121,11 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
         IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
+}
+
+pub fn systemtime_to_rfc3339(t: &time::SystemTime) -> String {
+    let datetime: DateTime<Utc> = t.clone().into();
+    datetime.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 pub fn gen_timestamp_secs() -> String {

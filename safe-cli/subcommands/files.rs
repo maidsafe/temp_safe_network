@@ -26,6 +26,7 @@ use safe_api::{
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
+use std::path::{Component, Path};
 use structopt::StructOpt;
 
 type FileDetails = BTreeMap<String, String>;
@@ -482,25 +483,28 @@ fn build_tree(
     if depth < path_parts.len() {
         let item = &path_parts[depth];
 
+        if item.is_empty() {
+            return (dirs, files);
+        }
+
         let mut node = match node.find_child(&item) {
             Some(n) => n,
             None => {
                 // Note: fs_type assignment relies on the fact that input
                 // is a path to a file, not a directory.
-                let (fs_type, d, di, fi) = if depth == path_parts.len() - 1 {
-                    (
-                        FileTreeNodeType::File,
-                        if show_details {
-                            Some(details.clone())
-                        } else {
-                            None
-                        },
-                        0, // dirs increment
-                        1, // files increment
-                    )
+                let det = if show_details {
+                    Some(details.clone())
                 } else {
-                    (FileTreeNodeType::Directory, None, 1, 0)
+                    None
                 };
+
+                let (fs_type, d, di, fi) = match details["type"].as_str() {
+                    "inode/directory" => (FileTreeNodeType::Directory, det, 1, 0),
+                    // coming soon.
+                    // "inode/symlink" => {},
+                    _ => (FileTreeNodeType::File, det, 0, 1),
+                };
+
                 dirs += di;
                 files += fi;
                 let n = FileTreeNode::new(&item, fs_type, d);
@@ -598,7 +602,9 @@ fn print_file_system_node_details_body(
             }
         }
         FileTreeNodeType::Directory => {
-            table.add_row(row!["", "", "", name]);
+            if let Some(d) = &dir.details {
+                table.add_row(row![d["size"], d["created"], d["modified"], name]);
+            }
         }
     }
 
@@ -704,17 +710,74 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
     };
 
     let mut total = 0;
-    files_map.iter().for_each(|(filepath, fileitem)| {
+    for (filepath, fileitem) in files_map.iter() {
         // let's first filter out file items not belonging to the provided path
         if filepath
             .trim_matches('/')
             .starts_with(&folder_path.trim_matches('/'))
         {
-            total += 1;
-            let mut relative_path = filepath.clone();
-            relative_path.replace_range(..folder_path.len(), "");
-            let subdirs = relative_path.split('/').collect::<Vec<&str>>();
+            // TODO:
+            // for now we just filter out directory entries,
+            // and use existing code-path.  We could however
+            // refactor to display the mtime and ctime fields
+            // from these directory FileItem(s).
+            if fileitem["type"] == "inode/directory" {
+                continue;
+            }
+
+            // note: refactored this a bit to support specifying
+            // path to an individual file, eg:
+            //   safe files ls safe://<xor>/testdata/test.md
+            // It should return a FilesMap with 1 entry, not 0.
+            let p_folder_path = Path::new(&folder_path);
+            let p_filepath = Path::new(filepath);
+            let mut subdirs = Vec::<&str>::new();
+            let mut prefix_components = p_folder_path.components();
+            let cnt = p_filepath.components().count();
+
+            // Iterate through p_filepath and p_folder_path,
+            // to find where they diverge.  Doing it this way,
+            // we match by normalized path component, rather than by
+            // characters, which previously caused weirdness
+            // eg if folder_path = /test instead of
+            //                     /testdata
+            // and may have had normalization issues as well.
+            for (idx, p) in p_filepath.components().enumerate() {
+                let prefix_next = prefix_components.next();
+
+                // We only want 'normal' path components.
+                // Other types, eg "../" will never match in a filemap.
+                match p {
+                    Component::Normal(_) => {}
+                    _ => continue,
+                }
+
+                // We add the path component if either:
+                //  a) the prefix component matches and last
+                //     component in fileitem path, ie a file.
+                //  b) the prefix component is None,
+                //     meaning all prefix components matched.
+                //
+                //  We filter out fileitem (break) if:
+                //   (a) and (b) are false and next prefix
+                //   component does not match next fileitem
+                //   path component.
+                if (Some(p) == prefix_next && idx == cnt - 1) || prefix_next.is_none() {
+                    let component = match p.as_os_str().to_str() {
+                        Some(c) => c,
+                        None => {
+                            return Err("Encountered invalid unicode sequence in path".to_string())
+                        }
+                    };
+                    subdirs.push(component);
+                } else if Some(p) != prefix_next {
+                    break;
+                }
+            }
+
             if !subdirs.is_empty() {
+                total += 1;
+
                 // let's get base path of current file item
                 let mut is_folder = false;
                 let base_path = if subdirs.len() > 1 {
@@ -767,7 +830,7 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
                 }
             }
         }
-    });
+    }
 
     Ok((total, filtered_filesmap))
 }

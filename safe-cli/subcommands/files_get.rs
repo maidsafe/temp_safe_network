@@ -38,6 +38,7 @@ pub struct FilesGetStatus<'a, 'b> {
     pub transfer_bytes_written: u64,
     pub file_size: u64,
     pub file_bytes_written: u64,
+    pub file_type: String,
 }
 
 /// # Action to perform when downloading if a file already exists.
@@ -158,7 +159,12 @@ pub async fn process_get_command(
                 //      unix cp does not provide any flag/option/prompt to permit this
                 //      and it always emits a warning.  So I am satisfied with this
                 //      working the same way, at least for now.
-                if let Some(parent) = status.path_local.parent() {
+                let dirpath = if status.file_type == "inode/directory" {
+                    Some(status.path_local)
+                } else {
+                    status.path_local.parent()
+                };
+                if let Some(parent) = dirpath {
                     if let Some(filepath) = path_contains_file(&parent) {
                         let msg = format!(
                             "cannot overwrite non-directory '{}' with directory in '{}'",
@@ -578,21 +584,18 @@ async fn files_map_get_files(
     // Loop through files map and download each file.
     // caller may cancel individual files, but not entire transfer.
     for (idx, (path, details)) in files_map.iter().enumerate() {
-        // fetch xorurl and write to path.  directory paths created if needed.
-
-        let xorurl = &details["link"];
         let abspath = if !path.is_empty() {
             dpath.join(path.trim_matches('/'))
         } else {
             dpath.to_path_buf()
         };
-        trace!("file target path: {}", abspath.display());
+        trace!("target path: {}", abspath.display());
 
         // determine the file size from metadata.  string must be parsed.
         let size: u64 = details["size"].parse().map_err(|err| {
             Error::Unexpected(format!(
                 "Invalid file size: {} for {}.  {:?}",
-                details["size"], xorurl, err
+                details["size"], path, err
             ))
         })?;
 
@@ -606,6 +609,7 @@ async fn files_map_get_files(
             transfer_bytes_written,
             file_size: size,
             file_bytes_written: 0,
+            file_type: details["type"].clone(),
         };
 
         // status callback before file download begins.
@@ -616,6 +620,15 @@ async fn files_map_get_files(
             total_transfer_bytes -= size;
             continue;
         }
+
+        // If a directory, we just create and continue.
+        if details["type"] == "inode/directory" {
+            create_dir_all(&abspath)?;
+            continue;
+        }
+
+        // Note: must never get here if a directory/symlink.
+        let xorurl = &details["link"];
 
         // Download file.  We handle callback from download_file_from_net()
         // and our handler calls a callback supplied by our caller.

@@ -20,11 +20,12 @@ use safe_api::{
 };
 use safe_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
-    parse_files_put_or_sync_output, CLI,
+    parse_files_container_output, parse_files_put_or_sync_output, CLI,
 };
 use std::process::Command;
 use unwrap::unwrap;
 
+const TEST_DATA: &str = "../testdata/";
 const TEST_FILE: &str = "../testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
 const ID_RELATIVE_FILE_ERROR: &str = "Cannot get relative path of Immutable Data";
@@ -60,6 +61,38 @@ fn calling_safe_cat() {
         xorurl_encoder.data_type(),
         SafeDataType::PublishedImmutableData
     );
+}
+
+#[test]
+fn calling_safe_cat_subfolders() {
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "put",
+        TEST_DATA,
+        "--json",
+        "--recursive",
+    )
+    .read()
+    .unwrap();
+
+    let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
+
+    let content = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "cat",
+        &container_xorurl,
+        "--json",
+    )
+    .read()
+    .unwrap();
+
+    let (_xorurl, filesmap) = parse_files_container_output(&content);
+
+    assert_eq!(filesmap["/emptyfolder"]["type"], "inode/directory");
+    assert_eq!(filesmap["/emptyfolder"]["size"], "0");
+    assert_eq!(filesmap["/subfolder"]["type"], "inode/directory");
+    assert_eq!(filesmap["/subfolder"]["size"], "0");
 }
 
 #[test]
