@@ -12,7 +12,7 @@ use rand::{thread_rng, Rng};
 use safe_api::{files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
 use safe_nd::Coins;
 use std::collections::BTreeMap;
-use std::{env, str::FromStr};
+use std::{env, process, str::FromStr};
 use unwrap::unwrap;
 
 #[macro_use]
@@ -196,4 +196,28 @@ pub fn parse_cat_wallet_output(output: &str) -> (String, WalletSpendableBalances
 #[allow(dead_code)]
 pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
     serde_json::from_str(output).expect("Failed to parse output of `safe xorurl`")
+}
+
+// Executes arbitrary `safe ` commands and returns 
+// output (stdout, stderr, exit code).
+//
+// If expect_exit_code is Some, then an Err is returned 
+// if value does not match process exit code.
+pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output, String> {
+    println!("Executing: safe {}", args.join(" "));
+
+    let output = duct::cmd(get_bin_location(), args)
+        .stdout_capture()
+        .stderr_capture()
+        .unchecked()
+        .run()
+        .map_err(|e| format!("{:#?}", e))?;
+
+    if let Some(ec) = expect_exit_code {
+        match output.status.code() {
+            Some(code) => assert_eq!(ec, code),
+            None => return Err("Command returned no exit code".to_string()),
+        }
+    }
+    Ok(output)
 }

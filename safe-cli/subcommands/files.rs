@@ -336,22 +336,59 @@ pub async fn files_commander(
             let target_url =
                 get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
-            let (version, files_map) = safe
-                .files_container_get(&target_url)
-                .await
-                .map_err(|err| format!("Make sure the URL targets a FilesContainer.\n{}", err))?;
-            let (total, filtered_filesmap) = filter_files_map(&files_map, &target_url)?;
+            // Goal: Support 'files ls /path/to/file' as well as /path/to/folder
+            //
+            // We (presently) can't use Safe::fetch() because it returns
+            // an ImmutableObject for the file, without it's name, which
+            // comes from the FileContainer
+            //
+            // So how then?
+            //   Retrieve NRS resolution steps and walk through them backwards
+            //   to find FilesContainer.  This is very awkward, so hopefully a
+            //   better approach can/will be found.
+            let steps = safe.inspect(&target_url).await?;
+            let mut found_filecontainer = false;
+            for (cnt, step) in steps.iter().rev().enumerate() {
+                let (xorurl, files_map, version) = match step {
+                    // logic: if cnt == 0, then urlpath is a path to folder with
+                    //           FileMap containing folder contents, and we want the
+                    //           xorurl, without path info.
+                    //        if cnt != 0 then urlpath must/should be a path to file.
+                    //           The FileMap is relative to FileContainer root.  So
+                    //           we need the resolved_from url to filter the contents.
+                    SafeData::FilesContainer {
+                        xorurl,
+                        resolved_from,
+                        files_map,
+                        version,
+                        ..
+                    } => (
+                        if cnt == 0 { xorurl } else { resolved_from },
+                        files_map,
+                        version,
+                    ),
+                    _ => continue,
+                };
+                let (total, filtered_filesmap) = filter_files_map(&files_map, &xorurl)?;
 
-            if OutputFmt::Pretty == output_fmt {
-                print_files_map(&filtered_filesmap, total, version, &target_url);
-            } else {
-                println!(
-                    "{}",
-                    serialise_output(&(target_url, filtered_filesmap), output_fmt)
-                );
+                if OutputFmt::Pretty == output_fmt {
+                    print_files_map(&filtered_filesmap, total, *version, &target_url);
+                } else {
+                    println!(
+                        "{}",
+                        serialise_output(&(target_url, filtered_filesmap), output_fmt)
+                    );
+                }
+                // once we find FileContainer, we are done.
+                found_filecontainer = true;
+                break;
             }
 
-            Ok(())
+            if found_filecontainer {
+                Ok(())
+            } else {
+                Err("Make sure the URL targets a FilesContainer.".to_string())
+            }
         }
         FilesSubCommands::Tree { target, details } => {
             process_tree_command(safe, target, details, output_fmt).await
@@ -703,19 +740,40 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
     let mut xorurl_encoder = Safe::parse_url(target_url)?;
     let path = xorurl_encoder.path_decoded()?;
 
+    // optimization: if path is to a single file, we don't need to
+    // iterate and filter other entries.  We just return the single
+    // match.
+    //
+    // note: as of this writing, code below passes all tests, even if
+    //       this optimization removed.
+    if files_map.contains_key(&path) {
+        let details = &files_map[&path];
+        match details["type"].as_str() {
+            "inode/directory" => {}
+            "inode/symlink" => {}
+            _ => {
+                // found a single file.  cool!
+                let mut parts: Vec<&str> = path.split('/').collect();
+                let newpath = parts.pop().unwrap_or(&path).to_string();
+                filtered_filesmap.insert(newpath, details.clone());
+                return Ok((1, filtered_filesmap));
+            }
+        }
+    }
+
     let folder_path = if !path.ends_with('/') {
         format!("{}/", path)
     } else {
         path
     };
 
+    let folder_path_trimmed = folder_path.trim_matches('/');
     let mut total = 0;
     for (filepath, fileitem) in files_map.iter() {
+        let filepath_trimmed = filepath.trim_matches('/');
+
         // let's first filter out file items not belonging to the provided path
-        if filepath
-            .trim_matches('/')
-            .starts_with(&folder_path.trim_matches('/'))
-        {
+        if folder_path_trimmed.is_empty() || filepath_trimmed.starts_with(&folder_path_trimmed) {
             // TODO:
             // for now we just filter out directory entries,
             // and use existing code-path.  We could however
@@ -724,7 +782,6 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
             if fileitem["type"] == "inode/directory" {
                 continue;
             }
-
             // note: refactored this a bit to support specifying
             // path to an individual file, eg:
             //   safe files ls safe://<xor>/testdata/test.md
@@ -743,13 +800,17 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
             //                     /testdata
             // and may have had normalization issues as well.
             for (idx, p) in p_filepath.components().enumerate() {
-                let prefix_next = prefix_components.next();
-
                 // We only want 'normal' path components.
                 // Other types, eg "../" will never match in a filemap.
                 match p {
                     Component::Normal(_) => {}
                     _ => continue,
+                }
+
+                // lets get past the RootDir
+                let mut prefix_next = prefix_components.next();
+                if prefix_next == Some(Component::RootDir) {
+                    prefix_next = prefix_components.next();
                 }
 
                 // We add the path component if either:

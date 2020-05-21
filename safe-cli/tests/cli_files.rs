@@ -16,8 +16,9 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use safe_api::xorurl::XorUrlEncoder;
 use safe_cmd_test_utilities::{
-    get_random_nrs_string, parse_files_container_output, parse_files_put_or_sync_output,
-    parse_files_tree_output, read_cmd, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
+    create_nrs_link, get_random_nrs_string, parse_files_container_output,
+    parse_files_put_or_sync_output, parse_files_tree_output, read_cmd, safe_cmd,
+    upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
     env,
@@ -944,47 +945,92 @@ fn calling_files_ls() {
         processed_files[&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER)].1
     );
     assert_eq!(files_map["subexists.md"]["size"], "23");
+}
 
-    // test ls'ing an individual file.
-    xorurl_encoder.set_path("subfolder/sub2.md");
-    let single_file_path = xorurl_encoder.to_string();
+// Test:  safe ls safe://<xorurl>/subfold
+//
+//    note: URL path is invalid.
+//
+//    expected result:
+//       a. exit code = 1
+//       b. stderr contains "No data found for path"
+#[test]
+fn calling_files_ls_with_invalid_path() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor).unwrap();
 
-    let files_ls_output = cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "ls",
-        &single_file_path,
-        "--json"
-    )
-    .read()
-    .unwrap();
-
-    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
-    assert_eq!(xorurl, single_file_path);
-    assert_eq!(files_map.len(), 1);
-    assert_eq!(
-        files_map["sub2.md"]["link"],
-        processed_files[&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER)].1
-    );
-    assert_eq!(files_map["sub2.md"]["size"], "4");
-
-    // test ls'ing a partial path that should not match anything.
+    // set invalid path
     xorurl_encoder.set_path("subfold");
     let partial_path = xorurl_encoder.to_string();
 
-    let files_ls_output = cmd!(
+    let args = ["files", "ls", &partial_path, "--json"];
+    let output = safe_cmd(&args, Some(1))?;
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert!(stderr.contains("No data found for path"));
+
+    Ok(())
+}
+
+// Test:  safe ls safe://<xorurl>/subfolder/sub2.md
+//
+//    expected result: We find the single file requested
+#[test]
+fn calling_files_ls_on_single_file() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
+
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor).unwrap();
+    xorurl_encoder.set_path("/subfolder/sub2.md");
+    let single_file_url = xorurl_encoder.to_string();
+
+    let files_ls_output = read_cmd(cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "ls",
-        &partial_path,
+        &single_file_url,
         "--json"
-    )
-    .read()
-    .unwrap();
+    ))?;
 
-    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
-    assert_eq!(xorurl, partial_path);
-    assert_eq!(files_map.len(), 0);
+    let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(files_map.len(), 1);
+    assert_eq!(files_map["sub2.md"]["size"], "4");
+
+    Ok(())
+}
+
+// Test:  safe ls safe://<nrsname>/subfolder
+//
+//    safe://<nrsname> links to safe://<xorurl>/testdata
+//
+//    expected result: We find the 2 files beneath testdata/subfolder
+#[test]
+fn calling_files_ls_on_nrs_with_path() -> Result<(), String> {
+    let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
+
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor).unwrap();
+    xorurl_encoder.set_content_version(Some(0));
+    xorurl_encoder.set_path("/testdata");
+    let container_xorurl_v0 = xorurl_encoder.to_string();
+
+    let container_nrsurl = create_nrs_link(&get_random_nrs_string(), &container_xorurl_v0)?;
+
+    let mut nrsurl_encoder = XorUrlEncoder::from_url(&container_nrsurl).unwrap();
+    nrsurl_encoder.set_path("/subfolder");
+    let nrsurl = nrsurl_encoder.to_string();
+
+    let files_ls_output = read_cmd(cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "files",
+        "ls",
+        &nrsurl,
+        "--json"
+    ))?;
+
+    let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(files_map.len(), 2);
+    assert_eq!(files_map["sub2.md"]["size"], "4");
+
+    Ok(())
 }
 
 #[test]
