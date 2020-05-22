@@ -2,7 +2,7 @@
 name = "safe-api"
 version = "0.13.0"
 description = "SAFE API"
-authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
+authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 license = "MIT OR BSD-3-Clause"
 repository = "https://github.com/maidsafe/safe-api"
 include = ["Cargo.toml", "src/api/*", "src/lib.rs"]

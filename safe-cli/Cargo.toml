@@ -2,7 +2,7 @@
 name = "safe-cli"
 version = "0.13.0"
 description = "SAFE CLI"
-authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>", "Calum Craig <calum.craig@maidsafe.net>", "Chris O'Neil <chris.oneil@gmail.com>"]
+authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 publish = false
 license = "MIT OR BSD-3-Clause"
 default-run = "safe"
