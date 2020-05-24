@@ -339,7 +339,7 @@ async fn resolve_one_indirection(
 
             the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
             let nrs_map_container = SafeData::NrsMapContainer {
-                public_name: the_xor.public_name().to_string(),
+                public_name: the_xor.top_name().to_string(),
                 xorurl: the_xor.to_xorurl_string(),
                 xorname: the_xor.xorname(),
                 type_tag: the_xor.type_tag(),

@@ -99,10 +99,11 @@ impl NrsMap {
             None
         };
 
-        for curr_sub_name in sub_names.iter().rev() {
+        let num_of_subnames = sub_names.len();
+        for (i, curr_sub_name) in sub_names.iter().rev().enumerate() {
             match nrs_map.sub_names_map.get(curr_sub_name) {
                 Some(SubNameRDF::SubName(nrs_sub_map)) => {
-                    if nrs_sub_map.sub_names_map.is_empty() {
+                    if nrs_sub_map.sub_names_map.is_empty() || i == num_of_subnames - 1 {
                         // we need default one then
                         if let DefaultRdf::OtherRdf(def_data) = &nrs_sub_map.default {
                             debug!("NRS subname resolution done. Located: \"{:?}\"", def_data);

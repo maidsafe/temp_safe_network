@@ -134,7 +134,9 @@ fn calling_safe_nrs_put_folder_and_fetch() {
 
 #[test]
 fn calling_safe_nrs_put_no_top_default_fetch() {
-    let test_name = format!("safe://a.b.c.{}", get_random_nrs_string());
+    let nrs_name = get_random_nrs_string();
+    let test_name1 = format!("safe://a.b.c.{}", nrs_name);
+    let test_name2 = format!("safe://b.c.{}", nrs_name);
 
     let (container_xorurl, _map) = upload_test_folder();
     let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
@@ -144,7 +146,7 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
         env!("CARGO_BIN_EXE_safe"),
         "nrs",
         "create",
-        &test_name,
+        &test_name1,
         "-l",
         &link,
         "--json"
@@ -152,10 +154,29 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
     .read()
     .unwrap();
 
-    let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name)
+    let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name1)
         .read()
         .unwrap();
     assert_eq!(cat_of_new_url, "hello tests!");
+
+    xorurl_encoder.set_path("/another.md");
+    let link2 = xorurl_encoder.to_string();
+    let _nrs_addition = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "nrs",
+        "add",
+        &test_name2,
+        "-l",
+        &link2,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name2)
+        .read()
+        .unwrap();
+    assert_eq!(cat_of_new_url, "exists");
 }
 
 #[test]
