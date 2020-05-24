@@ -198,10 +198,10 @@ pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
     serde_json::from_str(output).expect("Failed to parse output of `safe xorurl`")
 }
 
-// Executes arbitrary `safe ` commands and returns 
+// Executes arbitrary `safe ` commands and returns
 // output (stdout, stderr, exit code).
 //
-// If expect_exit_code is Some, then an Err is returned 
+// If expect_exit_code is Some, then an Err is returned
 // if value does not match process exit code.
 pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output, String> {
     println!("Executing: safe {}", args.join(" "));

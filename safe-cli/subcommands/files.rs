@@ -31,6 +31,8 @@ use structopt::StructOpt;
 
 type FileDetails = BTreeMap<String, String>;
 
+const UNKNOWN_FILE_NAME: &str = "<unknown>";
+
 // Differentiates between nodes in a file system.
 #[derive(Debug, Serialize, PartialEq)]
 enum FileTreeNodeType {
@@ -336,59 +338,56 @@ pub async fn files_commander(
             let target_url =
                 get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
-            // Goal: Support 'files ls /path/to/file' as well as /path/to/folder
-            //
-            // We (presently) can't use Safe::fetch() because it returns
-            // an ImmutableObject for the file, without it's name, which
-            // comes from the FileContainer
-            //
-            // So how then?
-            //   Retrieve NRS resolution steps and walk through them backwards
-            //   to find FilesContainer.  This is very awkward, so hopefully a
-            //   better approach can/will be found.
-            let steps = safe.inspect(&target_url).await?;
-            let mut found_filecontainer = false;
-            for (cnt, step) in steps.iter().rev().enumerate() {
-                let (xorurl, files_map, version) = match step {
-                    // logic: if cnt == 0, then urlpath is a path to folder with
-                    //           FileMap containing folder contents, and we want the
-                    //           xorurl, without path info.
-                    //        if cnt != 0 then urlpath must/should be a path to file.
-                    //           The FileMap is relative to FileContainer root.  So
-                    //           we need the resolved_from url to filter the contents.
-                    SafeData::FilesContainer {
-                        xorurl,
-                        resolved_from,
-                        files_map,
-                        version,
-                        ..
-                    } => (
-                        if cnt == 0 { xorurl } else { resolved_from },
-                        files_map,
-                        version,
-                    ),
-                    _ => continue,
-                };
-                let (total, filtered_filesmap) = filter_files_map(&files_map, &xorurl)?;
+            debug!("Getting files in container {:?}", target_url);
+            let mut resolution_chain = safe.inspect(&target_url).await?;
+            let resolved_content = resolution_chain
+                .pop()
+                .ok_or_else(|| "Unexpectedly failed to obtain the resolved content".to_string())?;
 
-                if OutputFmt::Pretty == output_fmt {
-                    print_files_map(&filtered_filesmap, total, *version, &target_url);
-                } else {
-                    println!(
-                        "{}",
-                        serialise_output(&(target_url, filtered_filesmap), output_fmt)
-                    );
+            let (version, files_map, total) = match resolved_content {
+                SafeData::FilesContainer {
+                    version, files_map, ..
+                } => {
+                    let (total, filtered_filesmap) = filter_files_map(&files_map, &target_url)?;
+                    (version, filtered_filesmap, total)
                 }
-                // once we find FileContainer, we are done.
-                found_filecontainer = true;
-                break;
+                SafeData::PublishedImmutableData { metadata, .. } => {
+                    if let Some(file_item) = metadata {
+                        let mut files_map = FilesMap::new();
+                        let name = match file_item.get("name") {
+                            Some(name) => name,
+                            None => UNKNOWN_FILE_NAME,
+                        };
+                        files_map.insert(name.to_string(), file_item);
+
+                        let container_version = match resolution_chain.pop() {
+                            Some(SafeData::FilesContainer { version, .. }) => version,
+                            _ => {
+                                return Err("Unexpectedly failed to obtain the container's version"
+                                    .to_string())
+                            }
+                        };
+
+                        (container_version, files_map, 1)
+                    } else {
+                        return Err(
+                            "You can target files only by providing a FilesContainer with the file's path."
+                                .to_string(),
+                        );
+                    }
+                }
+                _other_type => {
+                    return Err("Make sure the URL targets a FilesContainer.".to_string())
+                }
+            };
+
+            if OutputFmt::Pretty == output_fmt {
+                print_files_map(&files_map, total, version, &target_url);
+            } else {
+                println!("{}", serialise_output(&(target_url, files_map), output_fmt));
             }
 
-            if found_filecontainer {
-                Ok(())
-            } else {
-                Err("Make sure the URL targets a FilesContainer.".to_string())
-            }
+            Ok(())
         }
         FilesSubCommands::Tree { target, details } => {
             process_tree_command(safe, target, details, output_fmt).await
@@ -738,155 +737,83 @@ fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap), String> {
     let mut filtered_filesmap = FilesMap::default();
     let mut xorurl_encoder = Safe::parse_url(target_url)?;
-    let path = xorurl_encoder.path_decoded()?;
-
-    // optimization: if path is to a single file, we don't need to
-    // iterate and filter other entries.  We just return the single
-    // match.
-    //
-    // note: as of this writing, code below passes all tests, even if
-    //       this optimization removed.
-    if files_map.contains_key(&path) {
-        let details = &files_map[&path];
-        match details["type"].as_str() {
-            "inode/directory" => {}
-            "inode/symlink" => {}
-            _ => {
-                // found a single file.  cool!
-                let mut parts: Vec<&str> = path.split('/').collect();
-                let newpath = parts.pop().unwrap_or(&path).to_string();
-                filtered_filesmap.insert(newpath, details.clone());
-                return Ok((1, filtered_filesmap));
-            }
-        }
-    }
-
-    let folder_path = if !path.ends_with('/') {
-        format!("{}/", path)
-    } else {
-        path
-    };
-
-    let folder_path_trimmed = folder_path.trim_matches('/');
     let mut total = 0;
-    for (filepath, fileitem) in files_map.iter() {
-        let filepath_trimmed = filepath.trim_matches('/');
 
-        // let's first filter out file items not belonging to the provided path
-        if folder_path_trimmed.is_empty() || filepath_trimmed.starts_with(&folder_path_trimmed) {
-            // TODO:
-            // for now we just filter out directory entries,
-            // and use existing code-path.  We could however
-            // refactor to display the mtime and ctime fields
-            // from these directory FileItem(s).
-            if fileitem["type"] == "inode/directory" {
+    for (filepath, fileitem) in files_map.iter() {
+        // TODO:
+        // for now we just filter out directory entries,
+        // and use existing code-path.  We could however
+        // refactor to display the mtime and ctime fields
+        // from these directory FileItem(s).
+        if fileitem["type"] == "inode/directory" {
+            continue;
+        }
+
+        // Iterate through p_filepath with normalized path components
+        // to populate a list of subdirs.
+        let filepath_components = Path::new(filepath).components();
+        let mut subdirs = Vec::<&str>::new();
+        for p in filepath_components {
+            // We only want 'normal' path components.
+            // Other types, eg "../" will never match in a filemap.
+            if let Component::Normal(comp) = p {
+                match comp.to_str() {
+                    Some(c) => subdirs.push(c),
+                    None => return Err("Encountered invalid unicode sequence in path".to_string()),
+                };
+            } else {
                 continue;
             }
-            // note: refactored this a bit to support specifying
-            // path to an individual file, eg:
-            //   safe files ls safe://<xor>/testdata/test.md
-            // It should return a FilesMap with 1 entry, not 0.
-            let p_folder_path = Path::new(&folder_path);
-            let p_filepath = Path::new(filepath);
-            let mut subdirs = Vec::<&str>::new();
-            let mut prefix_components = p_folder_path.components();
-            let cnt = p_filepath.components().count();
+        }
 
-            // Iterate through p_filepath and p_folder_path,
-            // to find where they diverge.  Doing it this way,
-            // we match by normalized path component, rather than by
-            // characters, which previously caused weirdness
-            // eg if folder_path = /test instead of
-            //                     /testdata
-            // and may have had normalization issues as well.
-            for (idx, p) in p_filepath.components().enumerate() {
-                // We only want 'normal' path components.
-                // Other types, eg "../" will never match in a filemap.
-                match p {
-                    Component::Normal(_) => {}
-                    _ => continue,
-                }
+        if !subdirs.is_empty() {
+            total += 1;
 
-                // lets get past the RootDir
-                let mut prefix_next = prefix_components.next();
-                if prefix_next == Some(Component::RootDir) {
-                    prefix_next = prefix_components.next();
-                }
+            // let's get base path of current file item
+            let mut is_folder = false;
+            let base_path = if subdirs.len() > 1 {
+                is_folder = true;
+                format!("{}/", subdirs[0])
+            } else {
+                subdirs[0].to_string()
+            };
 
-                // We add the path component if either:
-                //  a) the prefix component matches and last
-                //     component in fileitem path, ie a file.
-                //  b) the prefix component is None,
-                //     meaning all prefix components matched.
-                //
-                //  We filter out fileitem (break) if:
-                //   (a) and (b) are false and next prefix
-                //   component does not match next fileitem
-                //   path component.
-                if (Some(p) == prefix_next && idx == cnt - 1) || prefix_next.is_none() {
-                    let component = match p.as_os_str().to_str() {
-                        Some(c) => c,
-                        None => {
-                            return Err("Encountered invalid unicode sequence in path".to_string())
-                        }
-                    };
-                    subdirs.push(component);
-                } else if Some(p) != prefix_next {
-                    break;
-                }
-            }
-
-            if !subdirs.is_empty() {
-                total += 1;
-
-                // let's get base path of current file item
-                let mut is_folder = false;
-                let base_path = if subdirs.len() > 1 {
-                    is_folder = true;
-                    format!("{}/", subdirs[0])
-                } else {
-                    subdirs[0].to_string()
-                };
-
-                // insert or merge current file item into the filtered list
-                match filtered_filesmap.get_mut(&base_path) {
-                    None => {
-                        let mut fileitem = fileitem.clone();
-                        if is_folder {
-                            // then set link to xorurl with path current subfolder
-                            let subfolder_path = format!("{}{}", folder_path, subdirs[0]);
-                            xorurl_encoder.set_path(&subfolder_path);
-                            let link = xorurl_encoder.to_string();
-                            fileitem.insert("link".to_string(), link);
-                            fileitem.insert("type".to_string(), "".to_string());
-                        }
-
-                        filtered_filesmap.insert(base_path.to_string(), fileitem);
+            // insert or merge current file item into the filtered list
+            match filtered_filesmap.get_mut(&base_path) {
+                None => {
+                    let mut fileitem = fileitem.clone();
+                    if is_folder {
+                        // then set link to xorurl with path current subfolder
+                        xorurl_encoder.set_path(&subdirs[0]);
+                        let link = xorurl_encoder.to_string();
+                        fileitem.insert("link".to_string(), link);
+                        fileitem.insert("type".to_string(), "".to_string());
                     }
-                    Some(item) => {
-                        // current file item belongs to same base path as other files,
-                        // we need to merge them together into the filtered list
 
-                        // Add up files sizes
-                        let current_dir_size = (*item["size"]).parse::<u32>().unwrap_or_else(|_| 0);
-                        let additional_dir_size =
-                            fileitem["size"].parse::<u32>().unwrap_or_else(|_| 0);
-                        (*item).insert(
-                            "size".to_string(),
-                            format!("{}", current_dir_size + additional_dir_size),
-                        );
+                    filtered_filesmap.insert(base_path.to_string(), fileitem);
+                }
+                Some(item) => {
+                    // current file item belongs to same base path as other files,
+                    // we need to merge them together into the filtered list
 
-                        // If current file item's modified date is more recent
-                        // set it as the folder's modififed date
-                        if fileitem["modified"] > item["modified"] {
-                            (*item).insert("modified".to_string(), fileitem["modified"].clone());
-                        }
+                    // Add up files sizes
+                    let current_dir_size = (*item["size"]).parse::<u32>().unwrap_or_else(|_| 0);
+                    let additional_dir_size = fileitem["size"].parse::<u32>().unwrap_or_else(|_| 0);
+                    (*item).insert(
+                        "size".to_string(),
+                        format!("{}", current_dir_size + additional_dir_size),
+                    );
 
-                        // If current file item's creation date is older than others
-                        // set it as the folder's created date
-                        if fileitem["created"] > item["created"] {
-                            (*item).insert("created".to_string(), fileitem["created"].clone());
-                        }
+                    // If current file item's modified date is more recent
+                    // set it as the folder's modififed date
+                    if fileitem["modified"] > item["modified"] {
+                        (*item).insert("modified".to_string(), fileitem["modified"].clone());
+                    }
+
+                    // If current file item's creation date is older than others
+                    // set it as the folder's created date
+                    if fileitem["created"] > item["created"] {
+                        (*item).insert("created".to_string(), fileitem["created"].clone());
                     }
                 }
             }

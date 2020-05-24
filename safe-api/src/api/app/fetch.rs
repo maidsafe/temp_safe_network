@@ -19,6 +19,7 @@ pub use super::{
 use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 
@@ -264,7 +265,12 @@ async fn resolve_one_indirection(
                                 match file_item.get("link") {
                                     Some(link) => {
                                         let new_target_xorurl = XorUrlEncoder::from_url(link)?;
-                                        let metadata = (*file_item).clone();
+                                        let mut metadata = (*file_item).clone();
+                                        Path::new(&path).file_name().map(|name| {
+                                            name.to_str().map(|str| {
+                                                metadata.insert("name".to_string(), str.to_string())
+                                            })
+                                        });
                                         (files_map, Some((new_target_xorurl, Some(metadata))))
                                     }
                                     None => {
