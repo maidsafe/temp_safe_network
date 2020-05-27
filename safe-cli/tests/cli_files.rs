@@ -16,8 +16,9 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use safe_api::xorurl::XorUrlEncoder;
 use safe_cmd_test_utilities::{
-    create_nrs_link, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_files_tree_output, read_cmd, safe_cmd,
+    create_nrs_link, get_random_nrs_string, mk_emptyfolder, parse_files_container_output,
+    parse_files_put_or_sync_output, parse_files_tree_output, read_cmd, safe_cmd_stderr,
+    safe_cmd_stdout, test_symlinks_are_valid, upload_test_symlinks_folder,
     upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
@@ -154,7 +155,7 @@ fn calling_safe_files_put_recursive_subfolder() {
 
 #[test]
 fn calling_safe_files_put_emptyfolder() {
-    let emptyfolder_paths = mk_emptyfolder().unwrap();
+    let emptyfolder_paths = mk_emptyfolder("emptyfolder").unwrap();
 
     let mut cmd = Command::cargo_bin(CLI).unwrap();
     cmd.args(&vec![
@@ -344,7 +345,7 @@ fn calling_safe_files_removed_sync() {
     .read()
     .unwrap();
 
-    let emptyfolder_paths = mk_emptyfolder().unwrap();
+    let emptyfolder_paths = mk_emptyfolder("emptyfolder").unwrap();
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -520,7 +521,7 @@ fn calling_files_sync_and_fetch_with_version() {
     .read()
     .unwrap();
 
-    let emptyfolder_paths = mk_emptyfolder().unwrap();
+    let emptyfolder_paths = mk_emptyfolder("emptyfolder").unwrap();
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -614,7 +615,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() {
     .read()
     .unwrap();
 
-    let emptyfolder_paths = mk_emptyfolder().unwrap();
+    let emptyfolder_paths = mk_emptyfolder("emptyfolder").unwrap();
 
     let sync_cmd_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -691,7 +692,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() {
     .read()
     .unwrap();
 
-    let emptyfolder_paths = mk_emptyfolder().unwrap();
+    let emptyfolder_paths = mk_emptyfolder("emptyfolder").unwrap();
 
     let sync_cmd_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -964,8 +965,7 @@ fn calling_files_ls_with_invalid_path() -> Result<(), String> {
     let partial_path = xorurl_encoder.to_string();
 
     let args = ["files", "ls", &partial_path, "--json"];
-    let output = safe_cmd(&args, Some(1))?;
-    let stderr = String::from_utf8(output.stderr).unwrap();
+    let stderr = safe_cmd_stderr(&args, Some(1))?;
 
     assert!(stderr.contains("No data found for path"));
 
@@ -1029,6 +1029,58 @@ fn calling_files_ls_on_nrs_with_path() -> Result<(), String> {
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
     assert_eq!(files_map.len(), 2);
     assert_eq!(files_map["sub2.md"]["size"], "4");
+
+    Ok(())
+}
+
+// Test:  safe files ls <src> --json
+//    src is symlinks_test dir, put with trailing slash.
+//
+//    expected result: result contains 9 FileItem and filenames match.
+//                     those in ../test_symlinks
+#[test]
+fn calling_files_ls_with_symlinks() -> Result<(), String> {
+    // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? {
+        return Ok(());
+    }
+
+    let (files_container_xor, ..) = upload_test_symlinks_folder(true)?;
+
+    let args = ["files", "ls", &files_container_xor, "--json"];
+    let files_ls_output = safe_cmd_stdout(&args, Some(0))?;
+
+    // Sample output:
+    //
+    // Files of FilesContainer (version 0) at "safe://hnyynyss1e1ihdzuspegnqft1y5tocd5o7qgfbmmcgjdizg49bdg68ysqgbnc":
+    // Files: 11   Size: 520   Total Files: 20   Total Size: 564
+    // SIZE  CREATED               MODIFIED              NAME
+    // 391   2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  absolute_links.txt
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  broken_rel_link.txt -> non-existing-target
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  dir_link -> sub
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  dir_link_deep -> sub/deep
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  dir_link_link -> dir_link
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  dir_outside -> ../
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  file_link -> realfile.txt
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  file_link_link -> file_link
+    // 0     2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  file_outside -> ../file_outside
+    // 21    2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  realfile.txt
+    // 34    2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  sub/
+    // 10    2020-06-11T22:13:36Z  2020-06-11T22:13:36Z  sub2/
+
+    let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
+    assert_eq!(xorurl, files_container_xor);
+    assert_eq!(files_map.len(), 12);
+    assert!(files_map.contains_key("absolute_links.txt"));
+    assert!(files_map.contains_key("broken_rel_link.txt"));
+    assert!(files_map.contains_key("file_link"));
+    assert!(files_map.contains_key("file_link_link"));
+    assert!(files_map.contains_key("dir_link"));
+    assert!(files_map.contains_key("realfile.txt"));
+    assert!(files_map.contains_key("sub/"));
+
+    // todo:
+    // 1. test ls'ing an individual symlink
 
     Ok(())
 }
@@ -1125,16 +1177,56 @@ fn calling_files_tree() -> Result<(), String> {
     Ok(())
 }
 
-// We create a folder named "emptyfolder" inside a randomly
-// named folder in system temp dir, and return both paths.
-fn mk_emptyfolder() -> Result<(String, String), String> {
-    let name = get_random_nrs_string();
-    let path_random = env::temp_dir().join(name);
-    let path_emptyfolder = path_random.join("emptyfolder");
-    fs::create_dir_all(&path_emptyfolder).map_err(|e| format!("{:?}", e))?;
-    let empty_folder_path_trailing_slash = format!("{}/", path_emptyfolder.display().to_string());
-    Ok((
-        path_random.display().to_string(),
-        empty_folder_path_trailing_slash,
-    ))
+// Test:  safe files tree <src>
+//    src is symlinks_test dir, put with trailing slash.
+//
+//    expected result: output matches output of `tree ../test_symlinks`
+#[test]
+fn calling_files_tree_with_symlinks() -> Result<(), String> {
+    // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? {
+        return Ok(());
+    }
+
+    let (files_container_xor, ..) = upload_test_symlinks_folder(true)?;
+
+    let args = ["files", "tree", &files_container_xor];
+    let stdout = safe_cmd_stdout(&args, Some(0))?;
+
+    // note: this is output from `tree` command on linux.
+    // `files tree` output should match exactly.
+    let should_match = format!(
+        "{}\n{}",
+        files_container_xor,
+        "\
+├── absolute_links.txt
+├── broken_rel_link.txt -> non-existing-target
+├── dir_link -> sub
+├── dir_link_deep -> sub/deep
+├── dir_link_link -> dir_link
+├── dir_outside -> ../
+├── file_link -> realfile.txt
+├── file_link_link -> file_link
+├── file_outside -> ../file_outside
+├── realfile.txt
+├── sub
+│   ├── deep
+│   │   └── a_file.txt
+│   ├── infinite_loop -> infinite_loop
+│   ├── parent_dir -> ..
+│   ├── parent_dir_file_link.txt -> ../realfile.txt
+│   ├── readme.md
+│   ├── sibling_dir -> ../sub2
+│   ├── sibling_dir_file.md -> ../sub2/hello.md
+│   └── sibling_dir_trailing_slash -> ../sub2/
+└── sub2
+    ├── hello.md
+    └── sub2 -> ../sub2
+
+11 directories, 12 files
+"
+    );
+    assert_eq!(stdout, should_match);
+
+    Ok(())
 }

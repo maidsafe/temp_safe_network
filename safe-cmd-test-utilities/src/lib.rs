@@ -7,13 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use safe_api::{files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
 use safe_nd::Coins;
 use std::collections::BTreeMap;
-use std::{env, process, str::FromStr};
+use std::path::Path;
+use std::{env, fs, process, str::FromStr};
+use tiny_keccak::sha3_256;
 use unwrap::unwrap;
+use walkdir::{DirEntry, WalkDir};
 
 #[macro_use]
 extern crate duct;
@@ -25,6 +29,8 @@ pub const SAFE_PROTOCOL: &str = "safe://";
 
 pub const TEST_FOLDER: &str = "../testdata/";
 pub const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
+pub const TEST_SYMLINKS_FOLDER: &str = "../test_symlinks";
+pub const TEST_SYMLINK: &str = "../test_symlinks/file_link";
 
 #[allow(dead_code)]
 pub fn get_bin_location() -> String {
@@ -116,28 +122,30 @@ pub fn create_nrs_link(name: &str, link: &str) -> Result<String, String> {
 }
 
 #[allow(dead_code)]
-pub fn upload_test_folder_with_result(
-    trailing_slash: bool,
-) -> Result<(String, ProcessedFiles), String> {
-    let path = if trailing_slash {
-        TEST_FOLDER
+pub fn upload_path_with_result(
+    path: &str,
+    add_trailing_slash: bool,
+) -> Result<(String, ProcessedFiles, String), String> {
+    let final_path = if add_trailing_slash {
+        format!("{}/", path)
     } else {
-        TEST_FOLDER_NO_TRAILING_SLASH
+        path.to_string()
     };
-    let files_container = cmd!(
-        get_bin_location(),
-        "files",
-        "put",
-        path,
-        "--recursive",
-        "--json"
-    )
-    .read()
-    .map_err(|e| format!("{:#?}", e))?;
+
+    let args = ["files", "put", &final_path, "--recursive", "--json"];
+    let files_container = safe_cmd_stdout(&args, Some(0))?;
 
     let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container);
 
-    Ok((container_xorurl, file_map))
+    Ok((container_xorurl, file_map, final_path))
+}
+
+#[allow(dead_code)]
+pub fn upload_test_folder_with_result(
+    trailing_slash: bool,
+) -> Result<(String, ProcessedFiles), String> {
+    let d = upload_path_with_result(TEST_FOLDER_NO_TRAILING_SLASH, trailing_slash)?;
+    Ok((d.0, d.1))
 }
 
 #[allow(dead_code)]
@@ -154,6 +162,123 @@ pub fn upload_testfolder_no_trailing_slash() -> Result<(String, ProcessedFiles),
 #[allow(dead_code)]
 pub fn upload_test_folder() -> (String, ProcessedFiles) {
     upload_test_folder_with_result(true).unwrap()
+}
+
+#[allow(dead_code)]
+pub fn upload_test_symlinks_folder(
+    trailing_slash: bool,
+) -> Result<(String, ProcessedFiles, String), String> {
+    upload_path_with_result(TEST_SYMLINKS_FOLDER, trailing_slash)
+}
+
+// Creates a tmp
+#[allow(dead_code)]
+fn create_tmp_absolute_symlinks_folder() -> Result<(String, String), String> {
+    let paths = mk_emptyfolder("abs_symlinks")?;
+    let symlinks = Path::new(&paths.1);
+
+    let subdir = symlinks.join("subdir");
+    fs::create_dir(&subdir).map_err(|e| format!("{:?}", e))?;
+
+    let dir_link_path = symlinks.join("absolute_link_to_dir");
+    create_symlink(&subdir, &dir_link_path, false).map_err(|e| format!("{:?}", e))?;
+
+    let filepath = symlinks.join("file.txt");
+    fs::write(&filepath, "Some data").map_err(|e| format!("{:?}", e))?;
+
+    let file_link_path = symlinks.join("absolute_link_to_file.txt");
+    create_symlink(&filepath, &file_link_path, false).map_err(|e| format!("{:?}", e))?;
+
+    Ok(paths)
+}
+
+#[cfg(unix)]
+pub fn create_symlink(target: &Path, link: &Path, _is_dir: bool) -> Result<(), std::io::Error> {
+    std::os::unix::fs::symlink(target, link)
+}
+
+#[cfg(windows)]
+pub fn create_symlink(target: &Path, link: &Path, is_dir: bool) -> Result<(), std::io::Error> {
+    if is_dir {
+        std::os::windows::fs::symlink_dir(target, link)
+    } else {
+        std::os::windows::fs::symlink_file(target, link)
+    }
+}
+
+// We create a folder named "emptyfolder" inside a randomly
+// named folder in system temp dir, and return both paths.
+#[allow(dead_code)]
+pub fn mk_emptyfolder(folder_name: &str) -> Result<(String, String), String> {
+    let name = get_random_nrs_string();
+    let path_random = env::temp_dir().join(name);
+    let path_emptyfolder = path_random.join(folder_name);
+    fs::create_dir_all(&path_emptyfolder).map_err(|e| format!("{:?}", e))?;
+    let empty_folder_path_trailing_slash = format!("{}/", path_emptyfolder.display().to_string());
+    Ok((
+        path_random.display().to_string(),
+        empty_folder_path_trailing_slash,
+    ))
+}
+
+#[allow(dead_code)]
+pub fn create_and_upload_test_absolute_symlinks_folder(
+    trailing_slash: bool,
+) -> Result<(String, ProcessedFiles, String, String), String> {
+    let paths = create_tmp_absolute_symlinks_folder()?;
+    let d = upload_path_with_result(&paths.1, trailing_slash)?;
+    Ok((d.0, d.1, paths.0, paths.1))
+}
+
+// generates a sha3_256 digest/hash of a directory tree.
+//
+// Note: hidden files or directories are not included.
+//  this is necessary for comparing ../testdata with
+//  dest dir since `safe files put` presently ignores hidden
+//  files.  The hidden files can be included once
+//  'safe files put' is fixed to include them.
+pub fn sum_tree(path: &str) -> String {
+    let paths = WalkDir::new(path)
+        .min_depth(1) // ignore top/root directory
+        .follow_links(false)
+        .sort_by(|a, b| a.path().cmp(b.path()))
+        .into_iter()
+        .filter_entry(|e| not_hidden_or_empty(e, 20))
+        .filter_map(|v| v.ok());
+
+    let mut digests = String::new();
+    for p in paths {
+        let relpath = p.path().strip_prefix(path).unwrap().display().to_string();
+        digests.push_str(&str_to_sha3_256(&relpath));
+        if p.path().is_file() {
+            digests.push_str(&digest_file(&p.path().display().to_string()));
+        } else if p.path_is_symlink() {
+            let target_path = fs::read_link(&p.path()).unwrap();
+            digests.push_str(&str_to_sha3_256(&target_path.display().to_string()));
+        }
+    }
+    str_to_sha3_256(&digests)
+}
+
+// callback for WalkDir::new() in sum_tree()
+fn not_hidden_or_empty(entry: &DirEntry, max_depth: usize) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| entry.depth() <= max_depth && (entry.depth() == 0 || !s.starts_with('.')))
+        .unwrap_or(false)
+}
+
+// returns sha3_256 hash of input string as a string.
+pub fn str_to_sha3_256(s: &str) -> String {
+    let bytes = sha3_256(&s.to_string().into_bytes());
+    encode(Base::Base32, bytes)
+}
+
+// returns sha3_256 digest/hash of a file as a string.
+pub fn digest_file(path: &str) -> String {
+    let data = fs::read_to_string(&path).unwrap();
+    str_to_sha3_256(&data)
 }
 
 #[allow(dead_code)]
@@ -203,6 +328,7 @@ pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
 //
 // If expect_exit_code is Some, then an Err is returned
 // if value does not match process exit code.
+#[allow(dead_code)]
 pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output, String> {
     println!("Executing: safe {}", args.join(" "));
 
@@ -220,4 +346,65 @@ pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process:
         }
     }
     Ok(output)
+}
+
+// Executes arbitrary `safe ` commands and returns
+// stdout output
+//
+// If expect_exit_code is Some, then an Err is returned
+// if value does not match process exit code.
+#[allow(dead_code)]
+pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<String, String> {
+    let output = safe_cmd(&args, expect_exit_code)?;
+    String::from_utf8(output.stdout).map_err(|_| "Invalid UTF-8".to_string())
+}
+
+// Executes arbitrary `safe ` commands and returns
+// stderr output
+//
+// If expect_exit_code is Some, then an Err is returned
+// if value does not match process exit code.
+pub fn safe_cmd_stderr(args: &[&str], expect_exit_code: Option<i32>) -> Result<String, String> {
+    let output = safe_cmd(&args, expect_exit_code)?;
+    String::from_utf8(output.stderr).map_err(|_| "Invalid UTF-8".to_string())
+}
+
+// returns true if the OS permits writing symlinks
+// For windows, this can fail if user does not have
+// adequate perms.  The easiest way to find out is just
+// to try writing one.
+#[cfg(windows)]
+pub fn can_write_symlinks() -> bool {
+    let name_target = get_random_nrs_string();
+    let name_link = get_random_nrs_string();
+    let path_link = env::temp_dir().join(name_link);
+
+    let result = std::os::windows::fs::symlink_file(name_target, &path_link);
+
+    if result.is_ok() {
+        // it worked, let's cleanup.
+        let _r = std::fs::remove_file(&path_link);
+    }
+
+    result.is_ok()
+}
+
+// returns true if the OS permits writing symlinks
+// For unix, this should always be true.
+#[cfg(unix)]
+pub fn can_write_symlinks() -> bool {
+    true
+}
+
+// determines if path test_symlinks/file_link is a real symlink.
+// This is a proxy to determine if symlinks within symlinks_test
+// dir were created properly (eg by git checkout) since this
+// will fail on windows without adequate permissions.
+pub fn test_symlinks_are_valid() -> Result<bool, String> {
+    let result = std::fs::symlink_metadata(TEST_SYMLINK);
+
+    match result {
+        Ok(meta) => Ok(meta.file_type().is_symlink()),
+        Err(e) => Err(format!("{:?}", e)),
+    }
 }

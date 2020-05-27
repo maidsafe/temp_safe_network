@@ -26,6 +26,7 @@ pub unsafe extern "C" fn files_container_create(
     location: *const c_char,
     dest: *const c_char,
     recursive: bool,
+    follow_links: bool,
     dry_run: bool,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
@@ -40,9 +41,14 @@ pub unsafe extern "C" fn files_container_create(
         let user_data = OpaqueCtx(user_data);
         let location_opt = from_c_str_to_str_option(location);
         let destination = from_c_str_to_str_option(dest);
-        let (xorurl, processed_files, files_map) = async_std::task::block_on(
-            (*app).files_container_create(location_opt, destination, recursive, dry_run),
-        )?;
+        let (xorurl, processed_files, files_map) =
+            async_std::task::block_on((*app).files_container_create(
+                location_opt,
+                destination,
+                recursive,
+                follow_links,
+                dry_run,
+            ))?;
         let xorurl_string = CString::new(xorurl)?;
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
@@ -85,6 +91,7 @@ pub unsafe extern "C" fn files_container_sync(
     location: *const c_char,
     url: *const c_char,
     recursive: bool,
+    follow_links: bool,
     delete: bool,
     update_nrs: bool,
     dry_run: bool,
@@ -106,6 +113,7 @@ pub unsafe extern "C" fn files_container_sync(
                 &location_str,
                 &url_str,
                 recursive,
+                follow_links,
                 delete,
                 update_nrs,
                 dry_run,
@@ -130,6 +138,7 @@ pub unsafe extern "C" fn files_container_add(
     url: *const c_char,
     force: bool,
     update_nrs: bool,
+    follow_links: bool,
     dry_run: bool,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
@@ -144,9 +153,15 @@ pub unsafe extern "C" fn files_container_add(
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
         let source_str = String::clone_from_repr_c(source_file)?;
-        let (version, processed_files, files_map) = async_std::task::block_on(
-            (*app).files_container_add(&source_str, &url_str, force, update_nrs, dry_run),
-        )?;
+        let (version, processed_files, files_map) =
+            async_std::task::block_on((*app).files_container_add(
+                &source_str,
+                &url_str,
+                force,
+                update_nrs,
+                follow_links,
+                dry_run,
+            ))?;
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(

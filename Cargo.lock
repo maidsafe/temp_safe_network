@@ -3124,6 +3124,7 @@ dependencies = [
  "threshold_crypto",
  "tiny-keccak",
  "tokio 0.2.21",
+ "uhttp_uri",
  "url 2.1.1",
  "urlencoding",
  "walkdir",
@@ -3205,12 +3206,15 @@ name = "safe-cmd-test-utilities"
 version = "1.0.0"
 dependencies = [
  "duct",
+ "multibase",
  "rand 0.6.5",
  "safe-api",
  "safe-nd",
  "serde",
  "serde_json",
+ "tiny-keccak",
  "unwrap",
+ "walkdir",
 ]
 
 [[package]]
@@ -4371,6 +4375,12 @@ name = "ucd-util"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c85f514e095d348c279b1e5cd76795082cf15bd59b93207832abe0b1d8fed236"
+
+[[package]]
+name = "uhttp_uri"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9b600e6da808f63a440874d633b22fa04abc9c3b08212ee7292512aec62805b"
 
 [[package]]
 name = "unicase"

@@ -20,11 +20,13 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use multibase::{encode, Base};
 use safe_api::{xorurl::XorUrlEncoder, Safe};
 use safe_cmd_test_utilities::{
-    create_nrs_link, get_random_nrs_string, parse_files_put_or_sync_output,
-    upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, TEST_FOLDER,
+    can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
+    create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
+    safe_cmd_stdout, str_to_sha3_256, sum_tree, test_symlinks_are_valid,
+    upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
+    upload_testfolder_trailing_slash, TEST_FOLDER,
 };
 
 use std::env;
@@ -32,8 +34,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tiny_keccak::sha3_256;
-use walkdir::{DirEntry, WalkDir};
 
 const NOEXTENSION: &str = "noextension";
 const NOEXTENSION_PATH: &str = "../testdata/noextension";
@@ -1043,6 +1043,134 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<(), String> {
     Ok(())
 }
 
+// ----------------------------------------
+// Symlink Tests
+// ----------------------------------------
+
+// Test:  safe files get <src> /tmp/newname
+//    src is xor-url generated from `safe files put ../test_symlinks`
+//    dest does not exist
+//
+//    expected result: ../test_symlinks matches /tmp/newname
+#[test]
+fn files_get_symlinks_relative() -> Result<(), String> {
+    // Bail if test_symlinks not valid, or cannot write a test symlink.
+    // Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? || !can_write_symlinks() {
+        return Ok(());
+    }
+
+    let (files_container_xor, _processed_files, path) = upload_test_symlinks_folder(true)?;
+
+    let src = source_path(&files_container_xor, &[])?;
+    let dest = dest_dir(&[NEWNAME]);
+
+    remove_dest(&dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    assert_eq!(sum_tree(&path), sum_tree(&dest));
+
+    Ok(())
+}
+
+// Test:  safe files get <xor-url>/absolute_symlinks /tmp/newname
+//    src is symlinks test dir containing absolute-path links
+//    dest does not exist
+//
+//    expected result: source directory matches /tmp/newname
+#[test]
+fn files_get_symlinks_absolute() -> Result<(), String> {
+    // Bail if cannot write a test symlink.
+    // Typically indicates missing perms on windows.
+    if !can_write_symlinks() {
+        return Ok(());
+    }
+
+    let (files_container_xor, _processed_files, tmp_dir, symlinks_dir) =
+        create_and_upload_test_absolute_symlinks_folder(true)?;
+
+    let src = source_path(&files_container_xor, &[])?;
+    let dest = dest_dir(&[NEWNAME]);
+
+    remove_dest(&dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    println!("FileContainer: {}", files_container_xor);
+
+    assert_eq!(sum_tree(&symlinks_dir), sum_tree(&dest));
+
+    remove_dest(&tmp_dir);
+
+    Ok(())
+}
+
+// Test:  safe files get <xor-url>/absolute_symlinks /tmp/newname
+//    src is symlinks test dir containing absolute-path links
+//    dest does not exist
+//
+//    expected result: source directory matches /tmp/newname
+#[test]
+fn files_get_symlinks_after_sync() -> Result<(), String> {
+    // Bail if cannot write a test symlink.
+    // Typically indicates missing perms on windows.
+    if !can_write_symlinks() {
+        return Ok(());
+    }
+
+    let (files_container_xor, _processed_files, tmp_dir, symlinks_dir) =
+        create_and_upload_test_absolute_symlinks_folder(true)?;
+
+    let mut safeurl =
+        XorUrlEncoder::from_xorurl(&files_container_xor).map_err(|e| format!("{:#?}", e))?;
+    safeurl.set_content_version(None);
+
+    // create a new symlink inside the directory.
+    let new_symlink_path = Path::new(&symlinks_dir).join("newlink");
+    let new_symlink_target = Path::new(&symlinks_dir).join("newlink_target");
+    create_symlink(&new_symlink_target, &new_symlink_path, false)
+        .map_err(|e| format!("{:?}", e))?;
+
+    // sync dir with new symlink to network
+    let args = ["files", "sync", &symlinks_dir, &safeurl.to_string()];
+    let _output = safe_cmd_stdout(&args, Some(0))?;
+
+    let src = source_path(&safeurl.to_string(), &[])?;
+    let dest = dest_dir(&[NEWNAME]);
+
+    remove_dest(&dest);
+
+    files_get(
+        &src,
+        Some(&dest),
+        Some(EXISTS_OVERWRITE),
+        Some(PROGRESS_NONE),
+        Some(0),
+    )?;
+
+    println!("FileContainer: {}", files_container_xor);
+
+    // downloaded tree should match src tree after sync.
+    assert_eq!(sum_tree(&symlinks_dir), sum_tree(&dest));
+
+    remove_dest(&tmp_dir);
+
+    Ok(())
+}
+
 // recursively removes a directory, or a file.
 // intended for removal of dir/files downloaded
 // by 'safe files get' test cases.
@@ -1053,48 +1181,6 @@ fn remove_dest(path: &str) {
     } else if p.is_dir() {
         fs::remove_dir_all(&path).unwrap();
     }
-}
-
-// callback for WalkDir::new() in sum_tree()
-fn not_hidden_or_empty(entry: &DirEntry, max_depth: usize) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| entry.depth() <= max_depth && (entry.depth() == 0 || !s.starts_with('.')))
-        .unwrap_or(false)
-}
-
-// generates a sha3_256 digest/hash of a directory tree.
-//
-// Note: hidden files or directories are not included.
-//  this is necessary for comparing ../testdata with
-//  dest dir since `safe files put` presently ignores hidden
-//  files.  The hidden files can be included once
-//  'safe files put' is fixed to include them.
-fn sum_tree(path: &str) -> String {
-    let paths = WalkDir::new(path)
-        .min_depth(1) // ignore top/root directory
-        .follow_links(false)
-        .sort_by(|a, b| a.path().cmp(b.path()))
-        .into_iter()
-        .filter_entry(|e| not_hidden_or_empty(e, 20))
-        .filter_map(|v| v.ok());
-
-    let mut digests = String::new();
-    for p in paths {
-        let relpath = p.path().strip_prefix(path).unwrap().display().to_string();
-        digests.push_str(&str_to_sha3_256(&relpath));
-        if p.path().is_file() {
-            digests.push_str(&digest_file(&p.path().display().to_string()));
-        }
-    }
-    str_to_sha3_256(&digests)
-}
-
-// returns sha3_256 digest/hash of a file as a string.
-fn digest_file(path: &str) -> String {
-    let data = fs::read_to_string(&path).unwrap();
-    str_to_sha3_256(&data)
 }
 
 // Executes `safe files get` with dynamic args and options.
@@ -1162,12 +1248,6 @@ fn cmd_option(name: &str, val: Option<&str>) -> String {
         Some(v) => format!("--{}={}", name, v),
         None => "".to_string(),
     }
-}
-
-// returns sha3_256 hash of input string as a string.
-fn str_to_sha3_256(s: &str) -> String {
-    let bytes = sha3_256(&s.to_string().into_bytes());
-    encode(Base::Base32, bytes)
 }
 
 // constructs a destination directory path

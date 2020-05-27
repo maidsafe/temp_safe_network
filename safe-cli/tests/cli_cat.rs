@@ -20,7 +20,8 @@ use safe_api::{
 };
 use safe_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
-    parse_files_container_output, parse_files_put_or_sync_output, CLI,
+    parse_files_container_output, parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout,
+    test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
 use unwrap::unwrap;
@@ -327,4 +328,123 @@ fn calling_safe_cat_safekey() {
         .unwrap();
 
     assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
+}
+
+// Test:  safe cat <src>/<path>
+//    src is symlinks_test dir, put with trailing slash.
+//    path references both directory and file relative symlinks
+//         including parent dir and sibling dir link targets.
+//         Final destination is the file sibling_dir_file.md
+//         which is itself a symlink to hello.md.
+//
+//         realpath: /sub2/hello.md
+//
+//    expected result: cmd output matches contents of
+//                     ../test_symlinks/sub2/hello.md
+#[test]
+fn calling_cat_symlinks_resolve_dir_and_file() -> Result<(), String> {
+    // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? {
+        return Ok(());
+    }
+
+    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let mut safeurl = XorUrlEncoder::from_url(&url)?;
+    safeurl.set_path("/dir_link_link/parent_dir/dir_link/sibling_dir_file.md");
+
+    let args = ["cat", &safeurl.to_string()];
+    let output = safe_cmd_stdout(&args, Some(0))?;
+
+    assert_eq!(output.trim(), "= Hello =");
+
+    Ok(())
+}
+
+// Test:  safe cat <src>/<path>
+//    src is symlinks_test dir, put with trailing slash.
+//    path references a symlink that links to itself.
+//         (infinite loop)
+//
+//    expected result: error, too many links.
+#[test]
+fn calling_cat_symlinks_resolve_infinite_loop() -> Result<(), String> {
+    // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? {
+        return Ok(());
+    }
+
+    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let mut safeurl = XorUrlEncoder::from_url(&url)?;
+
+    safeurl.set_path("/sub/infinite_loop");
+    let args = ["cat", &safeurl.to_string()];
+    let output = safe_cmd_stderr(&args, Some(1))?;
+    assert!(output.contains("ContentNotFound - Too many levels of symbolic links"));
+
+    Ok(())
+}
+
+// Test:  safe cat <src>/dir_link_deep/../readme.md
+//    src is symlinks_test dir, put with trailing slash.
+//    path should resolve as follows:
+//         dir_link_deep --> sub/deep
+//         ../           --> sub
+//         readme.md     --> readme.md
+//
+//         realpath: /sub/readme.md
+//
+//    This test verifies that "../" is being resolved
+//    correctly *after* dir_link_deep resolution, not before.
+//
+//    On unix, this behavior can be verified with:
+//       $ cat ../test_symlinks/dir_link_deep/../readme.md
+//       = This is a real markdown file. =
+//
+//    note: This test always failed when XorUrlEncoder
+//          used rust-url for parsing path because it
+//          normalizes away the "../" with no option
+//          to obtain the raw path.
+//          filed issue: https://github.com/servo/rust-url/issues/602
+//
+//    expected result: cmd output matches contents of
+//                     /sub/readme.md
+#[test]
+fn calling_cat_symlinks_resolve_parent_dir() -> Result<(), String> {
+    // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? {
+        return Ok(());
+    }
+
+    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let mut safeurl = XorUrlEncoder::from_url(&url)?;
+
+    safeurl.set_path("/dir_link_deep/../readme.md");
+    let args = ["cat", &safeurl.to_string()];
+    let output = safe_cmd_stdout(&args, Some(0))?;
+    assert_eq!(output.trim(), "= This is a real markdown file. =");
+
+    Ok(())
+}
+
+// Test:  safe cat <src>/dir_outside
+//    src is symlinks_test dir, put with trailing slash.
+//    path references a symlink with target outside the FileContainer
+//
+//    expected result: error, too many links.
+#[test]
+fn calling_cat_symlinks_resolve_dir_outside() -> Result<(), String> {
+    // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
+    if !test_symlinks_are_valid()? {
+        return Ok(());
+    }
+
+    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let mut safeurl = XorUrlEncoder::from_url(&url)?;
+
+    safeurl.set_path("/dir_outside");
+    let args = ["cat", &safeurl.to_string()];
+    let output = safe_cmd_stderr(&args, Some(1))?;
+    assert!(output.contains("ContentNotFound - Cannot ascend beyond root directory"));
+
+    Ok(())
 }

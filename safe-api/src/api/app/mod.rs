@@ -14,6 +14,7 @@ mod fake_scl;
 mod helpers;
 mod keys;
 mod nrs;
+mod realpath;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;

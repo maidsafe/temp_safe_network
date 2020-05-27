@@ -38,6 +38,7 @@ const UNKNOWN_FILE_NAME: &str = "<unknown>";
 enum FileTreeNodeType {
     File,
     Directory,
+    Symlink,
 }
 
 // A recursive type to represent a directory tree.
@@ -53,8 +54,7 @@ struct FileTreeNode {
     #[serde(skip)]
     fs_type: FileTreeNodeType,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    details: Option<FileDetails>,
+    details: FileDetails,
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
     //    #[allow(clippy::vec_box)]
@@ -62,8 +62,8 @@ struct FileTreeNode {
 }
 
 impl FileTreeNode {
-    // create a new FileTreeNode (either a Directory or File)
-    fn new(name: &str, fs_type: FileTreeNodeType, details: Option<FileDetails>) -> FileTreeNode {
+    // create a new FileTreeNode (either a Directory, File or Symlink)
+    fn new(name: &str, fs_type: FileTreeNodeType, details: FileDetails) -> FileTreeNode {
         Self {
             name: name.to_string(),
             fs_type,
@@ -105,6 +105,9 @@ pub enum FilesSubCommands {
         /// Recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
+        /// Follow symlinks
+        #[structopt(short = "l", long = "follow-links")]
+        follow_links: bool,
     },
     /// Get a file or folder from the SAFE Network
     Get {
@@ -132,6 +135,9 @@ pub enum FilesSubCommands {
         /// Recursively sync folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
+        /// Follow symlinks
+        #[structopt(short = "l", long = "follow-links")]
+        follow_links: bool,
         /// Delete files found at the target FilesContainer that are not in the source location. This is only allowed when --recursive is passed as well
         #[structopt(short = "d", long = "delete")]
         delete: bool,
@@ -158,6 +164,9 @@ pub enum FilesSubCommands {
         /// Overwrite the file on the FilesContainer if there already exists a file with the same name
         #[structopt(short = "f", long = "force")]
         force: bool,
+        /// Follow symlinks
+        #[structopt(short = "l", long = "follow-links")]
+        follow_links: bool,
     },
     #[structopt(name = "rm")]
     /// Remove a file from an existing FilesContainer on the network
@@ -199,13 +208,20 @@ pub async fn files_commander(
             location,
             dest,
             recursive,
+            follow_links,
         } => {
             // create FilesContainer from a given path to local files/folders
             if dry_run && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
             let (files_container_xorurl, processed_files, _files_map) = safe
-                .files_container_create(Some(&location), dest.as_deref(), recursive, dry_run)
+                .files_container_create(
+                    Some(&location),
+                    dest.as_deref(),
+                    recursive,
+                    follow_links,
+                    dry_run,
+                )
                 .await?;
 
             // Now let's just print out a list of the files uploaded/processed
@@ -235,6 +251,7 @@ pub async fn files_commander(
             location,
             target,
             recursive,
+            follow_links,
             delete,
             update_nrs,
         } => {
@@ -244,7 +261,15 @@ pub async fn files_commander(
             }
             // Update the FilesContainer on the Network
             let (version, processed_files, _files_map) = safe
-                .files_container_sync(&location, &target, recursive, delete, update_nrs, dry_run)
+                .files_container_sync(
+                    &location,
+                    &target,
+                    recursive,
+                    follow_links,
+                    delete,
+                    update_nrs,
+                    dry_run,
+                )
                 .await?;
 
             // Now let's just print out a list of the files synced/processed
@@ -283,6 +308,7 @@ pub async fn files_commander(
             location,
             target,
             update_nrs,
+            follow_links,
             force,
         } => {
             // Validate that location and target are not both "", ie stdin.
@@ -306,7 +332,7 @@ pub async fn files_commander(
                     safe.files_container_add_from_raw(&file_content, &target_url, force, update_nrs, dry_run).await?
                 } else {
                     // Update the FilesContainer on the Network
-                    safe.files_container_add(&location, &target_url, force, update_nrs, dry_run).await?
+                    safe.files_container_add(&location, &target_url, force, update_nrs, follow_links, dry_run).await?
                 };
 
             // Now let's just print out a list of the files synced/processed
@@ -418,7 +444,11 @@ async fn process_tree_command(
     };
 
     // Create a top/root node representing `target_url`.
-    let mut top = FileTreeNode::new(&target_url, FileTreeNodeType::Directory, Option::None);
+    let mut top = FileTreeNode::new(
+        &target_url,
+        FileTreeNodeType::Directory,
+        FileDetails::default(),
+    );
     // Transform flat list in `files_map` to a hierarchy in `top`
     let mut files: u64 = 0;
     let mut dirs: u64 = 0;
@@ -429,7 +459,7 @@ async fn process_tree_command(
             .split('/')
             .map(|s| s.to_string())
             .collect();
-        let (d, f) = build_tree(&mut top, &path_parts, file_details, details, 0);
+        let (d, f) = build_tree(&mut top, &path_parts, file_details, 0);
         files += f;
         dirs += d;
     }
@@ -511,7 +541,6 @@ fn build_tree(
     node: &mut FileTreeNode,
     path_parts: &[String],
     details: &FileDetails,
-    show_details: bool,
     depth: usize,
 ) -> (u64, u64) {
     let mut dirs: u64 = 0;
@@ -526,24 +555,19 @@ fn build_tree(
         let mut node = match node.find_child(&item) {
             Some(n) => n,
             None => {
-                // Note: fs_type assignment relies on the fact that input
-                // is a path to a file, not a directory.
-                let det = if show_details {
-                    Some(details.clone())
-                } else {
-                    None
-                };
-
                 let (fs_type, d, di, fi) = match details["type"].as_str() {
-                    "inode/directory" => (FileTreeNodeType::Directory, det, 1, 0),
-                    // coming soon.
-                    // "inode/symlink" => {},
-                    _ => (FileTreeNodeType::File, det, 0, 1),
+                    "inode/directory" => (FileTreeNodeType::Directory, details, 1, 0),
+                    "inode/symlink" => {
+                        let target_type = details["symlink_target_type"].as_str();
+                        let (dir, fil) = if target_type == "dir" { (1, 0) } else { (0, 1) };
+                        (FileTreeNodeType::Symlink, details, dir, fil)
+                    }
+                    _ => (FileTreeNodeType::File, details, 0, 1),
                 };
 
                 dirs += di;
                 files += fi;
-                let n = FileTreeNode::new(&item, fs_type, d);
+                let n = FileTreeNode::new(&item, fs_type, d.clone());
                 node.add_child(n);
                 // Very gross, but it works.
                 // if this can be done in a better way,
@@ -558,7 +582,7 @@ fn build_tree(
                 }
             }
         };
-        let (di, fi) = build_tree(&mut node, path_parts, details, show_details, depth + 1);
+        let (di, fi) = build_tree(&mut node, path_parts, details, depth + 1);
         dirs += di;
         files += fi;
     }
@@ -631,18 +655,13 @@ fn print_file_system_node_details_body(
 ) {
     let name = format_file_system_node_line(dir, depth, siblings);
 
-    match dir.fs_type {
-        FileTreeNodeType::File => {
-            if let Some(d) = &dir.details {
-                table.add_row(row![d["size"], d["created"], d["modified"], name]);
-            }
-        }
-        FileTreeNodeType::Directory => {
-            if let Some(d) = &dir.details {
-                table.add_row(row![d["size"], d["created"], d["modified"], name]);
-            }
-        }
-    }
+    let d = &dir.details;
+    table.add_row(row![
+        d.get("size").unwrap_or(&String::default()),
+        d.get("created").unwrap_or(&String::default()),
+        d.get("modified").unwrap_or(&String::default()),
+        name
+    ]);
 
     // And now, for some recursion...
     for (idx, child) in dir.sub.iter().enumerate() {
@@ -676,10 +695,30 @@ fn format_file_system_node_line(
         }
         let name = if dir.fs_type == FileTreeNodeType::Directory {
             if_tty(&dir.name, Colour::Blue.bold())
+        } else if dir.fs_type == FileTreeNodeType::Symlink {
+            format_symlink(&dir.name, &dir.details)
         } else {
             dir.name.clone()
         };
         format!("{}{} {}", buf, conn, name)
+    }
+}
+
+fn format_symlink(name: &str, fd: &FileDetails) -> String {
+    // display link name as cyan normally, or red if a broken link.
+    let name_txt = match fd.get("symlink_target_type") {
+        Some(t) if t == "unknown" => if_tty(name, Colour::Red.bold()),
+        _ => if_tty(name, Colour::Cyan.bold()),
+    };
+    match fd.get("symlink_target") {
+        Some(target) => {
+            let target_txt = match fd.get("symlink_target_type") {
+                Some(t) if t == "dir" => if_tty(&target, Colour::Blue.bold()),
+                _ => target.to_string(),
+            };
+            format!("{} -> {}", name_txt, target_txt)
+        }
+        None => name_txt, // this shouldn't happen.  means that FileDetail was created incorrectly.
     }
 }
 
@@ -719,11 +758,17 @@ fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_
                 cwd_size += file_item["size"].parse().unwrap_or(0);
                 cwd_files += 1;
             }
+            let name_field = if file_item["type"] == "inode/symlink" {
+                format_symlink(&name, &file_item)
+            } else {
+                name.to_string()
+            };
+
             table.add_row(row![
                 &file_item["size"],
                 file_item["created"],
                 file_item["modified"],
-                name
+                name_field
             ]);
         }
     });

@@ -107,7 +107,18 @@ pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<
             cmd,
             location,
             recursive,
-        }) => xorurl_commander(cmd, location, recursive, output_fmt, &mut safe).await,
+            follow_links,
+        }) => {
+            xorurl_commander(
+                cmd,
+                location,
+                recursive,
+                follow_links,
+                output_fmt,
+                &mut safe,
+            )
+            .await
+        }
         Some(SubCommands::Vault { cmd }) => vault_commander(cmd),
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to

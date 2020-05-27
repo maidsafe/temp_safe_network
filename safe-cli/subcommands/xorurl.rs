@@ -30,6 +30,7 @@ pub async fn xorurl_commander(
     cmd: Option<XorurlSubCommands>,
     location: Option<String>,
     recursive: bool,
+    follow_symlinks: bool,
     output_fmt: OutputFmt,
     safe: &mut Safe,
 ) -> Result<(), String> {
@@ -71,7 +72,7 @@ pub async fn xorurl_commander(
 
             // Do a dry-run on the location
             let (_version, processed_files, _files_map) = safe
-                .files_container_create(Some(&location), None, recursive, true)
+                .files_container_create(Some(&location), None, recursive, follow_symlinks, true)
                 .await?;
 
             // Now let's just print out a list of the xorurls

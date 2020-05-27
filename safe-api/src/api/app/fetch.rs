@@ -10,6 +10,7 @@
 use super::{
     files::{FileItem, FileMeta, FilesMap},
     nrs_map::NrsMap,
+    realpath::RealPath,
     Safe, XorName,
 };
 pub use super::{
@@ -106,7 +107,7 @@ impl Safe {
     /// # let mut safe = Safe::default();
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
-    ///     let (xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false).await.unwrap();
+    ///     let (xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false, false).await.unwrap();
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
@@ -152,7 +153,7 @@ impl Safe {
     /// # let mut safe = Safe::default();
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
-    ///     let (container_xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false).await.unwrap();
+    ///     let (container_xorurl, _, _) = safe.files_container_create(Some("../testdata/"), None, true, false, false).await.unwrap();
     ///
     ///     let inspected_content = safe.inspect( &format!( "{}/test.md", &container_xorurl.replace("?v=0", "") ) ).await.unwrap();
     ///     match &inspected_content[0] {
@@ -258,7 +259,8 @@ async fn resolve_one_indirection(
             let path = the_xor.path_decoded()?;
             let (files_map, next) = if resolve_path && path != "/" && !path.is_empty() {
                 // TODO: Move this logic (path resolver) to the FilesMap struct
-                match &files_map.get(&path) {
+                let realpath = files_map.realpath(&path)?;
+                match &files_map.get(&realpath) {
                     Some(file_item) => match file_item.get("type") {
                         Some(file_type) => {
                             if FileMeta::filetype_is_file(&file_type) {
@@ -278,8 +280,15 @@ async fn resolve_one_indirection(
                                         return Err(Error::ContentError(msg));
                                     }
                                 }
+                            } else if FileMeta::filetype_is_symlink(&file_type) {
+                                let msg = format!(
+                                    "symlink should not be present in resolved real path. {}",
+                                    realpath
+                                );
+                                return Err(Error::Unexpected(msg));
                             } else {
-                                (gen_filtered_filesmap(&path, &files_map, &xorurl)?, None)
+                                // Must be a directory.
+                                (gen_filtered_filesmap(&realpath, &files_map, &xorurl)?, None)
                             }
                         }
                         None => {
@@ -287,7 +296,7 @@ async fn resolve_one_indirection(
                             return Err(Error::ContentError(msg));
                         }
                     },
-                    None => (gen_filtered_filesmap(&path, &files_map, &xorurl)?, None),
+                    None => (gen_filtered_filesmap(&realpath, &files_map, &xorurl)?, None),
                 }
             } else {
                 (files_map, None)
@@ -533,7 +542,7 @@ mod tests {
     async fn test_fetch_files_container() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false)
+            .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
@@ -579,7 +588,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
 
         let (xorurl, _, the_files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false)
+            .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
@@ -627,7 +636,7 @@ mod tests {
 
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, _the_files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false)
+            .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
@@ -744,7 +753,7 @@ mod tests {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
         let (xorurl, _, _files_map) = safe
-            .files_container_create(Some("../testdata/"), None, true, false)
+            .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;

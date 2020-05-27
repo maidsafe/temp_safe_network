@@ -17,7 +17,7 @@ use log::{debug, info, trace, warn};
 use safe_api::{
     fetch::Range,
     fetch::SafeData,
-    files::{FilesMap, ProcessedFiles},
+    files::{FilesMap, GetAttr, ProcessedFiles},
     xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result as ApiResult, Safe,
 };
@@ -560,8 +560,7 @@ fn ensure_parent_dir_exists(path: &str) -> ApiResult<()> {
 
 /// # Downloads files within a FilesMap and writes them to disk, preserving paths.
 ///
-/// TODO: In the future, this will have options for preserving symlinks and
-/// file attributes.
+/// TODO: In the future, this will have options for preserving file attributes.
 async fn files_map_get_files(
     safe: &Safe,
     files_map: &FilesMap,
@@ -578,7 +577,7 @@ async fn files_map_get_files(
     // We need to calc total_transfer_bytes in advance for status callback
     let mut total_transfer_bytes = files_map
         .iter()
-        .map(|(_path, details)| &details["size"])
+        .map(|(_path, details)| &details["size"]) // todo: use FileItem::getattr()
         .fold(0, |tot, size| tot + size.parse().unwrap_or(0));
 
     // Loop through files map and download each file.
@@ -592,10 +591,11 @@ async fn files_map_get_files(
         trace!("target path: {}", abspath.display());
 
         // determine the file size from metadata.  string must be parsed.
-        let size: u64 = details["size"].parse().map_err(|err| {
+        let size_str = details.getattr("size")?;
+        let size: u64 = size_str.parse().map_err(|err| {
             Error::Unexpected(format!(
                 "Invalid file size: {} for {}.  {:?}",
-                details["size"], path, err
+                size_str, path, err
             ))
         })?;
 
@@ -609,7 +609,7 @@ async fn files_map_get_files(
             transfer_bytes_written,
             file_size: size,
             file_bytes_written: 0,
-            file_type: details["type"].clone(),
+            file_type: details.getattr("type")?.to_string(),
         };
 
         // status callback before file download begins.
@@ -622,13 +622,35 @@ async fn files_map_get_files(
         }
 
         // If a directory, we just create and continue.
-        if details["type"] == "inode/directory" {
+        if details.getattr("type")? == "inode/directory" {
             create_dir_all(&abspath)?;
             continue;
         }
 
+        // ensure parent dir exists.
+        let dir_path = match Path::new(&abspath).parent() {
+            Some(p) => p,
+            None => {
+                let msg = "Could not get parent directory";
+                processed_files.insert(path.to_string(), ("E".to_string(), format!("<{}>", msg)));
+                warn!("Skipping file \"{}\". {}", path, msg);
+                continue;
+            }
+        };
+        create_dir_all(&dir_path)?;
+
+        if details.getattr("type")? == "inode/symlink" {
+            create_symlink(
+                &Path::new(&denormalize_slashes(details.getattr("symlink_target")?)),
+                &abspath,
+                &details.getattr("symlink_target_type")?,
+            )
+            .await?;
+            continue;
+        }
+
         // Note: must never get here if a directory/symlink.
-        let xorurl = &details["link"];
+        let xorurl = &details.getattr("link")?;
 
         // Download file.  We handle callback from download_file_from_net()
         // and our handler calls a callback supplied by our caller.
@@ -650,7 +672,7 @@ async fn files_map_get_files(
         .await
         {
             Ok(_bytes) => {
-                processed_files.insert(path.to_string(), ("+".to_string(), xorurl.to_string()));
+                processed_files.insert(path.to_string(), ("+".to_string(), (*xorurl).to_string()));
             }
             Err(err) => {
                 processed_files.insert(path.to_string(), ("E".to_string(), format!("<{}>", err)));
@@ -660,6 +682,68 @@ async fn files_map_get_files(
     }
 
     Ok(processed_files)
+}
+
+#[cfg(unix)]
+async fn create_symlink_worker(
+    target: &Path,
+    link: &Path,
+    _target_type: &str,
+) -> Result<(), (String, String)> {
+    std::os::unix::fs::symlink(target, link).map_err(|e| {
+        (
+            format!(
+                "Could not create symlink: {} --> {}",
+                link.display(),
+                target.display()
+            ),
+            format!("{:?}", e),
+        )
+    })
+}
+
+#[cfg(windows)]
+async fn create_symlink_worker(
+    target: &Path,
+    link: &Path,
+    target_type: &str,
+) -> Result<(), (String, String)> {
+    let result = if target_type == "dir" {
+        std::os::windows::fs::symlink_dir(target, link)
+    } else {
+        std::os::windows::fs::symlink_file(target, link)
+    };
+    result.map_err(|e|
+        (format!("Could not create symlink: {} --> {}\nPerhaps try 'Run as Administrator' or enable Windows Developer mode.",
+            link.display(),
+            target.display()),
+         format!("{:?}", e)
+        )
+    )
+}
+
+async fn create_symlink(target: &Path, link: &Path, target_type: &str) -> ApiResult<()> {
+    info!(
+        "creating symlink: {} --> {}",
+        link.display(),
+        target.display()
+    );
+
+    let result = create_symlink_worker(target, link, target_type).await;
+    match result {
+        Ok(_) => {}
+        Err((msg, os_err)) => {
+            warn!("{}", msg);
+            warn!("{}", os_err);
+            println!("{}", msg);
+        }
+    }
+
+    Ok(())
+}
+
+fn denormalize_slashes(p: &str) -> String {
+    p.replace('/', &std::path::MAIN_SEPARATOR.to_string())
 }
 
 // Downloads a file from the network to a given file path
@@ -676,12 +760,6 @@ async fn download_file_from_net(
     mut callback: impl FnMut(&Path, u64, u64, u64) -> bool,
 ) -> ApiResult<u64> {
     debug!("downloading file {} to {}", xorurl, path.display());
-
-    // get directory path
-    let mut dir_path = path.to_path_buf();
-    dir_path.pop();
-
-    create_dir_all(&dir_path.as_path())?;
 
     // chunk_size based on https://stackoverflow.com/questions/8803515/optimal-buffer-size-for-write2
     // originally it was 4096 to match common disk block size, but that seems a bit small for the

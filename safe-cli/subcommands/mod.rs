@@ -109,6 +109,9 @@ pub enum SubCommands {
         /// Recursively crawl folders and files found in the location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
+        /// Follow symlinks
+        #[structopt(short = "l", long = "follow-links")]
+        follow_links: bool,
     },
     // #[structopt(name = "safe-id")]
     // /// Manage identities on the SAFE Network

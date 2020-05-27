@@ -20,7 +20,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::FromIterator;
 use tiny_keccak::sha3_256;
-use url::Url;
+use uhttp_uri::HttpUri;
+use url::Url; // for parsing raw path
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 const SAFE_URL_SCHEME: &str = "safe";
@@ -188,6 +189,11 @@ pub(crate) struct SafeUrlParts {
 impl SafeUrlParts {
     // parses a URL into its component parts, performing basic validation.
     pub fn parse(url: &str) -> Result<Self> {
+        // Note: we use rust-url for parsing because it is most widely used
+        // in rust ecosystem, and should be quite solid.  However, for paths,
+        // (see below) we use a different parser to avoid normalization.
+        // Parsing twice is inefficient, so there is room for improvement
+        // later to standardize on a single parser.
         let parsing_url = Url::parse(&url).map_err(|parse_err| {
             let msg = format!("Problem parsing the URL \"{}\": {}", url, parse_err);
             Error::InvalidXorUrl(msg)
@@ -230,8 +236,23 @@ impl SafeUrlParts {
         let sub_names_vec = (&names_vec[0..names_vec.len() - 1]).to_vec();
         let sub_names = sub_names_vec.join(".");
 
-        // get path, query_params, and fragment
-        let path = parsing_url.path().to_string();
+        // get raw path, without any normalization.
+        // We use HttpUri for this because rust-url does too
+        // much normalization, eg replacing "../" with no option
+        // to obtain raw path. Issue filed at:
+        //   https://github.com/servo/rust-url/issues/602
+        //
+        // HttpUri only supports http(s) urls,
+        // so we replace first occurrence of safe:// with http://.
+        // This could be improved/optimized at a later time.
+        let http_url = url.replacen("safe://", "http://", 1);
+        let uri = HttpUri::new(&http_url).map_err(|parse_err| {
+            let msg = format!("Problem parsing the URL \"{}\": {:?}", url, parse_err);
+            Error::InvalidXorUrl(msg)
+        })?;
+        let path = uri.resource.path.to_string();
+
+        // get query_params, and fragment
         let query_string = parsing_url.query().unwrap_or("").to_string();
         let fragment = parsing_url.fragment().unwrap_or("").to_string();
 

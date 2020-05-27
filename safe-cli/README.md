@@ -1427,6 +1427,12 @@ E.g. we can retrieve the content of a website with the `cat` command using eithe
 
 In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `dog` command.
 
+# Symlinks
+
+The safe-cli supports upload and retrieval of symlinks using the above commands. It can also resolve relative symlinks in a FileContainer provided that the target exists in the FileContainer.
+
+[More Details](README-symlinks.md)
+
 ### Dog
 
 The SAFE Network relates information and content using links, as an example, just considering some of the type of content we've seen in this guide, `FilesContainer`s, `Wallet`s and `NRS Map Container`s, they are all containers with named links (SAFE-URLs) to other content on the network, and depending on the abstraction they provide, each of these links are resolved following a specific set of rules for each type of container, e.g. NRS subnames are resolved with a predefined set of rules, while a file's location is resolved from a FilesContainer with another set of predefined rules.
