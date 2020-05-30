@@ -39,9 +39,6 @@ pub struct CmdArgs {
     // /// Increase output verbosity. (More logs!)
     // #[structopt(short = "v", long = "verbose", global(true))]
     // verbose: bool,
-    // /// Enable to query the output via SPARQL eg.
-    // #[structopt(short = "q", long = "query", global(true))]
-    // query: Option<String>,
     /// Dry run of command. No data will be written. No coins spent
     #[structopt(short = "n", long = "dry-run", global(true))]
     dry: bool,
@@ -95,7 +92,14 @@ pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<
             Ok(())
         }
         Some(SubCommands::Update {}) => {
-            update_commander().map_err(|err| format!("Error performing update: {}", err))
+            // We run this command in a separate thread to overcome a conflict with
+            // the self_update crate as it seems to be creating its own runtime.
+            let handler = std::thread::spawn(|| {
+                update_commander().map_err(|err| format!("Error performing update: {}", err))
+            });
+            handler
+                .join()
+                .map_err(|err| format!("Failed to run self update: {:?}", err))?
         }
         Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, &mut safe).await,
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
@@ -109,7 +113,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<
             // We treat these separatelly since we use the credentials if they are available to
             // connect to the network with them, otherwise the connection created will be with
             // read-only access and some of these commands will fail if they require write access
-            connect(&mut safe)?;
+            connect(&mut safe).await?;
             match other {
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &mut safe).await,

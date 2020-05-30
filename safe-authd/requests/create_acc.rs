@@ -43,7 +43,10 @@ pub async fn process_req(
             })?;
 
             let mut safe_authenticator = safe_auth_handle.lock().await;
-            match safe_authenticator.create_acc(sk, passphrase, password) {
+            match safe_authenticator
+                .create_acc(sk, passphrase, password)
+                .await
+            {
                 Ok(_) => {
                     let msg = "Account created successfully";
                     info!("{}", msg);

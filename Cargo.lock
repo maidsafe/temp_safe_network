@@ -140,44 +140,39 @@ dependencies = [
 
 [[package]]
 name = "async-std"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "538ecb01eb64eecd772087e5b6f7540cbc917f047727339a472dafed2185b267"
+checksum = "a45cee2749d880d7066e328a7e161c7470ced883b2fd000ca4643e9f1dd5083a"
 dependencies = [
  "async-task",
- "crossbeam-channel 0.4.2",
- "crossbeam-deque",
  "crossbeam-utils 0.7.2",
+ "futures-channel",
  "futures-core",
  "futures-io",
  "futures-timer",
  "kv-log-macro",
  "log 0.4.8",
  "memchr",
- "mio",
- "mio-uds",
  "num_cpus",
  "once_cell",
  "pin-project-lite",
  "pin-utils",
  "slab",
+ "smol",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
 name = "async-task"
-version = "1.3.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ac2c016b079e771204030951c366db398864f5026f84a44dafb0ff20f02085d"
-dependencies = [
- "libc",
- "winapi 0.3.8",
-]
+checksum = "c17772156ef2829aadc587461c7753af20b7e8db1529bc66855add962a3b35d3"
 
 [[package]]
 name = "async-trait"
-version = "0.1.29"
+version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bab5c215748dc1ad11a145359b1067107ae0f8ca5e99844fa64067ed5bf198e3"
+checksum = "26c4f3195085c36ea8d24d32b2f828d23296a9370a28aa39d111f6f16bef9f3b"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
@@ -1221,9 +1216,9 @@ checksum = "1b980f2816d6ee8673b6517b52cb0e808a180efc92e5c19d02cdda79066703ef"
 
 [[package]]
 name = "futures"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c329ae8753502fb44ae4fc2b622fa2a94652c41e795143765ba0927f92ab780"
+checksum = "1e05b85ec287aac0dc34db7d4a569323df697f9c55b99b15d6b4ef8cde49f613"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -1236,9 +1231,9 @@ dependencies = [
 
 [[package]]
 name = "futures-channel"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0c77d04ce8edd9cb903932b608268b3fffec4163dc053b3b402bf47eac1f1a8"
+checksum = "f366ad74c28cca6ba456d95e6422883cfb4b252a83bed929c83abfdbbf2967d5"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -1246,9 +1241,9 @@ dependencies = [
 
 [[package]]
 name = "futures-core"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f25592f769825e89b92358db00d26f965761e094951ac44d3663ef25b7ac464a"
+checksum = "59f5fff90fd5d971f936ad674802482ba441b6f09ba5e15fd8b39145582ca399"
 
 [[package]]
 name = "futures-cpupool"
@@ -1262,9 +1257,9 @@ dependencies = [
 
 [[package]]
 name = "futures-executor"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f674f3e1bcb15b37284a90cedf55afdba482ab061c407a9c0ebbd0f3109741ba"
+checksum = "10d6bb888be1153d3abeb9006b11b02cf5e9b209fda28693c31ae1e4e012e314"
 dependencies = [
  "futures-core",
  "futures-task",
@@ -1273,15 +1268,15 @@ dependencies = [
 
 [[package]]
 name = "futures-io"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a638959aa96152c7a4cddf50fcb1e3fede0583b27157c26e67d6f99904090dc6"
+checksum = "de27142b013a8e869c14957e6d2edeef89e97c289e69d042ee3a49acd8b51789"
 
 [[package]]
 name = "futures-macro"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a5081aa3de1f7542a794a397cde100ed903b0630152d0973479018fd85423a7"
+checksum = "d0b5a30a4328ab5473878237c447333c093297bded83a4983d10f4deea240d39"
 dependencies = [
  "proc-macro-hack",
  "proc-macro2 1.0.10",
@@ -1291,27 +1286,34 @@ dependencies = [
 
 [[package]]
 name = "futures-sink"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3466821b4bc114d95b087b850a724c6f83115e929bc88f1fa98a3304a944c8a6"
+checksum = "3f2032893cb734c7a05d85ce0cc8b8c4075278e93b24b66f9de99d6eb0fa8acc"
 
 [[package]]
 name = "futures-task"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b0a34e53cf6cdcd0178aa573aed466b646eb3db769570841fda0c7ede375a27"
+checksum = "bdb66b5f09e22019b1ab0830f7785bcea8e7a42148683f99214f73f8ec21a626"
+dependencies = [
+ "once_cell",
+]
 
 [[package]]
 name = "futures-timer"
-version = "2.0.2"
+version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1de7508b218029b0f01662ed8f61b1c964b3ae99d6f25462d0f55a595109df6"
+checksum = "e64b03909df88034c26dc1547e8970b91f98bdb65165d6a4e9110d94263dbb2c"
+dependencies = [
+ "gloo-timers",
+ "send_wrapper",
+]
 
 [[package]]
 name = "futures-util"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22766cf25d64306bedf0384da004d05c9974ab104fcc4528f1236181c18004c5"
+checksum = "8764574ff08b701a084482c3c7031349104b07ac897393010494beaa18ce32c6"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -1320,6 +1322,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
+ "pin-project",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1368,6 +1371,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
+name = "gloo-timers"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47204a46aaff920a1ea58b11d03dec6f704287d27561724a4631e450654a891f"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "h2"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1400,7 +1416,7 @@ dependencies = [
  "indexmap",
  "log 0.4.8",
  "slab",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "tokio-util",
 ]
 
@@ -1561,7 +1577,7 @@ dependencies = [
  "net2",
  "pin-project",
  "time",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "tower-service",
  "want 0.3.0",
 ]
@@ -1596,7 +1612,7 @@ dependencies = [
  "log 0.4.8",
  "rustls",
  "rustls-native-certs",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "tokio-rustls",
  "webpki",
 ]
@@ -1738,14 +1754,13 @@ name = "jsonrpc-quic"
 version = "0.0.5"
 dependencies = [
  "directories 2.0.2",
- "futures 0.3.4",
+ "futures 0.3.5",
  "log 0.4.8",
  "quinn",
  "rand 0.7.3",
  "rcgen",
  "serde",
  "serde_json",
- "tokio 0.2.15",
  "url 2.1.1",
 ]
 
@@ -2079,6 +2094,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50e4785f2c3b7589a0d0c1dd60285e1188adac4006e8abd6dd578e1567027363"
+dependencies = [
+ "bitflags 1.2.1",
+ "cc",
+ "cfg-if",
+ "libc",
+ "void",
+]
+
+[[package]]
 name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2191,7 +2219,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81e8dfa4c69d7bde595e9a940fcf1d7f60966d3fce8a8c4cad67c60e35ea2a11"
 dependencies = [
- "nix",
+ "nix 0.15.0",
  "winapi 0.3.8",
 ]
 
@@ -2321,9 +2349,21 @@ checksum = "237844750cfbb86f67afe27eee600dfbbcb6188d734139b534cbfbf4f96792ae"
 
 [[package]]
 name = "pin-utils"
-version = "0.1.0-alpha.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5894c618ce612a3fa23881b152b608bafb8c56cfc22f434a3ba3120b40f7b587"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "piper"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b0deb65f46e873ba8aa7c6a8dbe3f23cb1bf59c339a81a1d56361dde4d66ac8"
+dependencies = [
+ "crossbeam-utils 0.7.2",
+ "futures-io",
+ "futures-sink",
+ "futures-util",
+]
 
 [[package]]
 name = "pkg-config"
@@ -2509,7 +2549,7 @@ dependencies = [
  "derive_more",
  "directories 1.0.2",
  "err-derive",
- "futures 0.3.4",
+ "futures 0.3.5",
  "log 0.4.8",
  "quinn",
  "rcgen",
@@ -2517,7 +2557,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt 0.2.18",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "unwrap",
  "webpki",
 ]
@@ -2545,12 +2585,12 @@ checksum = "cea81de5e0f97f552239ce4eff6fa8e8b0e3ec0ba5a8f1d84fb2096f4ba2ad41"
 dependencies = [
  "bytes 0.5.4",
  "err-derive",
- "futures 0.3.4",
+ "futures 0.3.5",
  "libc",
  "mio",
  "quinn-proto",
  "rustls",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "tracing",
  "webpki",
 ]
@@ -2955,7 +2995,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded 0.6.1",
  "time",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "tokio-rustls",
  "url 2.1.1",
  "wasm-bindgen",
@@ -3095,7 +3135,7 @@ dependencies = [
  "chrono",
  "directories 2.0.2",
  "env_logger 0.6.2",
- "futures 0.1.29",
+ "futures 0.3.5",
  "jsonrpc-quic",
  "lazy_static",
  "log 0.4.8",
@@ -3106,13 +3146,13 @@ dependencies = [
  "relative-path",
  "safe-nd",
  "safe_app",
- "safe_authenticator",
- "safe_core",
+ "safe_authenticator 0.15.0 (git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings)",
+ "safe_core 0.40.0 (git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings)",
  "serde",
  "serde_json",
  "threshold_crypto",
  "tiny-keccak",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "url 2.1.1",
  "urlencoding",
  "walkdir",
@@ -3126,18 +3166,18 @@ dependencies = [
  "cluFlock",
  "directories 2.0.2",
  "flexi_logger",
- "futures 0.3.4",
+ "futures 0.3.5",
  "human-panic",
  "jsonrpc-quic",
  "log 0.4.8",
  "quinn",
  "rcgen",
  "safe-api",
- "self_update 0.13.0",
+ "self_update",
  "serde",
  "serde_json",
  "structopt 0.2.18",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "unwrap",
  "url 2.1.1",
  "urlencoding",
@@ -3177,14 +3217,14 @@ dependencies = [
  "safe-cmd-test-utilities",
  "safe-nd",
  "safe-nlt",
- "self_update 0.14.0",
+ "self_update",
  "serde",
  "serde_json",
  "serde_yaml",
  "shrust",
  "structopt 0.3.12",
  "tiny-keccak",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "unwrap",
  "walkdir",
 ]
@@ -3214,7 +3254,7 @@ dependencies = [
  "safe-nd",
  "safe_authenticator_ffi",
  "safe_bindgen",
- "safe_core",
+ "safe_core 0.40.0 (git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings)",
  "serde",
  "serde_json",
  "unwrap",
@@ -3253,28 +3293,51 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3f1eb064d6a2788c7837ca55ce9aca3ec2c87596bba47b405be87040218a625"
+source = "git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings#e4c4039c1d18a49f147c0cee7a9c3424802a1a46"
 dependencies = [
+ "async-trait",
  "bincode",
  "env_logger 0.6.2",
  "ffi_utils",
- "futures 0.1.29",
+ "futures 0.3.5",
  "jni",
  "log 0.4.8",
  "lru-cache",
  "miscreant",
  "rand 0.6.5",
  "safe-nd",
- "safe_authenticator",
- "safe_authenticator_ffi",
- "safe_core",
- "self_encryption",
+ "safe_authenticator 0.15.0 (git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings)",
+ "safe_core 0.40.0 (git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings)",
+ "self_encryption 0.17.0",
  "serde",
  "serde_derive",
  "threshold_crypto",
  "tiny-keccak",
- "tokio 0.1.22",
+ "tokio 0.2.21",
+ "unwrap",
+]
+
+[[package]]
+name = "safe_authenticator"
+version = "0.15.0"
+source = "git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings#e4c4039c1d18a49f147c0cee7a9c3424802a1a46"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "futures 0.3.5",
+ "futures-util",
+ "jni",
+ "log 0.4.8",
+ "lru-cache",
+ "rand 0.6.5",
+ "safe-nd",
+ "safe_core 0.40.0 (git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings)",
+ "serde",
+ "threshold_crypto",
+ "tiny-keccak",
+ "tokio 0.2.21",
  "unwrap",
 ]
 
@@ -3293,7 +3356,7 @@ dependencies = [
  "lru-cache",
  "rand 0.6.5",
  "safe-nd",
- "safe_core",
+ "safe_core 0.40.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "threshold_crypto",
  "tiny-keccak",
@@ -3316,8 +3379,8 @@ dependencies = [
  "lru-cache",
  "rand 0.6.5",
  "safe-nd",
- "safe_authenticator",
- "safe_core",
+ "safe_authenticator 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe_core 0.40.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "threshold_crypto",
  "tiny-keccak",
@@ -3340,6 +3403,47 @@ dependencies = [
  "syn 0.15.44",
  "toml 0.5.6",
  "unwrap",
+]
+
+[[package]]
+name = "safe_core"
+version = "0.40.0"
+source = "git+https://github.com/joshuef/safe_client_libs.git?branch=Feat-EnAsyncAwaitAllTheThings#e4c4039c1d18a49f147c0cee7a9c3424802a1a46"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bytes 0.4.12",
+ "chrono",
+ "crossbeam-channel 0.3.9",
+ "data-encoding",
+ "directories 2.0.2",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "fs2",
+ "futures 0.3.5",
+ "futures-util",
+ "hmac",
+ "lazy_static",
+ "log 0.4.8",
+ "log4rs",
+ "lru-cache",
+ "miscreant",
+ "pbkdf2",
+ "quic-p2p",
+ "rand 0.6.5",
+ "regex 1.3.6",
+ "safe-nd",
+ "self_encryption 0.17.0",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "sha3",
+ "threshold_crypto",
+ "tiny-keccak",
+ "tokio 0.2.21",
+ "unwrap",
+ "url 2.1.1",
+ "ws",
 ]
 
 [[package]]
@@ -3369,7 +3473,7 @@ dependencies = [
  "rand 0.6.5",
  "regex 1.3.6",
  "safe-nd",
- "self_encryption",
+ "self_encryption 0.16.0",
  "serde",
  "serde-value",
  "serde_json",
@@ -3406,6 +3510,12 @@ dependencies = [
  "lazy_static",
  "winapi 0.3.8",
 ]
+
+[[package]]
+name = "scoped-tls-hkt"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2e9d7eaddb227e8fbaaa71136ae0e1e913ca159b86c7da82f3e8f0044ad3a63"
 
 [[package]]
 name = "scopeguard"
@@ -3466,35 +3576,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "self_update"
-version = "0.13.0"
+name = "self_encryption"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c505727b982d8c85ea1b3345a3a3c2712ba3d8417708ebacc960e4f8f84e3dbc"
+checksum = "16c07d372e528948d2d24d31999f8f839be8a828175b2c53478b0117af4ae5cb"
 dependencies = [
- "either",
- "flate2",
- "hyper-old-types",
- "indicatif 0.13.0",
- "quick-xml",
- "regex 1.3.6",
- "reqwest 0.10.4",
- "semver",
- "serde_json",
- "tar",
- "tempdir",
- "zip",
+ "aes",
+ "async-trait",
+ "bincode",
+ "block-modes",
+ "brotli",
+ "futures 0.3.5",
+ "memmap",
+ "rand 0.6.5",
+ "rand_chacha 0.1.1",
+ "serde",
+ "tiny-keccak",
+ "tokio 0.2.21",
+ "unwrap",
 ]
 
 [[package]]
 name = "self_update"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0881a950f4b11e5f6d0aa916884842f9ddd1d5ebcf6ff960a14cc9e151c011a"
+checksum = "932cde1f76c44915f4725a42357f29ac3584c058a00a6e6c07ddede3db7baf17"
 dependencies = [
  "either",
  "flate2",
  "hyper-old-types",
  "indicatif 0.13.0",
+ "log 0.4.8",
  "quick-xml",
  "regex 1.3.6",
  "reqwest 0.10.4",
@@ -3519,6 +3631,12 @@ name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+
+[[package]]
+name = "send_wrapper"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f638d531eccd6e23b980caf34876660d38e265409d8e99b397ab71eb3612fad0"
 
 [[package]]
 name = "serde"
@@ -3661,6 +3779,37 @@ name = "smallvec"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
+
+[[package]]
+name = "smol"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "686c634ad1873fffef6aed20f180eede424fbf3bb31802394c90fd7335a661b7"
+dependencies = [
+ "async-task",
+ "crossbeam",
+ "futures-io",
+ "futures-util",
+ "nix 0.17.0",
+ "once_cell",
+ "piper",
+ "scoped-tls-hkt",
+ "slab",
+ "socket2",
+ "wepoll-binding",
+]
+
+[[package]]
+name = "socket2"
+version = "0.3.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03088793f677dce356f3ccc2edb1b314ad191ab702a5de3faf49304f7e104918"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "redox_syscall",
+ "winapi 0.3.8",
+]
 
 [[package]]
 name = "spin"
@@ -4054,9 +4203,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.15"
+version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "619cdb2245c40c42d563089b72e80c5df659513d667a017598439ef7a7b1ffe1"
+checksum = "d099fa27b9702bed751524694adbe393e18b36b204da91eb1cbbbbb4a5ee2d58"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -4173,7 +4322,7 @@ checksum = "4adb8b3e5f86b707f1b54e7c15b6de52617a823608ccda98a15d3a24222f265a"
 dependencies = [
  "futures-core",
  "rustls",
- "tokio 0.2.15",
+ "tokio 0.2.21",
  "webpki",
 ]
 
@@ -4274,7 +4423,7 @@ dependencies = [
  "futures-sink",
  "log 0.4.8",
  "pin-project-lite",
- "tokio 0.2.15",
+ "tokio 0.2.21",
 ]
 
 [[package]]
@@ -4669,6 +4818,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91cd5736df7f12a964a5067a12c62fa38e1bd8080aff1f80bc29be7c80d19ab4"
 dependencies = [
  "webpki",
+]
+
+[[package]]
+name = "wepoll-binding"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "374fff4ff9701ff8b6ad0d14bacd3156c44063632d8c136186ff5967d48999a7"
+dependencies = [
+ "bitflags 1.2.1",
+ "wepoll-sys",
+]
+
+[[package]]
+name = "wepoll-sys"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9082a777aed991f6769e2b654aa0cb29f1c3d615daf009829b07b66c7aff6a24"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

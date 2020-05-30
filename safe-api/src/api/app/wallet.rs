@@ -265,8 +265,8 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let wallet_xorurl = safe.wallet_create().await.unwrap();
     ///     let wallet_xorurl2 = safe.wallet_create().await.unwrap();
     ///     let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("14").await.unwrap();
@@ -543,7 +543,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_create() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let xorurl = safe.wallet_create().await?;
         assert!(xorurl.starts_with("safe://"));
 
@@ -554,7 +554,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_insert_and_balance() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
         let (_key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
         let (_key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
@@ -585,7 +585,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_insert_and_get() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
         let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
         let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
@@ -625,7 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_insert_and_set_default() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
         let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("65.82").await?;
         let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("11.44").await?;
@@ -665,7 +665,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_no_default() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?; // this one won't have a default balance
 
         let to_wallet_xorurl = safe.wallet_create().await?; // we'll insert a default balance
@@ -730,7 +730,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_from_zero_balance() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("0.0").await?;
         safe.wallet_insert(
@@ -799,7 +799,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_diff_amounts() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
         safe.wallet_insert(
@@ -888,7 +888,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_to_safekey() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_, key_pair1) = safe.keys_create_preload_test_coins("4621.45").await?;
         safe.wallet_insert(
@@ -937,7 +937,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_from_safekey() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (safekey_xorurl1, _) = safe.keys_create_preload_test_coins("7").await?;
         let (safekey_xorurl2, _) = safe.keys_create_preload_test_coins("0").await?;
 
@@ -964,7 +964,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_with_nrs_urls() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_, key_pair1) = safe.keys_create_preload_test_coins("0.2").await?;
         safe.wallet_insert(
@@ -1019,7 +1019,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_from_specific_balance() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
         safe.wallet_insert(
@@ -1118,7 +1118,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_to_specific_balance() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.7").await?;
         safe.wallet_insert(
@@ -1203,7 +1203,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wallet_transfer_specific_balances_with_nrs_urls() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = {
             let from_wallet_xorurl = safe.wallet_create().await?;
             let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("10.1").await?;
@@ -1313,7 +1313,7 @@ mod tests {
     #[tokio::test]
     #[cfg(not(feature = "scl-mock"))]
     async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let account1_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
         safe.wallet_insert(
@@ -1325,7 +1325,9 @@ mod tests {
         .await?;
 
         let mut another_safe = Safe::default();
-        another_safe.connect("", Some("another-fake-credentials"))?;
+        another_safe
+            .connect("", Some("another-fake-credentials"))
+            .await?;
         let (key_xorurl, _key_pair) = another_safe.keys_create_preload_test_coins("100.5").await?;
 
         // test fail to transfer from a not owned wallet in <from> argument

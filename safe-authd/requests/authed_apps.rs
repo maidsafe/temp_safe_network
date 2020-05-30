@@ -23,7 +23,7 @@ pub async fn process_req(
     } else {
         info!("Obtaining list of authorised applications...");
         let safe_authenticator = safe_auth_handle.lock().await;
-        match safe_authenticator.authed_apps() {
+        match safe_authenticator.authed_apps().await {
             Ok(authed_apps_list) => {
                 info!("List of authorised apps sent: {:?}", authed_apps_list);
                 Ok(json!(authed_apps_list))

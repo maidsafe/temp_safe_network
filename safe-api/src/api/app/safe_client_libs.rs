@@ -17,11 +17,10 @@ use super::{
 };
 use crate::{Error, Result};
 use async_trait::async_trait;
-use futures::future::Future;
 use log::{debug, info, warn};
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
-use safe_app::{run, App, AppError::CoreError as SafeAppError};
+use safe_app::App;
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
@@ -51,28 +50,25 @@ impl SafeAppScl {
         }
     }
 
-    fn mutate_seq_mdata_entries(
+    async fn mutate_seq_mdata_entries(
         &self,
         name: XorName,
         tag: u64,
         entry_actions: MDataSeqEntryActions,
         error_msg: &str,
     ) -> Result<()> {
-        let safe_app = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
         let message = error_msg.to_string();
-        run(safe_app, move |client, _app_context| {
-            client
-                .mutate_seq_mdata_entries(name, tag, entry_actions)
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| {
-            if let SafeAppError(SafeCoreError::DataError(SafeNdError::InvalidEntryActions(_))) = err
-            {
-                Error::EntryExists(format!("{}: {}", message, err))
-            } else {
-                Error::NetDataError(format!("{}: {}", message, err))
-            }
-        })
+        client
+            .mutate_seq_mdata_entries(name, tag, entry_actions)
+            .await
+            .map_err(|err| {
+                if let SafeCoreError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
+                    Error::EntryExists(format!("{}: {}", message, err))
+                } else {
+                    Error::NetDataError(format!("{}: {}", message, err))
+                }
+            })
     }
 }
 
@@ -83,15 +79,15 @@ impl SafeApp for SafeAppScl {
     }
 
     #[cfg(feature = "fake-auth")]
-    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
+    async fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
         warn!("Using fake authorisation for testing...");
-        self.safe_conn = Some(create_app());
+        self.safe_conn = Some(create_app().await);
         Ok(())
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     #[cfg(not(feature = "fake-auth"))]
-    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
+    async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
         let disconnect_cb = || {
@@ -103,14 +99,14 @@ impl SafeApp for SafeAppScl {
                 let auth_granted = decode_ipc_msg(auth_credentials)?;
                 match auth_granted {
                     AuthResponseType::Registered(authgranted) => {
-                        App::registered(app_id.to_string(), authgranted, disconnect_cb)
+                        App::registered(app_id.to_string(), authgranted, disconnect_cb).await
                     }
                     AuthResponseType::Unregistered(config) => {
-                        App::unregistered(disconnect_cb, Some(config))
+                        App::unregistered(disconnect_cb, Some(config)).await
                     }
                 }
             }
-            None => App::unregistered(disconnect_cb, None),
+            None => App::unregistered(disconnect_cb, None).await,
         }
         .map_err(|err| {
             Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
@@ -127,27 +123,23 @@ impl SafeApp for SafeAppScl {
         new_balance_owner: PublicKey,
         amount: Coins,
     ) -> Result<XorName> {
-        let safe_app: &App = self.get_safe_app()?;
-        let handle = run(safe_app, move |client, _app_context| {
-            let from_fullid = from_sk.map(ClientFullId::from);
-            client
-                .create_balance(
-                    from_fullid.as_ref(),
-                    SafeNdPublicKey::Bls(new_balance_owner),
-                    amount,
-                    None,
-                )
-                .map_err(SafeAppError)
-        });
-
-        // Wait for the spawned task to finish
-        handle.map_err(|err| {
-            if let SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) = err {
-                Error::NotEnoughBalance(amount.to_string())
-            } else {
-                Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
-            }
-        })?;
+        let client = &self.get_safe_app()?.client;
+        let from_fullid = from_sk.map(ClientFullId::from);
+        client
+            .create_balance(
+                from_fullid.as_ref(),
+                SafeNdPublicKey::Bls(new_balance_owner),
+                amount,
+                None,
+            )
+            .await
+            .map_err(|err| {
+                if let SafeCoreError::DataError(SafeNdError::InsufficientBalance) = err {
+                    Error::NotEnoughBalance(amount.to_string())
+                } else {
+                    Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
+                }
+            })?;
 
         let xorname = xorname_from_pk(new_balance_owner);
         Ok(xorname)
@@ -157,19 +149,18 @@ impl SafeApp for SafeAppScl {
         info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&ClientFullId::from(owner_sk), amount)
+            .await
             .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 
         Ok(xorname)
     }
 
     async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
-        let safe_app: &App = self.get_safe_app()?;
-        let coins = run(safe_app, move |client, _app_context| {
-            client
-                .get_balance(Some(&ClientFullId::from(sk)))
-                .map_err(SafeAppError)
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
+        let client = &self.get_safe_app()?.client;
+        let coins = client
+            .get_balance(Some(&ClientFullId::from(sk)))
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
 
         Ok(coins)
     }
@@ -181,23 +172,21 @@ impl SafeApp for SafeAppScl {
         tx_id: TransactionId,
         amount: Coins,
     ) -> Result<Transaction> {
-        let safe_app: &App = self.get_safe_app()?;
-        let tx = run(safe_app, move |client, _app_context| {
-            let from_fullid = from_sk.map(ClientFullId::from);
-            client
-                .transfer_coins(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| match err {
-            SafeAppError(SafeCoreError::DataError(SafeNdError::ExcessiveValue))
-            | SafeAppError(SafeCoreError::DataError(SafeNdError::InsufficientBalance)) => {
-                Error::NotEnoughBalance(amount.to_string())
-            }
-            SafeAppError(SafeCoreError::DataError(SafeNdError::InvalidOperation)) => {
-                Error::InvalidAmount(amount.to_string())
-            }
-            other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
-        })?;
+        let client = &self.get_safe_app()?.client;
+        let from_fullid = from_sk.map(ClientFullId::from);
+        let tx = client
+            .transfer_coins(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
+            .await
+            .map_err(|err| match err {
+                SafeCoreError::DataError(SafeNdError::ExcessiveValue)
+                | SafeCoreError::DataError(SafeNdError::InsufficientBalance) => {
+                    Error::NotEnoughBalance(amount.to_string())
+                }
+                SafeCoreError::DataError(SafeNdError::InvalidOperation) => {
+                    Error::InvalidAmount(amount.to_string())
+                }
+                other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
+            })?;
 
         Ok(tx)
     }
@@ -227,35 +216,36 @@ impl SafeApp for SafeAppScl {
         dry_run: bool,
     ) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
-        let safe_app: &App = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
 
         let data_vec = data.to_vec();
-        let idata = run(safe_app, move |client, _app_context| {
-            let client2 = client.clone();
-            if dry_run {
-                immutable_data::gen_data_map(
-                    client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
-                )
-            } else {
-                immutable_data::create(
-                    client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
-                )
-            }
-            .and_then(move |data_map| {
-                let address = *data_map.address();
-                if dry_run {
-                    futures::future::Either::A(futures::future::ok(address))
-                } else {
-                    futures::future::Either::B(client2.put_idata(data_map).map(move |_| address))
-                }
-            })
-            .map_err(SafeAppError)
-        })
+        let data_map = if dry_run {
+            immutable_data::gen_data_map(
+                client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+            )
+            .await
+        } else {
+            immutable_data::create(
+                client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+            )
+            .await
+        }
         .map_err(|e| {
-            Error::NetDataError(format!("Failed to PUT Published ImmutableData: {:?}", e))
+            Error::NetDataError(format!(
+                "Failed to create data map for Published ImmutableData: {:?}",
+                e
+            ))
         })?;
 
-        Ok(*idata.name())
+        let xorname = *data_map.address().name();
+
+        if !dry_run {
+            client.put_idata(data_map).await.map_err(|e| {
+                Error::NetDataError(format!("Failed to PUT Published ImmutableData: {:?}", e))
+            })?;
+        }
+
+        Ok(xorname)
     }
 
     async fn files_get_published_immutable(
@@ -265,38 +255,37 @@ impl SafeApp for SafeAppScl {
     ) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
-        let safe_app: &App = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
         let immd_data_addr = IDataAddress::Pub(xorname);
-        let data = run(safe_app, move |client, _app_context| {
-            if let Some((start, end)) = range {
-                let len = if let Some(end_index) = end {
-                    Some(end_index - start.unwrap_or_else(|| 0))
-                } else {
-                    None
-                };
-
-                immutable_data::get_value(
-                    client,
-                    immd_data_addr,
-                    start,
-                    len,
-                    /*decryption_key:*/ None,
-                )
-                .map_err(SafeAppError)
+        let data = if let Some((start, end)) = range {
+            let len = if let Some(end_index) = end {
+                Some(end_index - start.unwrap_or_else(|| 0))
             } else {
-                immutable_data::get_value(
-                    client,
-                    immd_data_addr,
-                    None,
-                    None,
-                    /*decryption_key:*/ None,
-                )
-                .map_err(SafeAppError)
-            }
-        })
+                None
+            };
+
+            immutable_data::get_value(
+                client,
+                immd_data_addr,
+                start,
+                len,
+                /*decryption_key:*/ None,
+            )
+            .await
+        } else {
+            immutable_data::get_value(
+                client,
+                immd_data_addr,
+                None,
+                None,
+                /*decryption_key:*/ None,
+            )
+            .await
+        }
         .map_err(|e| {
             Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
         })?;
+
         debug!(
             "Published ImmutableData data successfully retrieved from: {:?}",
             &xorname
@@ -317,7 +306,8 @@ impl SafeApp for SafeAppScl {
             tag, name
         );
 
-        let safe_app: &App = self.get_safe_app()?;
+        let safe_app = self.get_safe_app()?;
+        let client = &safe_app.client;
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
@@ -327,7 +317,7 @@ impl SafeApp for SafeAppScl {
         // TODO: setup permissions from props
         let mut perms = BTreeMap::<ADataUser, ADataPubPermissionSet>::new();
         let set = ADataPubPermissionSet::new(true, true);
-        let usr_app = ADataUser::Key(SafeNdPublicKey::Bls(get_public_bls_key(safe_app)?));
+        let usr_app = ADataUser::Key(SafeNdPublicKey::Bls(get_public_bls_key(safe_app).await?));
         let _ = perms.insert(usr_app, set);
         data.append_permissions(
             ADataPubPermissions {
@@ -344,7 +334,7 @@ impl SafeApp for SafeAppScl {
             ))
         })?;
 
-        let usr_acc_owner = get_owner_pk(safe_app)?;
+        let usr_acc_owner = safe_app.client.owner_key().await;
         let owner = ADataOwner {
             public_key: usr_acc_owner,
             entries_index: 0,
@@ -366,17 +356,21 @@ impl SafeApp for SafeAppScl {
             values: entries_vec,
         };
 
-        run(safe_app, move |client, _app_context| {
-            let append_client = client.clone();
-            client
-                .put_adata(AData::PubSeq(data.clone()))
-                .and_then(move |_| append_client.append_seq_adata(append, 0))
-                .map_err(SafeAppError)
-                .map(move |_| xorname)
-        })
-        .map_err(|e| {
-            Error::NetDataError(format!("Failed to PUT Sequenced Append Only Data: {:?}", e))
-        })
+        client
+            .put_adata(AData::PubSeq(data.clone()))
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!("Failed to PUT Sequenced Append Only Data: {:?}", e))
+            })?;
+
+        client.append_seq_adata(append, 0).await.map_err(|e| {
+            Error::NetDataError(format!(
+                "Failed to append initial data to Sequenced Append Only Data: {:?}",
+                e
+            ))
+        })?;
+
+        Ok(xorname)
     }
 
     async fn append_seq_append_only_data(
@@ -386,28 +380,26 @@ impl SafeApp for SafeAppScl {
         name: XorName,
         tag: u64,
     ) -> Result<u64> {
-        let safe_app: &App = self.get_safe_app()?;
-        run(safe_app, move |client, _app_context| {
-            let append_only_data_address = ADataAddress::PubSeq { name, tag };
-            let entries_vec = the_data
-                .iter()
-                .map(|(k, v)| ADataEntry::new(k.to_vec(), v.to_vec()))
-                .collect();
-            let append = ADataAppendOperation {
-                address: append_only_data_address,
-                values: entries_vec,
-            };
+        let client = &self.get_safe_app()?.client;
+        let append_only_data_address = ADataAddress::PubSeq { name, tag };
+        let entries_vec = the_data
+            .iter()
+            .map(|(k, v)| ADataEntry::new(k.to_vec(), v.to_vec()))
+            .collect();
+        let append = ADataAppendOperation {
+            address: append_only_data_address,
+            values: entries_vec,
+        };
 
-            client
-                .append_seq_adata(append, new_version)
-                .map_err(SafeAppError)
-        })
-        .map_err(|e| {
-            Error::NetDataError(format!(
-                "Failed to UPDATE Sequenced Append Only Data: {:?}",
-                e
-            ))
-        })?;
+        client
+            .append_seq_adata(append, new_version)
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!(
+                    "Failed to UPDATE Sequenced Append Only Data: {:?}",
+                    e
+                ))
+            })?;
 
         Ok(new_version)
     }
@@ -419,7 +411,7 @@ impl SafeApp for SafeAppScl {
     ) -> Result<(u64, AppendOnlyDataRawData)> {
         debug!("Getting latest seq_append_only_data for: {:?}", &name);
 
-        let safe_app: &App = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         debug!("Address for a_data : {:?}", append_only_data_address);
@@ -430,14 +422,12 @@ impl SafeApp for SafeAppScl {
                 Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
             })?;
 
-        let data_entry = run(safe_app, move |client, _app_context| {
-            client
-                .get_adata_last_entry(append_only_data_address)
-                .map_err(SafeAppError)
-        })
-        .map_err(|e| {
-            Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
-        })?;
+        let data_entry = client
+            .get_adata_last_entry(append_only_data_address)
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
+            })?;
 
         let data = (data_entry.key, data_entry.value);
         Ok((data_length, data))
@@ -450,21 +440,20 @@ impl SafeApp for SafeAppScl {
     ) -> Result<u64> {
         debug!("Getting seq appendable data, length for: {:?}", name);
 
-        let safe_app: &App = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
-        run(safe_app, move |client, _app_context| {
-            client
-                .get_adata_indices(append_only_data_address)
-                .map_err(SafeAppError)
-        })
-        .map_err(|e| {
-            Error::NetDataError(format!(
-                "Failed to get Sequenced Append Only Data indices: {:?}",
-                e
-            ))
-        })
-        .map(|data_returned| data_returned.entries_index() - 1)
+        let data_returned = client
+            .get_adata_indices(append_only_data_address)
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!(
+                    "Failed to get Sequenced Append Only Data indices: {:?}",
+                    e
+                ))
+            })?;
+
+        Ok(data_returned.entries_index() - 1)
     }
 
     async fn get_seq_append_only_data(
@@ -478,29 +467,27 @@ impl SafeApp for SafeAppScl {
             version, name
         );
 
-        let safe_app: &App = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         let start = ADataIndex::FromStart(version);
         let end = ADataIndex::FromStart(version + 1);
-        let data_entries = run(safe_app, move |client, _app_context| {
-            client
-                .get_adata_range(append_only_data_address, (start, end))
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| {
-            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
-                Error::VersionNotFound(format!(
-                    "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
-                    version, name
-                ))
-            } else {
-                Error::NetDataError(format!(
-                    "Failed to get Sequenced Append Only Data: {:?}",
-                    err
-                ))
-            }
-        })?;
+        let data_entries = client
+            .get_adata_range(append_only_data_address, (start, end))
+            .await
+            .map_err(|err| {
+                if let SafeCoreError::DataError(SafeNdError::NoSuchEntry) = err {
+                    Error::VersionNotFound(format!(
+                        "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+                        version, name
+                    ))
+                } else {
+                    Error::NetDataError(format!(
+                        "Failed to get Sequenced Append Only Data: {:?}",
+                        err
+                    ))
+                }
+            })?;
 
         let this_version = data_entries[0].clone();
         Ok((this_version.key, this_version.value))
@@ -513,8 +500,9 @@ impl SafeApp for SafeAppScl {
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let safe_app: &App = self.get_safe_app()?;
-        let owner_key_option = get_owner_pk(safe_app)?;
+        let safe_app = self.get_safe_app()?;
+        let client = &safe_app.client;
+        let owner_key_option = client.owner_key().await;
         let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
             owners
         } else {
@@ -533,7 +521,7 @@ impl SafeApp for SafeAppScl {
             .allow(MDataAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
-        let sign_pk = get_public_bls_key(safe_app)?;
+        let sign_pk = get_public_bls_key(safe_app).await?;
         let app_pk = SafeNdPublicKey::Bls(sign_pk);
         permission_map.insert(app_pk, permission_set);
 
@@ -545,22 +533,21 @@ impl SafeApp for SafeAppScl {
             SafeNdPublicKey::Bls(owners),
         );
 
-        run(safe_app, move |client, _app_context| {
-            client
-                .put_seq_mutable_data(mdata)
-                .map_err(SafeAppError)
-                .map(move |_| xorname)
-        })
-        .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
+        client
+            .put_seq_mutable_data(mdata)
+            .await
+            .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
+
+        Ok(xorname)
     }
 
     #[allow(dead_code)]
     async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
-        let safe_app: &App = self.get_safe_app()?;
-        run(safe_app, move |client, _app_context| {
-            client.get_seq_mdata(name, tag).map_err(SafeAppError)
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
+        let client = &self.get_safe_app()?.client;
+        client
+            .get_seq_mdata(name, tag)
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
     async fn seq_mutable_data_insert(
@@ -573,6 +560,7 @@ impl SafeApp for SafeAppScl {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
+            .await
     }
 
     async fn seq_mutable_data_get_value(
@@ -581,31 +569,29 @@ impl SafeApp for SafeAppScl {
         tag: u64,
         key: &[u8],
     ) -> Result<MDataSeqValue> {
-        let safe_app: &App = self.get_safe_app()?;
+        let client = &self.get_safe_app()?.client;
         let key_vec = key.to_vec();
-        run(safe_app, move |client, _app_context| {
-            client
-                .get_seq_mdata_value(name, tag, key_vec)
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| match err {
-            SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) => {
-                Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
-            }
-            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData)) => {
-                Error::ContentNotFound(format!(
-                    "Sequenced MutableData not found at Xor name: {}",
-                    xorname_to_hex(&name)
-                ))
-            }
-            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) => {
-                Error::EntryNotFound(format!(
-                    "Entry not found in Sequenced MutableData found at Xor name: {}",
-                    xorname_to_hex(&name)
-                ))
-            }
-            err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
-        })
+        client
+            .get_seq_mdata_value(name, tag, key_vec)
+            .await
+            .map_err(|err| match err {
+                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
+                    Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
+                    Error::ContentNotFound(format!(
+                        "Sequenced MutableData not found at Xor name: {}",
+                        xorname_to_hex(&name)
+                    ))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
+                    Error::EntryNotFound(format!(
+                        "Entry not found in Sequenced MutableData found at Xor name: {}",
+                        xorname_to_hex(&name)
+                    ))
+                }
+                err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
+            })
     }
 
     async fn list_seq_mdata_entries(
@@ -613,35 +599,35 @@ impl SafeApp for SafeAppScl {
         name: XorName,
         tag: u64,
     ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
-        let safe_app: &App = self.get_safe_app()?;
-        run(safe_app, move |client, _app_context| {
-            client
-                .list_seq_mdata_entries(name, tag)
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| match err {
-            SafeAppError(SafeCoreError::DataError(SafeNdError::AccessDenied)) => {
-                Error::AccessDenied(format!(
-                    "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
-                    name, tag
-                ))
-            }
-            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchData)) => {
-                Error::ContentNotFound(format!(
-                    "Sequenced MutableData not found at Xor name: {} (type tag: {})",
-                    xorname_to_hex(&name),
-                    tag
-                ))
-            }
-            SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) => {
-                Error::EntryNotFound(format!(
+        let client = &self.get_safe_app()?.client;
+        client
+            .list_seq_mdata_entries(name, tag)
+            .await
+            .map_err(|err| match err {
+                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
+                    Error::AccessDenied(format!(
+                        "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
+                        name, tag
+                    ))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
+                    Error::ContentNotFound(format!(
+                        "Sequenced MutableData not found at Xor name: {} (type tag: {})",
+                        xorname_to_hex(&name),
+                        tag
+                    ))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
+                    Error::EntryNotFound(format!(
                     "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
                     xorname_to_hex(&name),
                     tag
                 ))
-            }
-            err => Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err)),
-        })
+                }
+                err => {
+                    Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err))
+                }
+            })
     }
 
     async fn seq_mutable_data_update(
@@ -655,31 +641,21 @@ impl SafeApp for SafeAppScl {
         let entry_actions = MDataSeqEntryActions::new();
         let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
+            .await
     }
 }
 
 // Helpers
 
-fn get_owner_pk(safe_app: &App) -> Result<SafeNdPublicKey> {
-    run(safe_app, move |client, _app_context| Ok(client.owner_key())).map_err(|err| {
-        Error::Unexpected(format!("Failed to retrieve account's public key: {}", err))
-    })
-}
+async fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
+    let pk = safe_app
+        .client
+        .public_key()
+        .await
+        .bls()
+        .ok_or_else(|| Error::Unexpected("Client's key is not a BLS Public Key".to_string()))?;
 
-fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
-    run(safe_app, move |client, _app_context| {
-        let pk = client
-            .public_key()
-            .bls()
-            .ok_or_else(|| "It's not a BLS Public Key".to_string())?;
-        Ok(pk)
-    })
-    .map_err(|err| {
-        Error::Unexpected(format!(
-            "Failed to retrieve account's public BLS key: {}",
-            err
-        ))
-    })
+    Ok(pk)
 }
 
 #[cfg(test)]
@@ -697,7 +673,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_put_and_get_immutable_data() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
 
         let id1 = b"HELLLOOOOOOO".to_vec();
 
@@ -716,7 +692,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_put_get_update_seq_append_only_data() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
 
         let key1 = b"KEY1".to_vec();
         let val1 = b"VALUE1".to_vec();
@@ -802,7 +778,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_seq_append_only_data_error() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
 
         let key1 = b"KEY1".to_vec();
         let val1 = b"VALUE1".to_vec();

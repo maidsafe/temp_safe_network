@@ -7,9 +7,12 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID};
+use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID, APP_NAME, APP_VENDOR};
+use log::debug;
 use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
+
+const AUTH_REQ_NOTIFS_ENDPOINT: &str = "https://localhost:33002";
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
@@ -211,22 +214,26 @@ async fn self_authorise(
     safe: &mut Safe,
     mut safe_authd: SafeAuthdClient,
 ) -> Result<(), String> {
-    // Let's subscribe so we can automatically allow our own auth request
+    debug!("Let's subscribe so we can automatically allow our own auth request...");
     safe_authd
         .subscribe(
-            "https://localhost:33002",
+            AUTH_REQ_NOTIFS_ENDPOINT,
             APP_ID,
             &move |auth_req: AuthReq| {
-                // TODO: pass the endpoint
-                let safe_authd = SafeAuthdClient::new(None);
-                match async_std::task::block_on(safe_authd.allow(auth_req.req_id)) {
-                    Ok(()) => {}
-                    Err(err) => println!("Failed to self authorise: {}", err),
+                debug!("We received an auth req notification, let's allow it if it's CLI's one...");
+                if auth_req.app_id == APP_ID
+                    && auth_req.app_name == APP_NAME
+                    && auth_req.app_vendor == APP_VENDOR
+                {
+                    Some(true)
+                } else {
+                    None
                 }
-                None
             },
         )
         .await?;
+
+    debug!("Send the authorisation request for CLI app now...");
     authorise_cli(safe, endpoint, true).await?;
     Ok(())
 }

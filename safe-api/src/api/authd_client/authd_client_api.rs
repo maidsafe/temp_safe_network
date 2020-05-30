@@ -13,7 +13,6 @@ use super::{
     notifs_endpoint::jsonrpc_listen,
 };
 use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
-use async_std::task;
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
@@ -25,8 +24,10 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process::{Command, Stdio},
-    sync::mpsc,
-    thread,
+};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -121,7 +122,7 @@ pub struct SafeAuthdClient {
     // authd endpoint
     pub authd_endpoint: String,
     // keep track of (endpoint URL, join handle for the listening thread, join handle of callback thread)
-    subscribed_endpoint: Option<(String, thread::JoinHandle<()>, thread::JoinHandle<()>)>,
+    subscribed_endpoint: Option<(String, task::JoinHandle<()>, task::JoinHandle<()>)>,
     // TODO: add a session_token field to use for communicating with authd for restricted operations,
     // we should restrict operations like subscribe, or allow/deny, to only be accepted with a valid token
     // session_token: String,
@@ -134,14 +135,14 @@ impl Drop for SafeAuthdClient {
         match &self.subscribed_endpoint {
             None => {}
             Some((url, _, _)) => {
-                match task::block_on(send_unsubscribe(url, &self.authd_endpoint)) {
+                match futures::executor::block_on(send_unsubscribe(url, &self.authd_endpoint)) {
                     Ok(msg) => {
                         debug!("{}", msg);
                     }
                     Err(err) => {
                         // We are still ok, it was just us trying to be nice and unsubscribe if possible
                         // It could be the case we were already unsubscribe automatically by authd before
-                        // we were attempting to do it now, which can happend due to our endpoint
+                        // we were attempting to do it now, which can happen due to our endpoint
                         // being unresponsive, so it's all ok
                         debug!("Failed to unsubscribe endpoint from authd: {}", err);
                     }
@@ -399,13 +400,13 @@ impl SafeAuthdClient {
 
         // Start listening first
         // We need a channel to receive auth req notifications from the thread running the QUIC endpoint
-        let (tx, rx): (mpsc::Sender<AuthReq>, mpsc::Receiver<AuthReq>) = mpsc::channel();
+        let (tx, mut rx) = mpsc::unbounded_channel::<(AuthReq, oneshot::Sender<Option<bool>>)>();
 
         let listen = endpoint_url.to_string();
-        // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
-        // TODO: if there was a previous subscription, make sure we kill the previously created threads
-        let endpoint_thread_join_handle = thread::spawn(move || {
-            match jsonrpc_listen(&listen, &cert_base_path.display().to_string(), tx) {
+        // TODO: if there was a previous subscription,
+        // make sure we kill/stop the previously created tasks
+        let endpoint_thread_join_handle = tokio::spawn(async move {
+            match jsonrpc_listen(&listen, &cert_base_path.display().to_string(), tx).await {
                 Ok(()) => {
                     info!("Endpoint successfully launched for receiving auth req notifications");
                 }
@@ -419,29 +420,26 @@ impl SafeAuthdClient {
         });
 
         let cb = Box::new(allow_cb);
-        // TODO: use Tokio futures with singled-threaded tasks and mpsc channel to receive reqs callbacks
-        // TODO: we may be also able to merge this logic into the endpoint thread
-        let cb_thread_join_handle = thread::spawn(move || loop {
-            match rx.recv() {
-                Ok(auth_req) => {
-                    debug!(
-                        "Notification for authorisation request ({}) from app ID '{}' received",
-                        auth_req.req_id, auth_req.app_id
-                    );
-                    let _user_decision = cb(auth_req);
-                    // TODO: send the callback return value back to authd
-                    /*match auth_req.tx.try_send(user_decision) {
-                        Ok(_) => println!("Auth req decision made"),
-                        Err(_) => println!(
-                            "Auth req decision couldn't be obtained from user callback"
-                        ),
-                    };*/
-                }
-                Err(err) => {
-                    debug!("Failed to receive message: {}", err);
-                }
+        // TODO: we may be able to merge this logic into the endpoint thread
+        let cb_thread_join_handle = tokio::spawn(async move {
+            while let Some((auth_req, decision_tx)) = rx.recv().await {
+                debug!(
+                    "Notification for authorisation request ({}) from app ID '{}' received",
+                    auth_req.req_id, auth_req.app_id
+                );
+
+                // Let's get the decision from the user by invoking the callback provided
+                let user_decision = cb(auth_req);
+
+                // Send the decision received back to authd-client so it
+                // can in turn send it to authd
+                match decision_tx.send(user_decision) {
+                    Ok(_) => debug!("Auth req decision sent to authd"),
+                    Err(_) => error!("Auth req decision couldn't be sent back to authd"),
+                };
             }
         });
+
         self.subscribed_endpoint = Some((
             endpoint_url.to_string(),
             endpoint_thread_join_handle,
@@ -485,7 +483,7 @@ impl SafeAuthdClient {
         // If the URL is the same as the endpoint locally launched, terminate the thread
         if let Some((url, _, _)) = &self.subscribed_endpoint {
             if endpoint_url == url {
-                // TODO: send signal to stop/kill threads
+                // TODO: send signal to stop/kill the running tasks
                 self.subscribed_endpoint = None;
             }
         }

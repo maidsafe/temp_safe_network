@@ -121,7 +121,7 @@ impl SafeApp for SafeAppFake {
         Self { fake_vault }
     }
 
-    fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
+    async fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
         debug!("Using mock so there is no connection to network");
         Ok(())
     }

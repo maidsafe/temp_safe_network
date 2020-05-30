@@ -81,7 +81,7 @@ pub async fn key_commander(
                 return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
             } else if !test_coins {
                 // We need to connect with an authorised app since we are not creating a SafeKey with test-coins
-                connect(safe)?;
+                connect(safe).await?;
             }
 
             let (xorurl, key_pair, amount) =
@@ -90,7 +90,7 @@ pub async fn key_commander(
             Ok(())
         }
         KeysSubCommands::Balance { keyurl, secret } => {
-            connect(safe)?;
+            connect(safe).await?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
             let current_balance = if target.is_empty() {
@@ -113,7 +113,7 @@ pub async fn key_commander(
             tx_id,
         } => {
             // TODO: don't connect if --from sk was passed
-            connect(safe)?;
+            connect(safe).await?;
 
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(

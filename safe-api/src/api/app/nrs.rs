@@ -127,8 +127,8 @@ impl Safe {
     /// # use rand::{thread_rng, Rng};
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     ///     let file_xorurl = safe.files_put_published_immutable(&vec![], None, false).await.unwrap();
     ///     let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
@@ -232,8 +232,8 @@ impl Safe {
     /// # use rand::distributions::Alphanumeric;
     /// # use rand::{thread_rng, Rng};
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
     ///     let file_xorurl = safe.files_put_published_immutable(&vec![], Some("text/plain"), false).await.unwrap();
     ///     let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
@@ -346,7 +346,7 @@ mod tests {
         use crate::api::app::consts::FAKE_RDF_PREDICATE_LINK;
         use crate::nrs_map::DefaultRdf;
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
 
         let nrs_xorname = Safe::parse_url(&site_name)?.xorname();
 
@@ -392,7 +392,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_map_container_add() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (_xor_url, _entries, nrs_map) = safe
             .nrs_map_container_create(
                 &format!("b.{}", site_name),
@@ -430,7 +430,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_map_container_add_or_remove_with_versioned_target() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let _ = safe
             .nrs_map_container_create(
                 &format!("b.{}", site_name),
@@ -489,7 +489,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_map_container_remove_one_of_two() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (_xor_url, _entries, nrs_map) = safe
             .nrs_map_container_create(
                 &format!("a.b.{}", site_name),
@@ -527,7 +527,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_map_container_remove_default_soft_link() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (_xor_url, _entries, nrs_map) = safe
             .nrs_map_container_create(
                 &format!("a.b.{}", site_name),
@@ -568,7 +568,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_map_container_remove_default_hard_link() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (_xor_url, _entries, nrs_map) = safe
             .nrs_map_container_create(
                 &format!("a.b.{}", site_name),

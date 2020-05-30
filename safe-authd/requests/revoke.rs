@@ -18,7 +18,7 @@ pub async fn process_req(
     if let Value::String(app_id) = params {
         info!("Revoking application...");
         let safe_authenticator = safe_auth_handle.lock().await;
-        match safe_authenticator.revoke_app(&app_id) {
+        match safe_authenticator.revoke_app(&app_id).await {
             Ok(()) => {
                 let msg = "Application revoked successfully";
                 info!("{}", msg);

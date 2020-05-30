@@ -101,8 +101,17 @@ async fn main() {
 
 async fn process_command(opt: CmdArgs) -> Result<()> {
     match opt {
-        CmdArgs::Update {} => update_commander()
-            .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err))),
+        CmdArgs::Update {} => {
+            // We run this command in a separate thread to overcome a conflict with
+            // the self_update crate as it seems to be creating its own runtime.
+            let handler = std::thread::spawn(|| {
+                update_commander()
+                    .map_err(|err| Error::GeneralError(format!("Error performing update: {}", err)))
+            });
+            handler.join().map_err(|err| {
+                Error::GeneralError(format!("Failed to run self update: {:?}", err))
+            })?
+        }
         CmdArgs::Start {
             listen,
             log_dir,

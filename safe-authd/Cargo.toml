@@ -16,7 +16,7 @@ path = "main.rs"
 cluFlock = "^1.2.5"
 directories = "^2.0.2"
 flexi_logger = "~0.15.2"
-futures = "~0.3.4"
+futures = "~0.3.5"
 human-panic = "^1.0.1"
 jsonrpc-quic = { path = "../jsonrpc-quic" }
 log = "~0.4.8"
@@ -24,7 +24,7 @@ rcgen = "~0.7.0"
 serde = "^1.0.91"
 serde_json = "^1.0.41"
 structopt = "~0.2.15"
-tokio = { version = "~0.2.13", features = ["macros"] }
+tokio = { version = "~0.2.21", features = ["macros"] }
 url = "^2.1.1"
 urlencoding = "^1.0.0"
 quinn = {version = "~0.6.0", features=["tls-rustls"], default-features = false}
@@ -38,7 +38,7 @@ default-features = false
 features = ["authenticator", "authd_client"]
 
 [dependencies.self_update]
-version = "~0.13.0"
+version = "~0.15.0"
 default-features = false
 features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"]
 

@@ -229,9 +229,11 @@ impl Safe {
     /// ```rust
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
-    /// let (xorurl, _processed_files, _files_map) = async_std::task::block_on(safe.files_container_create(Some("../testdata"), None, true, false)).unwrap();
-    /// assert!(xorurl.contains("safe://"))
+    /// # async_std::task::block_on(async {
+    ///     safe.connect("", Some("fake-credentials")).await.unwrap();
+    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
+    ///     assert!(xorurl.contains("safe://"))
+    /// # });
     /// ```
     pub async fn files_container_create(
         &mut self,
@@ -302,8 +304,8 @@ impl Safe {
     /// ```rust
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap();
     ///     println!("FilesContainer fetched is at version: {}", version);
@@ -390,8 +392,8 @@ impl Safe {
     /// ```rust
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_sync("../testdata", &xorurl, true, false, false, false).await.unwrap();
     ///     println!("FilesContainer synced up is at version: {}", version);
@@ -479,8 +481,8 @@ impl Safe {
     /// ```rust
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add("../testdata/test.md", &new_file_name, false, false, false).await.unwrap();
@@ -546,8 +548,8 @@ impl Safe {
     /// ```rust
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("../testdata"), None, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add_from_raw(b"0123456789", &new_file_name, false, false, false).await.unwrap();
@@ -597,8 +599,8 @@ impl Safe {
     /// ```rust
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let (xorurl, processed_files, files_map) = safe.files_container_create(Some("../testdata/"), None, true, false).await.unwrap();
     ///     let remote_file_path = format!("{}/test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).await.unwrap();
@@ -730,8 +732,8 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
     ///     let xorurl = safe.files_put_published_immutable(data, Some("text/plain"), false).await.unwrap();
     ///     let received_data = safe.files_get_published_immutable(&xorurl, None).await.unwrap();
@@ -774,8 +776,8 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
     ///     let xorurl = safe.files_put_published_immutable(data, None, false).await.unwrap();
     ///     let received_data = safe.files_get_published_immutable(&xorurl, None).await.unwrap();
@@ -1624,7 +1626,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_empty() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(None, None, false, false)
             .await?;
@@ -1653,7 +1655,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_file() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let filename = "../testdata/test.md";
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some(filename), None, false, false)
@@ -1673,7 +1675,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_dry_run() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let filename = "../testdata/";
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some(filename), None, true, true)
@@ -1719,7 +1721,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_folder_without_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata"), None, true, false)
             .await?;
@@ -1760,7 +1762,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_folder_with_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -1801,7 +1803,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_dest_path_without_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata"), Some("/myroot"), true, false)
             .await?;
@@ -1842,7 +1844,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_dest_path_with_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata"), Some("/myroot/"), true, false)
             .await?;
@@ -1883,7 +1885,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -1948,7 +1950,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_dry_run() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2022,7 +2024,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_same_size() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/test.md"), None, false, false)
             .await?;
@@ -2072,7 +2074,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_with_versioned_target() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2107,7 +2109,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_with_delete() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2174,7 +2176,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_delete_without_recursive() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         match safe
             .files_container_sync(
                 "../testdata/subfolder/",
@@ -2203,7 +2205,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_update_nrs_unversioned_link() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2234,7 +2236,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_update_nrs_with_xorurl() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2268,7 +2270,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_update_nrs_versioned_link() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2301,7 +2303,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_target_path_without_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2371,7 +2373,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_target_path_with_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2441,7 +2443,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_get() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2463,7 +2465,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_version() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2494,7 +2496,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_get_with_version() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2569,7 +2571,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_get_empty_folder() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;
@@ -2588,7 +2590,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_with_nrs_url() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/test.md"), None, false, false)
             .await?;
@@ -2641,7 +2643,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
@@ -2687,7 +2689,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_dry_run() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
@@ -2739,7 +2741,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_dir() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
@@ -2769,7 +2771,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_existing_name() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
@@ -2843,7 +2845,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/test.md"), None, false, false)
             .await?;
@@ -2898,7 +2900,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_a_url() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
@@ -2980,7 +2982,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_from_raw() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/subfolder/"), None, false, false)
             .await?;
@@ -3035,7 +3037,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_remove_path() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false)
             .await?;

@@ -55,7 +55,7 @@ async fn handle_authorisation(
     if let Value::String(auth_req_str) = params {
         info!("Authorising application...");
         let safe_authenticator = safe_auth_handle.lock().await;
-        match safe_authenticator.decode_req(&auth_req_str) {
+        match safe_authenticator.decode_req(&auth_req_str).await {
             Ok((req_id, request)) => {
                 // We have a valid decoded authorisation request,
                 // let's now treat it according to its type
@@ -122,7 +122,7 @@ async fn handle_authorisation(
                     }
                     SafeAuthReq::Unregistered(_) => {
                         // We simply allow unregistered authorisation requests
-                        match safe_authenticator.authorise_app(&auth_req_str) {
+                        match safe_authenticator.authorise_app(&auth_req_str).await {
                             Ok(resp) => {
                                 info!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
                                 Ok(AuthorisationResponse::Ready(json!(resp)))
@@ -163,7 +163,7 @@ async fn await_authorisation_decision(
                     req_id
                 );
                 let safe_authenticator = safe_auth_handle.lock().await;
-                match safe_authenticator.authorise_app(&auth_req_str) {
+                match safe_authenticator.authorise_app(&auth_req_str).await {
                     Ok(resp) => {
                         info!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
                         Ok(serde_json::value::Value::String(resp))

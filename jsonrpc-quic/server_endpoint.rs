@@ -142,7 +142,7 @@ impl IncomingJsonRpcRequest {
             Some(stream) => {
                 let (send, recv): (quinn::SendStream, quinn::RecvStream) = match stream {
                     Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
-                        warn!("Connection terminated");
+                        info!("Connection terminated");
                         return None;
                     }
                     Err(err) => {

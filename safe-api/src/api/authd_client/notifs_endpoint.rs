@@ -13,18 +13,20 @@ use jsonrpc_quic::{
 };
 use log::{debug, info};
 use serde_json::json;
-use std::{str, sync::mpsc};
-use tokio::runtime::Builder;
+use tokio::{
+    runtime,
+    sync::{mpsc, oneshot},
+};
 use url::Url;
 
 const JSONRPC_NOTIF_ERROR: isize = -1;
 
 // Start listening for incoming notifications from authd,
 // by setting up a JSON-RPC over QUIC server endpoint
-pub fn jsonrpc_listen(
+pub async fn jsonrpc_listen(
     listen: &str,
     cert_base_path: &str,
-    notif_channel: mpsc::Sender<AuthReq>,
+    notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> Result<(), String> {
     debug!("Launching new QUIC endpoint on '{}'", listen);
 
@@ -36,30 +38,29 @@ pub fn jsonrpc_listen(
     let jsonrpc_quic_endpoint = Endpoint::new(cert_base_path, None)
         .map_err(|err| format!("Failed to create endpoint: {}", err))?;
 
-    let mut runtime = Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .map_err(|err| format!("Failed to create thread scheduler: {}", err))?;
+    // We try to obtain current runtime or create a new one if there is none
+    let runtime = match runtime::Handle::try_current() {
+        Ok(r) => r,
+        Err(_) => runtime::Runtime::new()
+            .map_err(|err| format!("Failed to create runtime: {}", err))?
+            .handle()
+            .clone(),
+    };
 
     let mut incoming_conn = runtime
         .enter(|| jsonrpc_quic_endpoint.bind(&listen_socket_addr))
         .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
 
-    runtime.block_on({
-        async move {
-            while let Some(conn) = incoming_conn.get_next().await {
-                tokio::spawn(handle_connection(conn, notif_channel.clone()));
-            }
-        }
-    });
+    while let Some(conn) = incoming_conn.get_next().await {
+        tokio::spawn(handle_connection(conn, notif_channel.clone()));
+    }
 
     Ok(())
 }
 
 async fn handle_connection(
     mut conn: IncomingJsonRpcRequest,
-    notif_channel: mpsc::Sender<AuthReq>,
+    notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> Result<(), String> {
     // Each stream initiated by the client constitutes a new request.
     tokio::spawn(async move {
@@ -75,7 +76,7 @@ async fn handle_connection(
 async fn handle_request(
     jsonrpc_req: JsonRpcRequest,
     mut send: JsonRpcResponseStream,
-    notif_channel: mpsc::Sender<AuthReq>,
+    notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> Result<(), String> {
     // Execute the request
     let resp = process_jsonrpc_request(jsonrpc_req, notif_channel).await;
@@ -96,7 +97,7 @@ async fn handle_request(
 
 async fn process_jsonrpc_request(
     jsonrpc_req: JsonRpcRequest,
-    notif_channel: mpsc::Sender<AuthReq>,
+    notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> JsonRpcResponse {
     let auth_req: AuthReq = match serde_json::from_value(jsonrpc_req.params) {
         Ok(auth_req) => auth_req,
@@ -111,16 +112,28 @@ async fn process_jsonrpc_request(
 
     // New notification for auth req to be sent to user
     let app_id = auth_req.app_id.clone();
-    let msg = match notif_channel.send(auth_req) {
-        Ok(_) => format!(
+    let (decision_tx, decision_rx) = oneshot::channel::<Option<bool>>();
+    match notif_channel.send((auth_req, decision_tx)) {
+        Ok(_) => debug!(
             "Auth req notification from app id '{}' sent to user",
             app_id
         ),
-        Err(err) => format!(
+        Err(err) => debug!(
             "Auth req notification for app id '{}' couldn't be sent to user: {}",
             app_id, err
         ),
-    };
+    }
 
-    JsonRpcResponse::result(json!(msg), 0)
+    // Send the decision made by the user back to authd
+    // TODO: send the decision as Option<bool> instead of as String
+    match decision_rx.await {
+        Ok(Some(true)) => JsonRpcResponse::result(json!("true"), jsonrpc_req.id),
+        Ok(Some(false)) => JsonRpcResponse::result(json!("false"), jsonrpc_req.id),
+        Ok(None) => JsonRpcResponse::result(json!("No decision made"), jsonrpc_req.id),
+        Err(err) => JsonRpcResponse::error(
+            format!("Failed to obtain decision made for auth req: {}", err),
+            JSONRPC_NOTIF_ERROR,
+            Some(jsonrpc_req.id),
+        ),
+    }
 }

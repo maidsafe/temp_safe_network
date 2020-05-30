@@ -50,7 +50,7 @@ pub async fn monitor_pending_auth_reqs(
         // and remove them if they don't respond or if they reply with a negative response.
         for (req_id, incoming_auth_req) in reqs_to_process.iter_mut() {
             // Let's remove this auth req from the list if it's been standing for too long,
-            // we assume the requestor already timed out out by now
+            // we assume the requestor already timed out by now
             let is_timeout = match incoming_auth_req.timestamp.elapsed() {
                 Ok(elapsed) => {
                     if elapsed >= Duration::from_millis(AUTH_REQS_TIMEOUT) {
@@ -102,17 +102,20 @@ pub async fn monitor_pending_auth_reqs(
             }
 
             info!(
-                "Decision obtained for auth req id: {} - from app id: {}: {:?}",
+                "Decision obtained for auth req id {} sent by app id '{}': {:?}",
                 incoming_auth_req.auth_req.req_id, incoming_auth_req.auth_req.app_id, response
             );
 
             if current_req_notified {
-                // then update its state in the list
-                let mut auth_reqs_list = auth_reqs_handle.lock().await;
+                // Then update its state in the list
                 // ...but only if the auth req is still in the list, as it could
                 // have been removed already if a user allowed/denied it with a request
-                // while we were sending the notifications
-                if auth_reqs_list.contains_key(req_id) {
+                // while we were sending the notifications.
+                let mut auth_reqs_list = auth_reqs_handle.lock().await;
+                if response.is_some() {
+                    // We can even remove it, since a decision to allow/deny was received
+                    auth_reqs_list.remove(req_id);
+                } else if auth_reqs_list.contains_key(req_id) {
                     let mut current_auth_req = incoming_auth_req.clone();
                     current_auth_req.notified = true;
                     let _ = auth_reqs_list.insert(*req_id, current_auth_req);
@@ -191,6 +194,8 @@ async fn jsonrpc_send(
     let method2 = method.to_string();
     let mut new_conn = outgoing_conn.connect(&url2, None).await?;
 
+    // TODO: here the response result type should be changed to Option<bool>
+    // We didn't do it yet as it breaks compatibility with other authd client apps
     let response = new_conn.send::<String>(&method2, params).await;
 
     // Allow the endpoint driver to automatically shut down

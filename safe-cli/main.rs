@@ -35,12 +35,13 @@ const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
 const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
 const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
 
-fn main() {
+#[tokio::main]
+async fn main() {
     setup_panic!();
     env_logger::init();
     debug!("Starting SAFE CLI...");
 
-    if let Err(e) = async_std::task::block_on(run()) {
+    if let Err(e) = run().await {
         error!("safe-cli error: {}", e);
         process::exit(1);
     }

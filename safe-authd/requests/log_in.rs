@@ -37,7 +37,7 @@ pub async fn process_req(
             })?;
 
             let mut safe_authenticator = safe_auth_handle.lock().await;
-            match safe_authenticator.log_in(passphrase, password) {
+            match safe_authenticator.log_in(passphrase, password).await {
                 Ok(_) => {
                     let msg = "Logged in successfully!";
                     info!("{}", msg);

@@ -12,9 +12,9 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
 // Instantiate a Safe instance
-pub fn new_safe_instance() -> Result<Safe> {
+pub async fn new_safe_instance() -> Result<Safe> {
     let mut safe = Safe::default();
-    safe.connect("", Some("fake-credentials"))?;
+    safe.connect("", Some("fake-credentials")).await?;
     Ok(safe)
 }
 

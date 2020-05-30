@@ -11,7 +11,7 @@ use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use jsonrpc_quic::ClientEndpoint;
 use serde::de::DeserializeOwned;
 use threshold_crypto::SecretKey;
-use tokio::runtime::Builder;
+use tokio::runtime;
 
 pub mod auth_types {
     use safe_core::ipc::req::{ContainerPermissions, IpcReq};
@@ -67,6 +67,7 @@ pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey> {
         .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))
 }
 
+// Send a request to authd using JSON-RPC over QUIC
 pub async fn send_authd_request<T>(
     dest_endpoint: &str,
     method: &str,
@@ -91,13 +92,16 @@ where
                 Error::AuthdClientError(format!("Failed to create client endpoint: {}", err))
             })?;
 
-            let mut runtime = Builder::new()
-                .threaded_scheduler()
-                .enable_all()
-                .build()
-                .map_err(|err| {
-                    Error::AuthdClientError(format!("Failed to create runtime: {}", err))
-                })?;
+            // We try to obtain current runtime or create a new one if there is none
+            let runtime = match runtime::Handle::try_current() {
+                Ok(r) => r,
+                Err(_) => runtime::Runtime::new()
+                    .map_err(|err| {
+                        Error::AuthdClientError(format!("Failed to create runtime: {}", err))
+                    })?
+                    .handle()
+                    .clone(),
+            };
 
             let mut outgoing_conn = {
                 runtime
@@ -107,30 +111,23 @@ where
                     })?
             };
 
-            runtime.block_on(async {
-                let mut new_conn =
-                    outgoing_conn
-                        .connect(dest_endpoint, None)
-                        .await
-                        .map_err(|err| {
-                            Error::AuthdClientError(format!(
-                                "Failed to establish connection with authd: {}",
-                                err
-                            ))
-                        })?;
-
-                let res = new_conn
-                    .send(method, params)
-                    .await
-                    .map_err(|err| match err {
-                        jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
-                        other => Error::AuthdClientError(other.to_string()),
-                    });
-
-                // Allow the endpoint driver to automatically shut down
-                drop(outgoing_conn);
-                res
-            })
+            // Establish a new connection
+            outgoing_conn
+                .connect(dest_endpoint, None)
+                .await
+                .map_err(|err| {
+                    Error::AuthdClientError(format!(
+                        "Failed to establish connection with authd: {}",
+                        err
+                    ))
+                })?
+                // Send request and await for response
+                .send(method, params)
+                .await
+                .map_err(|err| match err {
+                    jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
+                    other => Error::AuthdClientError(other.to_string()),
+                })
         }
     }
 }

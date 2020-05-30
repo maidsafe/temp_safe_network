@@ -31,7 +31,7 @@ pub async fn xorurl_commander(
     location: Option<String>,
     recursive: bool,
     output_fmt: OutputFmt,
-    mut safe: &mut Safe,
+    safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
         Some(XorurlSubCommands::Decode { xorurl }) => {
@@ -65,7 +65,7 @@ pub async fn xorurl_commander(
             }
         }
         None => {
-            connect(&mut safe)?;
+            connect(safe).await?;
             let location =
                 get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
 

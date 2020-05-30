@@ -20,7 +20,7 @@ pub type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
 pub trait SafeApp {
     fn new() -> Self;
 
-    fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
+    async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
 
     async fn create_balance(
         &mut self,

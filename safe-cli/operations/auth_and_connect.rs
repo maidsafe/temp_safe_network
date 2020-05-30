@@ -61,7 +61,7 @@ pub fn clear_credentials() -> Result<(), String> {
     Ok(())
 }
 
-pub fn connect(safe: &mut Safe) -> Result<(), String> {
+pub async fn connect(safe: &mut Safe) -> Result<(), String> {
     debug!("Connecting...");
 
     let auth_credentials = match get_credentials_file_path() {
@@ -91,16 +91,14 @@ pub fn connect(safe: &mut Safe) -> Result<(), String> {
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    safe.connect(APP_ID, auth_credentials.as_deref())
-        .or_else(|err| {
-            if auth_credentials.is_some() {
-                warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-                safe.connect(APP_ID, None)
-            } else {
-                Err(err)
-            }
-        })
-        .map_err(|err| format!("Failed to connect: {}", err))
+    match safe.connect(APP_ID, auth_credentials.as_deref()).await {
+        Err(_err) if auth_credentials.is_some() => {
+            warn!("Credentials found for CLI are invalid, connecting with read-only access...");
+            safe.connect(APP_ID, None).await
+        }
+        other => other,
+    }
+    .map_err(|err| format!("Failed to connect: {}", err))
 }
 
 // Private helpers

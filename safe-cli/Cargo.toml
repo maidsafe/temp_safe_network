@@ -15,7 +15,7 @@ path = "main.rs"
 
 [dependencies]
 ansi_term = "~0.9.0"
-async-std = "^1.4.0"
+async-std = "^1.6.0"
 crossbeam = "~0.7.3"
 directories = "^2.0.1"
 env_logger = "~0.6.0"
@@ -34,7 +34,7 @@ serde_json = "^1.0.39"
 serde_yaml = "~0.8.11"
 shrust = "~0.0.7"
 structopt = "~0.3.5"
-tokio = { version = "~0.2.13", features = ["macros"] }
+tokio = { version = "~0.2.21", features = ["macros"] }
 isatty = "~0.1"
 num-traits = "~0.2"
 indicatif = { git="https://github.com/mibac138/indicatif", branch="mpb-tick" }
@@ -52,7 +52,7 @@ default-features = false
 features = ["app", "authd_client"]
 
 [dependencies.self_update]
-version = "~0.14.0"
+version = "~0.15.0"
 default-features = false
 features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"]
 

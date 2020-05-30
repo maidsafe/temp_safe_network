@@ -10,12 +10,11 @@
 use super::common::sk_from_hex;
 use crate::{AuthedApp, AuthedAppsList, Error, Result, SafeAuthReq, SafeAuthReqId};
 use bincode::deserialize;
-use futures::{stream, Future, Stream};
 use log::{debug, info};
 use safe_authenticator::{
     access_container, access_container::update_container_perms, app_auth::authenticate, config,
     errors::AuthError, ipc::decode_ipc_msg,
-    revocation::revoke_app as safe_authenticator_revoke_app, run as auth_run_helper, Authenticator,
+    revocation::revoke_app as safe_authenticator_revoke_app, Authenticator,
 };
 use safe_core::{
     client as safe_core_client,
@@ -66,20 +65,23 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
-    /// let logged_in = safe_auth.log_in(my_secret, my_password);
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
+    /// let logged_in = safe_auth.log_in(my_secret, my_password).await;
     /// match logged_in {
     ///    Ok(()) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
+    /// # });
     ///```
     ///
     /// ## Error Example
     /// If the account does not exist, the function will return an appropriate error:
-    ///```
+    ///```ignore
     /// use safe_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);
-    /// let not_logged_in = safe_auth.log_in("non", "existant");
+    /// # async_std::task::block_on(async {
+    /// let not_logged_in = safe_auth.log_in("non", "existant").await;
     /// match not_logged_in {
     ///    Ok(()) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
@@ -87,10 +89,13 @@ impl SafeAuthenticator {
     ///    }
     ///    Err(_) => assert!(false), // This should not pass
     /// }
+    /// # });
     ///```
-    pub fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
+    pub async fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to log in...");
-        match Authenticator::login(passphrase, password, || info!("Disconnected from network")) {
+        match Authenticator::login(passphrase, password, || info!("Disconnected from network"))
+            .await
+        {
             Ok(auth) => {
                 debug!("Logged-in successfully");
                 self.safe_authenticator = Some(auth);
@@ -142,11 +147,13 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// let acc_created = safe_auth.create_acc(sk, my_secret, my_password);
+    /// # async_std::task::block_on(async {
+    /// let acc_created = safe_auth.create_acc(sk, my_secret, my_password).await;
     /// match acc_created {
     ///    Ok(()) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
+    /// # });
     ///```
     ///
     /// ## Error Example
@@ -162,8 +169,9 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
-    /// let acc_not_created = safe_auth.create_acc(sk, my_secret, my_password);
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
+    /// let acc_not_created = safe_auth.create_acc(sk, my_secret, my_password).await;
     /// match acc_not_created {
     ///    Ok(_) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
@@ -171,12 +179,13 @@ impl SafeAuthenticator {
     ///    }
     ///    Err(_) => assert!(false), // This should not pass
     /// }
+    /// # });
     ///```
-    pub fn create_acc(&mut self, sk: &str, passphrase: &str, password: &str) -> Result<()> {
+    pub async fn create_acc(&mut self, sk: &str, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a SAFE account...");
         let secret_key = sk_from_hex(sk)?;
 
-        match Authenticator::create_acc(
+        match Authenticator::create_client_with_acc(
             passphrase,
             password,
             ClientFullId::from(secret_key),
@@ -184,7 +193,9 @@ impl SafeAuthenticator {
                 // TODO: allow the caller to provide the callback function
                 // eprintln!("{}", "Disconnected from network");
             },
-        ) {
+        )
+        .await
+        {
             Ok(auth) => {
                 debug!("Account just created successfully");
                 self.safe_authenticator = Some(auth);
@@ -205,8 +216,8 @@ impl SafeAuthenticator {
         }
     }
 
-    pub fn decode_req(&self, req: &str) -> Result<(SafeAuthReqId, SafeAuthReq)> {
-        let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
+    pub async fn decode_req(&self, req: &str) -> Result<(SafeAuthReqId, SafeAuthReq)> {
+        let client = &get_safe_authenticator(&self.safe_authenticator)?.client;
 
         let req_msg = match decode_msg(req) {
             Ok(msg) => msg,
@@ -219,10 +230,9 @@ impl SafeAuthenticator {
         };
         debug!("Auth request string decoded: {:?}", req_msg);
 
-        let ipc_req = auth_run_helper(safe_authenticator, move |client| {
-            decode_ipc_msg(client, req_msg)
-        })
-        .map_err(|err| Error::AuthenticatorError(format!("Failed to decode request: {}", err)))?;
+        let ipc_req = decode_ipc_msg(client, req_msg).await.map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to decode request: {}", err))
+        })?;
 
         match ipc_req {
             Ok(IpcMsg::Req {
@@ -252,14 +262,16 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
     /// let auth_req = "bAAAAAAEXVK4SGAAAAAABAAAAAAAAAAAANZSXILTNMFUWI43BMZSS4Y3MNEAAQAAAAAAAAAAAKNAUMRJAINGESEAAAAAAAAAAABGWC2LEKNQWMZJONZSXIICMORSAAAIBAAAAAAAAAAAAOAAAAAAAAAAAL5YHKYTMNFRQCAAAAAAAAAAAAAAAAAAB";
-    /// safe_auth.log_in(my_secret, my_password).unwrap();
-    /// let auth_response = safe_auth.authorise_app(auth_req/*, &|_| true*/);
+    /// safe_auth.log_in(my_secret, my_password).await.unwrap();
+    /// let auth_response = safe_auth.authorise_app(auth_req/*, &|_| true*/).await;
     /// match auth_response {
     ///    Ok(_) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
+    /// # });
     ///```
     /// ## Error Example
     /// ```ignore
@@ -272,11 +284,12 @@ impl SafeAuthenticator {
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
     /// /// Using an invalid auth request string
     /// let auth_req = "invalid-auth-req-string";
-    /// safe_auth.log_in(my_secret, my_password).unwrap();
-    /// let auth_response = safe_auth.authorise_app(auth_req/*, &|_| true*/);
+    /// safe_auth.log_in(my_secret, my_password).await.unwrap();
+    /// let auth_response = safe_auth.authorise_app(auth_req/*, &|_| true*/).await;
     /// match auth_response {
     ///    Ok(_) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
@@ -284,10 +297,11 @@ impl SafeAuthenticator {
     ///    }
     ///    Err(_) => assert!(false), // This should not pass
     /// }
+    /// # });
     ///```
-    pub fn authorise_app(&self, req: &str) -> Result<String> {
+    pub async fn authorise_app(&self, req: &str) -> Result<String> {
         let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
-
+        let client = &safe_authenticator.client;
         let req_msg = match decode_msg(req) {
             Ok(msg) => msg,
             Err(err) => {
@@ -299,10 +313,9 @@ impl SafeAuthenticator {
         };
         debug!("Auth request string decoded: {:?}", req_msg);
 
-        let ipc_req = auth_run_helper(safe_authenticator, move |client| {
-            decode_ipc_msg(client, req_msg)
-        })
-        .map_err(|err| Error::AuthenticatorError(format!("Failed to decode request: {}", err)))?;
+        let ipc_req = decode_ipc_msg(client, req_msg).await.map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to decode request: {}", err))
+        })?;
 
         match ipc_req {
             Ok(IpcMsg::Req {
@@ -311,7 +324,7 @@ impl SafeAuthenticator {
             }) => {
                 info!("Request was recognised as a general app auth request");
                 debug!("Decoded request (req_id={:?}): {:?}", req_id, app_auth_req);
-                gen_auth_response(safe_authenticator, req_id, app_auth_req)
+                gen_auth_response(safe_authenticator, req_id, app_auth_req).await
             }
             Ok(IpcMsg::Req {
                 request: IpcReq::Containers(cont_req),
@@ -319,7 +332,7 @@ impl SafeAuthenticator {
             }) => {
                 info!("Request was recognised as a containers auth request");
                 debug!("Decoded request (req_id={:?}): {:?}", req_id, cont_req);
-                gen_cont_auth_response(safe_authenticator, req_id, cont_req)
+                gen_cont_auth_response(safe_authenticator, req_id, cont_req).await
             }
             Ok(IpcMsg::Req {
                 request: IpcReq::Unregistered(user_data),
@@ -338,7 +351,7 @@ impl SafeAuthenticator {
                     "Decoded request (req_id={:?}): {:?}",
                     req_id, share_mdata_req
                 );
-                gen_shared_md_auth_response(safe_authenticator, req_id, share_mdata_req)
+                gen_shared_md_auth_response(safe_authenticator, req_id, share_mdata_req).await
             }
             Err((error_code, description, _err)) => Err(Error::AuthError(format!(
                 "Failed decoding the auth request: {} - {:?}",
@@ -363,92 +376,105 @@ impl SafeAuthenticator {
     /// use safe_api::SafeAuthenticator;
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account which has been used
-    /// /// to authorise some application already:
+    /// /// Using an already existing account which has been
+    /// /// already used to authorise some application:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
-    /// safe_auth.log_in(my_secret, my_password).unwrap();
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
+    /// safe_auth.log_in(my_secret, my_password).await.unwrap();
     /// # let auth_req = "bAAAAAAEXVK4SGAAAAAABAAAAAAAAAAAANZSXILTNMFUWI43BMZSS4Y3MNEAAQAAAAAAAAAAAKNAUMRJAINGESEAAAAAAAAAAABGWC2LEKNQWMZJONZSXIICMORSAAAIBAAAAAAAAAAAAOAAAAAAAAAAAL5YHKYTMNFRQCAAAAAAAAAAAAAAAAAAB";
-    /// # safe_auth.authorise_app(auth_req/*, &|_| true*/).unwrap();
+    /// # safe_auth.authorise_app(auth_req/*, &|_| true*/).await.unwrap();
     /// /// Get the list of authorised apps
-    /// let authed_apps = safe_auth.authed_apps();
+    /// let authed_apps = safe_auth.authed_apps().await;
     /// match authed_apps {
     ///    Ok(_) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
+    /// # });
     ///```
-    pub fn authed_apps(&self) -> Result<AuthedAppsList> {
-        let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
+    pub async fn authed_apps(&self) -> Result<AuthedAppsList> {
+        let client = &get_safe_authenticator(&self.safe_authenticator)?.client;
 
         debug!("Attempting to fetch list of authorised apps...");
-        let authed_apps = auth_run_helper(safe_authenticator, move |client| {
-            let c2 = client.clone();
-            let c3 = client.clone();
-            config::list_apps(client)
-                .map(move |(_, auth_cfg)| (c2.access_container(), auth_cfg))
-                .and_then(move |(access_container, auth_cfg)| {
-                    c3.list_seq_mdata_entries(access_container.name(), access_container.type_tag())
-                        .map_err(From::from)
-                        .map(move |entries| (access_container, entries, auth_cfg))
-                })
-                .and_then(move |(access_container, entries, auth_cfg)| {
-                    let nonce = access_container.nonce().ok_or_else(|| {
-                        AuthError::from("No nonce on access container's MDataInfo")
-                    })?;
 
-                    let mut authed_apps_list = AuthedAppsList::new();
-                    for app in auth_cfg.values() {
-                        let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
-
-                        // Empty entry means it has been deleted.
-                        let entry = match entries.get(&key) {
-                            Some(entry) if !entry.data.is_empty() => Some(entry),
-                            _ => None,
-                        };
-
-                        if let Some(entry) = entry {
-                            let plaintext = symmetric_decrypt(&entry.data, &app.keys.enc_key)?;
-                            let app_access = deserialize::<AccessContainerEntry>(&plaintext)?;
-
-                            let mut containers = HashMap::new();
-                            for (container_name, (_mdata_info, permission_set)) in app_access {
-                                let _ = containers.insert(container_name, permission_set);
-                            }
-
-                            authed_apps_list.push(AuthedApp {
-                                id: app.info.id.clone(),
-                                name: app.info.name.clone(),
-                                vendor: app.info.vendor.clone(),
-                                app_permissions: AppPermissions {
-                                    //TODO: retrieve the app permissions
-                                    transfer_coins: true,
-                                    perform_mutations: true,
-                                    get_balance: true,
-                                },
-                                containers,
-                                own_container: false, //TODO: retrieve the own container flag
-                            });
-                        }
-                    }
-
-                    debug!(
-                        "Returning list of authorised applications: {:?}",
-                        authed_apps_list
-                    );
-                    Ok(authed_apps_list)
-                })
-                .map_err(AuthError::from)
-        })
-        .map_err(|err| {
+        let (_, auth_cfg) = config::list_apps(client).await.map_err(|err| {
             Error::AuthenticatorError(format!(
                 "Failed to obtain list of authorised applications: {}",
                 err
             ))
         })?;
+        let access_container = client.access_container().await;
+        let entries = client
+            .list_seq_mdata_entries(access_container.name(), access_container.type_tag())
+            .await
+            .map_err(|err| {
+                Error::AuthenticatorError(format!("Failed to read access container: {}", err))
+            })?;
+
+        let nonce = access_container.nonce().ok_or_else(|| {
+            Error::AuthenticatorError("No nonce on access container's MDataInfo".to_string())
+        })?;
+
+        let mut authed_apps = AuthedAppsList::new();
+        for app in auth_cfg.values() {
+            let key = access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce).map_err(
+                |err| {
+                    Error::AuthenticatorError(format!(
+                        "Failed to generate an acceess container encryption key: {}",
+                        err
+                    ))
+                },
+            )?;
+
+            // Empty entry means it has been deleted.
+            match entries.get(&key) {
+                Some(entry) if !entry.data.is_empty() => {
+                    let plaintext =
+                        symmetric_decrypt(&entry.data, &app.keys.enc_key).map_err(|err| {
+                            Error::AuthenticatorError(format!(
+                                "Failed to obtain list of authorised applications: {}",
+                                err
+                            ))
+                        })?;
+                    let app_access =
+                        deserialize::<AccessContainerEntry>(&plaintext).map_err(|err| {
+                            Error::AuthenticatorError(format!(
+                                "Failed to deserialise access container entry: {}",
+                                err
+                            ))
+                        })?;
+
+                    let mut containers = HashMap::new();
+                    for (container_name, (_mdata_info, permission_set)) in app_access {
+                        let _ = containers.insert(container_name, permission_set);
+                    }
+
+                    authed_apps.push(AuthedApp {
+                        id: app.info.id.clone(),
+                        name: app.info.name.clone(),
+                        vendor: app.info.vendor.clone(),
+                        app_permissions: AppPermissions {
+                            //TODO: retrieve the app permissions
+                            transfer_coins: true,
+                            perform_mutations: true,
+                            get_balance: true,
+                        },
+                        containers,
+                        own_container: false, //TODO: retrieve the own container flag
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        debug!(
+            "Returning list of authorised applications: {:?}",
+            authed_apps
+        );
 
         Ok(authed_apps)
     }
@@ -464,23 +490,25 @@ impl SafeAuthenticator {
     /// use safe_api::SafeAuthenticator;
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account which has been used
-    /// /// to authorise some application already:
+    /// /// Using an already existing account which has been
+    /// /// already used to authorise some application:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
-    /// safe_auth.log_in(my_secret, my_password).unwrap();
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
+    /// safe_auth.log_in(my_secret, my_password).await.unwrap();
     /// # let auth_req = "bAAAAAAEXVK4SGAAAAAABAAAAAAAAAAAANZSXILTNMFUWI43BMZSS4Y3MNEAAQAAAAAAAAAAAKNAUMRJAINGESEAAAAAAAAAAABGWC2LEKNQWMZJONZSXIICMORSAAAIBAAAAAAAAAAAAOAAAAAAAAAAAL5YHKYTMNFRQCAAAAAAAAAAAAAAAAAAB";
-    /// # safe_auth.authorise_app(auth_req/*, &|_| true*/).unwrap();
+    /// # safe_auth.authorise_app(auth_req/*, &|_| true*/).await.unwrap();
     /// /// Revoke all permissions from app with ID `net.maidsafe.cli`
-    /// let revoked = safe_auth.revoke_app("net.maidsafe.cli");
+    /// let revoked = safe_auth.revoke_app("net.maidsafe.cli").await;
     /// match revoked {
     ///    Ok(_) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
     /// }
+    /// # });
     /// ```
     ///
     /// ## Error Example
@@ -488,17 +516,18 @@ impl SafeAuthenticator {
     /// use safe_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account which has been used
-    /// /// to authorise some application already:
+    /// /// Using an already existing account which has been
+    /// /// already used to authorise some application:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
-    /// # safe_auth.create_acc(sk, my_secret, my_password).unwrap();
-    /// safe_auth.log_in(my_secret, my_password).unwrap();
+    /// # async_std::task::block_on(async {
+    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
+    /// safe_auth.log_in(my_secret, my_password).await.unwrap();
     /// /// Try to revoke permissions with an incorrect app ID
-    /// let revoked = safe_auth.revoke_app("invalid-app-id");
+    /// let revoked = safe_auth.revoke_app("invalid-app-id").await;
     /// match revoked {
     ///    Ok(_) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
@@ -506,17 +535,17 @@ impl SafeAuthenticator {
     ///    }
     ///    Err(_) => assert!(false), // This should not pass
     /// }
+    /// # });
     ///```
-    pub fn revoke_app(&self, app_id: &str) -> Result<()> {
-        let safe_authenticator = get_safe_authenticator(&self.safe_authenticator)?;
+    pub async fn revoke_app(&self, app_id: &str) -> Result<()> {
+        let client = &get_safe_authenticator(&self.safe_authenticator)?.client;
         let id = app_id.to_string();
-        auth_run_helper(safe_authenticator, |client| {
-            safe_authenticator_revoke_app(client, &id).and_then(move |_| {
-                debug!("Application sucessfully revoked: {}", id);
-                Ok(())
-            })
-        })
-        .map_err(|err| Error::AuthError(format!("Failed to revoke permissions: {}", err)))
+        safe_authenticator_revoke_app(client, &id)
+            .await
+            .map_err(|err| Error::AuthError(format!("Failed to revoke permissions: {}", err)))?;
+
+        debug!("Application sucessfully revoked: {}", id);
+        Ok(())
     }
 }
 
@@ -528,12 +557,13 @@ fn get_safe_authenticator(safe_authenticator: &Option<Authenticator>) -> Result<
 }
 
 // Helper function to generate an app authorisation response
-fn gen_auth_response(
+async fn gen_auth_response(
     authenticator: &Authenticator,
     req_id: SafeAuthReqId,
     auth_req: AuthReq,
 ) -> Result<String> {
-    let auth_granted = auth_run_helper(authenticator, move |client| authenticate(client, auth_req))
+    let auth_granted = authenticate(&authenticator.client, auth_req)
+        .await
         .map_err(|err| {
             Error::AuthenticatorError(format!(
                 "Failed to authorise application on the network: {}",
@@ -554,66 +584,64 @@ fn gen_auth_response(
 }
 
 // Helper function to generate a containers authorisation response
-fn gen_cont_auth_response(
+async fn gen_cont_auth_response(
     authenticator: &Authenticator,
     req_id: SafeAuthReqId,
     cont_req: ContainersReq,
 ) -> Result<String> {
     let permissions = cont_req.containers.clone();
     let app_id = cont_req.app.id;
+    let client = &authenticator.client;
 
-    auth_run_helper(authenticator, move |client| {
-        let c2 = client.clone();
-        let c3 = client.clone();
-        let c4 = client.clone();
+    let app = config::get_app(client, &app_id)
+        .await
+        .map_err(|err| Error::AuthError(format!("Failed to generate response: {}", err)))?;
 
-        config::get_app(client, &app_id)
-            .and_then(move |app| {
-                let sign_pk = app.keys.public_key();
-                update_container_perms(&c2, permissions, sign_pk).map(move |perms| (app, perms))
-            })
-            .and_then(move |(app, mut perms)| {
-                let app_keys = app.keys;
-                access_container::fetch_entry(&c3, &app_id, app_keys.clone()).then(move |res| {
-                    let version = match res {
-                        // Updating an existing entry
-                        Ok((version, Some(mut existing_perms))) => {
-                            for (key, val) in perms {
-                                let _ = existing_perms.insert(key, val);
-                            }
-                            perms = existing_perms;
-                            version + 1
-                        }
+    let sign_pk = app.keys.public_key();
+    let mut perms = update_container_perms(&client, permissions, sign_pk)
+        .await
+        .map_err(|err| Error::AuthError(format!("Failed to update permissions: {}", err)))?;
 
-                        // Adding a new access container entry
-                        Ok((_, None))
-                        | Err(AuthError::CoreError(CoreError::DataError(
-                            safe_nd::Error::NoSuchEntry,
-                        ))) => 0,
+    let app_keys = app.keys;
+    let version =
+        match access_container::fetch_entry(client.clone(), app_id.clone(), app_keys.clone()).await
+        {
+            // Updating an existing entry
+            Ok((version, Some(mut existing_perms))) => {
+                for (key, val) in perms {
+                    let _ = existing_perms.insert(key, val);
+                }
+                perms = existing_perms;
+                version + 1
+            }
 
-                        // Error has occurred while trying to get an
-                        // existing entry
-                        Err(e) => return Err(e),
-                    };
-                    Ok((version, app_id, app_keys, perms))
-                })
-            })
-            .and_then(move |(version, app_id, app_keys, perms)| {
-                access_container::put_entry(&c4, &app_id, &app_keys, &perms, version)
-            })
-            .and_then(move |_| {
-                debug!("Encoding response...");
-                let resp = encode_msg(&IpcMsg::Resp {
-                    req_id,
-                    response: IpcResp::Containers(Ok(())),
-                })?;
+            // Adding a new access container entry
+            Ok((_, None))
+            | Err(AuthError::CoreError(CoreError::DataError(safe_nd::Error::NoSuchEntry))) => 0,
 
-                debug!("Returning containers auth response generated: {:?}", resp);
-                Ok(resp)
-            })
-            .map_err(AuthError::from)
+            // Error has occurred while trying to get an
+            // existing entry
+            Err(e) => return Err(Error::AuthError(format!("{}", e))),
+        };
+
+    access_container::put_entry(&client, &app_id, &app_keys, &perms, version)
+        .await
+        .map_err(|err| {
+            Error::AuthError(format!(
+                "Failed to write permissions in access container: {}",
+                err
+            ))
+        })?;
+
+    debug!("Encoding response...");
+    let resp = encode_msg(&IpcMsg::Resp {
+        req_id,
+        response: IpcResp::Containers(Ok(())),
     })
-    .map_err(|err| Error::AuthError(format!("Failed to generate response: {}", err)))
+    .map_err(|err| Error::AuthError(format!("Failed to encode response: {:?}", err)))?;
+
+    debug!("Returning containers auth response generated: {:?}", resp);
+    Ok(resp)
 }
 
 // Helper function to generate an unregistered authorisation response
@@ -637,50 +665,46 @@ fn gen_unreg_auth_response(req_id: SafeAuthReqId) -> Result<String> {
 }
 
 // Helper function to generate an authorisation response for sharing MD
-fn gen_shared_md_auth_response(
+async fn gen_shared_md_auth_response(
     authenticator: &Authenticator,
     req_id: SafeAuthReqId,
     share_mdata_req: ShareMDataReq,
 ) -> Result<String> {
-    auth_run_helper(authenticator, move |client| {
-        let client_cloned0 = client.clone();
-        let client_cloned1 = client.clone();
-        config::get_app(client, &share_mdata_req.app.id).and_then(move |app_info| {
-            let user = app_info.keys.public_key();
-            let num_mdata = share_mdata_req.mdata.len();
-            stream::iter_ok(share_mdata_req.mdata.into_iter())
-                .map(move |mdata| {
-                    client_cloned0
-                        .get_seq_mdata_shell(mdata.name, mdata.type_tag)
-                        .map(|md| (md.version(), mdata))
-                })
-                .buffer_unordered(num_mdata)
-                .map(move |(version, mdata)| {
-                    let address = MDataAddress::Seq {
-                        name: mdata.name,
-                        tag: mdata.type_tag,
-                    };
-                    client_cloned1.set_mdata_user_permissions(
-                        address,
-                        user,
-                        mdata.perms,
-                        version + 1,
-                    )
-                })
-                .buffer_unordered(num_mdata)
-                .map_err(AuthError::from)
-                .for_each(|()| Ok(()))
-                .and_then(move |()| {
-                    debug!("Encoding response...");
-                    let resp = encode_msg(&IpcMsg::Resp {
-                        req_id,
-                        response: IpcResp::ShareMData(Ok(())),
-                    })?;
+    let client = &authenticator.client;
 
-                    debug!("Returning shared MD auth response generated: {:?}", resp);
-                    Ok(resp)
-                })
-        })
+    let app_info = config::get_app(client, &share_mdata_req.app.id)
+        .await
+        .map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to find application by its id: {}", err))
+        })?;
+
+    let user = app_info.keys.public_key();
+    for mdata in share_mdata_req.mdata.iter() {
+        let md = client
+            .get_seq_mdata_shell(mdata.name, mdata.type_tag)
+            .await
+            .map_err(|err| {
+                Error::AuthenticatorError(format!("Failed to obtain MData shell: {}", err))
+            })?;
+
+        let version = md.version();
+        let address = MDataAddress::Seq {
+            name: mdata.name,
+            tag: mdata.type_tag,
+        };
+        client
+            .set_mdata_user_permissions(address, user, mdata.perms.clone(), version + 1)
+            .await
+            .map_err(|err| Error::AuthError(format!("Failed set user permissions: {}", err)))?;
+    }
+
+    debug!("Encoding response...");
+    let resp = encode_msg(&IpcMsg::Resp {
+        req_id,
+        response: IpcResp::ShareMData(Ok(())),
     })
-    .map_err(|err| Error::AuthError(format!("Failed to generate response: {}", err)))
+    .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
+
+    debug!("Returning shared MD auth response generated: {:?}", resp);
+    Ok(resp)
 }
