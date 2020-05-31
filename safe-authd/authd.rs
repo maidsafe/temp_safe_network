@@ -133,6 +133,8 @@ async fn handle_request(
     auth_reqs_handle: SharedAuthReqsHandle,
     notif_endpoints_handle: SharedNotifEndpointsHandle,
 ) -> Result<()> {
+    let req_id = jsonrpc_req.id;
+
     // Execute the request
     let resp = process_jsonrpc_request(
         jsonrpc_req,
@@ -152,6 +154,6 @@ async fn handle_request(
         .await
         .map_err(|e| Error::GeneralError(format!("Failed to shutdown stream: {}", e)))?;
 
-    info!("Response sent, request complete");
+    info!("Response sent, request {} complete", req_id);
     Ok(())
 }

@@ -20,7 +20,7 @@ use safe_nd::AppPermissions;
 use serde_json::json;
 use std::collections::HashMap;
 
-// Path of authenticator endpoint for authorising applications
+// Method for requesting application's authorisation
 const SAFE_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 
 impl Safe {

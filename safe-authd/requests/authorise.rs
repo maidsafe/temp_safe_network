@@ -62,7 +62,7 @@ async fn handle_authorisation(
                 match request {
                     SafeAuthReq::Auth(app_auth_req) => {
                         info!(
-                            "The following application authorisation request ({}) was received:",
+                            "The following application authorisation request '{}' was received:",
                             req_id
                         );
                         info!("{:?}", app_auth_req);
@@ -71,7 +71,7 @@ async fn handle_authorisation(
 
                         // Reject if there are too many pending auth reqs
                         if auth_reqs_list.len() >= MAX_NUMBER_QUEUED_AUTH_REQS {
-                            Err(format!("Authorisation request ({}) is rejected by authd since it reached its maximum number ({}) of pending auth requests", req_id, MAX_NUMBER_QUEUED_AUTH_REQS))
+                            Err(format!("Authorisation request '{}' is rejected by authd since it reached its maximum number ({}) of pending auth requests", req_id, MAX_NUMBER_QUEUED_AUTH_REQS))
                         } else {
                             // We need a channel to communicate with the thread which will be
                             // sending the notification to a subcribed endpoint. Once it got a response
@@ -124,7 +124,7 @@ async fn handle_authorisation(
                         // We simply allow unregistered authorisation requests
                         match safe_authenticator.authorise_app(&auth_req_str).await {
                             Ok(resp) => {
-                                info!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
+                                info!("Authorisation request '{}' was allowed and response sent back to the application", req_id);
                                 Ok(AuthorisationResponse::Ready(json!(resp)))
                             }
                             Err(err) => {
@@ -156,28 +156,27 @@ async fn await_authorisation_decision(
     auth_req_str: String,
 ) -> Result<Value, String> {
     match rx.recv().await {
-        Some(is_allowed) => {
-            if is_allowed {
-                info!(
-                    "Let's request the authenticator lib to authorise the request '{}'...",
-                    req_id
-                );
-                let safe_authenticator = safe_auth_handle.lock().await;
-                match safe_authenticator.authorise_app(&auth_req_str).await {
-                    Ok(resp) => {
-                        info!("Authorisation request ({}) was allowed and response sent back to the application", req_id);
-                        Ok(serde_json::value::Value::String(resp))
-                    }
-                    Err(err) => {
-                        error!("Failed to authorise application: {}", err);
-                        Err(err.to_string())
-                    }
+        Some(true) => {
+            info!(
+                "Let's request the authenticator lib to authorise the auth request with id '{}'...",
+                req_id
+            );
+            let safe_authenticator = safe_auth_handle.lock().await;
+            match safe_authenticator.authorise_app(&auth_req_str).await {
+                Ok(resp) => {
+                    info!("Authorisation request '{}' was allowed and response sent back to the application", req_id);
+                    Ok(serde_json::value::Value::String(resp))
                 }
-            } else {
-                let msg = format!("Authorisation request ({}) was denied", req_id);
-                info!("{}", msg);
-                Err(msg)
+                Err(err) => {
+                    error!("Failed to authorise application: {}", err);
+                    Err(err.to_string())
+                }
             }
+        }
+        Some(false) => {
+            let msg = format!("Authorisation request '{}' was denied", req_id);
+            info!("{}", msg);
+            Err(msg)
         }
         None => {
             // We didn't get a response in a timely manner, we cannot allow the list

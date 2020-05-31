@@ -26,7 +26,7 @@ pub async fn process_req(
             Some(mut auth_req) => match auth_req.tx.try_send(false) {
                 Ok(_) => {
                     let msg = format!(
-                        "Authorisation request ({}) denied successfully",
+                        "Authorisation request '{}' denied successfully",
                         auth_req_id
                     );
                     info!("{}", msg);

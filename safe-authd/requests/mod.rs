@@ -27,7 +27,45 @@ use crate::{
 use jsonrpc_quic::{JsonRpcRequest, JsonRpcResponse};
 use log::{error, info};
 
+// Error code in JSON-RPC response when failed to process a request
+// TODO: have different error codes for each error case
 const JSONRPC_AUTH_ERROR: isize = -1;
+
+// Method for requesting application's authorisation
+const METHOD_AUTHORISE: &str = "authorise";
+
+// Method for getting a status report of the safe-authd
+const METHOD_STATUS: &str = "status";
+
+// Method for login into a SAFE account
+const METHOD_LOGIN: &str = "login";
+
+// Method for loging out from a SAFE account
+const METHOD_LOGOUT: &str = "logout";
+
+// Method for creating a new SAFE account
+const METHOD_CREATE: &str = "create-acc";
+
+// Method for fetching list of authorised apps
+const METHOD_AUTHED_APPS: &str = "authed-apps";
+
+// Method for revoking applications and/or permissions
+const METHOD_REVOKE: &str = "revoke";
+
+// Method for retrieving the list of pending authorisation requests
+const METHOD_AUTH_REQS: &str = "auth-reqs";
+
+// Method for allowing an authorisation request
+const METHOD_ALLOW: &str = "allow";
+
+// Method for denying an authorisation request
+const METHOD_DENY: &str = "deny";
+
+// Method for subscribing to authorisation requests notifications
+const METHOD_SUBSCRIBE: &str = "subscribe";
+
+// Method for unsubscribing from authorisation requests notifications
+const METHOD_UNSUBSCRIBE: &str = "unsubscribe";
 
 // Process the JSON-RPC request based on the method
 pub async fn process_jsonrpc_request(
@@ -43,7 +81,7 @@ pub async fn process_jsonrpc_request(
 
     let params = jsonrpc_req.params;
     let outcome = match jsonrpc_req.method.as_str() {
-        "status" => {
+        METHOD_STATUS => {
             status::process_req(
                 params,
                 safe_auth_handle,
@@ -52,22 +90,22 @@ pub async fn process_jsonrpc_request(
             )
             .await
         }
-        "login" => log_in::process_req(params, safe_auth_handle).await,
-        "logout" => log_out::process_req(params, safe_auth_handle, auth_reqs_handle).await,
-        "create-acc" => create_acc::process_req(params, safe_auth_handle).await,
-        "authed-apps" => authed_apps::process_req(params, safe_auth_handle).await,
-        "revoke" => revoke::process_req(params, safe_auth_handle).await,
-        "auth-reqs" => auth_reqs::process_req(params, auth_reqs_handle).await,
-        "allow" => allow::process_req(params, auth_reqs_handle).await,
-        "deny" => deny::process_req(params, auth_reqs_handle).await,
-        "subscribe" => subscribe::process_req(params, notif_endpoints_handle).await,
-        "unsubscribe" => unsubscribe::process_req(params, notif_endpoints_handle).await,
-        "authorise" => {
+        METHOD_LOGIN => log_in::process_req(params, safe_auth_handle).await,
+        METHOD_LOGOUT => log_out::process_req(params, safe_auth_handle, auth_reqs_handle).await,
+        METHOD_CREATE => create_acc::process_req(params, safe_auth_handle).await,
+        METHOD_AUTHED_APPS => authed_apps::process_req(params, safe_auth_handle).await,
+        METHOD_REVOKE => revoke::process_req(params, safe_auth_handle).await,
+        METHOD_AUTH_REQS => auth_reqs::process_req(params, auth_reqs_handle).await,
+        METHOD_ALLOW => allow::process_req(params, auth_reqs_handle).await,
+        METHOD_DENY => deny::process_req(params, auth_reqs_handle).await,
+        METHOD_SUBSCRIBE => subscribe::process_req(params, notif_endpoints_handle).await,
+        METHOD_UNSUBSCRIBE => unsubscribe::process_req(params, notif_endpoints_handle).await,
+        METHOD_AUTHORISE => {
             authorise::process_req(params, safe_auth_handle.clone(), auth_reqs_handle.clone()).await
         }
         other => {
             let msg = format!(
-                "Action '{}' not supported or unknown by the Authenticator daemon",
+                "Method '{}' not supported or unknown by the Authenticator daemon",
                 other
             );
             error!("{}", msg);
@@ -80,8 +118,8 @@ pub async fn process_jsonrpc_request(
         Ok(result) => Ok(JsonRpcResponse::result(result, jsonrpc_req.id)),
         Err(err_msg) => {
             error!(
-                "Failed processing incoming request {}: {}",
-                jsonrpc_req.id, err_msg
+                "Error when processing incoming '{}' request with id {}: {}",
+                jsonrpc_req.method, jsonrpc_req.id, err_msg
             );
             Ok(JsonRpcResponse::error(
                 err_msg,

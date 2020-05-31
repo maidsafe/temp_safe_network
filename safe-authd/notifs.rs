@@ -102,8 +102,8 @@ pub async fn monitor_pending_auth_reqs(
             }
 
             info!(
-                "Decision obtained for auth req id {} sent by app id '{}': {:?}",
-                incoming_auth_req.auth_req.req_id, incoming_auth_req.auth_req.app_id, response
+                "Decision obtained for auth req sent by app id '{}' with id '{}': {:?}",
+                incoming_auth_req.auth_req.app_id, incoming_auth_req.auth_req.req_id, response
             );
 
             if current_req_notified {

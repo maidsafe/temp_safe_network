@@ -9,6 +9,7 @@
 
 use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use jsonrpc_quic::ClientEndpoint;
+use log::info;
 use serde::de::DeserializeOwned;
 use threshold_crypto::SecretKey;
 use tokio::runtime;
@@ -76,6 +77,11 @@ pub async fn send_authd_request<T>(
 where
     T: DeserializeOwned,
 {
+    info!(
+        "Sending '{}' request to SAFE Authenticator on {} ...",
+        method, dest_endpoint
+    );
+
     match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
         None => Err(Error::AuthdClientError(
             "Failed to obtain local project directory where to read certificate from".to_string(),

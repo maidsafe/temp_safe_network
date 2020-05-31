@@ -142,7 +142,7 @@ impl IncomingJsonRpcRequest {
             Some(stream) => {
                 let (send, recv): (quinn::SendStream, quinn::RecvStream) = match stream {
                     Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
-                        info!("Connection terminated");
+                        debug!("Connection terminated");
                         return None;
                     }
                     Err(err) => {
@@ -157,7 +157,7 @@ impl IncomingJsonRpcRequest {
                     .await
                 {
                     Ok(req_bytes) => {
-                        info!("Got new request's bytes");
+                        debug!("Got new request's bytes");
                         match parse_jsonrpc_request(req_bytes) {
                             Ok(jsonrpc_req) => {
                                 debug!("Request parsed successfully");
