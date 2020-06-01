@@ -211,7 +211,7 @@ pub fn core_error_code(err: &CoreError) -> i32 {
             SndError::NoSuchBalance => ERR_NO_SUCH_BALANCE,
             SndError::BalanceExists => ERR_BALANCE_EXISTS,
             SndError::FailedToParse(_) => ERR_FAILED_TO_PARSE,
-            SndError::TransactionIdExists => ERR_TRANSACTION_ID_EXISTS,
+            SndError::TransferIdExists => ERR_TRANSACTION_ID_EXISTS,
             SndError::InsufficientBalance => ERR_INSUFFICIENT_BALANCE,
             SndError::ExceededSize => ERR_EXCEEDED_SIZE,
         },
@@ -254,7 +254,7 @@ pub fn safe_nd_error_core(err: &SndError) -> i32 {
         SndError::NoSuchBalance => ERR_NO_SUCH_BALANCE,
         SndError::BalanceExists => ERR_BALANCE_EXISTS,
         SndError::FailedToParse(_) => ERR_FAILED_TO_PARSE,
-        SndError::TransactionIdExists => ERR_TRANSACTION_ID_EXISTS,
+        SndError::TransferIdExists => ERR_TRANSACTION_ID_EXISTS,
         SndError::InsufficientBalance => ERR_INSUFFICIENT_BALANCE,
         SndError::ExceededSize => ERR_EXCEEDED_SIZE,
     }

@@ -24,7 +24,7 @@ use log::trace;
 use rand::rngs::StdRng;
 use rand::{thread_rng, SeedableRng};
 use safe_nd::{
-    ClientFullId, Coins, CoinsRequest, LoginPacket, LoginPacketRequest, PublicKey, Request,
+    ClientFullId, LoginPacket, LoginPacketRequest, Money, MoneyRequest, PublicKey, Request,
     Response,
 };
 use std::str::FromStr;
@@ -107,16 +107,16 @@ impl CoreClient {
             // Create the balance for the client
             let response = req(
                 &mut connection_manager,
-                Request::Coins(CoinsRequest::CreateBalance {
+                Request::Money(MoneyRequest::CreateBalance {
                     new_balance_owner,
-                    amount: unwrap!(Coins::from_str("10")),
-                    transaction_id: rand::random(),
+                    amount: unwrap!(Money::from_str("10")),
+                    transfer_id: rand::random(),
                 }),
                 &balance_client_id,
             )
             .await?;
             let _ = match response {
-                Response::Transaction(res) => res?,
+                Response::TransferRegistration(res) => res?,
                 _ => return Err(CoreError::from("Unexpected response")),
             };
 
