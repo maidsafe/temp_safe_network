@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.13.0 (2020-06-01)
+
+### Features
+
+* ***api*** Adapt codebase to use the newly exposed safe_client_libs async API ([508429b2](https://github.com/maidsafe/safe-api/commit/508429b24a79ec61c40dc7ce95a1334953e776db))
+
+* ***cli*** files put/sync commands now include files that begin with '.' (a.k.a. hidden on Unix). Also, we now omit sub-dirs if recursive flag is not present ([e417cb91](https://github.com/maidsafe/safe-api/commit/e417cb9173149afbc1a41391f9c392e7a23f2118))
+
+* ***cli*** Support empty directories and lays groundwork for symlinks and hidden files. ([284db242](https://github.com/maidsafe/safe-api/commit/284db2427560f83f7c96e5bf4172993802687db1))
+
+* ***ffi*** Refactor files API to return FilesMap object. ([d5de80c4](https://github.com/maidsafe/safe-api/commit/d5de80c4cc77a2b4d97f702633273b979f566a07))
+
+* ***api*** Remove parse_and_resolve_url from the public safe-api API. ([89312c07](https://github.com/maidsafe/safe-api/commit/89312c07be4481be1ec07ab67cf4f354b90e24ce))
+
+* ***api*** Return the complete resolution chain from the inspect API. ([84f57da6](https://github.com/maidsafe/safe-api/commit/84f57da6d9c9384901195824bf69533a024a96af))
+
+* ***cli*** Show complete URL resolution chain from dog command. ([3f98b4be](https://github.com/maidsafe/safe-api/commit/3f98b4be0bd40e8e045efccf2308dc082ea1e87e))
+
+* ***api*** Significant reworking of XorUrlEncoder and its API. ([85941f1b](https://github.com/maidsafe/safe-api/commit/85941f1b7080008eb1ffe6d7d408588a1baac33d))
+
+* ***api*** Rename SafeUrl properties to match changes in rfc-0052 PR: https://github.com/maidsafe/rfcs/pull/356. ([326cfccd](https://github.com/maidsafe/safe-api/commit/326cfccd433441d602070d04e4e5a3843803131e))
+
+* ***api*** Use full_name(), public_name(), sub_names() in SafeUrl instead of name(), top_name(), sub_names().  also improvements and additional tests. ([606be860](https://github.com/maidsafe/safe-api/commit/606be8606f7e86724ede1040d0882ac668946213))
+
+* ***ffi*** Expose vec<string> as string[] in FFI. ([f531ea38](https://github.com/maidsafe/safe-api/commit/f531ea380d4ab5eb6d4e093120b417f9a2997e86))
+
+* ***api*** Parse query params in any type of URL and keep them as part of XorUrlEncoder info. ([3efdacc6](https://github.com/maidsafe/safe-api/commit/3efdacc684a4574b3e99adf59025688c254fa5ba))
+
+* ***test*** First version of cmd-test-utils crate. ([81284c43](https://github.com/maidsafe/safe-api/commit/81284c4381d4fcf27531ee28a1dce3cd91e4bd7b))
+
+### Bug Fixes
+
+* ***cli*** Addresses issue #510, 'files ls' now uses NRS paths ([eae5c9ee](https://github.com/maidsafe/safe-api/commit/eae5c9eef9ee867ccb4bb63c8dda19b96d89dde8))
+
+* ***nrs*** Subnames were not properly resolved if they contained nested subnames ([d8654602](https://github.com/maidsafe/safe-api/commit/d8654602d632f89f57e5b0b8f1f21ee857bbdc96))
+
+* ***cli*** files get was not resolving URLs with more than one resolution step and paths. ([66018ac0](https://github.com/maidsafe/safe-api/commit/66018ac01716be18c99f8ca781ba0e4ea59f595e))
+
+* ***ffi*** Return `null` when value is `None`. ([b5d54cba](https://github.com/maidsafe/safe-api/commit/b5d54cbaefcca3515d02fb2f89545cffc9a1df4e))
+
+* ***ffi*** Remove ffi panic when media_type has no value. ([69d7ce57](https://github.com/maidsafe/safe-api/commit/69d7ce57bcd1bfa34b8de67ac32fda6be33c4f14))
+
+* ***cli*** Remove trailing / from filename when syncing or adding files to container. ([9098b075](https://github.com/maidsafe/safe-api/commit/9098b075e28d751abd148540550069a275bc1229))
+
+
 ### 0.12.0 (2020-04-14)
 
 ### Features
