@@ -46,6 +46,17 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+      # Run cargo tarpaulin & push result to coveralls.io
+      - name: Code Coverage - safe-api
+        uses: actions-rs/tarpaulin@master
+        with:
+          args: '-v --manifest-path=safe-api/Cargo.toml --features=scl-mock --exclude-files=safe-cli/*,jsonrpc-quic/*,safe-authd/*,safe-ffi/* --out Lcov -- --test-threads 1'
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./lcov.info
+
       # Run Clippy.
       - uses: actions-rs/cargo@v1
         with:
