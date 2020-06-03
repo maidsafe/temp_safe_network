@@ -37,11 +37,13 @@ jobs:
             output: safe-authd-x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1
@@ -60,11 +62,12 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       # Build
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
-      - uses: actions/upload-artifact@master
+      - name: Build
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml
+
+      # Upload
+      - name: Upload
+        uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.output }}
           path: target/release/${{ matrix.target }}
@@ -87,7 +90,8 @@ jobs:
             output: libsafe_ffi.dylib
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -111,34 +115,35 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       # Build prod FFI lib
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
+      - name: Build FFI lib - Prod
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml
+
       # Notarize FFI lib
       - name: Sign & Notarize
         shell: bash
         run: ./resources/notarize.sh ${{ matrix.output }}
         if: matrix.target == 'macOS-latest'
+
       # Upload prod FFI lib
-      - uses: actions/upload-artifact@master
+      - name: Upload prod FFI lib
+        uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.component }}-${{ matrix.target }}-prod
           path: target/release/${{ matrix.output }}
+
       # Build dev FFI lib
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args:  >
-            --release --manifest-path=${{ matrix.component }}/Cargo.toml
-            --features=mock-network
+      - name: Build FFI lib - Dev
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --features=mock-network
+
       # Notarize FFI lib
       - name: Sign & Notarize
         shell: bash
         run: ./resources/notarize.sh ${{ matrix.output }}
         if: matrix.target == 'macOS-latest'
+
       # Upload dev FFI lib
-      - uses: actions/upload-artifact@master
+      - name: Upload dev FFI lib
+        uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.component }}-${{ matrix.target }}-dev
           path: target/release/${{ matrix.output }}
@@ -167,11 +172,13 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY : true
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1
@@ -190,17 +197,22 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       # Build
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml
+      - name: Build
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml
+
+      # Sign & Notarize
       - name: Sign & Notarize
         shell: bash
         run: ./resources/notarize.sh ${{ matrix.target }}
+      
+      # List contents of release folder
       - name: what is in release...
         shell: bash
         run: ls target/release
-      - uses: actions/upload-artifact@master
+
+      # Upload
+      - name: Upload
+        uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.output }}
           path: target/release/${{ matrix.target }}
@@ -214,7 +226,8 @@ jobs:
         component: [safe-ffi]
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -273,27 +286,23 @@ jobs:
         run:  rustup target add ${{matrix.target}}
 
       # Build prod native lib.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
+      - name: Build native lib - Prod
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
 
       # Upload prod native lib.
-      - uses: actions/upload-artifact@master
+      - name: Upload prod native lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-prod
           path: target/${{ matrix.target }}/release/libsafe_ffi.so
 
       # Build dev native lib.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: >
-            --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
-            --features=mock-network
+      - name: Build native lib - Dev
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=mock-network
 
       # Upload dev native lib.
-      - uses: actions/upload-artifact@master
+      - name: Upload dev native lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-dev
           path: target/${{ matrix.target }}/release/libsafe_ffi.so
@@ -306,13 +315,16 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust aarch64-apple-ios target
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
           target: aarch64-apple-ios
-      - uses: actions-rs/toolchain@v1
+
+      - name: Install Rust x86_64-apple-ios target
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -337,25 +349,29 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
      # Install cargo-lipo to generate universal libs.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-lipo
+      - name: Install cargo-lipo
+        run: cargo install cargo-lipo
+
       # Build prod universal library.
       - name: Build universal lib - Prod
         shell: bash
         run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml
+
       # Upload prod universal library.
-      - uses: actions/upload-artifact@master
+      - name: Upload prod universal lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-apple-ios-prod
           path: target/universal/release/libsafe_ffi.a
+
       # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
         run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=mock-network
+
       # Upload dev universal library.
-      - uses: actions/upload-artifact@master
+      - name: Upload dev universal lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-apple-ios-dev
           path: target/universal/release/libsafe_ffi.a
@@ -377,79 +393,97 @@ jobs:
       # Checkout and get all the artifacts built in the previous jobs.
       - uses: actions/checkout@v1
       # cli
-      - uses: actions/download-artifact@master
+      - name: Download safe-x86_64-pc-windows-msvc release
+        uses: actions/download-artifact@master
         with:
           name: safe-x86_64-pc-windows-msvc
           path: artifacts/safe-cli/prod/x86_64-pc-windows-msvc/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-x86_64-unknown-linux-gnu release
+        uses: actions/download-artifact@master
         with:
           name: safe-x86_64-unknown-linux-gnu
           path: artifacts/safe-cli/prod/x86_64-unknown-linux-gnu/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-x86_64-apple-darwin release
+        uses: actions/download-artifact@master
         with:
           name: safe-x86_64-apple-darwin
           path: artifacts/safe-cli/prod/x86_64-apple-darwin/release
 
       # authd
-      - uses: actions/download-artifact@master
+      - name: Download safe-authd-x86_64-pc-windows-msvc release
+        uses: actions/download-artifact@master
         with:
           name: safe-authd-x86_64-pc-windows-msvc
           path: artifacts/safe-authd/prod/x86_64-pc-windows-msvc/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-authd-x86_64-unknown-linux-gnu release
+        uses: actions/download-artifact@master
         with:
           name: safe-authd-x86_64-unknown-linux-gnu
           path: artifacts/safe-authd/prod/x86_64-unknown-linux-gnu/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-authd-x86_64-apple-darwin release
+        uses: actions/download-artifact@master
         with:
           name: safe-authd-x86_64-apple-darwin
           path: artifacts/safe-authd/prod/x86_64-apple-darwin/release
 
       # ffi
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-pc-windows-msvc-prod release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-pc-windows-msvc-prod
           path: artifacts/safe-ffi/prod/x86_64-pc-windows-msvc/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-pc-windows-msvc-dev release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-pc-windows-msvc-dev
           path: artifacts/safe-ffi/dev/x86_64-pc-windows-msvc/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-unknown-linux-gnu-prod release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-unknown-linux-gnu-prod
           path: artifacts/safe-ffi/prod/x86_64-unknown-linux-gnu/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-unknown-linux-gnu-dev release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-unknown-linux-gnu-dev
           path: artifacts/safe-ffi/dev/x86_64-unknown-linux-gnu/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-apple-darwin-prod release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-apple-darwin-prod
           path: artifacts/safe-ffi/prod/x86_64-apple-darwin/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-apple-darwin-dev release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-apple-darwin-dev
           path: artifacts/safe-ffi/dev/x86_64-apple-darwin/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-armv7-linux-androideabi-prod release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-armv7-linux-androideabi-prod
           path: artifacts/safe-ffi/prod/armv7-linux-androideabi/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-armv7-linux-androideabi-dev release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-armv7-linux-androideabi-dev
           path: artifacts/safe-ffi/dev/armv7-linux-androideabi/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-linux-android-prod release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-linux-android-prod
           path: artifacts/safe-ffi/prod/x86_64-linux-android/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-x86_64-linux-android-dev release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-x86_64-linux-android-dev
           path: artifacts/safe-ffi/dev/x86_64-linux-android/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-apple-ios-prod release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-apple-ios-prod
           path: artifacts/safe-ffi/prod/apple-ios/release
-      - uses: actions/download-artifact@master
+      - name: Download safe-ffi-apple-ios-dev release
+        uses: actions/download-artifact@master
         with:
           name: safe-ffi-apple-ios-dev
           path: artifacts/safe-ffi/dev/apple-ios/release
@@ -585,7 +619,8 @@ jobs:
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=old_jsonrpc_version::$old_jsonrpc_version"
           echo "::set-output name=old_api_version::$old_api_version"
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable

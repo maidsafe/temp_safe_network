@@ -12,11 +12,12 @@ env:
 
 jobs:
   clippy:
-    name: Rustfmt-Clippy
+    name: Clippy, fmt & code coverage checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust and required components
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -24,10 +25,8 @@ jobs:
           components: rustfmt, clippy
 
       # Check if the code is formatted correctly.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
       # Cache.
       - name: Cache cargo registry
@@ -46,22 +45,22 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      # Run cargo tarpaulin & push result to coveralls.io
+      # Run Clippy.
+      - name: Clippy checks
+        run: cargo clippy --all-targets --all-features
+
+      # Run cargo tarpaulin
       - name: Code Coverage - safe-api
         uses: actions-rs/tarpaulin@master
         with:
-          args: '-v --manifest-path=safe-api/Cargo.toml --features=scl-mock --exclude-files=safe-cli/*,jsonrpc-quic/*,safe-authd/*,safe-ffi/* --out Lcov -- --test-threads 1'
+          args: '-v --manifest-path=safe-api/Cargo.toml --features=scl-mock --exclude-files=safe-cli/*,jsonrpc-quic/*,safe-authd/*,safe-ffi/* --out Lcov -- --test-threads=1'
+      
+      # Push tarpaulin results to coveralls.io
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./lcov.info
-
-      # Run Clippy.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets --all-features
 
   build-ffi-android:
     name: Build FFI Android
@@ -72,7 +71,8 @@ jobs:
         component: [safe-ffi]
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -131,27 +131,23 @@ jobs:
         run:  rustup target add ${{matrix.target}}
 
       # Build prod native lib.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
+      - name: Build native lib - Prod
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
 
       # Upload prod native lib.
-      - uses: actions/upload-artifact@master
+      - name: Upload prod native lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-prod
           path: target/${{ matrix.target }}/release/libsafe_ffi.so
 
       # Build dev native lib.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: >
-            --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
-            --features=mock-network
+      - name: Build native lib - Dev
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=mock-network
 
       # Upload dev native lib.
-      - uses: actions/upload-artifact@master
+      - name: Upload dev native lib 
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-dev
           path: target/${{ matrix.target }}/release/libsafe_ffi.so
@@ -164,13 +160,15 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust target aarch64-apple-ios
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
           target: aarch64-apple-ios
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust target x86_64-apple-ios
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -195,25 +193,29 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       # Install cargo-lipo to generate universal libs.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-lipo
+      - name: Install cargo-lipo
+        run: cargo install cargo-lipo
+
       # Build prod universal library.
       - name: Build universal lib - Prod
         shell: bash
         run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml
+
       # Upload prod universal library.
-      - uses: actions/upload-artifact@master
+      - name: Upload prod universal lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-apple-ios-prod
           path: target/universal/release/libsafe_ffi.a
+
       # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
         run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=mock-network
+
       # Upload dev universal library.
-      - uses: actions/upload-artifact@master
+      - name: Upload dev universal lib
+        uses: actions/upload-artifact@master
         with:
           name: safe-ffi-apple-ios-dev
           path: target/universal/release/libsafe_ffi.a
@@ -227,11 +229,13 @@ jobs:
         component: [api-tests, cli-mock-tests, e2e-authd-mock-tests, e2e-authd-vault-tests]
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+
       # Cache.
       - name: Cache cargo registry
         uses: actions/cache@v1

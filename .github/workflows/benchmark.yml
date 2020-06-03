@@ -16,20 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
-      - uses: actions/upload-artifact@master
+      - name: Build
+        run: cargo build --release
+      - name: Upload CLI
+        uses: actions/upload-artifact@master
         with:
           name: safe-cli
           path: target/release/safe
-      - uses: actions/upload-artifact@master
+      - name: Upload authd
+        uses: actions/upload-artifact@master
         with:
           name: safe-authd
           path: target/release/safe-authd
@@ -57,12 +58,14 @@ jobs:
           mkdir -p ~/.safe/authd
         
 
-      - uses: actions/download-artifact@master
+      - name: Download CLI
+        uses: actions/download-artifact@master
         with:
           name: safe-cli
           path: ./dl
     
-      - uses: actions/download-artifact@master
+      - name: Download authd
+        uses: actions/download-artifact@master
         with:
           name: safe-authd
           path: ./dl
