@@ -11,6 +11,7 @@ mod balances;
 mod data_requests;
 mod login_packets;
 mod messaging;
+mod replica_manager;
 mod transfers;
 
 use self::{
@@ -18,6 +19,7 @@ use self::{
     data_requests::Evaluation,
     login_packets::LoginPackets,
     messaging::Messaging,
+    replica_manager::ReplicaManager,
     transfers::Transfers,
 };
 use crate::{
@@ -34,13 +36,13 @@ use rand::{CryptoRng, Rng};
 use safe_nd::{
     MessageId, Money, NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
 };
-use safe_transfers::TransferReplica;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     rc::Rc,
 };
+use threshold_crypto::{PublicKeySet, SecretKeySet, SecretKeyShare};
 
 /// The cost to Put a chunk to the network.
 pub const COST_OF_PUT: Money = Money::from_nano(1);
@@ -71,12 +73,20 @@ impl ClientHandler {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
-        let replica = TransferReplica::new(PublicKey::Ed25519(*id.clone().ed25519_public_key()));
+
+        let mut rng = rand::thread_rng();
+        let replica_count = 7;
+        let threshold = (2 * replica_count / 3) - 1;
+        let bls_secret_key = SecretKeySet::random(threshold as usize, &mut rng);
+        let peer_replicas = bls_secret_key.public_keys();
+        let key_index = 0;
+        let key_share = bls_secret_key.secret_key_share(key_index);
+        let replica_manager = ReplicaManager::new(key_share, key_index, peer_replicas, vec![])?;
 
         let messaging = Messaging::new(id.clone(), routing_node);
 
         let auth = Auth::new(id.clone(), auth_keys_db);
-        let transfers = Transfers::new(id.clone(), replica);
+        let transfers = Transfers::new(id.clone(), replica_manager);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = Evaluation::new(id.clone());
 

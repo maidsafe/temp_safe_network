@@ -13,7 +13,7 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node;
 use safe_nd::{
-    HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId, ProofOfAgreement,
+    DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId,
     PublicId, Request, Response, Signature, TransferNotification, XorName,
 };
 use serde::Serialize;
@@ -168,7 +168,7 @@ impl Messaging {
         }
     }
 
-    pub fn notify_client(&mut self, client: &XorName, receipt: ProofOfAgreement) {
+    pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
         for client_id in self.lookup_client_and_its_apps(client) {
             self.send_notification_to_client(&client_id, &TransferNotification(receipt.clone()));
         }
@@ -234,7 +234,7 @@ impl Messaging {
             | GetMDataValue(..)
             | Mutation(..)
             | TransferValidation(..)
-            | TransferProofOfAgreement(..)
+            | TransferDebitAgreementProof(..)
             | TransferRegistration(..)
             | TransferPropagation(..) => {
                 self.respond_to_client(message_id, response);

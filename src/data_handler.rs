@@ -184,7 +184,7 @@ impl DataHandler {
             | GetPubADataUserPermissions(_)
             | GetUnpubADataUserPermissions(_)
             | TransferValidation(_)
-            | TransferProofOfAgreement(_)
+            | TransferDebitAgreementProof(_)
             | TransferRegistration(_)
             | TransferPropagation(_)
             | GetBalance(_)

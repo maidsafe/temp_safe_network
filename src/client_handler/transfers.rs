@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{auth::ClientInfo, messaging::Messaging};
+use super::{auth::ClientInfo, messaging::Messaging, replica_manager::ReplicaManager};
 use crate::{action::Action, rpc::Rpc};
 //use log::{error, trace};
 use safe_nd::{
-    Error as NdError, MessageId, Money, MoneyRequest, NodePublicId, PublicId, PublicKey,
-    RegisterTransfer, Request, Response, ValidateTransfer, XorName,
+    DebitAgreementProof, Error as NdError, MessageId, Money, MoneyRequest, NodePublicId, PublicId,
+    PublicKey, Request, Response, SignedTransfer, XorName,
 };
 use std::fmt::{self, Display, Formatter};
 
-use safe_transfers::{TransferReplica as Replica, TransferReplicaEvent as TransferEvent};
+use safe_transfers::TransferReplica as Replica;
 
 /*
 Transfers is the layer that manages
@@ -40,11 +40,11 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// interaction with an AT2 Replica.
 pub(super) struct Transfers {
     id: NodePublicId,
-    replica: Replica,
+    replica: ReplicaManager,
 }
 
 impl Transfers {
-    pub fn new(id: NodePublicId, replica: Replica) -> Self {
+    pub fn new(id: NodePublicId, replica: ReplicaManager) -> Self {
         Self { id, replica }
     }
 
@@ -73,61 +73,67 @@ impl Transfers {
         messaging: &mut Messaging,
     ) -> Option<Action> {
         match request {
-            MoneyRequest::ValidateTransfer { payload } => {
-                self.validate(payload, &requester, message_id)
+            MoneyRequest::ValidateTransfer { signed_transfer } => {
+                self.validate(signed_transfer, &requester, message_id)
             }
-            MoneyRequest::RegisterTransfer { payload } => {
-                self.register(payload, &requester, message_id, messaging)
+            MoneyRequest::RegisterTransfer { proof } => {
+                self.register(&proof, &requester, message_id, messaging)
             }
-            MoneyRequest::PropagateTransfer { payload } => {
-                self.propagate(payload, &requester, message_id, messaging)
+            MoneyRequest::PropagateTransfer { proof } => {
+                self.receive_propagated(&proof, &requester, message_id, messaging)
             }
             MoneyRequest::GetBalance(xorname) => {
-                let authorized = xorname == requester.public_key().into();
-                let result = if !authorized {
-                    Err(NdError::NoSuchBalance)
-                } else {
-                    self.replica
-                        .balance(&requester.public_key())
-                        .ok_or(NdError::NoSuchBalance)
-                };
-                let response = Response::GetBalance(result);
-                messaging.respond_to_client(message_id, response);
-                None
+                self.balance(xorname, requester, message_id, messaging)
             }
-            MoneyRequest::GetHistory {
-                at,
-                since_version,
-                incoming_only,
-            } => {
-                let authorized = at == requester.public_key().into();
-                let result = if !authorized {
-                    Err(NdError::NoSuchBalance)
-                } else {
-                    let outgoing = if incoming_only {
-                        vec![]
-                    } else {
-                        match self
-                            .replica
-                            .outgoing_since(&requester.public_key(), since_version)
-                        {
-                            None => vec![],
-                            Some(history) => history,
-                        }
-                    };
-                    match self
-                        .replica
-                        .incoming_since(&requester.public_key(), since_version)
-                    {
-                        None => Err(NdError::NoSuchBalance),
-                        Some(incoming) => Ok([&outgoing[..], &incoming[..]].concat()),
-                    }
-                };
-                let response = Response::GetHistory(result);
-                messaging.respond_to_client(message_id, response);
-                None
+            MoneyRequest::GetHistory { at, since_version } => {
+                self.history(at, since_version, requester, message_id, messaging)
             }
         }
+    }
+
+    fn balance(
+        &mut self,
+        xorname: XorName,
+        requester: PublicId,
+        message_id: MessageId,
+        messaging: &mut Messaging,
+    ) -> Option<Action> {
+        let authorized = xorname == requester.public_key().into();
+        let result = if !authorized {
+            Err(NdError::NoSuchBalance)
+        } else {
+            self.replica
+                .balance(&requester.public_key())
+                .ok_or(NdError::NoSuchBalance)
+        };
+        let response = Response::GetBalance(result);
+        messaging.respond_to_client(message_id, response);
+        None
+    }
+
+    fn history(
+        &mut self,
+        at: XorName,
+        since_version: usize,
+        requester: PublicId,
+        message_id: MessageId,
+        messaging: &mut Messaging,
+    ) -> Option<Action> {
+        let authorized = at == requester.public_key().into();
+        let result = if !authorized {
+            Err(NdError::NoSuchBalance)
+        } else {
+            match self
+                    .replica
+                    .history(&requester.public_key()) // since_version
+                {
+                    None => Ok(vec![]),
+                    Some(history) => Ok(history.clone()),
+                }
+        };
+        let response = Response::GetHistory(result);
+        messaging.respond_to_client(message_id, response);
+        None
     }
 
     /// This validation will render a signature over the
@@ -135,19 +141,11 @@ impl Transfers {
     /// proof by this individual Elder, that the transfer is valid.
     fn validate(
         &mut self,
-        payload: ValidateTransfer,
+        transfer: SignedTransfer,
         requester: &PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
-        // temporary test coin impl: when test_create_balance=true, don't require a from!
-        let test_create_balance = true;
-        let result = if test_create_balance {
-            // .. so for now, this will create money out of thin air!
-            self.replica.test_validate_transfer(payload)
-        } else {
-            self.replica.validate(payload)
-        };
-
+        let result = self.replica.validate(transfer);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
@@ -162,25 +160,22 @@ impl Transfers {
     /// with a proof of enough Elders having validated it.
     fn register(
         &mut self,
-        payload: RegisterTransfer,
+        proof: &DebitAgreementProof,
         requester: &PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
     ) -> Option<Action> {
-        let transfer = &payload.proof.transfer_cmd.transfer;
-        let result = self.replica.register(payload.proof.clone());
-
-        match result {
+        match self.replica.register(proof) {
             Ok(event) => {
-                self.replica
-                    .apply(TransferEvent::TransferRegistered(event.clone()));
-
+                let transfer = &proof.signed_transfer.transfer;
                 // sender is notified with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from(transfer.id.actor), payload.proof.clone());
+                messaging.notify_client(&XorName::from(transfer.id.actor), proof);
 
                 // the transfer is then propagated, and will reach the recipient section
                 Some(Action::ForwardClientRequest(Rpc::Request {
-                    request: Request::Money(MoneyRequest::PropagateTransfer { payload }),
+                    request: Request::Money(MoneyRequest::PropagateTransfer {
+                        proof: proof.clone(),
+                    }),
                     requester: requester.clone(),
                     message_id,
                 }))
@@ -200,24 +195,19 @@ impl Transfers {
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destionation.
-    fn propagate(
+    fn receive_propagated(
         &mut self,
-        payload: RegisterTransfer,
+        proof: &DebitAgreementProof,
         requester: &PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
     ) -> Option<Action> {
         // We will just validate the proofs and then apply the event.
-        let transfer = &payload.proof.transfer_cmd.transfer;
-        let result = self.replica.propagate(payload.proof.clone());
-
-        match result {
+        match self.replica.receive_propagated(proof) {
             Ok(event) => {
-                self.replica
-                    .apply(TransferEvent::TransferPropagated(event.clone()));
+                let transfer = &proof.signed_transfer.transfer;
                 // notify recipient, with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from(transfer.to), payload.proof);
-
+                messaging.notify_client(&XorName::from(transfer.to), proof);
                 None
             }
             Err(err) => Some(Action::RespondToClientHandlers {
@@ -238,28 +228,7 @@ impl Transfers {
         request: &Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        unimplemented!("");
-
-        // let result = self.replica.transfer(
-        //     from,
-        //     PublicKey::Ed25519(*self.id.ed25519_public_key()),
-        //     amount,
-        //     true,
-        // );
-
-        // match result {
-        //     Ok(event) => {
-        //         self.replica.apply(event);
-        //         None
-        //     }
-        //     Err(error) => {
-        //         trace!("{}: Unable to pay {}: {}", self, amount, error);
-        //         Some(Action::RespondToClient {
-        //             message_id,
-        //             response: request.error_response(error.into()),
-        //         })
-        //     }
-        // }
+        None
     }
 }
 
