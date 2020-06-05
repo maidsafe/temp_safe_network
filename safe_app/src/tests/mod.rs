@@ -78,8 +78,8 @@ async fn get_access_info() -> Result<(), AppError> {
             app_container: true,
             app_permissions: AppPermissions {
                 transfer_money: true,
-                perform_mutations: true,
-                get_balance: true,
+                data_mutations: true,
+                read_balance: true,
             },
             containers: container_permissions,
         },
@@ -157,8 +157,8 @@ async fn authorise_app(
             app_container,
             app_permissions: AppPermissions {
                 transfer_money: true,
-                perform_mutations: true,
-                get_balance: true,
+                data_mutations: true,
+                read_balance: true,
             },
             containers: HashMap::new(),
         },
@@ -359,8 +359,8 @@ async fn account_info() -> Result<(), AppError> {
     let mut app_auth_req = create_random_auth_req();
     app_auth_req.app_permissions = AppPermissions {
         transfer_money: false,
-        perform_mutations: true,
-        get_balance: true,
+        data_mutations: true,
+        read_balance: true,
     };
 
     let app = create_app_by_req(&app_auth_req).await?;
