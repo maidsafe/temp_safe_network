@@ -22,9 +22,9 @@ pub(super) struct ReplicaManager {
 #[allow(unused)]
 impl ReplicaManager {
     pub fn new(
-        secret_key: SecretKeyShare,
+        secret_key: &SecretKeyShare,
         key_index: usize,
-        peer_replicas: PublicKeySet,
+        peer_replicas: &PublicKeySet,
         events: Vec<ReplicaEvent>,
     ) -> Result<Self> {
         let mut store = EventStore {
@@ -34,8 +34,12 @@ impl ReplicaManager {
         /// OKs on empty vec as well, only errors from underlying storage.
         match store.init(events.clone()) {
             Ok(()) => {
-                let mut replica =
-                    Replica::from_history(secret_key, key_index, peer_replicas, events);
+                let mut replica = Replica::from_history(
+                    secret_key.clone(),
+                    key_index,
+                    peer_replicas.clone(),
+                    events,
+                );
                 Ok(Self { store, replica })
             }
             Err(e) => Err(Error::InvalidOperation), // todo: storage error

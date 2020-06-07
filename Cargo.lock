@@ -167,6 +167,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "bitvec"
+version = "0.17.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41262f11d771fd4a61aa3ce019fca363b4b6c282fca9da2a31186d3965a47a5c"
+dependencies = [
+ "either",
+ "radium",
+]
+
+[[package]]
 name = "blake2b_simd"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -365,11 +375,13 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "3.0.0"
-source = "git+https://github.com/rust-crdt/rust-crdt?branch=useability-improvements#a880c631961c93a56f8346b29b6919f6c5e007a5"
+version = "4.0.0"
+source = "git+https://github.com/rust-crdt/rust-crdt#eab41f73f00e2bbfebcaabf69c9065f9088248d3"
 dependencies = [
+ "bitvec",
  "num-bigint 0.2.6",
  "quickcheck",
+ "rand 0.7.3",
  "serde",
 ]
 
@@ -381,7 +393,30 @@ checksum = "bd66663db5a988098a89599d4857919b3acf7f61402e61365acfd3919857b9be"
 
 [[package]]
 name = "crossbeam-channel"
+<<<<<<< HEAD
 version = "0.4.2"
+=======
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8ec7fcd21571dc78f96cc96243cab8d8f035247c3efd16c687be154c3fa9efa"
+dependencies = [
+ "crossbeam-utils 0.6.6",
+]
+
+[[package]]
+name = "crossbeam-channel"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cced8691919c02aac3cb0a1bc2e9b73d89e832bf9a06fc579d4e71b68a2da061"
+dependencies = [
+ "crossbeam-utils 0.7.2",
+ "maybe-uninit",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.6.6"
+>>>>>>> refactor/replica: fix fetching BLS keys from routing Node
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cced8691919c02aac3cb0a1bc2e9b73d89e832bf9a06fc579d4e71b68a2da061"
 dependencies = [
@@ -1103,6 +1138,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1355,8 +1399,27 @@ name = "mock-quic-p2p"
 version = "0.1.0"
 source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
 dependencies = [
+<<<<<<< HEAD
  "bytes 0.5.4",
  "crossbeam-channel",
+=======
+ "bytes 0.4.12",
+ "crossbeam-channel 0.3.9",
+ "fxhash",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
+ "structopt",
+]
+
+[[package]]
+name = "mock-quic-p2p"
+version = "0.1.0"
+source = "git+https://github.com/maidsafe/quic-p2p#14e601daed8b80d3008352883d898fc75f93a5d7"
+dependencies = [
+ "bytes 0.5.4",
+ "crossbeam-channel 0.4.2",
+>>>>>>> refactor/replica: fix fetching BLS keys from routing Node
  "fxhash",
  "rand 0.7.3",
  "serde",
@@ -1692,12 +1755,21 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.6.2"
+<<<<<<< HEAD
 source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9a3d2dc326b4094f599118fdaa8565bd14204b685b91301c47db74c4a41ee7"
+>>>>>>> refactor/replica: fix fetching BLS keys from routing Node
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
  "bytes 0.5.4",
+<<<<<<< HEAD
  "crossbeam-channel",
+=======
+ "crossbeam-channel 0.4.2",
+>>>>>>> refactor/replica: fix fetching BLS keys from routing Node
  "derive_more",
  "directories 1.0.2",
  "err-derive",
@@ -1793,6 +1865,12 @@ checksum = "54a21852a652ad6f610c9510194f398ff6f8692e334fd1145fed931f7fbe44ea"
 dependencies = [
  "proc-macro2 1.0.17",
 ]
+
+[[package]]
+name = "radium"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "def50a86306165861203e7f84ecffbbdfdea79f0e51039b33de1e952358c47ac"
 
 [[package]]
 name = "rand"
@@ -2134,11 +2212,19 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
+<<<<<<< HEAD
 source = "git+https://github.com/maidsafe/routing.git?branch=igd-err#4a092f0bb57f0504b1ba553f159cde5265a0e4b2"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.5.4",
  "crossbeam-channel",
+=======
+source = "git+https://github.com/yoga07/routing?branch=transfers#1c20d3f17209e15d50c1b76d6226b9980cf578a9"
+dependencies = [
+ "bincode 1.1.4",
+ "bytes 0.5.4",
+ "crossbeam-channel 0.4.2",
+>>>>>>> refactor/replica: fix fetching BLS keys from routing Node
  "ctrlc",
  "derive_more",
  "env_logger",
@@ -2151,7 +2237,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "lru_time_cache",
- "mock-quic-p2p",
+ "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p)",
  "num-bigint 0.1.44",
  "parsec",
  "quic-p2p",
@@ -2236,7 +2322,7 @@ checksum = "ed3d612bc64430efeb3f7ee6ef26d590dce0c43249217bddc62112540c7941e1"
 [[package]]
 name = "safe-nd"
 version = "0.9.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=at2-network-payments#30c79c0ae421ae17b2abac00f9876f1f46e8b276"
+source = "git+https://github.com/yoga07/safe-nd?branch=transfers#f27f2c082b7e37efece8ccbe960a35c6c1cc5d53"
 dependencies = [
  "bincode 1.1.4",
  "crdts",
@@ -2254,10 +2340,11 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-transfers.git#74222a9fa47a24202222bf660067d1219a011951"
+source = "git+https://github.com/yoga07/safe-transfers.git?branch=transfers#54bda53f63fb40e6348a9c8b651ccaabfb7a1fb4"
 dependencies = [
  "bincode 1.1.4",
  "crdts",
+ "itertools 0.9.0",
  "rand 0.6.5",
  "safe-nd",
  "serde",
@@ -2270,9 +2357,9 @@ version = "0.24.0"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
- "bytes 0.4.12",
+ "bytes 0.5.4",
  "crdts",
- "crossbeam-channel",
+ "crossbeam-channel 0.4.2",
  "ctrlc",
  "directories 2.0.2",
  "ed25519-dalek",
@@ -2284,7 +2371,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "maplit",
- "mock-quic-p2p",
+ "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p?tag=0.5.0)",
  "pickledb",
  "quick-error",
  "rand 0.6.5",
@@ -2766,9 +2853,15 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0c3acc6aa564495a0f2e1d59fab677cd7f81a19994cfc7f3ad0e64301560389"
 dependencies = [
+<<<<<<< HEAD
  "proc-macro2 1.0.17",
  "quote 1.0.6",
  "syn 1.0.25",
+=======
+ "proc-macro2 1.0.9",
+ "quote 1.0.3",
+ "syn 1.0.17",
+>>>>>>> refactor/replica: fix fetching BLS keys from routing Node
 ]
 
 [[package]]
