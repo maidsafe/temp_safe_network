@@ -96,10 +96,11 @@ async fn send_as_helper(
 ) -> Result<Response, CoreError> {
     let (message, identity) = match client_id {
         Some(id) => (sign_request(request, id), SafeKey::client(id.clone())),
-        None => (
-            client.compose_message(request, true).await,
-            client.full_id().await,
-        ),
+        None => {
+            let msg = client.compose_message(request, true).await;
+            let client_id = client.full_id().await;
+            (msg, client_id)
+        }
     };
 
     let pub_id = identity.public_id();
@@ -154,10 +155,9 @@ pub trait Client: Clone + Send + Sync {
 
     /// Return the public and secret encryption keys.
     async fn encryption_keypair(&self) -> (threshold_crypto::PublicKey, shared_box::SecretKey) {
-        (
-            self.public_encryption_key().await,
-            self.secret_encryption_key().await,
-        )
+        let enc_key = self.public_encryption_key().await;
+        let sec_key = self.secret_encryption_key().await;
+        (enc_key, sec_key)
     }
 
     /// Return the symmetric encryption key.

@@ -213,11 +213,8 @@ async fn main() {
 
                 // TODO(nbaksalyar): stress test mutate_mdata and get_mdata_value here
                 // Get all the chunks again.
-                let retrieved_data = unwrap!(
-                    client
-                        .get_seq_mdata_shell(data.name().clone(), data.tag())
-                        .await
-                );
+                let retrieved_data =
+                    unwrap!(client.get_seq_mdata_shell(*data.name(), data.tag()).await);
                 assert_eq!(data, retrieved_data);
                 println!("Retrieved chunk #{}: {:?}", i, data.name());
             }

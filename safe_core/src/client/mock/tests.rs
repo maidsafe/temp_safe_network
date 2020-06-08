@@ -1301,7 +1301,7 @@ async fn auth_actions_from_app() {
 async fn low_balance_check() {
     for unlimited in &[true, false] {
         let (mut connection_manager, _, client_safe_key, owner_key) = setup(Some(Config {
-            quic_p2p: QuicP2pConfig::with_default_cert(),
+            quic_p2p: QuicP2pConfig::default(),
             dev: Some(DevConfig {
                 mock_unlimited_coins: *unlimited,
                 mock_in_memory_storage: false,
@@ -1392,7 +1392,7 @@ async fn invalid_config_mock_vault_path() {
 
     // Make sure that using a non-existant mock-vault path fails.
     let (mut _conn_manager, _, _client_safe_key, _owner_key) = setup(Some(Config {
-        quic_p2p: QuicP2pConfig::with_default_cert(),
+        quic_p2p: QuicP2pConfig::default(),
         dev: Some(DevConfig {
             mock_unlimited_coins: false,
             mock_in_memory_storage: false,
@@ -1418,7 +1418,7 @@ async fn config_mock_vault_path() {
     }
 
     let (mut conn_manager, _, client_safe_key, owner_key) = setup(Some(Config {
-        quic_p2p: QuicP2pConfig::with_default_cert(),
+        quic_p2p: QuicP2pConfig::default(),
         dev: Some(DevConfig {
             mock_unlimited_coins: false,
             mock_in_memory_storage: false,
