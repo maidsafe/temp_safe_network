@@ -418,7 +418,7 @@ impl SafeUrl {
                 // we have an xorurl
                 public_name = String::default(); // set later
                 top_name = String::default(); // set later
-                sub_names_vec = sub_names.unwrap_or_else(|| vec![]);
+                sub_names_vec = sub_names.unwrap_or_else(Vec::new);
                 sub_names_str = sub_names_vec.join(".");
                 safeurl_type = SafeUrlType::XorUrl;
 
