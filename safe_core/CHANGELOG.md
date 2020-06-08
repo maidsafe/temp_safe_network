@@ -1,5 +1,9 @@
 # Safe Core - Change Log
 
+## [0.41.1]
+- Update quic-p2p to 0.6.2
+- Update safe-nd to 0.9.0
+- Refactor to use updated request/response types
 
 ## [0.41.0]
 - Use Async/await rust.
