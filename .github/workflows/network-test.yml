@@ -31,17 +31,17 @@ jobs:
         run: cargo build --release
       - name: Setup SAFE Cli and PATH etc
         run: |
-          mkdir -p ~/.safe/safe-cli
+          mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
-          cp ./target/release/safe $HOME/.safe/safe-cli/
+          cp ./target/release/safe $HOME/.safe/cli/
           cp ./target/release/safe-authd $HOME/.safe/authd/
-          ls $HOME/.safe/safe-cli
+          ls $HOME/.safe/cli
           ls $HOME/.safe/authd
-          echo "::add-path::$HOME/.safe/safe-cli"
+          echo "::add-path::$HOME/.safe/cli"
           echo "::add-path::$HOME/.safe/authd"
           echo $PATH
           chmod +x $HOME/.safe/authd/safe-authd
-          chmod +x $HOME/.safe/safe-cli/safe
+          chmod +x $HOME/.safe/cli/safe
           chmod +x $HOME/.safe/vault/safe_vault
       - name: Setup The Baby
         run : safe vault run-baby-fleming -t

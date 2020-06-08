@@ -54,7 +54,7 @@ jobs:
 
       - name: Setup SAFE Cli and Authd dirs
         run: |
-          mkdir -p ~/.safe/safe-cli
+          mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
         
 
@@ -70,16 +70,16 @@ jobs:
           name: safe-authd
           path: ./dl
 
-      - run: cp ./dl/safe $HOME/.safe/safe-cli
+      - run: cp ./dl/safe $HOME/.safe/cli
       - run: cp ./dl/safe-authd $HOME/.safe/authd
 
-      - run: ls $HOME/.safe/safe-cli
+      - run: ls $HOME/.safe/cli
       - run: ls $HOME/.safe/authd
-      - run: echo "::add-path::$HOME/.safe/safe-cli"
+      - run: echo "::add-path::$HOME/.safe/cli"
       - run: echo "::add-path::$HOME/.safe/authd"
       - run: echo $PATH
       - run: chmod +x $HOME/.safe/authd/safe-authd
-      - run: chmod +x $HOME/.safe/safe-cli/safe
+      - run: chmod +x $HOME/.safe/cli/safe
 
       - run: chmod +x $HOME/.safe/vault/safe_vault
 
@@ -87,13 +87,13 @@ jobs:
 
       # - name: Setup SAFE Cli and PATH etc
       #   run: |
-      #     ls $HOME/.safe/safe-cli
+      #     ls $HOME/.safe/cli
       #     ls $HOME/.safe/authd
-      #     echo "::add-path::$HOME/.safe/safe-cli"
+      #     echo "::add-path::$HOME/.safe/cli"
       #     echo "::add-path::$HOME/.safe/authd"
       #     echo $PATH
       #     chmod +x $HOME/.safe/authd/safe-authd
-      #     chmod +x $HOME/.safe/safe-cli/safe
+      #     chmod +x $HOME/.safe/cli/safe
       #     chmod +x $HOME/.safe/vault/safe_vault
 
       - name: Setup The Baby
