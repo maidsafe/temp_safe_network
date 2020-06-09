@@ -102,7 +102,6 @@ impl CoreClient {
 
         connection_manager = connection_manager_wrapper_fn(connection_manager);
 
-
         let validator = ClientTransferValidator {};
         // Here for now, Actor with 10 setup, as before
         // transfer actor handles all our responses and proof aggregation
@@ -110,7 +109,6 @@ impl CoreClient {
             TransferActor::new(validator, client_full_id, connection_manager.clone()).await?;
 
         // TODO: Create the balance for the client
-
 
         // let response = req(
         //     &mut connection_manager,

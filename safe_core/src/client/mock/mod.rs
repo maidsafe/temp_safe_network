@@ -13,7 +13,7 @@ mod connection_manager;
 #[cfg(test)]
 mod tests;
 
-pub use self::account::{Account, CoinBalance};
+pub use self::account::{Account, AccountBalance};
 pub use self::connection_manager::{ConnectionManager, RequestHookFn};
 use safe_nd::{IDataAddress, MDataAddress, SDataAddress};
 use serde::{Deserialize, Serialize};
