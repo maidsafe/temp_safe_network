@@ -14,14 +14,13 @@ use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId, 
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 
-pub type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
-
 #[async_trait]
 pub trait SafeApp {
     fn new() -> Self;
 
     async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
 
+    // === Coins operations ===
     async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
@@ -49,56 +48,48 @@ pub trait SafeApp {
         amount: Coins,
     ) -> Result<Transaction>;
 
-    async fn get_transaction(&self, tx_id: u64, pk: PublicKey, sk: SecretKey) -> Result<String>;
+    // === ImmutableData operations ===
+    async fn put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
 
-    async fn files_put_published_immutable(
+    async fn get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>>;
+
+    // === MutableData operations ===
+    async fn put_mdata(
         &mut self,
-        data: &[u8],
-        dry_run: bool,
-    ) -> Result<XorName>;
-
-    async fn files_get_published_immutable(
-        &self,
-        xorname: XorName,
-        range: Range,
-    ) -> Result<Vec<u8>>;
-
-    async fn put_seq_append_only_data(
-        &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
         tag: u64,
+        // data: Option<String>,
         permissions: Option<String>,
     ) -> Result<XorName>;
 
-    async fn append_seq_append_only_data(
+    async fn get_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData>;
+
+    async fn mdata_insert(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
-        new_version: u64,
         name: XorName,
         tag: u64,
-    ) -> Result<u64>;
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<()>;
 
-    async fn get_latest_seq_append_only_data(
+    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue>;
+
+    async fn mdata_list_entries(
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<(u64, AppendOnlyDataRawData)>;
+    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>>;
 
-    async fn get_current_seq_append_only_data_version(
-        &self,
+    async fn mdata_update(
+        &mut self,
         name: XorName,
         tag: u64,
-    ) -> Result<u64>;
-
-    async fn get_seq_append_only_data(
-        &self,
-        name: XorName,
-        tag: u64,
+        key: &[u8],
+        value: &[u8],
         version: u64,
-    ) -> Result<AppendOnlyDataRawData>;
+    ) -> Result<()>;
 
-    // === Sequence ===
+    // === Sequence data operations ===
     async fn store_sequence_data(
         &mut self,
         data: &[u8],
@@ -107,50 +98,9 @@ pub trait SafeApp {
         permissions: Option<String>,
     ) -> Result<XorName>;
 
-    async fn get_sequence_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)>;
+    async fn sequence_get_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)>;
 
-    async fn get_sequence_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>>;
+    async fn sequence_get_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>>;
 
     async fn sequence_append(&mut self, data: &[u8], name: XorName, tag: u64) -> Result<()>;
-
-    // === MutableData ===
-    async fn put_seq_mutable_data(
-        &mut self,
-        name: Option<XorName>,
-        tag: u64,
-        // data: Option<String>,
-        permissions: Option<String>,
-    ) -> Result<XorName>;
-
-    async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData>;
-
-    async fn seq_mutable_data_insert(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-    ) -> Result<()>;
-
-    async fn seq_mutable_data_get_value(
-        &self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-    ) -> Result<MDataSeqValue>;
-
-    async fn list_seq_mdata_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>>;
-
-    async fn seq_mutable_data_update(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-        version: u64,
-    ) -> Result<()>;
 }

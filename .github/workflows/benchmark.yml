@@ -46,7 +46,7 @@ jobs:
         benchmark: [ keys, put ]
     steps:
       - uses: actions/checkout@v1
-   
+
       - run: mkdir -p ~/.safe/vault
       - name: dl vault
         run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
@@ -56,14 +56,14 @@ jobs:
         run: |
           mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
-        
+
 
       - name: Download CLI
         uses: actions/download-artifact@master
         with:
           name: safe-cli
           path: ./dl
-    
+
       - name: Download authd
         uses: actions/download-artifact@master
         with:
@@ -83,7 +83,7 @@ jobs:
 
       - run: chmod +x $HOME/.safe/vault/safe_vault
 
-      
+
 
       # - name: Setup SAFE Cli and PATH etc
       #   run: |
@@ -99,10 +99,10 @@ jobs:
       - name: Setup The Baby
         run : safe vault run-baby-fleming -t
 
-      - name: Benchmark 
+      - name: Benchmark
         run: cargo bench --bench ${{ matrix.benchmark }}
         shell: bash
-      
+
       - name: Stop the network.
         if: failure()
         run: safe vault killall || true && safe auth stop || true

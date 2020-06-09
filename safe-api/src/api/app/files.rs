@@ -770,7 +770,7 @@ impl Safe {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self
             .safe_app
-            .files_put_published_immutable(&data, dry_run)
+            .put_published_immutable(&data, dry_run)
             .await?;
 
         XorUrlEncoder::encode_immutable_data(xorname, content_type, self.xorurl_base)
@@ -805,7 +805,7 @@ impl Safe {
         range: Range,
     ) -> Result<Vec<u8>> {
         self.safe_app
-            .files_get_published_immutable(xorurl_encoder.xorname(), range)
+            .get_published_immutable(xorurl_encoder.xorname(), range)
             .await
     }
 }

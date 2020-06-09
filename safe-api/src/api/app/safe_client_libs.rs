@@ -12,7 +12,6 @@ use super::helpers::{decode_ipc_msg, AuthResponseType};
 use super::{
     fetch::Range,
     helpers::{xorname_from_pk, xorname_to_hex},
-    safe_net::AppendOnlyDataRawData,
     SafeApp,
 };
 use crate::{Error, Result};
@@ -23,10 +22,8 @@ use safe_app::test_utils::create_app;
 use safe_app::App;
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
-    AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
-    ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, ClientFullId, Coins,
-    Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
-    MDataSeqValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SData, SDataAddress,
+    ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
+    MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SData, SDataAddress,
     SDataIndex, SDataPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
     SeqMutableData, Transaction, TransactionId, XorName,
 };
@@ -117,6 +114,7 @@ impl SafeApp for SafeAppScl {
         Ok(())
     }
 
+    // === Coins operations ===
     async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
@@ -191,7 +189,6 @@ impl SafeApp for SafeAppScl {
         Ok(tx)
     }
 
-    #[allow(dead_code)]
     async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
@@ -204,17 +201,8 @@ impl SafeApp for SafeAppScl {
             .await
     }
 
-    #[allow(dead_code)]
-    async fn get_transaction(&self, _tx_id: u64, _pk: PublicKey, _sk: SecretKey) -> Result<String> {
-        // TODO: Replace with SCL calling code
-        Ok("Success(0)".to_string())
-    }
-
-    async fn files_put_published_immutable(
-        &mut self,
-        data: &[u8],
-        dry_run: bool,
-    ) -> Result<XorName> {
+    // === ImmutableData operations ===
+    async fn put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
         let client = &self.get_safe_app()?.client;
 
@@ -248,11 +236,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    async fn files_get_published_immutable(
-        &self,
-        xorname: XorName,
-        range: Range,
-    ) -> Result<Vec<u8>> {
+    async fn get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let client = &self.get_safe_app()?.client;
@@ -294,217 +278,153 @@ impl SafeApp for SafeAppScl {
         Ok(data)
     }
 
-    async fn put_seq_append_only_data(
+    // === MutableData operations ===
+    async fn put_mdata(
         &mut self,
-        the_data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
         tag: u64,
+        // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        debug!(
-            "Putting appendable data w/ type: {:?}, xorname: {:?}",
-            tag, name
-        );
-
         let safe_app = self.get_safe_app()?;
         let client = &safe_app.client;
+        let owner_key_option = client.owner_key().await;
+        let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
+            owners
+        } else {
+            return Err(Error::Unexpected(
+                "Failed to retrieve public key.".to_string(),
+            ));
+        };
+
         let xorname = name.unwrap_or_else(rand::random);
-        info!("Xorname for storage: {:?}", &xorname);
 
-        let append_only_data_address = ADataAddress::PubSeq { name: xorname, tag };
-        let mut data = PubSeqAppendOnlyData::new(xorname, tag);
+        let permission_set = MDataPermissionSet::new()
+            .allow(MDataAction::Read)
+            .allow(MDataAction::Insert)
+            .allow(MDataAction::Update)
+            .allow(MDataAction::Delete)
+            .allow(MDataAction::ManagePermissions);
 
-        // TODO: setup permissions from props
-        let mut perms = BTreeMap::<ADataUser, ADataPubPermissionSet>::new();
-        let set = ADataPubPermissionSet::new(true, true);
-        let usr_app = ADataUser::Key(SafeNdPublicKey::Bls(get_public_bls_key(safe_app).await?));
-        let _ = perms.insert(usr_app, set);
-        data.append_permissions(
-            ADataPubPermissions {
-                permissions: perms,
-                entries_index: 0,
-                owners_index: 0,
-            },
-            0,
-        )
-        .map_err(|e| {
-            Error::Unexpected(format!(
-                "Failed to set permissions for the Sequenced Append Only Data: {:?}",
-                e
-            ))
-        })?;
+        let mut permission_map = BTreeMap::new();
+        let sign_pk = get_public_bls_key(safe_app).await?;
+        let app_pk = SafeNdPublicKey::Bls(sign_pk);
+        permission_map.insert(app_pk, permission_set);
 
-        let usr_acc_owner = safe_app.client.owner_key().await;
-        let owner = ADataOwner {
-            public_key: usr_acc_owner,
-            entries_index: 0,
-            permissions_index: 1,
-        };
-        data.append_owner(owner, 0).map_err(|e| {
-            Error::Unexpected(format!(
-                "Failed to set the owner to the Sequenced Append Only Data: {:?}",
-                e
-            ))
-        })?;
-
-        let entries_vec = the_data
-            .iter()
-            .map(|(k, v)| ADataEntry::new(k.to_vec(), v.to_vec()))
-            .collect();
-        let append = ADataAppendOperation {
-            address: append_only_data_address,
-            values: entries_vec,
-        };
+        let mdata = SeqMutableData::new_with_data(
+            xorname,
+            tag,
+            BTreeMap::new(),
+            permission_map,
+            SafeNdPublicKey::Bls(owners),
+        );
 
         client
-            .put_adata(AData::PubSeq(data.clone()))
+            .put_seq_mutable_data(mdata)
             .await
-            .map_err(|e| {
-                Error::NetDataError(format!("Failed to PUT Sequenced Append Only Data: {:?}", e))
-            })?;
-
-        client.append_seq_adata(append, 0).await.map_err(|e| {
-            Error::NetDataError(format!(
-                "Failed to append initial data to Sequenced Append Only Data: {:?}",
-                e
-            ))
-        })?;
+            .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
 
         Ok(xorname)
     }
 
-    async fn append_seq_append_only_data(
-        &mut self,
-        the_data: Vec<(Vec<u8>, Vec<u8>)>,
-        new_version: u64,
-        name: XorName,
-        tag: u64,
-    ) -> Result<u64> {
+    async fn get_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
         let client = &self.get_safe_app()?.client;
-        let append_only_data_address = ADataAddress::PubSeq { name, tag };
-        let entries_vec = the_data
-            .iter()
-            .map(|(k, v)| ADataEntry::new(k.to_vec(), v.to_vec()))
-            .collect();
-        let append = ADataAppendOperation {
-            address: append_only_data_address,
-            values: entries_vec,
-        };
-
         client
-            .append_seq_adata(append, new_version)
+            .get_seq_mdata(name, tag)
             .await
-            .map_err(|e| {
-                Error::NetDataError(format!(
-                    "Failed to UPDATE Sequenced Append Only Data: {:?}",
-                    e
-                ))
-            })?;
-
-        Ok(new_version)
+            .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
-    async fn get_latest_seq_append_only_data(
-        &self,
+    async fn mdata_insert(
+        &mut self,
         name: XorName,
         tag: u64,
-    ) -> Result<(u64, AppendOnlyDataRawData)> {
-        debug!("Getting latest seq_append_only_data for: {:?}", &name);
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<()> {
+        let entry_actions = MDataSeqEntryActions::new();
+        let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
+        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
+            .await
+    }
 
+    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue> {
         let client = &self.get_safe_app()?.client;
-        let append_only_data_address = ADataAddress::PubSeq { name, tag };
-
-        debug!("Address for a_data : {:?}", append_only_data_address);
-        let data_length = self
-            .get_current_seq_append_only_data_version(name, tag)
+        let key_vec = key.to_vec();
+        client
+            .get_seq_mdata_value(name, tag, key_vec)
             .await
             .map_err(|err| match err {
-                Error::EmptyContent(_) => err,
-                _ => Error::NetDataError(format!(
-                    "Failed to get Sequenced Append Only Data: {:?}",
-                    err
-                )),
-            })?;
-
-        let data_entry = client
-            .get_adata_last_entry(append_only_data_address)
-            .await
-            .map_err(|e| {
-                Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
-            })?;
-
-        let data = (data_entry.key, data_entry.value);
-        Ok((data_length, data))
-    }
-
-    async fn get_current_seq_append_only_data_version(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<u64> {
-        debug!("Getting seq appendable data, length for: {:?}", name);
-
-        let client = &self.get_safe_app()?.client;
-        let append_only_data_address = ADataAddress::PubSeq { name, tag };
-
-        let data_returned = client
-            .get_adata_indices(append_only_data_address)
-            .await
-            .map_err(|e| {
-                Error::NetDataError(format!(
-                    "Failed to get Sequenced Append Only Data indices: {:?}",
-                    e
-                ))
-            })?;
-
-        if data_returned.entries_index() > 0 {
-            Ok(data_returned.entries_index() - 1)
-        } else {
-            Err(Error::EmptyContent(format!(
-                "Empty Sequenced AppendOnlyData found at Xor name {}",
-                xorname_to_hex(&name)
-            )))
-        }
-    }
-
-    async fn get_seq_append_only_data(
-        &self,
-        name: XorName,
-        tag: u64,
-        version: u64,
-    ) -> Result<AppendOnlyDataRawData> {
-        debug!(
-            "Getting seq appendable data, version: {:?}, from: {:?}",
-            version, name
-        );
-
-        let client = &self.get_safe_app()?.client;
-        let append_only_data_address = ADataAddress::PubSeq { name, tag };
-
-        let start = ADataIndex::FromStart(version);
-        let end = ADataIndex::FromStart(version + 1);
-        let data_entries = client
-            .get_adata_range(append_only_data_address, (start, end))
-            .await
-            .map_err(|err| {
-                if let SafeCoreError::DataError(SafeNdError::NoSuchEntry) = err {
-                    Error::VersionNotFound(format!(
-                        "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
-                        version, name
-                    ))
-                } else {
-                    Error::NetDataError(format!(
-                        "Failed to get Sequenced Append Only Data: {:?}",
-                        err
+                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
+                    Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
+                    Error::ContentNotFound(format!(
+                        "Sequenced MutableData not found at Xor name: {}",
+                        xorname_to_hex(&name)
                     ))
                 }
-            })?;
-
-        let this_version = data_entries[0].clone();
-        Ok((this_version.key, this_version.value))
+                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
+                    Error::EntryNotFound(format!(
+                        "Entry not found in Sequenced MutableData found at Xor name: {}",
+                        xorname_to_hex(&name)
+                    ))
+                }
+                err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
+            })
     }
 
-    // === Sequence Data operations ===
+    async fn mdata_list_entries(
+        &self,
+        name: XorName,
+        tag: u64,
+    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
+        let client = &self.get_safe_app()?.client;
+        client
+            .list_seq_mdata_entries(name, tag)
+            .await
+            .map_err(|err| match err {
+                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
+                    Error::AccessDenied(format!(
+                        "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
+                        name, tag
+                    ))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
+                    Error::ContentNotFound(format!(
+                        "Sequenced MutableData not found at Xor name: {} (type tag: {})",
+                        xorname_to_hex(&name),
+                        tag
+                    ))
+                }
+                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
+                    Error::EntryNotFound(format!(
+                    "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
+                    xorname_to_hex(&name),
+                    tag
+                ))
+                }
+                err => {
+                    Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err))
+                }
+            })
+    }
+
+    async fn mdata_update(
+        &mut self,
+        name: XorName,
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
+        version: u64,
+    ) -> Result<()> {
+        let entry_actions = MDataSeqEntryActions::new();
+        let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
+        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
+            .await
+    }
+
+    // === Sequence data operations ===
     async fn store_sequence_data(
         &mut self,
         data: &[u8],
@@ -554,7 +474,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    async fn get_sequence_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)> {
+    async fn sequence_get_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)> {
         debug!(
             "Fetching Sequence data w/ type: {:?}, xorname: {:?}",
             tag, name
@@ -579,7 +499,7 @@ impl SafeApp for SafeAppScl {
             })
     }
 
-    async fn get_sequence_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>> {
+    async fn sequence_get_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>> {
         debug!(
             "Fetching Sequence data w/ type: {:?}, xorname: {:?}",
             tag, name
@@ -633,158 +553,6 @@ impl SafeApp for SafeAppScl {
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
     }
-
-    // === MutableData operations ===
-    async fn put_seq_mutable_data(
-        &mut self,
-        name: Option<XorName>,
-        tag: u64,
-        // _data: Option<String>,
-        _permissions: Option<String>,
-    ) -> Result<XorName> {
-        let safe_app = self.get_safe_app()?;
-        let client = &safe_app.client;
-        let owner_key_option = client.owner_key().await;
-        let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
-            owners
-        } else {
-            return Err(Error::Unexpected(
-                "Failed to retrieve public key.".to_string(),
-            ));
-        };
-
-        let xorname = name.unwrap_or_else(rand::random);
-
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::Update)
-            .allow(MDataAction::Delete)
-            .allow(MDataAction::ManagePermissions);
-
-        let mut permission_map = BTreeMap::new();
-        let sign_pk = get_public_bls_key(safe_app).await?;
-        let app_pk = SafeNdPublicKey::Bls(sign_pk);
-        permission_map.insert(app_pk, permission_set);
-
-        let mdata = SeqMutableData::new_with_data(
-            xorname,
-            tag,
-            BTreeMap::new(),
-            permission_map,
-            SafeNdPublicKey::Bls(owners),
-        );
-
-        client
-            .put_seq_mutable_data(mdata)
-            .await
-            .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
-
-        Ok(xorname)
-    }
-
-    #[allow(dead_code)]
-    async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
-        let client = &self.get_safe_app()?.client;
-        client
-            .get_seq_mdata(name, tag)
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
-    }
-
-    async fn seq_mutable_data_insert(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-    ) -> Result<()> {
-        let entry_actions = MDataSeqEntryActions::new();
-        let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
-            .await
-    }
-
-    async fn seq_mutable_data_get_value(
-        &self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-    ) -> Result<MDataSeqValue> {
-        let client = &self.get_safe_app()?.client;
-        let key_vec = key.to_vec();
-        client
-            .get_seq_mdata_value(name, tag, key_vec)
-            .await
-            .map_err(|err| match err {
-                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
-                    Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
-                }
-                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
-                    Error::ContentNotFound(format!(
-                        "Sequenced MutableData not found at Xor name: {}",
-                        xorname_to_hex(&name)
-                    ))
-                }
-                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
-                    Error::EntryNotFound(format!(
-                        "Entry not found in Sequenced MutableData found at Xor name: {}",
-                        xorname_to_hex(&name)
-                    ))
-                }
-                err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
-            })
-    }
-
-    async fn list_seq_mdata_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
-        let client = &self.get_safe_app()?.client;
-        client
-            .list_seq_mdata_entries(name, tag)
-            .await
-            .map_err(|err| match err {
-                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
-                    Error::AccessDenied(format!(
-                        "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
-                        name, tag
-                    ))
-                }
-                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
-                    Error::ContentNotFound(format!(
-                        "Sequenced MutableData not found at Xor name: {} (type tag: {})",
-                        xorname_to_hex(&name),
-                        tag
-                    ))
-                }
-                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
-                    Error::EntryNotFound(format!(
-                    "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
-                    xorname_to_hex(&name),
-                    tag
-                ))
-                }
-                err => {
-                    Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err))
-                }
-            })
-    }
-
-    async fn seq_mutable_data_update(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-        version: u64,
-    ) -> Result<()> {
-        let entry_actions = MDataSeqEntryActions::new();
-        let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
-            .await
-    }
 }
 
 // Helpers
@@ -819,86 +587,65 @@ mod tests {
 
         let id1 = b"HELLLOOOOOOO".to_vec();
 
-        let xorname = safe
-            .safe_app
-            .files_put_published_immutable(&id1, false)
-            .await?;
-        let data = safe
-            .safe_app
-            .files_get_published_immutable(xorname, None)
-            .await?;
+        let xorname = safe.safe_app.put_published_immutable(&id1, false).await?;
+        let data = safe.safe_app.get_published_immutable(xorname, None).await?;
         let text = utf8_str_from_slice(data.as_slice())?;
         assert_eq!(text, "HELLLOOOOOOO");
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_put_get_update_seq_append_only_data() -> Result<()> {
+    async fn test_put_get_update_sequence() -> Result<()> {
         let mut safe = new_safe_instance().await?;
 
-        let key1 = b"KEY1".to_vec();
-        let val1 = b"VALUE1".to_vec();
-        let data1 = [(key1, val1)].to_vec();
-
+        let entry1 = b"VALUE1";
         let type_tag = 12322;
         let xorname = safe
             .safe_app
-            .put_seq_append_only_data(data1, None, type_tag, None)
+            .store_sequence_data(entry1, None, type_tag, None)
             .await?;
 
-        let (this_version, (key, value)) = safe
+        let (this_version, entry) = safe
             .safe_app
-            .get_latest_seq_append_only_data(xorname, type_tag)
+            .sequence_get_last_entry(xorname, type_tag)
             .await?;
 
         assert_eq!(this_version, 0);
+        assert_eq!(&utf8_str_from_slice(entry.as_slice())?, "VALUE1");
 
-        assert_eq!(&utf8_str_from_slice(key.as_slice())?, "KEY1");
-        assert_eq!(&utf8_str_from_slice(value.as_slice())?, "VALUE1");
-
-        let key2 = b"KEY2".to_vec();
-        let val2 = b"VALUE2".to_vec();
-        let data2 = [(key2, val2)].to_vec();
-        let new_version = 1;
-
-        let updated_version = safe
-            .safe_app
-            .append_seq_append_only_data(data2, new_version, xorname, type_tag)
+        let entry2 = b"VALUE2";
+        safe.safe_app
+            .sequence_append(entry2, xorname, type_tag)
             .await?;
         let (the_latest_version, data_updated) = safe
             .safe_app
-            .get_latest_seq_append_only_data(xorname, type_tag)
+            .sequence_get_last_entry(xorname, type_tag)
             .await?;
 
-        assert_eq!(updated_version, the_latest_version);
-
-        assert_eq!(&utf8_str_from_slice(data_updated.0.as_slice())?, "KEY2");
-        assert_eq!(&utf8_str_from_slice(data_updated.1.as_slice())?, "VALUE2");
+        assert_eq!(the_latest_version, 1);
+        assert_eq!(&utf8_str_from_slice(data_updated.as_slice())?, "VALUE2");
 
         let first_version = 0;
-
         let first_data = safe
             .safe_app
-            .get_seq_append_only_data(xorname, type_tag, first_version)
+            .sequence_get_entry(xorname, type_tag, first_version)
             .await?;
 
-        assert_eq!(&utf8_str_from_slice(first_data.0.as_slice())?, "KEY1");
-        assert_eq!(&utf8_str_from_slice(first_data.1.as_slice())?, "VALUE1");
+        assert_eq!(&utf8_str_from_slice(first_data.as_slice())?, "VALUE1");
 
         let second_version = 1;
         let second_data = safe
             .safe_app
-            .get_seq_append_only_data(xorname, type_tag, second_version)
+            .sequence_get_entry(xorname, type_tag, second_version)
             .await?;
 
-        assert_eq!(&utf8_str_from_slice(second_data.0.as_slice())?, "KEY2");
-        assert_eq!(&utf8_str_from_slice(second_data.1.as_slice())?, "VALUE2");
+        assert_eq!(&utf8_str_from_slice(second_data.as_slice())?, "VALUE2");
 
         // test checking for versions that dont exist
         let nonexistant_version = 2;
         match safe
             .safe_app
-            .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
+            .sequence_get_entry(xorname, type_tag, nonexistant_version)
             .await
         {
             Ok(_) => Err(Error::Unexpected(
@@ -906,57 +653,9 @@ mod tests {
             )),
             Err(Error::VersionNotFound(msg)) => {
                 assert!(msg.contains(&format!(
-                    "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+                    "Invalid version ({}) for Sequence found at XoR name {}",
                     nonexistant_version, xorname
                 )));
-                Ok(())
-            }
-            err => Err(Error::Unexpected(format!(
-                "Error returned is not the expected one: {:?}",
-                err
-            ))),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_update_seq_append_only_data_error() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-
-        let key1 = b"KEY1".to_vec();
-        let val1 = b"VALUE1".to_vec();
-        let data1 = [(key1, val1)].to_vec();
-
-        let type_tag = 12322;
-        let xorname = safe
-            .safe_app
-            .put_seq_append_only_data(data1, None, type_tag, None)
-            .await?;
-
-        let (this_version, (key, value)) = safe
-            .safe_app
-            .get_latest_seq_append_only_data(xorname, type_tag)
-            .await?;
-
-        assert_eq!(this_version, 0);
-
-        assert_eq!(&utf8_str_from_slice(key.as_slice())?, "KEY1");
-        assert_eq!(&utf8_str_from_slice(value.as_slice())?, "VALUE1");
-
-        let key2 = b"KEY2".to_vec();
-        let val2 = b"VALUE2".to_vec();
-        let data2 = [(key2, val2)].to_vec();
-        let wrong_new_version = 0;
-
-        match safe
-            .safe_app
-            .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
-            .await
-        {
-            Ok(_) => Err(Error::Unexpected(
-                "No error thrown when passing an outdated new version".to_string(),
-            )),
-            Err(Error::NetDataError(msg)) => {
-                assert!(msg.contains("Data given is not a valid successor of stored data"));
                 Ok(())
             }
             err => Err(Error::Unexpected(format!(

@@ -40,10 +40,7 @@ pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalanc
 impl Safe {
     // Create an empty Wallet and return its XOR-URL
     pub async fn wallet_create(&mut self) -> Result<XorUrl> {
-        let xorname = self
-            .safe_app
-            .put_seq_mutable_data(None, WALLET_TYPE_TAG, None)
-            .await?;
+        let xorname = self.safe_app.put_mdata(None, WALLET_TYPE_TAG, None).await?;
 
         XorUrlEncoder::encode_mutable_data(
             xorname,
@@ -91,7 +88,7 @@ impl Safe {
         let md_key = name.unwrap_or_else(|| &xorurl);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
         self.safe_app
-            .seq_mutable_data_insert(
+            .mdata_insert(
                 xorurl_encoder.xorname(),
                 WALLET_TYPE_TAG,
                 &md_key.to_string().into_bytes(),
@@ -114,7 +111,7 @@ impl Safe {
         if default {
             match self
                 .safe_app
-                .seq_mutable_data_insert(
+                .mdata_insert(
                     xorurl_encoder.xorname(),
                     WALLET_TYPE_TAG,
                     WALLET_DEFAULT_BYTES,
@@ -125,7 +122,7 @@ impl Safe {
                 Err(Error::EntryExists(_)) => {
                     let (_, version) = self.wallet_get_default_balance(url).await?;
                     self.safe_app
-                        .seq_mutable_data_update(
+                        .mdata_update(
                             xorurl_encoder.xorname(),
                             WALLET_TYPE_TAG,
                             WALLET_DEFAULT_BYTES,
@@ -229,7 +226,7 @@ impl Safe {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
         let default = self
             .safe_app
-            .seq_mutable_data_get_value(
+            .mdata_get_value(
                 xorurl_encoder.xorname(),
                 xorurl_encoder.type_tag(),
                 WALLET_DEFAULT_BYTES,
@@ -412,11 +409,7 @@ async fn gen_wallet_spendable_balances_list(
     type_tag: u64,
     url: &str,
 ) -> Result<WalletSpendableBalances> {
-    let entries = match safe
-        .safe_app
-        .list_seq_mdata_entries(xorname, type_tag)
-        .await
-    {
+    let entries = match safe.safe_app.mdata_list_entries(xorname, type_tag).await {
         Ok(entries) => entries,
         Err(Error::AccessDenied(_)) => {
             return Err(Error::AccessDenied(format!(
@@ -479,7 +472,7 @@ async fn wallet_get_spendable_balance(
     let the_balance: (WalletSpendableBalance, u64) = {
         let default_balance_vec = safe
             .safe_app
-            .seq_mutable_data_get_value(xorname, type_tag, balance_name)
+            .mdata_get_value(xorname, type_tag, balance_name)
             .await
             .map_err(|_| {
                 Error::ContentError(format!(
@@ -1315,7 +1308,7 @@ mod tests {
     async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let account1_wallet_xorurl = safe.wallet_create().await?;
-        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        let (key_xorurl, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
         safe.wallet_insert(
             &account1_wallet_xorurl,
             Some("my-first-balance"),
@@ -1325,10 +1318,7 @@ mod tests {
         .await?;
 
         let mut another_safe = Safe::default();
-        another_safe
-            .connect("", Some("another-fake-credentials"))
-            .await?;
-        let (key_xorurl, _key_pair) = another_safe.keys_create_preload_test_coins("100.5").await?;
+        another_safe.connect("", None).await?;
 
         // test fail to transfer from a not owned wallet in <from> argument
         match another_safe

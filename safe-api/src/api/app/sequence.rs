@@ -22,8 +22,8 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data, None, 20_000).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
@@ -55,8 +55,8 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data, None, 20_000).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
@@ -80,7 +80,7 @@ impl Safe {
                 // We fetch a specific entry since the URL specifies a specific version
                 let data = self
                     .safe_app
-                    .get_sequence_entry(
+                    .sequence_get_entry(
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
                         version,
@@ -101,7 +101,7 @@ impl Safe {
             None => {
                 // ...then get last entry in the Sequence
                 self.safe_app
-                    .get_sequence_last_entry(xorurl_encoder.xorname(), xorurl_encoder.type_tag())
+                    .sequence_get_last_entry(xorurl_encoder.xorname(), xorurl_encoder.type_tag())
                     .await
             }
         };
@@ -128,8 +128,8 @@ impl Safe {
     /// ```
     /// # use safe_api::Safe;
     /// # let mut safe = Safe::default();
-    /// # safe.connect("", Some("fake-credentials")).unwrap();
     /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data1 = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data1, None, 20_000).await.unwrap();
     ///     let data2 = b"Second in the sequence";
@@ -205,6 +205,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(any(feature = "mock-network", feature = "scl-mock")))]
     async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
         let mut client1 = new_safe_instance().await?;
         let mut client2 = new_safe_instance().await?;
@@ -237,6 +238,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(any(feature = "mock-network", feature = "scl-mock")))]
     #[ignore]
     async fn test_sequence_append_from_other_actor() -> Result<()> {
         let mut client1 = new_safe_instance().await?;

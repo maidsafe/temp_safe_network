@@ -11,18 +11,19 @@ use super::{
     common::parse_hex,
     fetch::Range,
     helpers::{parse_coins_amount, vec_to_hex, xorname_from_pk, xorname_to_hex},
-    safe_net::AppendOnlyDataRawData,
     SafeApp,
 };
 use crate::{Error, Result};
 use async_trait::async_trait;
+use futures::lock::Mutex;
+use lazy_static::lazy_static;
 use log::{debug, trace};
 use safe_nd::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
     XorName,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, io::Write, str};
+use std::{collections::BTreeMap, fs, io::Write, str, sync::Arc};
 use threshold_crypto::{PublicKey, SecretKey};
 use tiny_keccak::sha3_256;
 
@@ -34,8 +35,6 @@ struct SafeKey {
     value: String,
 }
 
-type AppendOnlyDataFake = Vec<(Vec<u8>, Vec<u8>)>;
-type TxStatusList = BTreeMap<String, String>;
 type XorNameStr = String;
 type SeqMutableDataFake = BTreeMap<String, MDataSeqValue>;
 type SequenceDataFake = Vec<Vec<u8>>;
@@ -43,44 +42,76 @@ type SequenceDataFake = Vec<Vec<u8>>;
 #[derive(Default, Serialize, Deserialize)]
 struct FakeData {
     coin_balances: BTreeMap<XorNameStr, SafeKey>,
-    txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
-    published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataFake>, // keep a versioned map of data per xorname
     public_sequence: BTreeMap<XorNameStr, SequenceDataFake>,
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataFake>,
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
 
+lazy_static! {
+    static ref FAKE_DATA_SINGLETON: Arc<Mutex<FakeData>> = {
+        let fake_data = match fs::File::open(&FAKE_VAULT_FILE) {
+            Ok(file) => {
+                let deserialised: FakeData =
+                    serde_json::from_reader(&file).expect("Failed to read fake vault DB file");
+                deserialised
+            }
+            Err(error) => {
+                debug!("Error reading mock file. {}", error.to_string());
+                FakeData::default()
+            }
+        };
+        Arc::new(Mutex::new(fake_data))
+    };
+}
+
 #[derive(Default)]
 pub struct SafeAppFake {
-    fake_vault: FakeData,
+    fake_vault: Arc<Mutex<FakeData>>,
 }
 
 /// Writes the fake Vault data onto the file
 impl Drop for SafeAppFake {
     fn drop(&mut self) {
-        let serialised = serde_json::to_string(&self.fake_vault)
-            .expect("Failed to serialised fake vault data to write on file");
-        trace!("Writing serialised fake vault data = {}", serialised);
+        if Arc::strong_count(&self.fake_vault) <= 2 {
+            // we are the last SafeAppFake instance going out of scope then,
+            // the other ref is from FAKE_DATA_SINGLETON
+            let fake_data: &FakeData = &futures::executor::block_on(self.fake_vault.lock());
+            let serialised = serde_json::to_string(fake_data)
+                .expect("Failed to serialised fake vault data to write on file");
+            trace!("Writing serialised fake vault data = {}", serialised);
 
-        let mut file =
-            fs::File::create(&FAKE_VAULT_FILE).expect("Failed to create fake vault DB file");
-        let _ = file
-            .write(serialised.as_bytes())
-            .expect("Failed to write fake vault DB file");
+            let mut file =
+                fs::File::create(&FAKE_VAULT_FILE).expect("Failed to create fake vault DB file");
+            let _ = file
+                .write(serialised.as_bytes())
+                .expect("Failed to write fake vault DB file");
+        }
     }
 }
 
 impl SafeAppFake {
-    // private helper
-    fn get_balance_from_xorname(&self, xorname: &XorName) -> Result<Coins> {
-        match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
+    // private helpers
+    async fn get_balance_from_xorname(&self, xorname: &XorName) -> Result<Coins> {
+        match self
+            .fake_vault
+            .lock()
+            .await
+            .coin_balances
+            .get(&xorname_to_hex(xorname))
+        {
             None => Err(Error::ContentNotFound("SafeKey data not found".to_string())),
             Some(coin_balance) => parse_coins_amount(&coin_balance.value),
         }
     }
 
-    fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKey> {
-        match self.fake_vault.coin_balances.get(&xorname_to_hex(xorname)) {
+    async fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKey> {
+        match self
+            .fake_vault
+            .lock()
+            .await
+            .coin_balances
+            .get(&xorname_to_hex(xorname))
+        {
             None => Err(Error::ContentNotFound("SafeKey data not found".to_string())),
             Some(coin_balance) => Ok(coin_balance.owner),
         }
@@ -92,7 +123,7 @@ impl SafeAppFake {
             None => Err(Error::NotEnoughBalance(from_balance.to_string())),
             Some(new_balance_coins) => {
                 let from_pk = sk.public_key();
-                self.fake_vault.coin_balances.insert(
+                self.fake_vault.lock().await.coin_balances.insert(
                     xorname_to_hex(&xorname_from_pk(from_pk)),
                     SafeKey {
                         owner: from_pk,
@@ -108,19 +139,9 @@ impl SafeAppFake {
 #[async_trait]
 impl SafeApp for SafeAppFake {
     fn new() -> Self {
-        let fake_vault = match fs::File::open(&FAKE_VAULT_FILE) {
-            Ok(file) => {
-                let deserialised: FakeData =
-                    serde_json::from_reader(&file).expect("Failed to read fake vault DB file");
-                deserialised
-            }
-            Err(error) => {
-                debug!("Error reading mock file. {}", error.to_string());
-                FakeData::default()
-            }
-        };
-
-        Self { fake_vault }
+        Self {
+            fake_vault: Arc::clone(&FAKE_DATA_SINGLETON),
+        }
     }
 
     async fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
@@ -128,6 +149,7 @@ impl SafeApp for SafeAppFake {
         Ok(())
     }
 
+    // === Coins operations ===
     async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
@@ -141,7 +163,7 @@ impl SafeApp for SafeAppFake {
         };
 
         let to_xorname = xorname_from_pk(new_balance_owner);
-        self.fake_vault.coin_balances.insert(
+        self.fake_vault.lock().await.coin_balances.insert(
             xorname_to_hex(&to_xorname),
             SafeKey {
                 owner: new_balance_owner,
@@ -155,7 +177,7 @@ impl SafeApp for SafeAppFake {
     async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         let to_pk = owner_sk.public_key();
         let xorname = xorname_from_pk(to_pk);
-        self.fake_vault.coin_balances.insert(
+        self.fake_vault.lock().await.coin_balances.insert(
             xorname_to_hex(&xorname),
             SafeKey {
                 owner: (to_pk),
@@ -169,7 +191,7 @@ impl SafeApp for SafeAppFake {
     async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
         let pk = sk.public_key();
         let xorname = xorname_from_pk(pk);
-        self.get_balance_from_xorname(&xorname)
+        self.get_balance_from_xorname(&xorname).await
     }
 
     async fn safecoin_transfer_to_xorname(
@@ -183,44 +205,34 @@ impl SafeApp for SafeAppFake {
             return Err(Error::InvalidAmount(amount.to_string()));
         }
 
-        let to_xorname_hex = xorname_to_hex(&to_xorname);
-
-        // generate TX in destination section (to_pk)
-        let mut txs_for_xorname = match self.fake_vault.txs.get(&to_xorname_hex) {
-            Some(txs) => txs.clone(),
-            None => BTreeMap::new(),
-        };
-        txs_for_xorname.insert(tx_id.to_string(), format!("Success({})", amount));
-        self.fake_vault
-            .txs
-            .insert(to_xorname_hex.clone(), txs_for_xorname);
-
         if let Some(sk) = from_sk {
             // reduce balance from safecoin_transferer
             self.substract_coins(sk, amount).await?;
         }
 
         // credit destination
-        let to_balance = self.get_balance_from_xorname(&to_xorname)?;
+        let to_balance = self.get_balance_from_xorname(&to_xorname).await?;
         match to_balance.checked_add(amount) {
             None => Err(Error::Unexpected(
                 "Failed to credit destination due to overflow...maybe a millionaire's problem?!"
                     .to_string(),
             )),
             Some(new_balance_coins) => {
-                self.fake_vault.coin_balances.insert(
-                    to_xorname_hex,
-                    SafeKey {
-                        owner: self.fetch_pk_from_xorname(&to_xorname)?,
-                        value: new_balance_coins.to_string(),
-                    },
-                );
+                let safekey = SafeKey {
+                    owner: self.fetch_pk_from_xorname(&to_xorname).await?,
+                    value: new_balance_coins.to_string(),
+                };
+
+                self.fake_vault
+                    .lock()
+                    .await
+                    .coin_balances
+                    .insert(xorname_to_hex(&to_xorname), safekey);
                 Ok(Transaction { id: tx_id, amount })
             }
         }
     }
 
-    #[allow(dead_code)]
     async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
@@ -233,21 +245,8 @@ impl SafeApp for SafeAppFake {
             .await
     }
 
-    #[allow(dead_code)]
-    async fn get_transaction(&self, tx_id: u64, pk: PublicKey, _sk: SecretKey) -> Result<String> {
-        let xorname = xorname_from_pk(pk);
-        let txs_for_xorname = &self.fake_vault.txs[&xorname_to_hex(&xorname)];
-        let tx_state = txs_for_xorname.get(&tx_id.to_string()).ok_or_else(|| {
-            Error::ContentNotFound(format!("Transaction not found with id '{}'", tx_id))
-        })?;
-        Ok(tx_state.to_string())
-    }
-
-    async fn files_put_published_immutable(
-        &mut self,
-        data: &[u8],
-        dry_run: bool,
-    ) -> Result<XorName> {
+    // === ImmutableData operations ===
+    async fn put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         // We create a XorName based on a hash of the content, not a real one as
         // it doesn't apply self-encryption, but a unique one for our fake SCL
         let vec_hash = sha3_256(&data);
@@ -255,6 +254,8 @@ impl SafeApp for SafeAppFake {
 
         if !dry_run {
             self.fake_vault
+                .lock()
+                .await
                 .published_immutable_data
                 .insert(xorname_to_hex(&xorname), data.to_vec());
         }
@@ -262,13 +263,11 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    async fn files_get_published_immutable(
-        &self,
-        xorname: XorName,
-        range: Range,
-    ) -> Result<Vec<u8>> {
+    async fn get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         let data = match self
             .fake_vault
+            .lock()
+            .await
             .published_immutable_data
             .get(&xorname_to_hex(&xorname))
         {
@@ -290,131 +289,128 @@ impl SafeApp for SafeAppFake {
         Ok(data)
     }
 
-    async fn put_seq_append_only_data(
+    // === MutableData operations ===
+    async fn put_mdata(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
         _tag: u64,
+        // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
         let xorname = name.unwrap_or_else(rand::random);
+        let seq_md = match self
+            .fake_vault
+            .lock()
+            .await
+            .mutable_data
+            .get(&xorname_to_hex(&xorname))
+        {
+            Some(uao) => uao.clone(),
+            None => BTreeMap::new(),
+        };
 
         self.fake_vault
-            .published_seq_append_only
-            .insert(xorname_to_hex(&xorname), data);
+            .lock()
+            .await
+            .mutable_data
+            .insert(xorname_to_hex(&xorname), seq_md);
 
         Ok(xorname)
     }
 
-    async fn append_seq_append_only_data(
+    async fn get_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
+        let xorname_hex = xorname_to_hex(&name);
+        debug!("attempting to locate scl mock mdata: {}", xorname_hex);
+
+        match self.fake_vault.lock().await.mutable_data.get(&xorname_hex) {
+            Some(seq_md) => {
+                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataSeqValue> = BTreeMap::new();
+                seq_md.iter().for_each(|(k, v)| {
+                    seq_md_with_vec.insert(parse_hex(k), v.clone());
+                });
+
+                Ok(SeqMutableData::new_with_data(
+                    name,
+                    tag,
+                    seq_md_with_vec,
+                    BTreeMap::default(),
+                    SafeNdPublicKey::Bls(SecretKey::random().public_key()),
+                ))
+            }
+            None => Err(Error::ContentNotFound(format!(
+                "Sequenced MutableData not found at Xor name: {}",
+                xorname_hex
+            ))),
+        }
+    }
+
+    async fn mdata_insert(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
-        _new_version: u64,
         name: XorName,
-        _tag: u64,
-    ) -> Result<u64> {
-        let xorname_hex = xorname_to_hex(&name);
-        let mut seq_append_only = match self.fake_vault.published_seq_append_only.get(&xorname_hex)
-        {
-            Some(seq_append_only) => seq_append_only.clone(),
-            None => {
-                return Err(Error::ContentNotFound(format!(
-                    "Sequenced AppendOnlyData not found at Xor name: {}",
-                    xorname_hex
-                )))
-            }
-        };
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<()> {
+        let seq_md = self.get_mdata(name, tag).await?;
+        let mut data = seq_md.entries().clone();
 
-        seq_append_only.extend(data);
+        data.insert(
+            key.to_vec(),
+            MDataSeqValue {
+                data: value.to_vec(),
+                version: 0,
+            },
+        );
+
+        let mut seq_md_with_str: BTreeMap<String, MDataSeqValue> = BTreeMap::new();
+        data.iter().for_each(|(k, v)| {
+            seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
+        });
         self.fake_vault
-            .published_seq_append_only
-            .insert(xorname_hex, seq_append_only.to_vec());
+            .lock()
+            .await
+            .mutable_data
+            .insert(xorname_to_hex(&name), seq_md_with_str);
 
-        Ok((seq_append_only.len() - 1) as u64)
+        Ok(())
     }
 
-    async fn get_latest_seq_append_only_data(
-        &self,
-        name: XorName,
-        _tag: u64,
-    ) -> Result<(u64, AppendOnlyDataRawData)> {
-        let xorname_hex = xorname_to_hex(&name);
-        debug!("Attempting to locate scl mock mdata: {}", xorname_hex);
-
-        match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
-            Some(seq_append_only) => {
-                let latest_index = if seq_append_only.is_empty() {
-                    0
-                } else {
-                    seq_append_only.len() - 1
-                };
-                let last_entry = seq_append_only.get(latest_index).ok_or_else(|| {
-                    Error::EmptyContent(format!(
-                        "Empty Sequenced AppendOnlyData found at Xor name {}",
-                        xorname_hex
-                    ))
-                })?;
-                Ok(((seq_append_only.len() - 1) as u64, last_entry.clone()))
-            }
-            None => Err(Error::ContentNotFound(format!(
-                "Sequenced AppendOnlyData not found at Xor name: {}",
-                xorname_hex
+    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue> {
+        let seq_md = self.get_mdata(name, tag).await?;
+        match seq_md.get(&key.to_vec()) {
+            Some(value) => Ok(value.clone()),
+            None => Err(Error::EntryNotFound(format!(
+                "Entry not found in Sequenced MutableData found at Xor name: {}",
+                xorname_to_hex(&name)
             ))),
         }
     }
 
-    async fn get_current_seq_append_only_data_version(
+    async fn mdata_list_entries(
         &self,
         name: XorName,
-        _tag: u64,
-    ) -> Result<u64> {
-        debug!("Getting seq appendable data, length for: {:?}", name);
-        let xorname_hex = xorname_to_hex(&name);
-        let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
-            Some(seq_append_only) => seq_append_only.len(),
-            None => {
-                return Err(Error::ContentNotFound(format!(
-                    "Sequenced AppendOnlyData not found at Xor name: {}",
-                    xorname_hex
-                )))
-            }
-        };
+        tag: u64,
+    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
+        debug!("Listing seq_mdata_entries for: {}", name);
+        let seq_md = self.get_mdata(name, tag).await?;
+        let mut res = BTreeMap::new();
+        seq_md.entries().iter().for_each(|elem| {
+            res.insert(elem.0.clone(), elem.1.clone());
+        });
 
-        // return the version
-        Ok((length - 1) as u64)
+        Ok(res)
     }
 
-    async fn get_seq_append_only_data(
-        &self,
+    async fn mdata_update(
+        &mut self,
         name: XorName,
-        _tag: u64,
-        version: u64,
-    ) -> Result<AppendOnlyDataRawData> {
-        let xorname_hex = xorname_to_hex(&name);
-        match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
-            Some(seq_append_only) => {
-                if version >= seq_append_only.len() as u64 {
-                    Err(Error::VersionNotFound(format!(
-                        "Invalid version ({}) for Sequenced AppendOnlyData found at Xor name {}",
-                        version, name
-                    )))
-                } else {
-                    let index = version as usize;
-                    let entry = seq_append_only.get(index).ok_or_else(|| {
-                        Error::EmptyContent(format!(
-                            "Empty Sequenced AppendOnlyData found at Xor name {}",
-                            xorname_hex
-                        ))
-                    })?;
-
-                    Ok(entry.clone())
-                }
-            }
-            None => Err(Error::ContentNotFound(format!(
-                "Sequenced AppendOnlyData not found at Xor name: {}",
-                xorname_hex
-            ))),
-        }
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
+        _version: u64,
+    ) -> Result<()> {
+        let _ = self.mdata_get_value(name, tag, key).await;
+        self.mdata_insert(name, tag, key, value).await
     }
 
     // === Sequence data operations ===
@@ -426,19 +422,28 @@ impl SafeApp for SafeAppFake {
         _permissions: Option<String>,
     ) -> Result<XorName> {
         let xorname = name.unwrap_or_else(rand::random);
+        let xorname_hex = xorname_to_hex(&xorname);
         let initial_data = vec![data.to_vec()];
         self.fake_vault
+            .lock()
+            .await
             .public_sequence
-            .insert(xorname_to_hex(&xorname), initial_data);
+            .insert(xorname_hex, initial_data);
 
         Ok(xorname)
     }
 
-    async fn get_sequence_last_entry(&self, name: XorName, _tag: u64) -> Result<(u64, Vec<u8>)> {
+    async fn sequence_get_last_entry(&self, name: XorName, _tag: u64) -> Result<(u64, Vec<u8>)> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate Sequence in scl mock: {}", xorname_hex);
 
-        match self.fake_vault.public_sequence.get(&xorname_hex) {
+        match self
+            .fake_vault
+            .lock()
+            .await
+            .public_sequence
+            .get(&xorname_hex)
+        {
             Some(seq) => {
                 if seq.is_empty() {
                     Err(Error::EmptyContent(format!(
@@ -463,11 +468,17 @@ impl SafeApp for SafeAppFake {
         }
     }
 
-    async fn get_sequence_entry(&self, name: XorName, _tag: u64, index: u64) -> Result<Vec<u8>> {
+    async fn sequence_get_entry(&self, name: XorName, _tag: u64, index: u64) -> Result<Vec<u8>> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate Sequence in scl mock: {}", xorname_hex);
 
-        match self.fake_vault.public_sequence.get(&xorname_hex) {
+        match self
+            .fake_vault
+            .lock()
+            .await
+            .public_sequence
+            .get(&xorname_hex)
+        {
             Some(seq) => {
                 if seq.is_empty() {
                     Err(Error::EmptyContent(format!(
@@ -498,7 +509,13 @@ impl SafeApp for SafeAppFake {
             xorname_hex
         );
 
-        match self.fake_vault.public_sequence.get_mut(&xorname_hex) {
+        match self
+            .fake_vault
+            .lock()
+            .await
+            .public_sequence
+            .get_mut(&xorname_hex)
+        {
             Some(seq) => {
                 seq.push(data.to_vec());
                 Ok(())
@@ -508,125 +525,6 @@ impl SafeApp for SafeAppFake {
                 xorname_hex
             ))),
         }
-    }
-
-    // === MutableData operations ===
-    async fn put_seq_mutable_data(
-        &mut self,
-        name: Option<XorName>,
-        _tag: u64,
-        // _data: Option<String>,
-        _permissions: Option<String>,
-    ) -> Result<XorName> {
-        let xorname = name.unwrap_or_else(rand::random);
-        let seq_md = match self.fake_vault.mutable_data.get(&xorname_to_hex(&xorname)) {
-            Some(uao) => uao.clone(),
-            None => BTreeMap::new(),
-        };
-
-        self.fake_vault
-            .mutable_data
-            .insert(xorname_to_hex(&xorname), seq_md);
-
-        Ok(xorname)
-    }
-
-    async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
-        let xorname_hex = xorname_to_hex(&name);
-        debug!("attempting to locate scl mock mdata: {}", xorname_hex);
-
-        match self.fake_vault.mutable_data.get(&xorname_hex) {
-            Some(seq_md) => {
-                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataSeqValue> = BTreeMap::new();
-                seq_md.iter().for_each(|(k, v)| {
-                    seq_md_with_vec.insert(parse_hex(k), v.clone());
-                });
-
-                Ok(SeqMutableData::new_with_data(
-                    name,
-                    tag,
-                    seq_md_with_vec,
-                    BTreeMap::default(),
-                    SafeNdPublicKey::Bls(SecretKey::random().public_key()),
-                ))
-            }
-            None => Err(Error::ContentNotFound(format!(
-                "Sequenced MutableData not found at Xor name: {}",
-                xorname_hex
-            ))),
-        }
-    }
-
-    async fn seq_mutable_data_insert(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-    ) -> Result<()> {
-        let seq_md = self.get_seq_mdata(name, tag).await?;
-        let mut data = seq_md.entries().clone();
-
-        data.insert(
-            key.to_vec(),
-            MDataSeqValue {
-                data: value.to_vec(),
-                version: 0,
-            },
-        );
-
-        let mut seq_md_with_str: BTreeMap<String, MDataSeqValue> = BTreeMap::new();
-        data.iter().for_each(|(k, v)| {
-            seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
-        });
-        self.fake_vault
-            .mutable_data
-            .insert(xorname_to_hex(&name), seq_md_with_str);
-
-        Ok(())
-    }
-
-    async fn seq_mutable_data_get_value(
-        &self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-    ) -> Result<MDataSeqValue> {
-        let seq_md = self.get_seq_mdata(name, tag).await?;
-        match seq_md.get(&key.to_vec()) {
-            Some(value) => Ok(value.clone()),
-            None => Err(Error::EntryNotFound(format!(
-                "Entry not found in Sequenced MutableData found at Xor name: {}",
-                xorname_to_hex(&name)
-            ))),
-        }
-    }
-
-    async fn list_seq_mdata_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
-        debug!("Listing seq_mdata_entries for: {}", name);
-        let seq_md = self.get_seq_mdata(name, tag).await?;
-        let mut res = BTreeMap::new();
-        seq_md.entries().iter().for_each(|elem| {
-            res.insert(elem.0.clone(), elem.1.clone());
-        });
-
-        Ok(res)
-    }
-
-    async fn seq_mutable_data_update(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-        _version: u64,
-    ) -> Result<()> {
-        let _ = self.seq_mutable_data_get_value(name, tag, key).await;
-        self.seq_mutable_data_insert(name, tag, key, value).await
     }
 }
 
@@ -708,7 +606,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_safecoin_transfer() -> Result<()> {
-        use rand_core::RngCore;
         use threshold_crypto::SecretKey;
 
         let mut mock = SafeAppFake::new();
@@ -727,9 +624,7 @@ mod tests {
         assert_eq!(balance1, curr_balance1);
         assert_eq!(balance2, curr_balance2);
 
-        let mut rng = rand::thread_rng();
-        let tx_id = rng.next_u64();
-
+        let tx_id = rand::random();
         let _ = mock
             .safecoin_transfer_to_xorname(
                 Some(sk1.clone()),
@@ -738,8 +633,6 @@ mod tests {
                 coins_from_str("1.4")?,
             )
             .await?;
-
-        mock.get_transaction(tx_id, pk2, sk2.clone()).await?;
 
         let curr_balance1 = mock.get_balance_from_sk(sk1).await?;
         let curr_balance2 = mock.get_balance_from_sk(sk2).await?;

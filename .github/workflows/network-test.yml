@@ -6,7 +6,7 @@ env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  SAFE_VAULT_VERSION: "0.23.0"
+  SAFE_VAULT_VERSION: "0.24.0"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
@@ -14,7 +14,6 @@ jobs:
   network-test:
     name: E2E against real baby
     runs-on: ubuntu-latest
-    if: false
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust
@@ -25,7 +24,7 @@ jobs:
           override: true
       - run: mkdir -p ~/.safe/vault
       - name: dl vault
-        run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
+        run: wget https://github.com/bochaco/safe_vault/releases/download/testing/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
       - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
       - name: Build
         run: cargo build --release

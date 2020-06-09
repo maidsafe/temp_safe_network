@@ -244,13 +244,13 @@ impl Safe {
         let data = match xorurl_encoder.content_version() {
             None => {
                 self.safe_app
-                    .get_sequence_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
+                    .sequence_get_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
                     .await
             }
             Some(content_version) => {
                 let serialised_nrs_map = self
                     .safe_app
-                    .get_sequence_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, content_version)
+                    .sequence_get_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, content_version)
                     .await
                     .map_err(|_| {
                         Error::VersionNotFound(format!(
