@@ -23,6 +23,20 @@ pub enum VaultSubCommands {
         #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
         vault_path: Option<PathBuf>,
     },
+    #[structopt(name = "join")]
+    /// Join a already running network
+    Join {
+        #[structopt(long = "vault-path")]
+        /// Path where to install safe-vault executable (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can be also used to set the path
+        #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
+        vault_path: Option<PathBuf>,
+        /// Vebosity level for vaults logs
+        #[structopt(short = "y", parse(from_occurrences))]
+        verbosity: u8,
+        /// Hardcoded contact IP to be used to join a already running network.
+        #[structopt(long = "ip")]
+        ip: Option<String>,
+    },
     #[structopt(name = "run-baby-fleming")]
     /// Run vaults to form a local single-section SAFE network
     Run {
@@ -62,6 +76,11 @@ pub enum VaultSubCommands {
 pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
     match cmd {
         Some(VaultSubCommands::Install { vault_path }) => vault_install(vault_path),
+        Some(VaultSubCommands::Join {
+            vault_path,
+            verbosity,
+            ip,
+        }) => vault_join(vault_path, VAULTS_DATA_FOLDER, verbosity, ip),
         Some(VaultSubCommands::Run {
             vault_path,
             verbosity,

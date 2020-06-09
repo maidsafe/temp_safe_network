@@ -12,7 +12,7 @@ use directories::BaseDirs;
 use log::debug;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_nlt::run_with;
+use safe_nlt::{join_with, run_with};
 use std::{
     collections::HashMap,
     fs::create_dir_all,
@@ -181,6 +181,61 @@ pub fn vault_run(
         run_safe_cmd(&login, Some(env), report_errors, verbosity)?;
     }
 
+    Ok(())
+}
+
+pub fn vault_join(
+    vault_path: Option<PathBuf>,
+    vaults_dir: &str,
+    verbosity: u8,
+    ip: Option<String>,
+) -> Result<(), String> {
+    let vault_path = get_vault_bin_path(vault_path)?;
+
+    let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
+    debug!("Running vault from {}", arg_vault_path);
+
+    let vaults_dir = vault_path.join(vaults_dir);
+    if !vaults_dir.exists() {
+        println!("Creating '{}' folder", vaults_dir.display());
+        create_dir_all(vaults_dir.clone()).map_err(|err| {
+            format!(
+                "Couldn't create target path to store vaults' generated data: {}",
+                err
+            )
+        })?;
+    }
+    let arg_vaults_dir = vaults_dir.display().to_string();
+    println!("Storing vaults' generated data at {}", arg_vaults_dir);
+
+    // Let's create an args array to pass to the network launcher tool
+    let mut nlt_args = vec![
+        "safe-nlt-join",
+        "-v",
+        "--vault-path",
+        &arg_vault_path,
+        "--vaults-dir",
+        &arg_vaults_dir,
+    ];
+
+    let mut verbosity_arg = String::from("-");
+    if verbosity > 0 {
+        let v = "y".repeat(verbosity as usize);
+        println!("V: {}", v);
+        verbosity_arg.push_str(&v);
+        nlt_args.push(&verbosity_arg);
+    }
+
+    if let Some(ref hardcoded_contact_ip) = ip {
+        nlt_args.push("--ip");
+        nlt_args.push(hardcoded_contact_ip);
+    };
+
+    debug!("Running network launch tool with args: {:?}", nlt_args);
+
+    // We can now call the tool with the args
+    println!("Launching local SAFE network...");
+    join_with(Some(&nlt_args))?;
     Ok(())
 }
 
