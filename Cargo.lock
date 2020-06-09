@@ -145,7 +145,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a45cee2749d880d7066e328a7e161c7470ced883b2fd000ca4643e9f1dd5083a"
 dependencies = [
  "async-task",
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "futures-channel",
  "futures-core",
  "futures-io",
@@ -389,7 +389,6 @@ dependencies = [
  "byteorder",
  "either",
  "iovec",
- "serde",
 ]
 
 [[package]]
@@ -397,6 +396,9 @@ name = "bytes"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "130aac562c0dd69c56b3b1cc8ffd2e17be31d0b6c25b61c96b76231aa23e39e1"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "cargo-husky"
@@ -639,20 +641,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69323bff1fb41c635347b8ead484a5ca6c3f11914d784170b158d8449ab07f8e"
 dependencies = [
  "cfg-if",
- "crossbeam-channel 0.4.2",
+ "crossbeam-channel",
  "crossbeam-deque",
  "crossbeam-epoch",
  "crossbeam-queue",
- "crossbeam-utils 0.7.2",
-]
-
-[[package]]
-name = "crossbeam-channel"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8ec7fcd21571dc78f96cc96243cab8d8f035247c3efd16c687be154c3fa9efa"
-dependencies = [
- "crossbeam-utils 0.6.6",
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -661,7 +654,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cced8691919c02aac3cb0a1bc2e9b73d89e832bf9a06fc579d4e71b68a2da061"
 dependencies = [
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "maybe-uninit",
 ]
 
@@ -672,7 +665,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f02af974daeee82218205558e51ec8768b48cf524bd01d550abe5573a608285"
 dependencies = [
  "crossbeam-epoch",
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "maybe-uninit",
 ]
 
@@ -684,7 +677,7 @@ checksum = "058ed274caafc1f60c4997b5fc07bf7dc7cca454af7c6e81edffe5f33f70dace"
 dependencies = [
  "autocfg 1.0.0",
  "cfg-if",
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "lazy_static",
  "maybe-uninit",
  "memoffset",
@@ -698,17 +691,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c695eeca1e7173472a32221542ae469b3e9aac3a4fc81f7696bcad82029493db"
 dependencies = [
  "cfg-if",
- "crossbeam-utils 0.7.2",
-]
-
-[[package]]
-name = "crossbeam-utils"
-version = "0.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04973fa96e96579258a5091af6003abde64af786b860f18622b82e026cca60e6"
-dependencies = [
- "cfg-if",
- "lazy_static",
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -2348,7 +2331,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b0deb65f46e873ba8aa7c6a8dbe3f23cb1bf59c339a81a1d56361dde4d66ac8"
 dependencies = [
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "futures-io",
  "futures-sink",
  "futures-util",
@@ -2527,14 +2510,14 @@ dependencies = [
 
 [[package]]
 name = "quic-p2p"
-version = "0.5.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae212c9a93beeb003cba5bea4a0d8af7a5b557619a3a04e7e12bf2c9f90cb055"
+checksum = "1e9a3d2dc326b4094f599118fdaa8565bd14204b685b91301c47db74c4a41ee7"
 dependencies = [
  "base64 0.10.1",
  "bincode",
- "bytes 0.4.12",
- "crossbeam-channel 0.3.9",
+ "bytes 0.5.4",
+ "crossbeam-channel",
  "derive_more",
  "directories 1.0.2",
  "err-derive",
@@ -2568,9 +2551,9 @@ dependencies = [
 
 [[package]]
 name = "quinn"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cea81de5e0f97f552239ce4eff6fa8e8b0e3ec0ba5a8f1d84fb2096f4ba2ad41"
+checksum = "88de58d76d8f82fb28e5c89302119c102bb5b9ce57b034186b559b63ba147a0f"
 dependencies = [
  "bytes 0.5.4",
  "err-derive",
@@ -2586,9 +2569,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b70cb5efbbd520ef4a5361fb0ec64360dcd873cfb76c1be2f1d2594729d7b5a"
+checksum = "f0ea0a358c179c6b7af34805c675d1664a9c6a234a7acd7efdbb32d2f39d3d2a"
 dependencies = [
  "bytes 0.5.4",
  "err-derive",
@@ -2816,7 +2799,7 @@ checksum = "08a89b46efaf957e52b18062fb2f4660f8b8a4dde1807ca002690868ef2c85a9"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-queue",
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "lazy_static",
  "num_cpus",
 ]
@@ -3028,7 +3011,7 @@ dependencies = [
  "base64 0.11.0",
  "blake2b_simd",
  "constant_time_eq",
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -3251,9 +3234,9 @@ dependencies = [
 
 [[package]]
 name = "safe-nd"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d22dcd7515d740dd0133c19c738830da96813e33dcc949849025d871de59564d"
+checksum = "900fe3baee261f7c9b1532c5f401c391e7445f444a5a4bccc032326052582030"
 dependencies = [
  "bincode",
  "ed25519-dalek",
@@ -3270,7 +3253,7 @@ dependencies = [
 [[package]]
 name = "safe-nlt"
 version = "0.0.1"
-source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#419cf1ade6347abfeba5c6d7f1cb48d708f96320"
+source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#b1b73f06f336728316e87abbd7fa71ab2723d391"
 dependencies = [
  "directories 2.0.2",
  "env_logger 0.7.1",
@@ -3281,9 +3264,9 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f345ae9e25ddadc63567a8320de9d7157bba30dfda937084d1153aa87a83e6ef"
+checksum = "a2725dbf414dccc0a77f8eb1b784c2423297c362b0350a14787ef148c1e926ca"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3309,9 +3292,9 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee99a274b1bbd6729d772621367d564dbaf44681105206f9c787756e8509a8fd"
+checksum = "276db07b0a1280db6260e1d11dbeede7f5ca09716d60846e5120dfdd8e532275"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3334,9 +3317,9 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator_ffi"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3bd1fd45dbb93d45b41e8f66302cea16af925cd982e9279589850562177edf9"
+checksum = "ffc4a50024bffe9b5c272567ad130178796f69a34240e82509f6cd985b44b568"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3376,15 +3359,15 @@ dependencies = [
 
 [[package]]
 name = "safe_core"
-version = "0.41.0"
+version = "0.41.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b385ab087241bc9b928161f8905bab4c076b60b1bc10e2d998d66690b60784c"
+checksum = "87670d2e94e14e57972de4c79d9d6f026f94d9bb5f109ce3cdbfc40ddf9e09a2"
 dependencies = [
  "async-trait",
  "bincode",
- "bytes 0.4.12",
+ "bytes 0.5.4",
  "chrono",
- "crossbeam-channel 0.3.9",
+ "crossbeam-channel",
  "data-encoding",
  "directories 2.0.2",
  "env_logger 0.6.2",
@@ -4153,7 +4136,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb2d1b8f4548dbf5e1f7818512e9c406860678f29c300cdf0ebac72d1a3a1671"
 dependencies = [
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "futures 0.1.29",
 ]
 
@@ -4185,7 +4168,7 @@ version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09bc590ec4ba8ba87652da2068d150dcada2cfa2e07faae270a5e0409aa51351"
 dependencies = [
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "futures 0.1.29",
  "lazy_static",
  "log 0.4.8",
@@ -4242,7 +4225,7 @@ checksum = "df720b6581784c118f0eb4310796b12b1d242a7eb95f716a8367855325c25f89"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-queue",
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "futures 0.1.29",
  "lazy_static",
  "log 0.4.8",
@@ -4257,7 +4240,7 @@ version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93044f2d313c95ff1cb7809ce9a7a05735b012288a888b62d4434fd58c94f296"
 dependencies = [
- "crossbeam-utils 0.7.2",
+ "crossbeam-utils",
  "futures 0.1.29",
  "slab",
  "tokio-executor",

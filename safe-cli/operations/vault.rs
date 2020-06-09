@@ -110,6 +110,7 @@ pub fn vault_run(
         &arg_vaults_dir,
         "--interval",
         &interval,
+        "--local",
     ];
 
     let interval_as_int = &interval.parse::<u64>().unwrap();
