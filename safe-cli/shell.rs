@@ -108,6 +108,12 @@ pub fn shell_run() -> Result<(), String> {
         |io, (safe, _safe_authd_client), args| call_cli("files", args, safe, io),
     );
     shell.new_command(
+        "seq",
+        "Manage Sequences on the SAFE Network",
+        0,
+        |io, (safe, _safe_authd_client), args| call_cli("seq", args, safe, io),
+    );
+    shell.new_command(
         "keypair",
         "Generate a key pair without creating and/or storing a SafeKey on the network",
         0,

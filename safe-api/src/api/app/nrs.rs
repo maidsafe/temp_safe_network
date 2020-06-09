@@ -170,7 +170,7 @@ impl Safe {
                     )
                     .await?;
 
-                let xorurl = XorUrlEncoder::encode_append_only_data(
+                let xorurl = XorUrlEncoder::encode_sequence_data(
                     xorname,
                     NRS_MAP_TYPE_TAG,
                     SafeContentType::NrsMapContainer,

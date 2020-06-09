@@ -10,11 +10,19 @@
 use crate::{BlsKeyPair, Error, Result, Safe};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use std::env::var;
+
+// Environment variable where to read auth credentials to be used for all safe-api tests
+const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 
 // Instantiate a Safe instance
 pub async fn new_safe_instance() -> Result<Safe> {
     let mut safe = Safe::default();
-    safe.connect("", Some("fake-credentials")).await?;
+    let credentials = match var(TEST_AUTH_CREDENTIALS) {
+        Ok(val) => val,
+        Err(_) => "fake-credentials".to_string(),
+    };
+    safe.connect("", Some(&credentials)).await?;
     Ok(safe)
 }
 

@@ -42,7 +42,7 @@ pub mod xorurl;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use keys::BlsKeyPair;
 pub use nrs::ProcessedEntries;
-pub use safe_nd::XorName;
+pub use safe_nd::{XorName, XOR_NAME_LEN};
 
 pub struct Safe {
     safe_app: SafeAppImpl,

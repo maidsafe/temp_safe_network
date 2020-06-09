@@ -162,8 +162,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_sequence_create() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let initial_data = b"initial data";
+
         let xorurl = safe.sequence_create(initial_data, None, 25_000).await?;
         let received_data = safe.sequence_get(&xorurl).await?;
         assert_eq!(received_data, (0, initial_data.to_vec()));
@@ -172,13 +173,133 @@ mod tests {
 
     #[tokio::test]
     async fn test_sequence_append() -> Result<()> {
-        let mut safe = new_safe_instance()?;
-        let data1 = b"First in the sequence";
-        let xorurl = safe.sequence_create(data1, None, 25_000).await?;
-        let data2 = b"Second in the sequence";
-        safe.sequence_append(&xorurl, data2).await?;
-        let received_data = safe.sequence_get(&format!("{}?v=1", xorurl)).await?;
-        assert_eq!(received_data, (1, data2.to_vec()));
+        let mut safe = new_safe_instance().await?;
+        let data_v0 = b"First in the sequence";
+        let data_v1 = b"Second in the sequence";
+
+        let xorurl = safe.sequence_create(data_v0, None, 25_000).await?;
+        safe.sequence_append(&xorurl, data_v1).await?;
+
+        let received_data_v0 = safe.sequence_get(&format!("{}?v=0", xorurl)).await?;
+        let received_data_v1 = safe.sequence_get(&xorurl).await?;
+        assert_eq!(received_data_v0, (0, data_v0.to_vec()));
+        assert_eq!(received_data_v1, (1, data_v1.to_vec()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sequence_read_from_second_client() -> Result<()> {
+        let mut client1 = new_safe_instance().await?;
+        let data_v0 = b"First in the sequence";
+        let data_v1 = b"Second in the sequence";
+
+        let xorurl = client1.sequence_create(data_v0, None, 25_000).await?;
+        client1.sequence_append(&xorurl, data_v1).await?;
+
+        let client2 = new_safe_instance().await?;
+        let received_data_v0 = client2.sequence_get(&format!("{}?v=0", xorurl)).await?;
+        let received_data_v1 = client2.sequence_get(&xorurl).await?;
+        assert_eq!(received_data_v0, (0, data_v0.to_vec()));
+        assert_eq!(received_data_v1, (1, data_v1.to_vec()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
+        let mut client1 = new_safe_instance().await?;
+        let mut client2 = new_safe_instance().await?;
+        let data_v0 = b"First from client1";
+        let data_v1 = b"First from client2";
+
+        let xorurl = client1.sequence_create(data_v0, None, 25_000).await?;
+        client2.sequence_append(&xorurl, data_v1).await?;
+
+        let received_client1 = client1.sequence_get(&xorurl).await?;
+        let received_client2 = client2.sequence_get(&xorurl).await?;
+
+        // client1 sees only data_v0 as version 0 since it's using its own replica
+        // it didn't see the append from client2 even it was merged on the network
+        assert_eq!(received_client1, (0, data_v0.to_vec()));
+
+        // client2 sees data_v1 as version 1 since it fetched v0 before appending
+        assert_eq!(received_client2, (1, data_v1.to_vec()));
+
+        // a third client should see all versions now since it'll fetch from the
+        // replicas on the network which have merged all appends from client1 and client2,
+        let client3 = new_safe_instance().await?;
+        let received_v0 = client3.sequence_get(&format!("{}?v=0", xorurl)).await?;
+        assert_eq!((0, data_v0.to_vec()), received_v0);
+
+        let received_v1 = client3.sequence_get(&xorurl).await?;
+        assert_eq!((1, data_v1.to_vec()), received_v1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_sequence_append_from_other_actor() -> Result<()> {
+        let mut client1 = new_safe_instance().await?;
+        let mut client2 = new_safe_instance().await?;
+        let data_v0 = b"First from client1";
+        let data_v1 = b"First from client2";
+        let data_v2 = b"Second from client1";
+        let data_v3 = b"Second from client2";
+
+        let xorurl = client1.sequence_create(data_v0, None, 25_000).await?;
+        client2.sequence_append(&xorurl, data_v1).await?;
+        client1.sequence_append(&xorurl, data_v2).await?;
+        client2.sequence_append(&xorurl, data_v3).await?;
+
+        let received_client1 = client1.sequence_get(&xorurl).await?;
+        let received_client2 = client2.sequence_get(&xorurl).await?;
+
+        // client1 sees only data_v2 but as version 1 since it's using its own replica
+        // it didn't see any of the appends from client2 even they were being merged on the network
+        assert_eq!(received_client1, (1, data_v2.to_vec()));
+
+        // client2 sees data_v3 but as version 2 since it's using its own replica which
+        // includes the v0 created from client1, altohugh it didn't see the other append
+        // from client1 even it was merged on the network
+        assert_eq!(received_client2, (2, data_v3.to_vec()));
+
+        // a third client should see all versions now since it'll fetch from the
+        // replicas on the network which have merged all appends from client1 and client2
+        let client3 = new_safe_instance().await?;
+        println!("FETCHING: {}", xorurl);
+        let received_client3 = client3.sequence_get(&format!("{}?v=0", xorurl)).await?;
+        println!(
+            "v{} := {:?}",
+            received_client3.0,
+            std::str::from_utf8(&received_client3.1).unwrap()
+        );
+        assert_eq!((0, data_v0.to_vec()), received_client3);
+
+        let received_client3 = client3.sequence_get(&format!("{}?v=1", xorurl)).await?;
+        println!(
+            "v{} := {:?}",
+            received_client3.0,
+            std::str::from_utf8(&received_client3.1).unwrap()
+        );
+        //        assert_eq!((1, data_v1.to_vec()), received_client3);
+
+        let received_client3 = client3.sequence_get(&format!("{}?v=2", xorurl)).await?;
+        println!(
+            "v{} := {:?}",
+            received_client3.0,
+            std::str::from_utf8(&received_client3.1).unwrap()
+        );
+        //        assert_eq!((2, data_v2.to_vec()), received_client3);
+
+        let received_client3 = client3.sequence_get(&format!("{}?v=3", xorurl)).await?;
+        //let received_client3 = client3.sequence_get(&xorurl).await?;
+        println!(
+            "v{} := {:?}",
+            received_client3.0,
+            std::str::from_utf8(&received_client3.1).unwrap()
+        );
+        //        assert_eq!((3, data_v3.to_vec()), received_client3);
+
         Ok(())
     }
 }

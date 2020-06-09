@@ -12,7 +12,7 @@ use ansi_term::Style;
 use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::{nrs_map::NrsMap, XorName};
+use safe_api::{nrs_map::NrsMap, XorName, XOR_NAME_LEN};
 use serde::ser::Serialize;
 use std::{
     collections::BTreeMap,
@@ -31,11 +31,13 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
 
 // Converts a hex encoded string to XOR name bytes
 pub fn hex_to_xorname(hex_str: &str) -> Result<XorName, String> {
-    if hex_str.len() != 32 {
+    if hex_str.len() != XOR_NAME_LEN {
         Err("Invalid hex encoded XorName string".to_string())
     } else {
         let mut xorname = XorName::default();
-        xorname.0.copy_from_slice(hex_str[0..32].as_bytes());
+        xorname
+            .0
+            .copy_from_slice(hex_str[0..XOR_NAME_LEN].as_bytes());
         Ok(xorname)
     }
 }

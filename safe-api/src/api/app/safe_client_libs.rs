@@ -27,8 +27,8 @@ use safe_nd::{
     ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData, ClientFullId, Coins,
     Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet, MDataSeqEntryActions,
     MDataSeqValue, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey, SData, SDataAddress,
-    SDataAppendOperation, SDataIndex, SDataPermissions, SDataPubPermissions,
-    SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction, TransactionId, XorName,
+    SDataIndex, SDataPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
+    SeqMutableData, Transaction, TransactionId, XorName,
 };
 use std::collections::BTreeMap;
 
@@ -521,14 +521,9 @@ impl SafeApp for SafeAppScl {
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
-        let public_key = SafeNdPublicKey::Bls(get_public_bls_key(safe_app)?);
+        let public_key = SafeNdPublicKey::Bls(get_public_bls_key(safe_app).await?);
         let mut pub_sequence = SData::new_pub(public_key, xorname, tag);
-        pub_sequence.append(vec![data.to_vec()]).map_err(|e| {
-            Error::Unexpected(format!(
-                "Failed to set the initial data to the Sequence data: {:?}",
-                e
-            ))
-        })?;
+        let _op = pub_sequence.append(data.to_vec());
 
         let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
         let user_perms = SDataPubUserPermissions::new(true, true);
@@ -547,16 +542,16 @@ impl SafeApp for SafeAppScl {
                 ))
             })?;
 
-        let usr_acc_owner = get_owner_pk(safe_app)?;
+        let usr_acc_owner = safe_app.client.owner_key().await;
         pub_sequence.set_owner(usr_acc_owner);
 
-        run(safe_app, move |client, _app_context| {
-            client
-                .store_sdata(pub_sequence.clone())
-                .map_err(SafeAppError)
-                .map(move |_| xorname)
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to store Sequence data: {:?}", e)))
+        safe_app
+            .client
+            .store_sdata(pub_sequence.clone())
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to store Sequence data: {:?}", e)))?;
+
+        Ok(xorname)
     }
 
     async fn get_sequence_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)> {
@@ -568,23 +563,20 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
 
         let sequence_address = SDataAddress::Public { name, tag };
-        let res = run(safe_app, move |client, _app_context| {
-            client
-                .get_sdata_last_entry(sequence_address)
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| {
-            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
-                Error::EmptyContent(format!("Empty Sequence found at XoR name {}", name))
-            } else {
-                Error::NetDataError(format!(
-                    "Failed to retrieve last entry from Sequence data: {:?}",
-                    err
-                ))
-            }
-        })?;
-
-        Ok(res)
+        safe_app
+            .client
+            .get_sdata_last_entry(sequence_address)
+            .await
+            .map_err(|err| {
+                if let SafeCoreError::DataError(SafeNdError::NoSuchEntry) = err {
+                    Error::EmptyContent(format!("Empty Sequence found at XoR name {}", name))
+                } else {
+                    Error::NetDataError(format!(
+                        "Failed to retrieve last entry from Sequence data: {:?}",
+                        err
+                    ))
+                }
+            })
     }
 
     async fn get_sequence_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>> {
@@ -598,24 +590,23 @@ impl SafeApp for SafeAppScl {
         let sequence_address = SDataAddress::Public { name, tag };
         let start = SDataIndex::FromStart(index);
         let end = SDataIndex::FromStart(index + 1);
-        let res = run(safe_app, move |client, _app_context| {
-            client
-                .get_sdata_range(sequence_address, (start, end))
-                .map_err(SafeAppError)
-        })
-        .map_err(|err| {
-            if let SafeAppError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
-                Error::VersionNotFound(format!(
-                    "Invalid version ({}) for Sequence found at XoR name {}",
-                    index, name
-                ))
-            } else {
-                Error::NetDataError(format!(
-                    "Failed to retrieve entry at index {} from Sequence data: {:?}",
-                    index, err
-                ))
-            }
-        })?;
+        let res = safe_app
+            .client
+            .get_sdata_range(sequence_address, (start, end))
+            .await
+            .map_err(|err| {
+                if let SafeCoreError::DataError(SafeNdError::NoSuchEntry) = err {
+                    Error::VersionNotFound(format!(
+                        "Invalid version ({}) for Sequence found at XoR name {}",
+                        index, name
+                    ))
+                } else {
+                    Error::NetDataError(format!(
+                        "Failed to retrieve entry at index {} from Sequence data: {:?}",
+                        index, err
+                    ))
+                }
+            })?;
 
         let entry = res.get(0).ok_or_else(|| {
             Error::EmptyContent(format!(
@@ -635,16 +626,12 @@ impl SafeApp for SafeAppScl {
 
         let safe_app: &App = self.get_safe_app()?;
 
-        let address = SDataAddress::Public { name, tag };
-        let append_op = SDataAppendOperation {
-            address,
-            values: vec![data.to_vec()],
-        };
-
-        run(safe_app, move |client, _app_context| {
-            client.sdata_append(append_op).map_err(SafeAppError)
-        })
-        .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
+        let sdata_address = SDataAddress::Public { name, tag };
+        safe_app
+            .client
+            .sdata_append(sdata_address, data.to_vec())
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
     }
 
     // === MutableData operations ===

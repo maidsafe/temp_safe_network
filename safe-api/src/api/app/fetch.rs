@@ -389,6 +389,8 @@ async fn resolve_one_indirection(
                 retrieve_immd(safe, &the_xor, retrieve_data, None, &metadata, range).await
             }
             SafeDataType::PublicSequence => {
+                // TODO: fetch only if 'retrieve_data' is set,
+                // although we need the version regardless
                 let (version, data) = safe.fetch_sequence(&the_xor).await?;
                 debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
                 let safe_data = SafeData::PublicSequence {
@@ -836,7 +838,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_public_sequence() -> Result<()> {
-        let mut safe = new_safe_instance()?;
+        let mut safe = new_safe_instance().await?;
         let data = b"Something super immutable";
         let xorurl = safe.sequence_create(data, None, 25_000).await?;
 
