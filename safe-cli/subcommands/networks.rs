@@ -56,7 +56,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
                     println!("Successfully switched to '{}' network in your system!", network_name);
                     println!("If you need write access to the '{}' network, you'll need to restart authd, login and re-authorise the CLI again", network_name);
                 },
-                None => return Err(format!("No network with name '{}' was found in the config. Please use the 'config add network' command to add it", network_name))
+                None => return Err(format!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", network_name))
             }
         }
         Some(NetworksSubCommands::Check {}) => {

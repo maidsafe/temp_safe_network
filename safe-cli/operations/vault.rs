@@ -29,8 +29,6 @@ const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
 #[cfg(target_os = "windows")]
 const SAFE_VAULT_EXECUTABLE: &str = "safe_vault.exe";
 
-const LOCAL_VAULT_DIR: &str = "local-vault";
-
 fn run_safe_cmd(
     args: &[&str],
     envs: Option<HashMap<String, String>>,
@@ -188,25 +186,26 @@ pub fn vault_run(
 
 pub fn vault_join(
     vault_path: Option<PathBuf>,
+    vault_data_dir: &str,
     verbosity: u8,
-    hcc: Option<String>,
+    contacts: &str,
 ) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
     let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
     debug!("Running vault from {}", arg_vault_path);
 
-    let vaults_dir = vault_path.join(LOCAL_VAULT_DIR);
-    if !vaults_dir.exists() {
-        println!("Creating '{}' folder", vaults_dir.display());
-        create_dir_all(vaults_dir.clone()).map_err(|err| {
+    let vault_data_dir = vault_path.join(vault_data_dir);
+    if !vault_data_dir.exists() {
+        println!("Creating '{}' folder", vault_data_dir.display());
+        create_dir_all(vault_data_dir.clone()).map_err(|err| {
             format!(
                 "Couldn't create target path to store vaults' generated data: {}",
                 err
             )
         })?;
     }
-    let arg_vaults_dir = vaults_dir.display().to_string();
+    let arg_vaults_dir = vault_data_dir.display().to_string();
     println!("Storing vaults' generated data at {}", arg_vaults_dir);
 
     // Let's create an args array to pass to the network launcher tool
@@ -227,10 +226,8 @@ pub fn vault_join(
         nlt_args.push(&verbosity_arg);
     }
 
-    if let Some(ref hardcoded_contact_ip) = hcc {
-        nlt_args.push("--hard-coded-contacts");
-        nlt_args.push(hardcoded_contact_ip);
-    };
+    nlt_args.push("--hard-coded-contacts");
+    nlt_args.push(contacts);
 
     debug!("Running network launch tool with args: {:?}", nlt_args);
 

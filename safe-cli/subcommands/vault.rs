@@ -7,11 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use crate::operations::config::{read_config_settings, retrieve_conn_info};
 use crate::operations::vault::*;
+use log::debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 const VAULTS_DATA_FOLDER: &str = "baby-fleming-vaults";
+
+const LOCAL_VAULT_DIR: &str = "local-vault";
 
 #[derive(StructOpt, Debug)]
 pub enum VaultSubCommands {
@@ -26,6 +30,8 @@ pub enum VaultSubCommands {
     #[structopt(name = "join")]
     /// Join an already running network
     Join {
+        /// Network to have the vault to join to
+        network_name: Option<String>,
         #[structopt(long = "vault-path")]
         /// Path where to run safe-vault executable from (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can also be used to set the path
         #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
@@ -33,7 +39,7 @@ pub enum VaultSubCommands {
         /// Vebosity level for vaults logs
         #[structopt(short = "y", parse(from_occurrences))]
         verbosity: u8,
-        /// Hardcoded contacts (endpoints) to be used to bootstrap to an already running network.
+        /// Hardcoded contacts (endpoints) to be used to bootstrap to an already running network (this overrides any value passed as 'network_name').
         #[structopt(short = "h", long = "hcc")]
         hard_coded_contacts: Option<String>,
     },
@@ -77,10 +83,51 @@ pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
     match cmd {
         Some(VaultSubCommands::Install { vault_path }) => vault_install(vault_path),
         Some(VaultSubCommands::Join {
+            network_name,
             vault_path,
             verbosity,
             hard_coded_contacts,
-        }) => vault_join(vault_path, verbosity, hard_coded_contacts),
+        }) => {
+            let network_contacts = if let Some(contacts) = hard_coded_contacts {
+                let msg = format!("Joining network with contacts {}...", contacts);
+                debug!("{}", msg);
+                println!("{}", msg);
+                Ok(contacts)
+            } else if let Some(name) = network_name {
+                let (settings, _) = read_config_settings()?;
+                let msg = format!("Joining the '{}' network...", name);
+                debug!("{}", msg);
+                println!("{}", msg);
+                let contacts =
+                match settings.networks.get(&name) {
+                    Some(config_location) => retrieve_conn_info(&name, config_location),
+                    None => Err(format!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name))
+                }?;
+
+                let mut contacts_str = std::str::from_utf8(&contacts)
+                    .map_err(|err| {
+                        format!(
+                            "Failed to parse network contact information from the config: {}",
+                            err
+                        )
+                    })?
+                    .to_string();
+
+                contacts_str = contacts_str.replace("\"", "");
+                let len_withoutcrlf = contacts_str.trim_end().len();
+                contacts_str.truncate(len_withoutcrlf);
+                debug!(
+                    "Joining network '{}' with contacts {}...",
+                    name, contacts_str
+                );
+
+                Ok(contacts_str)
+            } else {
+                Err("Please provide either a network name, or pass a contacts list with '--hcc' argument".to_string())
+            }?;
+
+            vault_join(vault_path, LOCAL_VAULT_DIR, verbosity, &network_contacts)
+        }
         Some(VaultSubCommands::Run {
             vault_path,
             verbosity,
