@@ -188,7 +188,7 @@ pub fn vault_join(
     vault_path: Option<PathBuf>,
     vaults_dir: &str,
     verbosity: u8,
-    ip: Option<String>,
+    hcc: Option<String>,
 ) -> Result<(), String> {
     let vault_path = get_vault_bin_path(vault_path)?;
 
@@ -226,15 +226,15 @@ pub fn vault_join(
         nlt_args.push(&verbosity_arg);
     }
 
-    if let Some(ref hardcoded_contact_ip) = ip {
-        nlt_args.push("--ip");
+    if let Some(ref hardcoded_contact_ip) = hcc {
+        nlt_args.push("--hard-coded-contacts");
         nlt_args.push(hardcoded_contact_ip);
     };
 
     debug!("Running network launch tool with args: {:?}", nlt_args);
 
     // We can now call the tool with the args
-    println!("Launching local SAFE network...");
+    println!("Starting a vault to join a SAFE network...");
     join_with(Some(&nlt_args))?;
     Ok(())
 }
