@@ -27,7 +27,7 @@ pub enum VaultSubCommands {
     /// Join an already running network
     Join {
         #[structopt(long = "vault-path")]
-        /// Path where to install safe-vault executable (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can also be used to set the path
+        /// Path where to run safe-vault executable from (default ~/.safe/vault/). The SAFE_VAULT_PATH env var can also be used to set the path
         #[structopt(long = "vault-path", env = "SAFE_VAULT_PATH")]
         vault_path: Option<PathBuf>,
         /// Vebosity level for vaults logs
