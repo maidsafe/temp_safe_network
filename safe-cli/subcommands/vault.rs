@@ -80,12 +80,7 @@ pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
             vault_path,
             verbosity,
             hard_coded_contacts,
-        }) => vault_join(
-            vault_path,
-            VAULTS_DATA_FOLDER,
-            verbosity,
-            hard_coded_contacts,
-        ),
+        }) => vault_join(vault_path, verbosity, hard_coded_contacts),
         Some(VaultSubCommands::Run {
             vault_path,
             verbosity,

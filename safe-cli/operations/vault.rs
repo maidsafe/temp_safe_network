@@ -29,6 +29,8 @@ const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
 #[cfg(target_os = "windows")]
 const SAFE_VAULT_EXECUTABLE: &str = "safe_vault.exe";
 
+const LOCAL_VAULT_DIR: &str = "local-vault";
+
 fn run_safe_cmd(
     args: &[&str],
     envs: Option<HashMap<String, String>>,
@@ -186,7 +188,6 @@ pub fn vault_run(
 
 pub fn vault_join(
     vault_path: Option<PathBuf>,
-    vaults_dir: &str,
     verbosity: u8,
     hcc: Option<String>,
 ) -> Result<(), String> {
@@ -195,7 +196,7 @@ pub fn vault_join(
     let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
     debug!("Running vault from {}", arg_vault_path);
 
-    let vaults_dir = vault_path.join(vaults_dir);
+    let vaults_dir = vault_path.join(LOCAL_VAULT_DIR);
     if !vaults_dir.exists() {
         println!("Creating '{}' folder", vaults_dir.display());
         create_dir_all(vaults_dir.clone()).map_err(|err| {
