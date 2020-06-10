@@ -12,6 +12,7 @@
   - [Networks](#networks)
     - [Vault install](#vault-install)
     - [Run a local network](#run-a-local-network)
+    - [Connect to a shared network](#connect-to-a-shared-network)
     - [Switch networks](#switch-networks)
     - [Vault update](#vault-update)
   - [Auth](#auth)
@@ -208,6 +209,53 @@ Success, all processes instances of safe_vault were stopped!
 ##### Run a local network for testing: `--test`
 
 The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new account and log in the CLI for test purposes. This requires that the `vault`, `authd` and `cli` themselves be installed in the correct locations on the system
+
+#### Connect to a shared network
+
+Ready to play your part in a shared network by adding your vault from home to a single section with other people's vaults? Keep reading...
+
+MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your vault joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create an account on this network, login, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
+
+You will need the network configuration containing the details of the hardcoded contacts that will bootstrap you to the shared section. If you have connected to this or previous iterations of the MaidSafe shared section then you may already have a `shared-section` network profile saved on your machine. You can confirm this and update it to the latest configuration using `safe networks check`:
+```shell
+$ safe networks check
+Checking current setup network connection information...
+Fetching 'my-network' network connection information from '~/.config/safe-cli/networks/my-network_vault_connection_info.config' ...
+Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+
+'shared-section' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-section' network as per current config
+```
+
+If you don't have a configuration in your results which points to the exact [S3 location](https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config) listed in the results above, you can add using `safe networks add`:
+```shell
+$ safe networks add shared-section https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config
+Network 'shared-section' was added to the list
+```
+
+Now you need to ensure you are set to use this `shared-section` configuration that we have updated/added, we can use `safe networks switch shared-section` for this:
+```shell
+$ safe networks switch shared-section
+Switching to 'shared-section' network...
+Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+Successfully switched to 'shared-section' network in your system!
+If you need write access to the 'shared-section' network, you'll need to restart authd, login and re-authorise the CLI again
+```
+
+We're now ready to launch our vault and add it as a node. This is achieved using `safe vault join` as follows:
+```shell
+$ safe vault join
+Creating '/Users/maidsafe/.safe/vault/local-vault' folder
+Storing vaults' generated data at /Users/maidsafe/.safe/vault/local-vault
+Starting a vault to join a SAFE network...
+Launching with vault executable from: /Users/maidsafe/.safe/vault/safe_vault
+Node started with hardcoded contact: 161.35.36.185:12000
+Launching vault...
+Vault logs are being stored at: /Users/maidsafe/.safe/vault/local-vault/safe_vault.log
+```
+
+Your vault will now launch and attempt to connect to the shared network. You can keep an eye on its progress via its logs, which can be found at `~/.safe/vault/local-vault/safe_vault.log`.
+
+Note that at the time of writing vaults from home is being restricted to those with home routers which correctly implement [IGD](https://en.wikipedia.org/wiki/Internet_Gateway_Device_Protocol). This will be expanded imminently to include those with routers which don't support IGD, with instructions added here for manual port forwarding at that point. If your log file states `Automatic Port forwarding Failed` then be on stand by for the next iteration.
 
 #### Switch networks
 
