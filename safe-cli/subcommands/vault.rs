@@ -83,7 +83,14 @@ pub enum VaultSubCommands {
 
 pub fn vault_commander(cmd: Option<VaultSubCommands>) -> Result<(), String> {
     match cmd {
-        Some(VaultSubCommands::Install { vault_path }) => vault_install(vault_path),
+        Some(VaultSubCommands::Install { vault_path }) => {
+            // We run this command in a separate thread to overcome a conflict with
+            // the self_update crate as it seems to be creating its own runtime.
+            let handler = std::thread::spawn(|| vault_install(vault_path));
+            handler
+                .join()
+                .map_err(|err| format!("Failed to run self update: {:?}", err))?
+        }
         Some(VaultSubCommands::Join {
             network_name,
             vault_path,
