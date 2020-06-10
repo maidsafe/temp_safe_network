@@ -3253,7 +3253,7 @@ dependencies = [
 [[package]]
 name = "safe-nlt"
 version = "0.0.1"
-source = "git+https://github.com/ravinderjangra/safe-network-launch-tool.git#d36571fe3f745daadab9de1b8b9014e25a05988a"
+source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#510545b0aa19fd68c04babcfa492c5c6ebf6164a"
 dependencies = [
  "directories 2.0.2",
  "env_logger 0.7.1",
