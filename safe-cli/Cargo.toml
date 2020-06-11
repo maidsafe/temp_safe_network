@@ -1,6 +1,6 @@
 [package]
 name = "safe-cli"
-version = "0.13.0"
+version = "0.14.0"
 description = "SAFE CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 publish = false

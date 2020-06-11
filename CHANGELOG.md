@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.13.1 (2020-06-11)
+
+### Features
+
+* ***cli*** allow vault join command to join currently setup network if no network name provided ([f89642b](https://github.com/maidsafe/safe-api/commit/f89642b0def681dc8df2581e24bef3351a867eaf))
+
+* ***cli*** support for passing a network name to vault join command ([e70812d](https://github.com/maidsafe/safe-api/commit/e70812d36ae139211e055d4fc22a827c7e181dec))
+
+* ***cli*** use maidsafe nlt master branch ([f2df7f5](https://github.com/maidsafe/safe-api/commit/f2df7f5ad6a96305de72b7441de5cfbe8022fe59))
+
+* ***cli*** support multiple hcc in vault join command ([d65e6fd](https://github.com/maidsafe/safe-api/commit/d65e6fd02c4529f5aaaf272d3fe7d0c8399bd031))
+
+* ***cli*** run a vault and join a network ([92384cb](https://github.com/maidsafe/safe-api/commit/92384cb712c8f5ca14dbc1e11fec1265552f1a23))
+
+* ***cli*** test safe-cli against phase-2b vaults ([01f3d89](https://github.com/maidsafe/safe-api/commit/01f3d89099b1792957ceebd9b856a03f973b58e1))
+
+* ***api*** add code coverage for safe-api to CI ([32e1756](https://github.com/maidsafe/safe-api/commit/32e17565b292f3fd446cbead34813f4478df77b1))
+
+### Bug Fixes
+
+* ***cli*** solved self_update conflict wth async when running vault install cmd ([d3cabdd](https://github.com/maidsafe/safe-api/commit/d3cabdd8ca7743eacb9cd741d1be54b730fa3be2))
+
+
 ### 0.13.0 (2020-06-01)
 
 ### Features
