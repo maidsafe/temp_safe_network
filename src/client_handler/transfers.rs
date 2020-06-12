@@ -15,8 +15,6 @@ use safe_nd::{
 };
 use std::fmt::{self, Display, Formatter};
 
-use safe_transfers::TransferReplica as Replica;
-
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -83,11 +81,19 @@ impl Transfers {
                 self.receive_propagated(&proof, &requester, message_id, messaging)
             }
             MoneyRequest::GetBalance(xorname) => {
-                self.balance(xorname, requester, message_id, messaging)
+                self.balance(XorName::from(xorname), requester, message_id, messaging)
             }
-            MoneyRequest::GetHistory { at, since_version } => {
-                self.history(at, since_version, requester, message_id, messaging)
-            }
+            MoneyRequest::GetHistory { at, since_version } => self.history(
+                XorName::from(at),
+                since_version,
+                requester,
+                message_id,
+                messaging,
+            ),
+            #[cfg(features = "testing")]
+            MoneyRequest::SimulatePayout { transfer } => self
+                .replica
+                .register_without_proof(transfer, requester, message_id),
         }
     }
 

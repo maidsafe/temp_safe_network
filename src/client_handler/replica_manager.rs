@@ -14,6 +14,15 @@ use safe_transfers::TransferReplica as Replica;
 use std::collections::HashMap;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
+#[cfg(features = "testing")]
+use {
+    crate::{action::Action, rpc::Rpc},
+    safe_nd::{
+        MessageId, MoneyRequest, PublicId, PublicKey, Request, Signature, SignatureShare, Transfer,
+    },
+    threshold_crypto::SecretKey,
+};
+
 pub(super) struct ReplicaManager {
     store: EventStore,
     replica: Replica,
@@ -100,6 +109,46 @@ impl ReplicaManager {
         self.store.try_append(event.clone())?;
         self.replica.apply(event);
         Ok(())
+    }
+}
+
+#[cfg(features = "testing")]
+impl ReplicaManager {
+    pub fn register_without_proof(
+        &mut self,
+        transfer: Transfer,
+        requester: PublicId,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        self.replica.apply_without_proof(transfer.clone());
+        let dummy_msg = "DUMMY MSG";
+        let sec_key = SecretKey::random();
+        let pub_key = sec_key.public_key();
+        let dummy_shares = SecretKeyShare::default();
+        let dummy_sig = dummy_shares.sign(dummy_msg);
+        let sig = sec_key.sign(dummy_msg);
+        let debit_proof = DebitAgreementProof {
+            signed_transfer: SignedTransfer {
+                transfer,
+                actor_signature: Signature::from(sig.clone()),
+            },
+            debiting_replicas_sig: Signature::from(sig),
+        };
+        self.store
+            .try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
+                debit_proof: debit_proof.clone(),
+                debiting_replicas: PublicKey::from(pub_key),
+                crediting_replica_sig: SignatureShare {
+                    index: 0,
+                    share: dummy_sig,
+                },
+            }));
+        // the transfer is then propagated as SimulatePayout, and will reach the recipient section
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            request: Request::Money(MoneyRequest::SimulatePayout { transfer: Transfer }),
+            requester: requester.clone(),
+            message_id,
+        }))
     }
 }
 
