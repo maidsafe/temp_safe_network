@@ -195,6 +195,7 @@ impl LoginPackets {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
@@ -244,11 +245,11 @@ impl LoginPackets {
     #[allow(clippy::too_many_arguments)]
     fn finalise_proxied_creation(
         &mut self,
-        payer: PublicId,
-        amount: Money,
-        transfer_id: TransferId,
-        login_packet: LoginPacket,
-        message_id: MessageId,
+        _payer: PublicId,
+        _amount: Money,
+        _transfer_id: TransferId,
+        _login_packet: LoginPacket,
+        _message_id: MessageId,
     ) -> Option<Action> {
         unimplemented!("conundrum..")
         // // Step three - store login_packet.

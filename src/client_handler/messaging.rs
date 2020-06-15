@@ -25,9 +25,6 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(not(feature = "mock"))]
-use routing::Node;
-
 pub(super) struct Messaging {
     id: NodePublicId,
     routing_node: Rc<RefCell<Node>>,

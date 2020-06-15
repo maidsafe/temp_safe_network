@@ -361,15 +361,6 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     None
                 },
             ),
-            RoutingEvent::MessageReceived { content, src, dst } => {
-                info!(
-                    "Received message: {:8?}\n Sent from {:?} to {:?}",
-                    HexFmt(&content),
-                    src,
-                    dst
-                );
-                self.handle_routing_message(src, content)
-            }
             RoutingEvent::MemberLeft { name, age: _u8 } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 let get_copy_actions = self
@@ -656,13 +647,17 @@ impl<R: CryptoRng + Rng> Vault<R> {
         if self.self_is_handler_for(&dst_address) {
             // TODO - We need a better way for determining which handler should be given the
             //        message.
-            return match rpc {
+            return match rpc.clone() {
                 Rpc::Request {
                     request: Request::LoginPacket(LoginPacketRequest::Create(_)),
                     ..
                 }
                 | Rpc::Request {
                     request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
                     ..
                 }
                 | Rpc::Request {
@@ -674,23 +669,23 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
+                    request: Request::Money(MoneyRequest::SimulatePayout { .. }),
                     ..
                 } => self
-                .client_handler_mut()?
-                .handle_vault_rpc(requester_name, rpc),
-                _data_request => self.data_handler_mut()?.handle_vault_rpc(
-                SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                rpc,
-                None,
-            ),
+                    .client_handler_mut()?
+                    .handle_vault_rpc(requester_name, rpc),
+                    _data_request => self.data_handler_mut()?.handle_vault_rpc(
+                    SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
+                    rpc,
+                    None,
+                    ),
                 }
             } else {
                 error!("{}: Logic error - unexpected RPC.", self);
                 None
             }
         }
-    }
+
 
     fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {
         let requester_name = utils::requester_address(&rpc);

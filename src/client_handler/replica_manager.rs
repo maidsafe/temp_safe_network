@@ -7,19 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_nd::{
-    AccountId, DebitAgreementProof, Error, KnownGroupAdded, Money, ReplicaEvent, Result,
-    SignedTransfer, TransferPropagated, TransferRegistered, TransferValidated,
+    AccountId, DebitAgreementProof, Error, KnownGroupAdded, MessageId, Money, PublicId,
+    ReplicaEvent, Result, SignedTransfer, TransferPropagated, TransferRegistered,
+    TransferValidated, XorName,
 };
 use safe_transfers::TransferReplica as Replica;
 use std::collections::HashMap;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
-#[cfg(features = "testing")]
+use crate::rpc::Rpc;
+#[cfg(feature = "simulated-payouts")]
 use {
-    crate::{action::Action, rpc::Rpc},
-    safe_nd::{
-        MessageId, MoneyRequest, PublicId, PublicKey, Request, Signature, SignatureShare, Transfer,
-    },
+    crate::action::Action,
+    safe_nd::{PublicKey, Response, Signature, SignatureShare, Transfer},
     threshold_crypto::SecretKey,
 };
 
@@ -112,13 +112,14 @@ impl ReplicaManager {
     }
 }
 
-#[cfg(features = "testing")]
+#[cfg(feature = "simulated-payouts")]
 impl ReplicaManager {
     pub fn register_without_proof(
         &mut self,
-        transfer: Transfer,
         requester: PublicId,
+        transfer: Transfer,
         message_id: MessageId,
+        sender: XorName,
     ) -> Option<Action> {
         self.replica.apply_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
@@ -142,13 +143,18 @@ impl ReplicaManager {
                     index: 0,
                     share: dummy_sig,
                 },
-            }));
-        // the transfer is then propagated as SimulatePayout, and will reach the recipient section
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            request: Request::Money(MoneyRequest::SimulatePayout { transfer: Transfer }),
-            requester: requester.clone(),
-            message_id,
-        }))
+            }))
+            .ok()?;
+        // Respond to the Client with TransferRegistered
+        Some(Action::RespondToClientHandlers {
+            sender,
+            rpc: Rpc::Response {
+                response: Response::TransferRegistration(Ok(TransferRegistered { debit_proof })),
+                requester,
+                message_id,
+                refund: None,
+            },
+        })
     }
 }
 

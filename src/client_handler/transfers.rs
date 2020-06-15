@@ -90,10 +90,13 @@ impl Transfers {
                 message_id,
                 messaging,
             ),
-            #[cfg(features = "testing")]
-            MoneyRequest::SimulatePayout { transfer } => self
-                .replica
-                .register_without_proof(transfer, requester, message_id),
+            #[cfg(feature = "simulated-payouts")]
+            MoneyRequest::SimulatePayout { transfer } => self.replica.register_without_proof(
+                requester,
+                transfer,
+                message_id,
+                *self.id.name(),
+            ),
         }
     }
 
@@ -120,7 +123,7 @@ impl Transfers {
     fn history(
         &mut self,
         at: XorName,
-        since_version: usize,
+        _since_version: usize,
         requester: PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
@@ -158,6 +161,7 @@ impl Transfers {
                 response: Response::TransferValidation(result),
                 requester: requester.clone(),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -172,7 +176,7 @@ impl Transfers {
         messaging: &mut Messaging,
     ) -> Option<Action> {
         match self.replica.register(proof) {
-            Ok(event) => {
+            Ok(_event) => {
                 let transfer = &proof.signed_transfer.transfer;
                 // sender is notified with a push msg (only delivered if recipient is online)
                 messaging.notify_client(&XorName::from(transfer.id.actor), proof);
@@ -192,6 +196,7 @@ impl Transfers {
                     response: Response::TransferRegistration(Err(err)),
                     requester: requester.clone(),
                     message_id,
+                    refund: None,
                 },
             }),
         }
@@ -210,7 +215,7 @@ impl Transfers {
     ) -> Option<Action> {
         // We will just validate the proofs and then apply the event.
         match self.replica.receive_propagated(proof) {
-            Ok(event) => {
+            Ok(_event) => {
                 let transfer = &proof.signed_transfer.transfer;
                 // notify recipient, with a push msg (only delivered if recipient is online)
                 messaging.notify_client(&XorName::from(transfer.to), proof);
@@ -222,6 +227,7 @@ impl Transfers {
                     response: Response::TransferPropagation(Err(err)),
                     requester: requester.clone(),
                     message_id,
+                    refund: None,
                 },
             }),
         }
@@ -229,10 +235,10 @@ impl Transfers {
 
     pub fn pay_section(
         &mut self,
-        amount: Money,
-        from: PublicKey,
-        request: &Request,
-        message_id: MessageId,
+        _amount: Money,
+        _from: PublicKey,
+        _request: &Request,
+        _message_id: MessageId,
     ) -> Option<Action> {
         None
     }

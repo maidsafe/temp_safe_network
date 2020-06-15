@@ -94,6 +94,7 @@ impl IDataHandler {
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
@@ -175,6 +176,7 @@ impl IDataHandler {
         let our_name = *self.id.name();
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
@@ -268,6 +270,7 @@ impl IDataHandler {
 
         let client_id = requester.clone();
         let respond = |result: NdResult<IData>| {
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
@@ -409,7 +412,6 @@ impl IDataHandler {
             metadata.holders.len()
         );
 
-<<<<<<< HEAD
         // We're acting as data handler, received request from client handlers
         let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
 
@@ -454,6 +456,7 @@ impl IDataHandler {
                     },
                 })
         }
+<<<<<<< HEAD
 =======
         self.remove_idata_op_if_concluded(&message_id)
             .map(|idata_op| Action::RespondToClientHandlers {
@@ -466,6 +469,8 @@ impl IDataHandler {
             })
 >>>>>>> add initial at2-inspired parts
 >>>>>>> add initial at2-inspired parts
+=======
+>>>>>>> fix/all: rebase at2-vault on top of phase2b-testnet
     }
 
     pub(super) fn handle_delete_unpub_idata_resp(
@@ -564,6 +569,9 @@ impl IDataHandler {
                         requester: idata_op.client().clone(),
                         response: Response::Mutation(response),
                         message_id,
+                        // Deleting data is free so, no refund
+                        // This field can be put to use when deletion is incentivised
+                        refund: None,
                     },
                 }
             })

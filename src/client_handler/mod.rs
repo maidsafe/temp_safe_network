@@ -33,6 +33,7 @@ use crate::{
 use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
+use routing::Node;
 use safe_nd::{MessageId, Money, NodePublicId, PublicId, Request, Response, Signature, XorName};
 use std::{
     cell::{Cell, RefCell},
