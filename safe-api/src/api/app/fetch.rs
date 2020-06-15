@@ -322,8 +322,7 @@ async fn resolve_one_indirection(
                 (files_map, None)
             };
 
-            // We don't want the path in the SafeData field,
-            // just the FilesContainer XOR-URL and version
+            // We don't want the path just the FilesContainer XOR-URL and version
             the_xor.set_path("");
             let safe_data = SafeData::FilesContainer {
                 xorurl: the_xor.to_xorurl_string(),
@@ -372,7 +371,9 @@ async fn resolve_one_indirection(
                 target_xorurl_encoder
             );
 
-            the_xor.set_path(""); // we don't want the path, just the NRS Map xorurl and version
+            // We don't want the path or subnames, just the FilesContainer XOR-URL and version
+            the_xor.set_path("");
+            the_xor.set_sub_names("")?;
             let nrs_map_container = SafeData::NrsMapContainer {
                 public_name: the_xor.top_name().to_string(),
                 xorurl: the_xor.to_xorurl_string(),
@@ -635,7 +636,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_resolvable_container() -> Result<()> {
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let random_str: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let site_name = format!("subname.{}", random_str);
 
         let mut safe = new_safe_instance().await?;
 
@@ -652,6 +654,9 @@ mod tests {
         let nrs_url = format!("safe://{}", site_name);
         let content = safe.fetch(&nrs_url, None).await?;
 
+        xorurl_encoder.set_sub_names("")?;
+        let xorurl_without_subname = xorurl_encoder.to_string();
+
         // this should resolve to a FilesContainer until we enable prevent resolution.
         match &content {
             SafeData::FilesContainer {
@@ -663,7 +668,7 @@ mod tests {
                 data_type,
                 ..
             } => {
-                assert_eq!(*xorurl, xorurl_encoder.to_string());
+                assert_eq!(*xorurl, xorurl_without_subname);
                 assert_eq!(*xorname, xorurl_encoder.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, 0);
