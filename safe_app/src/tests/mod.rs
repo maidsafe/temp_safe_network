@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod coins;
+mod money;
 mod sequence;
 mod unpublished_mutable_data;
 
@@ -80,6 +80,8 @@ async fn get_access_info() -> Result<(), AppError> {
                 transfer_money: true,
                 data_mutations: true,
                 read_balance: true,
+                read_transfer_history: true,
+
             },
             containers: container_permissions,
         },
@@ -159,6 +161,8 @@ async fn authorise_app(
                 transfer_money: true,
                 data_mutations: true,
                 read_balance: true,
+                read_transfer_history: true,
+
             },
             containers: HashMap::new(),
         },
@@ -285,17 +289,16 @@ async fn unregistered_client() -> Result<(), AppError> {
         Err(CoreError::DataError(SndError::AccessDenied)) => (),
         res => panic!("Unexpected result {:?}", res),
     }
-    Ok(())
 }
 
 // Test PUTs by unregistered clients.
 // 1. Have a unregistered client put public immutable. This should fail by returning Error
 // as they are not allowed to PUT data into the network.
 #[tokio::test]
-async fn unregistered_client_put() -> Result<(), AppError> {
-    let pub_idata = PubImmutableData::new(utils::generate_random_vector(30)?);
+async fn unregistered_client_put() {
+    let pub_idata = PubImmutableData::new(utils::generate_random_vector(30).unwrap());
 
-    let app = App::unregistered(|| (), None).await?;
+    let app = App::unregistered(|| (), None).await.unwrap();
     // Unregistered Client should not be able to PUT data.
     let client = app.client;
     match client.put_idata(pub_idata).await {
@@ -303,7 +306,6 @@ async fn unregistered_client_put() -> Result<(), AppError> {
         Ok(()) => panic!("Unexpected Success"),
         Err(e) => panic!("Unexpected Error: {}", e),
     }
-    Ok(())
 }
 
 // Verify that public data can be accessed by both unregistered clients and clients that are not
@@ -354,30 +356,37 @@ async fn public_data_access() -> Result<(), AppError> {
 
 // Test account usage statistics before and after a mutation.
 #[tokio::test]
-async fn account_info() -> Result<(), AppError> {
+async fn account_info() {
     // Create an app that can access the owner's coin balance and mutate data on behalf of user.
+    
+    // is this creating transfer actor???
     let mut app_auth_req = create_random_auth_req();
     app_auth_req.app_permissions = AppPermissions {
         transfer_money: false,
         data_mutations: true,
         read_balance: true,
+        read_transfer_history: true,
+
     };
 
-    let app = create_app_by_req(&app_auth_req).await?;
+    println!("111111111111111111111111111111111111111111111111111111111");
+    let app = create_app_by_req(&app_auth_req).await.unwrap();
     let client = app.client;
-    let orig_balance: Money = client.get_balance(None).await?;
+
+    println!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    let orig_balance: Money = client.get_balance(None).await.unwrap();
+    println!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
     client
         .put_idata(PubImmutableData::new(vec![1, 2, 3]))
-        .await?;
+        .await.unwrap();
 
-    let new_balance: Money = client.get_balance(None).await?;
+    let new_balance: Money = client.get_balance(None).await.unwrap();
 
     assert_eq!(
         new_balance,
         orig_balance
             .checked_sub(COST_OF_PUT)
-            .ok_or_else(|| AppError::Unexpected("failed to substract cost of put".to_string()))?
+            .ok_or_else(|| AppError::Unexpected("failed to substract cost of put".to_string())).unwrap()
     );
-    Ok(())
 }

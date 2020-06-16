@@ -29,7 +29,7 @@ use std::time::Duration;
 pub struct AppClient {
     inner: Arc<Mutex<Inner>>,
     app_inner: Arc<Mutex<AppInner>>,
-    transfer_actor: TransferActor,
+    transfer_actor: Option<TransferActor>,
 }
 
 impl AppClient {
@@ -58,15 +58,13 @@ impl AppClient {
         let connection_manager =
             attempt_bootstrap(&qp2p_config, &net_tx, app_keys.app_safe_key()).await?;
 
-        let validator = ClientTransferValidator {};
         // Here for now, Actor with 10 setup, as before
         // transfer actor handles all our responses and proof aggregation
-        let transfer_actor = TransferActor::new(
-            validator,
-            SafeKey::app(app_keys.clone().app_full_id),
-            connection_manager.clone(),
-        )
-        .await?;
+        // let transfer_actor = TransferActor::new(
+        //     SafeKey::app(app_keys.clone().app_full_id),
+        //     connection_manager.clone(),
+        // )
+        // .await?;
 
         Ok(Self {
             inner: Arc::new(Mutex::new(Inner::new(
@@ -76,7 +74,7 @@ impl AppClient {
                 net_tx,
             ))),
             app_inner: Arc::new(Mutex::new(AppInner::new(app_keys, pk, config))),
-            transfer_actor,
+            transfer_actor: None
         })
     }
 
@@ -135,12 +133,11 @@ impl AppClient {
         let validator = ClientTransferValidator {};
         // Here for now, Actor with 10 setup, as before
         // transfer actor handles all our responses and proof aggregation
-        let transfer_actor = TransferActor::new(
-            validator,
+        let transfer_actor = Some( TransferActor::new(
             SafeKey::app(keys.clone().app_full_id),
             connection_manager.clone(),
         )
-        .await?;
+        .await?);
 
         Ok(Self {
             inner: Arc::new(Mutex::new(Inner::new(
@@ -192,7 +189,7 @@ impl Client for AppClient {
     }
 
     /// Return the TransferActor for this client
-    async fn transfer_actor(&self) -> TransferActor {
+    async fn transfer_actor(&self) -> Option<TransferActor> {
         self.transfer_actor.clone()
     }
 }
