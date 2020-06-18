@@ -25,7 +25,7 @@ use safe_core::utils::test_utils::random_client;
 #[cfg(feature = "mock-network")]
 use safe_core::ConnectionManager;
 use safe_core::{client::COST_OF_PUT, Client, CoreError};
-use safe_nd::{AppPermissions, Money, Error as SndError, IData, PubImmutableData, XorName};
+use safe_nd::{AppPermissions, Error as SndError, IData, Money, PubImmutableData, XorName};
 #[cfg(feature = "mock-network")]
 use safe_nd::{RequestType, Response};
 use std::collections::{BTreeMap, HashMap};
@@ -287,6 +287,8 @@ async fn unregistered_client() -> Result<(), AppError> {
         Err(CoreError::DataError(SndError::AccessDenied)) => (),
         res => panic!("Unexpected result {:?}", res),
     }
+
+    Ok(())
 }
 
 // Test PUTs by unregistered clients.
@@ -366,13 +368,10 @@ async fn account_info() {
         read_transfer_history: true,
     };
 
-    println!("111111111111111111111111111111111111111111111111111111111");
     let app = create_app_by_req(&app_auth_req).await.unwrap();
     let client = app.client;
 
-    println!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     let orig_balance: Money = client.get_balance(None).await.unwrap();
-    println!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
     client
         .put_idata(PubImmutableData::new(vec![1, 2, 3]))

@@ -19,8 +19,7 @@ use safe_core::{
     config_handler::Config,
     crypto::{shared_box, shared_secretbox},
     ipc::BootstrapConfig,
-    utils, Client, ClientKeys, ConnectionManager, CoreError, MDataInfo,
-    NetworkTx, TransferActor,
+    utils, Client, ClientKeys, ConnectionManager, CoreError, MDataInfo, NetworkTx, TransferActor,
 };
 use safe_nd::{
     ClientFullId, LoginPacket, LoginPacketRequest, Message, MessageId, PublicId, PublicKey,
@@ -145,19 +144,14 @@ impl AuthClient {
         connection_manager = connection_manager_wrapper_fn(connection_manager);
 
         // setup client transfer actor
-
-        // Here for now, Actor with 10 setup, as before
-        // transfer actor handles all our responses and proof aggregation
-        let transfer_actor =
-            Some(TransferActor::new(client_safe_key.clone(), connection_manager.clone()).await?);
+        let mut the_actor =
+            TransferActor::new(client_safe_key.clone(), connection_manager.clone()).await?;
+        let transfer_actor = Some(the_actor.clone());
 
         // create login packet
-        let response = req(
-            &mut connection_manager,
-            Request::LoginPacket(LoginPacketRequest::Create(new_login_packet)),
-            &client_safe_key,
-        )
-        .await?;
+        let response = the_actor
+            .store_login_packet(new_login_packet)
+            .await?;
 
         match response {
             Response::Mutation(res) => res?,

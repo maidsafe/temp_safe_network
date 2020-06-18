@@ -38,9 +38,6 @@ async fn money_app_deny_permissions() {
 
     let client = app.client;
 
-    // what client was this trying to get prior??
-    // if its just the appp client...
-    // how should our mock auth operations behave?
 
     // This app client should not have money....const
     /// this app client should be trying to query
@@ -53,12 +50,6 @@ async fn money_app_deny_permissions() {
     let mut rng = thread_rng();
     let random_target_pk = *ClientFullId::new_bls(&mut rng).public_id().public_key();
 
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..");
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..");
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..");
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..");
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..");
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..");
     match client
         .transfer_money(random_target_pk, Money::from_str("1.0").unwrap())
         .await

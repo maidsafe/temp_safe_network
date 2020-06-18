@@ -18,7 +18,7 @@ use connection_group::ConnectionGroup;
 use futures::lock::Mutex;
 use log::{error, trace};
 use quic_p2p::Config as QuicP2pConfig;
-use safe_nd::{Message, PublicId, Response};
+use safe_nd::{DebitAgreementProof, Message, PublicId, Response};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
@@ -29,7 +29,7 @@ const CONNECTION_TIMEOUT_SECS: u64 = 30;
 
 /// Initialises `QuicP2p` instance. Establishes new connections.
 /// Contains a reference to crossbeam channel provided by quic-p2p for capturing the events.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConnectionManager {
     inner: Arc<Mutex<Inner>>,
 }
@@ -66,7 +66,7 @@ impl ConnectionManager {
         pub_id: &PublicId,
         msg: &Message,
         transfer_actor: &mut TransferActor,
-    ) -> Result<(), CoreError> {
+    ) -> Result<DebitAgreementProof, CoreError> {
         self.inner
             .lock()
             .await
@@ -147,7 +147,7 @@ impl Inner {
         pub_id: &PublicId,
         msg: &Message,
         transfer_actor: &mut TransferActor,
-    ) -> Result<(), CoreError> {
+    ) -> Result<DebitAgreementProof, CoreError> {
         let msg_id = if let Message::Request { message_id, .. } = msg {
             *message_id
         } else {
@@ -160,11 +160,11 @@ impl Inner {
             )
         })?;
 
-        conn_group
+        let proof = conn_group
             .send_for_validation(&msg_id, msg, transfer_actor)
-            .await;
+            .await?;
 
-        Ok(())
+        Ok(proof)
     }
 
     /// Disconnect from a group.

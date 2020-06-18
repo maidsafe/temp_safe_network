@@ -61,10 +61,6 @@ impl Vault {
                 Response::TransferRegistration(final_result)
             }
             MoneyRequest::ValidateTransfer { signed_transfer } => {
-                // DO WE WANT THIS TO BE DIFFERENT FOR APPP?
-                // APP PK doesnt have anything....
-
-                println!("innnnnnnnnnnnnnnnnnnnnnnnnnvalidate transfer mock");
                 let source = owner_pk.into();
                 let destination = signed_transfer.to();
                 let amount = signed_transfer.amount();

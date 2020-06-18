@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use futures::channel::mpsc;
-use log::trace;
+use log::{debug, trace};
 use safe_nd::{MessageId, Response};
 use std::collections::HashMap;
 
@@ -57,10 +57,9 @@ impl ResponseManager {
 
     /// Handle a response from one of the elders.
     pub fn handle_response(&mut self, msg_id: MessageId, response: Response) -> Result<(), String> {
-        trace!(
+        debug!(
             "Handling response for msg_id: {:?}, resp: {:?}",
-            msg_id,
-            response
+            msg_id, response
         );
 
         let _ = self
@@ -71,10 +70,12 @@ impl ResponseManager {
                 let vote_response = response.clone();
 
                 // Handle validation requests separately...
+                // TODO: add tests here
                 if is_validation_request {
-                    sender.unbounded_send((response.clone(), msg_id));
-
-                    // do we need to negate the below?
+                    // here we send _each_ req back to be validated and processed.
+                    // Once a proof has bene found, the sender will be disconnected.
+                    // This error is not important
+                    let _ = sender.unbounded_send((response.clone(), msg_id));
                 }
 
                 // drop the count as we have this new response.
@@ -123,6 +124,7 @@ impl ResponseManager {
                         return;
                     }
                 }
+
                 let _ = self.requests.insert(
                     msg_id,
                     (sender, vote_map, current_count, is_validation_request),

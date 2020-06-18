@@ -50,7 +50,7 @@ unwrap = "1.2.0"
 mock-network = ["testing", "safe_core/mock-network", "safe_authenticator/mock-network", "simulated-payouts"]
 testing = ["safe_core/testing", "safe_authenticator/testing", "env_logger"]
 bindings = ["safe_bindgen"]
-simulated-payouts = ["safe-nd/simulated-payouts"]
+simulated-payouts = ["safe-nd/simulated-payouts", "safe_core/simulated-payouts"]
 
 [[example]]
 bench = false

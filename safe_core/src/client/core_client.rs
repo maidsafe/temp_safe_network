@@ -9,7 +9,7 @@
 use crate::client::account::{Account as ClientAccount, ClientKeys};
 #[cfg(feature = "mock-network")]
 use crate::client::mock::ConnectionManager;
-use crate::client::{attempt_bootstrap, req, AuthActions, Client, Inner, SafeKey, TransferActor};
+use crate::client::{attempt_bootstrap, AuthActions, Client, Inner, SafeKey, TransferActor};
 use crate::config_handler::Config;
 #[cfg(not(feature = "mock-network"))]
 use crate::connection_manager::ConnectionManager;
@@ -100,15 +100,14 @@ impl CoreClient {
 
         connection_manager = connection_manager_wrapper_fn(connection_manager);
 
-        let transfer_actor =
-            Some(TransferActor::new(balance_client_id.clone(), connection_manager.clone()).await?);
+        // ----------------------
+        // create the login packet
+        // ----------------------
+        let mut the_actor =
+            TransferActor::new(balance_client_id.clone(), connection_manager.clone()).await?;
+        let transfer_actor = Some(the_actor.clone());
 
-        let response = req(
-            &mut connection_manager,
-            Request::LoginPacket(LoginPacketRequest::Create(new_login_packet)),
-            &balance_client_id,
-        )
-        .await?;
+        let response = the_actor.store_login_packet(new_login_packet).await?;
 
         match response {
             Response::Mutation(res) => res?,

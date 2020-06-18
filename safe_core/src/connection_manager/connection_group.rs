@@ -24,9 +24,11 @@ use quic_p2p::{
 };
 use rand::Rng;
 use safe_nd::{
-    HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId, PublicId, Request,
-    RequestType, Response,
+    DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId,
+    PublicId, Request, RequestType, Response,
 };
+
+use tokio::time::timeout;
 
 // use std::iter::Iterator;
 use futures_util::stream::StreamExt;
@@ -113,34 +115,24 @@ impl ConnectionGroup {
         // user block here to drop lock asap
         let mut receiver_future = { self.inner.lock().await.send(msg_id, msg).await? };
 
-        let response_received = false;
-
-        let mut response = Err(CoreError::RequestTimeout);
         // TODO reimpl timeout here
-        while !response_received {
-            if let Some((res, _message_id)) = receiver_future.next().await {
-                let _response_received = true;
+        let response_future = async {
+            let mut response = Err(CoreError::RequestTimeout);
+            while let Some((res, _message_id)) = receiver_future.next().await {
                 response = Ok(res);
                 receiver_future.close();
-            } else {
-                // do nothing...
             }
 
-            // return Ok(res);
-            // {
+            response
+        };
 
-            // return on first response here.
-            // };
-            // Let the actor handle receipt of each response from elders
-            // transfer_actor.handle_validation_response(res, &message_id);
+
+        match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response_future).await {
+            Ok(response) => {
+                response.map_err(|err| CoreError::from(format!("{}", err)))
+            }
+            Err(_) => Err(CoreError::RequestTimeout),
         }
-
-        response
-
-        // match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), receiver_future).await {
-        //     Ok(response) => response.map_err(|err| CoreError::from(format!("{}", err))),
-        //     Err(_) => Err(CoreError::RequestTimeout),
-        // }
     }
 
     /// Send transfer validation, which requires all responses to be handled for signature reconstruction.
@@ -149,12 +141,10 @@ impl ConnectionGroup {
         msg_id: &MessageId,
         msg: &Message,
         transfer_actor: &mut TransferActor,
-    ) -> Result<(), CoreError> {
-        // setup a channel.
-        // send message, and pass sender.
+    ) -> Result<DebitAgreementProof, CoreError> {
+        trace!("Sending transfer req for validation");
 
-        // user block here to drop lock asap
-        let mut response_future = {
+        let mut receiver_future = {
             self.inner
                 .lock()
                 .await
@@ -162,58 +152,39 @@ impl ConnectionGroup {
                 .await?
         };
 
-        // let proof = None;
-        // response manager sends on _each_ response.
-        // TODO: update response manager to handle this
+        // wrap receiver for a timeout
+        let response_future = async {
+            let mut response = Err(CoreError::from("No debit agreement proof received"));
 
-        //   let proof_future = async move {
+            while let Some((res, message_id)) = receiver_future.next().await {
+                // Let the actor handle receipt of each response from elders
 
-        while let Some((res, message_id)) = response_future.next().await {
-            // Let the actor handle receipt of each response from elders
-            transfer_actor.handle_validation_response(res, &message_id);
-            // n(msg);
-            // let result = match transfer_actor.handle_validation_response(res) {
-            //     Ok(response ) => response,
-            //     // will this be too brittle? One error doesn't need to fail everything...
-            //     Err(error) => return Err(CoreError::from(format!("Error while receiving validation proofs: {:?}", error)))
-            // };
+                match transfer_actor
+                    .handle_validation_response(res, &message_id)
+                    .await
+                {
+                    Ok(proof) => {
+                        if let Some(debit_agreement_proof) = proof {
+        
+                            receiver_future.close();
+                            response = Ok(debit_agreement_proof)
+                        };
+                    }
+                    Err(error) => response = Err(error),
+                }
+            }
 
-            // if let Some(proof) = result.proof {
-            //     warn!("WE HAVE PROOF");
-            //       proof = result.proof;
-            //     break;
-            // };
-            // warn!("no proof yet")
+            response
+        };
+
+
+        match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response_future).await {
+            Ok(response) => {
+
+                response.map_err(|err| CoreError::from(format!("{}", err)))
+            }
+            Err(_) => Err(CoreError::RequestTimeout),
         }
-
-        // Ok(())
-        // };
-
-        //   response_future.for_each( |res| {
-        //       // keep passing in receive into TransferActor until "proof" pops out.
-        //       let result = match transfer_actor.handle_validation_response(res) {
-        //           Ok(response ) => response,
-        //           // will this be too brittle? One error doesn't need to fail everything...
-        //           Err(error) => return Err(CoreError::from(format!("Error while receiving validation proofs: {:?}", error)))
-        //       };
-
-        //       if let Some(proof) = result.proof {
-        //           warn!("WE HAVE PROOF");
-        //             proof = result.proof;
-        //         //   break;
-        //       };
-
-        //       Ok(())
-        //   }).await;
-
-        Ok(())
-        // TODO: time out here...
-        // return this proof.
-
-        //   match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), receiver_future).await {
-        //       Ok(response) => response.map_err(|err| CoreError::from(format!("{}", err))),
-        //       Err(_) => Err(CoreError::RequestTimeout),
-        //   }
     }
 
     /// Terminate the QUIC connections gracefully.
@@ -463,7 +434,8 @@ impl Connected {
 
         let (sender_future, response_future) = mpsc::unbounded();
 
-        let expected_responses = 1; //not important
+        let expected_responses = 7;
+        // let expected_responses =  self.elders.len() / 2 + 1;
 
         let is_this_validation_request = true;
 

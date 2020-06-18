@@ -168,16 +168,6 @@ impl ConnectionManager {
         Ok(())
     }
 
-    // /// Add some coins to a wallet's PublicKey
-    // pub async fn allocate_test_money(
-    //     &self,
-    //     account_balance: &PublicKey,
-    //     amount: Money,
-    // ) -> Result<(), safe_nd::Error> {
-    //     let mut vault = vault::lock(&self.vault, true).await;
-    //     vault.mock_increment_balance(account_balance, amount)
-    // }
-
     /// Create coin balance in the mock network arbitrarily.
     pub async fn create_balance(&self, owner: PublicKey, amount: Money) {
         let mut vault = vault::lock(&self.vault, true).await;

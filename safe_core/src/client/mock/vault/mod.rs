@@ -10,8 +10,8 @@ mod client;
 mod idata;
 mod login_packet;
 mod mdata;
-mod sdata;
 mod money;
+mod sdata;
 
 use super::DataId;
 use super::{Account, AccountBalance};
@@ -213,11 +213,12 @@ impl Vault {
     ) -> Result<(), SndError> {
         let requester = XorName::from(requester_pk);
         let balance = self.get_balance(&owner)?;
-
-        println!(
-            ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>OWNWER {:?}, requestet: {:?}",
-            owner, requester_pk
+        debuug!(
+            "Checking mock auth perms for op. Owner: {:?}, requester: {:?} ",
+            owner,
+            requester_pk
         );
+
         // Prior this was a xorname vs pk check... which wouldn't happen?
         // // Checks if the requester is the owner
         if owner == requester_pk {
@@ -244,7 +245,6 @@ impl Vault {
             SndError::AccessDenied
         })?;
 
-        println!("////////////////////////////////////////////////////////////");
         // Iterates over the list of operations requested to authorise.
         // Will fail to authorise any even if one of the requested operations had been denied.
         for operation in operations {
@@ -348,10 +348,7 @@ impl Vault {
         transfer_id: TransferId,
     ) -> SndResult<Transfer> {
         let unlimited = unlimited_money(&self.config);
-        println!(
-            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxfer {:?} from, {:?}",
-            amount, source
-        );
+        info!("Mock transfer money{:?} from, {:?}", amount, source);
 
         let _ = match self.read_account_balance_mut(&source) {
             Some(balance) => {
@@ -359,9 +356,7 @@ impl Vault {
                     balance.debit_balance(amount)?
                 }
             }
-            // None => (),
             None => {
-                println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!THIS ODESNNNNNT EXIST");
                 return Err(SndError::NoSuchBalance);
             }
         };
@@ -372,7 +367,6 @@ impl Vault {
             None => self.create_balance(destination, amount)?, // None => return Err(SndError::NoSuchBalance),
         };
 
-        println!("***************************************");
         Ok(Transfer {
             to: destination,
             id: transfer_id,
@@ -469,20 +463,13 @@ impl Vault {
                 *client_public_id.public_key(),
                 *client_public_id.public_key(),
             ),
-            PublicId::App(app_public_id) => {
-                println!("Wee see iots an appp okay.............");
-                (
-                    *app_public_id.public_key(),
-                    *app_public_id.owner().public_key(),
-                )
-            }
+            PublicId::App(app_public_id) => (
+                *app_public_id.public_key(),
+                *app_public_id.owner().public_key(),
+            ),
             _ => return Err(SndError::AccessDenied),
         };
 
-        println!(
-            "and then auth.... w. req key: {:?}, key: {:?}",
-            requester_key, owner_key
-        );
         self.authorise_operations(&[Operation::Mutation], owner_key, requester_key)?;
         if self.contains_data(&data_name) {
             // Published Immutable Data is de-duplicated
