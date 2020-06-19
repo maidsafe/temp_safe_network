@@ -626,7 +626,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 Some(address) => address,
                 None => {
                     if let Request::Client(ClientRequest::InsAuthKey { .. })
-                    | Request::Client(ClientRequest::DelAuthKey { .. }) = request
+                    | Request::Client(ClientRequest::DelAuthKey { .. })
+                    | Request::Money(_) = request
                     {
                         Cow::Borrowed(self.id.public_id().name())
                     } else {
@@ -661,15 +662,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::Money(MoneyRequest::ValidateTransfer { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Money(MoneyRequest::RegisterTransfer { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Money(MoneyRequest::SimulatePayout { .. }),
+                    request: Request::Money(_),
                     ..
                 } => self
                     .client_handler_mut()?
