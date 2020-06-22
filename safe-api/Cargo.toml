@@ -9,33 +9,33 @@ include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 
 [dependencies]
-async-std = "^1.6.0"
+async-std = "1.6.0"
 async-trait = "~0.1.24"
-bincode = "^1.1.4"
+bincode = "1.1.4"
 chrono = "~0.4.6"
-directories = "^2.0.2"
+directories = "2.0.2"
 env_logger = "~0.6.0"
 futures = "~0.3.5"
 jsonrpc-quic = { path = "../jsonrpc-quic", version = "~0.0.6" }
-lazy_static = "^1.4.0"
+lazy_static = "1.4.0"
 log = "~0.4.6"
-mime_guess = "^2.0.1"
+mime_guess = "2.0.1"
 multibase = "~0.6.0"
 rand = "~0.6.5"
 rand_core = "~0.4.0"
 relative-path = "~0.4.0"
-safe_app = "0.16.3"
-safe_authenticator = "0.16.3"
-safe_core = "0.41.3"
+safe_app = "~0.16.3"
+safe_authenticator = "~0.16.3"
+safe_core = "~0.41.3"
 safe-nd = "~0.9.0"
-serde = "^1.0.91"
-serde_json = "^1.0.41"
+serde = "1.0.91"
+serde_json = "1.0.41"
 threshold_crypto = "~0.3.2"
-tiny-keccak = "^1.5.0"
+tiny-keccak = "1.5.0"
 tokio = { version = "~0.2.21", features = ["rt-core"] }
-url = "^2.1.1"
-urlencoding = "^1.0.0"
-walkdir = "^2.3.1" #ffi utils needs this version
+url = "2.1.1"
+urlencoding = "1.0.0"
+walkdir = "2.3.1" #ffi utils needs this version
 uhttp_uri = "~0.5.1"
 
 [features]
@@ -51,6 +51,6 @@ default = ["authenticator", "authd_client", "app"]
 tokio = { version = "~0.2.21", features = ["macros"] }
 
 [dev-dependencies.cargo-husky]
-version = "^1"
+version = "1"
 default-features = false # Disable features which are enabled by default
 features = ["precommit-hook","user-hooks"]

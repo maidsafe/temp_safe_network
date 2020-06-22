@@ -15,22 +15,22 @@ path = "main.rs"
 
 [dependencies]
 ansi_term = "~0.9.0"
-async-std = "^1.6.0"
+async-std = "1.6.0"
 crossbeam = "~0.7.3"
-directories = "^2.0.1"
+directories = "2.0.1"
 env_logger = "~0.6.0"
 envy = "~0.4.0"
-human-panic = "^1.0.1"
+human-panic = "1.0.1"
 log = "~0.4.6"
 pretty-hex = "~0.1.1"
 prettytable-rs = "~0.8"
 rand = "~0.6.5"
 relative-path = "~0.4.0"
 reqwest = "~0.9.22"
-rpassword = "^4.0.5"
+rpassword = "4.0.5"
 safe-nlt = { git = "https://github.com/maidsafe/safe-network-launch-tool.git" }
-serde = "^1.0.91"
-serde_json = "^1.0.39"
+serde = "1.0.91"
+serde_json = "1.0.39"
 serde_yaml = "~0.8.11"
 shrust = "~0.0.7"
 structopt = "~0.3.5"
@@ -39,7 +39,7 @@ isatty = "~0.1"
 num-traits = "~0.2"
 indicatif = { git="https://github.com/mibac138/indicatif", branch="mpb-tick" }
 console = "~0.10.0"
-percent-encoding = "^2.1.0"
+percent-encoding = "2.1.0"
 
 [features]
 mock-network = ["safe-api/mock-network"]
@@ -57,16 +57,16 @@ default-features = false
 features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"]
 
 [dev-dependencies]
-assert_cmd = "0.11.1"
-duct = "0.12.0"
+assert_cmd = "~0.11.1"
+duct = "~0.12.0"
 predicates = "1.0.0"
-pretty_assertions = "0.6.1"
-safe-nd = "^0.9.0"
-unwrap = "~1.2.1"
-criterion = "0.3"
-walkdir = "~2.3.1"
-tiny-keccak = "~1.5.0"
-multibase = "0.6.0"
+pretty_assertions = "~0.6.1"
+safe-nd = "~0.9.0"
+unwrap = "1.2.1"
+criterion = "~0.3"
+walkdir = "2.3.1"
+tiny-keccak = "1.5.0"
+multibase = "~0.6.0"
 safe-cmd-test-utilities = { path = "../safe-cmd-test-utilities" }
 
 [dev-dependencies.cargo-husky]
