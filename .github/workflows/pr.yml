@@ -6,7 +6,7 @@ env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  SAFE_VAULT_VERSION: "0.23.0"
+  SAFE_VAULT_VERSION: "0.24.0"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
@@ -54,7 +54,7 @@ jobs:
         uses: actions-rs/tarpaulin@master
         with:
           args: '-v --manifest-path=safe-api/Cargo.toml --features=scl-mock --exclude-files=safe-cli/*,jsonrpc-quic/*,safe-authd/*,safe-ffi/* --out Lcov -- --test-threads=1'
-      
+
       # Push tarpaulin results to coveralls.io
       - name: Coveralls
         uses: coverallsapp/github-action@master
@@ -146,7 +146,7 @@ jobs:
         run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=mock-network
 
       # Upload dev native lib.
-      - name: Upload dev native lib 
+      - name: Upload dev native lib
         uses: actions/upload-artifact@master
         with:
           name: safe-ffi-${{ matrix.target }}-dev

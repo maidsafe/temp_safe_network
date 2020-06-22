@@ -54,6 +54,8 @@
   - [SAFE-URLs](#safe-urls)
   - [Dog](#dog)
   - [Seq](#seq-sequence)
+    - [Store](#seq-store)
+    - [Append](#seq-append)
   - [Shell Completions](#shell-completions)
     - [Bash Completions](#bash-completions)
     - [Windows Powershell Completions](#windows-powershell-completions)
@@ -1428,7 +1430,7 @@ E.g. we can retrieve the content of a website with the `cat` command using eithe
 
 In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `dog` command.
 
-# Symlinks
+#### Symlinks
 
 The safe-cli supports upload and retrieval of symlinks using the above commands. It can also resolve relative symlinks in a FileContainer provided that the target exists in the FileContainer.
 
@@ -1489,15 +1491,56 @@ In this case we don't only get information about the content that the URL resolv
 
 ### Seq (Sequence)
 
-TODO
+As mentioned before, `FilesContainers` and `NRS Map Containers` are abstractions created on top of the network's native `Public Sequence` data type. A `Public Sequence` is a very simple data type that allows the user to only append elements to it  once it has been created on the network.
+
+Mutations made to `FilesContainers` and `NRS Map Containers` are made by storing the new version as a snapshot of the content and appended as a new item into its underlying `Public Sequence`. This is how these types of content are able to keep the complete history on the network.
 
 #### Seq Store
 
-TODO
+The CLI also allows us to store our own `Public Sequence` instances, with any other type of content we would like to store, instead of the data representing a `FilesContainer` or `NRS Map Container`. We can store a `Public Sequence` on the network with "my initial note" string as its first item:
+```shell
+$ safe seq store "my initial note"
+Sequence stored at: "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo"
+```
+
+We can then retrieve the content of this Sequence data, using either the `cat`/`dog` command as we do it with any other type of content:
+```shell
+$ safe cat safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo
+Sequence (version 0) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo":
+my initial note
+```
+
+It's also possible to pipe the output of another command into the `seq store` command to store a new `Sequence` with the content obtained from STDIN by providing `-` as the data argument:
+```shell
+$ echo "hello from stdin" | safe seq store -
+Sequence stored at: "safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo"
+
+$ safe cat safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo
+Sequence (version 0) at "safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo
+hello from stdin
+```
 
 #### Seq Append
 
-TODO
+Once we have a `Sequence` stored on the network, new items can be appended to it:
+```shell
+$ safe seq append "first update to my note" safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo
+Data appended to the Sequence: "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo"
+```
+
+We can confirm the new item has been appended to the `Sequence`:
+```shell
+$ safe cat safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo
+Sequence (version 1) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo":
+first update to my note
+```
+
+And we can also confirm the previous item has been kept in the `Sequence` if we provide the same XOR-URL but specifying a version (with `?v=<version>`):
+```shell
+$ safe cat safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo?v=0
+Sequence (version 0) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo?v=0":
+my initial note
+```
 
 ### Shell Completions
 

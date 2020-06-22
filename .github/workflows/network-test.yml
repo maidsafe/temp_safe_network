@@ -24,7 +24,7 @@ jobs:
           override: true
       - run: mkdir -p ~/.safe/vault
       - name: dl vault
-        run: wget https://github.com/bochaco/safe_vault/releases/download/testing/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
+        run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
       - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
       - name: Build
         run: cargo build --release
