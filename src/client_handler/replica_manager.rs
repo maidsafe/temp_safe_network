@@ -7,19 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_nd::{
-    AccountId, DebitAgreementProof, Error, KnownGroupAdded, MessageId, Money, PublicId,
-    ReplicaEvent, Result, SignedTransfer, TransferPropagated, TransferRegistered,
-    TransferValidated, XorName,
+    AccountId, DebitAgreementProof, Error, KnownGroupAdded, Money, ReplicaEvent, Result,
+    SignedTransfer, TransferPropagated, TransferRegistered, TransferValidated,
 };
 use safe_transfers::TransferReplica as Replica;
 use std::collections::HashMap;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
-use crate::rpc::Rpc;
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::action::Action,
-    safe_nd::{PublicKey, Response, Signature, SignatureShare, Transfer},
+    crate::{action::Action, rpc::Rpc},
+    safe_nd::{
+        MessageId, PublicId, PublicKey, Response, Signature, SignatureShare, Transfer, XorName,
+    },
     threshold_crypto::SecretKey,
 };
 
@@ -114,14 +114,14 @@ impl ReplicaManager {
 
 #[cfg(feature = "simulated-payouts")]
 impl ReplicaManager {
-    pub fn register_without_proof(
+    pub fn credit_without_proof(
         &mut self,
         requester: PublicId,
         transfer: Transfer,
         message_id: MessageId,
         sender: XorName,
     ) -> Option<Action> {
-        self.replica.apply_without_proof(transfer.clone());
+        self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
         let sec_key = SecretKey::random();
         let pub_key = sec_key.public_key();
@@ -155,6 +155,10 @@ impl ReplicaManager {
                 refund: None,
             },
         })
+    }
+
+    pub fn debit_without_proof(&mut self, transfer: Transfer) {
+        self.replica.debit_without_proof(transfer)
     }
 }
 

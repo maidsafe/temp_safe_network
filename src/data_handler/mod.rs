@@ -99,6 +99,7 @@ impl DataHandler {
                 address,
                 holders,
                 message_id,
+                refund,
                 ..
             } => self.handle_duplicate_request(address, holders, message_id, accumulated_signature),
             Rpc::DuplicationComplete {

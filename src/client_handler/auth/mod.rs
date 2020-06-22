@@ -17,8 +17,9 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, ClientRequest, Error as NdError, MessageId, MiscAuthKind, MoneyAuthKind, 
-    NodePublicId, PublicId, PublicKey, Request, RequestAuthKind, Response, Signature
+    AppPermissions, AppPublicId, ClientRequest, DataAuthKind, Error as NdError, MessageId,
+    MiscAuthKind, MoneyAuthKind, NodePublicId, PublicId, PublicKey, Request, RequestAuthKind,
+    Response, Signature,
 };
 use std::fmt::{self, Display, Formatter};
 

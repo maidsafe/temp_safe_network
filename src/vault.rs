@@ -650,7 +650,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             //        message.
             return match rpc.clone() {
                 Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Create(_)),
+                    request: Request::LoginPacket(LoginPacketRequest::Create { .. }),
                     ..
                 }
                 | Rpc::Request {

@@ -6,12 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{rpc::Rpc, vault::Init, Result, COST_OF_PUT};
+use crate::{rpc::Rpc, vault::Init, Result};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::SrcLocation;
-use safe_nd::{ClientPublicId, Money, PublicId, PublicKey, Result as NdResult, XorName};
+use safe_nd::{
+    ClientPublicId, DebitAgreementProof, PublicId, PublicKey, Result as NdResult, XorName,
+};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -86,9 +88,12 @@ pub(crate) fn requester_address(rpc: &Rpc) -> XorName {
     }
 }
 
-pub(crate) fn get_refund_for_put<T>(result: &NdResult<T>) -> Option<Money> {
+pub(crate) fn get_refund_for_put<T>(
+    result: &NdResult<T>,
+    debit_proof: DebitAgreementProof,
+) -> Option<DebitAgreementProof> {
     if result.is_err() {
-        Some(COST_OF_PUT)
+        Some(debit_proof)
     } else {
         None
     }

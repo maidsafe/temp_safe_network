@@ -8,7 +8,7 @@
 
 //! RPC messages internal to Vaults.
 
-use safe_nd::{Coins, IDataAddress, MessageId, Money, PublicId, Request, Response, XorName};
+use safe_nd::{DebitAgreementProof, IDataAddress, MessageId, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use threshold_crypto::{Signature, SignatureShare};
@@ -29,7 +29,7 @@ pub(crate) enum Rpc {
         response: Response,
         requester: PublicId,
         message_id: MessageId,
-        refund: Option<Money>,
+        refund: Option<DebitAgreementProof>,
         proof: Option<(Request, Signature)>,
     },
     /// Wrapper for a duplicate request, from elders to other nodes in the section.

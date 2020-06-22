@@ -16,9 +16,10 @@ use crate::{
 };
 
 use safe_nd::{
-    Error as NdError, MessageId, NodePublicId, PublicId, Response, Result as NdResult, SData,
-    SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataMutationOperation, SDataOwner,
-    SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataRequest, SDataUser,
+    DebitAgreementProof, Error as NdError, MessageId, NodePublicId, PublicId, Response,
+    Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex,
+    SDataMutationOperation, SDataOwner, SDataPermissions, SDataPrivPermissions,
+    SDataPubPermissions, SDataRequest, SDataUser,
 };
 
 use std::{
@@ -58,7 +59,9 @@ impl SDataHandler {
     ) -> Option<Action> {
         use SDataRequest::*;
         match request {
-            Store(data) => self.handle_store_req(requester, &data, message_id),
+            Store { data, debit_proof } => {
+                self.handle_store_req(requester, &data, message_id, debit_proof)
+            }
             Get(address) => self.handle_get_req(requester, address, message_id),
             GetRange { address, range } => {
                 self.handle_get_range_req(requester, address, range, message_id)
@@ -72,16 +75,18 @@ impl SDataHandler {
                 self.handle_get_permissions_req(requester, address, message_id)
             }
             Delete(address) => self.handle_delete_req(requester, address, message_id),
-            MutatePubPermissions(operation) => {
-                self.handle_mutate_pub_permissions_req(&requester, operation, message_id)
+            MutatePubPermissions { op, debit_proof } => {
+                self.handle_mutate_pub_permissions_req(&requester, op, message_id, debit_proof)
             }
-            MutatePrivPermissions(operation) => {
-                self.handle_mutate_priv_permissions_req(&requester, operation, message_id)
+            MutatePrivPermissions { op, debit_proof } => {
+                self.handle_mutate_priv_permissions_req(&requester, op, message_id, debit_proof)
             }
-            MutateOwner(operation) => {
-                self.handle_mutate_owner_req(&requester, operation, message_id)
+            MutateOwner { op, debit_proof } => {
+                self.handle_mutate_owner_req(&requester, op, message_id, debit_proof)
             }
-            Mutate(operation) => self.handle_mutate_data_req(&requester, operation, message_id),
+            Mutate { op, debit_proof } => {
+                self.handle_mutate_data_req(&requester, op, message_id, debit_proof)
+            }
         }
     }
 
@@ -90,6 +95,7 @@ impl SDataHandler {
         requester: PublicId,
         data: &SData,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
@@ -99,7 +105,7 @@ impl SDataHandler {
                 .map_err(|error| error.to_string().into())
         };
 
-        let refund = utils::get_refund_for_put(&result);
+        let refund = utils::get_refund_for_put(&result, debit_proof);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
@@ -327,6 +333,7 @@ impl SDataHandler {
         requester: &PublicId,
         mutation_op: SDataMutationOperation<SDataPubPermissions>,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
         self.mutate_sdata_chunk(
@@ -334,6 +341,7 @@ impl SDataHandler {
             address,
             SDataAction::ManagePermissions,
             message_id,
+            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_pub_perms_op(mutation_op.crdt_op)?;
                 Ok(sdata)
@@ -346,6 +354,7 @@ impl SDataHandler {
         requester: &PublicId,
         mutation_op: SDataMutationOperation<SDataPrivPermissions>,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
         self.mutate_sdata_chunk(
@@ -353,6 +362,7 @@ impl SDataHandler {
             address,
             SDataAction::ManagePermissions,
             message_id,
+            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_priv_perms_op(mutation_op.crdt_op)?;
                 Ok(sdata)
@@ -365,6 +375,7 @@ impl SDataHandler {
         requester: &PublicId,
         mutation_op: SDataMutationOperation<SDataOwner>,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
         self.mutate_sdata_chunk(
@@ -372,6 +383,7 @@ impl SDataHandler {
             address,
             SDataAction::ManagePermissions,
             message_id,
+            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_owner_op(mutation_op.crdt_op);
                 Ok(sdata)
@@ -384,6 +396,7 @@ impl SDataHandler {
         requester: &PublicId,
         mutation_op: SDataMutationOperation<SDataEntry>,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
         self.mutate_sdata_chunk(
@@ -391,6 +404,7 @@ impl SDataHandler {
             address,
             SDataAction::Append,
             message_id,
+            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_op(mutation_op.crdt_op);
                 Ok(sdata)
@@ -404,6 +418,7 @@ impl SDataHandler {
         address: SDataAddress,
         action: SDataAction,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
         mutation_fn: F,
     ) -> Option<Action>
     where
@@ -418,7 +433,7 @@ impl SDataHandler {
                     .map_err(|error| error.to_string().into())
             });
 
-        let refund = utils::get_refund_for_put(&result);
+        let refund = utils::get_refund_for_put(&result, debit_proof);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {

@@ -37,7 +37,7 @@ pub(crate) enum OpType {
 }
 
 // TODO: document this struct.
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub(crate) struct IDataOp {
     client: PublicId,
     request: IDataRequest,
@@ -73,7 +73,7 @@ impl IDataOp {
 
     pub fn op_type(&self) -> OpType {
         match self.request {
-            IDataRequest::Put(_) => OpType::Put,
+            IDataRequest::Put { .. } => OpType::Put,
             IDataRequest::Get(_) => OpType::Get,
             IDataRequest::DeleteUnpub(_) => OpType::Delete,
         }
@@ -115,7 +115,7 @@ impl IDataOp {
         self.set_to_actioned(&sender, result.err(), &own_id)?;
 
         match self.request {
-            IDataRequest::Put(ref data) => Some(*data.address()),
+            IDataRequest::Put { ref data, .. } => Some(*data.address()),
             IDataRequest::DeleteUnpub(address) => Some(address),
             IDataRequest::Get(_) => unreachable!(), // we checked above
         }

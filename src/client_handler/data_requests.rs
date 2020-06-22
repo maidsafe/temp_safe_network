@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{auth::ClientInfo, COST_OF_PUT};
+use super::auth::ClientInfo;
 use crate::{
     action::{Action, ConsensusAction},
     rpc::Rpc,
@@ -14,8 +14,8 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, IDataKind, IDataRequest, MData, MDataRequest, MessageId,
-    NodePublicId, Request, Response, SData, SDataAddress, SDataRequest,
+    DebitAgreementProof, Error as NdError, IData, IDataAddress, IDataKind, IDataRequest, MData,
+    MDataRequest, MessageId, NodePublicId, Request, Response, SData, SDataAddress, SDataRequest,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -59,7 +59,9 @@ impl Sequence {
     ) -> Option<Action> {
         use SDataRequest::*;
         match request {
-            Store(chunk) => self.initiate_creation(client, chunk, message_id),
+            Store { data, debit_proof } => {
+                self.initiate_creation(client, data, message_id, debit_proof)
+            }
             Get(_)
             | GetRange { .. }
             | GetLastEntry(_)
@@ -67,10 +69,18 @@ impl Sequence {
             | GetPermissions { .. }
             | GetUserPermissions { .. } => self.get(client, request, message_id),
             Delete(address) => self.initiate_deletion(client, address, message_id),
-            MutatePubPermissions { .. }
-            | MutatePrivPermissions { .. }
-            | MutateOwner { .. }
-            | Mutate(..) => self.initiate_mutation(client, request, message_id),
+            MutatePubPermissions {
+                ref debit_proof, ..
+            }
+            | MutatePrivPermissions {
+                ref debit_proof, ..
+            }
+            | MutateOwner {
+                ref debit_proof, ..
+            }
+            | Mutate {
+                ref debit_proof, ..
+            } => self.initiate_mutation(client, request.clone(), message_id, debit_proof.clone()),
         }
     }
 
@@ -95,6 +105,7 @@ impl Sequence {
         client: &ClientInfo,
         chunk: SData,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
@@ -111,12 +122,15 @@ impl Sequence {
             });
         }
 
-        let request = Request::SData(SDataRequest::Store(chunk));
+        let request = Request::SData(SDataRequest::Store {
+            data: chunk,
+            debit_proof: debit_proof.clone(),
+        });
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: COST_OF_PUT,
+            debit_proof,
         }))
     }
 
@@ -147,12 +161,13 @@ impl Sequence {
         client: &ClientInfo,
         request: SDataRequest,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request: Request::SData(request),
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: COST_OF_PUT,
+            debit_proof,
         }))
     }
 }
@@ -186,7 +201,9 @@ impl Immutable {
     ) -> Option<Action> {
         use IDataRequest::*;
         match request {
-            Put(chunk) => self.initiate_creation(client, chunk, message_id),
+            Put { data, debit_proof } => {
+                self.initiate_creation(client, data, message_id, debit_proof.unwrap())
+            }
             Get(address) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
                 // since it's free for anyone to get.  However, as a means of spam prevention, we
@@ -222,6 +239,7 @@ impl Immutable {
         client: &ClientInfo,
         chunk: IData,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
 
@@ -242,12 +260,15 @@ impl Immutable {
             }
         }
 
-        let request = Request::IData(IDataRequest::Put(chunk));
+        let request = Request::IData(IDataRequest::Put {
+            data: chunk,
+            debit_proof: Some(debit_proof.clone()),
+        });
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: COST_OF_PUT,
+            debit_proof,
         }))
     }
 
@@ -301,10 +322,18 @@ impl Mutable {
     ) -> Option<Action> {
         use MDataRequest::*;
         match request {
-            Put(chunk) => self.initiate_creation(client, chunk, message_id),
-            MutateEntries { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
-                self.initiate_mutation(request, client, message_id)
+            Put { data, debit_proof } => {
+                self.initiate_creation(client, data, message_id, debit_proof)
             }
+            MutateEntries {
+                ref debit_proof, ..
+            }
+            | SetUserPermissions {
+                ref debit_proof, ..
+            }
+            | DelUserPermissions {
+                ref debit_proof, ..
+            } => self.initiate_mutation(request.clone(), client, message_id, debit_proof.clone()),
             Delete(..) => self.initiate_deletion(request, client, message_id),
             Get(..)
             | GetVersion(..)
@@ -339,12 +368,13 @@ impl Mutable {
         request: MDataRequest,
         client: &ClientInfo,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request: Request::MData(request),
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: COST_OF_PUT,
+            debit_proof,
         }))
     }
 
@@ -368,6 +398,7 @@ impl Mutable {
         client: &ClientInfo,
         chunk: MData,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
 
@@ -385,13 +416,16 @@ impl Mutable {
             });
         }
 
-        let request = Request::MData(MDataRequest::Put(chunk));
+        let request = Request::MData(MDataRequest::Put {
+            data: chunk,
+            debit_proof: debit_proof.clone(),
+        });
 
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: COST_OF_PUT,
+            debit_proof,
         }))
     }
 }

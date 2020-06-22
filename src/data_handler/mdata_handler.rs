@@ -17,9 +17,9 @@ use crate::{
 use log::error;
 
 use safe_nd::{
-    Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions, MDataPermissionSet,
-    MDataRequest, MDataValue, MessageId, NodePublicId, PublicId, PublicKey, Response,
-    Result as NdResult,
+    DebitAgreementProof, Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions,
+    MDataPermissionSet, MDataRequest, MDataValue, MessageId, NodePublicId, PublicId, PublicKey,
+    Response, Result as NdResult,
 };
 
 use std::{
@@ -59,7 +59,9 @@ impl MDataHandler {
     ) -> Option<Action> {
         use MDataRequest::*;
         match request {
-            Put(data) => self.handle_put_mdata_req(requester, &data, message_id),
+            Put { data, debit_proof } => {
+                self.handle_put_mdata_req(requester, &data, message_id, debit_proof)
+            }
             Get(address) => self.handle_get_mdata_req(requester, address, message_id),
             GetValue { address, ref key } => {
                 self.handle_get_mdata_value_req(requester, address, key, message_id)
@@ -87,6 +89,7 @@ impl MDataHandler {
                 user,
                 ref permissions,
                 version,
+                ref debit_proof,
             } => self.handle_set_mdata_user_permissions_req(
                 requester,
                 address,
@@ -94,17 +97,32 @@ impl MDataHandler {
                 permissions,
                 version,
                 message_id,
+                debit_proof.clone(),
             ),
             DelUserPermissions {
                 address,
                 user,
                 version,
+                debit_proof,
             } => self.handle_del_mdata_user_permissions_req(
-                requester, address, user, version, message_id,
+                requester,
+                address,
+                user,
+                version,
+                message_id,
+                debit_proof,
             ),
-            MutateEntries { address, actions } => {
-                self.handle_mutate_mdata_entries_req(requester, address, actions, message_id)
-            }
+            MutateEntries {
+                address,
+                actions,
+                debit_proof,
+            } => self.handle_mutate_mdata_entries_req(
+                requester,
+                address,
+                actions,
+                message_id,
+                debit_proof,
+            ),
         }
     }
 
@@ -146,6 +164,7 @@ impl MDataHandler {
         address: &MDataAddress,
         requester: PublicId,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
         mutation_fn: F,
     ) -> Option<Action>
     where
@@ -164,7 +183,7 @@ impl MDataHandler {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
-        let refund = utils::get_refund_for_put(&result);
+        let refund = utils::get_refund_for_put(&result, debit_proof);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
@@ -183,6 +202,7 @@ impl MDataHandler {
         requester: PublicId,
         data: &MData,
         message_id: MessageId,
+        transfer: DebitAgreementProof,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
@@ -191,7 +211,7 @@ impl MDataHandler {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        let refund = utils::get_refund_for_put(&result);
+        let refund = utils::get_refund_for_put(&result, transfer);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
@@ -249,14 +269,21 @@ impl MDataHandler {
         permissions: &MDataPermissionSet,
         version: u64,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
-        self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
-            data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
-            data.set_user_permissions(user, permissions.clone(), version)?;
-            Ok(data)
-        })
+        self.mutate_mdata_chunk(
+            &address,
+            requester,
+            message_id,
+            debit_proof,
+            move |mut data| {
+                data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
+                data.set_user_permissions(user, permissions.clone(), version)?;
+                Ok(data)
+            },
+        )
     }
 
     /// Delete MData user permissions.
@@ -267,14 +294,21 @@ impl MDataHandler {
         user: PublicKey,
         version: u64,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
-        self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
-            data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
-            data.del_user_permissions(user, version)?;
-            Ok(data)
-        })
+        self.mutate_mdata_chunk(
+            &address,
+            requester,
+            message_id,
+            debit_proof,
+            move |mut data| {
+                data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
+                data.del_user_permissions(user, version)?;
+                Ok(data)
+            },
+        )
     }
 
     /// Mutate Sequenced MData.
@@ -284,13 +318,20 @@ impl MDataHandler {
         address: MDataAddress,
         actions: MDataEntryActions,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
-        self.mutate_mdata_chunk(&address, requester, message_id, move |mut data| {
-            data.mutate_entries(actions, requester_pk)?;
-            Ok(data)
-        })
+        self.mutate_mdata_chunk(
+            &address,
+            requester,
+            message_id,
+            debit_proof,
+            move |mut data| {
+                data.mutate_entries(actions, requester_pk)?;
+                Ok(data)
+            },
+        )
     }
 
     /// Get entire MData.

@@ -10,11 +10,16 @@ use super::{auth::ClientInfo, messaging::Messaging, replica_manager::ReplicaMana
 use crate::{action::Action, rpc::Rpc};
 //use log::{error, trace};
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, MessageId, Money, MoneyRequest, NodePublicId, PublicId,
-    PublicKey, Request, Response, SignedTransfer, XorName,
+    DebitAgreementProof, Error as NdError, MessageId, MoneyRequest, NodePublicId, PublicId,
+    Request, Response, SignedTransfer, XorName,
 };
 use std::fmt::{self, Display, Formatter};
 
+#[cfg(not(feature = "simulated-payouts"))]
+use safe_nd::PublicKey;
+
+#[cfg(feature = "simulated-payouts")]
+use safe_nd::Transfer;
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -91,12 +96,10 @@ impl Transfers {
                 messaging,
             ),
             #[cfg(feature = "simulated-payouts")]
-            MoneyRequest::SimulatePayout { transfer } => self.replica.register_without_proof(
-                requester,
-                transfer,
-                message_id,
-                *self.id.name(),
-            ),
+            MoneyRequest::SimulatePayout { transfer } => {
+                self.replica
+                    .credit_without_proof(requester, transfer, message_id, *self.id.name())
+            }
         }
     }
 
@@ -206,7 +209,7 @@ impl Transfers {
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destionation.
-    fn receive_propagated(
+    pub(crate) fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,
         requester: &PublicId,
@@ -233,14 +236,20 @@ impl Transfers {
         }
     }
 
+    #[cfg(not(feature = "simulated-payouts"))]
     pub fn pay_section(
         &mut self,
-        _amount: Money,
+        _transfer: DebitAgreementProof,
         _from: PublicKey,
         _request: &Request,
         _message_id: MessageId,
     ) -> Option<Action> {
         None
+    }
+
+    #[cfg(feature = "simulated-payouts")]
+    pub fn pay(&mut self, transfer: Transfer) {
+        self.replica.debit_without_proof(transfer)
     }
 }
 
