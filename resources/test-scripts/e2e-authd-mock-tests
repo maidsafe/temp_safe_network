@@ -29,6 +29,7 @@ function run_cli_tests_with_auth_daemon_with_mock() {
     cargo test --release --features mock-network --test cli_keys
     cargo test --release --features mock-network --test cli_wallet
     cargo test --release --features mock-network --test cli_nrs
+    cargo test --release --features mock-network --test cli_seq
     cd -
 }
 

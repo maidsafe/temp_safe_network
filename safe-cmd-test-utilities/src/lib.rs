@@ -323,6 +323,16 @@ pub fn parse_xorurl_output(output: &str) -> Vec<(String, String)> {
     serde_json::from_str(output).expect("Failed to parse output of `safe xorurl`")
 }
 
+#[allow(dead_code)]
+pub fn parse_seq_store_output(output: &str) -> String {
+    serde_json::from_str(output).expect("Failed to parse output of `safe seq store`")
+}
+
+#[allow(dead_code)]
+pub fn parse_cat_seq_output(output: &str) -> (String, Vec<u8>) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe cat seq`")
+}
+
 // Executes arbitrary `safe ` commands and returns
 // output (stdout, stderr, exit code).
 //

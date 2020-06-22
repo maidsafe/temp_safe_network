@@ -36,6 +36,7 @@ function run_cli_tests_with_auth_daemon() {
     cargo test --release --test cli_keys
     cargo test --release --test cli_wallet
     cargo test --release --test cli_nrs
+    cargo test --release --test cli_seq
     cd -
 }
 
