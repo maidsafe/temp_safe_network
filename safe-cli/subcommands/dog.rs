@@ -74,7 +74,7 @@ pub async fn dog_commander(
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
                 }
-                SafeData::PublishedImmutableData {
+                SafeData::PublicImmutableData {
                     xorurl,
                     xorname,
                     media_type,
@@ -85,7 +85,7 @@ pub async fn dog_commander(
                     println!("= File =");
                     println!("XOR-URL: {}", xorurl);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: ImmutableData (published)");
+                    println!("Native data type: ImmutableData (public)");
                     println!(
                         "Media type: {}",
                         media_type.clone().unwrap_or_else(|| "Unknown".to_string())

@@ -217,7 +217,7 @@ pub unsafe extern "C" fn encode_mutable_data(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn encode_append_only_data(
+pub unsafe extern "C" fn encode_sequence_data(
     name: *const XorNameArray,
     type_tag: u64,
     content_type: u16,
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn encode_append_only_data(
         let xor_name = XorName(*name);
         let content_type_enum = SafeContentType::from_u16(content_type)?;
         let encoding_base = XorUrlBase::from_u16(base_encoding)?;
-        let encoded_safe_url = NativeSafeUrl::encode_append_only_data(
+        let encoded_safe_url = NativeSafeUrl::encode_sequence_data(
             xor_name,
             type_tag,
             content_type_enum,

@@ -128,7 +128,7 @@ impl Drop for FilesContainer {
 }
 
 #[repr(C)]
-pub struct PublishedImmutableData {
+pub struct PublicImmutableData {
     pub xorurl: *const c_char,
     pub xorname: XorNameArray,
     pub data: *const u8,
@@ -138,7 +138,7 @@ pub struct PublishedImmutableData {
     pub resolved_from: *const c_char,
 }
 
-impl Drop for PublishedImmutableData {
+impl Drop for PublicImmutableData {
     fn drop(&mut self) {
         unsafe {
             if !self.xorurl.is_null() {

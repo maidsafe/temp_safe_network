@@ -51,7 +51,7 @@ pub enum SafeData {
         data_type: SafeDataType,
         resolved_from: String,
     },
-    PublishedImmutableData {
+    PublicImmutableData {
         xorurl: String,
         xorname: XorName,
         data: Vec<u8>,
@@ -86,7 +86,7 @@ impl SafeData {
             SafeKey { xorurl, .. }
             | Wallet { xorurl, .. }
             | FilesContainer { xorurl, .. }
-            | PublishedImmutableData { xorurl, .. }
+            | PublicImmutableData { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
             | PublicSequence { xorurl, .. } => xorurl.clone(),
         }
@@ -98,7 +98,7 @@ impl SafeData {
             SafeKey { resolved_from, .. }
             | Wallet { resolved_from, .. }
             | FilesContainer { resolved_from, .. }
-            | PublishedImmutableData { resolved_from, .. }
+            | PublicImmutableData { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
             | PublicSequence { resolved_from, .. } => resolved_from.clone(),
         }
@@ -121,7 +121,7 @@ impl Safe {
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
-    ///         SafeData::PublishedImmutableData { data, .. } => {
+    ///         SafeData::PublicImmutableData { data, .. } => {
     ///             match String::from_utf8(data) {
     ///                 Ok(string) => string,
     ///                 Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
@@ -176,7 +176,7 @@ impl Safe {
     ///         )
     ///     };
     ///     match &inspected_content[1] {
-    ///         SafeData::PublishedImmutableData { data, media_type, .. } => {
+    ///         SafeData::PublicImmutableData { data, media_type, .. } => {
     ///             assert_eq!(*media_type, Some("text/markdown".to_string()));
     ///             assert!(data.is_empty());
     ///         }
@@ -385,7 +385,7 @@ async fn resolve_one_indirection(
                 };
                 Ok((safe_data, None))
             }
-            SafeDataType::PublishedImmutableData => {
+            SafeDataType::PublicImmutableData => {
                 retrieve_immd(safe, &the_xor, retrieve_data, None, &metadata, range).await
             }
             SafeDataType::PublicSequence => {
@@ -410,7 +410,7 @@ async fn resolve_one_indirection(
             ))),
         },
         SafeContentType::MediaType(media_type_str) => match the_xor.data_type() {
-            SafeDataType::PublishedImmutableData => {
+            SafeDataType::PublicImmutableData => {
                 retrieve_immd(
                     safe,
                     &the_xor,
@@ -468,7 +468,7 @@ async fn retrieve_immd(
         vec![]
     };
 
-    let safe_data = SafeData::PublishedImmutableData {
+    let safe_data = SafeData::PublicImmutableData {
         xorurl: the_xor.to_xorurl_string(),
         xorname: the_xor.xorname(),
         data,
@@ -709,7 +709,7 @@ mod tests {
         let content = safe.fetch(&xorurl, None).await?;
         assert!(
             content
-                == SafeData::PublishedImmutableData {
+                == SafeData::PublicImmutableData {
                     xorurl: xorurl.clone(),
                     xorname: xorurl_encoder.xorname(),
                     data: data.to_vec(),
@@ -723,7 +723,7 @@ mod tests {
         let inspected_content = safe.inspect(&xorurl).await?;
         assert!(
             inspected_content[0]
-                == SafeData::PublishedImmutableData {
+                == SafeData::PublicImmutableData {
                     xorurl: xorurl.clone(),
                     xorname: xorurl_encoder.xorname(),
                     data: vec![],
@@ -748,11 +748,11 @@ mod tests {
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
         let content = safe.fetch(&xorurl, fetch_first_half).await?;
 
-        if let SafeData::PublishedImmutableData { data, .. } = &content {
+        if let SafeData::PublicImmutableData { data, .. } = &content {
             assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
         } else {
             return Err(Error::Unexpected(format!(
-                "Content fetched is not a PublishedImmutableData: {:?}",
+                "Content fetched is not a PublicImmutableData: {:?}",
                 content
             )));
         }
@@ -761,12 +761,12 @@ mod tests {
         let fetch_second_half = Some((Some(size as u64 / 2), Some(size as u64)));
         let content = safe.fetch(&xorurl, fetch_second_half).await?;
 
-        if let SafeData::PublishedImmutableData { data, .. } = &content {
+        if let SafeData::PublicImmutableData { data, .. } = &content {
             assert_eq!(data.clone(), saved_data[size / 2..size].to_vec());
             Ok(())
         } else {
             Err(Error::Unexpected(format!(
-                "Content fetched is not a PublishedImmutableData: {:?}",
+                "Content fetched is not a PublicImmutableData: {:?}",
                 content
             )))
         }
@@ -799,11 +799,11 @@ mod tests {
 
         // Fetch full file and match
         let content = safe.fetch(&nrs_url, None).await?;
-        if let SafeData::PublishedImmutableData { data, .. } = &content {
+        if let SafeData::PublicImmutableData { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {
             return Err(Error::Unexpected(format!(
-                "Content fetched is not a PublishedImmutableData: {:?}",
+                "Content fetched is not a PublicImmutableData: {:?}",
                 content
             )));
         }
@@ -812,11 +812,11 @@ mod tests {
         let fetch_first_half = Some((None, Some(file_size as u64 / 2)));
         let content = safe.fetch(&nrs_url, fetch_first_half).await?;
 
-        if let SafeData::PublishedImmutableData { data, .. } = &content {
+        if let SafeData::PublicImmutableData { data, .. } = &content {
             assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
         } else {
             return Err(Error::Unexpected(format!(
-                "Content fetched is not a PublishedImmutableData: {:?}",
+                "Content fetched is not a PublicImmutableData: {:?}",
                 content
             )));
         }
@@ -825,12 +825,12 @@ mod tests {
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
         let content = safe.fetch(&nrs_url, fetch_second_half).await?;
 
-        if let SafeData::PublishedImmutableData { data, .. } = &content {
+        if let SafeData::PublicImmutableData { data, .. } = &content {
             assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
             Ok(())
         } else {
             Err(Error::Unexpected(format!(
-                "Content fetched is not a PublishedImmutableData: {:?}",
+                "Content fetched is not a PublicImmutableData: {:?}",
                 content
             )))
         }
@@ -881,7 +881,7 @@ mod tests {
             xorname,
             None,
             type_tag,
-            SafeDataType::UnpublishedImmutableData,
+            SafeDataType::PrivateImmutableData,
             SafeContentType::Raw,
             None,
             None,
@@ -901,7 +901,7 @@ mod tests {
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
-                    "Data type 'UnpublishedImmutableData' not supported yet".to_string()
+                    "Data type 'PrivateImmutableData' not supported yet".to_string()
                 )
             ),
         };
@@ -916,7 +916,7 @@ mod tests {
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
-                    "Data type 'UnpublishedImmutableData' not supported yet".to_string()
+                    "Data type 'PrivateImmutableData' not supported yet".to_string()
                 )
             ),
         };
@@ -932,7 +932,7 @@ mod tests {
             xorname,
             None,
             type_tag,
-            SafeDataType::UnpublishedImmutableData,
+            SafeDataType::PrivateImmutableData,
             SafeContentType::MediaType("text/html".to_string()),
             None,
             None,
@@ -952,7 +952,7 @@ mod tests {
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
-                    "Data type 'UnpublishedImmutableData' not supported yet".to_string()
+                    "Data type 'PrivateImmutableData' not supported yet".to_string()
                 )
             ),
         };
@@ -967,7 +967,7 @@ mod tests {
             Err(msg) => assert_eq!(
                 msg,
                 Error::ContentError(
-                    "Data type 'UnpublishedImmutableData' not supported yet".to_string()
+                    "Data type 'PrivateImmutableData' not supported yet".to_string()
                 )
             ),
         };

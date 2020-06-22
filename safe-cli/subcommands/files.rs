@@ -377,7 +377,7 @@ pub async fn files_commander(
                     let (total, filtered_filesmap) = filter_files_map(&files_map, &target_url)?;
                     (version, filtered_filesmap, total)
                 }
-                SafeData::PublishedImmutableData { metadata, .. } => {
+                SafeData::PublicImmutableData { metadata, .. } => {
                     if let Some(file_item) = metadata {
                         let mut files_map = FilesMap::new();
                         let name = match file_item.get("name") {

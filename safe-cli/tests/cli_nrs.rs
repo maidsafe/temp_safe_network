@@ -33,7 +33,7 @@ fn gen_fake_target() -> String {
         xorname,
         None,
         0x00a5_3cde,
-        SafeDataType::PublishedImmutableData,
+        SafeDataType::PublicImmutableData,
         SafeContentType::Raw,
         None,
         None,

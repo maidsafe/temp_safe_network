@@ -64,7 +64,7 @@ pub async fn cat_commander(
                 println!("{}", serialise_output(&(url, files_map), output_fmt));
             }
         }
-        SafeData::PublishedImmutableData { data, .. } => {
+        SafeData::PublicImmutableData { data, .. } => {
             if cmd.hexdump {
                 // Render hex representation of ImmutableData file
                 println!("{}", pretty_hex::pretty_hex(data));

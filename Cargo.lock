@@ -58,6 +58,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahash"
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f33b5018f120946c1dcf279194f238a9f146725593ead1c08fa47ff22b0b5d3"
+dependencies = [
+ "const-random",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -283,6 +292,16 @@ name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
+
+[[package]]
+name = "bitvec"
+version = "0.17.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41262f11d771fd4a61aa3ce019fca363b4b6c282fca9da2a31186d3965a47a5c"
+dependencies = [
+ "either",
+ "radium",
+]
 
 [[package]]
 name = "blake2b_simd"
@@ -594,6 +613,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-random"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f1af9ac737b2dd2d577701e59fd09ba34822f6f2ebdb30a7647405d9e55e16a"
+dependencies = [
+ "const-random-macro",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "const-random-macro"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25e4c606eb459dd29f7c57b2e0879f2b6f14ee130918c2b78ccb58a9624e6c7a"
+dependencies = [
+ "getrandom",
+ "proc-macro-hack",
+]
+
+[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -650,6 +689,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba125de2af0df55319f41944744ad91c71113bf74a4646efff39afe1f6842db1"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "crdts"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbe3a81de7c6d486b5087559d310092b053e7e9fddefe5257b745a233b2a66a7"
+dependencies = [
+ "bitvec",
+ "num-bigint",
+ "quickcheck",
+ "rand 0.7.3",
+ "serde",
 ]
 
 [[package]]
@@ -1450,6 +1502,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e6073d0ca812575946eb5f35ff68dbe519907b25c42530389ff946dc84c6ead"
+dependencies = [
+ "ahash",
+ "autocfg 0.1.7",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1918,6 +1980,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297efb9401445cf7b6986a583d7ac194023334b46b294ff7da0d36662c1251c2"
+dependencies = [
+ "hashbrown",
+]
+
+[[package]]
 name = "lru-cache"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2125,6 +2196,17 @@ name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
+
+[[package]]
+name = "num-bigint"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg 1.0.0",
+ "num-integer",
+ "num-traits",
+]
 
 [[package]]
 name = "num-integer"
@@ -2592,6 +2674,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "quickcheck"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a44883e74aa97ad63db83c4bf8ca490f02b2fc02f92575e720c8551e843c945f"
+dependencies = [
+ "env_logger 0.7.1",
+ "log 0.4.8",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+]
+
+[[package]]
 name = "quinn"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2642,6 +2736,12 @@ checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
  "proc-macro2 1.0.18",
 ]
+
+[[package]]
+name = "radium"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "def50a86306165861203e7f84ecffbbdfdea79f0e51039b33de1e952358c47ac"
 
 [[package]]
 name = "rand"
@@ -3268,11 +3368,12 @@ dependencies = [
 
 [[package]]
 name = "safe-nd"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900fe3baee261f7c9b1532c5f401c391e7445f444a5a4bccc032326052582030"
+checksum = "d7b9ca69f41d96da8c972538673f07d104691cced39af4d3eab91c1333cb3513"
 dependencies = [
  "bincode",
+ "crdts",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
@@ -3287,7 +3388,7 @@ dependencies = [
 [[package]]
 name = "safe-nlt"
 version = "0.0.1"
-source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#a6401640840ac6e2b0aaa62435e24dba0940b4e8"
+source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#ff4e258a0ef6a2e0fe5b16eba95537f06f00d6ce"
 dependencies = [
  "directories 2.0.2",
  "env_logger 0.7.1",
@@ -3299,8 +3400,7 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df522f09b18ec6e115afdbcf45af3e6ccf03a57e06b6963b6a8aa1033860a782"
+source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3327,8 +3427,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "479c4298aa8b392500944ae7d22d91371dda5944bf82940ef298e0e9f84cd916"
+source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3351,8 +3450,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator_ffi"
 version = "0.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b572616806fa30e140a15165f1bfeb368e275108bdb9898bada51865e23852d2"
+source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3361,7 +3459,6 @@ dependencies = [
  "futures 0.3.5",
  "jni",
  "log 0.4.8",
- "lru-cache",
  "rand 0.6.5",
  "safe-nd",
  "safe_authenticator",
@@ -3393,8 +3490,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.41.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62cea8ebd708ff21f16544f113a239e820f537e7d10407dd97c917d7825db618"
+source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3412,7 +3508,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.8",
  "log4rs",
- "lru-cache",
+ "lru",
  "miscreant",
  "pbkdf2",
  "quic-p2p",

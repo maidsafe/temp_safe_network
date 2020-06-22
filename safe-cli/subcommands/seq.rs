@@ -13,7 +13,7 @@ use super::{
     },
     OutputFmt,
 };
-use safe_api::{xorurl::XorUrl, Safe};
+use safe_api::Safe;
 use structopt::StructOpt;
 
 // Default type tag to use for the Sequence
@@ -21,15 +21,15 @@ const DEFAULT_SEQUENCE_TYPE_TAG: u64 = 1_200;
 
 #[derive(StructOpt, Debug)]
 pub enum SeqSubCommands {
-    #[structopt(name = "put")]
-    /// Create a new Sequence on the SAFE Network
-    Put {
+    #[structopt(name = "store")]
+    /// Stores a new Sequence on the SAFE Network
+    Store {
         /// The data to store in the new Sequence as first element.  Specify '-' to read from stdin
         data: String,
-        /// The type tag to be set
+        /// The type tag to be set (by default is set to 1200)
         #[structopt(long = "type")]
         type_tag: Option<u64>,
-        /// The Xor name address (in hex) where to store the Sequence
+        /// The Xor name address (in Hex) where to store the Sequence (by default is a random location)
         #[structopt(long = "xorname")]
         xorname: Option<String>,
     },
@@ -50,7 +50,7 @@ pub async fn seq_commander(
     safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
-        SeqSubCommands::Put {
+        SeqSubCommands::Store {
             data,
             type_tag,
             xorname,
@@ -74,9 +74,9 @@ pub async fn seq_commander(
             };
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Sequence created at: \"{}\"", xorurl);
+                println!("Sequence stored at: \"{}\"", xorurl);
             } else {
-                print_serialized_output(xorurl, output_fmt)?;
+                println!("{}", serialise_output(&xorurl, output_fmt));
             }
 
             Ok(())
@@ -98,23 +98,10 @@ pub async fn seq_commander(
             if OutputFmt::Pretty == output_fmt {
                 println!("Data appended to the Sequence: \"{}\"", target_url);
             } else {
-                print_serialized_output(target_url, output_fmt)?;
+                println!("{}", serialise_output(&target_url, output_fmt));
             }
 
             Ok(())
         }
     }
-}
-
-fn print_serialized_output(xorurl: XorUrl, output_fmt: OutputFmt) -> Result<(), String> {
-    /*let url = match XorUrlEncoder::from_url(&xorurl) {
-        Ok(mut xorurl_encoder) => {
-            xorurl_encoder.set_content_version(Some(version));
-            xorurl_encoder.to_string()
-        }
-        Err(_) => xorurl,
-    };*/
-    println!("{}", serialise_output(&xorurl, output_fmt));
-
-    Ok(())
 }

@@ -60,7 +60,7 @@ fn calling_safe_cat() {
     );
     assert_eq!(
         xorurl_encoder.data_type(),
-        SafeDataType::PublishedImmutableData
+        SafeDataType::PublicImmutableData
     );
 }
 
@@ -144,7 +144,7 @@ fn calling_safe_cat_hexdump() {
     );
     assert_eq!(
         xorurl_encoder.data_type(),
-        SafeDataType::PublishedImmutableData
+        SafeDataType::PublicImmutableData
     );
 }
 

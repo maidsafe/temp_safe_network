@@ -23,9 +23,8 @@ use safe_app::App;
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
     ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
-    MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SData, SDataAddress,
-    SDataIndex, SDataPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
-    SeqMutableData, Transaction, TransactionId, XorName,
+    MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
+    SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction, TransactionId, XorName,
 };
 use std::collections::BTreeMap;
 
@@ -433,7 +432,7 @@ impl SafeApp for SafeAppScl {
         _permissions: Option<String>,
     ) -> Result<XorName> {
         debug!(
-            "Storing Sequence data w/ type: {:?}, xorname: {:?}",
+            "Storing Sequence data with tag type: {:?}, xorname: {:?}",
             tag, name
         );
 
@@ -441,35 +440,29 @@ impl SafeApp for SafeAppScl {
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
-        let public_key = SafeNdPublicKey::Bls(get_public_bls_key(safe_app).await?);
-        let mut pub_sequence = SData::new_pub(public_key, xorname, tag);
-        let _op = pub_sequence.append(data.to_vec());
-
+        // Set permissions for append and manage perms to this application
+        let app_public_key = SafeNdPublicKey::Bls(get_public_bls_key(safe_app).await?);
+        let user_app = SDataUser::Key(app_public_key);
         let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
-        let user_perms = SDataPubUserPermissions::new(true, true);
-        let usr_app = SDataUser::Key(public_key);
-        let _ = perms.insert(usr_app, user_perms);
-        pub_sequence
-            .set_permissions(&SDataPermissions::Pub(SDataPubPermissions {
-                permissions: perms,
-                entries_index: 1,
-                owners_index: 0,
-            }))
-            .map_err(|e| {
-                Error::Unexpected(format!(
-                    "Failed to set permissions for the Sequence data: {:?}",
-                    e
-                ))
-            })?;
+        let _ = perms.insert(user_app, SDataPubUserPermissions::new(true, true));
 
-        let usr_acc_owner = safe_app.client.owner_key().await;
-        pub_sequence.set_owner(usr_acc_owner);
+        // The Sequence's owner will be the user
+        let user_acc_owner = safe_app.client.owner_key().await;
 
-        safe_app
+        // Store the Sequence on the network
+        let address = safe_app
             .client
-            .store_sdata(pub_sequence.clone())
+            .store_pub_sdata(xorname, tag, user_acc_owner, perms)
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to store Sequence data: {:?}", e)))?;
+
+        let _op = safe_app
+            .client
+            .sdata_append(address, data.to_vec())
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!("Failed to append data to the Sequence: {:?}", e))
+            })?;
 
         Ok(xorname)
     }

@@ -429,7 +429,7 @@ async fn files_container_get_files(
         SafeData::FilesContainer {
             version, files_map, ..
         } => (version, files_map),
-        SafeData::PublishedImmutableData { metadata, .. } => {
+        SafeData::PublicImmutableData { metadata, .. } => {
             if let Some(file_item) = metadata {
                 let mut files_map = FilesMap::new();
                 files_map.insert("".to_string(), file_item);
@@ -886,10 +886,8 @@ async fn files_get_unpublished_immutable(
 ///
 pub async fn files_get_immutable(safe: &Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
     match XorUrlEncoder::from_url(&url)?.data_type() {
-        SafeDataType::PublishedImmutableData => {
-            safe.files_get_published_immutable(&url, range).await
-        }
-        SafeDataType::UnpublishedImmutableData => {
+        SafeDataType::PublicImmutableData => safe.files_get_published_immutable(&url, range).await,
+        SafeDataType::PrivateImmutableData => {
             files_get_unpublished_immutable(&safe, &url, range).await
         }
         _ => Err(Error::InvalidInput(

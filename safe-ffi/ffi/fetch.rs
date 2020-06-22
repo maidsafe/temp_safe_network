@@ -12,7 +12,7 @@ use super::{
     errors::{Error, Result},
     ffi_structs::{
         files_map_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
-        NrsMapContainer, PublishedImmutableData, SafeKey, Wallet,
+        NrsMapContainer, PublicImmutableData, SafeKey, Wallet,
     },
 };
 use ffi_utils::{
@@ -29,7 +29,7 @@ pub unsafe extern "C" fn fetch(
     user_data: *mut c_void,
     start: u64,
     end: u64,
-    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
+    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
     o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
     o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
     o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn inspect(
 unsafe fn invoke_callback(
     content: safe_api::Result<SafeData>,
     user_data: *mut c_void,
-    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublishedImmutableData),
+    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
     o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
     o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
     o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
@@ -97,7 +97,7 @@ unsafe fn invoke_callback(
 ) -> Result<()> {
     let user_data = OpaqueCtx(user_data);
     match &content {
-        Ok(SafeData::PublishedImmutableData {
+        Ok(SafeData::PublicImmutableData {
             xorurl,
             data,
             xorname,
@@ -106,7 +106,7 @@ unsafe fn invoke_callback(
             resolved_from,
         }) => {
             let (data, data_len) = vec_into_raw_parts(data.to_vec());
-            let published_data = PublishedImmutableData {
+            let published_data = PublicImmutableData {
                 xorurl: CString::new(xorurl.clone())?.into_raw(),
                 xorname: xorname.0,
                 data,

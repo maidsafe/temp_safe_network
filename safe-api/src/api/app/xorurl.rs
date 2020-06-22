@@ -137,16 +137,12 @@ impl SafeContentType {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeDataType {
     SafeKey = 0x00,
-    PublishedImmutableData = 0x01,
-    UnpublishedImmutableData = 0x02,
-    SeqMutableData = 0x03,
-    UnseqMutableData = 0x04,
-    PublishedSeqAppendOnlyData = 0x05,
-    PublishedUnseqAppendOnlyData = 0x06,
-    UnpublishedSeqAppendOnlyData = 0x07,
-    UnpublishedUnseqAppendOnlyData = 0x08,
-    PublicSequence = 0x09,
-    PrivateSequence = 0x0a,
+    PublicImmutableData = 0x01,
+    PrivateImmutableData = 0x02,
+    PublicSequence = 0x03,
+    PrivateSequence = 0x04,
+    SeqMutableData = 0x05,
+    UnseqMutableData = 0x06,
 }
 
 impl std::fmt::Display for SafeDataType {
@@ -159,16 +155,12 @@ impl SafeDataType {
     pub fn from_u64(value: u64) -> Result<Self> {
         match value {
             0 => Ok(Self::SafeKey),
-            1 => Ok(Self::PublishedImmutableData),
-            2 => Ok(Self::UnpublishedImmutableData),
-            3 => Ok(Self::SeqMutableData),
-            4 => Ok(Self::UnseqMutableData),
-            5 => Ok(Self::PublishedSeqAppendOnlyData),
-            6 => Ok(Self::PublishedUnseqAppendOnlyData),
-            7 => Ok(Self::UnpublishedSeqAppendOnlyData),
-            8 => Ok(Self::UnpublishedUnseqAppendOnlyData),
-            9 => Ok(Self::PublicSequence),
-            10 => Ok(Self::PrivateSequence),
+            1 => Ok(Self::PublicImmutableData),
+            2 => Ok(Self::PrivateImmutableData),
+            3 => Ok(Self::PublicSequence),
+            4 => Ok(Self::PrivateSequence),
+            5 => Ok(Self::SeqMutableData),
+            6 => Ok(Self::UnseqMutableData),
             _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
@@ -535,7 +527,7 @@ impl SafeUrl {
             hashed_name,
             Some(&parts.public_name),
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             SafeContentType::NrsMapContainer,
             Some(&parts.path),
             Some(parts.sub_names_vec),
@@ -612,16 +604,12 @@ impl SafeUrl {
 
         let data_type = match xorurl_bytes[3] {
             0 => SafeDataType::SafeKey,
-            1 => SafeDataType::PublishedImmutableData,
-            2 => SafeDataType::UnpublishedImmutableData,
-            3 => SafeDataType::SeqMutableData,
-            4 => SafeDataType::UnseqMutableData,
-            5 => SafeDataType::PublishedSeqAppendOnlyData,
-            6 => SafeDataType::PublishedUnseqAppendOnlyData,
-            7 => SafeDataType::UnpublishedSeqAppendOnlyData,
-            8 => SafeDataType::UnpublishedUnseqAppendOnlyData,
-            9 => SafeDataType::PublicSequence,
-            10 => SafeDataType::PrivateSequence,
+            1 => SafeDataType::PublicImmutableData,
+            2 => SafeDataType::PrivateImmutableData,
+            3 => SafeDataType::PublicSequence,
+            4 => SafeDataType::PrivateSequence,
+            5 => SafeDataType::SeqMutableData,
+            6 => SafeDataType::UnseqMutableData,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid SAFE data type encoded in the XOR-URL string: {}",
@@ -1106,7 +1094,7 @@ impl SafeUrl {
             xor_name,
             None,
             0,
-            SafeDataType::PublishedImmutableData,
+            SafeDataType::PublicImmutableData,
             content_type,
             None,
             None,
@@ -1129,28 +1117,6 @@ impl SafeUrl {
             None,
             type_tag,
             SafeDataType::SeqMutableData,
-            content_type,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
-        )
-    }
-
-    // A non-member AppendOnlyData encoder function for convenience
-    pub fn encode_append_only_data(
-        xor_name: XorName,
-        type_tag: u64,
-        content_type: SafeContentType,
-        base: XorUrlBase,
-    ) -> Result<String> {
-        SafeUrl::encode(
-            xor_name,
-            None,
-            type_tag,
-            SafeDataType::PublishedSeqAppendOnlyData,
             content_type,
             None,
             None,
@@ -1368,7 +1334,7 @@ mod tests {
             xor_name,
             None,
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             SafeContentType::MediaType("garbage/trash".to_string()),
             None,
             None,
@@ -1389,7 +1355,7 @@ mod tests {
             xor_name,
             Some(""), // passing empty string as nrs name
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             SafeContentType::NrsMapContainer,
             None,
             None,
@@ -1408,7 +1374,7 @@ mod tests {
             xor_name,
             Some("a.b.c"), // passing nrs name not matching xor_name.
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             SafeContentType::NrsMapContainer,
             None,
             None,
@@ -1427,7 +1393,7 @@ mod tests {
             xor_name,
             Some("a..b.c"), // passing empty sub-name in nrs name
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             SafeContentType::NrsMapContainer,
             None,
             None,
@@ -1446,7 +1412,7 @@ mod tests {
             xor_name,
             None, // not NRS
             NRS_MAP_TYPE_TAG,
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             SafeContentType::NrsMapContainer,
             None,
             Some(vec!["a".to_string(), "".to_string(), "b".to_string()]),
@@ -1470,7 +1436,7 @@ mod tests {
             xor_name,
             None,
             0xa632_3c4d_4a32,
-            SafeDataType::PublishedImmutableData,
+            SafeDataType::PublicImmutableData,
             SafeContentType::Raw,
             None,
             None,
@@ -1498,13 +1464,13 @@ mod tests {
     #[test]
     fn test_safeurl_base64_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_append_only_data(
+        let xorurl = SafeUrl::encode_sequence_data(
             xor_name,
             4_584_545,
             SafeContentType::FilesContainer,
             XorUrlBase::Base64,
         )?;
-        let base64_xorurl = "safe://mQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+        let base64_xorurl = "safe://mQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
         let xorurl_encoder = SafeUrl::from_url(&base64_xorurl)?;
         assert_eq!(base64_xorurl, xorurl_encoder.to_base(XorUrlBase::Base64));
@@ -1512,10 +1478,7 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, xorurl_encoder.encoding_version());
         assert_eq!(xor_name, xorurl_encoder.xorname());
         assert_eq!(4_584_545, xorurl_encoder.type_tag());
-        assert_eq!(
-            SafeDataType::PublishedSeqAppendOnlyData,
-            xorurl_encoder.data_type()
-        );
+        assert_eq!(SafeDataType::PublicSequence, xorurl_encoder.data_type());
         assert_eq!(
             SafeContentType::FilesContainer,
             xorurl_encoder.content_type()
@@ -1546,7 +1509,7 @@ mod tests {
             xor_name,
             None,
             type_tag,
-            SafeDataType::PublishedImmutableData,
+            SafeDataType::PublicImmutableData,
             SafeContentType::Raw,
             Some(subdirs),
             Some(vec!["subname".to_string()]),
@@ -1562,7 +1525,7 @@ mod tests {
         assert_eq!(xor_name, xorurl_encoder.xorname());
         assert_eq!(type_tag, xorurl_encoder.type_tag());
         assert_eq!(
-            SafeDataType::PublishedImmutableData,
+            SafeDataType::PublicImmutableData,
             xorurl_encoder.data_type()
         );
         assert_eq!(SafeContentType::Raw, xorurl_encoder.content_type());
@@ -1576,7 +1539,7 @@ mod tests {
     fn test_safeurl_decoding_with_path() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = SafeUrl::encode_append_only_data(
+        let xorurl = SafeUrl::encode_sequence_data(
             xor_name,
             type_tag,
             SafeContentType::Wallet,
@@ -1597,7 +1560,7 @@ mod tests {
         assert_eq!(xor_name, xorurl_encoder_with_path.xorname());
         assert_eq!(type_tag, xorurl_encoder_with_path.type_tag());
         assert_eq!(
-            SafeDataType::PublishedSeqAppendOnlyData,
+            SafeDataType::PublicSequence,
             xorurl_encoder_with_path.data_type()
         );
         assert_eq!(
@@ -1615,7 +1578,7 @@ mod tests {
             xor_name,
             None,
             type_tag,
-            SafeDataType::PublishedImmutableData,
+            SafeDataType::PublicImmutableData,
             SafeContentType::NrsMapContainer,
             None,
             Some(vec!["sub".to_string()]),
@@ -1850,7 +1813,7 @@ mod tests {
     fn test_safeurl_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hnyydypixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
 
         let nrs = SafeUrl::from_url(nrsurl)?;
         let xor = SafeUrl::from_url(xorurl)?;

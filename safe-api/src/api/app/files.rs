@@ -848,10 +848,10 @@ async fn validate_files_add_params(
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
         let source_xorurl_encoder = Safe::parse_url(source_file)?;
-        if source_xorurl_encoder.data_type() != SafeDataType::PublishedImmutableData {
+        if source_xorurl_encoder.data_type() != SafeDataType::PublicImmutableData {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
-                SafeDataType::PublishedImmutableData,
+                SafeDataType::PublicImmutableData,
                 source_xorurl_encoder.content_type()
             )));
         }

@@ -53,6 +53,7 @@
     - [Remove](#nrs-remove)
   - [SAFE-URLs](#safe-urls)
   - [Dog](#dog)
+  - [Seq](#seq-sequence)
   - [Shell Completions](#shell-completions)
     - [Bash Completions](#bash-completions)
     - [Windows Powershell Completions](#windows-powershell-completions)
@@ -1485,6 +1486,18 @@ Version: 3
 ```
 
 In this case we don't only get information about the content that the URL resolves to, but also about the NRS Map Container this NRS-URL was resolved with. E.g. we see the XOR-URL of the NRS Map Container, its version, and among other data we also see the list of all NRS names defined by it with their corresponding XOR-URL links.
+
+### Seq (Sequence)
+
+TODO
+
+#### Seq Store
+
+TODO
+
+#### Seq Append
+
+TODO
 
 ### Shell Completions
 

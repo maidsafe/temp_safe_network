@@ -19,7 +19,7 @@ async-std = "1.6.0"
 ffi_utils = "~0.16.0"
 # Required by ffi_utils macros.
 log = "~0.4.8"
-safe-nd = { git = "https://github.com/bochaco/safe-nd.git", branch = "sequence-on-lseq-crdt" }
+safe-nd = "~0.10.0"
 serde = "1.0.91"
 serde_json = "1.0.39"
 safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "sequence-data-type" }
@@ -36,7 +36,7 @@ unwrap = "1.2.1"
 
 [build-dependencies]
 safe_bindgen = { git = "https://github.com/maidsafe/safe_bindgen", optional = true }
-safe-nd = { git = "https://github.com/bochaco/safe-nd.git", branch = "sequence-on-lseq-crdt" }
+safe-nd = "~0.10.0"
 unwrap = "1.2.1"
 
 [features]
