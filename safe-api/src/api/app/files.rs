@@ -488,7 +488,7 @@ impl Safe {
         Ok((version, processed_files, new_files_map))
     }
 
-    /// # Add a file, either a local path or a published file, on an existing FilesContainer.
+    /// # Add a file, either a local path or an already uploaded file, on an existing FilesContainer.
     ///
     /// ## Example
     ///
@@ -586,9 +586,7 @@ impl Safe {
             validate_files_add_params(self, "", url, update_nrs).await?;
 
         let dest_path = xorurl_encoder.path();
-        let new_file_xorurl = self
-            .files_put_published_immutable(data, None, false)
-            .await?;
+        let new_file_xorurl = self.files_put_public_immutable(data, None, false).await?;
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
@@ -732,7 +730,7 @@ impl Safe {
         Ok(version)
     }
 
-    /// # Put Published ImmutableData
+    /// # Put a Public ImmutableData
     /// Put data blobs onto the network.
     ///
     /// ## Example
@@ -742,12 +740,12 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_put_published_immutable(data, Some("text/plain"), false).await.unwrap();
-    ///     let received_data = safe.files_get_published_immutable(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_put_public_immutable(data, Some("text/plain"), false).await.unwrap();
+    ///     let received_data = safe.files_get_public_immutable(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_put_published_immutable(
+    pub async fn files_put_public_immutable(
         &mut self,
         data: &[u8],
         media_type: Option<&str>,
@@ -768,15 +766,12 @@ impl Safe {
         )?;
 
         // TODO: do we want ownership from other PKs yet?
-        let xorname = self
-            .safe_app
-            .put_published_immutable(&data, dry_run)
-            .await?;
+        let xorname = self.safe_app.put_public_immutable(&data, dry_run).await?;
 
         XorUrlEncoder::encode_immutable_data(xorname, content_type, self.xorurl_base)
     }
 
-    /// # Get Published ImmutableData
+    /// # Get a Public ImmutableData
     /// Put data blobs onto the network.
     ///
     /// ## Example
@@ -786,26 +781,26 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_put_published_immutable(data, None, false).await.unwrap();
-    ///     let received_data = safe.files_get_published_immutable(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_put_public_immutable(data, None, false).await.unwrap();
+    ///     let received_data = safe.files_get_public_immutable(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_published_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
+    pub async fn files_get_public_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-        self.fetch_published_immutable_data(&xorurl_encoder, range)
+        self.fetch_public_immutable_data(&xorurl_encoder, range)
             .await
     }
 
     /// Fetch an ImmutableData from a XorUrlEncoder without performing any type of URL resolution
-    pub(crate) async fn fetch_published_immutable_data(
+    pub(crate) async fn fetch_public_immutable_data(
         &self,
         xorurl_encoder: &XorUrlEncoder,
         range: Range,
     ) -> Result<Vec<u8>> {
         self.safe_app
-            .get_published_immutable(xorurl_encoder.xorname(), range)
+            .get_public_immutable(xorurl_encoder.xorname(), range)
             .await
     }
 }
@@ -1380,7 +1375,7 @@ fn files_map_remove_path(
     Ok((processed_files, new_files_map, success_count))
 }
 
-// Upload a files to the Network as a Published-ImmutableData
+// Upload a files to the Network as a Public ImmutableData
 async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
@@ -1388,15 +1383,14 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_put_published_immutable(&data, mime_type.first_raw(), dry_run)
+        .files_put_public_immutable(&data, mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_put_published_immutable(&data, None, dry_run)
-                    .await
+                safe.files_put_public_immutable(&data, None, dry_run).await
             } else {
                 Err(err)
             }
@@ -3015,9 +3009,7 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let data = b"0123456789";
-        let file_xorurl = safe
-            .files_put_published_immutable(data, None, false)
-            .await?;
+        let file_xorurl = safe.files_put_public_immutable(data, None, false).await?;
         let new_filename = "/new_filename_test.md";
 
         let (version, new_processed_files, new_files_map) = safe
@@ -3061,9 +3053,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let other_file_xorurl = safe
-            .files_put_published_immutable(data, None, false)
-            .await?;
+        let other_file_xorurl = safe.files_put_public_immutable(data, None, false).await?;
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
                 &other_file_xorurl,

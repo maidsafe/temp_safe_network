@@ -3400,7 +3400,7 @@ dependencies = [
 [[package]]
 name = "safe_app"
 version = "0.16.3"
-source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
+source = "git+https://github.com/maidsafe/safe_client_libs#1deaa230e38dd03d9664aaa721475d023cd81134"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3427,7 +3427,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator"
 version = "0.16.3"
-source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
+source = "git+https://github.com/maidsafe/safe_client_libs#1deaa230e38dd03d9664aaa721475d023cd81134"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3450,7 +3450,7 @@ dependencies = [
 [[package]]
 name = "safe_authenticator_ffi"
 version = "0.16.3"
-source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
+source = "git+https://github.com/maidsafe/safe_client_libs#1deaa230e38dd03d9664aaa721475d023cd81134"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3490,7 +3490,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.41.3"
-source = "git+https://github.com/bochaco/safe_client_libs?branch=sequence-data-type#61bde2cb52eb346fe160953303f6b639c9774407"
+source = "git+https://github.com/maidsafe/safe_client_libs#1deaa230e38dd03d9664aaa721475d023cd81134"
 dependencies = [
  "async-trait",
  "bincode",

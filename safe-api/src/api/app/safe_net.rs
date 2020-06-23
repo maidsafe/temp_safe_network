@@ -49,9 +49,9 @@ pub trait SafeApp {
     ) -> Result<Transaction>;
 
     // === ImmutableData operations ===
-    async fn put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
+    async fn put_public_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
 
-    async fn get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>>;
+    async fn get_public_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>>;
 
     // === MutableData operations ===
     async fn put_mdata(

@@ -22,9 +22,9 @@ log = "~0.4.8"
 safe-nd = "~0.10.0"
 serde = "1.0.91"
 serde_json = "1.0.39"
-safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "sequence-data-type" }
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
 bincode = "1.1.4"
-safe_authenticator_ffi = { git = "https://github.com/bochaco/safe_client_libs", branch = "sequence-data-type" }
+safe_authenticator_ffi = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
 
 [dependencies.safe-api]
 path = "../safe-api"

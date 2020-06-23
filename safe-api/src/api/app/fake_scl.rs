@@ -44,7 +44,7 @@ struct FakeData {
     coin_balances: BTreeMap<XorNameStr, SafeKey>,
     public_sequence: BTreeMap<XorNameStr, SequenceDataFake>,
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataFake>,
-    published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
+    public_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
 
 lazy_static! {
@@ -246,7 +246,7 @@ impl SafeApp for SafeAppFake {
     }
 
     // === ImmutableData operations ===
-    async fn put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    async fn put_public_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         // We create a XorName based on a hash of the content, not a real one as
         // it doesn't apply self-encryption, but a unique one for our fake SCL
         let vec_hash = sha3_256(&data);
@@ -256,19 +256,19 @@ impl SafeApp for SafeAppFake {
             self.fake_vault
                 .lock()
                 .await
-                .published_immutable_data
+                .public_immutable_data
                 .insert(xorname_to_hex(&xorname), data.to_vec());
         }
 
         Ok(xorname)
     }
 
-    async fn get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    async fn get_public_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         let data = match self
             .fake_vault
             .lock()
             .await
-            .published_immutable_data
+            .public_immutable_data
             .get(&xorname_to_hex(&xorname))
         {
             Some(data) => data.clone(),

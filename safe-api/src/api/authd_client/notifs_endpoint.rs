@@ -125,11 +125,8 @@ async fn process_jsonrpc_request(
     }
 
     // Send the decision made by the user back to authd
-    // TODO: send the decision as Option<bool> instead of as String
     match decision_rx.await {
-        Ok(Some(true)) => JsonRpcResponse::result(json!("true"), jsonrpc_req.id),
-        Ok(Some(false)) => JsonRpcResponse::result(json!("false"), jsonrpc_req.id),
-        Ok(None) => JsonRpcResponse::result(json!("No decision made"), jsonrpc_req.id),
+        Ok(decision) => JsonRpcResponse::result(json!(decision), jsonrpc_req.id),
         Err(err) => JsonRpcResponse::error(
             format!("Failed to obtain decision made for auth req: {}", err),
             JSONRPC_NOTIF_ERROR,

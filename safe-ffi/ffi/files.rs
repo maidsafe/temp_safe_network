@@ -214,7 +214,7 @@ pub unsafe extern "C" fn files_container_add_from_raw(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn files_put_published_immutable(
+pub unsafe extern "C" fn files_put_public_immutable(
     app: *mut Safe,
     data: *const u8,
     data_len: usize,
@@ -227,7 +227,7 @@ pub unsafe extern "C" fn files_put_published_immutable(
         let user_data = OpaqueCtx(user_data);
         let media_type_str = from_c_str_to_str_option(media_type);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        let xorurl = async_std::task::block_on((*app).files_put_published_immutable(
+        let xorurl = async_std::task::block_on((*app).files_put_public_immutable(
             &data_vec,
             media_type_str,
             dry_run,
@@ -239,7 +239,7 @@ pub unsafe extern "C" fn files_put_published_immutable(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn files_get_published_immutable(
+pub unsafe extern "C" fn files_get_public_immutable(
     app: *mut Safe,
     url: *const c_char,
     start: u64,
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn files_get_published_immutable(
         };
 
         let data = async_std::task::block_on(
-            (*app).files_get_published_immutable(&url_str, Some((start, end))),
+            (*app).files_get_public_immutable(&url_str, Some((start, end))),
         )?;
         o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
         Ok(())

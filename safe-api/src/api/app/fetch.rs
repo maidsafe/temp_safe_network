@@ -463,7 +463,7 @@ async fn retrieve_immd(
     };
 
     let data = if retrieve_data {
-        safe.fetch_published_immutable_data(the_xor, range).await?
+        safe.fetch_public_immutable_data(the_xor, range).await?
     } else {
         vec![]
     };
@@ -698,11 +698,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_published_immutable_data() -> Result<()> {
+    async fn test_fetch_public_immutable_data() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data = b"Something super immutable";
         let xorurl = safe
-            .files_put_published_immutable(data, Some("text/plain"), false)
+            .files_put_public_immutable(data, Some("text/plain"), false)
             .await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
@@ -736,12 +736,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_range_published_immutable_data() -> Result<()> {
+    async fn test_fetch_range_public_immutable_data() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let saved_data = b"Something super immutable";
         let size = saved_data.len();
         let xorurl = safe
-            .files_put_published_immutable(saved_data, Some("text/plain"), false)
+            .files_put_public_immutable(saved_data, Some("text/plain"), false)
             .await?;
 
         // Fetch first half and match
@@ -975,12 +975,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_published_immutable_data_with_path() -> Result<()> {
+    async fn test_fetch_public_immutable_data_with_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data = b"Something super immutable";
-        let xorurl = safe
-            .files_put_published_immutable(data, None, false)
-            .await?;
+        let xorurl = safe.files_put_public_immutable(data, None, false).await?;
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -1003,7 +1001,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .files_put_published_immutable(data, Some("text/plain"), false)
+            .files_put_public_immutable(data, Some("text/plain"), false)
             .await?;
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;

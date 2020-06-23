@@ -870,10 +870,10 @@ fn create_dir_all(dir_path: &Path) -> ApiResult<()> {
     })
 }
 
-/// # Get Unpublished ImmutableData
-/// Get unpublished immutable data blobs from the network.
+/// # Get Private ImmutableData
+/// Get private immutable data blobs from the network.
 ///
-async fn files_get_unpublished_immutable(
+async fn files_get_private_immutable(
     _safe: &Safe,
     _url: &str,
     _range: Range,
@@ -881,15 +881,13 @@ async fn files_get_unpublished_immutable(
     unimplemented!();
 }
 
-/// # Get Published or Unpublished ImmutableData
+/// # Get Public or Private ImmutableData
 /// Get immutable data blobs from the network.
 ///
 pub async fn files_get_immutable(safe: &Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
     match XorUrlEncoder::from_url(&url)?.data_type() {
-        SafeDataType::PublicImmutableData => safe.files_get_published_immutable(&url, range).await,
-        SafeDataType::PrivateImmutableData => {
-            files_get_unpublished_immutable(&safe, &url, range).await
-        }
+        SafeDataType::PublicImmutableData => safe.files_get_public_immutable(&url, range).await,
+        SafeDataType::PrivateImmutableData => files_get_private_immutable(&safe, &url, range).await,
         _ => Err(Error::InvalidInput(
             "URL target is not immutable data.".to_string(),
         )),

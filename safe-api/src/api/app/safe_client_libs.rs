@@ -201,25 +201,25 @@ impl SafeApp for SafeAppScl {
     }
 
     // === ImmutableData operations ===
-    async fn put_published_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    async fn put_public_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
         let client = &self.get_safe_app()?.client;
 
         let data_vec = data.to_vec();
         let data_map = if dry_run {
             immutable_data::gen_data_map(
-                client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+                client, &data_vec, /*public:*/ true, /*encryption_key:*/ None,
             )
             .await
         } else {
             immutable_data::create(
-                client, &data_vec, /*published:*/ true, /*encryption_key:*/ None,
+                client, &data_vec, /*public:*/ true, /*encryption_key:*/ None,
             )
             .await
         }
         .map_err(|e| {
             Error::NetDataError(format!(
-                "Failed to create data map for Published ImmutableData: {:?}",
+                "Failed to create data map for Public ImmutableData: {:?}",
                 e
             ))
         })?;
@@ -228,14 +228,14 @@ impl SafeApp for SafeAppScl {
 
         if !dry_run {
             client.put_idata(data_map).await.map_err(|e| {
-                Error::NetDataError(format!("Failed to PUT Published ImmutableData: {:?}", e))
+                Error::NetDataError(format!("Failed to PUT Public ImmutableData: {:?}", e))
             })?;
         }
 
         Ok(xorname)
     }
 
-    async fn get_published_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    async fn get_public_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let client = &self.get_safe_app()?.client;
@@ -265,12 +265,10 @@ impl SafeApp for SafeAppScl {
             )
             .await
         }
-        .map_err(|e| {
-            Error::NetDataError(format!("Failed to GET Published ImmutableData: {:?}", e))
-        })?;
+        .map_err(|e| Error::NetDataError(format!("Failed to GET Public ImmutableData: {:?}", e)))?;
 
         debug!(
-            "Published ImmutableData data successfully retrieved from: {:?}",
+            "Public ImmutableData data successfully retrieved from: {:?}",
             &xorname
         );
 
@@ -580,8 +578,8 @@ mod tests {
 
         let id1 = b"HELLLOOOOOOO".to_vec();
 
-        let xorname = safe.safe_app.put_published_immutable(&id1, false).await?;
-        let data = safe.safe_app.get_published_immutable(xorname, None).await?;
+        let xorname = safe.safe_app.put_public_immutable(&id1, false).await?;
+        let data = safe.safe_app.get_public_immutable(xorname, None).await?;
         let text = utf8_str_from_slice(data.as_slice())?;
         assert_eq!(text, "HELLLOOOOOOO");
         Ok(())

@@ -125,7 +125,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    ///     let file_xorurl = safe.files_put_published_immutable(&vec![], None, false).await.unwrap();
+    ///     let file_xorurl = safe.files_put_public_immutable(&vec![], None, false).await.unwrap();
     ///     let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
@@ -229,7 +229,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    ///     let file_xorurl = safe.files_put_published_immutable(&vec![], Some("text/plain"), false).await.unwrap();
+    ///     let file_xorurl = safe.files_put_public_immutable(&vec![], Some("text/plain"), false).await.unwrap();
     ///     let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
     ///     let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).await.unwrap();
     ///     assert_eq!(version, 0);

@@ -85,7 +85,7 @@ pub async fn dog_commander(
                     println!("= File =");
                     println!("XOR-URL: {}", xorurl);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: ImmutableData (public)");
+                    println!("Native data type: PublicImmutableData");
                     println!(
                         "Media type: {}",
                         media_type.clone().unwrap_or_else(|| "Unknown".to_string())
@@ -133,7 +133,7 @@ pub async fn dog_commander(
                     println!("Version: {}", version);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: Sequence (public)");
+                    println!("Native data type: PublicSequence");
                 }
             }
         }

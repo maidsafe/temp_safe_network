@@ -152,15 +152,8 @@ async fn send_notification(
     .await
     {
         Ok(notif_result) => {
-            let response = if notif_result == "true" {
-                Some(true)
-            } else if notif_result == "false" {
-                Some(false)
-            } else {
-                None
-            };
-            info!("Subscriber's response: {}", notif_result);
-            Some(response)
+            info!("Subscriber's response: {:?}", notif_result);
+            Some(notif_result)
         }
         Err(err) => {
             // Let's unsubscribe it immediately, ... we could be more laxed
@@ -180,7 +173,7 @@ async fn jsonrpc_send(
     params: serde_json::Value,
     cert_base_path: &str,
     idle_timeout: Option<u64>,
-) -> Result<String, String> {
+) -> Result<Option<bool>, String> {
     let jsonrpc_quic_client = ClientEndpoint::new(cert_base_path, idle_timeout, false)
         .map_err(|err| format!("Failed to create client endpoint: {}", err))?;
 
@@ -194,9 +187,7 @@ async fn jsonrpc_send(
     let method2 = method.to_string();
     let mut new_conn = outgoing_conn.connect(&url2, None).await?;
 
-    // TODO: here the response result type should be changed to Option<bool>
-    // We didn't do it yet as it breaks compatibility with other authd client apps
-    let response = new_conn.send::<String>(&method2, params).await;
+    let response = new_conn.send::<Option<bool>>(&method2, params).await;
 
     // Allow the endpoint driver to automatically shut down
     drop(outgoing_conn);
@@ -211,7 +202,7 @@ async fn jsonrpc_send(
                     "Subscriber '{}' responded to the notification with an error: {:?}",
                     url, msg
                 );
-                Ok(msg)
+                Ok(None)
             }
             other => Err(format!("{}", other)),
         },

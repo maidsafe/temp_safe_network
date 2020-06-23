@@ -106,7 +106,7 @@ unsafe fn invoke_callback(
             resolved_from,
         }) => {
             let (data, data_len) = vec_into_raw_parts(data.to_vec());
-            let published_data = PublicImmutableData {
+            let public_data = PublicImmutableData {
                 xorurl: CString::new(xorurl.clone())?.into_raw(),
                 xorname: xorname.0,
                 data,
@@ -123,7 +123,7 @@ unsafe fn invoke_callback(
                 },
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            o_published(user_data.0, &published_data);
+            o_published(user_data.0, &public_data);
         }
         Ok(SafeData::FilesContainer {
             xorurl,
