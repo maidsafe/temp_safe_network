@@ -14,6 +14,7 @@ jobs:
   build:
     name: Build for benchmarking
     runs-on: ubuntu-latest
+    if: false
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust
@@ -41,6 +42,7 @@ jobs:
     name: Benchmarking ${{ matrix.benchmark }}
     needs: build
     runs-on: ubuntu-latest
+    if: false
     strategy:
       matrix:
         benchmark: [ keys, put ]
@@ -80,21 +82,7 @@ jobs:
       - run: echo $PATH
       - run: chmod +x $HOME/.safe/authd/safe-authd
       - run: chmod +x $HOME/.safe/cli/safe
-
       - run: chmod +x $HOME/.safe/vault/safe_vault
-
-
-
-      # - name: Setup SAFE Cli and PATH etc
-      #   run: |
-      #     ls $HOME/.safe/cli
-      #     ls $HOME/.safe/authd
-      #     echo "::add-path::$HOME/.safe/cli"
-      #     echo "::add-path::$HOME/.safe/authd"
-      #     echo $PATH
-      #     chmod +x $HOME/.safe/authd/safe-authd
-      #     chmod +x $HOME/.safe/cli/safe
-      #     chmod +x $HOME/.safe/vault/safe_vault
 
       - name: Setup The Baby
         run : safe vault run-baby-fleming -t
@@ -109,4 +97,4 @@ jobs:
 
       - name: Failure logs.
         if: failure()
-        run: tail -f $HOME/.safe/vault/baby-fleming-vaults/*/*.log
+        run: tail $HOME/.safe/vault/baby-fleming-vaults/*/*.log

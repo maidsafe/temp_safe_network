@@ -6,4 +6,3 @@ cargo fmt -- --check
 source ./resources/test-scripts/api-tests
 source ./resources/test-scripts/cli-mock-tests
 source ./resources/test-scripts/e2e-authd-mock-tests
-source ./resources/test-scripts/e2e-authd-vault-tests

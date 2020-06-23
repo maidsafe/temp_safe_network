@@ -226,7 +226,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        component: [api-tests, cli-mock-tests, e2e-authd-mock-tests, e2e-authd-vault-tests]
+        component: [api-tests, cli-mock-tests, e2e-authd-mock-tests]
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust
