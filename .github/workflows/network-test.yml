@@ -94,6 +94,9 @@ jobs:
       - name: Run CLI Tests
         run: ./resources/test-scripts/cli-network-tests
         shell: bash
+      - name: Run safe-api Tests
+        run: ./resources/test-scripts/api-network-tests
+        shell: bash
 
       - name: Stop the network.
         if: failure()
