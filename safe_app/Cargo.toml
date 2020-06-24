@@ -12,7 +12,7 @@ version = "0.16.3"
 
 [dependencies]
 async-trait = "~0.1.30"
-bincode = "1.1.4"
+bincode = "1.2.1"
 env_logger = { version = "~0.6.2", optional = true }
 ffi_utils = "~0.16.0"
 futures = "~0.3.5"

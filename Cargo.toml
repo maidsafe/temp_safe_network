@@ -13,3 +13,5 @@ members = ["safe_app", "safe_authenticator", "safe_authenticator_ffi", "safe_cor
 safe-nd = { path = "../safe-nd", features=["simulated-payouts"] }
 safe-transfers = { path = "../safe-transfers", features=["simulated-payouts"] }
 # safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "at2" }
+self_encryption = {git="https://github.com/maidsafe/self-encryption"}
+quic-p2p = {git="https://github.com/maidsafe/quic-p2p"}
