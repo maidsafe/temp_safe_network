@@ -21,7 +21,8 @@ use safe_cmd_test_utilities::{
 use std::{env, process::Command};
 use unwrap::unwrap;
 
-const PRETTY_FILES_CREATION_RESPONSE: &str = "Sequence stored at: ";
+const PRETTY_FILES_CREATION_RESPONSE: &str = "Public Sequence stored at: ";
+const PRETTY_FILES_PRIVATE_CREATION_RESPONSE: &str = "Private Sequence stored at: ";
 
 #[test]
 fn calling_safe_seq_store_pretty() {
@@ -30,6 +31,15 @@ fn calling_safe_seq_store_pretty() {
     cmd.args(&vec!["seq", "store", &random_content])
         .assert()
         .stdout(predicate::str::contains(PRETTY_FILES_CREATION_RESPONSE))
+        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
+        .success();
+
+    // run same command but now with --private flag
+    cmd.args(&vec!["--private"])
+        .assert()
+        .stdout(predicate::str::contains(
+            PRETTY_FILES_PRIVATE_CREATION_RESPONSE,
+        ))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
         .success();
 }
@@ -59,6 +69,31 @@ fn calling_safe_seq_store_and_cat() {
 }
 
 #[test]
+fn calling_safe_seq_store_priv_and_cat() {
+    let content = "first item";
+    let seq_store = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "seq",
+        "store",
+        content,
+        "--private",
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let seq_url = parse_seq_store_output(&seq_store);
+
+    let seq_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", seq_url, "--json")
+        .read()
+        .unwrap();
+
+    let (_url, data) = parse_cat_seq_output(&seq_cat);
+
+    assert_eq!(data, content.as_bytes());
+}
+
+#[test]
 fn calling_safe_seq_append() {
     let content_v0 = "first item";
     let seq_store = cmd!(
@@ -66,6 +101,56 @@ fn calling_safe_seq_append() {
         "seq",
         "store",
         content_v0,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let seq_url = parse_seq_store_output(&seq_store);
+    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&seq_url));
+
+    let content_v1 = "second item";
+    let _ = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "seq",
+        "append",
+        content_v1,
+        &seq_url,
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let seq_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &seq_url, "--json")
+        .read()
+        .unwrap();
+
+    let (_url, data) = parse_cat_seq_output(&seq_cat);
+    assert_eq!(data, content_v1.as_bytes());
+
+    xorurl_encoder.set_content_version(Some(0));
+    let seq_cat = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "cat",
+        &xorurl_encoder.to_string(),
+        "--json"
+    )
+    .read()
+    .unwrap();
+
+    let (_url, data) = parse_cat_seq_output(&seq_cat);
+    assert_eq!(data, content_v0.as_bytes());
+}
+
+#[test]
+fn calling_safe_seq_priv_append() {
+    let content_v0 = "first item";
+    let seq_store = cmd!(
+        env!("CARGO_BIN_EXE_safe"),
+        "seq",
+        "store",
+        content_v0,
+        "--private",
         "--json"
     )
     .read()

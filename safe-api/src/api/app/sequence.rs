@@ -9,7 +9,7 @@
 
 use super::{xorurl::SafeContentType, Safe, SafeApp};
 use crate::{
-    xorurl::{XorUrl, XorUrlEncoder},
+    xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result,
 };
 use log::debug;
@@ -25,7 +25,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"First in the sequence";
-    ///     let xorurl = safe.sequence_create(data, None, 20_000).await.unwrap();
+    ///     let xorurl = safe.sequence_create(data, None, 20_000, false).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
     ///     assert_eq!(received_data, (0, data.to_vec()));
     /// # });
@@ -35,10 +35,11 @@ impl Safe {
         data: &[u8],
         name: Option<XorName>,
         type_tag: u64,
+        private: bool,
     ) -> Result<XorUrl> {
         let xorname = self
             .safe_app
-            .store_sequence_data(data, name, type_tag, None)
+            .store_sequence_data(data, name, type_tag, None, private)
             .await?;
 
         XorUrlEncoder::encode_sequence_data(
@@ -46,6 +47,7 @@ impl Safe {
             type_tag,
             SafeContentType::Raw,
             self.xorurl_base,
+            private,
         )
     }
 
@@ -58,7 +60,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"First in the sequence";
-    ///     let xorurl = safe.sequence_create(data, None, 20_000).await.unwrap();
+    ///     let xorurl = safe.sequence_create(data, None, 20_000, false).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
     ///     assert_eq!(received_data, (0, data.to_vec()));
     /// # });
@@ -75,6 +77,7 @@ impl Safe {
         &self,
         xorurl_encoder: &XorUrlEncoder,
     ) -> Result<(u64, Vec<u8>)> {
+        let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
         let data = match xorurl_encoder.content_version() {
             Some(version) => {
                 // We fetch a specific entry since the URL specifies a specific version
@@ -84,6 +87,7 @@ impl Safe {
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
                         version,
+                        is_private,
                     )
                     .await
                     .map_err(|err| {
@@ -101,7 +105,11 @@ impl Safe {
             None => {
                 // ...then get last entry in the Sequence
                 self.safe_app
-                    .sequence_get_last_entry(xorurl_encoder.xorname(), xorurl_encoder.type_tag())
+                    .sequence_get_last_entry(
+                        xorurl_encoder.xorname(),
+                        xorurl_encoder.type_tag(),
+                        is_private,
+                    )
                     .await
             }
         };
@@ -131,7 +139,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data1 = b"First in the sequence";
-    ///     let xorurl = safe.sequence_create(data1, None, 20_000).await.unwrap();
+    ///     let xorurl = safe.sequence_create(data1, None, 20_000, false).await.unwrap();
     ///     let data2 = b"Second in the sequence";
     ///     safe.sequence_append(&xorurl, data2).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
@@ -151,7 +159,10 @@ impl Safe {
 
         let xorname = xorurl_encoder.xorname();
         let type_tag = xorurl_encoder.type_tag();
-        self.safe_app.sequence_append(data, xorname, type_tag).await
+        let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
+        self.safe_app
+            .sequence_append(data, xorname, type_tag, is_private)
+            .await
     }
 }
 
@@ -165,9 +176,17 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let initial_data = b"initial data";
 
-        let xorurl = safe.sequence_create(initial_data, None, 25_000).await?;
+        let xorurl = safe
+            .sequence_create(initial_data, None, 25_000, false)
+            .await?;
+        let xorurl_priv = safe
+            .sequence_create(initial_data, None, 25_000, true)
+            .await?;
+
         let received_data = safe.sequence_get(&xorurl).await?;
+        let received_data_priv = safe.sequence_get(&xorurl_priv).await?;
         assert_eq!(received_data, (0, initial_data.to_vec()));
+        assert_eq!(received_data_priv, (0, initial_data.to_vec()));
         Ok(())
     }
 
@@ -177,13 +196,21 @@ mod tests {
         let data_v0 = b"First in the sequence";
         let data_v1 = b"Second in the sequence";
 
-        let xorurl = safe.sequence_create(data_v0, None, 25_000).await?;
+        let xorurl = safe.sequence_create(data_v0, None, 25_000, false).await?;
         safe.sequence_append(&xorurl, data_v1).await?;
+
+        let xorurl_priv = safe.sequence_create(data_v0, None, 25_000, true).await?;
+        safe.sequence_append(&xorurl_priv, data_v1).await?;
 
         let received_data_v0 = safe.sequence_get(&format!("{}?v=0", xorurl)).await?;
         let received_data_v1 = safe.sequence_get(&xorurl).await?;
         assert_eq!(received_data_v0, (0, data_v0.to_vec()));
         assert_eq!(received_data_v1, (1, data_v1.to_vec()));
+
+        let received_data_v0_priv = safe.sequence_get(&format!("{}?v=0", xorurl)).await?;
+        let received_data_v1_priv = safe.sequence_get(&xorurl).await?;
+        assert_eq!(received_data_v0_priv, (0, data_v0.to_vec()));
+        assert_eq!(received_data_v1_priv, (1, data_v1.to_vec()));
         Ok(())
     }
 
@@ -193,7 +220,9 @@ mod tests {
         let data_v0 = b"First in the sequence";
         let data_v1 = b"Second in the sequence";
 
-        let xorurl = client1.sequence_create(data_v0, None, 25_000).await?;
+        let xorurl = client1
+            .sequence_create(data_v0, None, 25_000, false)
+            .await?;
         client1.sequence_append(&xorurl, data_v1).await?;
 
         let client2 = new_safe_instance().await?;
@@ -212,7 +241,9 @@ mod tests {
         let data_v0 = b"First from client1";
         let data_v1 = b"First from client2";
 
-        let xorurl = client1.sequence_create(data_v0, None, 25_000).await?;
+        let xorurl = client1
+            .sequence_create(data_v0, None, 25_000, false)
+            .await?;
         client2.sequence_append(&xorurl, data_v1).await?;
 
         let received_client1 = client1.sequence_get(&xorurl).await?;

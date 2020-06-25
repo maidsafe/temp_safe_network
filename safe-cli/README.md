@@ -1500,29 +1500,44 @@ Mutations made to `FilesContainers` and `NRS Map Containers` are made by storing
 The CLI also allows us to store our own `Public Sequence` instances, with any other type of content we would like to store, instead of the data representing a `FilesContainer` or `NRS Map Container`. We can store a `Public Sequence` on the network with "my initial note" string as its first item:
 ```shell
 $ safe seq store "my initial note"
-Sequence stored at: "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo"
+Public Sequence stored at: "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo"
 ```
 
 We can then retrieve the content of this Sequence data, using either the `cat`/`dog` command as we do it with any other type of content:
 ```shell
 $ safe cat safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo
-Sequence (version 0) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo":
+Public Sequence (version 0) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo":
 my initial note
 ```
 
 It's also possible to pipe the output of another command into the `seq store` command to store a new `Sequence` with the content obtained from STDIN by providing `-` as the data argument:
 ```shell
 $ echo "hello from stdin" | safe seq store -
-Sequence stored at: "safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo"
+Public Sequence stored at: "safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo"
 
 $ safe cat safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo
-Sequence (version 0) at "safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo
+Public Sequence (version 0) at "safe://hnyyyypfneksex7qxr5zuqqizdkbqbmn1tir1pmfwz1wsghb69rna76syabfo
 hello from stdin
+```
+
+##### Private Sequence
+
+The above CLI command will store the `Sequence` as Public by default, i.e. it's perpetually stored on the network and publicly available for other users to read it. We can otherwise store the new `Sequence` as private content, in which case, only the creator of it will have access to read and mutate. This can be simply achieved by providing the `--private` flag:
+```shell
+$ safe seq store "my initial private note" --private
+Private Sequence stored at: "safe://hnyyyytcgbrcfq5aw8myg6ihw6d8ss6bsgr9szm8y6qwjxsbiqufr8n3tebfo"
+```
+
+We can retrieve it, just as with `Public Sequence` using its XOR-URL, as long as the CLI has been authorised with the Authenticator by the same user who stored the Sequence, any other user will get an error when trying to retrieve it with the following command:
+```shell
+$ safe cat safe://hnyyyytcgbrcfq5aw8myg6ihw6d8ss6bsgr9szm8y6qwjxsbiqufr8n3tebfo
+Private Sequence (version 0) at "safe://hnyyyytcgbrcfq5aw8myg6ihw6d8ss6bsgr9szm8y6qwjxsbiqufr8n3tebfo
+my initial private note
 ```
 
 #### Seq Append
 
-Once we have a `Sequence` stored on the network, new items can be appended to it:
+Once we have a `Sequence` stored on the network, either `Public` or `Private`, new items can be appended to it:
 ```shell
 $ safe seq append "first update to my note" safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo
 Data appended to the Sequence: "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo"
@@ -1531,14 +1546,14 @@ Data appended to the Sequence: "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1p
 We can confirm the new item has been appended to the `Sequence`:
 ```shell
 $ safe cat safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo
-Sequence (version 1) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo":
+Public Sequence (version 1) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo":
 first update to my note
 ```
 
 And we can also confirm the previous item has been kept in the `Sequence` if we provide the same XOR-URL but specifying a version (with `?v=<version>`):
 ```shell
 $ safe cat safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo?v=0
-Sequence (version 0) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo?v=0":
+Public Sequence (version 0) at "safe://hnyyyyp3yb3dczuaaiwx1mb5491xir4kz1hex3d1pc34oxwicy7scm3x4ybfo?v=0":
 my initial note
 ```
 

@@ -24,7 +24,8 @@ use safe_core::{client::test_create_balance, immutable_data, Client, CoreError a
 use safe_nd::{
     ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
     MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
-    SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction, TransactionId, XorName,
+    SDataPrivUserPermissions, SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction,
+    TransactionId, XorName,
 };
 use std::collections::BTreeMap;
 
@@ -428,31 +429,54 @@ impl SafeApp for SafeAppScl {
         name: Option<XorName>,
         tag: u64,
         _permissions: Option<String>,
+        private: bool,
     ) -> Result<XorName> {
         debug!(
-            "Storing Sequence data with tag type: {:?}, xorname: {:?}",
-            tag, name
+            "Storing {} Sequence data with tag type: {:?}, xorname: {:?}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
         );
 
         let safe_app: &App = self.get_safe_app()?;
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
-        // Set permissions for append and manage perms to this application
-        let app_public_key = SafeNdPublicKey::Bls(get_public_bls_key(safe_app).await?);
-        let user_app = SDataUser::Key(app_public_key);
-        let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
-        let _ = perms.insert(user_app, SDataPubUserPermissions::new(true, true));
+        let app_public_key = get_public_bls_key(safe_app).await?;
 
         // The Sequence's owner will be the user
         let user_acc_owner = safe_app.client.owner_key().await;
 
         // Store the Sequence on the network
-        let address = safe_app
-            .client
-            .store_pub_sdata(xorname, tag, user_acc_owner, perms)
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to store Sequence data: {:?}", e)))?;
+        let address = if private {
+            // Set permissions for append, delete, and manage perms to this application
+            let mut perms = BTreeMap::default();
+            let _ = perms.insert(
+                SafeNdPublicKey::Bls(app_public_key),
+                SDataPrivUserPermissions::new(true, true, true),
+            );
+
+            safe_app
+                .client
+                .store_priv_sdata(xorname, tag, user_acc_owner, perms)
+                .await
+                .map_err(|e| {
+                    Error::NetDataError(format!("Failed to store Private Sequence data: {:?}", e))
+                })?
+        } else {
+            // Set permissions for append and manage perms to this application
+            let user_app = SDataUser::Key(SafeNdPublicKey::Bls(app_public_key));
+            let mut perms = BTreeMap::default();
+            let _ = perms.insert(user_app, SDataPubUserPermissions::new(true, true));
+
+            safe_app
+                .client
+                .store_pub_sdata(xorname, tag, user_acc_owner, perms)
+                .await
+                .map_err(|e| {
+                    Error::NetDataError(format!("Failed to store Public Sequence data: {:?}", e))
+                })?
+        };
 
         let _op = safe_app
             .client
@@ -465,15 +489,26 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    async fn sequence_get_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)> {
+    async fn sequence_get_last_entry(
+        &self,
+        name: XorName,
+        tag: u64,
+        private: bool,
+    ) -> Result<(u64, Vec<u8>)> {
         debug!(
-            "Fetching Sequence data w/ type: {:?}, xorname: {:?}",
-            tag, name
+            "Fetching {} Sequence data w/ type: {:?}, xorname: {:?}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
         );
 
         let safe_app: &App = self.get_safe_app()?;
 
-        let sequence_address = SDataAddress::Public { name, tag };
+        let sequence_address = if private {
+            SDataAddress::Private { name, tag }
+        } else {
+            SDataAddress::Public { name, tag }
+        };
         safe_app
             .client
             .get_sdata_last_entry(sequence_address)
@@ -490,15 +525,27 @@ impl SafeApp for SafeAppScl {
             })
     }
 
-    async fn sequence_get_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>> {
+    async fn sequence_get_entry(
+        &self,
+        name: XorName,
+        tag: u64,
+        index: u64,
+        private: bool,
+    ) -> Result<Vec<u8>> {
         debug!(
-            "Fetching Sequence data w/ type: {:?}, xorname: {:?}",
-            tag, name
+            "Fetching {} Sequence data w/ type: {:?}, xorname: {:?}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
         );
 
         let safe_app: &App = self.get_safe_app()?;
 
-        let sequence_address = SDataAddress::Public { name, tag };
+        let sequence_address = if private {
+            SDataAddress::Private { name, tag }
+        } else {
+            SDataAddress::Public { name, tag }
+        };
         let start = SDataIndex::FromStart(index);
         let end = SDataIndex::FromStart(index + 1);
         let res = safe_app
@@ -529,18 +576,30 @@ impl SafeApp for SafeAppScl {
         Ok(entry.to_vec())
     }
 
-    async fn sequence_append(&mut self, data: &[u8], name: XorName, tag: u64) -> Result<()> {
+    async fn sequence_append(
+        &mut self,
+        data: &[u8],
+        name: XorName,
+        tag: u64,
+        private: bool,
+    ) -> Result<()> {
         debug!(
-            "Appending to Sequence data w/ type: {:?}, xorname: {:?}",
-            tag, name
+            "Appending to {} Sequence data w/ type: {:?}, xorname: {:?}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
         );
 
         let safe_app: &App = self.get_safe_app()?;
 
-        let sdata_address = SDataAddress::Public { name, tag };
+        let sequence_address = if private {
+            SDataAddress::Private { name, tag }
+        } else {
+            SDataAddress::Public { name, tag }
+        };
         safe_app
             .client
-            .sdata_append(sdata_address, data.to_vec())
+            .sdata_append(sequence_address, data.to_vec())
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
     }
@@ -557,102 +616,4 @@ async fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
         .ok_or_else(|| Error::Unexpected("Client's key is not a BLS Public Key".to_string()))?;
 
     Ok(pk)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::app::test_helpers::new_safe_instance;
-
-    // Helper function to obtain utf8 string from bytes slice
-    fn utf8_str_from_slice(slice: &[u8]) -> Result<String> {
-        let utf8_str = std::str::from_utf8(slice).map_err(|err| {
-            Error::Unexpected(format!("Failed to read data as an utf8 string: {}", err))
-        })?;
-        Ok(utf8_str.to_string())
-    }
-
-    #[tokio::test]
-    async fn test_put_and_get_immutable_data() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-
-        let id1 = b"HELLLOOOOOOO".to_vec();
-
-        let xorname = safe.safe_app.put_public_immutable(&id1, false).await?;
-        let data = safe.safe_app.get_public_immutable(xorname, None).await?;
-        let text = utf8_str_from_slice(data.as_slice())?;
-        assert_eq!(text, "HELLLOOOOOOO");
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_put_get_update_sequence() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-
-        let entry1 = b"VALUE1";
-        let type_tag = 12322;
-        let xorname = safe
-            .safe_app
-            .store_sequence_data(entry1, None, type_tag, None)
-            .await?;
-
-        let (this_version, entry) = safe
-            .safe_app
-            .sequence_get_last_entry(xorname, type_tag)
-            .await?;
-
-        assert_eq!(this_version, 0);
-        assert_eq!(&utf8_str_from_slice(entry.as_slice())?, "VALUE1");
-
-        let entry2 = b"VALUE2";
-        safe.safe_app
-            .sequence_append(entry2, xorname, type_tag)
-            .await?;
-        let (the_latest_version, data_updated) = safe
-            .safe_app
-            .sequence_get_last_entry(xorname, type_tag)
-            .await?;
-
-        assert_eq!(the_latest_version, 1);
-        assert_eq!(&utf8_str_from_slice(data_updated.as_slice())?, "VALUE2");
-
-        let first_version = 0;
-        let first_data = safe
-            .safe_app
-            .sequence_get_entry(xorname, type_tag, first_version)
-            .await?;
-
-        assert_eq!(&utf8_str_from_slice(first_data.as_slice())?, "VALUE1");
-
-        let second_version = 1;
-        let second_data = safe
-            .safe_app
-            .sequence_get_entry(xorname, type_tag, second_version)
-            .await?;
-
-        assert_eq!(&utf8_str_from_slice(second_data.as_slice())?, "VALUE2");
-
-        // test checking for versions that dont exist
-        let nonexistant_version = 2;
-        match safe
-            .safe_app
-            .sequence_get_entry(xorname, type_tag, nonexistant_version)
-            .await
-        {
-            Ok(_) => Err(Error::Unexpected(
-                "No error thrown when passing an outdated new version".to_string(),
-            )),
-            Err(Error::VersionNotFound(msg)) => {
-                assert!(msg.contains(&format!(
-                    "Invalid version ({}) for Sequence found at XoR name {}",
-                    nonexistant_version, xorname
-                )));
-                Ok(())
-            }
-            err => Err(Error::Unexpected(format!(
-                "Error returned is not the expected one: {:?}",
-                err
-            ))),
-        }
-    }
 }

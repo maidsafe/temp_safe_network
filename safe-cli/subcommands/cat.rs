@@ -109,7 +109,23 @@ pub async fn cat_commander(
         }
         SafeData::PublicSequence { data, version, .. } => {
             if OutputFmt::Pretty == output_fmt {
-                println!("Sequence (version {}) at \"{}\":", version, url);
+                println!("Public Sequence (version {}) at \"{}\":", version, url);
+                if cmd.hexdump {
+                    // Render hex representation of Sequence content
+                    println!("{}", pretty_hex::pretty_hex(data));
+                } else {
+                    // Render Sequence content
+                    io::stdout().write_all(data).map_err(|err| {
+                        format!("Failed to print out the content of the file: {}", err)
+                    })?
+                }
+            } else {
+                println!("{}", serialise_output(&(url, data), output_fmt));
+            }
+        }
+        SafeData::PrivateSequence { data, version, .. } => {
+            if OutputFmt::Pretty == output_fmt {
+                println!("Private Sequence (version {}) at \"{}\":", version, url);
                 if cmd.hexdump {
                     // Render hex representation of Sequence content
                     println!("{}", pretty_hex::pretty_hex(data));

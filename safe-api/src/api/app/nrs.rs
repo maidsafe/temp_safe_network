@@ -106,6 +106,7 @@ impl Safe {
                     &nrs_map_raw_data,
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
+                    false,
                 )
                 .await?;
         }
@@ -167,6 +168,7 @@ impl Safe {
                         Some(nrs_xorname),
                         NRS_MAP_TYPE_TAG,
                         None,
+                        false,
                     )
                     .await?;
 
@@ -175,6 +177,7 @@ impl Safe {
                     NRS_MAP_TYPE_TAG,
                     SafeContentType::NrsMapContainer,
                     self.xorurl_base,
+                    false,
                 )?;
 
                 Ok((xorurl, processed_entries, nrs_map))
@@ -210,6 +213,7 @@ impl Safe {
                     &nrs_map_raw_data,
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
+                    false,
                 )
                 .await?;
         }
@@ -244,13 +248,18 @@ impl Safe {
         let data = match xorurl_encoder.content_version() {
             None => {
                 self.safe_app
-                    .sequence_get_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG)
+                    .sequence_get_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, false)
                     .await
             }
             Some(content_version) => {
                 let serialised_nrs_map = self
                     .safe_app
-                    .sequence_get_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, content_version)
+                    .sequence_get_entry(
+                        xorurl_encoder.xorname(),
+                        NRS_MAP_TYPE_TAG,
+                        content_version,
+                        false,
+                    )
                     .await
                     .map_err(|_| {
                         Error::VersionNotFound(format!(

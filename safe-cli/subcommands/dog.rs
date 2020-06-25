@@ -135,6 +135,24 @@ pub async fn dog_commander(
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: PublicSequence");
                 }
+                SafeData::PrivateSequence {
+                    xorurl,
+                    xorname,
+                    type_tag,
+                    version,
+                    resolved_from,
+                    ..
+                } => {
+                    if resolved_from != xorurl {
+                        println!("Resolved from: {}", resolved_from);
+                    }
+                    println!("= Sequence =");
+                    println!("XOR-URL: {}", xorurl);
+                    println!("Version: {}", version);
+                    println!("Type tag: {}", type_tag);
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!("Native data type: PrivateSequence");
+                }
             }
         }
         println!();

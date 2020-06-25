@@ -96,11 +96,29 @@ pub trait SafeApp {
         name: Option<XorName>,
         tag: u64,
         permissions: Option<String>,
+        private: bool,
     ) -> Result<XorName>;
 
-    async fn sequence_get_last_entry(&self, name: XorName, tag: u64) -> Result<(u64, Vec<u8>)>;
+    async fn sequence_get_last_entry(
+        &self,
+        name: XorName,
+        tag: u64,
+        private: bool,
+    ) -> Result<(u64, Vec<u8>)>;
 
-    async fn sequence_get_entry(&self, name: XorName, tag: u64, index: u64) -> Result<Vec<u8>>;
+    async fn sequence_get_entry(
+        &self,
+        name: XorName,
+        tag: u64,
+        index: u64,
+        private: bool,
+    ) -> Result<Vec<u8>>;
 
-    async fn sequence_append(&mut self, data: &[u8], name: XorName, tag: u64) -> Result<()>;
+    async fn sequence_append(
+        &mut self,
+        data: &[u8],
+        name: XorName,
+        tag: u64,
+        private: bool,
+    ) -> Result<()>;
 }

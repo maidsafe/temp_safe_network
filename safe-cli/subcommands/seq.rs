@@ -32,6 +32,9 @@ pub enum SeqSubCommands {
         /// The Xor name address (in Hex) where to store the Sequence (by default is a random location)
         #[structopt(long = "xorname")]
         xorname: Option<String>,
+        /// Store the Sequence as Private (default is Public)
+        #[structopt(short = "p", long = "private")]
+        private: bool,
     },
     #[structopt(name = "append")]
     /// Append an element to an existing Sequence on the network
@@ -54,6 +57,7 @@ pub async fn seq_commander(
             data,
             type_tag,
             xorname,
+            private,
         } => {
             let tag = type_tag.unwrap_or_else(|| DEFAULT_SEQUENCE_TYPE_TAG);
             let xorname = match xorname.as_ref() {
@@ -67,14 +71,20 @@ pub async fn seq_commander(
                     &get_from_stdin(Some("...awaiting data that will be stored from STDIN"))?,
                     xorname,
                     tag,
+                    private,
                 )
                 .await?
             } else {
-                safe.sequence_create(data.as_bytes(), xorname, tag).await?
+                safe.sequence_create(data.as_bytes(), xorname, tag, private)
+                    .await?
             };
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Sequence stored at: \"{}\"", xorurl);
+                println!(
+                    "{} Sequence stored at: \"{}\"",
+                    if private { "Private" } else { "Public" },
+                    xorurl
+                );
             } else {
                 println!("{}", serialise_output(&xorurl, output_fmt));
             }

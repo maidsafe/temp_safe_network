@@ -319,6 +319,7 @@ impl Safe {
                     None,
                     FILES_CONTAINER_TYPE_TAG,
                     None,
+                    false,
                 )
                 .await?;
 
@@ -327,6 +328,7 @@ impl Safe {
                 FILES_CONTAINER_TYPE_TAG,
                 SafeContentType::FilesContainer,
                 self.xorurl_base,
+                false,
             )?
         };
 
@@ -709,7 +711,7 @@ impl Safe {
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
             self.safe_app
-                .sequence_append(serialised_files_map.as_bytes(), xorname, type_tag)
+                .sequence_append(serialised_files_map.as_bytes(), xorname, type_tag, false)
                 .await?;
 
             let new_version = current_version + 1;

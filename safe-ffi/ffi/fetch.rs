@@ -198,7 +198,7 @@ unsafe fn invoke_callback(
             };
             o_nrs_map_container(user_data.0, &nrs_map_container);
         }
-        Ok(SafeData::PublicSequence { .. }) => {
+        Ok(SafeData::PublicSequence { .. }) | Ok(SafeData::PrivateSequence { .. }) => {
             let ffi_result = NativeResult {
                 error_code: 0,
                 description: Some(

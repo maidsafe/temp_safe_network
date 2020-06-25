@@ -77,6 +77,14 @@ pub enum SafeData {
         data: Vec<u8>,
         resolved_from: String,
     },
+    PrivateSequence {
+        xorurl: String,
+        xorname: XorName,
+        type_tag: u64,
+        version: u64,
+        data: Vec<u8>,
+        resolved_from: String,
+    },
 }
 
 impl SafeData {
@@ -88,7 +96,8 @@ impl SafeData {
             | FilesContainer { xorurl, .. }
             | PublicImmutableData { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
-            | PublicSequence { xorurl, .. } => xorurl.clone(),
+            | PublicSequence { xorurl, .. }
+            | PrivateSequence { xorurl, .. } => xorurl.clone(),
         }
     }
 
@@ -100,6 +109,7 @@ impl SafeData {
             | FilesContainer { resolved_from, .. }
             | PublicImmutableData { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
+            | PrivateSequence { resolved_from, .. }
             | PublicSequence { resolved_from, .. } => resolved_from.clone(),
         }
     }
@@ -394,6 +404,22 @@ async fn resolve_one_indirection(
                 let (version, data) = safe.fetch_sequence(&the_xor).await?;
                 debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
                 let safe_data = SafeData::PublicSequence {
+                    xorurl,
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
+                    version,
+                    data: if retrieve_data { data } else { vec![] },
+                    resolved_from: url.to_string(),
+                };
+
+                Ok((safe_data, None))
+            }
+            SafeDataType::PrivateSequence => {
+                // TODO: fetch only if 'retrieve_data' is set,
+                // although we need the version regardless
+                let (version, data) = safe.fetch_sequence(&the_xor).await?;
+                debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
+                let safe_data = SafeData::PrivateSequence {
                     xorurl,
                     xorname: the_xor.xorname(),
                     type_tag: the_xor.type_tag(),
@@ -840,7 +866,7 @@ mod tests {
     async fn test_fetch_public_sequence() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data = b"Something super immutable";
-        let xorurl = safe.sequence_create(data, None, 25_000).await?;
+        let xorurl = safe.sequence_create(data, None, 25_000, false).await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         let content = safe.fetch(&xorurl, None).await?;

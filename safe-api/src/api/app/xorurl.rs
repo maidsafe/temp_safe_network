@@ -1133,12 +1133,17 @@ impl SafeUrl {
         type_tag: u64,
         content_type: SafeContentType,
         base: XorUrlBase,
+        is_private: bool,
     ) -> Result<String> {
         SafeUrl::encode(
             xor_name,
             None,
             type_tag,
-            SafeDataType::PublicSequence,
+            if is_private {
+                SafeDataType::PrivateSequence
+            } else {
+                SafeDataType::PublicSequence
+            },
             content_type,
             None,
             None,
@@ -1469,6 +1474,7 @@ mod tests {
             4_584_545,
             SafeContentType::FilesContainer,
             XorUrlBase::Base64,
+            false,
         )?;
         let base64_xorurl = "safe://mQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
@@ -1544,6 +1550,7 @@ mod tests {
             type_tag,
             SafeContentType::Wallet,
             XorUrlBase::Base32z,
+            false,
         )?;
 
         let xorurl_with_path = format!("{}/subfolder/file", xorurl);

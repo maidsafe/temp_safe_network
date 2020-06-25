@@ -222,6 +222,7 @@ pub unsafe extern "C" fn encode_sequence_data(
     type_tag: u64,
     content_type: u16,
     base_encoding: u16,
+    private: bool,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
         user_data: *mut c_void,
@@ -239,6 +240,7 @@ pub unsafe extern "C" fn encode_sequence_data(
             type_tag,
             content_type_enum,
             encoding_base,
+            private,
         )?;
         let encoded_string = CString::new(encoded_safe_url)?;
         o_cb(user_data.0, FFI_RESULT_OK, encoded_string.as_ptr());
