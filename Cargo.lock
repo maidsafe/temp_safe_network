@@ -2032,7 +2032,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/yoga07/safe-nd?branch=at2#cf82eb67533743944a95f3bc9d158bfd0ee6d4c9"
+source = "git+https://github.com/maidsafe/safe-nd?branch=at2#3dd4f36945516399a7c4906ff8e1a3210f717f35"
 dependencies = [
  "bincode",
  "crdts",
@@ -2050,7 +2050,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/yoga07/safe-transfers?branch=transfers#ba0316091983e1d1762f8c8aa3410988e4e1b0ff"
+source = "git+https://github.com/maidsafe/safe-transfers#bb0350b2ffaca6741e1ebc237b98383d8f6f9c35"
 dependencies = [
  "bincode",
  "crdts",

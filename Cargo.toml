@@ -12,7 +12,8 @@ version = "0.24.0"
 
 [patch.crates-io]
 routing = { git = "https://github.com/yoga07/routing", branch = "transfers" }
-safe-transfers = { git = "https://github.com/yoga07/safe-transfers", branch = "transfers" }
+# safe-transfers = { path = "../safe-transfers" }
+safe-transfers = { git = "https://github.com/maidsafe/safe-transfers" }
 
 [dependencies]
 base64 = "~0.10.1"
@@ -36,7 +37,8 @@ rand = "~0.6.5"
 rand_chacha = "~0.1.1"
 routing_rand_core = { package = "rand_core", version = "~0.5.1" }
 routing = "0.37.0"
-safe-nd = { git = "https://github.com/yoga07/safe-nd", branch = "at2" }
+safe-nd = { git = "https://github.com/maidsafe/safe-nd", branch = "at2" }
+# safe-nd = { path="../safe-nd"}
 self_update = { version = "0.13.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "~1.0.97", features = ["derive"] }
 serde_json = "~1.0.40"

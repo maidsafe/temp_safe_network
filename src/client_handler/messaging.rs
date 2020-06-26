@@ -243,7 +243,11 @@ impl Messaging {
             //
             // ===== Invalid =====
             //
-            GetLoginPacket(_) | GetBalance(_) | GetHistory(_) | ListAuthKeysAndVersion(_) => {
+            GetLoginPacket(_)
+            | GetBalance(_)
+            | GetReplicaKeys(_)
+            | GetHistory(_)
+            | ListAuthKeysAndVersion(_) => {
                 error!(
                     "{}: Should not receive {:?} as a client handler.",
                     self, response

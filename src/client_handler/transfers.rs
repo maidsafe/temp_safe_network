@@ -14,6 +14,7 @@ use safe_nd::{
     Request, Response, SignedTransfer, XorName,
 };
 use std::fmt::{self, Display, Formatter};
+use threshold_crypto::PublicKeySet;
 
 #[cfg(not(feature = "simulated-payouts"))]
 use safe_nd::PublicKey;
@@ -85,8 +86,13 @@ impl Transfers {
             MoneyRequest::PropagateTransfer { proof } => {
                 self.receive_propagated(&proof, &requester, message_id, messaging)
             }
-            MoneyRequest::GetBalance(xorname) => {
-                self.balance(XorName::from(xorname), requester, message_id, messaging)
+            MoneyRequest::GetBalance(public_key) => {
+                self.balance(XorName::from(public_key), requester, message_id, messaging)
+            }
+            MoneyRequest::GetReplicaKeys(_public_key) => {
+                // Here we assume we're at the right section.
+                // TODO: verify this, or move transfers out of client handler in general
+                self.get_replica_pks(message_id, messaging)
             }
             MoneyRequest::GetHistory { at, since_version } => self.history(
                 XorName::from(at),
@@ -101,6 +107,14 @@ impl Transfers {
                     .credit_without_proof(requester, transfer, message_id, *self.id.name())
             }
         }
+    }
+
+    /// Get the PublicKeySet of our replicas
+    fn get_replica_pks(&self, message_id: MessageId, messaging: &mut Messaging) -> Option<Action> {
+        let result = self.replica.replicas_pk_set();
+        let response = Response::GetReplicaKeys(result);
+        messaging.respond_to_client(message_id, response);
+        None
     }
 
     fn balance(

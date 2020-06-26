@@ -110,6 +110,11 @@ impl ReplicaManager {
         self.replica.apply(event);
         Ok(())
     }
+
+    /// Get the replica's PK set
+    pub fn replicas_pk_set(&self) -> Result<PublicKeySet> {
+        self.replica.replicas_pk_set()
+    }
 }
 
 #[cfg(feature = "simulated-payouts")]
