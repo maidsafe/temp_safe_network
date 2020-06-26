@@ -664,6 +664,13 @@ impl SafeUrl {
         self.content_type.clone()
     }
 
+    /// sets the SAFE content type
+    pub fn set_content_type(&mut self, content_type: SafeContentType) -> Result<()> {
+        self.content_type_u16 = content_type.value()?;
+        self.content_type = content_type;
+        Ok(())
+    }
+
     /// returns XorName
     pub fn xorname(&self) -> XorName {
         self.xor_name

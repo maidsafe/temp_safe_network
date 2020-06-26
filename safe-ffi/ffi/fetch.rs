@@ -187,7 +187,8 @@ unsafe fn invoke_callback(
         }) => {
             let nrs_map_json = serde_json::to_string(&nrs_map)?;
             let nrs_map_container = NrsMapContainer {
-                public_name: CString::new(public_name.clone())?.into_raw(),
+                public_name: CString::new(public_name.clone().unwrap_or_else(|| "".to_string()))?
+                    .into_raw(),
                 xorurl: CString::new(xorurl.clone())?.into_raw(),
                 xorname: xorname.0,
                 type_tag: *type_tag,

@@ -39,11 +39,15 @@ pub async fn xorurl_commander(
             let url = get_from_arg_or_stdin(xorurl, Some("...awaiting XOR-URL from stdin"))?;
             let safeurl = SafeUrl::from_url(&url)?;
             if OutputFmt::Pretty == output_fmt {
-                let urltype = if safeurl.is_nrsurl() { "nrs" } else { "xor" };
+                let (urltype, public_name) = if safeurl.is_nrsurl() {
+                    ("NRS-URL", safeurl.public_name())
+                } else {
+                    ("XOR-URL", "<unknown>")
+                };
                 println!("Information decoded from SafeUrl: {}", url);
                 println!("UrlType: {}", urltype);
                 println!("Xorname: {}", xorname_to_hex(&safeurl.xorname()));
-                println!("Public Name: {}", safeurl.public_name());
+                println!("Public Name: {}", public_name);
                 if safeurl.is_nrsurl() {
                     println!("Top Name: {}", safeurl.top_name());
                 }

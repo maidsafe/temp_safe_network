@@ -16,7 +16,7 @@ mod keys;
 mod nrs;
 mod realpath;
 #[cfg(not(feature = "scl-mock"))]
-mod safe_client_libs;
+mod safe_client;
 mod safe_net;
 mod sequence;
 #[cfg(test)]
@@ -28,7 +28,7 @@ use super::constants;
 #[cfg(feature = "scl-mock")]
 use fake_scl::SafeAppFake as SafeAppImpl;
 #[cfg(not(feature = "scl-mock"))]
-use safe_client_libs::SafeAppScl as SafeAppImpl;
+use safe_client::SafeAppScl as SafeAppImpl;
 use safe_net::SafeApp;
 use xorurl::XorUrlBase;
 

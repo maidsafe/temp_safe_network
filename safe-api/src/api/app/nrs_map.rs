@@ -12,7 +12,11 @@ use super::{
     helpers::gen_timestamp_secs,
     Safe,
 };
-use crate::{fetch::SafeContentType, xorurl::XorUrl, Error, Result};
+use crate::{
+    fetch::{SafeContentType, SafeDataType},
+    xorurl::XorUrl,
+    Error, Result,
+};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, iter::FromIterator};
@@ -300,18 +304,25 @@ fn validate_nrs_link(link: &str) -> Result<()> {
     if link_encoder.content_version().is_none() {
         // We could try to automatically set the latest/current version,
         // but NRSMap currently doesn't have a connection to do so.
-        match link_encoder.content_type() {
-            SafeContentType::FilesContainer | SafeContentType::NrsMapContainer => {
-                Err(Error::InvalidInput(format!(
-                    "The linked content ({}) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
-                    link_encoder.content_type(), link
-                )))
-            }
-            _ => Ok(()),
+        let content_type = link_encoder.content_type();
+        let data_type = link_encoder.data_type();
+        if content_type == SafeContentType::FilesContainer
+            || content_type == SafeContentType::NrsMapContainer
+        {
+            return Err(Error::InvalidInput(format!(
+                "The linked content ({}) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
+                content_type, link
+            )));
+        } else if data_type == SafeDataType::PublicSequence
+            || data_type == SafeDataType::PrivateSequence
+        {
+            return Err(Error::InvalidInput(format!(
+                "The linked content ({}) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
+                data_type, link
+            )));
         }
-    } else {
-        Ok(())
     }
+    Ok(())
 }
 
 fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> Result<NrsMap> {

@@ -19,6 +19,8 @@ use std::{
     io::{stdin, stdout, Read, Write},
 };
 
+const UNKNOWN_PUBLIC_NAME: &str = "<unknown>";
+
 // Warn the user about a dry-run being performed
 pub fn notice_dry_run() {
     println!("NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.");
@@ -184,14 +186,18 @@ where
 }
 
 // Pretty print an NRS Map
-pub fn print_nrs_map(nrs_map: &NrsMap, public_name: &str) {
+pub fn print_nrs_map(nrs_map: &NrsMap, public_name: &Option<String>) {
     let mut table = Table::new();
     table.add_row(row![bFg->"NRS name/subname", bFg->"Created", bFg->"Modified", bFg->"Link"]);
 
     let summary = nrs_map.get_map_summary();
+    let pub_name: &str = match public_name {
+        Some(name) => name,
+        None => UNKNOWN_PUBLIC_NAME,
+    };
     summary.iter().for_each(|(name, rdf_info)| {
         table.add_row(row![
-            format!("{}{}", name, public_name),
+            format!("{}{}", name, pub_name),
             rdf_info["created"],
             rdf_info["modified"],
             rdf_info["link"],

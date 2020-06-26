@@ -12,7 +12,11 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use safe_api::{fetch::SafeData, Safe};
+use safe_api::{
+    fetch::{SafeContentType, SafeData},
+    xorurl::XorUrlEncoder,
+    Safe,
+};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -49,12 +53,18 @@ pub async fn dog_commander(
                 } => {
                     println!("Resolved from: {}", resolved_from);
                     println!("= NRS Map Container =");
-                    println!("PublicName: \"{}\"", public_name);
+                    match public_name {
+                        Some(name) => println!("PublicName: \"{}\"", name),
+                        None => {}
+                    }
                     println!("XOR-URL: {}", xorurl);
                     println!("Version: {}", version);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
+                    let mut xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+                    xorurl_encoder.set_content_type(SafeContentType::Raw)?;
+                    println!("Native data XOR-URL: {}", xorurl_encoder.to_string());
                     print_nrs_map(&nrs_map, &public_name);
                 }
                 SafeData::FilesContainer {
@@ -73,6 +83,9 @@ pub async fn dog_commander(
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
+                    let mut xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+                    xorurl_encoder.set_content_type(SafeContentType::Raw)?;
+                    println!("Native data XOR-URL: {}", xorurl_encoder.to_string());
                 }
                 SafeData::PublicImmutableData {
                     xorurl,
@@ -105,6 +118,9 @@ pub async fn dog_commander(
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
+                    let mut xorurl_encoder = XorUrlEncoder::from_url(xorurl)?;
+                    xorurl_encoder.set_content_type(SafeContentType::Raw)?;
+                    println!("Native data XOR-URL: {}", xorurl_encoder.to_string());
                 }
                 SafeData::SafeKey {
                     xorurl,
