@@ -10,7 +10,9 @@
 use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_api::{files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
+use safe_api::{
+    fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair,
+};
 use safe_nd::Coins;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -331,6 +333,11 @@ pub fn parse_seq_store_output(output: &str) -> String {
 #[allow(dead_code)]
 pub fn parse_cat_seq_output(output: &str) -> (String, Vec<u8>) {
     serde_json::from_str(output).expect("Failed to parse output of `safe cat seq`")
+}
+
+#[allow(dead_code)]
+pub fn parse_dog_output(output: &str) -> (String, Vec<SafeData>) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe dog`")
 }
 
 // Executes arbitrary `safe ` commands and returns

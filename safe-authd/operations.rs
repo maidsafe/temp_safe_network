@@ -19,7 +19,7 @@ use std::{
     fs::{create_dir_all, File, OpenOptions},
     io::{self, prelude::*},
     path::PathBuf,
-    process::{self, Command},
+    process::{self, Command, Stdio},
     str, thread,
     time::Duration,
 };
@@ -247,7 +247,11 @@ fn launch_detached_process(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
     );
 
     // Spwan the process
-    let mut child = Command::new(&authd_exec).args(&args).spawn()?;
+    let mut child = Command::new(&authd_exec)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
 
     // Let's give it a sec so it starts/fails
     thread::sleep(Duration::from_millis(1000));

@@ -494,8 +494,8 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
 
     let output = Command::new(&path_str)
         .args(args)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|err| {
             Error::AuthdClientError(format!(

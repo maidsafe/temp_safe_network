@@ -268,6 +268,15 @@ async fn resolve_one_indirection(
     debug!("Going into a new step in the URL resolution for {}", xorurl);
     match the_xor.content_type() {
         SafeContentType::FilesContainer => {
+            if !the_xor.sub_names_vec().is_empty() {
+                let msg = format!(
+                    "Cannot resolve FilesContainer URL as it contains subnames: {}",
+                    xorurl
+                );
+                debug!("{}", msg);
+                return Err(Error::InvalidXorUrl(msg));
+            }
+
             let (version, files_map) = safe.fetch_files_container(&the_xor).await?;
             debug!(
                 "Files container found with v:{}, on data type: {}, containing: {:?}",
@@ -391,73 +400,104 @@ async fn resolve_one_indirection(
 
             Ok((nrs_map_container, Some((target_xorurl_encoder, None))))
         }
-        SafeContentType::Raw => match the_xor.data_type() {
-            SafeDataType::SafeKey => {
-                let safe_data = SafeData::SafeKey {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    resolved_from: url,
-                };
-                Ok((safe_data, None))
+        SafeContentType::Raw => {
+            if !the_xor.sub_names_vec().is_empty() {
+                let msg = format!(
+                    "Cannot resolve URL targetting raw content as it contains subnames: {}",
+                    xorurl
+                );
+                debug!("{}", msg);
+                return Err(Error::InvalidXorUrl(msg));
             }
-            SafeDataType::PublicImmutableData => {
-                retrieve_immd(safe, &the_xor, retrieve_data, None, &metadata, range).await
-            }
-            SafeDataType::PublicSequence => {
-                // TODO: fetch only if 'retrieve_data' is set,
-                // although we need the version regardless
-                let (version, data) = safe.fetch_sequence(&the_xor).await?;
-                debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
-                let safe_data = SafeData::PublicSequence {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    data: if retrieve_data { data } else { vec![] },
-                    resolved_from: url.to_string(),
-                };
 
-                Ok((safe_data, None))
-            }
-            SafeDataType::PrivateSequence => {
-                // TODO: fetch only if 'retrieve_data' is set,
-                // although we need the version regardless
-                let (version, data) = safe.fetch_sequence(&the_xor).await?;
-                debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
-                let safe_data = SafeData::PrivateSequence {
-                    xorurl,
-                    xorname: the_xor.xorname(),
-                    type_tag: the_xor.type_tag(),
-                    version,
-                    data: if retrieve_data { data } else { vec![] },
-                    resolved_from: url.to_string(),
-                };
+            match the_xor.data_type() {
+                SafeDataType::SafeKey => {
+                    let safe_data = SafeData::SafeKey {
+                        xorurl,
+                        xorname: the_xor.xorname(),
+                        resolved_from: url,
+                    };
+                    Ok((safe_data, None))
+                }
+                SafeDataType::PublicImmutableData => {
+                    retrieve_immd(safe, &the_xor, retrieve_data, None, &metadata, range).await
+                }
+                SafeDataType::PublicSequence => {
+                    // TODO: fetch only if 'retrieve_data' is set,
+                    // although we need the version regardless
+                    let (version, data) = safe.fetch_sequence(&the_xor).await?;
+                    debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
+                    let safe_data = SafeData::PublicSequence {
+                        xorurl,
+                        xorname: the_xor.xorname(),
+                        type_tag: the_xor.type_tag(),
+                        version,
+                        data: if retrieve_data { data } else { vec![] },
+                        resolved_from: url.to_string(),
+                    };
 
-                Ok((safe_data, None))
+                    Ok((safe_data, None))
+                }
+                SafeDataType::PrivateSequence => {
+                    // TODO: fetch only if 'retrieve_data' is set,
+                    // although we need the version regardless
+                    let (version, data) = safe.fetch_sequence(&the_xor).await?;
+                    debug!("Data found with v:{}, on Sequence at: {}", version, xorurl);
+                    let safe_data = SafeData::PrivateSequence {
+                        xorurl,
+                        xorname: the_xor.xorname(),
+                        type_tag: the_xor.type_tag(),
+                        version,
+                        data: if retrieve_data { data } else { vec![] },
+                        resolved_from: url.to_string(),
+                    };
+
+                    Ok((safe_data, None))
+                }
+                other => Err(Error::ContentError(format!(
+                    "Data type '{:?}' not supported yet",
+                    other
+                ))),
             }
-            other => Err(Error::ContentError(format!(
-                "Data type '{:?}' not supported yet",
-                other
-            ))),
-        },
-        SafeContentType::MediaType(media_type_str) => match the_xor.data_type() {
-            SafeDataType::PublicImmutableData => {
-                retrieve_immd(
-                    safe,
-                    &the_xor,
-                    retrieve_data,
-                    Some(media_type_str),
-                    &metadata,
-                    range,
-                )
-                .await
+        }
+        SafeContentType::MediaType(media_type_str) => {
+            if !the_xor.sub_names_vec().is_empty() {
+                let msg = format!(
+                    "Cannot resolve URL targetting raw content as it contains subnames: {}",
+                    xorurl
+                );
+                debug!("{}", msg);
+                return Err(Error::InvalidXorUrl(msg));
             }
-            other => Err(Error::ContentError(format!(
-                "Data type '{:?}' not supported yet",
-                other
-            ))),
-        },
+
+            match the_xor.data_type() {
+                SafeDataType::PublicImmutableData => {
+                    retrieve_immd(
+                        safe,
+                        &the_xor,
+                        retrieve_data,
+                        Some(media_type_str),
+                        &metadata,
+                        range,
+                    )
+                    .await
+                }
+                other => Err(Error::ContentError(format!(
+                    "Data type '{:?}' not supported yet",
+                    other
+                ))),
+            }
+        }
         SafeContentType::Wallet => {
+            if !the_xor.sub_names_vec().is_empty() {
+                let msg = format!(
+                    "Cannot resolve Wallet URL as it contains subnames: {}",
+                    xorurl
+                );
+                debug!("{}", msg);
+                return Err(Error::InvalidXorUrl(msg));
+            }
+
             let balances = if retrieve_data {
                 safe.fetch_wallet(&the_xor).await?
             } else {
