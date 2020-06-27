@@ -60,7 +60,7 @@ pub enum VaultSubCommands {
         /// IP to be used to launch the local vaults.
         #[structopt(long = "ip")]
         ip: Option<String>,
-        /// Start authd and login with
+        /// Start authd and log in with
         #[structopt(short = "t", long = "testing")]
         test: bool,
     },

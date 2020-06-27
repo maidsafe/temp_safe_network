@@ -111,7 +111,7 @@ pub enum FilesSubCommands {
     },
     /// Get a file or folder from the SAFE Network
     Get {
-        /// The target FilesContainer to retrieve from, optionally including path to directory or file within
+        /// The target FilesContainer to retrieve from, optionally including the path to the directory or file within
         source: String,
         /// The local destination path for the retrieved files and folders (default is '.')
         dest: Option<String>,

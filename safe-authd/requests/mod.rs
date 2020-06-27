@@ -37,10 +37,10 @@ const METHOD_AUTHORISE: &str = "authorise";
 // Method for getting a status report of the safe-authd
 const METHOD_STATUS: &str = "status";
 
-// Method for login into a SAFE account
+// Method for logging into a SAFE account
 const METHOD_LOGIN: &str = "login";
 
-// Method for loging out from a SAFE account
+// Method for logging out from a SAFE account
 const METHOD_LOGOUT: &str = "logout";
 
 // Method for creating a new SAFE account

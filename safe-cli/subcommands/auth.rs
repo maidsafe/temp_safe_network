@@ -20,7 +20,7 @@ pub enum AuthSubCommands {
     /// Clear SAFE CLI authorisation credentials from local file
     Clear {},
     #[structopt(name = "login")]
-    /// Send request to a remote Authenticator daemon to login to a SAFE account
+    /// Send request to a remote Authenticator daemon to log in to a SAFE account
     Login {
         /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]

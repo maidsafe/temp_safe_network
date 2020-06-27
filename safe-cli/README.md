@@ -182,7 +182,7 @@ Done!
 
 #### Run a local network
 
-At current state of the SAFE project, a single-section SAFE network can be launched locally in our system. If the SAFE vault was installed in the system using the CLI as described in previous section we can then launch it with a simple command:
+At the current state of the SAFE project, a single-section SAFE network can be launched locally in our system. If the SAFE vault was installed in the system using the CLI as described in the previous section we can then launch it with a simple command:
 ```shell
 $ safe vault run-baby-fleming
 Storing vaults' generated data at ~/.safe/vault/baby-fleming-vaults
@@ -217,7 +217,7 @@ The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically 
 
 Ready to play your part in a shared network by adding your vault from home to a single section with other people's vaults? Keep reading...
 
-MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your vault joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create an account on this network, login, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
+MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your vault joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create an account on this network, log in, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
 
 You will need the network configuration containing the details of the hardcoded contacts that will bootstrap you to the shared section. If you have connected to this or previous iterations of the MaidSafe shared section then you may already have a `shared-section` network profile saved on your machine. You can confirm this and update it to the latest configuration using `safe networks check`:
 ```shell
@@ -241,7 +241,7 @@ $ safe networks switch shared-section
 Switching to 'shared-section' network...
 Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
 Successfully switched to 'shared-section' network in your system!
-If you need write access to the 'shared-section' network, you'll need to restart authd, login and re-authorise the CLI again
+If you need write access to the 'shared-section' network, you'll need to restart authd, log in and re-authorise the CLI again
 ```
 
 We're now ready to launch our vault and add it as a node. This is achieved using `safe vault join` as follows:
@@ -297,10 +297,10 @@ $ safe networks switch shared-section
 Switching to 'shared-section' network...
 Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
 Successfully switched to 'shared-section' network in your system!
-If you need write access to the 'shared-section' network, you'll need to restart authd, login and re-authorise the CLI again
+If you need write access to the 'shared-section' network, you'll need to restart authd, log in and re-authorise the CLI again
 ```
 
-Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your currently setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
+Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your current setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
 ```shell
 $ safe networks check
 Checking current setup network connection information...
@@ -325,7 +325,7 @@ This command will check if a newer safe-vault release is available on [GitHub](h
 
 The CLI is just another client SAFE application, therefore it needs to be authorised by the user to gain access to the SAFE Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the account owner (the user) via the SAFE Authenticator.
 
-This command simply sends an authorisation request to the Authenticator available, e.g. the `safe-authd` daemon (see further below for explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/safe-cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the SAFE Network for the corresponding operation.
+This command simply sends an authorisation request to the Authenticator available, e.g. the `safe-authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/safe-cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the SAFE Network for the corresponding operation.
 
 #### The Authenticator daemon (authd)
 
@@ -376,7 +376,7 @@ Sending request to authd to obtain a status report...
 
 #### Auth create-acc
 
-Since we now have our SAFE Authenticator running and ready to accept requests, we can start interacting with it by using others SAFE CLI `auth` subcommands.
+Since we now have our SAFE Authenticator running and ready to accept requests, we can start interacting with it by using other SAFE CLI `auth` subcommands.
 
 In order to create a SAFE Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
 ```shell
@@ -403,7 +403,7 @@ Account was created successfully!
 
 #### Auth login
 
-When a new account is created with CLI, as we've seen above, the `authd` will stay logged into that same account. However if we want to log in to a different account, or to the same account after the PC or `authd` was restarted, we can login using the following command:
+When a new account is created with CLI, as we've seen above, the `authd` will stay logged into that same account. However if we want to log in to a different account, or to the same account after the PC or `authd` was restarted, we can log in using the following command:
 ```shell
 $ safe auth login
 Passphrase:
@@ -452,7 +452,7 @@ Logged in successfully
 
 Another method for passing passphrase/password involves using the environment variables `SAFE_AUTH_PASSPHRASE` and `SAFE_AUTH_PASSWORD`.
 
-With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then login without needing to enter login details, or pass a config file:
+With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then log in without needing to enter login details, or pass a config file:
 ```shell
 $ safe auth login
 Sending login action request to authd...
@@ -472,9 +472,9 @@ Now that the Authenticator is running and ready to authorise applications, we ca
 
 In a normal scenario, an Authenticator GUI would be using `authd` as its backend process, e.g. the [SAFE Network Application](https://github.com/maidsafe/safe-network-app) provides such a GUI to review authorisation requests and allow the permissions requested to be granted.
 
-For the purpose of making this guide self contained with the SAFE CLI application, we will now use also the CLI on a second console to review and allow/deny authorisation requests.
+For the purpose of making this guide self-contained with the SAFE CLI application, we will now use also the CLI on a second console to review and allow/deny authorisation requests.
 
-Let's first send an authorisation request from current console by simply invoking the `auth` command with no subcommands:
+Let's first send an authorisation request from the current console by simply invoking the `auth` command with no subcommands:
 ```shell
 $ safe auth
 Authorising CLI application...
@@ -526,7 +526,7 @@ We are now ready to start using the CLI to operate with the network, via its com
 
 It could be the case the SAFE CLI is the only SAFE application that the user is intended to use to interact with the SAFE Network. In such a case authorising the CLI application as explained above (when there is no other UI for the `authd`) using another instance of the CLI in a second console is not that comfortable.
 
-Therefore there is an option which allows the SAFE CLI to automatically self authorise when the user logs in using the CLI, which is as simply as:
+Therefore there is an option which allows the SAFE CLI to automatically self authorise when the user logs in using the CLI, which is as simple as:
 ```shell
 $ safe auth login --self-auth
 Passphrase:
@@ -589,7 +589,7 @@ Sending request to authd to obtain a status report...
 
 As you can see, the commands operate in an analogous way as when they are invoked outside of the interactive shell. Although there are some operations which are only possible when they are executed from the interactive shell, one nice example is the possibility to subscribe to receive authorisation request notifications, let's see how that works.
 
-In the previous section we've used the `safe auth reqs` command to obtain a list of the authorisation requests which are awaiting for approval/denial. We could instead use the interactive shell to subscribe it as an endpoint to receive notifications when this authorisation requests are sent to the `authd`:
+In the previous section we've used the `safe auth reqs` command to obtain a list of the authorisation requests which are waiting for approval/denial. We could instead use the interactive shell to subscribe it as an endpoint to receive notifications when this authorisation requests are sent to the `authd`:
 ```shell
 > auth subscribe
 Sending request to subscribe...
@@ -627,7 +627,7 @@ It enables the possibility to also have a state in the session, e.g. allowing th
 
 ### SafeKeys
 
-`SafeKey` management allows users to generate sign/encryption key pairs that can be used for different type of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a `SafeKey` is linked from a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
+`SafeKey` management allows users to generate sign/encryption key pairs that can be used for different types of operations, like choosing which sign key to use for uploading files (and therefore paying for the storage used), or signing a message posted on some social application when a `SafeKey` is linked from a public profile (e.g. a WebID/SAFE-ID), or even for encrypting messages that are privately sent to another party so it can verify the authenticity of the sender.
 
 Users can record `SafeKey`s in a `Wallet` (see further below for more details about `Wallet`s), having friendly names to refer to them, but they can also be created as throw away `SafeKey`s which are not linked from any `Wallet`, container, or any other type of data on the network.
 
@@ -664,7 +664,7 @@ In this case, the new `SafeKey` is preloaded with coins which are transferred fr
 
 If we omit the `--pay-with` argument from the command above, or from any other command which supports it, the CLI will make use of the default `SafeKey` which is linked from the account for paying the costs of the operation. Upon the creation of a SAFE Account, a default `SafeKey` is linked to it and used for paying the costs incurred in any operations made by the applications that have been authorised by the owner of that account, like it's the case of the `safe-cli` application. Currently it's not possible to change the default `SafeKey` linked from an account, but it will be possible with the `safe-cli` in the near future.
 
-Other optional args that can be used with `keys create` sub-command are:
+Other optional args that can be used with the `keys create` sub-command are:
 ```
 --pk <pk>            Don't generate a key pair and just use the provided public key
 --preload <preload>  Preload the SafeKey with a coin balance
@@ -676,7 +676,7 @@ We can retrieve a given `SafeKey`'s balance simply using its secret key, which w
 
 We can optionally also pass the `SafeKey`'s XorUrl to have the CLI to verify they correspond to each other, i.e. if the `SafeKey`'s XorUrl is provided, the CLI will check if it corresponds to the public key derived from the passed secret key, and throw an error if it doesn't.
 
-The target `SafeKey`'s secret key can be passed as an argument (or it will be retrieved from `stdin`), let's check the balance of the `SafeKey` we created in previous section:
+The target `SafeKey`'s secret key can be passed as an argument (or it will be retrieved from `stdin`). Let's check the balance of the `SafeKey` we created in the previous section:
 ```bash
 $ safe keys balance
 Enter secret key corresponding to the SafeKey to query the balance from: c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
@@ -770,7 +770,7 @@ OPTIONS:
 
 Right now, only a secret key (of a `SafeKey` with coins) can be used to pay for the costs, but in the future a `Wallet` will be also allowed for this purpose.
 
-For example, if we use the secret key we obtained when creating a `SafeKey` in our example in previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
+For example, if we use the secret key we obtained when creating a `SafeKey` in our example in the previous section to pay for the costs, we can create a `Wallet` with a new spendable balance by simply running:
 
 ```shell
 $ safe wallet create --pay-with 62e323615235122f7e20c7f05ddf56c5e5684853d21f65fca686b0bfb2ed851a --name first-spendable-balance
@@ -789,7 +789,7 @@ $ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38
 Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e" has a total balance of 0 safecoins
 ```
 
-The coin balance of an individual spendable balance can also be queried by providing its friendly name as part of the `Wallet` URL, e.g. the `Wallet` we created above contains an spendable balance named 'first-spendable-balance', so we can check the balance of it (instead of the total balance of the `Wallet`) with the following command:
+The coin balance of an individual spendable balance can also be queried by providing its friendly name as part of the `Wallet` URL, e.g. the `Wallet` we created above contains a spendable balance named 'first-spendable-balance', so we can check the balance of it (instead of the total balance of the `Wallet`) with the following command:
 ```shell
 $ safe wallet balance safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance
 Wallet's spendable balance at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsjif1wegik9t38diuk1yny9e/first-spendable-balance" has a balance of 0 safecoins
@@ -959,7 +959,7 @@ FilesContainer updated (version 3): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7
 +  ./some-other-folder/file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
 ```
 
-If we have previously uploaded a file to the network, we can also add it to any existing `FilesContainer` by providing its XOR-URL as the `<location>` argument to the `files add` command. Let's add a file (same file we uploaded in previous command) to our `FilesContainer` again, but choosing a new destination filename, e.g. `/files-added/same-file.txt`:
+If we have previously uploaded a file to the network, we can also add it to any existing `FilesContainer` by providing its XOR-URL as the `<location>` argument to the `files add` command. Let's add a file (the same file we uploaded in the previous command) to our `FilesContainer` again, but choosing a new destination filename, e.g. `/files-added/same-file.txt`:
 ```shell
 $ safe files add safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9 safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/same-file.txt
 FilesContainer updated (version 4): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=4"
@@ -997,10 +997,10 @@ SIZE  CREATED               MODIFIED              NAME
 
 The `files get` command copies file(s) from the network to the local filesystem.
 
-This command works similarly to unix `cp` or `scp` or the windows `copy` command.  It accepts two arguments:
+This command works similarly to Unix `cp` or `scp` or the windows `copy` command.  It accepts two arguments:
 
 ```shell
-<source>  The target FilesContainer to retrieve from, optionally including path to directory or file within
+<source>  The target FilesContainer to retrieve from, optionally including the path to the directory or file within
 <dest>    The local destination path for the retrieved files and folders (default is '.')
 ```
 
@@ -1267,13 +1267,13 @@ As seen above, the `safe cat` command can be used to fetch any type of content f
 
 #### Retrieving binary files with --hexdump
 
-By default, binary files are treated just like a plaintext file and will typically display unreadable garbage on the screen unless output is redirected to a file, eg:
+By default, binary files are treated just like a plaintext file and will typically display unreadable garbage on the screen unless the output is redirected to a file, eg:
 
 ```shell
 $ safe cat safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky > /tmp/favicon.ico
 ```
 
-However, the flag --hexdump is available which provides a more human friendly hexadecimal dump, similar to that of the standard *xxd* unix tool.  Here's an example.
+However, the flag --hexdump is available which provides a more human-friendly hexadecimal dump, similar to that of the standard *xxd* Unix tool.  Here's an example.
 
 ```shell
 $ safe cat --hexdump safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky | head
@@ -1314,9 +1314,9 @@ As we've seen in all the above sections, every piece of data on the SAFE Network
 
 So far all commands were using the XOR-URLs to either inform of the new data created/stored on the Network, as well as for retrieving data from the Network.
 
-While XOR-URLs are simply a way to encode SAFE Network data unique location into a URL, there are some incentives for having more human friendly URLs that can be easily remembered and recognisable when trying to share them with other people, or use them with tools and applications like the SAFE CLI or the SAFE Browser.
+While XOR-URLs are simply a way to encode SAFE Network data unique location into a URL, there are some incentives for having more human-friendly URLs that can be easily remembered and recognisable when trying to share them with other people, or use them with tools and applications like the SAFE CLI or the SAFE Browser.
 
-This is why the SAFE Network also supports having such human friendly URLs through what it's called the `Name Resolution System (NRS)`. The NRS allows users to create friendly names that are resolvable to a unique location on the Network. These friendly names can be used in the form of a URL (NRS-URL) to share with other people the location of websites, web applications, files and folders, safecoin wallets for receiving transfers, SAFE IDs, etc.
+This is why the SAFE Network also supports having such human-friendly URLs through what it's called the `Name Resolution System (NRS)`. The NRS allows users to create friendly names that are resolvable to a unique location on the Network. These friendly names can be used in the form of a URL (NRS-URL) to share with other people the location of websites, web applications, files and folders, safecoin wallets for receiving transfers, SAFE IDs, etc.
 
 In this section we will explore the CLI commands which allow users to generate, administer, and use the NRS and its NRS-URLs for publishing and retrieving data to/from the SAFE Network.
 
@@ -1326,14 +1326,14 @@ Creating a friendly name on the Network can be achieved with the `nrs create` su
 
 Let's imagine we have uploaded the files and folders of a website we want to publish on the SAFE Network with `files put` command:
 ```shell
-$ safe files put ./website-to-publish/ --recursive`
+$ safe files put ./website-to-publish/ --recursive
 FilesContainer created at: "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc"
 +  ./website-to-publish/index.html              safe://hbyyyydhp7y3mb6zcj4herpqm53ywnbycstamb54yhniud1cij7frjfe8c
 +  ./website-to-publish/image.jpg               safe://hbyyyynkt8ak5mxmbqkdt81hqceota8fu83e49gi3weszddujfc8fxcugp
 +  ./website-to-publish/contact/form.html       safe://hbyyyyd1sw4dd57k1xeeijukansatia6mthaz1h6htnb8pjoh9naskoaks
 ```
 
-As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human friendly NRS-URL:
+As we know that website is now publicly available on the SAFE Network for anyone who wants to visit using its XOR-URL "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc" with either `$ safe cat` command, or a SAFE Browser. But let's now create a NRS name for it and obtain its human-friendly NRS-URL:
 ```shell
 $ safe nrs create mywebsite --link "safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0"
 New NRS Map for "safe://mywebsite" created at: "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh"
@@ -1491,7 +1491,7 @@ In this case we don't only get information about the content that the URL resolv
 
 ### Seq (Sequence)
 
-As mentioned before, `FilesContainers` and `NRS Map Containers` are abstractions created on top of the network's native `Public Sequence` data type. A `Public Sequence` is a very simple data type that allows the user to only append elements to it  once it has been created on the network.
+As mentioned before, `FilesContainers` and `NRS Map Containers` are abstractions created on top of the network's native `Public Sequence` data type. A `Public Sequence` is a very simple data type that allows the user to only append elements to it once it has been created on the network.
 
 Mutations made to `FilesContainers` and `NRS Map Containers` are made by storing the new version as a snapshot of the content and appended as a new item into its underlying `Public Sequence`. This is how these types of content are able to keep the complete history on the network.
 

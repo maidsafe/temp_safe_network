@@ -107,7 +107,7 @@ impl SafeAuthenticator {
                         "no SAFE account found with the passphrase provided".to_string()
                     }
                     AuthError::CoreError(CoreError::SymmetricDecipherFailure) => {
-                        "unable to login with the password provided".to_string()
+                        "unable to log in with the password provided".to_string()
                     }
                     other => other.to_string(),
                 };

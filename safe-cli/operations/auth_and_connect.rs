@@ -32,7 +32,7 @@ pub async fn authorise_cli(
     if !is_self_authing {
         println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth login' command to automatically self authorise the CLI app.");
     }
-    println!("Awaiting for authorising response from authd...");
+    println!("Waiting for authorising response from authd...");
     let auth_credentials = Safe::auth_app(APP_ID, APP_NAME, APP_VENDOR, endpoint.as_deref())
         .await
         .map_err(|err| format!("Application authorisation failed: {}", err))?;

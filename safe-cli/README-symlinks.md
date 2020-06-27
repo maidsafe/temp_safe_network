@@ -7,7 +7,7 @@
 
 ## What is a symlink?
 
-Symlinks have long been a feature of unix filesystems, and are now also
+Symlinks have long been a feature of Unix filesystems, and are now also
 available on Windows ([with some restrictions](#enabling-symlinks-on-windows)).
 A symlink is a special node in a filesystem that is neither a file or a
 directory, but rather points to a file or directory or another symlink, called
@@ -15,8 +15,8 @@ the target. Multiple symlinks may reference a single target. Symlinks are useful
 for creating shortcuts to any path in the filesystem.
 
 Symlinks may be either absolute or relative. A symlink is called absolute if the
-target path begins with the root of the filesystem, ie `/` in unix or `c:\` in
-windows. A symlink is called relative if target path is just a name, or begins
+target path begins with the root of the filesystem, ie `/` in Unix or `c:\` in
+Windows. A symlink is called relative if the target path is just a name, or begins
 with `./` or `../`, in which case the target location is relative to the
 symlink's path.
 
@@ -177,18 +177,18 @@ performed and it is stored as a symlink.
 
 A trait RealPath was added to FilesMap::realpath() for resolving paths
 containing ./ ../ and relative symlinks. This works like the standard realpath()
-function on a unix system, but understands structure/metadata in a FilesMap.
+function on a Unix system, but understands structure/metadata in a FilesMap.
 
 Safe::fetch() and Safe::inspect() APIs were modified to resolve URL paths via
 FilesMap::realpath()
 
-SafeUrl (XorUrlEncoder) now uses a different url parser to obtain the raw path,
+SafeUrl (XorUrlEncoder) now uses a different URL parser to obtain the raw path,
 because rust-url normalizes '../' away.
 
 ## Path Resolution
 
 If a SafeUrl contains a path component, the path will be resolved by
-FilesMap::realpath(), which is a SAFE Network adaptation of the standard unix
+FilesMap::realpath(), which is a SAFE Network adaptation of the standard Unix
 realpath() function. This function checks each component of the path from the
 beginning, and if it finds a relative symlink with a valid target, then it
 substitutes the target path and continues processing path components. Each
@@ -211,7 +211,7 @@ $ safe cat safe://hnyynyi9npmuhnsyfk5a31umcfh4macnwa5f4kq1wb7bhgpypnug6qgaqhbnc/
 ```
 
 In the above example, if the `../` were resolved from the path in the URL alone
-as per whatwg url spec and rust-url implementation, it would result in the final
+as per the WHATWG URL spec and the rust-url implementation, it would result in the final
 path `/hello.txt`, which does not exist in the FileContainer, so the `safe cat`
 command would fail. Instead, the resolver first resolves the `/level3` symlink
 to `/level2/level3`, then resolves `../` to `/level2` and finally appends
@@ -236,13 +236,13 @@ The relative symlinks test directory resides at path safe-api/test_symlinks.
 
 See [Integration Testing on Windows](#integration-testing-on-windows)
 
-## Windows specific behavior
+## Windows-specific behavior
 
 ### Symlink Creation APIs
 
-Rust has platform specific API's for creating symlinks.  On unix, a single API
+Rust has platform specific APIs for creating symlinks.  On Unix, a single API
 `std::os::unix::fs::symlink(target, link)` creates a symlink regardless of the
-target.  On windows, two API's exist:
+target.  On Windows, two APIs exist:
 
 ```
 std::os::windows::fs::symlink_file(target, link)
@@ -260,7 +260,7 @@ will skip the symlink and log/print a warning in this case.
 
 Git also supports symlinks and faces the same issue. When Git on windows fails
 to create a symlink, it falls back to creating a text file containing the target
-path instead. If the file gets changed/commited locally, git can translate that
+path instead. If the file gets changed/committed locally, git can translate that
 back into a symlink in the repository because it has metadata in the .git
 storage. safe-cli does not have this local metadata, so a download -> upload
 cycle would cause the original symlink to be uploaded (PUT) as a file instead of
