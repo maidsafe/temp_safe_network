@@ -202,7 +202,7 @@ impl EventStore {
                 self.group_changes.push(e);
             }
             ReplicaEvent::TransferPropagated(e) => {
-                let id = e.debit_proof.signed_transfer.transfer.to;
+                let id = e.to();
                 match self.streams.get_mut(&id) {
                     Some(stream) => stream.push(event),
                     None => {
@@ -212,14 +212,14 @@ impl EventStore {
                 }
             }
             ReplicaEvent::TransferValidated(e) => {
-                let id = e.signed_transfer.transfer.id.actor;
+                let id = e.from();
                 match self.streams.get_mut(&id) {
                     Some(stream) => stream.push(event),
                     None => return Err(Error::InvalidOperation), // A stream cannot start with a debit.
                 }
             }
             ReplicaEvent::TransferRegistered(e) => {
-                let id = e.debit_proof.signed_transfer.transfer.to;
+                let id = e.from();
                 match self.streams.get_mut(&id) {
                     Some(stream) => stream.push(event),
                     None => return Err(Error::InvalidOperation), // A stream cannot start with a debit.

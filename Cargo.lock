@@ -2032,7 +2032,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/maidsafe/safe-nd?branch=at2#3dd4f36945516399a7c4906ff8e1a3210f717f35"
+source = "git+https://github.com/maidsafe/safe-nd?branch=at2#d58a9e3786635fb55f0db17e824a85342e4b02d6"
 dependencies = [
  "bincode",
  "crdts",
