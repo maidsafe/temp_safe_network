@@ -14,7 +14,6 @@ use safe_nd::{
     Request, Response, SignedTransfer, XorName,
 };
 use std::fmt::{self, Display, Formatter};
-use threshold_crypto::PublicKeySet;
 
 #[cfg(not(feature = "simulated-payouts"))]
 use safe_nd::PublicKey;
@@ -194,9 +193,8 @@ impl Transfers {
     ) -> Option<Action> {
         match self.replica.register(proof) {
             Ok(_event) => {
-                let transfer = &proof.signed_transfer.transfer;
                 // sender is notified with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from(transfer.id.actor), proof);
+                messaging.notify_client(&XorName::from((&proof).from()), proof);
 
                 // the transfer is then propagated, and will reach the recipient section
                 Some(Action::ForwardClientRequest(Rpc::Request {
@@ -233,9 +231,8 @@ impl Transfers {
         // We will just validate the proofs and then apply the event.
         match self.replica.receive_propagated(proof) {
             Ok(_event) => {
-                let transfer = &proof.signed_transfer.transfer;
                 // notify recipient, with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from(transfer.to), proof);
+                messaging.notify_client(&XorName::from((&proof).to()), proof);
                 None
             }
             Err(err) => Some(Action::RespondToClientHandlers {
