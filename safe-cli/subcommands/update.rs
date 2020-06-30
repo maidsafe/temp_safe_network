@@ -9,14 +9,6 @@
 
 use log::debug;
 
-#[cfg(feature = "mock-network")]
-pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
-    debug!("The update command is not supported for the development build.");
-    println!("The update command is not supported for the development build.");
-    Ok(())
-}
-
-#[cfg(not(feature = "mock-network"))]
 pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     let target = self_update::get_target();
     let releases = self_update::backends::github::ReleaseList::configure()

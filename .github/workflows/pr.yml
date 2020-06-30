@@ -143,7 +143,7 @@ jobs:
 
       # Build dev native lib.
       - name: Build native lib - Dev
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=mock-network
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=scl-mock
 
       # Upload dev native lib.
       - name: Upload dev native lib
@@ -211,7 +211,7 @@ jobs:
       # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
-        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=mock-network
+        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=scl-mock
 
       # Upload dev universal library.
       - name: Upload dev universal lib
@@ -226,7 +226,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        component: [api-tests, cli-mock-tests, e2e-authd-mock-tests]
+        component: [api-mock-tests, cli-mock-tests]
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust

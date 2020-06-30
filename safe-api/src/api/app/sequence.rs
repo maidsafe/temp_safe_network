@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(any(feature = "mock-network", feature = "scl-mock")))]
+    #[cfg(not(feature = "scl-mock"))]
     async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
         let mut client1 = new_safe_instance().await?;
         let mut client2 = new_safe_instance().await?;

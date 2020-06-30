@@ -7,9 +7,4 @@ rm -f fake_vault_data.json
 cargo test --lib --release --features=scl-mock -- --test-threads=1
 rm -f fake_vault_data.json
 cargo test --doc --release --features=scl-mock -- --test-threads=1
-
-rm -f fake_vault_data.json
-cargo test --lib --release --features=mock-network,fake-auth -- --test-threads=1
-rm -f fake_vault_data.json
-cargo test --doc --release --features=mock-network,fake-auth -- --test-threads=1
 cd -

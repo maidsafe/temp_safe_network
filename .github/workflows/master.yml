@@ -133,7 +133,7 @@ jobs:
 
       # Build dev FFI lib
       - name: Build FFI lib - Dev
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --features=mock-network
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --features=scl-mock
 
       # Notarize FFI lib
       - name: Sign & Notarize
@@ -204,7 +204,7 @@ jobs:
       - name: Sign & Notarize
         shell: bash
         run: ./resources/notarize.sh ${{ matrix.target }}
-      
+
       # List contents of release folder
       - name: what is in release...
         shell: bash
@@ -298,7 +298,7 @@ jobs:
 
       # Build dev native lib.
       - name: Build native lib - Dev
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=mock-network
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=scl-mock
 
       # Upload dev native lib.
       - name: Upload dev native lib
@@ -367,7 +367,7 @@ jobs:
       # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
-        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=mock-network
+        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=scl-mock
 
       # Upload dev universal library.
       - name: Upload dev universal lib

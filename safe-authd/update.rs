@@ -8,19 +8,10 @@
 // Software.
 
 use log::debug;
-#[cfg(not(feature = "mock-network"))]
 use std::path::PathBuf;
-#[cfg(all(not(windows), not(feature = "mock-network")))]
+#[cfg(not(windows))]
 use std::{fs::File, os::unix::fs::PermissionsExt};
 
-#[cfg(feature = "mock-network")]
-pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
-    debug!("The update command is not supported for the development build.");
-    println!("The update command is not supported for the development build.");
-    Ok(())
-}
-
-#[cfg(not(feature = "mock-network"))]
 pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     let target = self_update::get_target();
     let releases = self_update::backends::s3::ReleaseList::configure()
@@ -62,14 +53,14 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     Ok(())
 }
 
-#[cfg(all(windows, not(feature = "mock-network")))]
+#[cfg(windows)]
 #[inline]
 fn set_exec_perms(_file_path: PathBuf) -> Result<(), String> {
     // no need to set execution permissions on Windows
     Ok(())
 }
 
-#[cfg(all(not(windows), not(feature = "mock-network")))]
+#[cfg(not(windows))]
 #[inline]
 fn set_exec_perms(file_path: PathBuf) -> Result<(), String> {
     println!(

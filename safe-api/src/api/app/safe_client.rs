@@ -7,7 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-#[cfg(not(feature = "fake-auth"))]
 use super::helpers::{decode_ipc_msg, AuthResponseType};
 use super::{
     fetch::Range,
@@ -17,8 +16,6 @@ use super::{
 use crate::{Error, Result};
 use async_trait::async_trait;
 use log::{debug, info, warn};
-#[cfg(feature = "fake-auth")]
-use safe_app::test_utils::create_app;
 use safe_app::App;
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
@@ -75,15 +72,7 @@ impl SafeApp for SafeAppScl {
         Self { safe_conn: None }
     }
 
-    #[cfg(feature = "fake-auth")]
-    async fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
-        warn!("Using fake authorisation for testing...");
-        self.safe_conn = Some(create_app().await);
-        Ok(())
-    }
-
     // Connect to the SAFE Network using the provided app id and auth credentials
-    #[cfg(not(feature = "fake-auth"))]
     async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 

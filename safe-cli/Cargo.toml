@@ -42,8 +42,6 @@ console = "~0.10.0"
 percent-encoding = "2.1.0"
 
 [features]
-mock-network = ["safe-api/mock-network"]
-fake-auth = ["safe-api/fake-auth"]
 scl-mock = ["safe-api/scl-mock"]
 
 [dependencies.safe-api]

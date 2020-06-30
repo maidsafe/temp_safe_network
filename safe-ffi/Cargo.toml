@@ -40,6 +40,5 @@ safe-nd = "~0.10.0"
 unwrap = "1.2.1"
 
 [features]
-mock-network = ["safe-api/mock-network", "safe_authenticator_ffi/mock-network"]
-fake-auth = ["safe-api/fake-auth"]
 bindings = ["safe_bindgen"]
+scl-mock = ["safe-api/scl-mock", "safe_authenticator_ffi/mock-network"]

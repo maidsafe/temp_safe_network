@@ -29,9 +29,6 @@ url = "2.1.1"
 urlencoding = "1.0.0"
 quinn = {version = "~0.6.1", features=["tls-rustls"], default-features = false}
 
-[features]
-mock-network = ["safe-api/mock-network"]
-
 [dependencies.safe-api]
 path = "../safe-api"
 default-features = false

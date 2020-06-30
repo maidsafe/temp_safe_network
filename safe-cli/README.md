@@ -106,7 +106,7 @@ If otherwise you prefer to build the SAFE CLI from source code, please follow th
 
 ## Build
 
-In order to build this CLI from source code you need to make sure you have `rustc v1.41.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this CLI from source code you need to make sure you have `rustc v1.44.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-cli` (the build process may take several minutes the first time you run it on this crate):
 ```shell
@@ -116,21 +116,6 @@ $ cargo build
 ```
 
 Since this project has a cargo workspace with the `safe-cli` as the default crate, when building from the root location it will build the SAFE CLI. Once it's built, you can find the `safe` executable at `target/debug/` or `target/release` if you built it with the `--release` flag.
-
-### Using the Mock or Non-Mock SAFE Network
-
-By default, the `safe-cli` is built with [Non-Mock libraries](https://github.com/maidsafe/safe_client_libs/wiki/Mock-vs.-non-mock). If you are intending to use it with the `Mock` network you'll need to specify the `mock-network` feature in every command you run with `cargo`, e.g. to build it for the `Mock` network you can run:
-```
-$ cd safe-cli
-$ cargo build --features mock-network
-```
-
-Keep in mind that if you run the `safe-cli` with `cargo run`, you also need to make sure to set the `mock-network` feature if you want to use the `Mock` network, e.g. with the following command the `safe-cli` will try to create a `SafeKey` with test-coins on the `Mock` network:
-```
-$ cargo run --features mock-network -- keys create --test-coins
-```
-
-Also note you need to be within the `safe-cli` folder to be able to pass the `--features` argument to `cargo`.
 
 ## Using the CLI
 
