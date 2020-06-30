@@ -197,6 +197,34 @@ impl Drop for NrsMapContainer {
 }
 
 #[repr(C)]
+pub struct SequenceData {
+    pub xorurl: *const c_char,
+    pub xorname: XorNameArray,
+    pub type_tag: u64,
+    pub version: u64,
+    pub data: *const u8,
+    pub data_len: usize,
+    pub resolved_from: *const c_char,
+    pub is_private: bool,
+}
+
+impl Drop for SequenceData {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.xorurl.is_null() {
+                let _ = CString::from_raw(self.xorurl as *mut _);
+            }
+
+            if !self.resolved_from.is_null() {
+                let _ = CString::from_raw(self.resolved_from as *mut _);
+            }
+
+            let _ = vec_from_raw_parts(self.data as *mut u8, self.data_len);
+        }
+    }
+}
+
+#[repr(C)]
 #[derive(Debug)]
 pub struct SafeUrl {
     pub encoding_version: u64,

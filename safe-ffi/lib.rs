@@ -23,6 +23,7 @@ pub use ffi::ipc::*;
 pub use ffi::keys::*;
 pub use ffi::logging::*;
 pub use ffi::nrs::*;
+pub use ffi::sequence::*;
 pub use ffi::wallet::*;
 pub use ffi::xorurl::*;
 pub use ffi::*;

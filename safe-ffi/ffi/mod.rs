@@ -20,6 +20,7 @@ pub mod ipc;
 pub mod keys;
 pub mod logging;
 pub mod nrs;
+pub mod sequence;
 pub mod wallet;
 pub mod xorurl;
 

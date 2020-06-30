@@ -12,7 +12,7 @@ use super::{
     errors::{Error, Result},
     ffi_structs::{
         files_map_into_repr_c, wallet_spendable_balances_into_repr_c, FilesContainer,
-        NrsMapContainer, PublicImmutableData, SafeKey, Wallet,
+        NrsMapContainer, PublicImmutableData, SafeKey, SequenceData, Wallet,
     },
 };
 use ffi_utils::{
@@ -29,14 +29,15 @@ pub unsafe extern "C" fn fetch(
     user_data: *mut c_void,
     start: u64,
     end: u64,
-    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
-    o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
-    o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
-    o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
-    o_nrs_map_container: extern "C" fn(user_data: *mut c_void, data: *const NrsMapContainer),
-    o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
+    published_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
+    sequence_cb: extern "C" fn(user_data: *mut c_void, data: *const SequenceData),
+    wallet_cb: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
+    keys_cb: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
+    container_cb: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
+    nrs_map_container_cb: extern "C" fn(user_data: *mut c_void, data: *const NrsMapContainer),
+    err_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) {
-    catch_unwind_cb(user_data, o_err, || -> Result<()> {
+    catch_unwind_cb(user_data, err_cb, || -> Result<()> {
         let url = String::clone_from_repr_c(url)?;
         let start = if start == FILE_READ_FROM_START {
             None
@@ -53,12 +54,13 @@ pub unsafe extern "C" fn fetch(
         invoke_callback(
             content,
             user_data,
-            o_published,
-            o_wallet,
-            o_keys,
-            o_container,
-            o_nrs_map_container,
-            o_err,
+            published_cb,
+            sequence_cb,
+            wallet_cb,
+            keys_cb,
+            container_cb,
+            nrs_map_container_cb,
+            err_cb,
         )
     })
 }
@@ -88,12 +90,13 @@ pub unsafe extern "C" fn inspect(
 unsafe fn invoke_callback(
     content: safe_api::Result<SafeData>,
     user_data: *mut c_void,
-    o_published: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
-    o_wallet: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
-    o_keys: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
-    o_container: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
-    o_nrs_map_container: extern "C" fn(user_data: *mut c_void, data: *const NrsMapContainer),
-    o_err: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
+    published_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
+    sequence_cb: extern "C" fn(user_data: *mut c_void, data: *const SequenceData),
+    wallet_cb: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
+    keys_cb: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
+    container_cb: extern "C" fn(user_data: *mut c_void, data: *const FilesContainer),
+    nrs_map_container_cb: extern "C" fn(user_data: *mut c_void, data: *const NrsMapContainer),
+    err_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult),
 ) -> Result<()> {
     let user_data = OpaqueCtx(user_data);
     match &content {
@@ -123,7 +126,7 @@ unsafe fn invoke_callback(
                 },
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            o_published(user_data.0, &public_data);
+            published_cb(user_data.0, &public_data);
         }
         Ok(SafeData::FilesContainer {
             xorurl,
@@ -143,7 +146,7 @@ unsafe fn invoke_callback(
                 data_type: (*data_type).clone() as u64,
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            o_container(user_data.0, &container);
+            container_cb(user_data.0, &container);
         }
         Ok(SafeData::Wallet {
             xorurl,
@@ -161,7 +164,7 @@ unsafe fn invoke_callback(
                 data_type: (*data_type).clone() as u64,
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            o_wallet(user_data.0, &wallet);
+            wallet_cb(user_data.0, &wallet);
         }
         Ok(SafeData::SafeKey {
             xorurl,
@@ -173,7 +176,7 @@ unsafe fn invoke_callback(
                 xorname: xorname.0,
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            o_keys(user_data.0, &keys);
+            keys_cb(user_data.0, &keys);
         }
         Ok(SafeData::NrsMapContainer {
             public_name,
@@ -197,16 +200,49 @@ unsafe fn invoke_callback(
                 data_type: (*data_type).clone() as u64,
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            o_nrs_map_container(user_data.0, &nrs_map_container);
+            nrs_map_container_cb(user_data.0, &nrs_map_container);
         }
-        Ok(SafeData::PublicSequence { .. }) | Ok(SafeData::PrivateSequence { .. }) => {
-            let ffi_result = NativeResult {
-                error_code: 0,
-                description: Some(
-                    "Sequence not supported yet to be fetched through FFI API".to_string(),
-                ),
+        Ok(SafeData::PublicSequence {
+            xorurl,
+            xorname,
+            type_tag,
+            version,
+            data,
+            resolved_from,
+        }) => {
+            let (data, data_len) = vec_into_raw_parts(data.to_vec());
+            let seq_data = SequenceData {
+                xorurl: CString::new(xorurl.clone())?.into_raw(),
+                xorname: xorname.0,
+                type_tag: *type_tag,
+                version: *version,
+                data,
+                data_len,
+                resolved_from: CString::new(resolved_from.clone())?.into_raw(),
+                is_private: false,
             };
-            o_err(user_data.0, &ffi_result.into_repr_c()?);
+            sequence_cb(user_data.0, &seq_data);
+        }
+        Ok(SafeData::PrivateSequence {
+            xorurl,
+            xorname,
+            type_tag,
+            version,
+            data,
+            resolved_from,
+        }) => {
+            let (data, data_len) = vec_into_raw_parts(data.to_vec());
+            let seq_data = SequenceData {
+                xorurl: CString::new(xorurl.clone())?.into_raw(),
+                xorname: xorname.0,
+                type_tag: *type_tag,
+                version: *version,
+                data,
+                data_len,
+                resolved_from: CString::new(resolved_from.clone())?.into_raw(),
+                is_private: true,
+            };
+            sequence_cb(user_data.0, &seq_data);
         }
         Err(err) => {
             let (error_code, description) = ffi_error!(Error::from(err.clone()));
@@ -214,7 +250,7 @@ unsafe fn invoke_callback(
                 error_code,
                 description: Some(description),
             };
-            o_err(user_data.0, &ffi_result.into_repr_c()?);
+            err_cb(user_data.0, &ffi_result.into_repr_c()?);
         }
     };
     Ok(())
