@@ -20,6 +20,7 @@ use safe_nd::PublicKey;
 
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
+use threshold_crypto::{PublicKeySet, SecretKeyShare};
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -51,6 +52,15 @@ impl Transfers {
         Self { id, replica }
     }
 
+    pub fn update_replica_keys(
+        &mut self,
+        pub_key_set: PublicKeySet,
+        sec_key_share: SecretKeyShare,
+        index: usize,
+    ) -> Option<()> {
+        self.replica.churn(sec_key_share, index, pub_key_set).ok()
+    }
+
     /// Elders that aren't in the dst
     /// section, will forward the request.
     pub(super) fn process_client_request(
@@ -63,6 +73,7 @@ impl Transfers {
             request: Request::Money(request),
             requester: client.public_id.clone(),
             message_id,
+            signature: None,
         }))
     }
 
@@ -178,6 +189,7 @@ impl Transfers {
                 requester: requester.clone(),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -203,6 +215,7 @@ impl Transfers {
                     }),
                     requester: requester.clone(),
                     message_id,
+                    signature: None,
                 }))
             }
             Err(err) => Some(Action::RespondToClientHandlers {
@@ -212,6 +225,7 @@ impl Transfers {
                     requester: requester.clone(),
                     message_id,
                     refund: None,
+                    proof: None,
                 },
             }),
         }
@@ -242,6 +256,7 @@ impl Transfers {
                     requester: requester.clone(),
                     message_id,
                     refund: None,
+                    proof: None,
                 },
             }),
         }

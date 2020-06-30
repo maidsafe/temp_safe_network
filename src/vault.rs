@@ -24,7 +24,7 @@ use routing::{
     TransportEvent as ClientEvent,
 };
 use safe_nd::{
-    ClientRequest, LoginPacketRequest, MoneyRequest, NodeFullId, PublicId, Request, Response, XorName,
+    ClientRequest, LoginPacketRequest, NodeFullId, PublicId, Request, Response, XorName,
 };
 use std::borrow::Cow;
 use std::{
@@ -391,6 +391,28 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     None
                 },
             ),
+            RoutingEvent::MessageReceived { content, src, dst } => {
+                info!(
+                    "Received message: {:8?}\n Sent from {:?} to {:?}",
+                    HexFmt(&content),
+                    src,
+                    dst
+                );
+                self.handle_routing_message(src, content)
+            }
+            RoutingEvent::EldersChanged { .. } => {
+                // Update our replica with the latest keys
+                let pub_key_set = self.routing_node.borrow().public_key_set().ok()?.clone();
+                let sec_key_share = self.routing_node.borrow().secret_key_share().ok()?.clone();
+                let our_index = self.routing_node.borrow().our_index().ok()?;
+                self.client_handler_mut()?
+                    .update_replica_keys(pub_key_set, sec_key_share, our_index)
+                    .or_else(|| {
+                        error!("{}: Error updating replica keys after churn", self);
+                        None
+                    })?;
+                None
+            }
             // Ignore all other events
             _ => None,
         }
@@ -667,18 +689,17 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 } => self
                     .client_handler_mut()?
                     .handle_vault_rpc(requester_name, rpc),
-                    _data_request => self.data_handler_mut()?.handle_vault_rpc(
+                _data_request => self.data_handler_mut()?.handle_vault_rpc(
                     SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
                     rpc,
                     None,
-                    ),
-                }
-            } else {
-                error!("{}: Logic error - unexpected RPC.", self);
-                None
-            }
+                ),
+            };
+        } else {
+            error!("{}: Logic error - unexpected RPC.", self);
+            None
         }
-
+    }
 
     fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {
         let requester_name = utils::requester_address(&rpc);

@@ -42,6 +42,7 @@ use std::{
     net::SocketAddr,
     rc::Rc,
 };
+use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
 /// The cost to Put a chunk to the network.
 pub const COST_OF_PUT: Money = Money::from_nano(1);
@@ -99,6 +100,16 @@ impl ClientHandler {
         Ok(client_handler)
     }
 
+    pub fn update_replica_keys(
+        &mut self,
+        pub_key_set: PublicKeySet,
+        sec_key_share: SecretKeyShare,
+        index: usize,
+    ) -> Option<()> {
+        self.transfers
+            .update_replica_keys(pub_key_set, sec_key_share, index)
+    }
+
     pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
         self.messaging.respond_to_client(message_id, response);
     }
@@ -144,17 +155,20 @@ impl ClientHandler {
                 response,
                 requester,
                 message_id,
-                refund,
+                refund: _,
                 ..
             } => {
+                // TODO: FIX AT2 REFUNDS HERE
+                /*
                 if let Some(refund_amount) = refund {
-                    if let Err(error) = self.balances.deposit(requester.name(), refund_amount) {
+                    if let Err(error) = self.transfers.deposit(requester.name(), refund_amount) {
                         error!(
                             "{}: Failed to refund {} coins for {:?}: {:?}",
-                            self, refund_amount, requester, error,
+                            self, refund_amount.signed_transfer.transfer.amount, requester, error,
                         )
                     };
                 }
+                */
 
                 self.messaging
                     .relay_reponse_to_client(src, &requester, response, message_id)

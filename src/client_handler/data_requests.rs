@@ -202,7 +202,7 @@ impl Immutable {
         use IDataRequest::*;
         match request {
             Put { data, debit_proof } => {
-                self.initiate_creation(client, data, message_id, debit_proof.unwrap())
+                self.initiate_creation(client, data, message_id, debit_proof)
             }
             Get(address) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
@@ -262,7 +262,7 @@ impl Immutable {
 
         let request = Request::IData(IDataRequest::Put {
             data: chunk,
-            debit_proof: Some(debit_proof.clone()),
+            debit_proof: debit_proof.clone(),
         });
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,

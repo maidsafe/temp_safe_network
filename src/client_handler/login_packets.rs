@@ -154,6 +154,7 @@ impl LoginPackets {
                         }),
                         requester,
                         message_id,
+                        signature: None,
                     }));
                 } else {
                     self.finalise_proxied_creation(
@@ -264,6 +265,7 @@ impl LoginPackets {
                 requester: payer,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }

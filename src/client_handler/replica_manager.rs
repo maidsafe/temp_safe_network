@@ -30,7 +30,7 @@ pub(super) struct ReplicaManager {
 
 #[allow(unused)]
 impl ReplicaManager {
-    pub fn new(
+    pub(crate) fn new(
         secret_key: &SecretKeyShare,
         key_index: usize,
         peer_replicas: &PublicKeySet,
@@ -55,15 +55,15 @@ impl ReplicaManager {
         }
     }
 
-    pub fn history(&self, id: &AccountId) -> Option<&Vec<ReplicaEvent>> {
+    pub(crate) fn history(&self, id: &AccountId) -> Option<&Vec<ReplicaEvent>> {
         self.store.history(id)
     }
 
-    pub fn balance(&self, id: &AccountId) -> Option<Money> {
+    pub(crate) fn balance(&self, id: &AccountId) -> Option<Money> {
         self.replica.balance(id)
     }
 
-    fn churn(
+    pub(crate) fn churn(
         &mut self,
         secret_key: SecretKeyShare,
         index: usize,
@@ -78,7 +78,7 @@ impl ReplicaManager {
         }
     }
 
-    pub fn validate(&mut self, transfer: SignedTransfer) -> Result<TransferValidated> {
+    pub(crate) fn validate(&mut self, transfer: SignedTransfer) -> Result<TransferValidated> {
         let event = self.replica.validate(transfer)?;
         match self.persist(ReplicaEvent::TransferValidated(event.clone())) {
             Ok(()) => Ok(event),
@@ -86,7 +86,7 @@ impl ReplicaManager {
         }
     }
 
-    pub fn register(&mut self, proof: &DebitAgreementProof) -> Result<TransferRegistered> {
+    pub(crate) fn register(&mut self, proof: &DebitAgreementProof) -> Result<TransferRegistered> {
         let event = self.replica.register(proof)?;
         match self.persist(ReplicaEvent::TransferRegistered(event.clone())) {
             Ok(()) => Ok(event),
@@ -94,7 +94,7 @@ impl ReplicaManager {
         }
     }
 
-    pub fn receive_propagated(
+    pub(crate) fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,
     ) -> Result<TransferPropagated> {
@@ -158,6 +158,7 @@ impl ReplicaManager {
                 requester,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }

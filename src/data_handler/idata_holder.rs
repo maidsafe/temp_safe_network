@@ -13,8 +13,8 @@ use log::{error, info};
 
 use routing::SrcLocation;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
-    XorName,
+    DebitAgreementProof, Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId,
+    Request, Response, XorName,
 };
 use std::{
     cell::Cell,
@@ -55,6 +55,7 @@ impl IDataHolder {
         message_id: MessageId,
         accumulated_signature: Option<Signature>,
         request: Request,
+        debit_proof: Option<DebitAgreementProof>,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             info!(
@@ -68,7 +69,12 @@ impl IDataHolder {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        let refund = utils::get_refund_for_put(&result);
+
+        let refund = if let Some(proof) = debit_proof {
+            utils::get_refund_for_put(&result, proof)
+        } else {
+            None
+        };
 
         match sender {
             SrcLocation::Node(_) => Some(Action::RespondToOurDataHandlers {

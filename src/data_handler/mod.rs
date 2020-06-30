@@ -99,7 +99,6 @@ impl DataHandler {
                 address,
                 holders,
                 message_id,
-                refund,
                 ..
             } => self.handle_duplicate_request(address, holders, message_id, accumulated_signature),
             Rpc::DuplicationComplete {
@@ -211,7 +210,7 @@ impl DataHandler {
         match request.clone() {
             IData(idata_req) => {
                 match idata_req {
-                    IDataRequest::Put(data) => {
+                    IDataRequest::Put { data, debit_proof } => {
                         if src.is_section() {
                             // Since the requester is a section, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the
@@ -227,6 +226,7 @@ impl DataHandler {
                                     message_id,
                                     accumulated_signature,
                                     request,
+                                    Some(debit_proof),
                                 )
                             } else {
                                 error!("Accumulated signature for {:?} is invalid!", &message_id);
@@ -234,8 +234,13 @@ impl DataHandler {
                             }
                         } else {
                             self.handle_idata_request(|idata_handler| {
-                                idata_handler
-                                    .handle_put_idata_req(requester, data, message_id, request)
+                                idata_handler.handle_put_idata_req(
+                                    requester,
+                                    data,
+                                    message_id,
+                                    request,
+                                    debit_proof,
+                                )
                             })
                         }
                     }
@@ -406,6 +411,7 @@ impl DataHandler {
                                 message_id,
                                 Some(signature),
                                 request,
+                                None,
                             )
                         } else {
                             None

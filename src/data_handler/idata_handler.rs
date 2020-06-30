@@ -88,13 +88,14 @@ impl IDataHandler {
         data: IData,
         message_id: MessageId,
         request: Request,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            let refund = utils::get_refund_for_put(&result, debit_proof.clone());
+            let refund = utils::get_refund_for_put(&result, debit_proof);
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
@@ -355,7 +356,7 @@ impl IDataHandler {
         request: Request,
     ) -> Option<Action> {
         match &request {
-            Request::IData(IDataRequest::Put(data)) => {
+            Request::IData(IDataRequest::Put { data, .. }) => {
                 self.handle_put_idata_resp(*data.address(), sender, &result, message_id, requester)
             }
             Request::IData(IDataRequest::DeleteUnpub(address)) => {
@@ -424,7 +425,6 @@ impl IDataHandler {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
 
-<<<<<<< HEAD
         // Should we wait for multiple responses
         Some(Action::RespondToClientHandlers {
             sender: *idata_address.name(),
@@ -436,39 +436,6 @@ impl IDataHandler {
                 proof: None,
             },
         })
-=======
-        if is_idata_copy_op {
-            trace!("Duplication operation completed for : {:?}", idata_address);
-            let _ = self.idata_elder_ops.remove(&message_id);
-            let _ = self.remove_idata_op_if_concluded(&message_id);
-            None
-        } else {
-            self.remove_idata_op_if_concluded(&message_id)
-                .map(|idata_op| Action::RespondToClientHandlers {
-                    sender: *idata_address.name(),
-                    rpc: Rpc::Response {
-                        requester: idata_op.client().clone(),
-                        response: Response::Mutation(Ok(())),
-                        message_id,
-                        refund: None,
-                    },
-                })
-        }
-<<<<<<< HEAD
-=======
-        self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| Action::RespondToClientHandlers {
-                sender: *idata_address.name(),
-                rpc: Rpc::Response {
-                    requester: idata_op.client().clone(),
-                    response: Response::Mutation(Ok(())),
-                    message_id,
-                },
-            })
->>>>>>> add initial at2-inspired parts
->>>>>>> add initial at2-inspired parts
-=======
->>>>>>> fix/all: rebase at2-vault on top of phase2b-testnet
     }
 
     pub(super) fn handle_delete_unpub_idata_resp(
@@ -532,7 +499,6 @@ impl IDataHandler {
             };
         }
 
-<<<<<<< HEAD
         // TODO: Different responses from adults?
         Some(Action::RespondToClientHandlers {
             sender: *idata_address.name(),
@@ -546,34 +512,6 @@ impl IDataHandler {
                 proof: None,
             },
         })
-=======
-        self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| {
-                let response = {
-                    let errors_for_req = idata_op.get_any_errors();
-                    assert!(
-                        errors_for_req.len() <= 1,
-                        "Handling more than one response is not implemented."
-                    );
-                    if let Some(response) = errors_for_req.values().next() {
-                        Err(response.clone())
-                    } else {
-                        Ok(())
-                    }
-                };
-                Action::RespondToClientHandlers {
-                    sender: *idata_address.name(),
-                    rpc: Rpc::Response {
-                        requester: idata_op.client().clone(),
-                        response: Response::Mutation(response),
-                        message_id,
-                        // Deleting data is free so, no refund
-                        // This field can be put to use when deletion is incentivised
-                        refund: None,
-                    },
-                }
-            })
->>>>>>> add initial at2-inspired parts
     }
 
     pub(super) fn handle_get_idata_resp(
@@ -583,7 +521,6 @@ impl IDataHandler {
         requester: PublicId,
         proof: (Request, Signature),
     ) -> Option<Action> {
-<<<<<<< HEAD
         let response = Response::GetIData(result);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
@@ -595,86 +532,6 @@ impl IDataHandler {
                 proof: Some(proof),
             },
         })
-=======
-        let own_id = format!("{}", self);
-        let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
-
-        let action = if is_idata_copy_op {
-            info!("Holder {:?} responded with chunk for duplication", sender);
-
-            match result {
-                Ok(idata) => {
-                    let _ = self.idata_elder_ops.remove(&message_id);
-                    let _ = self.idata_client_ops.remove(&message_id);
-
-                    // Send PUT requests to holders to store a new copy of the chunk.
-                    // Use the address of the data as a seed to generate a unique ID on all data handlers.
-                    // This is only used for the requester field and it should not be used for encryption / signing.
-                    let mut rng = rand::rngs::StdRng::from_seed(idata.address().name().0);
-                    let node_id = NodeFullId::new(&mut rng);
-                    let requester = PublicId::Node(node_id.public_id().clone());
-
-                    // Hash the old message ID with the IData address for a unique MessageID
-                    let mut hash_bytes = Vec::new();
-                    hash_bytes.extend_from_slice(&(message_id.0).0);
-                    hash_bytes.extend_from_slice(&idata.address().name().0);
-                    let new_msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
-                    trace!(
-                        "Generated MsgID {:?} & NodeID {:?} to store additional chunk copy",
-                        &message_id,
-                        &requester
-                    );
-                    let new_holders = self.get_new_holders_for_chunk(idata.address());
-
-                    let idata_op = IDataOp::new(
-                        requester.clone(),
-                        IDataRequest::Put {
-                            data: idata,
-                            debit_proof: None, // FIXME: refunds
-                        },
-                        new_holders.clone(),
-                    );
-
-                    match self.idata_client_ops.entry(new_msg_id) {
-                        Entry::Occupied(_) => None,
-                        Entry::Vacant(vacant_entry) => {
-                            let _ = self.idata_elder_ops.insert(new_msg_id);
-                            let idata_op = vacant_entry.insert(idata_op);
-                            Some(Action::SendToPeers {
-                                sender: *self.id.name(),
-                                targets: new_holders,
-                                rpc: Rpc::Request {
-                                    request: Request::IData(idata_op.request().clone()),
-                                    requester,
-                                    message_id: new_msg_id,
-                                },
-                            })
-                        }
-                    }
-                }
-                Err(_) => None,
-            }
-        } else {
-            self.idata_op_mut(&message_id)
-                .and_then(|idata_op| {
-                    idata_op.handle_get_idata_resp(sender, result.clone(), &own_id, message_id)
-                })
-                .or_else(|| {
-                    // The response arrived before this particular vault processed the request
-                    // Note that for get responses we hold only one early response
-                    if let Entry::Vacant(vacant_entry) = self.early_responses.entry(message_id) {
-                        let _ =
-                            vacant_entry.insert(vec![(sender, IDataResult::Get(result.clone()))]);
-                    }
-                    trace!("Added early response for message ID: {:?}", message_id);
-                    trace!("Current: {:?}", self.early_responses.get(&message_id));
-                    None
-                })
-        };
-
-        let _ = self.remove_idata_op_if_concluded(&message_id);
-        action
->>>>>>> fix/at2: update payment, login_packet and refunds flows for data PUTs and Mutations according to AT2 method
     }
 
     // Updates the metadata of the chunks help by a node that left.

@@ -321,7 +321,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbe3a81de7c6d486b5087559d310092b053e7e9fddefe5257b745a233b2a66a7"
 dependencies = [
  "bitvec",
- "num-bigint",
+ "num-bigint 0.2.6",
  "quickcheck",
  "rand 0.7.3",
  "serde",
@@ -841,6 +841,12 @@ dependencies = [
 
 [[package]]
 name = "hex"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6a22814455d41612f41161581c2883c0c6a1c41852729b17d5ed88f01e153aa"
+
+[[package]]
+name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
@@ -850,6 +856,12 @@ name = "hex"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
+
+[[package]]
+name = "hex_fmt"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "879eb6cb1d33ed9e8926ee5db25db12acead81020c991009f41a934364fb04da"
 
 [[package]]
 name = "hex_fmt"
@@ -1235,7 +1247,7 @@ dependencies = [
 [[package]]
 name = "mock-quic-p2p"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p#7610eb8d322feb77fcc97913c59e288209605cbe"
+source = "git+https://github.com/maidsafe/quic-p2p#a1ed4c4284445194caad7728f065ccc851c4e3ba"
 dependencies = [
  "bytes 0.5.5",
  "crossbeam-channel",
@@ -1284,6 +1296,17 @@ name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg 1.0.0",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7f3fc75e3697059fb1bc465e3d8cca6cf92f56854f201158b3f9c77d5a3cfa0"
 dependencies = [
  "autocfg 1.0.0",
  "num-integer",
@@ -1514,8 +1537,9 @@ dependencies = [
 
 [[package]]
 name = "quic-p2p"
-version = "0.6.2"
-source = "git+https://github.com/maidsafe/quic-p2p?rev=7610eb8#7610eb8d322feb77fcc97913c59e288209605cbe"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea016023972754185c58c0ce82b51866fc665aac3fa827c0df2477e6845698fc"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -1940,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/yoga07/routing?branch=transfers#8a2aab26a6a0eadb37481e6e8ad94cad23c247e3"
+source = "git+https://github.com/yoga07/routing?branch=chain#0fe65d10f41a7d7c061ceaf7b234fed88a1d63a3"
 dependencies = [
  "bincode",
  "bytes 0.5.5",
@@ -1953,13 +1977,13 @@ dependencies = [
  "fake_clock",
  "fxhash",
  "hex 0.4.2",
- "hex_fmt",
+ "hex_fmt 0.3.0",
  "itertools 0.9.0",
  "lazy_static",
  "log 0.4.8",
  "lru_time_cache",
  "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p)",
- "num-bigint",
+ "num-bigint 0.2.6",
  "parsec",
  "quic-p2p",
  "rand 0.6.5",
@@ -1970,6 +1994,7 @@ dependencies = [
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
+ "xor_name",
 ]
 
 [[package]]
@@ -2032,12 +2057,12 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/maidsafe/safe-nd?branch=at2#d58a9e3786635fb55f0db17e824a85342e4b02d6"
+source = "git+https://github.com/yoga07/safe-nd?branch=at2#0587e5655e772c82e84f0c1cfce4d74f069c526e"
 dependencies = [
  "bincode",
  "crdts",
  "ed25519-dalek 0.9.1",
- "hex_fmt",
+ "hex_fmt 0.3.0",
  "multibase",
  "rand 0.6.5",
  "serde",
@@ -2050,11 +2075,12 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-transfers#bb0350b2ffaca6741e1ebc237b98383d8f6f9c35"
+source = "git+https://github.com/joshuef/safe-transfers?branch=Fix-FixAccumulationAndTransferLogix#12e44cbeb24c438c2f4762a3f551eac9405bda19"
 dependencies = [
  "bincode",
  "crdts",
  "itertools 0.9.0",
+ "log 0.4.8",
  "rand 0.6.5",
  "safe-nd",
  "serde",
@@ -2077,7 +2103,7 @@ dependencies = [
  "flexi_logger",
  "fxhash",
  "hex 0.3.2",
- "hex_fmt",
+ "hex_fmt 0.3.0",
  "lazy_static",
  "log 0.4.8",
  "maplit",
@@ -2428,7 +2454,7 @@ dependencies = [
  "byteorder",
  "errno",
  "failure",
- "hex_fmt",
+ "hex_fmt 0.3.0",
  "log 0.4.8",
  "memsec",
  "pairing",
@@ -2867,6 +2893,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77a607efe600db25447a8d9bab1f39217a82c4ba160b51b027d7c4f6053004df"
 dependencies = [
  "xml-rs",
+]
+
+[[package]]
+name = "xor_name"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8327d5c76a9c91ff6921a080e7b3920643fad8fa238629597a9644cf74bdcab0"
+dependencies = [
+ "bincode",
+ "hex 0.2.0",
+ "hex_fmt 0.1.0",
+ "log 0.4.8",
+ "num-bigint 0.3.0",
+ "rand 0.7.3",
+ "serde",
 ]
 
 [[package]]
