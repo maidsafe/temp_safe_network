@@ -207,6 +207,13 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         component: [api-mock-tests, cli-mock-tests]
     steps:
+      # Set git to checkout symlinks correctly on Windows only
+      # Otherwise the symlinks aren't created and tests fail
+      - name: Set git to checkout symlinks correctly on Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: git config --global --add core.symlinks true
+
       - uses: actions/checkout@v1
       - name: Install Rust
         uses: actions-rs/toolchain@v1
