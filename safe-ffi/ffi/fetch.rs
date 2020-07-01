@@ -29,7 +29,7 @@ pub unsafe extern "C" fn fetch(
     user_data: *mut c_void,
     start: u64,
     end: u64,
-    published_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
+    public_immutable_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
     sequence_cb: extern "C" fn(user_data: *mut c_void, data: *const SequenceData),
     wallet_cb: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
     keys_cb: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn fetch(
         invoke_callback(
             content,
             user_data,
-            published_cb,
+            public_immutable_cb,
             sequence_cb,
             wallet_cb,
             keys_cb,
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn inspect(
 unsafe fn invoke_callback(
     content: safe_api::Result<SafeData>,
     user_data: *mut c_void,
-    published_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
+    public_immutable_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
     sequence_cb: extern "C" fn(user_data: *mut c_void, data: *const SequenceData),
     wallet_cb: extern "C" fn(user_data: *mut c_void, data: *const Wallet),
     keys_cb: extern "C" fn(user_data: *mut c_void, data: *const SafeKey),
@@ -126,7 +126,7 @@ unsafe fn invoke_callback(
                 },
                 resolved_from: CString::new(resolved_from.clone())?.into_raw(),
             };
-            published_cb(user_data.0, &public_data);
+            public_immutable_cb(user_data.0, &public_data);
         }
         Ok(SafeData::FilesContainer {
             xorurl,
