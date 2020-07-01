@@ -387,7 +387,7 @@ impl Connected {
         trace!("Sending message {:?}", msg_id);
 
         let (sender_future, response_future) = mpsc::unbounded();
-        let expected_responses = if is_get_request(&msg) {
+        let expected_responses = if is_read(&msg) {
             self.elders.len()
         } else {
             self.elders.len() / 2 + 1
@@ -487,11 +487,11 @@ impl Connected {
     }
 }
 
-// Returns true when a message holds a GET request.
-fn is_get_request(msg: &Message) -> bool {
+// Returns true when a message is a request to read.
+fn is_read(msg: &Message) -> bool {
     if let Message::Request { request, .. } = msg {
         match request.get_type() {
-            RequestType::PublicGet | RequestType::PrivateGet => true,
+            RequestType::PublicRead | RequestType::PrivateRead => true,
             _ => false,
         }
     } else {

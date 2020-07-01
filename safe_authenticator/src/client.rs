@@ -149,12 +149,10 @@ impl AuthClient {
         let transfer_actor = Some(the_actor.clone());
 
         // create login packet
-        let response = the_actor
-            .store_login_packet(new_login_packet)
-            .await?;
+        let response = the_actor.store_login_packet(new_login_packet).await?;
 
         match response {
-            Response::Mutation(res) => res?,
+            Response::Write(res) => res?,
             _ => return Err(AuthError::from("Unexpected response")),
         };
 
@@ -405,7 +403,7 @@ impl AuthClient {
         ))?;
 
         let _resp = match resp {
-            Response::Mutation(res) => res.map_err(CoreError::from),
+            Response::Write(res) => res.map_err(CoreError::from),
             _ => return Err(AuthError::from(CoreError::from("Unexpected response"))),
         };
 

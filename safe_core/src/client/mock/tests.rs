@@ -61,7 +61,7 @@ async fn process_request(
     sender: &SafeKey,
     request: Request,
 ) -> Response {
-    let sign = request.get_type() != RequestType::PublicGet;
+    let sign = request.get_type() != RequestType::PublicRead;
     let message_id = MessageId::new();
     let signature = if sign {
         Some(sender.sign(&unwrap!(serialize(&(&request, message_id)))))
@@ -487,8 +487,8 @@ async fn mutable_data_reclaim() {
     )
     .await;
     match response {
-        Response::Mutation(Err(Error::InvalidEntryActions(_))) => (),
-        Response::Mutation(Ok(())) => panic!("Unexpected success"),
+        Response::Write(Err(Error::InvalidEntryActions(_))) => (),
+        Response::Write(Ok(())) => panic!("Unexpected success"),
         res => panic!("Unexpected response: {:?}", res),
     }
 
@@ -570,8 +570,8 @@ async fn mutable_data_entry_versioning() {
     )
     .await;
     match response {
-        Response::Mutation(Err(Error::InvalidEntryActions(_))) => (),
-        Response::Mutation(Ok(())) => panic!("Unexpected success"),
+        Response::Write(Err(Error::InvalidEntryActions(_))) => (),
+        Response::Write(Ok(())) => panic!("Unexpected success"),
         res => panic!("Unexpected response: {:?}", res),
     }
 
@@ -588,8 +588,8 @@ async fn mutable_data_entry_versioning() {
     )
     .await;
     match response {
-        Response::Mutation(Err(Error::InvalidEntryActions(_))) => (),
-        Response::Mutation(Ok(())) => panic!("Unexpected success"),
+        Response::Write(Err(Error::InvalidEntryActions(_))) => (),
+        Response::Write(Ok(())) => panic!("Unexpected success"),
         res => panic!("Unexpected response: {:?}", res),
     }
 
@@ -628,8 +628,8 @@ async fn mutable_data_entry_versioning() {
     )
     .await;
     match response {
-        Response::Mutation(Err(Error::InvalidEntryActions(_))) => (),
-        Response::Mutation(Ok(())) => panic!("Unexpected success"),
+        Response::Write(Err(Error::InvalidEntryActions(_))) => (),
+        Response::Write(Ok(())) => panic!("Unexpected success"),
         res => panic!("Unexpected response: {:?}", res),
     }
 
@@ -1363,7 +1363,7 @@ async fn low_balance_check() {
         )
         .await;
         match response {
-            Response::Mutation(res) => assert_eq!(*unlimited, res.is_ok()), // Should succeed if unlimited is true
+            Response::Write(res) => assert_eq!(*unlimited, res.is_ok()), // Should succeed if unlimited is true
             res => panic!("Unexpected response {:?}", res),
         }
 
@@ -1460,12 +1460,12 @@ async fn request_hooks() {
         match *req {
             Request::MData(MDataRequest::Put(ref data)) if data.tag() == 10_000u64 => {
                 // Send an OK response but don't put data on the mock vault
-                Some(Response::Mutation(Ok(())))
+                Some(Response::Write(Ok(())))
             }
             Request::MData(MDataRequest::MutateEntries { address, .. })
                 if address.tag() == 12_345u64 =>
             {
-                Some(Response::Mutation(Err(custom_error.clone())))
+                Some(Response::Write(Err(custom_error.clone())))
             }
             // Pass-throug)h
             _ => None,

@@ -73,7 +73,7 @@ mod mock_routing {
                             put_mdata_counter += 1;
 
                             if put_mdata_counter > 4 {
-                                Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                                Some(Response::Write(Err(SndError::InsufficientBalance)))
                             } else {
                                 None
                             }
@@ -132,8 +132,8 @@ mod mock_routing {
         // Register a hook prohibiting mutations and login
         let cm_hook = move |mut cm: ConnectionManager| -> ConnectionManager {
             cm.set_request_hook(move |req| {
-                if req.get_type() == RequestType::Mutation {
-                    Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                if req.get_type() == RequestType::Write {
+                    Some(Response::Write(Err(SndError::InsufficientBalance)))
                 } else {
                     // Pass-through
                     None
@@ -191,7 +191,7 @@ mod mock_routing {
                     // the `mutate_mdata_entries` operation (relating to
                     // the addition of the app to the user's config dir)
                     Request::Client(ClientRequest::InsAuthKey { .. }) => {
-                        Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                        Some(Response::Write(Err(SndError::InsufficientBalance)))
                     }
                     // Pass-through
                     _ => None,
@@ -237,7 +237,7 @@ mod mock_routing {
                         reqs_counter += 1;
 
                         if reqs_counter == 2 {
-                            Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                            Some(Response::Write(Err(SndError::InsufficientBalance)))
                         } else {
                             None
                         }
@@ -264,7 +264,7 @@ mod mock_routing {
             cm.set_request_hook(move |req| {
                 match *req {
                     Request::MData(MDataRequest::Put { .. }) => {
-                        Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                        Some(Response::Write(Err(SndError::InsufficientBalance)))
                     }
 
                     // Pass-through
@@ -289,7 +289,7 @@ mod mock_routing {
             cm.set_request_hook(move |req| {
                 match *req {
                     Request::MData(MDataRequest::MutateEntries { .. }) => {
-                        Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                        Some(Response::Write(Err(SndError::InsufficientBalance)))
                     }
 
                     // Pass-through

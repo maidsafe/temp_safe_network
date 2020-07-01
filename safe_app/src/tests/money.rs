@@ -38,7 +38,6 @@ async fn money_app_deny_permissions() {
 
     let client = app.client;
 
-
     // This app client should not have money....const
     /// this app client should be trying to query
     match client.get_balance(None).await {

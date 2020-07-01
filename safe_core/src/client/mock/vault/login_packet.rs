@@ -102,9 +102,9 @@ impl Vault {
                 if let Err(e) =
                     self.authorise_operations(&[Operation::Mutation], source, requester_pk)
                 {
-                    Response::Mutation(Err(e))
+                    Response::Write(Err(e))
                 } else if self.get_login_packet(account_data.destination()).is_some() {
-                    Response::Mutation(Err(SndError::LoginPacketExists))
+                    Response::Write(Err(SndError::LoginPacketExists))
                 } else {
                     let result = self
                         .get_balance(&source)
@@ -116,7 +116,7 @@ impl Vault {
                             Ok(())
                         })
                         .map(|_| self.insert_login_packet(account_data.clone()));
-                    Response::Mutation(result)
+                    Response::Write(result)
                 }
             }
             LoginPacketRequest::Get(location) => {
@@ -149,7 +149,7 @@ impl Vault {
                         None => Err(SndError::NoSuchLoginPacket),
                     }
                 };
-                Response::Mutation(result)
+                Response::Write(result)
             }
         }
     }

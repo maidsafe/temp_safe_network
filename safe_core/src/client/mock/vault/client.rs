@@ -44,7 +44,7 @@ impl Vault {
                 } else {
                     self.ins_auth_key(&requester.name(), *key, *permissions, *version)
                 };
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ClientRequest::DelAuthKey { key, version } => {
                 let result = if owner_pk != requester_pk {
@@ -52,7 +52,7 @@ impl Vault {
                 } else {
                     self.del_auth_key(&requester.name(), *key, *version)
                 };
-                Response::Mutation(result)
+                Response::Write(result)
             }
         }
     }

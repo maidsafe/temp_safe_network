@@ -480,7 +480,7 @@ where
                     Request::MData(MDataRequest::DelUserPermissions { address, .. }) => {
                         if *address.name() == ac_info.name() && address.tag() == ac_info.type_tag()
                         {
-                            Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+                            Some(Response::Write(Err(SndError::InsufficientBalance)))
                         } else {
                             None
                         }

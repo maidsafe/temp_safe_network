@@ -80,7 +80,7 @@ pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
 
 async fn send(client: &impl Client, request: Request) -> Result<Response, CoreError> {
     // `sign` should be false for GETs on published data, true otherwise.
-    let sign = request.get_type() != RequestType::PublicGet;
+    let sign = request.get_type() != RequestType::PublicRead;
     let request = client.compose_message(request, sign).await?;
     let inner = client.inner();
     let cm = &mut inner.lock().await.connection_manager;
@@ -88,10 +88,10 @@ async fn send(client: &impl Client, request: Request) -> Result<Response, CoreEr
 }
 
 // Sends a mutation request to a new routing.
-async fn send_mutation(client: &impl Client, req: Request) -> Result<(), CoreError> {
+async fn send_write(client: &impl Client, req: Request) -> Result<(), CoreError> {
     let response = send(client, req).await?;
     match response {
-        Response::Mutation(result) => {
+        Response::Write(result) => {
             trace!("mutation result: {:?}", result);
             result.map_err(CoreError::from)
         }
@@ -481,7 +481,7 @@ pub trait Client: Clone + Send + Sync {
 
         let _ = Arc::downgrade(&inner);
         trace!("Delete Unpublished IData at {:?}", name);
-        send_mutation(
+        send_write(
             self,
             Request::IData(IDataRequest::DeleteUnpub(IDataAddress::Unpub(name))),
         )
@@ -1254,7 +1254,7 @@ pub trait Client: Clone + Send + Sync {
     async fn delete_sdata(&self, address: SDataAddress) -> Result<(), CoreError> {
         trace!("Delete Private Sequence Data {:?}", address.name());
 
-        send_mutation(self, Request::SData(SDataRequest::Delete(address))).await?;
+        send_write(self, Request::SData(SDataRequest::Delete(address))).await?;
 
         // Delete it from local Sequence CRDT replica
         let _ = self.inner().lock().await.sdata_cache.pop(&address);
@@ -1507,7 +1507,7 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("InsAuthKey ({:?})", key);
 
-        send_mutation(
+        send_write(
             self,
             Request::Client(ClientRequest::InsAuthKey {
                 key,
@@ -1525,7 +1525,7 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("DelAuthKey ({:?})", key);
 
-        send_mutation(
+        send_write(
             self,
             Request::Client(ClientRequest::DelAuthKey { key, version }),
         )
@@ -1539,7 +1539,7 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("Delete entire Mutable Data at {:?}", address);
 
-        send_mutation(self, Request::MData(MDataRequest::Delete(address))).await
+        send_write(self, Request::MData(MDataRequest::Delete(address))).await
     }
 }
 

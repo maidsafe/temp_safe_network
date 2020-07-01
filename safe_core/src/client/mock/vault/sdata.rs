@@ -40,7 +40,7 @@ impl Vault {
                     }
                     None => Err(SndError::NoSuchEntry),
                 };
-                Response::Mutation(result)
+                Response::Write(result)
             }
             SDataRequest::Get(address) => {
                 let result = self.get_sdata(*address, requester_pk, &request);
@@ -58,7 +58,7 @@ impl Vault {
                         }
                     },
                 );
-                Response::Mutation(result)
+                Response::Write(result)
             }
             SDataRequest::GetRange { address, range } => {
                 let result =
@@ -103,7 +103,7 @@ impl Vault {
                     .and_then(move |data| data.user_permissions(*user, data.permissions_index()));
                 Response::GetSDataUserPermissions(result)
             }
-            SDataRequest::Mutate(op) => {
+            SDataRequest::Edit(op) => {
                 let id = DataId::Sequence(op.address);
                 let result = self.get_sdata(op.address, requester_pk, &request).and_then(
                     move |mut sdata| {
@@ -113,9 +113,9 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Mutation(result)
+                Response::Write(result)
             }
-            SDataRequest::MutatePubPermissions(op) => {
+            SDataRequest::SetPubPermissions(op) => {
                 let id = DataId::Sequence(op.address);
                 let result = self.get_sdata(op.address, requester_pk, &request).and_then(
                     move |mut sdata| {
@@ -125,9 +125,9 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Mutation(result)
+                Response::Write(result)
             }
-            SDataRequest::MutatePrivPermissions(op) => {
+            SDataRequest::SetPrivPermissions(op) => {
                 let id = DataId::Sequence(op.address);
                 let result = self.get_sdata(op.address, requester_pk, &request).and_then(
                     move |mut sdata| {
@@ -137,9 +137,9 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Mutation(result)
+                Response::Write(result)
             }
-            SDataRequest::MutateOwner(op) => {
+            SDataRequest::SetOwner(op) => {
                 let id = DataId::Sequence(op.address);
                 let result = self.get_sdata(op.address, requester_pk, &request).and_then(
                     move |mut sdata| {
@@ -149,7 +149,7 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Mutation(result)
+                Response::Write(result)
             }
             SDataRequest::GetOwner(address) => {
                 let result =
@@ -190,11 +190,11 @@ fn check_perms_sdata(sdata: &SData, request: &SDataRequest, requester: PublicKey
             SData::Public(_) => Ok(()),
             SData::Private(_) => sdata.check_permission(SDataAction::Read, requester),
         },
-        SDataRequest::Mutate { .. } => sdata.check_permission(SDataAction::Append, requester),
-        SDataRequest::MutatePubPermissions(_) | SDataRequest::MutatePrivPermissions(_) => {
+        SDataRequest::Edit { .. } => sdata.check_permission(SDataAction::Append, requester),
+        SDataRequest::SetPubPermissions(_) | SDataRequest::SetPrivPermissions(_) => {
             sdata.check_permission(SDataAction::ManagePermissions, requester)
         }
-        SDataRequest::MutateOwner(_) => sdata.check_is_last_owner(requester),
+        SDataRequest::SetOwner(_) => sdata.check_is_last_owner(requester),
         SDataRequest::Delete(_) => match sdata {
             SData::Public(_) => Err(SndError::InvalidOperation),
             SData::Private(_) => sdata.check_is_last_owner(requester),

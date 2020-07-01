@@ -46,7 +46,7 @@ impl Vault {
                         requester,
                     )
                 };
-                Response::Mutation(result)
+                Response::Write(result)
             }
             MDataRequest::GetValue { address, ref key } => {
                 let data = self.get_mdata(*address, requester_pk, &request);
@@ -153,7 +153,7 @@ impl Vault {
                             Err(SndError::AccessDenied)
                         }
                     });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             MDataRequest::SetUserPermissions {
                 address,
@@ -178,7 +178,7 @@ impl Vault {
 
                             Ok(())
                         });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             MDataRequest::DelUserPermissions {
                 address,
@@ -201,7 +201,7 @@ impl Vault {
 
                             Ok(())
                         });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             MDataRequest::ListUserPermissions { address, ref user } => {
                 let user = *user;
@@ -247,7 +247,7 @@ impl Vault {
 
                             Ok(())
                         });
-                Response::Mutation(result)
+                Response::Write(result)
             }
         }
     }

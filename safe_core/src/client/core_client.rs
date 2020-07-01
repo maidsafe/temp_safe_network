@@ -110,7 +110,7 @@ impl CoreClient {
         let response = the_actor.store_login_packet(new_login_packet).await?;
 
         match response {
-            Response::Mutation(res) => res?,
+            Response::Write(res) => res?,
             _ => return Err(CoreError::from("Unexpected response")),
         };
 

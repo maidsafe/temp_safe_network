@@ -111,8 +111,8 @@ pub async fn login_registered_with_low_balance() -> Result<(), AppError> {
     // Register a hook prohibiting mutations and login
     let cm_hook = move |mut cm: ConnectionManager| -> ConnectionManager {
         cm.set_request_hook(move |req| {
-            if req.get_type() == RequestType::Mutation {
-                Some(Response::Mutation(Err(SndError::InsufficientBalance)))
+            if req.get_type() == RequestType::Write {
+                Some(Response::Write(Err(SndError::InsufficientBalance)))
             } else {
                 // Pass-through
                 None
