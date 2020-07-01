@@ -232,7 +232,7 @@ impl Messaging {
             | ListMDataUserPermissions(..)
             | ListMDataPermissions(..)
             | GetMDataValue(..)
-            | Mutation(..)
+            | Write(..)
             | TransferValidation(..)
             | TransferDebitAgreementProof(..)
             | TransferRegistration(..)

@@ -92,7 +92,7 @@ impl LoginPackets {
         if !login_packet.size_is_valid() {
             return Some(Action::RespondToClient {
                 message_id,
-                response: Response::Mutation(Err(NdError::ExceededSize)),
+                response: Response::Write(Err(NdError::ExceededSize)),
             });
         }
 
@@ -198,7 +198,7 @@ impl LoginPackets {
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 requester,
                 message_id,
                 refund,
@@ -307,7 +307,7 @@ impl LoginPackets {
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 requester,
                 message_id,
                 // Updating the login packet is free

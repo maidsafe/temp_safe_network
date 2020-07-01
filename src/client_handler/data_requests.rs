@@ -69,18 +69,9 @@ impl Sequence {
             | GetPermissions { .. }
             | GetUserPermissions { .. } => self.get(client, request, message_id),
             Delete(address) => self.initiate_deletion(client, address, message_id),
-            MutatePubPermissions {
-                ref debit_proof, ..
+            SetPubPermissions { .. } | SetPrivPermissions { .. } | SetOwner { .. } | Edit(..) => {
+                self.initiate_mutation(client, request, message_id)
             }
-            | MutatePrivPermissions {
-                ref debit_proof, ..
-            }
-            | MutateOwner {
-                ref debit_proof, ..
-            }
-            | Mutate {
-                ref debit_proof, ..
-            } => self.initiate_mutation(client, request.clone(), message_id, debit_proof.clone()),
         }
     }
 
@@ -118,7 +109,7 @@ impl Sequence {
             );
             return Some(Action::RespondToClient {
                 message_id,
-                response: Response::Mutation(Err(NdError::InvalidOwners)),
+                response: Response::Write(Err(NdError::InvalidOwners)),
             });
         }
 
@@ -144,7 +135,7 @@ impl Sequence {
         if address.is_pub() {
             return Some(Action::RespondToClient {
                 message_id,
-                response: Response::Mutation(Err(NdError::InvalidOperation)),
+                response: Response::Write(Err(NdError::InvalidOperation)),
             });
         }
 
@@ -255,7 +246,7 @@ impl Immutable {
                 );
                 return Some(Action::RespondToClient {
                     message_id,
-                    response: Response::Mutation(Err(NdError::InvalidOwners)),
+                    response: Response::Write(Err(NdError::InvalidOwners)),
                 });
             }
         }
@@ -282,7 +273,7 @@ impl Immutable {
         if address.kind() == IDataKind::Pub {
             return Some(Action::RespondToClient {
                 message_id,
-                response: Response::Mutation(Err(NdError::InvalidOperation)),
+                response: Response::Write(Err(NdError::InvalidOperation)),
             });
         }
         Some(Action::VoteFor(ConsensusAction::Forward {
@@ -412,7 +403,7 @@ impl Mutable {
             );
             return Some(Action::RespondToClient {
                 message_id,
-                response: Response::Mutation(Err(NdError::InvalidOwners)),
+                response: Response::Write(Err(NdError::InvalidOwners)),
             });
         }
 

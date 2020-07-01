@@ -72,23 +72,23 @@ impl Auth {
         };
 
         let result = match request.authorisation_kind() {
-            RequestAuthKind::Data(DataAuthKind::GetPublic) => Ok(()),
-            RequestAuthKind::Data(DataAuthKind::GetPrivate) => {
+            RequestAuthKind::Data(DataAuthKind::PublicRead) => Ok(()),
+            RequestAuthKind::Data(DataAuthKind::PrivateRead) => {
                 self.check_app_permissions(app_id, |_| true)
             }
-            RequestAuthKind::Money(MoneyAuthKind::GetBalance) => {
+            RequestAuthKind::Money(MoneyAuthKind::ReadBalance) => {
                 self.check_app_permissions(app_id, |perms| perms.read_balance)
             }
-            RequestAuthKind::Money(MoneyAuthKind::GetHistory) => {
+            RequestAuthKind::Money(MoneyAuthKind::ReadHistory) => {
                 self.check_app_permissions(app_id, |perms| perms.read_transfer_history)
             }
-            RequestAuthKind::Data(DataAuthKind::Mutation) => {
+            RequestAuthKind::Data(DataAuthKind::Write) => {
                 self.check_app_permissions(app_id, |perms| perms.data_mutations)
             }
-            RequestAuthKind::Money(MoneyAuthKind::TransferMoney) => {
+            RequestAuthKind::Money(MoneyAuthKind::Transfer) => {
                 self.check_app_permissions(app_id, |perms| perms.transfer_money)
             }
-            RequestAuthKind::Misc(MiscAuthKind::MutAndTransferMoney) => self
+            RequestAuthKind::Misc(MiscAuthKind::WriteAndTransfer) => self
                 .check_app_permissions(app_id, |perms| {
                     perms.transfer_money && perms.data_mutations
                 }),
@@ -183,7 +183,7 @@ impl Auth {
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 requester: client,
                 message_id,
                 refund: None,
@@ -224,7 +224,7 @@ impl Auth {
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 requester: client,
                 message_id,
                 refund: None,
@@ -242,7 +242,7 @@ impl Auth {
         signature: Option<Signature>,
     ) -> Option<Action> {
         match request.authorisation_kind() {
-            RequestAuthKind::Data(DataAuthKind::GetPublic) => None,
+            RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
                 let valid = if let Some(signature) = signature {
                     self.is_valid_client_signature(public_id, request, &message_id, &signature)
