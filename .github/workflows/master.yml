@@ -503,7 +503,6 @@ jobs:
       - name: Upload dev to S3
         run: aws s3 sync deploy/dev s3://safe-api --acl public-read
 
-
       # Create the release and attach safe-cli archives as assets.
       - uses: csexton/create-release@add-body
         id: create_release
