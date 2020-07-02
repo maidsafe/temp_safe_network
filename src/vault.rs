@@ -406,12 +406,13 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 let sec_key_share = self.routing_node.borrow().secret_key_share().ok()?.clone();
                 let proof_chain = self.routing_node.borrow().our_history()?.clone();
                 let our_index = self.routing_node.borrow().our_index().ok()?;
-                self.client_handler_mut()?
-                    .update_replica_on_churn(pub_key_set, sec_key_share, our_index, proof_chain)
-                    .or_else(|| {
-                        error!("{}: Error updating replica keys after churn", self);
-                        None
-                    })?;
+                self.client_handler_mut()?.update_replica_on_churn(
+                    pub_key_set,
+                    sec_key_share,
+                    our_index,
+                    proof_chain,
+                )?;
+                info!("Successfully updated Replica details on churn");
                 None
             }
             // Ignore all other events

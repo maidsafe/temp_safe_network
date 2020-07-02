@@ -208,9 +208,9 @@ impl Transfers {
         messaging: &mut Messaging,
     ) -> Option<Action> {
         match self.replica.register(proof) {
-            Ok(_event) => {
+            Ok(event) => {
                 // sender is notified with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from((&proof).from()), proof);
+                messaging.respond_to_client(message_id, Response::TransferRegistration(Ok(event)));
 
                 // the transfer is then propagated, and will reach the recipient section
                 Some(Action::ForwardClientRequest(Rpc::Request {
