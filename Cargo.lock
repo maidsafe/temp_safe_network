@@ -1964,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/yoga07/routing?branch=chain#0fe65d10f41a7d7c061ceaf7b234fed88a1d63a3"
+source = "git+https://github.com/yoga07/routing?branch=chain#2063fa18769202bb82e6b9d1ba10983b64ed3fe8"
 dependencies = [
  "bincode",
  "bytes 0.5.5",
@@ -2057,7 +2057,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/yoga07/safe-nd?branch=at2#0587e5655e772c82e84f0c1cfce4d74f069c526e"
+source = "git+https://github.com/maidsafe/safe-nd?branch=at2#57f58cadc6a261a6fbaf0b7d5ec228b96aa03713"
 dependencies = [
  "bincode",
  "crdts",
@@ -2075,7 +2075,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/joshuef/safe-transfers?branch=Fix-FixAccumulationAndTransferLogix#12e44cbeb24c438c2f4762a3f551eac9405bda19"
+source = "git+https://github.com/joshuef/safe-transfers?branch=Fix-FixAccumulationAndTransferLogix#f1c9cc91f3906e2b07615c4d1d3637924b332eba"
 dependencies = [
  "bincode",
  "crdts",

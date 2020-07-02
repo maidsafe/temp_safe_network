@@ -7,25 +7,29 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_nd::{
-    AccountId, DebitAgreementProof, Error, KnownGroupAdded, Money, ReplicaEvent, Result,
-    SignedTransfer, TransferPropagated, TransferRegistered, TransferValidated,
+    AccountId, DebitAgreementProof, Error, KnownGroupAdded, Money, PublicKey as NdPublicKey,
+    ReplicaEvent, Result, SignedTransfer, TransferPropagated, TransferRegistered,
+    TransferValidated,
 };
 use safe_transfers::TransferReplica as Replica;
 use std::collections::HashMap;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
+use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
     crate::{action::Action, rpc::Rpc},
+    rand::thread_rng,
     safe_nd::{
         MessageId, PublicId, PublicKey, Response, Signature, SignatureShare, Transfer, XorName,
     },
-    threshold_crypto::SecretKey,
+    threshold_crypto::{SecretKey, SecretKeySet},
 };
 
 pub(super) struct ReplicaManager {
     store: EventStore,
     replica: Replica,
+    section_proof_chain: SectionProofChain,
 }
 
 #[allow(unused)]
@@ -35,6 +39,7 @@ impl ReplicaManager {
         key_index: usize,
         peer_replicas: &PublicKeySet,
         events: Vec<ReplicaEvent>,
+        section_proof_chain: SectionProofChain,
     ) -> Result<Self> {
         let mut store = EventStore {
             streams: Default::default(),
@@ -49,7 +54,11 @@ impl ReplicaManager {
                     peer_replicas.clone(),
                     events,
                 );
-                Ok(Self { store, replica })
+                Ok(Self {
+                    store,
+                    replica,
+                    section_proof_chain,
+                })
             }
             Err(e) => Err(Error::InvalidOperation), // todo: storage error
         }
@@ -68,10 +77,12 @@ impl ReplicaManager {
         secret_key: SecretKeyShare,
         index: usize,
         peer_replicas: PublicKeySet,
+        section_proof_chain: SectionProofChain,
     ) -> Result<()> {
         match self.store.try_load() {
             Ok(events) => {
                 self.replica = Replica::from_history(secret_key, index, peer_replicas, events);
+                self.section_proof_chain = section_proof_chain;
                 Ok(())
             }
             Err(e) => Err(Error::InvalidOperation), // todo: storage error
@@ -87,7 +98,29 @@ impl ReplicaManager {
     }
 
     pub(crate) fn register(&mut self, proof: &DebitAgreementProof) -> Result<TransferRegistered> {
-        let event = self.replica.register(proof)?;
+        let serialized = bincode::serialize(&proof.signed_transfer)
+            .map_err(|e| Error::NetworkOther(e.to_string()))?;
+        let sig = proof
+            .debiting_replicas_sig
+            .clone()
+            .into_bls()
+            .ok_or(Error::NetworkOther(
+                "Error retrieving threshold::Signature from DAP ".to_string(),
+            ))?;
+        let section_keys = self.section_proof_chain.clone();
+
+        let event = self.replica.clone().register(proof, move || {
+            let key = section_keys
+                .keys()
+                .find(|&key_in_chain| key_in_chain == &proof.replica_key.public_key());
+            if let Some(key_in_chain) = key {
+                key_in_chain.verify(&sig, serialized)
+            } else {
+                // PublicKey provided by the transfer was never a part of the Section retrospectively.
+                false
+            }
+        })?;
+
         match self.persist(ReplicaEvent::TransferRegistered(event.clone())) {
             Ok(()) => Ok(event),
             Err(err) => Err(err),
@@ -98,7 +131,33 @@ impl ReplicaManager {
         &mut self,
         proof: &DebitAgreementProof,
     ) -> Result<TransferPropagated> {
-        let event = self.replica.receive_propagated(proof)?;
+        let serialized = bincode::serialize(&proof.signed_transfer)
+            .map_err(|e| Error::NetworkOther(e.to_string()))?;
+        let section_keys = self.section_proof_chain.clone();
+        let sig = proof
+            .debiting_replicas_sig
+            .clone()
+            .into_bls()
+            .ok_or(Error::NetworkOther(
+                "Error retrieving threshold::Signature from DAP ".to_string(),
+            ))?;
+
+        let event = self.replica.receive_propagated(proof, move || {
+            let key = section_keys
+                .keys()
+                .find(|&key_in_chain| key_in_chain == &proof.replica_key.public_key());
+            if let Some(key_in_chain) = key {
+                if key_in_chain.verify(&sig, serialized) {
+                    Some(NdPublicKey::from(key_in_chain.clone()))
+                } else {
+                    None
+                }
+            } else {
+                // PublicKey provided by the transfer was never a part of the Section retrospectively.
+                None
+            }
+        })?;
+
         match self.persist(ReplicaEvent::TransferPropagated(event.clone())) {
             Ok(()) => Ok(event),
             Err(err) => Err(err),
@@ -128,6 +187,9 @@ impl ReplicaManager {
     ) -> Option<Action> {
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
+        let mut rng = thread_rng();
+        let sec_key_set = SecretKeySet::random(7, &mut rng);
+        let replica_key = sec_key_set.public_keys();
         let sec_key = SecretKey::random();
         let pub_key = sec_key.public_key();
         let dummy_shares = SecretKeyShare::default();
@@ -139,6 +201,7 @@ impl ReplicaManager {
                 actor_signature: Signature::from(sig.clone()),
             },
             debiting_replicas_sig: Signature::from(sig),
+            replica_key,
         };
         self.store
             .try_append(ReplicaEvent::TransferPropagated(TransferPropagated {

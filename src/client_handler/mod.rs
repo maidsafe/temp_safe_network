@@ -34,7 +34,7 @@ use crate::{
 use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
-use routing::Node;
+use routing::{Node, RoutingError, SectionProofChain};
 use safe_nd::{MessageId, Money, NodePublicId, PublicId, Request, Response, Signature, XorName};
 use std::{
     cell::{Cell, RefCell},
@@ -78,8 +78,14 @@ impl ClientHandler {
         let public_key_set = node.public_key_set()?;
         let secret_key_share = node.secret_key_share()?;
         let key_index = node.our_index()?;
-        let replica_manager =
-            ReplicaManager::new(secret_key_share, key_index, public_key_set, vec![])?;
+        let proof_chain = node.our_history().ok_or(RoutingError::InvalidState)?;
+        let replica_manager = ReplicaManager::new(
+            secret_key_share,
+            key_index,
+            public_key_set,
+            vec![],
+            proof_chain.clone(),
+        )?;
 
         let messaging = Messaging::new(id.clone(), routing_node.clone());
 
@@ -100,14 +106,15 @@ impl ClientHandler {
         Ok(client_handler)
     }
 
-    pub fn update_replica_keys(
+    pub fn update_replica_on_churn(
         &mut self,
         pub_key_set: PublicKeySet,
         sec_key_share: SecretKeyShare,
         index: usize,
+        proof_chain: SectionProofChain,
     ) -> Option<()> {
         self.transfers
-            .update_replica_keys(pub_key_set, sec_key_share, index)
+            .update_replica_on_churn(pub_key_set, sec_key_share, index, proof_chain)
     }
 
     pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {

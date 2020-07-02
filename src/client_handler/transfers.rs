@@ -18,6 +18,7 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(not(feature = "simulated-payouts"))]
 use safe_nd::PublicKey;
 
+use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
@@ -52,13 +53,16 @@ impl Transfers {
         Self { id, replica }
     }
 
-    pub fn update_replica_keys(
+    pub fn update_replica_on_churn(
         &mut self,
         pub_key_set: PublicKeySet,
         sec_key_share: SecretKeyShare,
         index: usize,
+        proof_chain: SectionProofChain,
     ) -> Option<()> {
-        self.replica.churn(sec_key_share, index, pub_key_set).ok()
+        self.replica
+            .churn(sec_key_share, index, pub_key_set, proof_chain)
+            .ok()
     }
 
     /// Elders that aren't in the dst
