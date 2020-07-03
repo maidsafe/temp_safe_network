@@ -27,15 +27,6 @@ pub(crate) enum ConsensusAction {
         client_public_id: PublicId,
         message_id: MessageId,
     },
-    /// Process pay for request and proxy the request to a different client's handler.
-    /// Only used by `CreateLoginPacketFor`
-    PayAndProxy {
-        request: Request,
-        client_public_id: PublicId,
-        message_id: MessageId,
-        put_debit_proof: DebitAgreementProof,
-        optional_amount_debit_proof: Option<DebitAgreementProof>,
-    },
 }
 
 #[derive(Debug)]
@@ -46,10 +37,6 @@ pub(crate) enum Action {
     VoteFor(ConsensusAction),
     /// Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
-    /// Send a request from client handlers of Client A to Client B to then be handled as if Client
-    /// B had made the request. Only used by `CreateLoginPacketFor`, where Client A is creating the
-    /// new balance for Client B, but also effectively bundles B's `CreateLoginPacket` with it.
-    ProxyClientRequest(Rpc),
     /// Send a response as an adult or elder to own section's elders.
     RespondToOurDataHandlers {
         rpc: Rpc,

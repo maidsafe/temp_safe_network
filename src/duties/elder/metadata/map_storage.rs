@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -9,17 +9,16 @@
 use crate::{
     action::Action,
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
+    node::Init,
     rpc::Rpc,
-    utils,
-    vault::Init,
-    Config, Result,
+    utils, Config, Result,
 };
 use log::error;
 
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions,
-    MDataPermissionSet, MDataRequest, MDataValue, MessageId, NodePublicId, PublicId, PublicKey,
-    Response, Result as NdResult,
+    Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions, MDataPermissionSet,
+    MDataValue, MapRead, MapWrite, MessageId, NodePublicId, PublicId, PublicKey, Response,
+    Result as NdResult,
 };
 
 use std::{
@@ -28,12 +27,12 @@ use std::{
     rc::Rc,
 };
 
-pub(super) struct MDataHandler {
+pub(super) struct MapStorage {
     id: NodePublicId,
     chunks: MutableChunkStore,
 }
 
-impl MDataHandler {
+impl MapStorage {
     pub(super) fn new(
         id: NodePublicId,
         config: &Config,
@@ -51,78 +50,57 @@ impl MDataHandler {
         Ok(Self { id, chunks })
     }
 
-    pub(super) fn handle_request(
-        &mut self,
+    pub(super) fn read(
+        &self,
         requester: PublicId,
-        request: MDataRequest,
+        read: &MapRead,
         message_id: MessageId,
     ) -> Option<Action> {
-        use MDataRequest::*;
-        match request {
-            Put { data, debit_proof } => {
-                self.handle_put_mdata_req(requester, &data, message_id, debit_proof)
-            }
-            Get(address) => self.handle_get_mdata_req(requester, address, message_id),
-            GetValue { address, ref key } => {
-                self.handle_get_mdata_value_req(requester, address, key, message_id)
-            }
-            Delete(address) => self.handle_delete_mdata_req(requester, address, message_id),
-            GetShell(address) => self.handle_get_mdata_shell_req(requester, address, message_id),
-            GetVersion(address) => {
-                self.handle_get_mdata_version_req(requester, address, message_id)
-            }
-            ListEntries(address) => {
-                self.handle_list_mdata_entries_req(requester, address, message_id)
-            }
-            ListKeys(address) => self.handle_list_mdata_keys_req(requester, address, message_id),
-            ListValues(address) => {
-                self.handle_list_mdata_values_req(requester, address, message_id)
-            }
-            ListPermissions(address) => {
-                self.handle_list_mdata_permissions_req(requester, address, message_id)
-            }
+        use MapRead::*;
+        match read {
+            Get(address) => self.get(requester, *address, message_id),
+            GetValue { address, ref key } => self.get_value(requester, *address, key, message_id),
+            GetShell(address) => self.get_shell(requester, *address, message_id),
+            GetVersion(address) => self.get_version(requester, *address, message_id),
+            ListEntries(address) => self.list_entries(requester, *address, message_id),
+            ListKeys(address) => self.list_keys(requester, *address, message_id),
+            ListValues(address) => self.list_values(requester, *address, message_id),
+            ListPermissions(address) => self.list_permissions(requester, *address, message_id),
             ListUserPermissions { address, user } => {
-                self.handle_list_mdata_user_permissions_req(requester, address, user, message_id)
+                self.list_user_permissions(requester, *address, *user, message_id)
             }
+        }
+    }
+
+    pub(super) fn write(
+        &mut self,
+        requester: PublicId,
+        write: MapWrite,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use MapWrite::*;
+        match write {
+            New(data) => self.create(requester, &data, message_id),
+            Delete(address) => self.delete(requester, address, message_id),
             SetUserPermissions {
                 address,
                 user,
                 ref permissions,
                 version,
-                ref debit_proof,
-            } => self.handle_set_mdata_user_permissions_req(
+            } => self.set_user_permissions(
                 requester,
                 address,
                 user,
                 permissions,
                 version,
                 message_id,
-                debit_proof.clone(),
             ),
             DelUserPermissions {
                 address,
                 user,
                 version,
-                debit_proof,
-            } => self.handle_del_mdata_user_permissions_req(
-                requester,
-                address,
-                user,
-                version,
-                message_id,
-                debit_proof,
-            ),
-            MutateEntries {
-                address,
-                actions,
-                debit_proof,
-            } => self.handle_mutate_mdata_entries_req(
-                requester,
-                address,
-                actions,
-                message_id,
-                debit_proof,
-            ),
+            } => self.delete_user_permissions(requester, address, user, version, message_id),
+            Edit { address, changes } => self.edit_entries(requester, address, changes, message_id),
         }
     }
 
@@ -130,8 +108,8 @@ impl MDataHandler {
     /// Returns `Some(Result<..>)` if the flow should be continued, returns
     /// `None` if there was a logic error encountered and the flow should be
     /// terminated.
-    fn get_mdata_chunk(
-        &mut self,
+    fn get_chunk(
+        &self,
         address: &MDataAddress,
         requester: &PublicId,
         action: MDataAction,
@@ -159,12 +137,11 @@ impl MDataHandler {
     }
 
     /// Get MData from the chunk store, update it, and overwrite the stored chunk.
-    fn mutate_mdata_chunk<F>(
+    fn edit_chunk<F>(
         &mut self,
         address: &MDataAddress,
         requester: PublicId,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
         mutation_fn: F,
     ) -> Option<Action>
     where
@@ -183,26 +160,25 @@ impl MDataHandler {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
-        let refund = utils::get_refund_for_put(&result, debit_proof);
+
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                refund,
+                refund: None,
                 proof: None,
             },
         })
     }
 
     /// Put MData.
-    fn handle_put_mdata_req(
+    fn create(
         &mut self,
         requester: PublicId,
         data: &MData,
         message_id: MessageId,
-        transfer: DebitAgreementProof,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
@@ -211,20 +187,20 @@ impl MDataHandler {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        let refund = utils::get_refund_for_put(&result, transfer);
+
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                refund,
+                refund: None,
                 proof: None,
             },
         })
     }
 
-    fn handle_delete_mdata_req(
+    fn delete(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -261,7 +237,7 @@ impl MDataHandler {
     }
 
     /// Set MData user permissions.
-    fn handle_set_mdata_user_permissions_req(
+    fn set_user_permissions(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
@@ -269,79 +245,58 @@ impl MDataHandler {
         permissions: &MDataPermissionSet,
         version: u64,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
-        self.mutate_mdata_chunk(
-            &address,
-            requester,
-            message_id,
-            debit_proof,
-            move |mut data| {
-                data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
-                data.set_user_permissions(user, permissions.clone(), version)?;
-                Ok(data)
-            },
-        )
+        self.edit_chunk(&address, requester, message_id, move |mut data| {
+            data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
+            data.set_user_permissions(user, permissions.clone(), version)?;
+            Ok(data)
+        })
     }
 
     /// Delete MData user permissions.
-    fn handle_del_mdata_user_permissions_req(
+    fn delete_user_permissions(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
         user: PublicKey,
         version: u64,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
-        self.mutate_mdata_chunk(
-            &address,
-            requester,
-            message_id,
-            debit_proof,
-            move |mut data| {
-                data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
-                data.del_user_permissions(user, version)?;
-                Ok(data)
-            },
-        )
+        self.edit_chunk(&address, requester, message_id, move |mut data| {
+            data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
+            data.del_user_permissions(user, version)?;
+            Ok(data)
+        })
     }
 
-    /// Mutate Sequenced MData.
-    fn handle_mutate_mdata_entries_req(
+    /// Edit MData.
+    fn edit_entries(
         &mut self,
         requester: PublicId,
         address: MDataAddress,
         actions: MDataEntryActions,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let requester_pk = *utils::own_key(&requester)?;
 
-        self.mutate_mdata_chunk(
-            &address,
-            requester,
-            message_id,
-            debit_proof,
-            move |mut data| {
-                data.mutate_entries(actions, requester_pk)?;
-                Ok(data)
-            },
-        )
+        self.edit_chunk(&address, requester, message_id, move |mut data| {
+            data.mutate_entries(actions, requester_pk)?;
+            Ok(data)
+        })
     }
 
     /// Get entire MData.
-    fn handle_get_mdata_req(
-        &mut self,
+    fn get(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
+        let result = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -356,14 +311,14 @@ impl MDataHandler {
     }
 
     /// Get MData shell.
-    fn handle_get_mdata_shell_req(
-        &mut self,
+    fn get_shell(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_mdata_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.shell());
 
         Some(Action::RespondToClientHandlers {
@@ -379,14 +334,14 @@ impl MDataHandler {
     }
 
     /// Get MData version.
-    fn handle_get_mdata_version_req(
-        &mut self,
+    fn get_version(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_mdata_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.version());
 
         Some(Action::RespondToClientHandlers {
@@ -402,14 +357,14 @@ impl MDataHandler {
     }
 
     /// Get MData value.
-    fn handle_get_mdata_value_req(
-        &mut self,
+    fn get_value(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         key: &[u8],
         message_id: MessageId,
     ) -> Option<Action> {
-        let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
+        let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::GetMDataValue(res.and_then(|data| {
             match data {
@@ -439,14 +394,14 @@ impl MDataHandler {
     }
 
     /// Get MData keys.
-    fn handle_list_mdata_keys_req(
-        &mut self,
+    fn list_keys(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_mdata_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.keys());
 
         Some(Action::RespondToClientHandlers {
@@ -462,13 +417,13 @@ impl MDataHandler {
     }
 
     /// Get MData values.
-    fn handle_list_mdata_values_req(
-        &mut self,
+    fn list_values(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
+        let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::ListMDataValues(res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.values().into()),
@@ -488,13 +443,13 @@ impl MDataHandler {
     }
 
     /// Get MData entries.
-    fn handle_list_mdata_entries_req(
-        &mut self,
+    fn list_entries(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
+        let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::ListMDataEntries(res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.entries().clone().into()),
@@ -514,14 +469,14 @@ impl MDataHandler {
     }
 
     /// Get MData permissions.
-    fn handle_list_mdata_permissions_req(
-        &mut self,
+    fn list_permissions(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_mdata_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.permissions());
 
         Some(Action::RespondToClientHandlers {
@@ -537,15 +492,15 @@ impl MDataHandler {
     }
 
     /// Get MData user permissions.
-    fn handle_list_mdata_user_permissions_req(
-        &mut self,
+    fn list_user_permissions(
+        &self,
         requester: PublicId,
         address: MDataAddress,
         user: PublicKey,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_mdata_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &requester, MDataAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
 
         Some(Action::RespondToClientHandlers {
@@ -561,7 +516,7 @@ impl MDataHandler {
     }
 }
 
-impl Display for MDataHandler {
+impl Display for MapStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

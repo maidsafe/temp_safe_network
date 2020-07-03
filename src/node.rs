@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -10,7 +10,7 @@ use crate::{
     accumulator::Accumulator,
     action::{Action, ConsensusAction},
     client_handler::ClientHandler,
-    data_handler::DataHandler,
+    duties::{adult::data::Data, elder::metadata::Metadata},
     rpc::Rpc,
     utils, Config, Result,
 };
@@ -20,11 +20,12 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use routing::{
-    event::Event as RoutingEvent, DstLocation, Node, Prefix, SrcLocation,
+    event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
     TransportEvent as ClientEvent,
 };
 use safe_nd::{
-    ClientRequest, LoginPacketRequest, NodeFullId, PublicId, Request, Response, XorName,
+    ClientAuth, ClientRequest, NodeFullId, NodeRequest, PublicId, Read, Request, Response,
+    SystemOp, Write, XorName,
 };
 use std::borrow::Cow;
 use std::{
@@ -35,6 +36,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
+use threshold_crypto::Signature;
 
 const STATE_FILENAME: &str = "state";
 
@@ -42,12 +44,12 @@ const STATE_FILENAME: &str = "state";
 enum State {
     Infant,
     Adult {
-        data_handler: DataHandler,
+        data: Data,
         accumulator: Accumulator,
     },
     Elder {
         client_handler: ClientHandler,
-        data_handler: DataHandler,
+        metadata: Metadata,
         accumulator: Accumulator,
     },
 }
@@ -59,29 +61,29 @@ pub enum Init {
     New,
 }
 
-/// Command that the user can send to a running vault to control its execution.
+/// Command that the user can send to a running node to control its execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     /// Shutdown the vault
     Shutdown,
 }
 
-/// Main vault struct.
-pub struct Vault<R: CryptoRng + Rng> {
+/// Main node struct.
+pub struct Node<R: CryptoRng + Rng> {
     id: NodeFullId,
     root_dir: PathBuf,
     state: State,
     event_receiver: Receiver<RoutingEvent>,
     client_receiver: Receiver<ClientEvent>,
     command_receiver: Receiver<Command>,
-    routing_node: Rc<RefCell<Node>>,
+    routing: Rc<RefCell<Routing>>,
     rng: R,
 }
 
-impl<R: CryptoRng + Rng> Vault<R> {
+impl<R: CryptoRng + Rng> Node<R> {
     /// Create and start vault. This will block until a `Command` to free it is fired.
     pub fn new(
-        routing_node: Node,
+        routing: Routing,
         event_receiver: Receiver<RoutingEvent>,
         client_receiver: Receiver<ClientEvent>,
         config: &Config,
@@ -99,16 +101,16 @@ impl<R: CryptoRng + Rng> Vault<R> {
         #[cfg(feature = "mock_parsec")]
         {
             // trace!(
-            //     "creating vault {:?} with routing_id {:?}",
+            //     "creating node {:?} with routing_id {:?}",
             //     id.public_id().name(),
-            //     routing_node.id()
+            //     routing.id()
             // );
         }
 
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
 
-        let routing_node = Rc::new(RefCell::new(routing_node));
+        let routing = Rc::new(RefCell::new(routing));
 
         let state = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
@@ -117,43 +119,42 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 &config,
                 &total_used_space,
                 init_mode,
-                routing_node.clone(),
+                routing.clone(),
             )?;
-            let data_handler = DataHandler::new(
+            let metadata = Metadata::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
                 init_mode,
-                is_elder,
-                routing_node.clone(),
+                routing.clone(),
             )?;
             State::Elder {
                 client_handler,
-                data_handler,
-                accumulator: Accumulator::new(routing_node.clone()),
+                metadata,
+                accumulator: Accumulator::new(routing.clone()),
             }
         } else {
-            info!("Initializing new Vault as Infant");
+            info!("Initializing new node as Infant");
             State::Infant
         };
 
-        let vault = Self {
+        let node = Self {
             id,
             root_dir: root_dir.to_path_buf(),
             state,
             event_receiver,
             client_receiver,
             command_receiver,
-            routing_node,
+            routing,
             rng,
         };
-        vault.dump_state()?;
-        Ok(vault)
+        node.dump_state()?;
+        Ok(node)
     }
 
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing_node
+        self.routing
             .borrow_mut()
             .our_connection_info()
             .map_err(From::from)
@@ -161,15 +162,24 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
-        self.routing_node.borrow().is_elder()
+        self.routing.borrow().is_elder()
     }
 
-    /// Runs the main event loop. Blocks until the vault is terminated.
+    /// Returns whether node is in adult state.
+    fn is_adult(&self) -> bool {
+        if let State::Adult { .. } = self.state {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Runs the main event loop. Blocks until the node is terminated.
     pub fn run(&mut self) {
         loop {
             let mut sel = Select::new();
 
-            let mut r_node = self.routing_node.borrow_mut();
+            let mut r_node = self.routing.borrow_mut();
             r_node.register(&mut sel);
             let routing_event_rx_idx = sel.recv(&self.event_receiver);
             let client_network_rx_idx = sel.recv(&self.client_receiver);
@@ -203,11 +213,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     }
                 }
                 idx => {
-                    if let Err(err) = self
-                        .routing_node
-                        .borrow_mut()
-                        .handle_selected_operation(idx)
-                    {
+                    if let Err(err) = self.routing.borrow_mut().handle_selected_operation(idx) {
                         warn!("Could not process operation: {}", err);
                     }
                 }
@@ -219,17 +225,16 @@ impl<R: CryptoRng + Rng> Vault<R> {
         let mut config = Config::default();
         config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
-        let data_handler = DataHandler::new(
+        let data = Data::new(
             self.id.public_id().clone(),
             &config,
             &total_used_space,
             Init::New,
-            false,
-            self.routing_node.clone(),
+            self.routing.clone(),
         )?;
         self.state = State::Adult {
-            data_handler,
-            accumulator: Accumulator::new(self.routing_node.clone()),
+            data,
+            accumulator: Accumulator::new(self.routing.clone()),
         };
         Ok(())
     }
@@ -243,20 +248,19 @@ impl<R: CryptoRng + Rng> Vault<R> {
             &config,
             &total_used_space,
             Init::New,
-            self.routing_node.clone(),
+            self.routing.clone(),
         )?;
-        let data_handler = DataHandler::new(
+        let metadata = Metadata::new(
             self.id.public_id().clone(),
             &config,
             &total_used_space,
             Init::New,
-            true,
-            self.routing_node.clone(),
+            self.routing.clone(),
         )?;
         self.state = State::Elder {
             client_handler,
-            data_handler,
-            accumulator: Accumulator::new(self.routing_node.clone()),
+            metadata,
+            accumulator: Accumulator::new(self.routing.clone()),
         };
         Ok(())
     }
@@ -267,7 +271,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         let mut _processed = false;
         loop {
             let mut sel = Select::new();
-            let mut r_node = self.routing_node.borrow_mut();
+            let mut r_node = self.routing.borrow_mut();
             r_node.register(&mut sel);
             let routing_event_rx_idx = sel.recv(&self.event_receiver);
             let client_network_rx_idx = sel.recv(&self.client_receiver);
@@ -304,11 +308,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                         _processed = true;
                     }
                     idx => {
-                        if let Err(err) = self
-                            .routing_node
-                            .borrow_mut()
-                            .handle_selected_operation(idx)
-                        {
+                        if let Err(err) = self.routing.borrow_mut().handle_selected_operation(idx) {
                             warn!("Could not process operation: {}", err);
                             break;
                         }
@@ -353,7 +353,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             }
             RoutingEvent::Promoted => self.promote_to_elder().map_or_else(
                 |err| {
-                    error!("Error when promoting Vault to Elder: {:?}", err);
+                    error!("Error when promoting node to Elder: {:?}", err);
                     None
                 },
                 |()| {
@@ -363,9 +363,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             ),
             RoutingEvent::MemberLeft { name, age: _u8 } => {
                 trace!("A node has left the section. Node: {:?}", name);
-                let get_copy_actions = self
-                    .data_handler_mut()?
-                    .trigger_chunk_duplication(XorName(name.0));
+                let get_copy_actions = self.metadata()?.trigger_chunk_duplication(XorName(name.0));
                 if let Some(copy_actions) = get_copy_actions {
                     for action in copy_actions {
                         let _ = self.handle_action(action);
@@ -375,15 +373,15 @@ impl<R: CryptoRng + Rng> Vault<R> {
             }
             RoutingEvent::MemberJoined { .. } => {
                 trace!("New member has joined the section");
-                let elder_count = self.routing_node.borrow().our_elders().count();
-                let adult_count = self.routing_node.borrow().our_adults().count();
+                let elder_count = self.routing.borrow().our_elders().count();
+                let adult_count = self.routing.borrow().our_adults().count();
                 info!("No. of Elders: {}", elder_count);
                 info!("No. of Adults: {}", adult_count);
                 None
             }
             RoutingEvent::Connected(_) => self.promote_to_adult().map_or_else(
                 |err| {
-                    error!("Error when promoting Vault to Adult: {:?}", err);
+                    error!("Error when promoting node to Adult: {:?}", err);
                     None
                 },
                 |()| {
@@ -402,10 +400,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
             }
             RoutingEvent::EldersChanged { .. } => {
                 // Update our replica with the latest keys
-                let pub_key_set = self.routing_node.borrow().public_key_set().ok()?.clone();
-                let sec_key_share = self.routing_node.borrow().secret_key_share().ok()?.clone();
-                let proof_chain = self.routing_node.borrow().our_history()?.clone();
-                let our_index = self.routing_node.borrow().our_index().ok()?;
+                let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
+                let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
+                let proof_chain = self.routing.borrow().our_history()?.clone();
+                let our_index = self.routing.borrow().our_index().ok()?;
                 self.client_handler_mut()?.update_replica_on_churn(
                     pub_key_set,
                     sec_key_share,
@@ -421,7 +419,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn accumulate_rpc(&mut self, src: SrcLocation, rpc: Rpc) -> Option<Action> {
-        let id = *self.routing_node.borrow().id().name();
+        let id = *self.routing.borrow().id().name();
         info!(
             "{}: Accumulating signatures for {:?}",
             &id,
@@ -437,13 +435,26 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
                 SrcLocation::Section(prefix) => prefix,
             };
-            self.data_handler_mut()?.handle_vault_rpc(
+            self.process_locally(
                 SrcLocation::Section(prefix),
                 accumulated_rpc,
                 Some(signature),
             )
         } else {
             None
+        }
+    }
+
+    fn process_locally(
+        &mut self,
+        src: SrcLocation,
+        msg: Rpc,
+        accumulated_sig: Option<Signature>,
+    ) -> Option<Action> {
+        match self.state {
+            State::Elder { .. } => self.metadata()?.receive_msg(src, msg, accumulated_sig),
+            State::Adult { .. } => self.data()?.receive_msg(src, msg, accumulated_sig),
+            _ => None,
         }
     }
 
@@ -458,29 +469,29 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 } => {
                     if matches!(requester, PublicId::Node(_)) {
                         if let Some((_, signature)) = signature.clone() {
-                            self.data_handler_mut()?
-                                .handle_vault_rpc(src, rpc, Some(signature.0))
+                            self.process_locally(src, rpc, Some(signature.0))
                         } else {
                             error!("Signature missing from duplication GET request");
                             None
                         }
                     } else {
                         match request {
-                            Request::IData(_) => self.accumulate_rpc(src, rpc),
+                            Request::Node(NodeRequest::Read(Read::Blob(_)))
+                            | Request::Node(NodeRequest::Write(Write::Blob(_))) => {
+                                self.accumulate_rpc(src, rpc)
+                            }
                             other => unimplemented!("Should not receive: {:?}", other),
                         }
                     }
                 }
                 Rpc::Response { response, .. } => match response {
                     Response::Write(_) | Response::GetIData(_) => {
-                        self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
+                        self.process_locally(src, rpc, None)
                     }
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
                 Rpc::Duplicate { .. } => self.accumulate_rpc(src, rpc),
-                Rpc::DuplicationComplete { .. } => {
-                    self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
-                }
+                Rpc::DuplicationComplete { .. } => self.process_locally(src, rpc, None),
             },
             Err(e) => {
                 error!("Error deserializing routing message into Rpc type: {:?}", e);
@@ -525,12 +536,12 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     #[allow(dead_code)]
     fn vote_for_action(&mut self, action: &ConsensusAction) -> Option<Action> {
-        self.routing_node
+        self.routing
             .borrow_mut()
             .vote_for_user_event(utils::serialise(&action))
             .map_or_else(
                 |_err| {
-                    error!("Cannot vote. Vault is not an elder");
+                    error!("Cannot vote. node is not an elder");
                     None
                 },
                 |()| None,
@@ -545,7 +556,6 @@ impl<R: CryptoRng + Rng> Vault<R> {
             // VoteFor(action) => self.vote_for_action(&action),
             VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
-            ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { rpc } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the data handlers, we'll call that
@@ -593,8 +603,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn respond_to_data_handlers(&self, rpc: Rpc) -> Option<Action> {
-        let name = *self.routing_node.borrow().id().name();
-        self.routing_node
+        let name = *self.routing.borrow().id().name();
+        self.routing
             .borrow_mut()
             .send_message(
                 SrcLocation::Node(name),
@@ -614,8 +624,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn send_message_to_peer(&self, target: XorName, rpc: Rpc) -> Option<Action> {
-        let name = *self.routing_node.borrow().id().name();
-        self.routing_node
+        let name = *self.routing.borrow().id().name();
+        self.routing
             .borrow_mut()
             .send_message(
                 SrcLocation::Node(name),
@@ -636,23 +646,14 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     fn forward_client_request(&mut self, rpc: Rpc) -> Option<Action> {
         trace!("{} received a client request {:?}", self, rpc);
-        let requester_name = if let Rpc::Request {
-            request: Request::LoginPacket(LoginPacketRequest::CreateFor { ref new_owner, .. }),
-            ..
-        } = rpc
-        {
-            XorName::from(*new_owner)
-        } else {
-            utils::requester_address(&rpc)
-        };
+        let requester_name = self.get_requester_name(&rpc);
         let dst_address = if let Rpc::Request { ref request, .. } = rpc {
-            match request.dest_address() {
+            match request.dst_address() {
                 Some(address) => address,
                 None => {
-                    if let Request::Client(ClientRequest::InsAuthKey { .. })
-                    | Request::Client(ClientRequest::DelAuthKey { .. })
-                    | Request::Money(_) = request
-                    {
+                    // temporary, while Authenticator is not
+                    // its own app using Map to store these things.
+                    if self.is_client_auth_write(request) {
                         Cow::Borrowed(self.id.public_id().name())
                     } else {
                         error!("{}: Logic error - no data handler address available.", self);
@@ -670,103 +671,111 @@ impl<R: CryptoRng + Rng> Vault<R> {
         //        same handler which Routing will call after receiving a message.
 
         if self.self_is_handler_for(&dst_address) {
-            // TODO - We need a better way for determining which handler should be given the
-            //        message.
-            return match rpc.clone() {
-                Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Create { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Money(_),
-                    ..
-                } => {
-                    let mut resulting_action = None;
-                    if let Some(client_handler) =  self
-                    .client_handler_mut() {
-                        resulting_action = client_handler.handle_vault_rpc(requester_name, rpc);
-                    }
+            if let Rpc::Request { request, .. } = &rpc {
+                if self.is_client_handler_req(&request) {
+                    return self
+                        .client_handler_mut()?
+                        .handle_vault_rpc(requester_name, rpc);
+                // } else if self.is_transfer_handler_req(&request) {
 
-                    resulting_action
-                },
-                _data_request => {
-                    let mut resulting_action = None;
-
-                    if let Some(data_handler) = self.data_handler_mut()
-                    {
-                        resulting_action = data_handler.handle_vault_rpc(
-                            SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                            rpc,
-                            None,
-                        )
-                    }
-
-                    resulting_action
+                // }
+                } else if self.is_data_handler_req(&request) {
+                    return self.process_locally(
+                        SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
+                        rpc,
+                        None,
+                    );
                 }
-            };
+            }
+
+            error!("{}: Logic error - unexpected RPC.", self);
+            return None;
         } else {
             error!("{}: Logic error - unexpected RPC.", self);
             None
         }
     }
 
-    fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {
-        let requester_name = utils::requester_address(&rpc);
-        let dst_address = if let Rpc::Request {
-            request: Request::LoginPacket(LoginPacketRequest::CreateFor { ref new_owner, .. }),
-            ..
-        } = rpc
-        {
-            XorName::from(*new_owner)
-        } else {
-            error!("{}: Logic error - unexpected RPC.", self);
-            return None;
-        };
-
-        // TODO - once Routing is integrated, we'll construct the full message to send
-        //        onwards, and then if we're also part of the data handlers, we'll call that
-        //        same handler which Routing will call after receiving a message.
-
-        if self.self_is_handler_for(&dst_address) {
-            return self
-                .client_handler_mut()?
-                .handle_vault_rpc(requester_name, rpc);
-        }
-        None
+    fn get_requester_name(&self, rpc: &Rpc) -> XorName {
+        utils::requester_address(&rpc)
     }
 
-    fn self_is_handler_for(&self, _address: &XorName) -> bool {
-        true
+    fn is_client_auth_write(&self, request: &Request) -> bool {
+        match request {
+            Request::Client(ClientRequest::System(SystemOp::ClientAuth(
+                ClientAuth::DelAuthKey { .. },
+            )))
+            | Request::Client(ClientRequest::System(SystemOp::ClientAuth(
+                ClientAuth::InsAuthKey { .. },
+            ))) => true,
+            _ => false,
+        }
+    }
+
+    fn is_client_req(&self, request: &Request) -> bool {
+        match request {
+            Request::Client(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_node_req(&self, request: &Request) -> bool {
+        match request {
+            Request::Node(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_client_handler_req(&self, request: &Request) -> bool {
+        match request {
+            Request::Client(ClientRequest::System(SystemOp::Transfers(_))) // Temporary! Is really at Section(TransferReplicas).
+            | Request::Client(ClientRequest::System(SystemOp::ClientAuth(_)))
+            | Request::Client(ClientRequest::Read(Read::Account(_)))
+            | Request::Client(ClientRequest::Write { write: Write::Account(_), .. })
+            | Request::Node(NodeRequest::System(SystemOp::ClientAuth(_)))
+            | Request::Node(NodeRequest::Read(Read::Account(_)))
+            | Request::Node(NodeRequest::Write(Write::Account(_))) => true,
+            _ => false,
+        }
+    }
+
+    fn is_data_handler_req(&self, request: &Request) -> bool {
+        !self.is_client_handler_req(request) // temporary simplification
+    }
+
+    fn is_transfer_handler_req(&self, request: &Request) -> bool {
+        match request {
+            Request::Client(ClientRequest::System(SystemOp::Transfers(_))) => true,
+            _ => false,
+        }
+    }
+
+    fn self_is_handler_for(&self, address: &XorName) -> bool {
+        let xorname = routing::XorName(address.0);
+        match self.routing.borrow().matches_our_prefix(&xorname) {
+            Ok(result) => result,
+            _ => false,
+        }
     }
 
     // TODO - remove this
     #[allow(unused)]
     fn client_handler(&self) -> Option<&ClientHandler> {
         match &self.state {
-            State::Infant => None,
             State::Elder {
                 ref client_handler, ..
             } => Some(client_handler),
-            State::Adult { .. } => None,
+            _ => None,
         }
     }
 
     fn client_handler_mut(&mut self) -> Option<&mut ClientHandler> {
         match &mut self.state {
-            State::Infant => None,
             State::Elder {
                 ref mut client_handler,
                 ..
             } => Some(client_handler),
-            State::Adult { .. } => None,
+            _ => None,
         }
     }
 
@@ -797,31 +806,19 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
-    // TODO - remove this
-    #[allow(unused)]
-    fn data_handler(&self) -> Option<&DataHandler> {
-        match &self.state {
-            State::Infant => None,
-            State::Elder {
-                ref data_handler, ..
-            } => Some(data_handler),
-            State::Adult {
-                ref data_handler, ..
-            } => Some(data_handler),
+    fn data(&mut self) -> Option<&mut Data> {
+        match &mut self.state {
+            State::Adult { ref mut data, .. } => Some(data),
+            _ => None,
         }
     }
 
-    fn data_handler_mut(&mut self) -> Option<&mut DataHandler> {
+    fn metadata(&mut self) -> Option<&mut Metadata> {
         match &mut self.state {
-            State::Infant => None,
             State::Elder {
-                ref mut data_handler,
-                ..
-            } => Some(data_handler),
-            State::Adult {
-                ref mut data_handler,
-                ..
-            } => Some(data_handler),
+                ref mut metadata, ..
+            } => Some(metadata),
+            _ => None,
         }
     }
 
@@ -842,7 +839,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for Vault<R> {
+impl<R: CryptoRng + Rng> Display for Node<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.public_id())
     }

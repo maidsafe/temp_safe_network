@@ -17,9 +17,9 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, ClientRequest, DataAuthKind, Error as NdError, MessageId,
-    MiscAuthKind, MoneyAuthKind, NodePublicId, PublicId, PublicKey, Request, RequestAuthKind,
-    Response, Signature,
+    AppPermissions, AppPublicId, ClientAuth, ClientRequest, DataAuthKind, Error as NdError,
+    MessageId, MiscAuthKind, MoneyAuthKind, NodePublicId, PublicId, PublicKey, Request,
+    RequestAuthKind, Response, Signature, SystemOp,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -38,14 +38,13 @@ impl Auth {
         Self { id, auth_keys }
     }
 
-    // on client request
-    pub fn process_client_request(
+    pub fn initiate(
         &mut self,
-        client: &ClientInfo,
-        request: ClientRequest,
+        client: PublicId,
+        request: ClientAuth,
         message_id: MessageId,
     ) -> Option<Action> {
-        use ClientRequest::*;
+        use ClientAuth::*;
         match request {
             ListAuthKeysAndVersion => self.list_keys_and_version(client, message_id),
             InsAuthKey {
@@ -107,14 +106,10 @@ impl Auth {
     }
 
     // client query
-    fn list_keys_and_version(
-        &mut self,
-        client: &ClientInfo,
-        message_id: MessageId,
-    ) -> Option<Action> {
+    fn list_keys_and_version(&mut self, client: PublicId, message_id: MessageId) -> Option<Action> {
         let result = Ok(self
             .auth_keys
-            .list_keys_and_version(utils::client(&client.public_id)?));
+            .list_keys_and_version(utils::client(&client)?));
         Some(Action::RespondToClient {
             message_id,
             response: Response::ListAuthKeysAndVersion(result),
@@ -122,13 +117,13 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise_client_request(
+    pub(super) fn finalise(
         &mut self,
         requester: PublicId,
-        request: ClientRequest,
+        request: ClientAuth,
         message_id: MessageId,
     ) -> Option<Action> {
-        use ClientRequest::*;
+        use ClientAuth::*;
         match request {
             InsAuthKey {
                 key,
@@ -151,19 +146,21 @@ impl Auth {
     // on client request
     fn initiate_key_insertion(
         &self,
-        client: &ClientInfo,
+        client_public_id: PublicId,
         key: PublicKey,
         new_version: u64,
         permissions: AppPermissions,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::Client(ClientRequest::InsAuthKey {
-                key,
-                version: new_version,
-                permissions,
-            }),
-            client_public_id: client.public_id.clone(),
+            request: Request::Client(ClientRequest::System(SystemOp::ClientAuth(
+                ClientAuth::InsAuthKey {
+                    key,
+                    version: new_version,
+                    permissions,
+                },
+            ))),
+            client_public_id,
             message_id,
         }))
     }
@@ -171,20 +168,20 @@ impl Auth {
     // on consensus
     fn finalise_key_insertion(
         &mut self,
-        client: PublicId,
+        requester: PublicId,
         key: PublicKey,
         new_version: u64,
         permissions: AppPermissions,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self
-            .auth_keys
-            .insert(utils::client(&client)?, key, new_version, permissions);
+        let result =
+            self.auth_keys
+                .insert(utils::client(&requester)?, key, new_version, permissions);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
                 response: Response::Write(result),
-                requester: client,
+                requester,
                 message_id,
                 refund: None,
                 proof: None,
@@ -195,17 +192,19 @@ impl Auth {
     // on client request
     fn initiate_key_deletion(
         &mut self,
-        client: &ClientInfo,
+        client_public_id: PublicId,
         key: PublicKey,
         new_version: u64,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::Client(ClientRequest::DelAuthKey {
-                key,
-                version: new_version,
-            }),
-            client_public_id: client.public_id.clone(),
+            request: Request::Client(ClientRequest::System(SystemOp::ClientAuth(
+                ClientAuth::DelAuthKey {
+                    key,
+                    version: new_version,
+                },
+            ))),
+            client_public_id,
             message_id,
         }))
     }
@@ -213,19 +212,19 @@ impl Auth {
     // on consensus
     pub fn finalise_key_deletion(
         &mut self,
-        client: PublicId,
+        requester: PublicId,
         key: PublicKey,
         new_version: u64,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
             .auth_keys
-            .delete(utils::client(&client)?, key, new_version);
+            .delete(utils::client(&requester)?, key, new_version);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
                 response: Response::Write(result),
-                requester: client,
+                requester,
                 message_id,
                 refund: None,
                 proof: None,
@@ -236,7 +235,7 @@ impl Auth {
     // Verify that valid signature is provided if the request requires it.
     pub fn verify_signature(
         &mut self,
-        public_id: &PublicId,
+        public_id: PublicId,
         request: &Request,
         message_id: MessageId,
         signature: Option<Signature>,
@@ -285,12 +284,12 @@ impl Auth {
 
     fn is_valid_client_signature(
         &self,
-        client_id: &PublicId,
+        client_id: PublicId,
         request: &Request,
         message_id: &MessageId,
         signature: &Signature,
     ) -> bool {
-        let pub_key = match utils::own_key(client_id) {
+        let pub_key = match utils::own_key(&client_id) {
             Some(pk) => pk,
             None => {
                 error!("{}: Logic error.  This should be unreachable.", self);

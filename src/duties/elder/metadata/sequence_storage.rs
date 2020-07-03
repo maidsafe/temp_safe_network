@@ -9,16 +9,16 @@
 use crate::{
     action::Action,
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
+    node::Init,
     rpc::Rpc,
-    utils,
-    vault::Init,
-    Config, Result,
+    utils, Config, Result,
 };
 
 use safe_nd::{
-DebitAgreementProof, Error as NdError, MessageId, NodePublicId, PublicId, Response, Result as NdResult, SData,
+    Error as NdError, MessageId, NodePublicId, PublicId, Response, Result as NdResult, SData,
     SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions,
-    SDataPrivPermissions, SDataPubPermissions, SDataRequest, SDataUser, SDataWriteOp,
+    SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp, SequenceRead,
+    SequenceWrite,
 };
 
 use std::{
@@ -27,12 +27,12 @@ use std::{
     rc::Rc,
 };
 
-pub(super) struct SDataHandler {
+pub(super) struct SequenceStorage {
     id: NodePublicId,
     chunks: SequenceChunkStore,
 }
 
-impl SDataHandler {
+impl SequenceStorage {
     pub(super) fn new(
         id: NodePublicId,
         config: &Config,
@@ -50,47 +50,51 @@ impl SDataHandler {
         Ok(Self { id, chunks })
     }
 
-    pub(super) fn handle_request(
-        &mut self,
+    pub(super) fn read(
+        &self,
         requester: PublicId,
-        request: SDataRequest,
+        read: &SequenceRead,
         message_id: MessageId,
     ) -> Option<Action> {
-        use SDataRequest::*;
-        match request {
-            Store { data, debit_proof } => {
-                self.handle_store_req(requester, &data, message_id, debit_proof)
-            }
-            Get(address) => self.handle_get_req(requester, address, message_id),
-            GetRange { address, range } => {
-                self.handle_get_range_req(requester, address, range, message_id)
-            }
-            GetLastEntry(address) => self.handle_get_last_entry_req(requester, address, message_id),
-            GetOwner(address) => self.handle_get_owner_req(requester, address, message_id),
+        use SequenceRead::*;
+        match read {
+            Get(address) => self.get(requester, *address, message_id),
+            GetRange { address, range } => self.get_range(requester, *address, *range, message_id),
+            GetLastEntry(address) => self.get_last_entry(requester, *address, message_id),
+            GetOwner(address) => self.get_owner(requester, *address, message_id),
             GetUserPermissions { address, user } => {
-                self.handle_get_user_permissions_req(requester, address, user, message_id)
+                self.get_user_permissions(requester, *address, *user, message_id)
             }
-            GetPermissions(address) => {
-                self.handle_get_permissions_req(requester, address, message_id)
-            }
-            Delete(address) => self.handle_delete_req(requester, address, message_id),
-            SetPubPermissions(operation) => {
-                self.handle_mutate_pub_permissions_req(&requester, operation, message_id)
-            }
-            SetPrivPermissions(operation) => {
-                self.handle_mutate_priv_permissions_req(&requester, operation, message_id)
-            }
-            SetOwner(operation) => self.handle_mutate_owner_req(&requester, operation, message_id),
-            Edit(operation) => self.handle_mutate_data_req(&requester, operation, message_id),
+            GetPermissions(address) => self.get_permissions(requester, *address, message_id),
         }
     }
 
-    fn handle_store_req(
+    pub(super) fn write(
+        &mut self,
+        requester: PublicId,
+        write: SequenceWrite,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use SequenceWrite::*;
+        match write {
+            New(data) => self.store(requester, &data, message_id),
+            Edit(operation) => self.edit(&requester, operation, message_id),
+            Delete(address) => self.delete(requester, address, message_id),
+            SetOwner(operation) => self.set_owner(&requester, operation, message_id),
+            SetPubPermissions(operation) => {
+                self.set_public_permissions(&requester, operation, message_id)
+            }
+            SetPrivPermissions(operation) => {
+                self.set_private_permissions(&requester, operation, message_id)
+            }
+        }
+    }
+
+    fn store(
         &mut self,
         requester: PublicId,
         data: &SData,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
@@ -100,26 +104,25 @@ impl SDataHandler {
                 .map_err(|error| error.to_string().into())
         };
 
-        let refund = utils::get_refund_for_put(&result, debit_proof);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                refund,
+                refund: None,
                 proof: None,
             },
         })
     }
 
-    fn handle_get_req(
-        &mut self,
+    fn get(
+        &self,
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.get_sdata(&requester, address, SDataAction::Read);
+        let result = self.get_chunk(&requester, address, SDataAction::Read);
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -133,7 +136,7 @@ impl SDataHandler {
         })
     }
 
-    fn get_sdata(
+    fn get_chunk(
         &self,
         requester: &PublicId,
         address: SDataAddress,
@@ -149,7 +152,7 @@ impl SDataHandler {
         Ok(data)
     }
 
-    fn handle_delete_req(
+    fn delete(
         &mut self,
         requester: PublicId,
         address: SDataAddress,
@@ -190,15 +193,15 @@ impl SDataHandler {
         })
     }
 
-    fn handle_get_range_req(
-        &mut self,
+    fn get_range(
+        &self,
         requester: PublicId,
         address: SDataAddress,
         range: (SDataIndex, SDataIndex),
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_sdata(&requester, address, SDataAction::Read)
+            .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToClientHandlers {
@@ -213,14 +216,14 @@ impl SDataHandler {
         })
     }
 
-    fn handle_get_last_entry_req(
+    fn get_last_entry(
         &self,
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_sdata(&requester, address, SDataAction::Read)
+            .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| match sdata.last_entry() {
                 Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
                 None => Err(NdError::NoSuchEntry),
@@ -238,14 +241,14 @@ impl SDataHandler {
         })
     }
 
-    fn handle_get_owner_req(
+    fn get_owner(
         &self,
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_sdata(&requester, address, SDataAction::Read)
+            .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
                 let index = sdata.owners_index() - 1;
                 sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
@@ -263,7 +266,7 @@ impl SDataHandler {
         })
     }
 
-    fn handle_get_user_permissions_req(
+    fn get_user_permissions(
         &self,
         requester: PublicId,
         address: SDataAddress,
@@ -271,7 +274,7 @@ impl SDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .get_sdata(&requester, address, SDataAction::Read)
+            .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
                 let index = sdata.permissions_index() - 1;
                 sdata.user_permissions(user, index)
@@ -289,7 +292,7 @@ impl SDataHandler {
         })
     }
 
-    fn handle_get_permissions_req(
+    fn get_permissions(
         &self,
         requester: PublicId,
         address: SDataAddress,
@@ -297,7 +300,7 @@ impl SDataHandler {
     ) -> Option<Action> {
         let response = {
             let result = self
-                .get_sdata(&requester, address, SDataAction::Read)
+                .get_chunk(&requester, address, SDataAction::Read)
                 .and_then(|sdata| {
                     let index = sdata.permissions_index() - 1;
                     let res = if sdata.is_pub() {
@@ -323,20 +326,18 @@ impl SDataHandler {
         })
     }
 
-    fn handle_mutate_pub_permissions_req(
+    fn set_public_permissions(
         &mut self,
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataPubPermissions>,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
-        self.mutate_sdata_chunk(
+        self.edit_chunk(
             &requester,
             address,
             SDataAction::ManagePermissions,
             message_id,
-            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_pub_perms_op(mutation_op.crdt_op)?;
                 Ok(sdata)
@@ -344,20 +345,18 @@ impl SDataHandler {
         )
     }
 
-    fn handle_mutate_priv_permissions_req(
+    fn set_private_permissions(
         &mut self,
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataPrivPermissions>,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
-        self.mutate_sdata_chunk(
+        self.edit_chunk(
             &requester,
             address,
             SDataAction::ManagePermissions,
             message_id,
-            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_priv_perms_op(mutation_op.crdt_op)?;
                 Ok(sdata)
@@ -365,20 +364,18 @@ impl SDataHandler {
         )
     }
 
-    fn handle_mutate_owner_req(
+    fn set_owner(
         &mut self,
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataOwner>,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
-        self.mutate_sdata_chunk(
+        self.edit_chunk(
             &requester,
             address,
             SDataAction::ManagePermissions,
             message_id,
-            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_owner_op(mutation_op.crdt_op);
                 Ok(sdata)
@@ -386,20 +383,18 @@ impl SDataHandler {
         )
     }
 
-    fn handle_mutate_data_req(
+    fn edit(
         &mut self,
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataEntry>,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let address = mutation_op.address;
-        self.mutate_sdata_chunk(
+        self.edit_chunk(
             &requester,
             address,
             SDataAction::Append,
             message_id,
-            debit_proof,
             move |mut sdata| {
                 sdata.apply_crdt_op(mutation_op.crdt_op);
                 Ok(sdata)
@@ -407,20 +402,19 @@ impl SDataHandler {
         )
     }
 
-    fn mutate_sdata_chunk<F>(
+    fn edit_chunk<F>(
         &mut self,
         requester: &PublicId,
         address: SDataAddress,
         action: SDataAction,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
         mutation_fn: F,
     ) -> Option<Action>
     where
         F: FnOnce(SData) -> NdResult<SData>,
     {
         let result = self
-            .get_sdata(requester, address, action)
+            .get_chunk(requester, address, action)
             .and_then(mutation_fn)
             .and_then(move |sdata| {
                 self.chunks
@@ -428,21 +422,20 @@ impl SDataHandler {
                     .map_err(|error| error.to_string().into())
             });
 
-        let refund = utils::get_refund_for_put(&result, debit_proof);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester: requester.clone(),
                 response: Response::Write(result),
                 message_id,
-                refund,
+                refund: None,
                 proof: None,
             },
         })
     }
 }
 
-impl Display for SDataHandler {
+impl Display for SequenceStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

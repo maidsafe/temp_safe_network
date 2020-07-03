@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
-mod balances;
 mod data_requests;
 mod login_packets;
 mod messaging;
@@ -15,27 +14,28 @@ mod replica_manager;
 mod transfers;
 
 use self::{
-    auth::{Auth, AuthKeysDb, ClientInfo},
-    data_requests::Evaluation,
+    auth::{Auth, AuthKeysDb},
+    data_requests::Validation,
     login_packets::LoginPackets,
     messaging::Messaging,
     replica_manager::ReplicaManager,
     transfers::Transfers,
 };
-#[cfg(not(feature = "simulated-payouts"))]
-use crate::utils;
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::LoginPacketChunkStore,
+    node::Init,
     rpc::Rpc,
-    vault::Init,
-    Config, Result,
+    utils, Config, Result,
 };
 use bytes::Bytes;
-use log::{error, trace};
+use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Node, RoutingError, SectionProofChain};
-use safe_nd::{MessageId, Money, NodePublicId, PublicId, Request, Response, Signature, XorName};
+use safe_nd::{
+    ClientRequest, MessageId, Money, NodePublicId, NodeRequest, PublicId, Read, Request, Response,
+    Signature, SystemOp, Write, XorName,
+};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -53,7 +53,7 @@ pub(crate) struct ClientHandler {
     transfers: Transfers,
     auth: Auth,
     login_packets: LoginPackets,
-    data: Evaluation,
+    data: Validation,
 }
 
 impl ClientHandler {
@@ -92,7 +92,7 @@ impl ClientHandler {
         let auth = Auth::new(id.clone(), auth_keys_db);
         let transfers = Transfers::new(id.clone(), replica_manager);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
-        let data = Evaluation::new(id.clone());
+        let data = Validation::new(id.clone());
 
         let client_handler = Self {
             id,
@@ -127,27 +127,6 @@ impl ClientHandler {
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
         self.messaging.handle_connection_failure(peer_addr)
-    }
-
-    pub fn handle_client_message<R: CryptoRng + Rng>(
-        &mut self,
-        peer_addr: SocketAddr,
-        bytes: &Bytes,
-        rng: &mut R,
-    ) -> Option<Action> {
-        let result = self
-            .messaging
-            .try_parse_client_request(peer_addr, bytes, rng);
-        if let Some(result) = result {
-            self.process_client_request(
-                &result.client,
-                result.request,
-                result.message_id,
-                result.signature,
-            )
-        } else {
-            None
-        }
     }
 
     pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
@@ -229,112 +208,109 @@ impl ClientHandler {
                 message_id,
                 signature: None,
             })),
-            PayAndProxy {
-                request,
-                client_public_id,
-                message_id,
-                put_debit_proof,
-                optional_amount_debit_proof,
-            } => {
-                #[cfg(feature = "simulated-payouts")]
-                {
-                    self.transfers.pay(put_debit_proof.signed_transfer.transfer);
+        }
+    }
 
-                    if let Some(proof) = optional_amount_debit_proof {
-                        self.transfers.pay(proof.signed_transfer.transfer);
-                    }
-                }
-
-                #[cfg(not(feature = "simulated-payouts"))]
-                {
-                    let owner = utils::owner(&client_public_id)?;
-
-                    // Pay for Mutation
-                    if let Some(action) = self.transfers.pay_section(
-                        put_debit_proof,
-                        *owner.public_key(),
-                        &request,
-                        message_id,
-                    ) {
-                        return Some(action);
-                    }
-
-                    // Pay for optional amount
-                    if let Some(proof) = optional_amount_debit_proof {
-                        if let Some(action) = self.transfers.pay_section(
-                            proof,
-                            *owner.public_key(),
-                            &request,
-                            message_id,
-                        ) {
-                            return Some(action);
-                        }
-                    }
-                }
-
-                Some(Action::ProxyClientRequest(Rpc::Request {
-                    requester: client_public_id,
-                    request,
-                    message_id,
-                    signature: None,
-                }))
-            }
+    pub fn handle_client_message<R: CryptoRng + Rng>(
+        &mut self,
+        peer_addr: SocketAddr,
+        bytes: &Bytes,
+        rng: &mut R,
+    ) -> Option<Action> {
+        let result = self
+            .messaging
+            .try_parse_client_request(peer_addr, bytes, rng);
+        if let Some(result) = result {
+            self.process_client_request(
+                result.client.public_id,
+                result.request,
+                result.message_id,
+                result.signature,
+            )
+        } else {
+            None
         }
     }
 
     // on client request
     fn process_client_request(
         &mut self,
-        client: &ClientInfo,
+        client: PublicId,
         request: Request,
-        message_id: MessageId,
+        msg_id: MessageId,
         signature: Option<Signature>,
     ) -> Option<Action> {
-        use Request::*;
         trace!(
             "{}: Received ({:?} {:?}) from {}",
             self,
             request,
-            message_id,
-            client.public_id
+            msg_id,
+            client.clone()
         );
 
         if let Some(action) =
             self.auth
-                .verify_signature(&client.public_id, &request, message_id, signature)
+                .verify_signature(client.clone(), &request, msg_id, signature)
         {
             return Some(action);
         };
-        if let Some(action) = self
-            .auth
-            .authorise_app(&client.public_id, &request, message_id)
-        {
+        if let Some(action) = self.auth.authorise_app(&client, &request, msg_id) {
             return Some(action);
         }
 
-        match request {
-            IData(idata_req) => self
-                .data
-                .immutable
-                .process_client_request(client, idata_req, message_id),
-            MData(mdata_req) => self
-                .data
-                .mutable
-                .process_client_request(client, mdata_req, message_id),
-            SData(sdata_req) => self
-                .data
-                .sequence
-                .process_client_request(client, sdata_req, message_id),
-            Money(money_req) => self
-                .transfers
-                .process_client_request(client, money_req, message_id),
-            LoginPacket(login_packet_req) => {
-                self.login_packets
-                    .process_client_request(client, login_packet_req, message_id)
+        if let Request::Client(client_request) = request {
+            match client_request {
+                // Temporary
+                ClientRequest::Write {
+                    write: Write::Account(write),
+                    debit_agreement,
+                } => self
+                    .login_packets
+                    .initiate_write(client, write, msg_id, debit_agreement),
+                // Temporary
+                ClientRequest::Read(Read::Account(read)) => {
+                    self.login_packets.read(client, read, msg_id)
+                }
+                ClientRequest::Read(read) => self.data.initiate_read(read, client, msg_id),
+                ClientRequest::Write {
+                    write,
+                    debit_agreement,
+                } => self
+                    .data
+                    .initiate_write(write, client, msg_id, debit_agreement),
+                ClientRequest::System(op) => self.initiate_system_op(op, client, msg_id),
             }
-            Client(client_req) => self
-                .auth
-                .process_client_request(client, client_req, message_id),
+        } else {
+            None
+        }
+    }
+
+    fn initiate_system_op(
+        &mut self,
+        op: SystemOp,
+        client: PublicId,
+        msg_id: MessageId,
+    ) -> Option<Action> {
+        use SystemOp::*;
+        match op {
+            Transfers(request) => self.transfers.initiate(client, request, msg_id),
+            ClientAuth(request) => self.auth.initiate(client, request, msg_id),
+        }
+    }
+
+    fn finalise_system_op(
+        &mut self,
+        op: SystemOp,
+        client: PublicId,
+        msg_id: MessageId,
+    ) -> Option<Action> {
+        use SystemOp::*;
+        match op {
+            Transfers(request) => {
+                self.transfers
+                    .finalise(client, request, msg_id, &mut self.messaging)
+            }
+            ClientAuth(request) => self.auth.finalise(client, request, msg_id),
         }
     }
 
@@ -344,42 +320,38 @@ impl ClientHandler {
         src: XorName,
         requester: PublicId,
         request: Request,
-        message_id: MessageId,
+        msg_id: MessageId,
     ) -> Option<Action> {
-        use Request::*;
         trace!(
             "{}: Received ({:?} {:?}) from src {} (client {:?})",
             self,
-            request,
-            message_id,
+            &request,
+            msg_id,
             src,
             requester
         );
-        match request {
-            LoginPacket(req) => self.login_packets.finalise_client_request(
-                src,
-                requester,
-                req,
-                message_id,
-                &mut self.transfers,
-                &mut self.messaging,
-            ),
-            Money(req) => self.transfers.finalise_client_request(
-                requester,
-                req,
-                message_id,
-                &mut self.messaging,
-            ),
-            Client(req) => self
-                .auth
-                .finalise_client_request(requester, req, message_id),
-            IData(_) | MData(_) | SData(_) => {
-                error!(
-                    "{}: Should not receive {:?} as a client handler.",
-                    self, request
-                );
-                None
+
+        if let Request::Node(node_request) = request {
+            match node_request {
+                NodeRequest::System(op) => self.finalise_system_op(op, requester, msg_id),
+                // Temporary
+                NodeRequest::Write(Write::Account(write)) => {
+                    self.login_packets.finalise_write(requester, write, msg_id)
+                }
+                // Temporary
+                NodeRequest::Read(Read::Account(read)) => {
+                    self.login_packets.read(requester, read, msg_id)
+                }
+                NodeRequest::Read(_) | NodeRequest::Write(_) => {
+                    // error!(
+                    //     "{}: Should not receive {:?} as a client handler.",
+                    //     self, request
+                    // );
+                    None
+                }
             }
+        } else {
+            None
         }
     }
 }

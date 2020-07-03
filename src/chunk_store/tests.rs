@@ -11,7 +11,7 @@ use super::{
     error::Error,
     ChunkStore, Subdir,
 };
-use crate::{vault::Init, ToDbKey};
+use crate::{node::Init, ToDbKey};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{cell::Cell, path::Path, rc::Rc, u64};

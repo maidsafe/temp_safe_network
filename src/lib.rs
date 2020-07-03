@@ -34,12 +34,12 @@ mod action;
 mod chunk_store;
 mod client_handler;
 mod config_handler;
-mod data_handler;
+mod duties;
 mod error;
+mod node;
 mod rpc;
 mod to_db_key;
 mod utils;
-mod vault;
 
 pub(crate) use to_db_key::ToDbKey;
 
@@ -48,5 +48,5 @@ pub use crate::{
     client_handler::COST_OF_PUT,
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
-    vault::{Command, Vault},
+    node::{Command, Node as Vault},
 };

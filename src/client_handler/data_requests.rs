@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::auth::ClientInfo;
 use crate::{
     action::{Action, ConsensusAction},
     rpc::Rpc,
@@ -14,24 +13,64 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, IData, IDataAddress, IDataKind, IDataRequest, MData,
-    MDataRequest, MessageId, NodePublicId, Request, Response, SData, SDataAddress, SDataRequest,
+    AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Error as NdError, IData,
+    IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId, NodePublicId, NodeRequest,
+    PublicId, Read, Request, Response, SData, SDataAddress, SequenceRead, SequenceWrite, Write,
 };
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone)]
-pub(crate) struct Evaluation {
-    pub immutable: Immutable,
-    pub mutable: Mutable,
-    pub sequence: Sequence,
+pub(crate) struct Validation {
+    blobs: Blobs,
+    maps: Maps,
+    sequences: Sequences,
+    accounts: Accounts,
 }
 
-impl Evaluation {
+impl Validation {
     pub fn new(id: NodePublicId) -> Self {
         Self {
-            immutable: Immutable::new(id.clone()),
-            mutable: Mutable::new(id.clone()),
-            sequence: Sequence::new(id),
+            blobs: Blobs::new(id.clone()),
+            maps: Maps::new(id.clone()),
+            sequences: Sequences::new(id.clone()),
+            accounts: Accounts::new(id.clone()),
+        }
+    }
+
+    pub fn initiate_write(
+        &mut self,
+        write: Write,
+        client: PublicId,
+        msg_id: MessageId,
+        debit_proof: DebitAgreementProof,
+    ) -> Option<Action> {
+        match write {
+            Write::Blob(write) => self
+                .blobs
+                .initiate_write(client, write, msg_id, debit_proof),
+            Write::Map(write) => self.maps.initiate_write(client, write, msg_id, debit_proof),
+            Write::Sequence(write) => {
+                self.sequences
+                    .initiate_write(client, write, msg_id, debit_proof)
+            }
+            Write::Account(write) => {
+                self.accounts
+                    .initiate_write(client, write, msg_id, debit_proof)
+            }
+        }
+    }
+
+    pub fn initiate_read(
+        &mut self,
+        read: Read,
+        client: PublicId,
+        msg_id: MessageId,
+    ) -> Option<Action> {
+        match read {
+            Read::Blob(write) => self.blobs.initiate_read(client, write, msg_id),
+            Read::Map(write) => self.maps.initiate_read(client, write, msg_id),
+            Read::Sequence(write) => self.sequences.initiate_read(client, write, msg_id),
+            Read::Account(read) => self.accounts.initiate_read(client, read, msg_id),
         }
     }
 }
@@ -41,71 +80,64 @@ impl Evaluation {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct Sequence {
+pub(crate) struct Sequences {
     id: NodePublicId,
 }
 
-impl Sequence {
+impl Sequences {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
     }
 
-    // on client request
-    pub fn process_client_request(
-        &mut self,
-        client: &ClientInfo,
-        request: SDataRequest,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        use SDataRequest::*;
-        match request {
-            Store { data, debit_proof } => {
-                self.initiate_creation(client, data, message_id, debit_proof)
-            }
-            Get(_)
-            | GetRange { .. }
-            | GetLastEntry(_)
-            | GetOwner { .. }
-            | GetPermissions { .. }
-            | GetUserPermissions { .. } => self.get(client, request, message_id),
-            Delete(address) => self.initiate_deletion(client, address, message_id),
-            SetPubPermissions { .. } | SetPrivPermissions { .. } | SetOwner { .. } | Edit(..) => {
-                self.initiate_mutation(client, request, message_id)
-            }
-        }
-    }
-
     // client query
-    fn get(
+    pub fn initiate_read(
         &mut self,
-        client: &ClientInfo,
-        request: SDataRequest,
+        requester: PublicId,
+        request: SequenceRead,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::SData(request),
+            requester,
+            request: Request::Node(NodeRequest::Read(Read::Sequence(request))),
             message_id,
             signature: None,
         }))
     }
 
     // on client request
+    pub fn initiate_write(
+        &mut self,
+        client: PublicId,
+        write: SequenceWrite,
+        message_id: MessageId,
+        debit_proof: DebitAgreementProof,
+    ) -> Option<Action> {
+        use SequenceWrite::*;
+        match write {
+            New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
+            Delete(address) => self.initiate_deletion(client, address, message_id),
+            SetPubPermissions { .. } | SetPrivPermissions { .. } | SetOwner { .. } | Edit(..) => {
+                self.initiate_mutation(client, write, message_id, debit_proof)
+            }
+        }
+    }
+
+    // on client request
     fn initiate_creation(
         &mut self,
-        client: &ClientInfo,
+        client: PublicId,
         chunk: SData,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        let owner = utils::owner(&client.public_id)?;
+        let owner = utils::owner(&client)?;
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*owner.public_key()).is_err() {
             trace!(
                 "{}: {} attempted to store Sequence with invalid owners.",
                 self,
-                client.public_id
+                client
             );
             return Some(Action::RespondToClient {
                 message_id,
@@ -113,13 +145,10 @@ impl Sequence {
             });
         }
 
-        let request = Request::SData(SDataRequest::Store {
-            data: chunk,
-            debit_proof: debit_proof.clone(),
-        });
+        let request = Self::wrap(SequenceWrite::New(chunk));
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
-            client_public_id: client.public_id.clone(),
+            client_public_id: client.clone(),
             message_id,
             debit_proof,
         }))
@@ -128,7 +157,7 @@ impl Sequence {
     // on client request
     fn initiate_deletion(
         &mut self,
-        client: &ClientInfo,
+        client: PublicId,
         address: SDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -140,8 +169,8 @@ impl Sequence {
         }
 
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::SData(SDataRequest::Delete(address)),
-            client_public_id: client.public_id.clone(),
+            request: Self::wrap(SequenceWrite::Delete(address)),
+            client_public_id: client.clone(),
             message_id,
         }))
     }
@@ -149,21 +178,25 @@ impl Sequence {
     // on client request
     fn initiate_mutation(
         &mut self,
-        client: &ClientInfo,
-        request: SDataRequest,
+        client: PublicId,
+        request: SequenceWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request: Request::SData(request),
-            client_public_id: client.public_id.clone(),
+            request: Self::wrap(request),
+            client_public_id: client.clone(),
             message_id,
             debit_proof,
         }))
     }
+
+    fn wrap(write: SequenceWrite) -> Request {
+        Request::Node(NodeRequest::Write(Write::Sequence(write)))
+    }
 }
 
-impl Display for Sequence {
+impl Display for Sequences {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }
@@ -174,28 +207,24 @@ impl Display for Sequence {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct Immutable {
+pub(crate) struct Blobs {
     id: NodePublicId,
 }
 
-impl Immutable {
+impl Blobs {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
     }
 
     // on client request
-    pub fn process_client_request(
+    pub fn initiate_read(
         &mut self,
-        client: &ClientInfo,
-        request: IDataRequest,
+        requester: PublicId,
+        read: BlobRead,
         message_id: MessageId,
     ) -> Option<Action> {
-        use IDataRequest::*;
-        match request {
-            Put { data, debit_proof } => {
-                self.initiate_creation(client, data, message_id, debit_proof)
-            }
-            Get(address) => {
+        match read {
+            BlobRead::Get(_) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
                 // since it's free for anyone to get.  However, as a means of spam prevention, we
                 // could change this so that signatures are required, and the signatures would need
@@ -203,36 +232,40 @@ impl Immutable {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                self.get(client, address, message_id)
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    requester,
+                    request: Request::Node(NodeRequest::Read(Read::Blob(read))),
+                    message_id,
+                    signature: None,
+                }))
             }
-            DeleteUnpub(address) => self.initiate_deletion(client, address, message_id),
         }
     }
 
-    // client query
-    fn get(
+    // on client request
+    pub fn initiate_write(
         &mut self,
-        client: &ClientInfo,
-        address: IDataAddress,
+        client: PublicId,
+        write: BlobWrite,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::IData(IDataRequest::Get(address)),
-            message_id,
-            signature: None,
-        }))
+        use BlobWrite::*;
+        match write {
+            New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
+            DeletePrivate(address) => self.initiate_deletion(client, address, message_id),
+        }
     }
 
     // on client request
     fn initiate_creation(
         &mut self,
-        client: &ClientInfo,
+        client: PublicId,
         chunk: IData,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        let owner = utils::owner(&client.public_id)?;
+        let owner = utils::owner(&client)?;
 
         // Assert that if the request was for UnpubIData, that the owner's public key has
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
@@ -242,7 +275,7 @@ impl Immutable {
                 trace!(
                     "{}: {} attempted Put UnpubIData with invalid owners field.",
                     self,
-                    client.public_id
+                    client
                 );
                 return Some(Action::RespondToClient {
                     message_id,
@@ -251,13 +284,10 @@ impl Immutable {
             }
         }
 
-        let request = Request::IData(IDataRequest::Put {
-            data: chunk,
-            debit_proof: debit_proof.clone(),
-        });
+        let request = Self::wrap(BlobWrite::New(chunk));
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
-            client_public_id: client.public_id.clone(),
+            client_public_id: client.clone(),
             message_id,
             debit_proof,
         }))
@@ -266,7 +296,7 @@ impl Immutable {
     // on client request
     fn initiate_deletion(
         &mut self,
-        client: &ClientInfo,
+        client: PublicId,
         address: IDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -277,14 +307,18 @@ impl Immutable {
             });
         }
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::IData(IDataRequest::DeleteUnpub(address)),
-            client_public_id: client.public_id.clone(),
+            request: Self::wrap(BlobWrite::DeletePrivate(address)),
+            client_public_id: client.clone(),
             message_id,
         }))
     }
+
+    fn wrap(write: BlobWrite) -> Request {
+        Request::Node(NodeRequest::Write(Write::Blob(write)))
+    }
 }
 
-impl Display for Immutable {
+impl Display for Blobs {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }
@@ -295,37 +329,28 @@ impl Display for Immutable {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct Mutable {
+pub(crate) struct Maps {
     id: NodePublicId,
 }
 
-impl Mutable {
+impl Maps {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
     }
 
+    fn wrap(write: MapWrite) -> Request {
+        Request::Node(NodeRequest::Write(Write::Map(write)))
+    }
+
     // on client request
-    pub fn process_client_request(
+    pub fn initiate_read(
         &mut self,
-        client: &ClientInfo,
-        request: MDataRequest,
+        client: PublicId,
+        read: MapRead,
         message_id: MessageId,
     ) -> Option<Action> {
-        use MDataRequest::*;
-        match request {
-            Put { data, debit_proof } => {
-                self.initiate_creation(client, data, message_id, debit_proof)
-            }
-            MutateEntries {
-                ref debit_proof, ..
-            }
-            | SetUserPermissions {
-                ref debit_proof, ..
-            }
-            | DelUserPermissions {
-                ref debit_proof, ..
-            } => self.initiate_mutation(request.clone(), client, message_id, debit_proof.clone()),
-            Delete(..) => self.initiate_deletion(request, client, message_id),
+        use MapRead::*;
+        match read {
             Get(..)
             | GetVersion(..)
             | GetShell(..)
@@ -334,20 +359,33 @@ impl Mutable {
             | ListUserPermissions { .. }
             | ListEntries(..)
             | ListKeys(..)
-            | ListValues(..) => self.get(request, client, message_id),
+            | ListValues(..) => self.get(read, client, message_id),
+        }
+    }
+
+    // on client request
+    pub fn initiate_write(
+        &mut self,
+        client: PublicId,
+        write: MapWrite,
+        message_id: MessageId,
+        debit_proof: DebitAgreementProof,
+    ) -> Option<Action> {
+        use MapWrite::*;
+        match write {
+            New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
+            Edit { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
+                self.initiate_mutation(write, client, message_id, debit_proof)
+            }
+            Delete(..) => self.initiate_deletion(write, client, message_id),
         }
     }
 
     // client query
-    fn get(
-        &mut self,
-        request: MDataRequest,
-        client: &ClientInfo,
-        message_id: MessageId,
-    ) -> Option<Action> {
+    fn get(&mut self, read: MapRead, requester: PublicId, message_id: MessageId) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::MData(request),
+            requester,
+            request: Request::Node(NodeRequest::Read(Read::Map(read))),
             message_id,
             signature: None,
         }))
@@ -356,14 +394,14 @@ impl Mutable {
     // on client request
     fn initiate_mutation(
         &mut self,
-        request: MDataRequest,
-        client: &ClientInfo,
+        write: MapWrite,
+        client: PublicId,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request: Request::MData(request),
-            client_public_id: client.public_id.clone(),
+            request: Self::wrap(write),
+            client_public_id: client.clone(),
             message_id,
             debit_proof,
         }))
@@ -372,13 +410,13 @@ impl Mutable {
     // on client request
     fn initiate_deletion(
         &mut self,
-        request: MDataRequest,
-        client: &ClientInfo,
+        write: MapWrite,
+        client: PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::MData(request),
-            client_public_id: client.public_id.clone(),
+            request: Self::wrap(write),
+            client_public_id: client.clone(),
             message_id,
         }))
     }
@@ -386,12 +424,12 @@ impl Mutable {
     // on client request
     fn initiate_creation(
         &mut self,
-        client: &ClientInfo,
+        client: PublicId,
         chunk: MData,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        let owner = utils::owner(&client.public_id)?;
+        let owner = utils::owner(&client)?;
 
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
@@ -399,7 +437,7 @@ impl Mutable {
             trace!(
                 "{}: {} attempted PutMData with invalid owners field.",
                 self,
-                client.public_id
+                client
             );
             return Some(Action::RespondToClient {
                 message_id,
@@ -407,21 +445,18 @@ impl Mutable {
             });
         }
 
-        let request = Request::MData(MDataRequest::Put {
-            data: chunk,
-            debit_proof: debit_proof.clone(),
-        });
+        let request = Self::wrap(MapWrite::New(chunk));
 
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
-            client_public_id: client.public_id.clone(),
+            client_public_id: client.clone(),
             message_id,
             debit_proof,
         }))
     }
 }
 
-impl Display for Mutable {
+impl Display for Maps {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }
@@ -430,3 +465,41 @@ impl Display for Mutable {
 // --------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------
+
+#[derive(Clone)]
+pub(super) struct Accounts {
+    id: NodePublicId,
+}
+
+impl Accounts {
+    pub fn new(id: NodePublicId) -> Self {
+        Self { id }
+    }
+
+    // on client request
+    pub fn initiate_read(
+        &mut self,
+        _client: PublicId,
+        _read: AccountRead,
+        _msg_id: MessageId,
+    ) -> Option<Action> {
+        None
+    }
+
+    // on client request
+    pub fn initiate_write(
+        &mut self,
+        _client: PublicId,
+        _write: AccountWrite,
+        _msg_id: MessageId,
+        _debit_proof: DebitAgreementProof,
+    ) -> Option<Action> {
+        None
+    }
+}
+
+impl Display for Accounts {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.id.name())
+    }
+}

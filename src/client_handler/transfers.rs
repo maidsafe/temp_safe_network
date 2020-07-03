@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{auth::ClientInfo, messaging::Messaging, replica_manager::ReplicaManager};
+use super::{messaging::Messaging, replica_manager::ReplicaManager};
 use crate::{action::Action, rpc::Rpc};
 //use log::{error, trace};
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, MessageId, MoneyRequest, NodePublicId, PublicId,
-    Request, Response, SignedTransfer, XorName,
+    DebitAgreementProof, Error as NdError, MessageId, NodePublicId, NodeRequest, PublicId, Request,
+    Response, SignedTransfer, SystemOp, Transfers as MoneyRequest, XorName,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -67,15 +67,15 @@ impl Transfers {
 
     /// Elders that aren't in the dst
     /// section, will forward the request.
-    pub(super) fn process_client_request(
+    pub(super) fn initiate(
         &mut self,
-        client: &ClientInfo,
+        requester: PublicId,
         request: MoneyRequest,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
-            request: Request::Money(request),
-            requester: client.public_id.clone(),
+            request: Request::Node(NodeRequest::System(SystemOp::Transfers(request))),
+            requester,
             message_id,
             signature: None,
         }))
@@ -83,7 +83,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub(super) fn finalise_client_request(
+    pub(super) fn finalise(
         &mut self,
         requester: PublicId,
         request: MoneyRequest,
@@ -95,7 +95,7 @@ impl Transfers {
                 self.validate(signed_transfer, &requester, message_id)
             }
             MoneyRequest::RegisterTransfer { proof } => {
-                self.register(&proof, &requester, message_id, messaging)
+                self.register(&proof, requester, message_id, messaging)
             }
             MoneyRequest::PropagateTransfer { proof } => {
                 self.receive_propagated(&proof, &requester, message_id, messaging)
@@ -203,7 +203,7 @@ impl Transfers {
     fn register(
         &mut self,
         proof: &DebitAgreementProof,
-        requester: &PublicId,
+        requester: PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
     ) -> Option<Action> {
@@ -214,10 +214,12 @@ impl Transfers {
 
                 // the transfer is then propagated, and will reach the recipient section
                 Some(Action::ForwardClientRequest(Rpc::Request {
-                    request: Request::Money(MoneyRequest::PropagateTransfer {
-                        proof: proof.clone(),
-                    }),
-                    requester: requester.clone(),
+                    request: Request::Node(NodeRequest::System(SystemOp::Transfers(
+                        MoneyRequest::PropagateTransfer {
+                            proof: proof.clone(),
+                        },
+                    ))),
+                    requester,
                     message_id,
                     signature: None,
                 }))

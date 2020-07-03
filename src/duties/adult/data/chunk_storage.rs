@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::Action, chunk_store::ImmutableChunkStore, rpc::Rpc, utils, vault::Init, Config, Result,
+    action::Action, chunk_store::ImmutableChunkStore, node::Init, rpc::Rpc, Config, Result,
 };
 use log::{error, info};
 
 use routing::SrcLocation;
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId,
-    Request, Response, XorName,
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
+    XorName,
 };
 use std::{
     cell::Cell,
@@ -24,12 +24,12 @@ use std::{
 };
 use threshold_crypto::Signature;
 
-pub(crate) struct IDataHolder {
+pub(crate) struct ChunkStorage {
     id: NodePublicId,
     chunks: ImmutableChunkStore,
 }
 
-impl IDataHolder {
+impl ChunkStorage {
     pub(crate) fn new(
         id: NodePublicId,
         config: &Config,
@@ -47,15 +47,14 @@ impl IDataHolder {
         Ok(Self { id, chunks })
     }
 
-    pub(crate) fn store_idata(
+    pub(crate) fn store(
         &mut self,
         sender: SrcLocation,
         data: &IData,
-        requester: PublicId,
+        requester: &PublicId,
         message_id: MessageId,
-        accumulated_signature: Option<Signature>,
+        accumulated_signature: Option<&Signature>,
         request: Request,
-        debit_proof: Option<DebitAgreementProof>,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             info!(
@@ -70,40 +69,34 @@ impl IDataHolder {
                 .map_err(|error| error.to_string().into())
         };
 
-        let refund = if let Some(proof) = debit_proof {
-            utils::get_refund_for_put(&result, proof)
-        } else {
-            None
-        };
-
         match sender {
             SrcLocation::Node(_) => Some(Action::RespondToOurDataHandlers {
                 rpc: Rpc::DuplicationComplete {
                     response: Response::Write(result),
                     message_id,
-                    proof: Some((*data.address(), accumulated_signature?)),
+                    proof: Some((*data.address(), (accumulated_signature?).clone())),
                 },
             }),
             SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
                 rpc: Rpc::Response {
-                    requester,
+                    requester: requester.clone(),
                     response: Response::Write(result),
                     message_id,
-                    refund,
-                    proof: Some((request, accumulated_signature?)),
+                    refund: None,
+                    proof: Some((request, (accumulated_signature?).clone())),
                 },
             }),
         }
     }
 
-    pub(crate) fn get_idata(
+    pub(crate) fn get(
         &self,
         sender: SrcLocation,
         address: IDataAddress,
-        requester: PublicId,
+        requester: &PublicId,
         message_id: MessageId,
         request: Request,
-        accumulated_signature: Option<Signature>,
+        accumulated_signature: Option<&Signature>,
     ) -> Option<Action> {
         let result = self
             .chunks
@@ -117,33 +110,33 @@ impl IDataHolder {
                 Some(Action::SendToPeers {
                     targets,
                     rpc: Rpc::Response {
-                        requester,
+                        requester: requester.clone(),
                         response: Response::GetIData(result),
                         message_id,
                         refund: None,
-                        proof: Some((request, accumulated_signature?)),
+                        proof: Some((request, (accumulated_signature?).clone())),
                     },
                 })
             }
             SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
                 rpc: Rpc::Response {
-                    requester,
+                    requester: requester.clone(),
                     response: Response::GetIData(result),
                     message_id,
                     refund: None,
-                    proof: Some((request, accumulated_signature?)),
+                    proof: Some((request, (accumulated_signature?).clone())),
                 },
             }),
         }
     }
 
-    pub(crate) fn delete_unpub_idata(
+    pub(crate) fn delete(
         &mut self,
         address: IDataAddress,
-        requester: PublicId,
+        requester: &PublicId,
         message_id: MessageId,
         request: Request,
-        accumulated_signature: Option<Signature>,
+        accumulated_signature: Option<&Signature>,
     ) -> Option<Action> {
         let result = if self.chunks.has(&address) {
             self.chunks
@@ -171,17 +164,17 @@ impl IDataHolder {
 
         Some(Action::RespondToOurDataHandlers {
             rpc: Rpc::Response {
-                requester,
+                requester: requester.clone(),
                 response: Response::Write(result),
                 message_id,
                 refund: None,
-                proof: Some((request, accumulated_signature?)),
+                proof: Some((request, (accumulated_signature?).clone())),
             },
         })
     }
 }
 
-impl Display for IDataHolder {
+impl Display for ChunkStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

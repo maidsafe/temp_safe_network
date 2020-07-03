@@ -1,7 +1,7 @@
 use crate::{rpc::Rpc, utils};
 use log::{error, info};
 use routing::Node;
-use safe_nd::{IDataAddress, IDataRequest, MessageId, PublicId, Request, XorName};
+use safe_nd::{IDataAddress, MessageId, NodeRequest, PublicId, Read, Request, XorName};
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
@@ -46,9 +46,7 @@ impl Accumulator {
                 if let Some(signature) = signature {
                     // If the request comes from a node, the signatures have already
                     // been accumulated at the Adult before the data is requested for duplication.
-                    if let (Request::IData(IDataRequest::Get(_)), PublicId::Node(_)) =
-                        (&request, &requester)
-                    {
+                    if let Request::Node(NodeRequest::Read(Read::Blob(_))) = &request {
                         Some((
                             Rpc::Request {
                                 request,

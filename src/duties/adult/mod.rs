@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,12 +6,4 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::chunk::Chunk;
-use safe_nd::{Account, XorName};
-
-impl Chunk for Account {
-    type Id = XorName;
-    fn id(&self) -> &Self::Id {
-        self.address()
-    }
-}
+pub mod data;

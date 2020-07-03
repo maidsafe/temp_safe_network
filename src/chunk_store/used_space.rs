@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::error::{Error, Result};
-use crate::vault::Init;
+use crate::node::Init;
 use std::{
     cell::Cell,
     fs::{File, OpenOptions},

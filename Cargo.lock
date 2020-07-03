@@ -2057,7 +2057,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=introduce_read_write#fce4443ac0356ed92dd45af6dbf82cafb88f3cbc"
+source = "git+https://github.com/oetyng/safe-nd.git?branch=separate_read_write#0393b9f325783d78e6594cee1a1136b469861112"
 dependencies = [
  "bincode",
  "crdts",
@@ -2075,7 +2075,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/joshuef/safe-transfers?branch=Fix-FixAccumulationAndTransferLogix#eced9b7fb9b5e48d0aec7af8362e0fa75433fcba"
+source = "git+https://github.com/oetyng/safe-transfers?branch=separate_read_write#49cbcf186e33a1603dd7a348fe016d310d91c6bc"
 dependencies = [
  "bincode",
  "crdts",
@@ -2151,21 +2151,22 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.13.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c505727b982d8c85ea1b3345a3a3c2712ba3d8417708ebacc960e4f8f84e3dbc"
+checksum = "6a3666182ee5fe97155008147fee49366a995e1fa30cfa78325c9dde2140b08e"
 dependencies = [
  "either",
  "flate2",
  "hyper-old-types",
  "indicatif",
+ "log 0.4.8",
  "quick-xml",
  "regex",
  "reqwest",
  "semver",
  "serde_json",
  "tar",
- "tempdir",
+ "tempfile",
  "zip",
 ]
 
@@ -2397,6 +2398,20 @@ checksum = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
 dependencies = [
  "rand 0.4.6",
  "remove_dir_all",
+]
+
+[[package]]
+name = "tempfile"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a6e24d9338a0a5be79593e2fa15a648add6138caa803e2d5bc782c371732ca9"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "rand 0.7.3",
+ "redox_syscall",
+ "remove_dir_all",
+ "winapi 0.3.8",
 ]
 
 [[package]]

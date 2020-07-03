@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,14 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
+use crate::{action::Action, node::Init, rpc::Rpc, utils, Config, Result, ToDbKey};
 use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use rand::SeedableRng;
 use routing::Node;
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, IData, IDataAddress, IDataRequest, MessageId,
-    NodeFullId, NodePublicId, PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
+    BlobWrite, Error as NdError, IData, IDataAddress, MessageId, NodeFullId, NodePublicId,
+    NodeRequest, PublicId, PublicKey, Request, Response, Result as NdResult, Write, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -43,11 +43,11 @@ struct HolderMetadata {
     chunks: BTreeSet<IDataAddress>,
 }
 
-pub(super) struct IDataHandler {
+pub(super) struct BlobRegister {
     id: NodePublicId,
     // idata_elder_ops: BTreeMap<MessageId, IDataAddress>,
     // idata_client_ops: BTreeMap<MessageId, IDataOp>,
-    // Responses from IDataHolders might arrive before we send a request.
+    // Responses from BlobStorages might arrive before we send a request.
     // This will hold the responses that are processed once the request arrives.
     // early_responses: BTreeMap<MessageId, Vec<(XorName, IDataResult)>>,
     metadata: PickleDb,
@@ -58,7 +58,7 @@ pub(super) struct IDataHandler {
     routing_node: Rc<RefCell<Node>>,
 }
 
-impl IDataHandler {
+impl BlobRegister {
     pub(super) fn new(
         id: NodePublicId,
         config: &Config,
@@ -82,27 +82,25 @@ impl IDataHandler {
         })
     }
 
-    pub(super) fn handle_put_idata_req(
+    pub(super) fn store(
         &mut self,
         requester: PublicId,
         data: IData,
         message_id: MessageId,
         request: Request,
-        debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            let refund = utils::get_refund_for_put(&result, debit_proof);
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::Write(result),
                     message_id,
-                    refund,
+                    refund: None,
                     proof: None,
                 },
             })
@@ -167,7 +165,7 @@ impl IDataHandler {
         })
     }
 
-    pub(super) fn handle_delete_unpub_idata_req(
+    pub(super) fn delete(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
@@ -213,29 +211,29 @@ impl IDataHandler {
         })
     }
 
-    pub(super) fn trigger_data_copy_process(&mut self, node_left: XorName) -> Option<Vec<Action>> {
+    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<Action>> {
         trace!(
-            "Get the list of IData holder {:?} was resposible for",
-            node_left
+            "Get the list of chunks holder {:?} was resposible for",
+            holder
         );
         // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
         // This is only used for the requester field and it should not be used for encryption / signing.
-        let mut rng = rand::rngs::StdRng::from_seed(node_left.0);
+        let mut rng = rand::rngs::StdRng::from_seed(holder.0);
         let node_id = NodeFullId::new(&mut rng);
         let requester = PublicId::Node(node_id.public_id().clone());
         trace!("Generated NodeID {:?} to get chunk copy", &requester);
 
-        let chunks_stored = self.update_chunk_metadata_on_node_left(node_left);
+        let chunks_stored = self.remove_holder(holder);
 
         if let Ok(chunks_stored) = chunks_stored {
             let mut actions = Vec::new();
 
             for (address, holders) in chunks_stored {
-                trace!("{:?} was resposible for : {:?}", node_left, address);
+                trace!("{:?} was resposible for : {:?}", holder, address);
 
                 let mut hash_bytes = Vec::new();
                 hash_bytes.extend_from_slice(&address.name().0);
-                hash_bytes.extend_from_slice(&node_left.0);
+                hash_bytes.extend_from_slice(&holder.0);
 
                 let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
                 trace!("Generated MsgID {:?} to duplicate chunks", &message_id);
@@ -259,21 +257,20 @@ impl IDataHandler {
         }
     }
 
-    pub(super) fn handle_get_idata_req(
-        &mut self,
-        requester: PublicId,
+    pub(super) fn get(
+        &self,
+        requester: &PublicId,
         address: IDataAddress,
         message_id: MessageId,
         request: Request,
     ) -> Option<Action> {
         let our_name = *self.id.name();
 
-        let client_id = requester.clone();
         let respond = |result: NdResult<IData>| {
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
-                    requester: client_id.clone(),
+                    requester: requester.clone(),
                     response: Response::GetIData(result),
                     message_id,
                     refund: None,
@@ -299,14 +296,14 @@ impl IDataHandler {
             targets: metadata.holders,
             rpc: Rpc::Request {
                 request,
-                requester: client_id,
+                requester: requester.clone(),
                 message_id,
                 signature,
             },
         })
     }
 
-    pub(super) fn update_idata_holders(
+    pub(super) fn update_holders(
         &mut self,
         address: IDataAddress,
         sender: XorName,
@@ -347,7 +344,7 @@ impl IDataHandler {
         None
     }
 
-    pub(super) fn handle_mutation_resp(
+    pub(super) fn handle_write_result(
         &mut self,
         sender: XorName,
         requester: PublicId,
@@ -356,17 +353,17 @@ impl IDataHandler {
         request: Request,
     ) -> Option<Action> {
         match &request {
-            Request::IData(IDataRequest::Put { data, .. }) => {
-                self.handle_put_idata_resp(*data.address(), sender, &result, message_id, requester)
+            Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
+                self.handle_store_result(*data.address(), sender, &result, message_id, requester)
             }
-            Request::IData(IDataRequest::DeleteUnpub(address)) => {
-                self.handle_delete_unpub_idata_resp(*address, sender, result, message_id, requester)
+            Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::DeletePrivate(address)))) => {
+                self.handle_delete_result(*address, sender, result, message_id, requester)
             }
             _ => None,
         }
     }
 
-    pub(super) fn handle_put_idata_resp(
+    pub(super) fn handle_store_result(
         &mut self,
         idata_address: IDataAddress,
         sender: XorName,
@@ -438,7 +435,7 @@ impl IDataHandler {
         })
     }
 
-    pub(super) fn handle_delete_unpub_idata_resp(
+    pub(super) fn handle_delete_result(
         &mut self,
         idata_address: IDataAddress,
         sender: XorName,
@@ -514,8 +511,8 @@ impl IDataHandler {
         })
     }
 
-    pub(super) fn handle_get_idata_resp(
-        &mut self,
+    pub(super) fn handle_get_result(
+        &self,
         result: NdResult<IData>,
         message_id: MessageId,
         requester: PublicId,
@@ -536,7 +533,7 @@ impl IDataHandler {
 
     // Updates the metadata of the chunks help by a node that left.
     // Returns the list of chunks that were held along with the remaining holders.
-    pub fn update_chunk_metadata_on_node_left(
+    pub fn remove_holder(
         &mut self,
         node: XorName,
     ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
@@ -661,7 +658,7 @@ impl IDataHandler {
     }
 }
 
-impl Display for IDataHandler {
+impl Display for BlobRegister {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

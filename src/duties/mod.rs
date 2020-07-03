@@ -6,12 +6,5 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::chunk::Chunk;
-use safe_nd::{Account, XorName};
-
-impl Chunk for Account {
-    type Id = XorName;
-    fn id(&self) -> &Self::Id {
-        self.address()
-    }
-}
+pub mod adult;
+pub mod elder;
