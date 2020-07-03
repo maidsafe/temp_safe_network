@@ -688,14 +688,29 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 | Rpc::Request {
                     request: Request::Money(_),
                     ..
-                } => self
-                    .client_handler_mut()?
-                    .handle_vault_rpc(requester_name, rpc),
-                _data_request => self.data_handler_mut()?.handle_vault_rpc(
-                    SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                    rpc,
-                    None,
-                ),
+                } => {
+                    let mut resulting_action = None;
+                    if let Some(client_handler) =  self
+                    .client_handler_mut() {
+                        resulting_action = client_handler.handle_vault_rpc(requester_name, rpc);
+                    }
+
+                    resulting_action
+                },
+                _data_request => {
+                    let mut resulting_action = None;
+
+                    if let Some(data_handler) = self.data_handler_mut()
+                    {
+                        resulting_action = data_handler.handle_vault_rpc(
+                            SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
+                            rpc,
+                            None,
+                        )
+                    }
+
+                    resulting_action
+                }
             };
         } else {
             error!("{}: Logic error - unexpected RPC.", self);
