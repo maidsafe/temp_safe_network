@@ -1964,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/yoga07/routing?branch=chain#2063fa18769202bb82e6b9d1ba10983b64ed3fe8"
+source = "git+https://github.com/yoga07/routing?branch=chain#6132f37fda9c51c0a00292a433469c4a00ea49fd"
 dependencies = [
  "bincode",
  "bytes 0.5.5",
@@ -2075,7 +2075,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/joshuef/safe-transfers?branch=Fix-FixAccumulationAndTransferLogix#f1c9cc91f3906e2b07615c4d1d3637924b332eba"
+source = "git+https://github.com/joshuef/safe-transfers?branch=Fix-FixAccumulationAndTransferLogix#eced9b7fb9b5e48d0aec7af8362e0fa75433fcba"
 dependencies = [
  "bincode",
  "crdts",
