@@ -41,7 +41,7 @@ impl Vault {
                     }
                     None => Err(SndError::NoSuchEntry),
                 };
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::Get(address) => {
                 let result = self.get_adata(*address, requester_pk, &request);
@@ -59,7 +59,7 @@ impl Vault {
                         }
                     },
                 );
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::GetShell {
                 address,
@@ -166,7 +166,7 @@ impl Vault {
                         }
                         _ => Err(SndError::NoSuchData),
                     });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::AppendUnseq(append) => {
                 let id = DataId::AppendOnly(append.address);
@@ -187,7 +187,7 @@ impl Vault {
                         }
                         _ => Err(SndError::NoSuchData),
                     });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::AddPubPermissions {
                 address,
@@ -224,7 +224,7 @@ impl Vault {
                             },
                             _ => Err(SndError::AccessDenied),
                         });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::AddUnpubPermissions {
                 address,
@@ -257,7 +257,7 @@ impl Vault {
                         },
                         _ => Err(SndError::AccessDenied),
                     });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::SetOwner {
                 address,
@@ -308,7 +308,7 @@ impl Vault {
                                 _ => Err(SndError::NoSuchData),
                             },
                         });
-                Response::Mutation(result)
+                Response::Write(result)
             }
             ADataRequest::GetOwners {
                 address,

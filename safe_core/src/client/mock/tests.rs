@@ -24,8 +24,8 @@ use futures::Future;
 use rand::thread_rng;
 use safe_nd::{
     AppFullId, AppPermissions, ClientFullId, ClientRequest,
-    Error, IData, IDataRequest, LoginPacketRequest, MData, MDataAction, MDataAddress, MDataEntries,
-    MDataEntryActions, MDataPermissionSet, MDataRequest, MDataSeqEntryAction, MDataSeqEntryActions,
+    Error, IData, IDataRequest, AccountRead, AccountWrite, MData, MDataAction, MDataAddress, MDataEntries,
+    MDataEntryActions, MDataPermissionSet, MapRead, MapWrite, MDataSeqEntryAction, MDataSeqEntryActions,
     MDataSeqValue, MDataValue, MDataValues, Message, MessageId, Money, MoneyRequest,
     PubImmutableData, PublicId, PublicKey, Request, RequestType, Response, SeqMutableData,
     UnpubImmutableData, UnseqMutableData, XorName, SeqMutableData
@@ -86,7 +86,7 @@ async fn immutable_data_basics() {
         PubImmutableData::new(unwrap!(utils::generate_random_vector(100))).into();
 
     // IData(IDataRequest::Get should fai)l
-    let get_request = Request::IData(IDataRequest::Get(*orig_data.address()));
+    let get_request = Request::Client(ClientRequest::Read(Read::Blob(BlobRead::Get(*orig_data.address()));
     send_req_expect_failure!(
         &mut connection_manager,
         &client_safe_key,
@@ -158,7 +158,7 @@ async fn mutable_data_basics() {
     send_req_expect_failure!(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetVersion(data1_address)),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(data1_address)))),
         Error::NoSuchData
     );
 
@@ -194,7 +194,7 @@ async fn mutable_data_basics() {
     let response = process_request(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetVersion(data2_address)),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(data2_address)))),
     )
     .await;
     assert_eq!(response, Response::GetMDataVersion(Ok(0)));
@@ -203,7 +203,7 @@ async fn mutable_data_basics() {
     send_req_expect_ok!(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::Get(data2_address)),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::Get(data2_address)))),
         data2
     );
 
@@ -325,10 +325,10 @@ async fn mutable_data_basics() {
     send_req_expect_ok!(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetValue {
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetValue {
             address: data2_address,
             key: key0.to_vec()
-        }),
+        }))),
         MDataValue::Seq(MDataSeqValue {
             data: value0_v0,
             version: 0,
@@ -340,10 +340,10 @@ async fn mutable_data_basics() {
     send_req_expect_failure!(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetValue {
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetValue {
             address: data2_address,
             key: key2.to_vec()
-        }),
+        }))),
         Error::NoSuchEntry
     );
 
@@ -466,7 +466,7 @@ async fn mutable_data_reclaim() {
     let response = process_request(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetVersion(address)),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(address)))),
     )
     .await;
     assert_eq!(response, Response::GetMDataVersion(Ok(0)));
@@ -764,7 +764,7 @@ async fn mutable_data_permissions() {
     let response = process_request(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetVersion(address)),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(address)))),
     )
     .await;
     assert_eq!(response, Response::GetMDataVersion(Ok(1)));
@@ -973,7 +973,7 @@ async fn pub_idata_rpc() {
     let orig_data: IData =
         PubImmutableData::new(unwrap!(utils::generate_random_vector(100))).into();
 
-    let get_request = Request::IData(IDataRequest::Get(*orig_data.address()));
+    let get_request = Request::Client(ClientRequest::Read(Read::Blob(BlobRead::Get(*orig_data.address()));
 
     // Put pub idata as an owner. Should succeed.
     {
@@ -1021,7 +1021,7 @@ async fn unpub_idata_rpc() {
     }
 
     // Construct get request.
-    let get_request = Request::IData(IDataRequest::Get(address));
+    let get_request = Request::Client(ClientRequest::Read(Read::Blob(BlobRead::Get(address));
     send_req_expect_ok!(
         &mut connection_manager,
         &client_safe_key,
@@ -1047,7 +1047,7 @@ async fn unpub_idata_rpc() {
         Error::AccessDenied
     );
 
-    let del_request = Request::IData(IDataRequest::DeleteUnpub(address));
+    let del_request = Request::Client(ClientRequest::Write(Write::Blob(BlobWrite::DeletePrivate(address));
     // Try to delete unpub idata while not being an owner. Should fail.
     send_req_expect_failure!(
         &mut app_conn_manager,
@@ -1078,7 +1078,7 @@ async fn unpub_md() {
     send_req_expect_ok!(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::Get(*data.address())),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::Get(*data.address())))),
         data
     );
 }
@@ -1264,7 +1264,7 @@ async fn auth_actions_from_app() {
     send_req_expect_ok!(
         &mut connection_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::Get(address)),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::Get(address)))),
         data
     );
 
@@ -1371,7 +1371,7 @@ async fn low_balance_check() {
         send_req_expect_ok!(
             &mut connection_manager,
             &client_safe_key,
-            Request::MData(MDataRequest::Get(*data.address())),
+            Request::Client(ClientRequest::Read(Read::Map(MapRead::Get(*data.address())))),
             data
         );
     }
@@ -1443,7 +1443,7 @@ async fn config_mock_vault_path() {
     send_req_expect_ok!(
         &mut conn_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::Get(*data.address())),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::Get(*data.address())))),
         data
     );
 
@@ -1490,7 +1490,7 @@ async fn request_hooks() {
     send_req_expect_failure!(
         &mut conn_manager,
         &client_safe_key,
-        Request::MData(MDataRequest::GetVersion(*data.address())),
+        Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(*data.address())))),
         Error::NoSuchData
     );
 

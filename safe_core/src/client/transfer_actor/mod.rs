@@ -1,5 +1,6 @@
 use safe_nd::{
-    DebitAgreementProof, Message, MessageId, MoneyRequest, PublicId, PublicKey, Request, Response,
+    ClientRequest, DebitAgreementProof, Message, MessageId, PublicId, PublicKey, Request, Response,
+    SystemOp, Transfers as MoneyRequest,
 };
 
 use safe_transfers::{ActorEvent, ReplicaValidator, TransferActor as SafeTransferActor};
@@ -45,16 +46,31 @@ impl ReplicaValidator for ClientTransferValidator {
 }
 
 impl TransferActor {
+    fn wrap(req: MoneyRequest) -> Request {
+        Request::Client(ClientRequest::System(SystemOp::Transfers(req)))
+    }
+
+    /// Get a payment proof
+    pub async fn get_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
+        let mut cm = self.connection_manager();
+
+        // --------------------------
+        // Payment for PUT
+        // --------------------------
+        self.create_write_payment_proof().await
+    }
+
     pub fn connection_manager(&self) -> ConnectionManager {
         self.connection_manager.clone()
     }
+
     /// Retrieve the history of the acocunt from the network and apply to our local actor
     pub async fn get_history(&mut self) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
         let public_key = self.safe_key.public_key();
         info!("Getting SafeTransfers history for pk: {:?}", public_key);
 
-        let request = Request::Money(MoneyRequest::GetHistory {
+        let request = Self::wrap(MoneyRequest::GetHistory {
             at: public_key,
             since_version: 0,
         });
@@ -119,7 +135,7 @@ impl TransferActor {
     }
 
     /// Validates a tranction for paying store_cost
-    async fn create_put_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
+    async fn create_write_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
         info!("Sending requests for payment for write operation");
 
         let mut cm = self.connection_manager();
@@ -138,7 +154,7 @@ impl TransferActor {
             .transfer(COST_OF_PUT, section_key)?
             .signed_transfer;
 
-        let request = Request::Money(MoneyRequest::ValidateTransfer {
+        let request = Self::wrap(MoneyRequest::ValidateTransfer {
             signed_transfer: signed_transfer.clone(),
         });
 

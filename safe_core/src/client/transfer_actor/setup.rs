@@ -1,6 +1,6 @@
 use safe_nd::{
-    DebitAgreementProof, Message, MessageId, Money, MoneyRequest, PublicKey, ReplicaEvent, Request,
-    Response, SignatureShare, SignedTransfer, Transfer, TransferPropagated,
+    DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, Response,
+    SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
 use safe_transfers::{ActorEvent, TransferActor as SafeTransferActor, TransfersSynched};
 
@@ -33,7 +33,7 @@ impl TransferActor {
 
         let message_id = MessageId::new();
 
-        let request = Request::Money(MoneyRequest::GetReplicaKeys(safe_key.public_key()));
+        let request = Self::wrap(MoneyRequest::GetReplicaKeys(safe_key.public_key()));
 
         // TODO: remove this unwrap
         let signature = Some(safe_key.sign(&unwrap::unwrap!(bincode::serialize(&(

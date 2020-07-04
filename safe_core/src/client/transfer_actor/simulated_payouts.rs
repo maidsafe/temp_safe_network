@@ -1,6 +1,6 @@
 use safe_nd::{
-    DebitAgreementProof, Money, MoneyRequest, PublicKey, ReplicaEvent, Request, Response,
-    SignatureShare, SignedTransfer, Transfer, TransferPropagated,
+    DebitAgreementProof, Money, PublicKey, ReplicaEvent, Request, Response, SignatureShare,
+    SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
 use safe_transfers::{ActorEvent, TransfersSynched};
 
@@ -50,7 +50,7 @@ impl TransferActor {
             id: self.simulated_farming_payout_dot,
         };
 
-        let simluated_farming_request = Request::Money(MoneyRequest::SimulatePayout {
+        let simluated_farming_request = Self::wrap(MoneyRequest::SimulatePayout {
             transfer: simulated_transfer.clone(),
         });
 

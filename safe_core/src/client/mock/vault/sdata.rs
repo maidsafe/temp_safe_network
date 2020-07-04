@@ -9,7 +9,7 @@
 use super::{DataId, Vault};
 use safe_nd::{
     Data, Error as SndError, PublicId, PublicKey, Response, Result as SndResult, SData,
-    SDataAction, SDataAddress, SDataRequest,
+    SDataAction, SDataAddress, SequenceRead, SequenceWrite,
 };
 
 impl Vault {

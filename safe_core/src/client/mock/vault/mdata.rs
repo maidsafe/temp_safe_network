@@ -8,8 +8,8 @@
 
 use super::{DataId, Vault};
 use safe_nd::{
-    Data, Error as SndError, MData, MDataAction, MDataAddress, MDataKind, MDataRequest, PublicId,
-    PublicKey, Response, Result as SndResult,
+    Data, Error as SndError, MData, MDataAction, MDataAddress, MDataKind, MapRead, MapWrite,
+    PublicId, PublicKey, Response, Result as SndResult,
 };
 
 impl Vault {

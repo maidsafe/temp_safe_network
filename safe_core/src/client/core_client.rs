@@ -23,7 +23,7 @@ use futures::lock::Mutex;
 use log::trace;
 use rand::rngs::StdRng;
 use rand::{thread_rng, SeedableRng};
-use safe_nd::{ClientFullId, LoginPacket, LoginPacketRequest, PublicKey, Request, Response};
+use safe_nd::{Account, ClientFullId, PublicKey, Response};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -86,7 +86,7 @@ impl CoreClient {
         };
 
         let sig = client_full_id.sign(&acc_ciphertext);
-        let new_login_packet = LoginPacket::new(acc_loc, client_pk, acc_ciphertext, sig)?;
+        let new_login_packet = Account::new(acc_loc, client_pk, acc_ciphertext, sig)?;
 
         let balance_client_id = maid_keys.client_id.clone();
         let _new_balance_owner = *balance_client_id.public_id().public_key();
@@ -107,7 +107,7 @@ impl CoreClient {
             TransferActor::new(balance_client_id.clone(), connection_manager.clone()).await?;
         let transfer_actor = Some(the_actor.clone());
 
-        let response = the_actor.store_login_packet(new_login_packet).await?;
+        let response = the_actor.new_account(new_login_packet).await?;
 
         match response {
             Response::Write(res) => res?,

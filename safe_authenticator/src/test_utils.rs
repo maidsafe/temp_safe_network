@@ -33,7 +33,7 @@ use safe_core::ConnectionManager;
 use safe_core::{utils, MDataInfo, NetworkEvent};
 use safe_nd::{AppPermissions, Money, PublicKey, XorName};
 #[cfg(feature = "mock-network")]
-use safe_nd::{Error as SndError, MDataRequest, Request, Response};
+use safe_nd::{Error as SndError, MapRead, MapWrite, Request, Response};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Write;

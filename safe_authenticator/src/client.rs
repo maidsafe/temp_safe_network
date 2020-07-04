@@ -22,8 +22,9 @@ use safe_core::{
     utils, Client, ClientKeys, ConnectionManager, CoreError, MDataInfo, NetworkTx, TransferActor,
 };
 use safe_nd::{
-    ClientFullId, LoginPacket, LoginPacketRequest, Message, MessageId, PublicId, PublicKey,
-    Request, Response, XorName,
+    Account as LoginPacket, AccountRead, AccountWrite, ClientFullId, ClientRequest,
+    DebitAgreementProof, Message, MessageId, PublicId, PublicKey, Read, Request, Response, Write,
+    XorName,
 };
 use std::{fmt, sync::Arc, time::Duration};
 use tiny_keccak::sha3_256;
@@ -149,7 +150,7 @@ impl AuthClient {
         let transfer_actor = Some(the_actor.clone());
 
         // create login packet
-        let response = the_actor.store_login_packet(new_login_packet).await?;
+        let response = the_actor.new_account(new_login_packet).await?;
 
         match response {
             Response::Write(res) => res?,
@@ -253,7 +254,7 @@ impl AuthClient {
 
             let response = req(
                 &mut connection_manager,
-                Request::LoginPacket(LoginPacketRequest::Get(acc_locator)),
+                wrap_account_read(AccountRead::Get(acc_locator)),
                 &client_full_id,
             )
             .await?;
@@ -385,7 +386,12 @@ impl AuthClient {
         let mut cm4 = cm.clone();
 
         let message_id = MessageId::new();
-        let request = Request::LoginPacket(LoginPacketRequest::Update(updated_packet));
+        let mut actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+        let payment_proof = actor.get_payment_proof().await?;
+        let request = wrap_account_write(AccountWrite::Update(updated_packet), payment_proof);
         let signature =
             account_packet_id.sign(&unwrap!(bincode::serialize(&(&request, message_id))));
 
@@ -496,6 +502,17 @@ struct AuthInner {
     acc: Account,
     acc_loc: XorName,
     user_cred: UserCred,
+}
+
+fn wrap_account_write(write: AccountWrite, debit_agreement: DebitAgreementProof) -> Request {
+    Request::Client(ClientRequest::Write {
+        write: Write::Account(write),
+        debit_agreement,
+    })
+}
+
+fn wrap_account_read(read: AccountRead) -> Request {
+    Request::Client(ClientRequest::Read(Read::Account(read)))
 }
 
 // ------------------------------------------------------------
@@ -736,122 +753,5 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    // Create a login packet using some credentials and pass the login packet to a client who stores
-    // it on the network and creates a wallet for it. Now calling login using the same credentials
-    // should succeed and we must be able to fetch the balance.
-    // Only called on real network as requires a full history for peroper testing.
-    #[tokio::test]
-    #[cfg(not(feature = "mock-network"))]
-    async fn create_login_packet_for() {
-        let sec_0 = utils::generate_random_string(10).unwrap();
-        let sec_1 = utils::generate_random_string(10).unwrap();
-
-        let acc_locator: &[u8] = sec_0.as_bytes();
-        let acc_password: &[u8] = sec_1.as_bytes();
-
-        let (password, keyword, pin) = utils::derive_secrets(acc_locator, acc_password);
-
-        let acc_loc = Account::generate_network_id(&keyword, &pin).unwrap();
-
-        let maid_keys = ClientKeys::new(&mut thread_rng());
-        let acc = Account::new(maid_keys.clone()).unwrap();
-
-        let acc_ciphertext = acc.encrypt(&password, &pin).unwrap();
-
-        let client_full_id = create_client_id(&acc_loc.0);
-
-        let sig = client_full_id.sign(&acc_ciphertext);
-        let client_pk = *client_full_id.public_id().public_key();
-        let new_login_packet = unwrap!(LoginPacket::new(acc_loc, client_pk, acc_ciphertext, sig));
-        let new_login_packet2 = new_login_packet.clone();
-        let five_coins = unwrap!(Money::from_str("5"));
-        let _client_id = gen_client_id();
-
-        // The `random_client()` initializes the client with 10 coins.
-        let start_bal = Money::from_str("10").unwrap();
-        // Create a client which has a pre-loaded balance and use it to store the login packet on
-        // the network.
-        let client = random_client().unwrap();
-        let c1 = client.clone();
-        let c2 = client.clone();
-        let c3 = client.clone();
-        let _c4 = client.clone();
-
-        // Make sure no error occurred.
-        let _ = client
-            .insert_login_packet_for(
-                // None,
-                maid_keys.public_key(),
-                five_coins,
-                new_login_packet.clone(),
-            )
-            .await
-            .unwrap();
-
-        // Re-insert to check for refunds for a failed insert_login_packet_for operation
-        // The balance is created first, so `BalanceExists` is returned.
-        match c1
-            .insert_login_packet_for(
-                // None,
-                maid_keys.public_key(),
-                unwrap!(Money::from_str("3")),
-                new_login_packet,
-            )
-            .await
-        {
-            Err(CoreError::DataError(SndError::BalanceExists)) => {}
-            res => panic!("Unexpected {:?}", res),
-        }
-
-        let random_target_id = SafeKey::client(create_client_id(b"rando-seed"));
-
-        // For a different balance and an existing login packet
-        // `LoginPacketExists` should be returned.
-        let balance = match c3
-            .insert_login_packet_for(
-                // None,
-                random_target_id.public_key(),
-                unwrap!(Money::from_str("3")),
-                new_login_packet2,
-            )
-            .await
-        {
-            Err(CoreError::DataError(SndError::LoginPacketExists)) => {
-                // setup oneshot client actor for send/receive via keys
-                let (random_sender, _random_receiver) = mpsc::unbounded();
-                let connection_manager = attempt_bootstrap(
-                    &Config::new().quic_p2p,
-                    &random_sender,
-                    random_target_id.clone(),
-                )
-                .await
-                .unwrap();
-                let temp_actor =
-                    TransferActor::for_existing_account(random_target_id, connection_manager)
-                        .await
-                        .unwrap();
-
-                temp_actor.get_local_balance().await
-            }
-            res => panic!("Unexpected {:?}", res),
-        };
-
-        // The new balance should exist
-        assert_eq!(balance, Money::from_str("3").unwrap());
-
-        let balance = c2.get_balance(None).await.unwrap();
-        let expected =
-            calculate_new_balance(start_bal, Some(3), Some(Money::from_str("8").unwrap()));
-        assert_eq!(balance, expected);
-
-        let client = setup_client(&(), |net_tx| {
-            futures::executor::block_on(AuthClient::login(&sec_0, &sec_1, net_tx))
-        })
-        .unwrap();
-
-        let balance = client.get_balance(None).await.unwrap();
-        assert_eq!(balance, five_coins);
     }
 }

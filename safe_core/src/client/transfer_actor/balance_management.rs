@@ -1,6 +1,6 @@
 use safe_nd::{
-    DebitAgreementProof, Message, MessageId, Money, MoneyRequest, PublicKey, ReplicaEvent, Request,
-    Response, SignatureShare, SignedTransfer, Transfer, TransferPropagated,
+    DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, Response,
+    SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
 use safe_transfers::ActorEvent;
 
@@ -78,7 +78,7 @@ impl TransferActor {
 
         let message_id = MessageId::new();
 
-        let request = Request::Money(MoneyRequest::GetBalance(public_key));
+        let request = Self::wrap(MoneyRequest::GetBalance(public_key));
         // TODO: remove this unwrap
         let signature = Some(self.safe_key.sign(&unwrap::unwrap!(bincode::serialize(&(
             &request, message_id
@@ -129,7 +129,7 @@ impl TransferActor {
             "Signed transfer for send money: {:?}",
             signed_transfer.transfer
         );
-        let request = Request::Money(MoneyRequest::ValidateTransfer { signed_transfer });
+        let request = Self::wrap(MoneyRequest::ValidateTransfer { signed_transfer });
 
         let (message, _message_id) = self.create_network_message(request)?;
 
@@ -151,7 +151,7 @@ impl TransferActor {
             .await?;
 
         // Register the transfer on the network.
-        let register_transaction_request = Request::Money(MoneyRequest::RegisterTransfer {
+        let register_transaction_request = Self::wrap(MoneyRequest::RegisterTransfer {
             proof: debit_proof.clone(),
         });
         let (message, _message_id) = self.create_network_message(register_transaction_request)?;
@@ -222,7 +222,6 @@ mod tests {
 
         Ok(())
     }
-
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]

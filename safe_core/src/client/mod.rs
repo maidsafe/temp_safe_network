@@ -49,15 +49,15 @@ use log::{debug, info, trace};
 use lru::LruCache;
 use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
-    AppPermissions, ClientFullId, ClientRequest, Error as SndError, IData, IDataAddress,
-    IDataRequest, LoginPacket, LoginPacketRequest, MData, MDataAddress, MDataEntries,
-    MDataEntryActions, MDataPermissionSet, MDataRequest, MDataSeqEntries, MDataSeqEntryActions,
-    MDataSeqValue, MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, Money,
-    MoneyRequest, PublicId, PublicKey, Request, RequestType, Response, SData, SDataAction,
-    SDataAddress, SDataEntries, SDataEntry, SDataIndex, SDataOwner, SDataPrivPermissions,
-    SDataPrivUserPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataRequest,
-    SDataUser, SDataUserPermissions, SeqMutableData, Transfer, TransferRegistered,
-    UnseqMutableData, XorName,
+    AccountRead, AccountWrite, AppPermissions, BlobRead, BlobWrite, ClientAuth, ClientFullId,
+    ClientRequest, DebitAgreementProof, IData, IDataAddress, MData, MDataAddress, MDataEntries,
+    MDataEntryActions, MDataPermissionSet, MDataSeqEntries, MDataSeqEntryActions, MDataSeqValue,
+    MDataUnseqEntryActions, MDataValue, MDataValues, MapRead, MapWrite, Message, MessageId, Money,
+    PublicId, PublicKey, Read, Request, RequestType, Response, SData, SDataAction, SDataAddress,
+    SDataEntries, SDataEntry, SDataIndex, SDataOwner, SDataPrivPermissions,
+    SDataPrivUserPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
+    SDataUserPermissions, SeqMutableData, SequenceRead, SequenceWrite, SystemOp,
+    TransferRegistered, UnseqMutableData, Write, XorName,
 };
 use std::sync::Arc;
 use unwrap::unwrap;
@@ -102,7 +102,7 @@ async fn send_write(client: &impl Client, req: Request) -> Result<(), CoreError>
 // Parses out mutation responses and errors when something erroneous found
 fn check_mutation_response(response: Response) -> Result<(), CoreError> {
     match response {
-        Response::Mutation(result) => {
+        Response::Write(result) => {
             trace!("mutation result: {:?}", result);
             result.map_err(CoreError::from)
         }
@@ -243,7 +243,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.store_mutable_data(MData::Unseq(data)).await?;
+        let res = actor.new_map(MData::Unseq(data)).await?;
 
         check_mutation_response(res)
     }
@@ -339,45 +339,6 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Insert a given login packet at the specified destination
-    async fn insert_login_packet_for(
-        &self,
-        // client_id: Option<&ClientFullId>,
-        new_owner: PublicKey,
-        amount: Money,
-        new_login_packet: LoginPacket,
-    ) -> Result<TransferRegistered, CoreError>
-    where
-        Self: Sized,
-    {
-        trace!(
-            "Insert a login packet for {:?} preloading the wallet with {} money.",
-            new_owner,
-            amount
-        );
-
-        let mut actor = self
-            .transfer_actor()
-            .await
-            .ok_or(CoreError::from("No TransferActor found for client."))?;
-
-        let response = actor
-            .create_login_for(new_owner, amount, new_login_packet)
-            .await;
-
-        match response {
-            Ok(res) => match res {
-                Response::TransferRegistration(result) => match result {
-                    Ok(transfer) => Ok(transfer),
-                    Err(error) => Err(CoreError::from(error)),
-                },
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            },
-
-            Err(error) => Err(error),
-        }
-    }
-
     /// Get the current coin balance via TransferActor for this client.
     async fn get_balance(&self, client_id: Option<&ClientFullId>) -> Result<Money, CoreError>
     where
@@ -423,7 +384,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.store_immutable_data(idata).await?;
+        let res = actor.new_blob(idata).await?;
 
         check_mutation_response(res)
     }
@@ -443,7 +404,11 @@ pub trait Client: Clone + Send + Sync {
         }
 
         let inner = Arc::downgrade(&self.inner());
-        let res = send(self, Request::IData(IDataRequest::Get(address))).await?;
+        let res = send(
+            self,
+            Request::Client(ClientRequest::Read(Read::Blob(BlobRead::Get(address)))),
+        )
+        .await?;
         let data = match res {
             Response::GetIData(res) => res.map_err(CoreError::from),
             _ => return Err(CoreError::ReceivedUnexpectedEvent),
@@ -476,16 +441,19 @@ pub trait Client: Clone + Send + Sync {
             trace!("Deleted UnpubImmutableData from cache.");
         }
 
-        // let inner = self.inner().clone();
         let inner = self.inner().clone();
 
         let _ = Arc::downgrade(&inner);
         trace!("Delete Unpublished IData at {:?}", name);
-        send_write(
-            self,
-            Request::IData(IDataRequest::DeleteUnpub(IDataAddress::Unpub(name))),
-        )
-        .await
+
+        let mut actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+
+        let res = actor.delete_blob(IDataAddress::Unpub(name)).await?;
+
+        check_mutation_response(res)
     }
 
     /// Put sequenced mutable data to the network
@@ -500,7 +468,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.store_mutable_data(MData::Seq(data)).await?;
+        let res = actor.new_map(MData::Seq(data)).await?;
 
         check_mutation_response(res)
     }
@@ -514,7 +482,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::Get(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::Get(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
@@ -540,7 +508,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::GetValue {
+            wrap_map_read(MapRead::GetValue {
                 address: MDataAddress::Seq { name, tag },
                 key,
             }),
@@ -571,7 +539,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::GetValue {
+            wrap_map_read(MapRead::GetValue {
                 address: MDataAddress::Unseq { name, tag },
                 key,
             }),
@@ -597,7 +565,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::Get(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::Get(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
@@ -630,9 +598,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor
-            .mutable_data_mutate_entries(address, mdata_actions)
-            .await?;
+        let res = actor.edit_map_entries(address, mdata_actions).await?;
 
         check_mutation_response(res)
     }
@@ -658,9 +624,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor
-            .mutable_data_mutate_entries(address, mdata_actions)
-            .await?;
+        let res = actor.edit_map_entries(address, mdata_actions).await?;
 
         check_mutation_response(res)
     }
@@ -678,7 +642,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::GetShell(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::GetShell(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
@@ -705,7 +669,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::GetShell(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::GetShell(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
@@ -726,7 +690,7 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("GetMDataVersion for {:?}", address);
 
-        match send(self, Request::MData(MDataRequest::GetVersion(address))).await? {
+        match send(self, wrap_map_read(MapRead::GetVersion(address))).await? {
             Response::GetMDataVersion(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -745,7 +709,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::ListEntries(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::ListEntries(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
@@ -773,7 +737,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::ListEntries(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::ListEntries(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
@@ -795,7 +759,7 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("ListMDataKeys for {:?}", address);
 
-        match send(self, Request::MData(MDataRequest::ListKeys(address))).await? {
+        match send(self, wrap_map_read(MapRead::ListKeys(address))).await? {
             Response::ListMDataKeys(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -814,7 +778,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::ListValues(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::ListValues(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
@@ -842,7 +806,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::ListUserPermissions { address, user }),
+            wrap_map_read(MapRead::ListUserPermissions { address, user }),
         )
         .await?
         {
@@ -864,7 +828,7 @@ pub trait Client: Clone + Send + Sync {
 
         match send(
             self,
-            Request::MData(MDataRequest::ListValues(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::ListValues(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
@@ -900,7 +864,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.store_sequenced_data(data.clone()).await?;
+        let res = actor.new_sequence(data.clone()).await?;
 
         check_mutation_response(res)?;
 
@@ -935,7 +899,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.store_sequenced_data(data.clone()).await?;
+        let res = actor.new_sequence(data.clone()).await?;
 
         check_mutation_response(res)?;
 
@@ -964,7 +928,7 @@ pub trait Client: Clone + Send + Sync {
 
         trace!("Sequence not found in local CRDT replica");
         // Let's fetch it from the network then
-        let sdata = match send(self, Request::SData(SDataRequest::Get(address))).await? {
+        let sdata = match send(self, wrap_seq_read(SequenceRead::Get(address))).await? {
             Response::GetSData(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }?;
@@ -1049,7 +1013,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.sequenced_data_append(op).await?;
+        let res = actor.append_to_sequence(op).await?;
 
         check_mutation_response(res)
     }
@@ -1149,7 +1113,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.sequenced_data_mutate_pub_permissions(op).await?;
+        let res = actor.edit_sequence_public_perms(op).await?;
 
         check_mutation_response(res)
     }
@@ -1191,7 +1155,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.sequenced_data_mutate_priv_permissions(op).await?;
+        let res = actor.edit_sequence_private_perms(op).await?;
 
         check_mutation_response(res)
     }
@@ -1245,7 +1209,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.sequenced_data_mutate_owner(op).await?;
+        let res = actor.set_sequence_owner(op).await?;
 
         check_mutation_response(res)
     }
@@ -1254,12 +1218,19 @@ pub trait Client: Clone + Send + Sync {
     async fn delete_sdata(&self, address: SDataAddress) -> Result<(), CoreError> {
         trace!("Delete Private Sequence Data {:?}", address.name());
 
-        send_write(self, Request::SData(SDataRequest::Delete(address))).await?;
-
         // Delete it from local Sequence CRDT replica
         let _ = self.inner().lock().await.sdata_cache.pop(&address);
 
-        Ok(())
+        trace!("Deleted local Private Sequence {:?}", address.name());
+
+        let mut actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+
+        let res = actor.delete_sequence(address).await?;
+
+        check_mutation_response(res)
     }
 
     // ========== END of Sequence Data functions =========
@@ -1274,7 +1245,7 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("List MDataPermissions for {:?}", address);
 
-        match send(self, Request::MData(MDataRequest::ListPermissions(address))).await? {
+        match send(self, wrap_map_read(MapRead::ListPermissions(address))).await? {
             Response::ListMDataPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -1299,7 +1270,7 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         let res = actor
-            .mutable_data_set_user_permissions(address, user, permissions, version)
+            .set_map_user_perms(address, user, permissions, version)
             .await?;
 
         check_mutation_response(res)
@@ -1322,9 +1293,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor
-            .mutable_data_del_user_permissions(address, user, version)
-            .await?;
+        let res = actor.delete_map_user_perms(address, user, version).await?;
 
         check_mutation_response(res)
     }
@@ -1489,7 +1458,7 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("ListAuthKeysAndVersion");
 
-        match send(self, Request::Client(ClientRequest::ListAuthKeysAndVersion)).await? {
+        match send(self, wrap_client_auth(ClientAuth::ListAuthKeysAndVersion)).await? {
             Response::ListAuthKeysAndVersion(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -1509,7 +1478,7 @@ pub trait AuthActions: Client + Clone + 'static {
 
         send_write(
             self,
-            Request::Client(ClientRequest::InsAuthKey {
+            wrap_client_auth(ClientAuth::InsAuthKey {
                 key,
                 permissions,
                 version,
@@ -1527,7 +1496,7 @@ pub trait AuthActions: Client + Clone + 'static {
 
         send_write(
             self,
-            Request::Client(ClientRequest::DelAuthKey { key, version }),
+            wrap_client_auth(ClientAuth::DelAuthKey { key, version }),
         )
         .await
     }
@@ -1539,7 +1508,14 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("Delete entire Mutable Data at {:?}", address);
 
-        send_write(self, Request::MData(MDataRequest::Delete(address))).await
+        let mut actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+
+        let res = actor.delete_map(address).await?;
+
+        check_mutation_response(res)
     }
 }
 
@@ -2035,7 +2011,7 @@ mod tests {
             res => panic!("Unexpected result: {:?}", res),
         }
     }
-    
+
     // 1. Create a client A with a wallet and allocate some test safecoin to it.
     // 2. Get the balance and verify it.
     // 3. Create another client B with a wallet holding some safecoin.
@@ -2085,7 +2061,6 @@ mod tests {
             calculate_new_balance(init_bal, Some(1), Some(unwrap!(Money::from_str("5"))));
         assert_eq!(balance, expected);
 
-
         let client_to_get_all_money = random_client().unwrap();
         // send all our money elsewhere to make sure we fail the next put
         let _ = client
@@ -2099,7 +2074,10 @@ mod tests {
         let res = client.put_idata(data).await;
         match res {
             Err(CoreError::DataError(SndError::InsufficientBalance)) => (),
-            res => panic!("Unexpected result in money transfer test, putting without balance: {:?}", res),
+            res => panic!(
+                "Unexpected result in money transfer test, putting without balance: {:?}",
+                res
+            ),
         };
     }
 
@@ -2772,6 +2750,54 @@ mod tests {
     }
 }
 
+fn wrap_blob_read(read: BlobRead) -> Request {
+    Request::Client(ClientRequest::Read(Read::Blob(read)))
+}
+
+fn wrap_blob_write(write: BlobWrite, debit_agreement: DebitAgreementProof) -> Request {
+    Request::Client(ClientRequest::Write {
+        write: Write::Blob(write),
+        debit_agreement,
+    })
+}
+
+fn wrap_map_read(read: MapRead) -> Request {
+    Request::Client(ClientRequest::Read(Read::Map(read)))
+}
+
+fn wrap_map_write(write: MapWrite, debit_agreement: DebitAgreementProof) -> Request {
+    Request::Client(ClientRequest::Write {
+        write: Write::Map(write),
+        debit_agreement,
+    })
+}
+
+fn wrap_seq_read(read: SequenceRead) -> Request {
+    Request::Client(ClientRequest::Read(Read::Sequence(read)))
+}
+
+fn wrap_seq_write(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> Request {
+    Request::Client(ClientRequest::Write {
+        write: Write::Sequence(write),
+        debit_agreement,
+    })
+}
+
+fn wrap_account_read(read: AccountRead) -> Request {
+    Request::Client(ClientRequest::Read(Read::Account(read)))
+}
+
+fn wrap_account_write(write: AccountWrite, debit_agreement: DebitAgreementProof) -> Request {
+    Request::Client(ClientRequest::Write {
+        write: Write::Account(write),
+        debit_agreement,
+    })
+}
+
+fn wrap_client_auth(op: ClientAuth) -> Request {
+    Request::Client(ClientRequest::System(SystemOp::ClientAuth(op)))
+}
+
 // 1. Store different variants of unpublished data on the network.
 // 2. Get the balance of the client.
 // 3. Delete data from the network.
@@ -2798,3 +2824,42 @@ mod tests {
 //     client.put_adata(adata.into()).await?;
 //     let mdata = UnseqMutableData::new(name, tag, client.public_key().await);
 //     client.put_unseq_mutable_data(mdata).await?;
+
+// /// Insert a given login packet at the specified destination
+// async fn insert_login_packet_for(
+//     &self,
+//     // client_id: Option<&ClientFullId>,
+//     new_owner: PublicKey,
+//     amount: Money,
+//     new_login_packet: Account,
+// ) -> Result<TransferRegistered, CoreError>
+// where
+//     Self: Sized,
+// {
+//     trace!(
+//         "Insert a login packet for {:?} preloading the wallet with {} money.",
+//         new_owner,
+//         amount
+//     );
+
+//     let mut actor = self
+//         .transfer_actor()
+//         .await
+//         .ok_or(CoreError::from("No TransferActor found for client."))?;
+
+//     let response = actor
+//         .create_login_for(new_owner, amount, new_login_packet)
+//         .await;
+
+//     match response {
+//         Ok(res) => match res {
+//             Response::TransferRegistration(result) => match result {
+//                 Ok(transfer) => Ok(transfer),
+//                 Err(error) => Err(CoreError::from(error)),
+//             },
+//             _ => Err(CoreError::ReceivedUnexpectedEvent),
+//         },
+
+//         Err(error) => Err(error),
+//     }
+// }

@@ -24,7 +24,7 @@ use fs2::FileExt;
 use futures::lock::{Mutex, MutexGuard};
 use log::{debug, trace, warn};
 use safe_nd::{
-    verify_signature, ClientFullId, Data, Error as SndError, LoginPacket, Message, Money, PublicId,
+    verify_signature, Account, ClientFullId, Data, Error as SndError, Message, Money, PublicId,
     PublicKey, Request, RequestType, Result as SndResult, SafeKey, Transfer, TransferId, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -151,14 +151,14 @@ impl Vault {
             .insert(name, Account::new(self.config.clone()));
     }
 
-    pub fn insert_login_packet(&mut self, login_packet: LoginPacket) {
+    pub fn insert_login_packet(&mut self, login_packet: Account) {
         let _ = self
             .cache
             .login_packets
             .insert(*login_packet.destination(), login_packet);
     }
 
-    pub fn get_login_packet(&self, name: &XorName) -> Option<&LoginPacket> {
+    pub fn get_login_packet(&self, name: &XorName) -> Option<&Account> {
         self.cache.login_packets.get(name)
     }
 
@@ -443,7 +443,7 @@ impl Vault {
             Request::SData(req) => self.process_sdata_req(req, requester, requester_pk, owner_pk),
             Request::Client(req) => self.process_client_req(req, requester, requester_pk, owner_pk),
             Request::Money(req) => self.process_money_req(req, requester_pk, owner_pk),
-            Request::LoginPacket(req) => self.process_login_packet_req(req, requester_pk, owner_pk),
+            Request::Account(req) => self.process_login_packet_req(req, requester_pk, owner_pk),
         };
 
         Ok(Message::Response {
@@ -524,7 +524,7 @@ pub async fn lock<'a>(vault: &'a Arc<Mutex<Vault>>, writing: bool) -> VaultGuard
 struct Cache {
     account_balances: HashMap<PublicKey, AccountBalance>,
     client_manager: HashMap<XorName, Account>,
-    login_packets: HashMap<XorName, LoginPacket>,
+    login_packets: HashMap<XorName, Account>,
     nae_manager: HashMap<DataId, Data>,
 }
 

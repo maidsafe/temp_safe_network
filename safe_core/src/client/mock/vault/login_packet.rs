@@ -9,17 +9,17 @@
 use super::{Operation, Vault};
 use crate::client::COST_OF_PUT;
 use safe_nd::{
-    ClientFullId, DebitAgreementProof, Error as SndError, LoginPacketRequest, Money, PublicKey,
-    Response, SafeKey, SignedTransfer, Transfer, TransferRegistered,
+    AccountRead, AccountWrite, ClientFullId, DebitAgreementProof, Error as SndError, Money,
+    PublicKey, Response, SafeKey, SignedTransfer, Transfer, TransferRegistered,
 };
 use std::str::FromStr;
 use unwrap::unwrap;
 
 impl Vault {
-    /// Process LoginPacket request
+    /// Process Account request
     pub(crate) fn process_login_packet_req(
         &mut self,
-        request: &LoginPacketRequest,
+        request: &AccountRequest,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
     ) -> Response {
@@ -28,7 +28,7 @@ impl Vault {
         let fake_signature = client_safe_key.sign(b"mock-key");
 
         match request {
-            LoginPacketRequest::CreateFor {
+            AccountRequest::CreateFor {
                 new_owner,
                 amount,
                 transfer_id,
@@ -61,7 +61,7 @@ impl Vault {
                             self.create_balance(*new_owner, Money::from_str("0").unwrap())
                         })
                         .and_then(|_| {
-                            // Debit the requester's wallet the cost of `CreateLoginPacketFor`
+                            // Debit the requester's wallet the cost of `CreateAccountFor`
                             self.debit_cost_of_mutation(&source);
                             self.transfer_money(source, *amount, new_balance_dest, *transfer_id)
                         })
@@ -96,7 +96,7 @@ impl Vault {
                 };
                 Response::TransferRegistration(result)
             }
-            LoginPacketRequest::Create(account_data) => {
+            AccountRequest::Create(account_data) => {
                 let source = owner_pk.into();
 
                 if let Err(e) =
@@ -119,7 +119,7 @@ impl Vault {
                     Response::Write(result)
                 }
             }
-            LoginPacketRequest::Get(location) => {
+            AccountRequest::Get(location) => {
                 let result = match self.get_login_packet(&location) {
                     None => Err(SndError::NoSuchLoginPacket),
                     Some(login_packet) => {
@@ -133,9 +133,9 @@ impl Vault {
                         }
                     }
                 };
-                Response::GetLoginPacket(result)
+                Response::GetAccount(result)
             }
-            LoginPacketRequest::Update(new_packet) => {
+            AccountRequest::Update(new_packet) => {
                 let result = {
                     match self.get_login_packet(new_packet.destination()) {
                         Some(old_packet) => {

@@ -2054,7 +2054,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=introduce_read_write#fce4443ac0356ed92dd45af6dbf82cafb88f3cbc"
+source = "git+https://github.com/oetyng/safe-nd.git?branch=separate_read_write#0393b9f325783d78e6594cee1a1136b469861112"
 dependencies = [
  "bincode",
  "crdts",
@@ -2072,7 +2072,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/joshuef/safe-transfers.git?branch=Fix-FixAccumulationAndTransferLogix#eced9b7fb9b5e48d0aec7af8362e0fa75433fcba"
+source = "git+https://github.com/oetyng/safe-transfers.git?branch=separate_read_write#dc960a4d9c3470f711304cb2022f5242da6d6ba8"
 dependencies = [
  "bincode",
  "crdts",
@@ -3048,3 +3048,8 @@ name = "zeroize"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ddfeb6eee2fb3b262ef6e0898a52b7563bb8e0d5955a313b3cf2f808246ea14"
+
+[[patch.unused]]
+name = "safe-nd"
+version = "0.10.0"
+source = "git+https://github.com/maidsafe/safe-nd?branch=at2#57f58cadc6a261a6fbaf0b7d5ec228b96aa03713"

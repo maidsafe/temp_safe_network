@@ -38,7 +38,7 @@ pub type ResponseHookFn = dyn FnMut(Response) -> Response + Send + Sync + 'stati
 /// Initialises QuicP2p instance. Establishes new connections.
 /// Contains a reference to crossbeam channel provided by quic-p2p for capturing the events.
 #[allow(unused)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 // #[async_trait]
 pub struct ConnectionManager {
     vault: Arc<Mutex<Vault>>,
