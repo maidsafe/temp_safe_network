@@ -2075,7 +2075,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-transfers?branch=separate_read_write#49cbcf186e33a1603dd7a348fe016d310d91c6bc"
+source = "git+https://github.com/oetyng/safe-transfers?branch=separate_read_write#dc960a4d9c3470f711304cb2022f5242da6d6ba8"
 dependencies = [
  "bincode",
  "crdts",
