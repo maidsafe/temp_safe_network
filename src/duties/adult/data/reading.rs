@@ -65,9 +65,7 @@ impl Reading {
     }
 
     fn blob(&self, read: &BlobRead, storage: &ChunkStorage) -> Option<Action> {
-        let address = match read {
-            BlobRead::Get(address) => address,
-        };
+        let BlobRead::Get(address) = read;
         if self.src.is_section() {
             // Since the requester is a node, this message was sent by the data handlers to us
             // as a single data handler, implying that we're a data holder where the chunk is

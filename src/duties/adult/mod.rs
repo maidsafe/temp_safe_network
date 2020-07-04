@@ -43,7 +43,7 @@ impl AdultDuties {
         Ok(Self {
             id,
             data,
-            _routing: routing.clone(),
+            _routing: routing,
         })
     }
 

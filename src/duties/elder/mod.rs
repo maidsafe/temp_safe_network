@@ -8,11 +8,13 @@
 
 mod gateway;
 mod metadata;
+mod payment;
 mod transfers;
 
 use self::{
     gateway::ClientHandler,
     metadata::Metadata,
+    payment::DataPayment,
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
@@ -26,7 +28,8 @@ use log::{error, trace};
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, RoutingError, SrcLocation};
 use safe_nd::{
-    MessageId, NodePublicId, NodeRequest, PublicId, Request, Response, SystemOp, XorName,
+    GatewayRequest, MessageId, NodePublicId, NodeRequest, PublicId, Request, Response, SystemOp,
+    XorName,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -41,6 +44,7 @@ pub(crate) struct ElderDuties {
     metadata: Metadata,
     transfers: Transfers,
     gateway: ClientHandler,
+    data_payment: DataPayment,
     routing: Rc<RefCell<Routing>>,
 }
 
@@ -80,13 +84,17 @@ impl ElderDuties {
             vec![],
             proof_chain.clone(),
         )?;
-        let transfers = Transfers::new(id.clone(), replica_manager);
+
+        let replica_manager = Rc::new(RefCell::new(replica_manager));
+        let transfers = Transfers::new(id.clone(), replica_manager.clone());
+        let data_payment = DataPayment::new(id.clone(), replica_manager);
 
         Ok(Self {
             id,
             gateway,
             metadata,
             transfers,
+            data_payment,
             routing: routing.clone(),
         })
     }
@@ -191,13 +199,20 @@ impl ElderDuties {
             src,
             requester
         );
-        //use NodeRequest::*;
-        //use Request::*;
+        use Request::*;
         match request.clone() {
-            Request::Node(NodeRequest::Read(_)) | Request::Node(NodeRequest::Write(_)) => self
+            //Client(client) => self.gateway... // Is handled by `fn handle_client_message(..)` above.
+            Gateway(write @ GatewayRequest::Write { .. }) => self.data_payment.handle_write(
+                src,
+                requester,
+                write,
+                message_id,
+                accumulated_signature,
+            ),
+            Node(NodeRequest::Read(_)) | Node(NodeRequest::Write(_)) => self
                 .metadata
                 .handle_request(src, requester, request, message_id, accumulated_signature),
-            Request::Node(NodeRequest::System(SystemOp::Transfers(req))) => {
+            Node(NodeRequest::System(SystemOp::Transfers(req))) => {
                 self.transfers.handle_request(requester, req, message_id)
             }
             _ => None,

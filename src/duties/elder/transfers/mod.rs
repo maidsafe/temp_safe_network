@@ -12,14 +12,17 @@ pub mod replica_manager;
 use self::replica_manager::ReplicaManager;
 use crate::{action::Action, rpc::Rpc};
 //use log::{error, trace};
+#[cfg(not(feature = "simulated-payouts"))]
+use safe_nd::PublicKey;
 use safe_nd::{
     DebitAgreementProof, Error as NdError, MessageId, NodePublicId, NodeRequest, PublicId, Request,
     Response, SignedTransfer, SystemOp, Transfers as MoneyRequest, XorName,
 };
-use std::fmt::{self, Display, Formatter};
-
-#[cfg(not(feature = "simulated-payouts"))]
-use safe_nd::PublicKey;
+use std::{
+    cell::RefCell,
+    fmt::{self, Display, Formatter},
+    rc::Rc,
+};
 
 use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
@@ -48,11 +51,11 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// interaction with an AT2 Replica.
 pub(crate) struct Transfers {
     id: NodePublicId,
-    replica: ReplicaManager,
+    replica: Rc<RefCell<ReplicaManager>>,
 }
 
 impl Transfers {
-    pub fn new(id: NodePublicId, replica: ReplicaManager) -> Self {
+    pub fn new(id: NodePublicId, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         Self { id, replica }
     }
 
@@ -64,6 +67,7 @@ impl Transfers {
         proof_chain: SectionProofChain,
     ) -> Option<()> {
         self.replica
+            .borrow_mut()
             .churn(sec_key_share, index, pub_key_set, proof_chain)
             .ok()
     }
@@ -123,23 +127,23 @@ impl Transfers {
                 &mut messaging,
             ),
             #[cfg(feature = "simulated-payouts")]
-            MoneyRequest::SimulatePayout { transfer } => {
-                self.replica
-                    .credit_without_proof(requester, transfer, message_id, *self.id.name())
-            }
+            MoneyRequest::SimulatePayout { transfer } => self
+                .replica
+                .borrow_mut()
+                .credit_without_proof(requester, transfer, message_id, *self.id.name()),
         }
     }
 
     /// Get the PublicKeySet of our replicas
     fn get_replica_pks(&self, message_id: MessageId, messaging: &mut Messaging) -> Option<Action> {
-        let result = self.replica.replicas_pk_set();
+        let result = self.replica.borrow().replicas_pk_set();
         let response = Response::GetReplicaKeys(result);
         messaging.respond_to_client(message_id, response);
         None
     }
 
     fn balance(
-        &mut self,
+        &self,
         xorname: XorName,
         requester: PublicId,
         message_id: MessageId,
@@ -150,6 +154,7 @@ impl Transfers {
             Err(NdError::NoSuchBalance)
         } else {
             self.replica
+                .borrow()
                 .balance(&requester.public_key())
                 .ok_or(NdError::NoSuchBalance)
         };
@@ -159,7 +164,7 @@ impl Transfers {
     }
 
     fn history(
-        &mut self,
+        &self,
         at: XorName,
         _since_version: usize,
         requester: PublicId,
@@ -172,6 +177,7 @@ impl Transfers {
         } else {
             match self
                     .replica
+                    .borrow()
                     .history(&requester.public_key()) // since_version
                 {
                     None => Ok(vec![]),
@@ -192,7 +198,7 @@ impl Transfers {
         requester: &PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.replica.validate(transfer);
+        let result = self.replica.borrow_mut().validate(transfer);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
@@ -214,7 +220,7 @@ impl Transfers {
         message_id: MessageId,
         messaging: &mut Messaging,
     ) -> Option<Action> {
-        match self.replica.register(proof) {
+        match self.replica.borrow_mut().register(proof) {
             Ok(event) => {
                 // sender is notified with a push msg (only delivered if recipient is online)
                 messaging.respond_to_client(message_id, Response::TransferRegistration(Ok(event)));
@@ -235,7 +241,7 @@ impl Transfers {
                 sender: *self.id.name(),
                 rpc: Rpc::Response {
                     response: Response::TransferRegistration(Err(err)),
-                    requester: requester.clone(),
+                    requester,
                     message_id,
                     refund: None,
                     proof: None,
@@ -256,7 +262,7 @@ impl Transfers {
         messaging: &mut Messaging,
     ) -> Option<Action> {
         // We will just validate the proofs and then apply the event.
-        match self.replica.receive_propagated(proof) {
+        match self.replica.borrow_mut().receive_propagated(proof) {
             Ok(_event) => {
                 // notify recipient, with a push msg (only delivered if recipient is online)
                 messaging.notify_client(&XorName::from((&proof).to()), proof);

@@ -105,9 +105,9 @@ impl ReplicaManager {
             .debiting_replicas_sig
             .clone()
             .into_bls()
-            .ok_or(Error::NetworkOther(
-                "Error retrieving threshold::Signature from DAP ".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                Error::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
+            })?;
         let section_keys = self.section_proof_chain.clone();
 
         let event = self.replica.clone().register(proof, move || {
@@ -139,9 +139,9 @@ impl ReplicaManager {
             .debiting_replicas_sig
             .clone()
             .into_bls()
-            .ok_or(Error::NetworkOther(
-                "Error retrieving threshold::Signature from DAP ".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                Error::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
+            })?;
 
         let event = self.replica.receive_propagated(proof, move || {
             let key = section_keys
@@ -149,7 +149,7 @@ impl ReplicaManager {
                 .find(|&key_in_chain| key_in_chain == &proof.replica_key.public_key());
             if let Some(key_in_chain) = key {
                 if key_in_chain.verify(&sig, serialized) {
-                    Some(NdPublicKey::from(key_in_chain.clone()))
+                    Some(NdPublicKey::from(*key_in_chain))
                 } else {
                     None
                 }

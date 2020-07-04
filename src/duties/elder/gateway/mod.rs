@@ -66,7 +66,7 @@ impl ClientHandler {
             init_mode,
         )?;
 
-        let messaging = Messaging::new(id.clone(), routing.clone());
+        let messaging = Messaging::new(id.clone(), routing);
         let auth = Auth::new(id.clone(), auth_keys_db);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = Validation::new(id.clone());
@@ -169,7 +169,7 @@ impl ClientHandler {
             self,
             request,
             msg_id,
-            client.clone()
+            client
         );
 
         if let Some(action) =

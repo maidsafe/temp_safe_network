@@ -468,6 +468,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    /// Will only act on this (i.e. return an action) if node is currently an Elder.
     fn handle_client_event(&mut self, event: ClientEvent) -> Option<Action> {
         use ClientEvent::*;
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
@@ -647,7 +648,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
         }
         error!("{}: Logic error - unexpected msg.", self);
-        return None;
+        None
     }
 
     fn is_client_auth_write(&self, request: &Request) -> bool {
@@ -662,45 +663,29 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    /// From Client to Gateway.
     #[allow(unused)]
-    fn is_client_req(&self, request: &Request) -> bool {
+    fn is_client_request(&self, request: &Request) -> bool {
         match request {
             Request::Client(_) => true,
             _ => false,
         }
     }
 
+    /// From Gateway to Node.
     #[allow(unused)]
-    fn is_node_req(&self, request: &Request) -> bool {
+    fn is_gateway_request(&self, request: &Request) -> bool {
+        match request {
+            Request::Gateway(_) => true,
+            _ => false,
+        }
+    }
+
+    /// From Node to Node.
+    #[allow(unused)]
+    fn is_node_request(&self, request: &Request) -> bool {
         match request {
             Request::Node(_) => true,
-            _ => false,
-        }
-    }
-
-    #[allow(unused)]
-    fn is_client_handler_req(&self, request: &Request) -> bool {
-        match request {
-            Request::Client(ClientRequest::System(SystemOp::Transfers(_))) // Temporary! Is really at Section(TransferReplicas).
-            | Request::Client(ClientRequest::System(SystemOp::ClientAuth(_)))
-            | Request::Client(ClientRequest::Read(Read::Account(_)))
-            | Request::Client(ClientRequest::Write { write: Write::Account(_), .. })
-            | Request::Node(NodeRequest::System(SystemOp::ClientAuth(_)))
-            | Request::Node(NodeRequest::Read(Read::Account(_)))
-            | Request::Node(NodeRequest::Write(Write::Account(_))) => true,
-            _ => false,
-        }
-    }
-
-    #[allow(unused)]
-    fn is_data_handler_req(&self, request: &Request) -> bool {
-        !self.is_client_handler_req(request) // temporary simplification
-    }
-
-    #[allow(unused)]
-    fn is_transfer_handler_req(&self, request: &Request) -> bool {
-        match request {
-            Request::Client(ClientRequest::System(SystemOp::Transfers(_))) => true,
             _ => false,
         }
     }

@@ -33,7 +33,7 @@ impl Validation {
             blobs: Blobs::new(id.clone()),
             maps: Maps::new(id.clone()),
             sequences: Sequences::new(id.clone()),
-            accounts: Accounts::new(id.clone()),
+            accounts: Accounts::new(id),
         }
     }
 
@@ -150,14 +150,13 @@ impl Sequences {
             request,
             client_public_id: client.clone(),
             message_id,
-            //debit_proof,
         }))
     }
 
     // on client request
     fn initiate_deletion(
         &mut self,
-        client: PublicId,
+        client_public_id: PublicId,
         address: SDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -170,7 +169,7 @@ impl Sequences {
 
         Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(SequenceWrite::Delete(address)),
-            client_public_id: client.clone(),
+            client_public_id,
             message_id,
         }))
     }
@@ -178,16 +177,15 @@ impl Sequences {
     // on client request
     fn initiate_mutation(
         &mut self,
-        client: PublicId,
+        client_public_id: PublicId,
         request: SequenceWrite,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(request),
-            client_public_id: client.clone(),
+            client_public_id,
             message_id,
-            //debit_proof,
         }))
     }
 
@@ -289,14 +287,13 @@ impl Blobs {
             request,
             client_public_id: client.clone(),
             message_id,
-            //debit_proof,
         }))
     }
 
     // on client request
     fn initiate_deletion(
         &mut self,
-        client: PublicId,
+        client_public_id: PublicId,
         address: IDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -308,7 +305,7 @@ impl Blobs {
         }
         Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(BlobWrite::DeletePrivate(address)),
-            client_public_id: client.clone(),
+            client_public_id,
             message_id,
         }))
     }
@@ -395,15 +392,14 @@ impl Maps {
     fn initiate_mutation(
         &mut self,
         write: MapWrite,
-        client: PublicId,
+        client_public_id: PublicId,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write),
-            client_public_id: client.clone(),
+            client_public_id,
             message_id,
-            //debit_proof,
         }))
     }
 
@@ -411,12 +407,12 @@ impl Maps {
     fn initiate_deletion(
         &mut self,
         write: MapWrite,
-        client: PublicId,
+        client_public_id: PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write),
-            client_public_id: client.clone(),
+            client_public_id,
             message_id,
         }))
     }
@@ -451,7 +447,6 @@ impl Maps {
             request,
             client_public_id: client.clone(),
             message_id,
-            //debit_proof,
         }))
     }
 }
