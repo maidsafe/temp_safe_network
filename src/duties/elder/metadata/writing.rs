@@ -17,32 +17,32 @@ use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
     request: Request,
-    src: SrcLocation,
+    _src: SrcLocation,
     requester: PublicId,
     write: Write,
     message_id: MessageId,
-    accumulated_signature: Option<Signature>,
-    public_key: Option<PublicKey>,
+    _accumulated_signature: Option<Signature>,
+    _public_key: Option<PublicKey>,
 }
 
 impl Writing {
     pub fn new(
         write: Write,
-        src: SrcLocation,
+        _src: SrcLocation,
         requester: PublicId,
         request: Request,
         message_id: MessageId,
-        accumulated_signature: Option<Signature>,
-        public_key: Option<PublicKey>,
+        _accumulated_signature: Option<Signature>,
+        _public_key: Option<PublicKey>,
     ) -> Self {
         Self {
             request,
-            src,
+            _src,
             requester,
             write,
             message_id,
-            accumulated_signature,
-            public_key,
+            _accumulated_signature,
+            _public_key,
         }
     }
 

@@ -10,30 +10,26 @@ mod auth;
 mod data_requests;
 mod login_packets;
 mod messaging;
-mod replica_manager;
-mod transfers;
 
 use self::{
     auth::{Auth, AuthKeysDb},
     data_requests::Validation,
     login_packets::LoginPackets,
     messaging::Messaging,
-    replica_manager::ReplicaManager,
-    transfers::Transfers,
 };
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::LoginPacketChunkStore,
     node::Init,
     rpc::Rpc,
-    utils, Config, Result,
+    Config, Result,
 };
 use bytes::Bytes;
-use log::trace;
+use log::{error, trace};
 use rand::{CryptoRng, Rng};
-use routing::{Node, RoutingError, SectionProofChain};
+use routing::Node as Routing;
 use safe_nd::{
-    ClientRequest, MessageId, Money, NodePublicId, NodeRequest, PublicId, Read, Request, Response,
+    ClientRequest, MessageId, NodePublicId, NodeRequest, PublicId, Read, Request, Response,
     Signature, SystemOp, Write, XorName,
 };
 use std::{
@@ -42,15 +38,11 @@ use std::{
     net::SocketAddr,
     rc::Rc,
 };
-use threshold_crypto::{PublicKeySet, SecretKeyShare};
-
-/// The cost to Put a chunk to the network.
-pub const COST_OF_PUT: Money = Money::from_nano(1);
 
 pub(crate) struct ClientHandler {
     id: NodePublicId,
     messaging: Messaging,
-    transfers: Transfers,
+
     auth: Auth,
     login_packets: LoginPackets,
     data: Validation,
@@ -62,7 +54,7 @@ impl ClientHandler {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
-        routing_node: Rc<RefCell<Node>>,
+        routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
@@ -74,47 +66,20 @@ impl ClientHandler {
             init_mode,
         )?;
 
-        let node = routing_node.borrow();
-        let public_key_set = node.public_key_set()?;
-        let secret_key_share = node.secret_key_share()?;
-        let key_index = node.our_index()?;
-        let proof_chain = node.our_history().ok_or(RoutingError::InvalidState)?;
-        let replica_manager = ReplicaManager::new(
-            secret_key_share,
-            key_index,
-            public_key_set,
-            vec![],
-            proof_chain.clone(),
-        )?;
-
-        let messaging = Messaging::new(id.clone(), routing_node.clone());
-
+        let messaging = Messaging::new(id.clone(), routing.clone());
         let auth = Auth::new(id.clone(), auth_keys_db);
-        let transfers = Transfers::new(id.clone(), replica_manager);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = Validation::new(id.clone());
 
         let client_handler = Self {
             id,
             messaging,
-            transfers,
             auth,
             login_packets,
             data,
         };
 
         Ok(client_handler)
-    }
-
-    pub fn update_replica_on_churn(
-        &mut self,
-        pub_key_set: PublicKeySet,
-        sec_key_share: SecretKeyShare,
-        index: usize,
-        proof_chain: SectionProofChain,
-    ) -> Option<()> {
-        self.transfers
-            .update_replica_on_churn(pub_key_set, sec_key_share, index, proof_chain)
     }
 
     pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
@@ -129,7 +94,7 @@ impl ClientHandler {
         self.messaging.handle_connection_failure(peer_addr)
     }
 
-    pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
+    pub fn receive_node_msg(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
         match rpc {
             Rpc::Request {
                 request,
@@ -143,61 +108,20 @@ impl ClientHandler {
                 message_id,
                 refund: _,
                 ..
-            } => {
-                // TODO: FIX AT2 REFUNDS HERE
-                /*
-                if let Some(refund_amount) = refund {
-                    if let Err(error) = self.transfers.deposit(requester.name(), refund_amount) {
-                        error!(
-                            "{}: Failed to refund {} coins for {:?}: {:?}",
-                            self, refund_amount.signed_transfer.transfer.amount, requester, error,
-                        )
-                    };
-                }
-                */
-
-                self.messaging
-                    .relay_reponse_to_client(src, &requester, response, message_id)
-            }
+            } => self
+                .messaging
+                .relay_reponse_to_client(src, &requester, response, message_id),
             Rpc::Duplicate { .. } => None,
             Rpc::DuplicationComplete { .. } => None,
         }
     }
 
+    /// Basically.. when Gateway nodes have agreed,
+    /// they'll forward the request into the network.
     pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
         use ConsensusAction::*;
         trace!("{}: Consensused {:?}", self, action,);
         match action {
-            PayAndForward {
-                request,
-                client_public_id,
-                message_id,
-                debit_proof,
-            } => {
-                #[cfg(feature = "simulated-payouts")]
-                self.transfers.pay(debit_proof.signed_transfer.transfer);
-
-                #[cfg(not(feature = "simulated-payouts"))]
-                {
-                    let owner = utils::owner(&client_public_id)?;
-
-                    if let Some(action) = self.transfers.pay_section(
-                        debit_proof,
-                        *owner.public_key(),
-                        &request,
-                        message_id,
-                    ) {
-                        return Some(action);
-                    }
-                }
-
-                Some(Action::ForwardClientRequest(Rpc::Request {
-                    requester: client_public_id,
-                    request,
-                    message_id,
-                    signature: None,
-                }))
-            }
             Forward {
                 request,
                 client_public_id,
@@ -293,7 +217,12 @@ impl ClientHandler {
     ) -> Option<Action> {
         use SystemOp::*;
         match op {
-            Transfers(request) => self.transfers.initiate(client, request, msg_id),
+            Transfers(request) => Some(Action::ForwardClientRequest(Rpc::Request {
+                request: Request::Node(NodeRequest::System(Transfers(request))),
+                requester: client,
+                message_id: msg_id,
+                signature: None,
+            })),
             ClientAuth(request) => self.auth.initiate(client, request, msg_id),
         }
     }
@@ -306,9 +235,15 @@ impl ClientHandler {
     ) -> Option<Action> {
         use SystemOp::*;
         match op {
-            Transfers(request) => {
-                self.transfers
-                    .finalise(client, request, msg_id, &mut self.messaging)
+            Transfers(_) => {
+                error!(
+                    "{}: Should not be handled at ClientHandler!! Received ({:?} {:?})(client {:?})",
+                    self,
+                    &op,
+                    msg_id,
+                    client
+                );
+                None
             }
             ClientAuth(request) => self.auth.finalise(client, request, msg_id),
         }

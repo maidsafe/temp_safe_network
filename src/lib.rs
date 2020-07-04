@@ -32,7 +32,6 @@
 mod accumulator;
 mod action;
 mod chunk_store;
-mod client_handler;
 mod config_handler;
 mod duties;
 mod error;
@@ -45,7 +44,6 @@ pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
-    client_handler::COST_OF_PUT,
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
     node::{Command, Node as Vault},

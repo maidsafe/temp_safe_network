@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{messaging::Messaging, replica_manager::ReplicaManager};
+pub mod replica_manager;
+
+//use super::{messaging::Messaging, replica_manager::ReplicaManager};
+use self::replica_manager::ReplicaManager;
 use crate::{action::Action, rpc::Rpc};
 //use log::{error, trace};
 use safe_nd::{
@@ -43,7 +46,7 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
-pub(super) struct Transfers {
+pub(crate) struct Transfers {
     id: NodePublicId,
     replica: ReplicaManager,
 }
@@ -65,55 +68,59 @@ impl Transfers {
             .ok()
     }
 
-    /// Elders that aren't in the dst
-    /// section, will forward the request.
-    pub(super) fn initiate(
-        &mut self,
-        requester: PublicId,
-        request: MoneyRequest,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            request: Request::Node(NodeRequest::System(SystemOp::Transfers(request))),
-            requester,
-            message_id,
-            signature: None,
-        }))
-    }
+    // /// Elders that aren't in the dst
+    // /// section, will forward the request.
+    // pub(super) fn initiate(
+    //     &mut self,
+    //     requester: PublicId,
+    //     request: MoneyRequest,
+    //     message_id: MessageId,
+    // ) -> Option<Action> {
+    //     Some(Action::ForwardClientRequest(Rpc::Request {
+    //         request: Request::Node(NodeRequest::System(SystemOp::Transfers(request))),
+    //         requester,
+    //         message_id,
+    //         signature: None,
+    //     }))
+    // }
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub(super) fn finalise(
+    pub(super) fn handle_request(
         &mut self,
         requester: PublicId,
         request: MoneyRequest,
         message_id: MessageId,
-        messaging: &mut Messaging,
+        //messaging: &mut Messaging,
     ) -> Option<Action> {
+        let mut messaging = Messaging {};
         match request {
             MoneyRequest::ValidateTransfer { signed_transfer } => {
                 self.validate(signed_transfer, &requester, message_id)
             }
             MoneyRequest::RegisterTransfer { proof } => {
-                self.register(&proof, requester, message_id, messaging)
+                self.register(&proof, requester, message_id, &mut messaging)
             }
             MoneyRequest::PropagateTransfer { proof } => {
-                self.receive_propagated(&proof, &requester, message_id, messaging)
+                self.receive_propagated(&proof, &requester, message_id, &mut messaging)
             }
-            MoneyRequest::GetBalance(public_key) => {
-                self.balance(XorName::from(public_key), requester, message_id, messaging)
-            }
+            MoneyRequest::GetBalance(public_key) => self.balance(
+                XorName::from(public_key),
+                requester,
+                message_id,
+                &mut messaging,
+            ),
             MoneyRequest::GetReplicaKeys(_public_key) => {
                 // Here we assume we're at the right section.
                 // TODO: verify this, or move transfers out of client handler in general
-                self.get_replica_pks(message_id, messaging)
+                self.get_replica_pks(message_id, &mut messaging)
             }
             MoneyRequest::GetHistory { at, since_version } => self.history(
                 XorName::from(at),
                 since_version,
                 requester,
                 message_id,
-                messaging,
+                &mut messaging,
             ),
             #[cfg(feature = "simulated-payouts")]
             MoneyRequest::SimulatePayout { transfer } => {
@@ -268,6 +275,7 @@ impl Transfers {
         }
     }
 
+    #[allow(unused)]
     #[cfg(not(feature = "simulated-payouts"))]
     pub fn pay_section(
         &mut self,
@@ -289,4 +297,11 @@ impl Display for Transfers {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id)
     }
+}
+
+pub struct Messaging {}
+
+impl Messaging {
+    pub fn notify_client(&mut self, _xorname: &XorName, _proof: &DebitAgreementProof) {}
+    pub fn respond_to_client(&mut self, _message_id: MessageId, _response: Response) {}
 }

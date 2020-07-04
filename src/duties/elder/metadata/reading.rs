@@ -17,32 +17,32 @@ use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Reading {
     request: Request,
-    src: SrcLocation,
+    _src: SrcLocation,
     requester: PublicId,
     read: Read,
     message_id: MessageId,
-    accumulated_signature: Option<Signature>,
-    public_key: Option<PublicKey>,
+    _accumulated_signature: Option<Signature>,
+    _public_key: Option<PublicKey>,
 }
 
 impl Reading {
     pub fn new(
         read: Read,
-        src: SrcLocation,
+        _src: SrcLocation,
         requester: PublicId,
         request: Request,
         message_id: MessageId,
-        accumulated_signature: Option<Signature>,
-        public_key: Option<PublicKey>,
+        _accumulated_signature: Option<Signature>,
+        _public_key: Option<PublicKey>,
     ) -> Self {
         Self {
             request,
-            src,
+            _src,
             requester,
             read,
             message_id,
-            accumulated_signature,
-            public_key,
+            _accumulated_signature,
+            _public_key,
         }
     }
 

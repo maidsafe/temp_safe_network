@@ -83,7 +83,7 @@ impl LoginPackets {
         client_public_id: PublicId,
         account: Account,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         if !account.size_is_valid() {
             return Some(Action::RespondToClient {
@@ -94,11 +94,11 @@ impl LoginPackets {
 
         let request = Self::wrap(AccountWrite::New(account));
 
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id,
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 
@@ -149,13 +149,13 @@ impl LoginPackets {
         client_public_id: PublicId,
         updated_account: Account,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(AccountWrite::Update(updated_account)),
             client_public_id,
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 

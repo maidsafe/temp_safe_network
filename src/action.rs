@@ -7,20 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::rpc::Rpc;
-use safe_nd::{DebitAgreementProof, MessageId, PublicId, Request, Response, XorName};
+use safe_nd::{MessageId, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 // Need to Serialize/Deserialize to go through the consensus process.
+/// A ConsensusAction is something only
+/// taking place at the network Gateways.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum ConsensusAction {
-    /// Process pay for request and forward request to client.
-    PayAndForward {
-        request: Request,
-        client_public_id: PublicId,
-        message_id: MessageId,
-        debit_proof: DebitAgreementProof,
-    },
     /// Process request that doesn't need a payment and forward request to client.
     Forward {
         request: Request,
@@ -55,3 +50,33 @@ pub(crate) enum Action {
         response: Response,
     },
 }
+
+// #[derive(Debug)]
+// #[allow(clippy::large_enum_variant)]
+// pub(crate) enum GatewayAction {
+//     /// Vote for a cmd so we can process the deferred action on consensus.
+//     /// (Currently immediately.)
+//     VoteFor(ConsensusAction),
+//     /// Send a validated client request from client handlers to the appropriate destination.
+//     ForwardClientRequest(Rpc),
+//     /// Send a response as an adult or elder to own section's elders.
+//     RespondToOurDataHandlers { rpc: Rpc },
+//     RespondToClient {
+//         message_id: MessageId,
+//         response: Response,
+//     },
+// }
+
+// #[derive(Debug)]
+// #[allow(clippy::large_enum_variant)]
+// pub(crate) enum NodeAction {
+//     RespondToGateway {
+//         sender: XorName,
+//         rpc: Rpc,
+//     },
+//     /// Send the same request to each individual peer (used to send IData requests to adults).
+//     SendToPeers {
+//         targets: BTreeSet<XorName>,
+//         rpc: Rpc,
+//     },
+// }

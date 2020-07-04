@@ -104,7 +104,7 @@ impl Metadata {
         self.elder_stores.blob_register_mut().duplicate_chunks(node)
     }
 
-    fn handle_request(
+    pub fn handle_request(
         &mut self,
         src: SrcLocation,
         requester: PublicId,
@@ -151,7 +151,7 @@ impl Metadata {
         }
     }
 
-    fn handle_response(
+    pub fn handle_response(
         &mut self,
         src: SrcLocation,
         response: Response,

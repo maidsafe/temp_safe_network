@@ -128,7 +128,7 @@ impl Sequences {
         client: PublicId,
         chunk: SData,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let owner = utils::owner(&client)?;
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
@@ -146,11 +146,11 @@ impl Sequences {
         }
 
         let request = Self::wrap(SequenceWrite::New(chunk));
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 
@@ -181,13 +181,13 @@ impl Sequences {
         client: PublicId,
         request: SequenceWrite,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(request),
             client_public_id: client.clone(),
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 
@@ -263,7 +263,7 @@ impl Blobs {
         client: PublicId,
         chunk: IData,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let owner = utils::owner(&client)?;
 
@@ -285,11 +285,11 @@ impl Blobs {
         }
 
         let request = Self::wrap(BlobWrite::New(chunk));
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 
@@ -397,13 +397,13 @@ impl Maps {
         write: MapWrite,
         client: PublicId,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write),
             client_public_id: client.clone(),
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 
@@ -427,7 +427,7 @@ impl Maps {
         client: PublicId,
         chunk: MData,
         message_id: MessageId,
-        debit_proof: DebitAgreementProof,
+        _debit_proof: DebitAgreementProof,
     ) -> Option<Action> {
         let owner = utils::owner(&client)?;
 
@@ -447,11 +447,11 @@ impl Maps {
 
         let request = Self::wrap(MapWrite::New(chunk));
 
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
+        Some(Action::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
-            debit_proof,
+            //debit_proof,
         }))
     }
 }

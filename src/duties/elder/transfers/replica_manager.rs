@@ -26,7 +26,7 @@ use {
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 
-pub(super) struct ReplicaManager {
+pub(crate) struct ReplicaManager {
     store: EventStore,
     replica: Replica,
     section_proof_chain: SectionProofChain,
@@ -83,6 +83,7 @@ impl ReplicaManager {
             Ok(events) => {
                 self.replica = Replica::from_history(secret_key, index, peer_replicas, events);
                 self.section_proof_chain = section_proof_chain;
+                //info!("Successfully updated Replica details on churn");
                 Ok(())
             }
             Err(e) => Err(Error::InvalidOperation), // todo: storage error

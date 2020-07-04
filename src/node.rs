@@ -9,9 +9,8 @@
 use crate::{
     accumulator::Accumulator,
     action::{Action, ConsensusAction},
-    client_handler::ClientHandler,
-    duties::{adult::data::Data, elder::metadata::Metadata},
-    rpc::Rpc,
+    duties::{adult::AdultDuties, elder::ElderDuties},
+    rpc::Rpc as Message,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -44,12 +43,11 @@ const STATE_FILENAME: &str = "state";
 enum State {
     Infant,
     Adult {
-        data: Data,
+        duties: AdultDuties,
         accumulator: Accumulator,
     },
     Elder {
-        client_handler: ClientHandler,
-        metadata: Metadata,
+        duties: ElderDuties,
         accumulator: Accumulator,
     },
 }
@@ -114,14 +112,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
         let state = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
-            let client_handler = ClientHandler::new(
-                id.public_id().clone(),
-                &config,
-                &total_used_space,
-                init_mode,
-                routing.clone(),
-            )?;
-            let metadata = Metadata::new(
+            let duties = ElderDuties::new(
                 id.public_id().clone(),
                 &config,
                 &total_used_space,
@@ -129,8 +120,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 routing.clone(),
             )?;
             State::Elder {
-                client_handler,
-                metadata,
+                duties,
                 accumulator: Accumulator::new(routing.clone()),
             }
         } else {
@@ -166,6 +156,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 
     /// Returns whether node is in adult state.
+    #[allow(unused)]
     fn is_adult(&self) -> bool {
         if let State::Adult { .. } = self.state {
             true
@@ -225,7 +216,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut config = Config::default();
         config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
-        let data = Data::new(
+        let duties = AdultDuties::new(
             self.id.public_id().clone(),
             &config,
             &total_used_space,
@@ -233,7 +224,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             self.routing.clone(),
         )?;
         self.state = State::Adult {
-            data,
+            duties,
             accumulator: Accumulator::new(self.routing.clone()),
         };
         Ok(())
@@ -243,14 +234,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut config = Config::default();
         config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
-        let client_handler = ClientHandler::new(
-            self.id.public_id().clone(),
-            &config,
-            &total_used_space,
-            Init::New,
-            self.routing.clone(),
-        )?;
-        let metadata = Metadata::new(
+        let duties = ElderDuties::new(
             self.id.public_id().clone(),
             &config,
             &total_used_space,
@@ -258,8 +242,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             self.routing.clone(),
         )?;
         self.state = State::Elder {
-            client_handler,
-            metadata,
+            duties,
             accumulator: Accumulator::new(self.routing.clone()),
         };
         Ok(())
@@ -341,10 +324,9 @@ impl<R: CryptoRng + Rng> Node<R> {
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<ConsensusAction>(&custom_event) {
-                    Ok(consensus_action) => {
-                        let client_handler = self.client_handler_mut()?;
-                        client_handler.handle_consensused_action(consensus_action)
-                    }
+                    Ok(consensus_action) => self
+                        .elder_duties()?
+                        .handle_consensused_action(consensus_action),
                     Err(e) => {
                         error!("Invalid ConsensusAction passed from Routing: {:?}", e);
                         None
@@ -361,11 +343,11 @@ impl<R: CryptoRng + Rng> Node<R> {
                     None
                 },
             ),
-            RoutingEvent::MemberLeft { name, age: _u8 } => {
+            RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
-                let get_copy_actions = self.metadata()?.trigger_chunk_duplication(XorName(name.0));
-                if let Some(copy_actions) = get_copy_actions {
-                    for action in copy_actions {
+                let next_actions = self.elder_duties()?.member_left(XorName(name.0), age);
+                if let Some(actions) = next_actions {
+                    for action in actions {
                         let _ = self.handle_action(action);
                     }
                 };
@@ -398,38 +380,24 @@ impl<R: CryptoRng + Rng> Node<R> {
                 );
                 self.handle_routing_message(src, content)
             }
-            RoutingEvent::EldersChanged { .. } => {
-                // Update our replica with the latest keys
-                let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
-                let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
-                let proof_chain = self.routing.borrow().our_history()?.clone();
-                let our_index = self.routing.borrow().our_index().ok()?;
-                self.client_handler_mut()?.update_replica_on_churn(
-                    pub_key_set,
-                    sec_key_share,
-                    our_index,
-                    proof_chain,
-                )?;
-                info!("Successfully updated Replica details on churn");
-                None
-            }
+            RoutingEvent::EldersChanged { .. } => self.elder_duties()?.elders_changed(),
             // Ignore all other events
             _ => None,
         }
     }
 
-    fn accumulate_rpc(&mut self, src: SrcLocation, rpc: Rpc) -> Option<Action> {
+    fn accumulate_msg(&mut self, src: SrcLocation, msg: Message) -> Option<Action> {
         let id = *self.routing.borrow().id().name();
         info!(
             "{}: Accumulating signatures for {:?}",
             &id,
-            rpc.message_id()
+            msg.message_id()
         );
-        if let Some((accumulated_rpc, signature)) = self.accumulator_mut()?.accumulate_request(rpc)
+        if let Some((accumulated_msg, signature)) = self.accumulator_mut()?.accumulate_request(msg)
         {
             info!(
                 "Got enough signatures for {:?}",
-                accumulated_rpc.message_id()
+                accumulated_msg.message_id()
             );
             let prefix = match src {
                 SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
@@ -437,7 +405,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             };
             self.process_locally(
                 SrcLocation::Section(prefix),
-                accumulated_rpc,
+                accumulated_msg,
                 Some(signature),
             )
         } else {
@@ -448,20 +416,20 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn process_locally(
         &mut self,
         src: SrcLocation,
-        msg: Rpc,
+        msg: Message,
         accumulated_sig: Option<Signature>,
     ) -> Option<Action> {
         match self.state {
-            State::Elder { .. } => self.metadata()?.receive_msg(src, msg, accumulated_sig),
-            State::Adult { .. } => self.data()?.receive_msg(src, msg, accumulated_sig),
+            State::Elder { .. } => self.elder_duties()?.receive_msg(src, msg, accumulated_sig),
+            State::Adult { .. } => self.adult_duties()?.receive_msg(src, msg, accumulated_sig),
             _ => None,
         }
     }
 
     fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<Action> {
-        match bincode::deserialize::<Rpc>(&message) {
-            Ok(rpc) => match &rpc {
-                Rpc::Request {
+        match bincode::deserialize::<Message>(&message) {
+            Ok(msg) => match &msg {
+                Message::Request {
                     request,
                     requester,
                     signature,
@@ -469,7 +437,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 } => {
                     if matches!(requester, PublicId::Node(_)) {
                         if let Some((_, signature)) = signature.clone() {
-                            self.process_locally(src, rpc, Some(signature.0))
+                            self.process_locally(src, msg, Some(signature.0))
                         } else {
                             error!("Signature missing from duplication GET request");
                             None
@@ -478,23 +446,23 @@ impl<R: CryptoRng + Rng> Node<R> {
                         match request {
                             Request::Node(NodeRequest::Read(Read::Blob(_)))
                             | Request::Node(NodeRequest::Write(Write::Blob(_))) => {
-                                self.accumulate_rpc(src, rpc)
+                                self.accumulate_msg(src, msg)
                             }
                             other => unimplemented!("Should not receive: {:?}", other),
                         }
                     }
                 }
-                Rpc::Response { response, .. } => match response {
+                Message::Response { response, .. } => match response {
                     Response::Write(_) | Response::GetIData(_) => {
-                        self.process_locally(src, rpc, None)
+                        self.process_locally(src, msg, None)
                     }
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
-                Rpc::Duplicate { .. } => self.accumulate_rpc(src, rpc),
-                Rpc::DuplicationComplete { .. } => self.process_locally(src, rpc, None),
+                Message::Duplicate { .. } => self.accumulate_msg(src, msg),
+                Message::DuplicationComplete { .. } => self.process_locally(src, msg, None),
             },
             Err(e) => {
-                error!("Error deserializing routing message into Rpc type: {:?}", e);
+                error!("Error deserializing routing message into msg type: {:?}", e);
                 None
             }
         }
@@ -502,17 +470,15 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     fn handle_client_event(&mut self, event: ClientEvent) -> Option<Action> {
         use ClientEvent::*;
-
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
-
-        let client_handler = self.client_handler_mut()?;
+        let elder_duties = self.elder_duties()?;
         match event {
-            ConnectedTo { peer } => client_handler.handle_new_connection(peer.peer_addr()),
+            ConnectedTo { peer } => elder_duties.handle_new_connection(peer.peer_addr()),
             ConnectionFailure { peer, .. } => {
-                client_handler.handle_connection_failure(peer.peer_addr());
+                elder_duties.handle_connection_failure(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                return client_handler.handle_client_message(peer.peer_addr(), &msg, &mut rng);
+                return elder_duties.handle_client_message(peer.peer_addr(), &msg, &mut rng);
             }
             SentUserMessage { peer, .. } => {
                 trace!(
@@ -554,8 +520,8 @@ impl<R: CryptoRng + Rng> Node<R> {
         match action {
             // Bypass client requests
             // VoteFor(action) => self.vote_for_action(&action),
-            VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
-            ForwardClientRequest(rpc) => self.forward_client_request(rpc),
+            VoteFor(action) => self.elder_duties()?.handle_consensused_action(action),
+            ForwardClientRequest(msg) => self.forward_client_request(msg),
             RespondToOurDataHandlers { rpc } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the data handlers, we'll call that
@@ -571,7 +537,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 //        same handler which Routing will call after receiving a message.
                 debug!("Responded to client handlers with {:?}", &rpc);
                 if self.self_is_handler_for(&client_name) {
-                    return self.client_handler_mut()?.handle_vault_rpc(sender, rpc);
+                    return self.elder_duties()?.respond_to_gateway(sender, rpc);
                 }
                 None
             }
@@ -580,7 +546,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         info!("Vault is one of the targets. Accumulating message locally");
-                        next_action = self.accumulate_rpc(
+                        next_action = self.accumulate_msg(
                             SrcLocation::Node(routing::XorName(target.0)),
                             rpc.clone(),
                         );
@@ -595,21 +561,20 @@ impl<R: CryptoRng + Rng> Node<R> {
                 message_id,
                 response,
             } => {
-                self.client_handler_mut()?
-                    .respond_to_client(message_id, response);
+                self.elder_duties()?.respond_to_client(message_id, response);
                 None
             }
         }
     }
 
-    fn respond_to_data_handlers(&self, rpc: Rpc) -> Option<Action> {
+    fn respond_to_data_handlers(&self, msg: Message) -> Option<Action> {
         let name = *self.routing.borrow().id().name();
         self.routing
             .borrow_mut()
             .send_message(
                 SrcLocation::Node(name),
                 DstLocation::Section(name),
-                utils::serialise(&rpc),
+                utils::serialise(&msg),
             )
             .map_or_else(
                 |err| {
@@ -617,20 +582,20 @@ impl<R: CryptoRng + Rng> Node<R> {
                     None
                 },
                 |()| {
-                    info!("Responded to our data handlers with: {:?}", &rpc);
+                    info!("Responded to our data handlers with: {:?}", &msg);
                     None
                 },
             )
     }
 
-    fn send_message_to_peer(&self, target: XorName, rpc: Rpc) -> Option<Action> {
+    fn send_message_to_peer(&self, target: XorName, msg: Message) -> Option<Action> {
         let name = *self.routing.borrow().id().name();
         self.routing
             .borrow_mut()
             .send_message(
                 SrcLocation::Node(name),
                 DstLocation::Node(routing::XorName(target.0)),
-                utils::serialise(&rpc),
+                utils::serialise(&msg),
             )
             .map_or_else(
                 |err| {
@@ -644,10 +609,9 @@ impl<R: CryptoRng + Rng> Node<R> {
             )
     }
 
-    fn forward_client_request(&mut self, rpc: Rpc) -> Option<Action> {
-        trace!("{} received a client request {:?}", self, rpc);
-        let requester_name = self.get_requester_name(&rpc);
-        let dst_address = if let Rpc::Request { ref request, .. } = rpc {
+    fn forward_client_request(&mut self, msg: Message) -> Option<Action> {
+        trace!("{} received a client request {:?}", self, msg);
+        let dst_address = if let Message::Request { ref request, .. } = msg {
             match request.dst_address() {
                 Some(address) => address,
                 None => {
@@ -662,7 +626,10 @@ impl<R: CryptoRng + Rng> Node<R> {
                 }
             }
         } else {
-            error!("{}: Logic error - unexpected RPC.", self);
+            error!(
+                "{}: Logic error - expected Request, but got something else.",
+                self
+            );
             return None;
         };
 
@@ -671,33 +638,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         //        same handler which Routing will call after receiving a message.
 
         if self.self_is_handler_for(&dst_address) {
-            if let Rpc::Request { request, .. } = &rpc {
-                if self.is_client_handler_req(&request) {
-                    return self
-                        .client_handler_mut()?
-                        .handle_vault_rpc(requester_name, rpc);
-                // } else if self.is_transfer_handler_req(&request) {
-
-                // }
-                } else if self.is_data_handler_req(&request) {
-                    return self.process_locally(
-                        SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                        rpc,
-                        None,
-                    );
-                }
+            if let Message::Request { .. } = &msg {
+                return self.process_locally(
+                    SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
+                    msg,
+                    None,
+                );
             }
-
-            error!("{}: Logic error - unexpected RPC.", self);
-            return None;
-        } else {
-            error!("{}: Logic error - unexpected RPC.", self);
-            None
         }
-    }
-
-    fn get_requester_name(&self, rpc: &Rpc) -> XorName {
-        utils::requester_address(&rpc)
+        error!("{}: Logic error - unexpected msg.", self);
+        return None;
     }
 
     fn is_client_auth_write(&self, request: &Request) -> bool {
@@ -712,6 +662,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    #[allow(unused)]
     fn is_client_req(&self, request: &Request) -> bool {
         match request {
             Request::Client(_) => true,
@@ -719,6 +670,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    #[allow(unused)]
     fn is_node_req(&self, request: &Request) -> bool {
         match request {
             Request::Node(_) => true,
@@ -726,6 +678,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    #[allow(unused)]
     fn is_client_handler_req(&self, request: &Request) -> bool {
         match request {
             Request::Client(ClientRequest::System(SystemOp::Transfers(_))) // Temporary! Is really at Section(TransferReplicas).
@@ -739,10 +692,12 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    #[allow(unused)]
     fn is_data_handler_req(&self, request: &Request) -> bool {
         !self.is_client_handler_req(request) // temporary simplification
     }
 
+    #[allow(unused)]
     fn is_transfer_handler_req(&self, request: &Request) -> bool {
         match request {
             Request::Client(ClientRequest::System(SystemOp::Transfers(_))) => true,
@@ -755,27 +710,6 @@ impl<R: CryptoRng + Rng> Node<R> {
         match self.routing.borrow().matches_our_prefix(&xorname) {
             Ok(result) => result,
             _ => false,
-        }
-    }
-
-    // TODO - remove this
-    #[allow(unused)]
-    fn client_handler(&self) -> Option<&ClientHandler> {
-        match &self.state {
-            State::Elder {
-                ref client_handler, ..
-            } => Some(client_handler),
-            _ => None,
-        }
-    }
-
-    fn client_handler_mut(&mut self) -> Option<&mut ClientHandler> {
-        match &mut self.state {
-            State::Elder {
-                ref mut client_handler,
-                ..
-            } => Some(client_handler),
-            _ => None,
         }
     }
 
@@ -806,18 +740,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn data(&mut self) -> Option<&mut Data> {
+    fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
         match &mut self.state {
-            State::Adult { ref mut data, .. } => Some(data),
+            State::Adult { ref mut duties, .. } => Some(duties),
             _ => None,
         }
     }
 
-    fn metadata(&mut self) -> Option<&mut Metadata> {
+    fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
         match &mut self.state {
-            State::Elder {
-                ref mut metadata, ..
-            } => Some(metadata),
+            State::Elder { ref mut duties, .. } => Some(duties),
             _ => None,
         }
     }

@@ -168,6 +168,7 @@ impl Messaging {
         }
     }
 
+    #[allow(unused)]
     pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
         for client_id in self.lookup_client_and_its_apps(client) {
             self.send_notification_to_client(&client_id, &TransferNotification(receipt.clone()));
