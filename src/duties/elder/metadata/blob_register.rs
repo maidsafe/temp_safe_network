@@ -6,7 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::ElderCmd, msg::Message, node::Init, utils, Config, Result, ToDbKey};
+use crate::{
+    cmd::{ElderCmd, MetadataCmd},
+    msg::Message,
+    node::Init,
+    utils, Config, Result, ToDbKey,
+};
 use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use rand::SeedableRng;
@@ -94,7 +99,7 @@ impl BlobRegister {
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            Some(ElderCmd::RespondToGateway {
+            wrap(MetadataCmd::RespondToGateway {
                 sender: our_name,
                 msg: Message::Response {
                     requester: client_id,
@@ -153,7 +158,7 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        Some(ElderCmd::SendToAdults {
+        wrap(MetadataCmd::SendToAdults {
             targets: target_holders,
             msg: Message::Request {
                 request,
@@ -174,7 +179,7 @@ impl BlobRegister {
         let our_name = *self.id.name();
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            Some(ElderCmd::RespondToGateway {
+            wrap(MetadataCmd::RespondToGateway {
                 sender: our_name,
                 msg: Message::Response {
                     requester: client_id.clone(),
@@ -197,7 +202,7 @@ impl BlobRegister {
             }
         };
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        Some(ElderCmd::SendToAdults {
+        wrap(MetadataCmd::SendToAdults {
             targets: metadata.holders,
             msg: Message::Request {
                 request,
@@ -237,7 +242,7 @@ impl BlobRegister {
 
                 let new_holders = self.get_new_holders_for_chunk(&address);
                 let signature = self.sign_with_signature_share(&utils::serialise(&address));
-                let duplicate_chunk_cmds = ElderCmd::SendToAdults {
+                let duplicate_chunk_cmds = ElderCmd::Metadata(MetadataCmd::SendToAdults {
                     targets: new_holders,
                     msg: Message::Duplicate {
                         address,
@@ -245,7 +250,7 @@ impl BlobRegister {
                         message_id,
                         signature,
                     },
-                };
+                });
                 cmds.push(duplicate_chunk_cmds);
             }
             Some(cmds)
@@ -264,7 +269,7 @@ impl BlobRegister {
         let our_name = *self.id.name();
 
         let respond = |result: NdResult<IData>| {
-            Some(ElderCmd::RespondToGateway {
+            wrap(MetadataCmd::RespondToGateway {
                 sender: our_name,
                 msg: Message::Response {
                     requester: requester.clone(),
@@ -288,7 +293,7 @@ impl BlobRegister {
             }
         };
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        Some(ElderCmd::SendToAdults {
+        wrap(MetadataCmd::SendToAdults {
             targets: metadata.holders,
             msg: Message::Request {
                 request,
@@ -419,7 +424,7 @@ impl BlobRegister {
         }
 
         // Should we wait for multiple responses
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *idata_address.name(),
             msg: Message::Response {
                 requester,
@@ -492,7 +497,7 @@ impl BlobRegister {
         }
 
         // TODO: Different responses from adults?
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *idata_address.name(),
             msg: Message::Response {
                 requester,
@@ -511,7 +516,7 @@ impl BlobRegister {
         proof: (Request, Signature),
     ) -> Option<ElderCmd> {
         let response = Response::GetIData(result);
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *self.id.name(),
             msg: Message::Response {
                 requester,
@@ -647,6 +652,10 @@ impl BlobRegister {
             .map_or(None, |key| Some(key.sign(data)));
         signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig))
     }
+}
+
+fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Metadata(cmd))
 }
 
 impl Display for BlobRegister {

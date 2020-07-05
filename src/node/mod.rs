@@ -8,7 +8,10 @@
 
 use crate::{
     accumulator::Accumulator,
-    cmd::{AdultCmd, ConsensusAction, ElderCmd, GatewayCmd, NodeCmd},
+    cmd::{
+        AdultCmd, ConsensusAction, ElderCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
+        TransferCmd,
+    },
     duties::{adult::AdultDuties, elder::ElderDuties},
     msg::Message,
     utils, Config, Result,
@@ -477,7 +480,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 elder_duties.handle_connection_failure(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                return elder_duties.handle_client_message(peer.peer_addr(), &msg, &mut rng);
+                return elder_duties.receive_client_request(peer.peer_addr(), &msg, &mut rng);
             }
             SentUserMessage { peer, .. } => {
                 trace!(
@@ -518,15 +521,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         match cmd {
             Adult(cmd) => self.handle_adult_cmd(cmd),
             Elder(cmd) => self.handle_elder_cmd(cmd),
-            Gateway(cmd) => self.handle_gateway_cmd(cmd),
         }
     }
 
     fn handle_gateway_cmd(&mut self, cmd: GatewayCmd) -> Option<NodeCmd> {
+        use GatewayCmd::*;
         match cmd {
-            GatewayCmd::VoteFor(cmd) => self.vote_for_cmd(cmd), // self.elder_duties()?.handle_consensused_cmd(cmd),
-            GatewayCmd::ForwardClientRequest(msg) => self.forward_client_request(msg),
-            GatewayCmd::RespondToClient {
+            VoteFor(cmd) => self.vote_for_cmd(cmd), // self.elder_duties()?.handle_consensused_cmd(cmd),
+            ForwardClientRequest(msg) => self.forward_client_request(msg),
+            RespondToClient {
                 message_id,
                 response,
             } => {
@@ -536,33 +539,63 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn handle_elder_cmd(&mut self, cmd: ElderCmd) -> Option<NodeCmd> {
+    fn handle_metadata_cmd(&mut self, cmd: MetadataCmd) -> Option<NodeCmd> {
+        use MetadataCmd::*;
         match cmd {
-            ElderCmd::SendToSection(msg) => {
+            SendToAdults { targets, msg } => self.send_to_nodes(targets, msg),
+            RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
+        }
+    }
+
+    fn handle_transfer_cmd(&mut self, cmd: TransferCmd) -> Option<NodeCmd> {
+        use TransferCmd::*;
+        match cmd {
+            SendToSection(msg) => {
                 let dst = utils::requester_address(&msg);
                 self.send_to_section(&dst, msg)
             }
-            ElderCmd::SendToAdults { targets, msg } => self.send_to_nodes(targets, msg),
-            ElderCmd::RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
-            ElderCmd::RespondToElderPeers(msg) => {
-                let targets: BTreeSet<XorName> = self
-                    .routing
-                    .borrow()
-                    .our_elders()
-                    .map(|n| XorName(n.name().0))
-                    .collect();
-                self.send_to_nodes(targets, msg)
+            RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
+        }
+    }
+
+    fn handle_payment_cmd(&mut self, cmd: PaymentCmd) -> Option<NodeCmd> {
+        use PaymentCmd::*;
+        match cmd {
+            SendToSection(msg) => {
+                let dst = utils::requester_address(&msg);
+                self.send_to_section(&dst, msg)
             }
+            RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
         }
     }
 
     fn handle_adult_cmd(&mut self, cmd: AdultCmd) -> Option<NodeCmd> {
+        use AdultCmd::*;
         match cmd {
-            AdultCmd::SendToAdultPeers { targets, msg } => self.send_to_nodes(targets, msg),
-            AdultCmd::RespondToOurElders(msg) => {
+            SendToAdultPeers { targets, msg } => self.send_to_nodes(targets, msg),
+            RespondToOurElders(msg) => {
                 self.send_to_section(&XorName(self.routing.borrow().id().name().0), msg)
             }
         }
+    }
+
+    fn handle_elder_cmd(&mut self, cmd: ElderCmd) -> Option<NodeCmd> {
+        use ElderCmd::*;
+        match cmd {
+            Gateway(cmd) => self.handle_gateway_cmd(cmd),
+            Metadata(cmd) => self.handle_metadata_cmd(cmd),
+            Transfer(cmd) => self.handle_transfer_cmd(cmd),
+            Payment(cmd) => self.handle_payment_cmd(cmd),
+        }
+        // RespondToElderPeers(msg) => {
+        //         let targets: BTreeSet<XorName> = self
+        //             .routing
+        //             .borrow()
+        //             .our_elders()
+        //             .map(|n| XorName(n.name().0))
+        //             .collect();
+        //         self.send_to_nodes(targets, msg)
+        //     }
     }
 
     fn forward_to_section(&mut self, dst_address: &XorName, msg: Message) -> Option<NodeCmd> {

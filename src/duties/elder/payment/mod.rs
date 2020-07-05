@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::ElderCmd, msg::Message};
+use crate::{
+    cmd::{ElderCmd, PaymentCmd},
+    msg::Message,
+};
 use log::trace;
 use routing::SrcLocation;
 use safe_nd::{
@@ -70,7 +73,7 @@ impl DataPayment {
                 {
                     return self.error_response(err, requester, message_id);
                 }
-                Some(ElderCmd::SendToSection(Message::Request {
+                wrap(PaymentCmd::SendToSection(Message::Request {
                     request: Request::Node(NodeRequest::Write(write)),
                     requester,
                     message_id,
@@ -87,7 +90,7 @@ impl DataPayment {
         requester: PublicId,
         message_id: MessageId,
     ) -> Option<ElderCmd> {
-        Some(ElderCmd::RespondToGateway {
+        wrap(PaymentCmd::RespondToGateway {
             sender: *self.id.name(),
             msg: Message::Response {
                 response: Response::Write(Err(err)),
@@ -97,6 +100,10 @@ impl DataPayment {
             },
         })
     }
+}
+
+fn wrap(cmd: PaymentCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Payment(cmd))
 }
 
 impl Display for DataPayment {

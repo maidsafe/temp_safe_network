@@ -8,7 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
-    cmd::ElderCmd,
+    cmd::{ElderCmd, MetadataCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -161,7 +161,7 @@ impl MapStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -187,7 +187,7 @@ impl MapStorage {
                 .map_err(|error| error.to_string().into())
         };
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *data.name(),
             msg: Message::Response {
                 requester,
@@ -221,7 +221,7 @@ impl MapStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -294,7 +294,7 @@ impl MapStorage {
     ) -> Option<ElderCmd> {
         let result = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -316,7 +316,7 @@ impl MapStorage {
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.shell());
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -338,7 +338,7 @@ impl MapStorage {
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.version());
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -374,7 +374,7 @@ impl MapStorage {
             }
         }));
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -396,7 +396,7 @@ impl MapStorage {
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.keys());
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -421,7 +421,7 @@ impl MapStorage {
             MData::Unseq(md) => Ok(md.values().into()),
         }));
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -446,7 +446,7 @@ impl MapStorage {
             MData::Unseq(md) => Ok(md.entries().clone().into()),
         }));
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -468,7 +468,7 @@ impl MapStorage {
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.permissions());
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -491,7 +491,7 @@ impl MapStorage {
             .get_chunk(&address, &requester, MDataAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -501,6 +501,10 @@ impl MapStorage {
             },
         })
     }
+}
+
+fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Metadata(cmd))
 }
 
 impl Display for MapStorage {

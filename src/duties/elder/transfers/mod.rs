@@ -10,13 +10,16 @@ pub mod replica_manager;
 
 //use super::{messaging::Messaging, replica_manager::ReplicaManager};
 use self::replica_manager::ReplicaManager;
-use crate::{cmd::ElderCmd, msg::Message};
+use crate::{
+    cmd::{ElderCmd, TransferCmd},
+    msg::Message,
+};
 //use log::{error, trace};
 #[cfg(not(feature = "simulated-payouts"))]
 use safe_nd::PublicKey;
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, MessageId, NodePublicId, NodeRequest, PublicId, Request,
-    Response, SignedTransfer, SystemOp, Transfers as MoneyRequest, XorName,
+    DebitAgreementProof, Error as NdError, Error, MessageId, NodePublicId, NodeRequest, PublicId,
+    Request, Response, SignedTransfer, SystemOp, Transfers as MoneyRequest,
 };
 use std::{
     cell::RefCell,
@@ -95,37 +98,24 @@ impl Transfers {
         requester: PublicId,
         request: MoneyRequest,
         message_id: MessageId,
-        //messaging: &mut Messaging,
     ) -> Option<ElderCmd> {
-        let mut messaging = Messaging {};
         match request {
             MoneyRequest::ValidateTransfer { signed_transfer } => {
                 self.validate(signed_transfer, &requester, message_id)
             }
             MoneyRequest::RegisterTransfer { proof } => {
-                self.register(&proof, requester, message_id, &mut messaging)
+                self.register(&proof, requester, message_id)
             }
             MoneyRequest::PropagateTransfer { proof } => {
-                self.receive_propagated(&proof, &requester, message_id, &mut messaging)
+                self.receive_propagated(&proof, &requester, message_id)
             }
-            MoneyRequest::GetBalance(public_key) => self.balance(
-                XorName::from(public_key),
-                requester,
-                message_id,
-                &mut messaging,
-            ),
-            MoneyRequest::GetReplicaKeys(_public_key) => {
-                // Here we assume we're at the right section.
-                // TODO: verify this, or move transfers out of client handler in general
-                self.get_replica_pks(message_id, &mut messaging)
+            MoneyRequest::GetBalance(public_key) => self.balance(public_key, requester, message_id),
+            MoneyRequest::GetReplicaKeys(public_key) => {
+                self.get_replica_pks(public_key, requester, message_id)
             }
-            MoneyRequest::GetHistory { at, since_version } => self.history(
-                XorName::from(at),
-                since_version,
-                requester,
-                message_id,
-                &mut messaging,
-            ),
+            MoneyRequest::GetHistory { at, since_version } => {
+                self.history(at, since_version, requester, message_id)
+            }
             #[cfg(feature = "simulated-payouts")]
             MoneyRequest::SimulatePayout { transfer } => self
                 .replica
@@ -137,60 +127,81 @@ impl Transfers {
     /// Get the PublicKeySet of our replicas
     fn get_replica_pks(
         &self,
+        public_key: PublicKey,
+        requester: PublicId,
+        // signature: Signature,
         message_id: MessageId,
-        messaging: &mut Messaging,
     ) -> Option<ElderCmd> {
-        let result = self.replica.borrow().replicas_pk_set();
-        let response = Response::GetReplicaKeys(result);
-        messaging.respond_to_client(message_id, response);
-        None
+        // validate signature
+
+        let result = match self.replica.borrow().balance(&public_key) {
+            None => Err(Error::InvalidOperation),
+            Some(_) => self.replica.borrow().replicas_pk_set(),
+        };
+        wrap(TransferCmd::RespondToGateway {
+            sender: *self.id.name(),
+            msg: Message::Response {
+                response: Response::GetReplicaKeys(result),
+                requester: requester.clone(),
+                message_id,
+                proof: None,
+            },
+        })
     }
 
     fn balance(
         &self,
-        xorname: XorName,
+        public_key: PublicKey,
         requester: PublicId,
+        // signature: Signature,
         message_id: MessageId,
-        messaging: &mut Messaging,
     ) -> Option<ElderCmd> {
-        let authorized = xorname == requester.public_key().into();
-        let result = if !authorized {
-            Err(NdError::NoSuchBalance)
-        } else {
-            self.replica
-                .borrow()
-                .balance(&requester.public_key())
-                .ok_or(NdError::NoSuchBalance)
-        };
-        let response = Response::GetBalance(result);
-        // messaging.respond_to_client(message_id, response);
-        None
+        // validate signature
+
+        let result = self
+            .replica
+            .borrow()
+            .balance(&public_key)
+            .ok_or(NdError::NoSuchBalance);
+
+        wrap(TransferCmd::RespondToGateway {
+            sender: *self.id.name(),
+            msg: Message::Response {
+                response: Response::GetBalance(result),
+                requester: requester.clone(),
+                message_id,
+                proof: None,
+            },
+        })
     }
 
     fn history(
         &self,
-        at: XorName,
+        public_key: PublicKey,
         _since_version: usize,
         requester: PublicId,
+        // signature: Signature,
         message_id: MessageId,
-        messaging: &mut Messaging,
     ) -> Option<ElderCmd> {
-        let authorized = at == requester.public_key().into();
-        let result = if !authorized {
-            Err(NdError::NoSuchBalance)
-        } else {
-            match self
-                    .replica
-                    .borrow()
-                    .history(&requester.public_key()) // since_version
-                {
-                    None => Ok(vec![]),
-                    Some(history) => Ok(history.clone()),
-                }
+        // validate signature
+
+        let result = match self
+            .replica
+            .borrow()
+            .history(&public_key) // since_version
+        {
+            None => Ok(vec![]),
+            Some(history) => Ok(history.clone()),
         };
-        let response = Response::GetHistory(result);
-        // messaging.respond_to_client(message_id, response);
-        None
+        wrap(TransferCmd::RespondToGateway {
+            sender: *self.id.name(),
+            msg: Message::Response {
+                response: Response::GetHistory(result),
+                requester: requester.clone(),
+                message_id,
+                proof: None,
+            },
+        })
     }
 
     /// This validation will render a signature over the
@@ -203,7 +214,7 @@ impl Transfers {
         message_id: MessageId,
     ) -> Option<ElderCmd> {
         let result = self.replica.borrow_mut().validate(transfer);
-        Some(ElderCmd::RespondToGateway {
+        wrap(TransferCmd::RespondToGateway {
             sender: *self.id.name(),
             msg: Message::Response {
                 response: Response::TransferValidation(result),
@@ -221,15 +232,11 @@ impl Transfers {
         proof: &DebitAgreementProof,
         requester: PublicId,
         message_id: MessageId,
-        messaging: &mut Messaging,
     ) -> Option<ElderCmd> {
         match self.replica.borrow_mut().register(proof) {
-            Ok(event) => {
-                // sender is notified with a push msg (only delivered if recipient is online)
-                // messaging.respond_to_client(message_id, Response::TransferRegistration(Ok(event)));
-
+            Ok(_) => {
                 // the transfer is then propagated, and will reach the recipient section
-                Some(ElderCmd::SendToSection(Message::Request {
+                wrap(TransferCmd::SendToSection(Message::Request {
                     request: Request::Node(NodeRequest::System(SystemOp::Transfers(
                         MoneyRequest::PropagateTransfer {
                             proof: proof.clone(),
@@ -240,7 +247,7 @@ impl Transfers {
                     signature: None,
                 }))
             }
-            Err(err) => Some(ElderCmd::RespondToGateway {
+            Err(err) => wrap(TransferCmd::RespondToGateway {
                 sender: *self.id.name(),
                 msg: Message::Response {
                     response: Response::TransferRegistration(Err(err)),
@@ -261,16 +268,11 @@ impl Transfers {
         proof: &DebitAgreementProof,
         requester: &PublicId,
         message_id: MessageId,
-        messaging: &mut Messaging,
     ) -> Option<ElderCmd> {
         // We will just validate the proofs and then apply the event.
         match self.replica.borrow_mut().receive_propagated(proof) {
-            Ok(_event) => {
-                // notify recipient, with a push msg (only delivered if recipient is online)
-                // messaging.notify_client(&XorName::from((&proof).to()), proof);
-                None
-            }
-            Err(err) => Some(ElderCmd::RespondToGateway {
+            Ok(_event) => None,
+            Err(err) => wrap(TransferCmd::RespondToGateway {
                 sender: *self.id.name(),
                 msg: Message::Response {
                     response: Response::TransferPropagation(Err(err)),
@@ -300,15 +302,12 @@ impl Transfers {
     }
 }
 
+fn wrap(cmd: TransferCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Transfer(cmd))
+}
+
 impl Display for Transfers {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id)
     }
-}
-
-pub struct Messaging {}
-
-impl Messaging {
-    pub fn notify_client(&mut self, _xorname: &XorName, _proof: &DebitAgreementProof) {}
-    pub fn respond_to_client(&mut self, _message_id: MessageId, _response: Response) {}
 }

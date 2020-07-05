@@ -41,7 +41,7 @@ const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 pub(crate) type ImmutableChunkStore = ChunkStore<IData>;
 pub(crate) type MutableChunkStore = ChunkStore<MData>;
 pub(crate) type SequenceChunkStore = ChunkStore<SData>;
-pub(crate) type LoginPacketChunkStore = ChunkStore<Account>;
+pub(crate) type AccountChunkStore = ChunkStore<Account>;
 
 /// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
@@ -208,7 +208,7 @@ impl Subdir for SequenceChunkStore {
     }
 }
 
-impl Subdir for LoginPacketChunkStore {
+impl Subdir for AccountChunkStore {
     fn subdir() -> &'static Path {
         Path::new("login_packets")
     }

@@ -7,12 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
-    sequence_storage::SequenceStorage,
+    account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
+    map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::cmd::ElderCmd;
 use routing::SrcLocation;
-use safe_nd::{BlobWrite, MapWrite, MessageId, PublicId, Request, SequenceWrite, Write};
+use safe_nd::{
+    AccountWrite, BlobWrite, MapWrite, MessageId, PublicId, Request, SequenceWrite, Write,
+};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
@@ -52,7 +54,7 @@ impl Writing {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
             Map(write) => self.map(write, stores.map_storage_mut()),
             Sequence(write) => self.sequence(write, stores.sequence_storage_mut()),
-            _ => None,
+            Account(write) => self.account(write, stores.account_storage_mut()),
         }
     }
 
@@ -83,6 +85,10 @@ impl Writing {
         write: SequenceWrite,
         storage: &mut SequenceStorage,
     ) -> Option<ElderCmd> {
+        storage.write(self.requester.clone(), write, self.message_id)
+    }
+
+    fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<ElderCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 }

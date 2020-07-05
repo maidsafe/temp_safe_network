@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod account_storage;
 mod blob_register;
 mod elder_stores;
 mod map_storage;
@@ -13,7 +14,13 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{cmd::ElderCmd, msg::Message, node::Init, utils, Config, Result};
+use crate::{
+    cmd::{ElderCmd, MetadataCmd},
+    msg::Message,
+    node::Init,
+    utils, Config, Result,
+};
+use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
@@ -50,11 +57,17 @@ impl Metadata {
         init_mode: Init,
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
+        let account_storage = AccountStorage::new(id.clone(), config, total_used_space, init_mode)?;
         let blob_register = BlobRegister::new(id.clone(), config, init_mode, routing_node.clone())?;
         let map_storage = MapStorage::new(id.clone(), config, total_used_space, init_mode)?;
         let sequence_storage =
             SequenceStorage::new(id.clone(), config, total_used_space, init_mode)?;
-        let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
+        let elder_stores = ElderStores::new(
+            account_storage,
+            blob_register,
+            map_storage,
+            sequence_storage,
+        );
         Ok(Self {
             id,
             elder_stores,
@@ -220,7 +233,7 @@ impl Metadata {
             holders,
         );
         let our_id = self.id.clone();
-        Some(ElderCmd::SendToAdults {
+        wrap(MetadataCmd::SendToAdults {
             targets: holders,
             msg: Message::Request {
                 request: Request::Node(NodeRequest::Read(Read::Blob(BlobRead::Get(address)))),
@@ -290,6 +303,10 @@ impl Metadata {
             None
         }
     }
+}
+
+fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Metadata(cmd))
 }
 
 impl Display for Metadata {

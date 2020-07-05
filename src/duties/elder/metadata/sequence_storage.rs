@@ -8,7 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    cmd::ElderCmd,
+    cmd::{ElderCmd, MetadataCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -104,7 +104,7 @@ impl SequenceStorage {
                 .map_err(|error| error.to_string().into())
         };
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *data.name(),
             msg: Message::Response {
                 requester,
@@ -123,7 +123,7 @@ impl SequenceStorage {
     ) -> Option<ElderCmd> {
         let result = self.get_chunk(&requester, address, SDataAction::Read);
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -178,7 +178,7 @@ impl SequenceStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -200,7 +200,7 @@ impl SequenceStorage {
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -224,7 +224,7 @@ impl SequenceStorage {
                 None => Err(NdError::NoSuchEntry),
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -248,7 +248,7 @@ impl SequenceStorage {
                 sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -273,7 +273,7 @@ impl SequenceStorage {
                 sdata.user_permissions(user, index)
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -306,7 +306,7 @@ impl SequenceStorage {
             Response::GetSDataPermissions(result)
         };
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester,
@@ -413,7 +413,7 @@ impl SequenceStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(ElderCmd::RespondToGateway {
+        wrap(MetadataCmd::RespondToGateway {
             sender: *address.name(),
             msg: Message::Response {
                 requester: requester.clone(),
@@ -423,6 +423,10 @@ impl SequenceStorage {
             },
         })
     }
+}
+
+fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Metadata(cmd))
 }
 
 impl Display for SequenceStorage {

@@ -7,111 +7,140 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
-mod data_requests;
-mod login_packets;
 mod messaging;
+mod validation;
 
 use self::{
-    auth::{Auth, AuthKeysDb},
-    data_requests::Validation,
-    login_packets::LoginPackets,
+    auth::{Auth, AuthKeysDb, ClientInfo},
     messaging::Messaging,
+    validation::Validation,
 };
 use crate::{
-    chunk_store::LoginPacketChunkStore,
-    cmd::{ConsensusAction, GatewayCmd},
+    cmd::{ConsensusAction, ElderCmd, GatewayCmd},
     msg::Message,
     node::Init,
     Config, Result,
 };
 use bytes::Bytes;
-use log::{error, trace};
+use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::{
-    ClientRequest, MessageId, NodePublicId, NodeRequest, PublicId, Read, Request, Response,
-    Signature, SystemOp, Write, XorName,
+    ClientAuth, ClientRequest, GatewayRequest, MessageId, NodePublicId, PublicId, Request,
+    Response, Signature, SystemOp, XorName,
 };
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     rc::Rc,
 };
 
-pub(crate) struct ClientHandler {
+pub(crate) struct Gateway {
     id: NodePublicId,
     messaging: Messaging,
-
     auth: Auth,
-    login_packets: LoginPackets,
     data: Validation,
 }
 
-impl ClientHandler {
+pub(crate) struct ClientMsg {
+    pub client: ClientInfo,
+    pub request: ClientRequest,
+    pub message_id: MessageId,
+    pub signature: Option<Signature>,
+}
+
+impl Gateway {
     pub fn new(
         id: NodePublicId,
         config: &Config,
-        total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
-        let login_packets_db = LoginPacketChunkStore::new(
-            root_dir,
-            config.max_capacity(),
-            Rc::clone(&total_used_space),
-            init_mode,
-        )?;
 
         let messaging = Messaging::new(id.clone(), routing);
         let auth = Auth::new(id.clone(), auth_keys_db);
-        let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = Validation::new(id.clone());
 
-        let client_handler = Self {
+        let gateway = Self {
             id,
             messaging,
             auth,
-            login_packets,
             data,
         };
 
-        Ok(client_handler)
+        Ok(gateway)
     }
 
-    pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
-        self.messaging.respond_to_client(message_id, response);
-    }
-
+    /// New connection
     pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
         self.messaging.handle_new_connection(peer_addr)
     }
 
+    /// Conection failure
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
         self.messaging.handle_connection_failure(peer_addr)
     }
 
-    pub fn receive_node_msg(&mut self, src: XorName, msg: Message) -> Option<GatewayCmd> {
-        match msg {
-            Message::Request {
-                request,
-                requester,
-                message_id,
-                ..
-            } => self.finalise_client_request(src, requester, request, message_id),
-            Message::Response {
-                response,
-                requester,
-                message_id,
-                ..
+    /// Respond to client
+    pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
+        self.messaging.respond_to_client(message_id, response);
+    }
+
+    // pub fn try_parse_client_msg<R: CryptoRng + Rng>(&mut self,
+    //     peer_addr: SocketAddr,
+    //     bytes: &Bytes,
+    //     rng: &mut R,
+    // ) -> Option<ClientMsg> {
+    //     self
+    //         .messaging
+    //         .try_parse_client_msg(peer_addr, bytes, rng)
+    // }
+
+    /// Receive client request
+    pub fn receive_client_request<R: CryptoRng + Rng>(
+        &mut self,
+        peer_addr: SocketAddr,
+        bytes: &Bytes,
+        rng: &mut R,
+    ) -> Option<GatewayCmd> {
+        let request = self.messaging.try_parse_client_msg(peer_addr, bytes, rng)?;
+
+        let client = request.client.public_id;
+        let msg_id = request.message_id;
+        let signature = request.signature;
+        let request = request.request;
+
+        trace!(
+            "{}: Received ({:?} {:?}) from {}",
+            self,
+            request,
+            msg_id,
+            client
+        );
+
+        if let Some(cmd) = self
+            .auth
+            .verify_signature(client.clone(), &request, msg_id, signature)
+        {
+            return Some(cmd);
+        };
+        if let Some(cmd) = self.auth.authorise_app(&client, &request, msg_id) {
+            return Some(cmd);
+        }
+
+        match request {
+            ClientRequest::System(op) => self.initiate_system_op(op, client, msg_id),
+            ClientRequest::Read(read) => self.data.initiate_read(read, client, msg_id),
+            ClientRequest::Write {
+                write,
+                debit_agreement,
             } => self
-                .messaging
-                .relay_reponse_to_client(src, &requester, response, message_id),
-            Message::Duplicate { .. } => None,
-            Message::DuplicationComplete { .. } => None,
+                .data
+                .initiate_write(write, client, msg_id, debit_agreement),
         }
     }
 
@@ -134,79 +163,48 @@ impl ClientHandler {
         }
     }
 
-    pub fn handle_client_message<R: CryptoRng + Rng>(
-        &mut self,
-        peer_addr: SocketAddr,
-        bytes: &Bytes,
-        rng: &mut R,
-    ) -> Option<GatewayCmd> {
-        let result = self
-            .messaging
-            .try_parse_client_request(peer_addr, bytes, rng);
-        if let Some(result) = result {
-            self.process_client_request(
-                result.client.public_id,
-                result.request,
-                result.message_id,
-                result.signature,
-            )
-        } else {
-            None
-        }
-    }
-
-    // on client request
-    fn process_client_request(
+    /// If a request within GatewayCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
+    /// was a GatewayRequest destined to our section, this is where the actual request will end up.
+    pub fn handle_request(
         &mut self,
         client: PublicId,
-        request: Request,
+        request: ClientAuth,
         msg_id: MessageId,
-        signature: Option<Signature>,
-    ) -> Option<GatewayCmd> {
-        trace!(
-            "{}: Received ({:?} {:?}) from {}",
-            self,
-            request,
-            msg_id,
-            client
-        );
-
-        if let Some(cmd) = self
-            .auth
-            .verify_signature(client.clone(), &request, msg_id, signature)
-        {
-            return Some(cmd);
-        };
-        if let Some(cmd) = self.auth.authorise_app(&client, &request, msg_id) {
-            return Some(cmd);
-        }
-
-        if let Request::Client(client_request) = request {
-            match client_request {
-                // Temporary
-                ClientRequest::Write {
-                    write: Write::Account(write),
-                    debit_agreement,
-                } => self
-                    .login_packets
-                    .initiate_write(client, write, msg_id, debit_agreement),
-                // Temporary
-                ClientRequest::Read(Read::Account(read)) => {
-                    self.login_packets.read(client, read, msg_id)
-                }
-                ClientRequest::Read(read) => self.data.initiate_read(read, client, msg_id),
-                ClientRequest::Write {
-                    write,
-                    debit_agreement,
-                } => self
-                    .data
-                    .initiate_write(write, client, msg_id, debit_agreement),
-                ClientRequest::System(op) => self.initiate_system_op(op, client, msg_id),
-            }
-        } else {
-            None
-        }
+    ) -> Option<ElderCmd> {
+        wrap(self.auth.finalise(client, request, msg_id)?)
     }
+
+    pub fn receive_node_response(
+        &mut self,
+        src: XorName,
+        client: &PublicId,
+        response: Response,
+        msg_id: MessageId,
+    ) -> Option<GatewayCmd> {
+        self.messaging
+            .relay_reponse_to_client(src, client, response, msg_id)
+    }
+
+    // pub fn receive_node_msg(&mut self, src: XorName, msg: Message) -> Option<GatewayCmd> {
+    //     match msg {
+    //         Message::Request {
+    //             request,
+    //             requester,
+    //             message_id,
+    //             ..
+    //         } => self.finalise_client_request(src, requester, request, message_id),
+    //         Message::Response {
+    //             response,
+    //             requester,
+    //             message_id,
+    //             ..
+    //         } => self
+    //             .messaging
+    //             .relay_reponse_to_client(src, &requester, response, message_id),
+    //         Message::Duplicate { .. } => None,
+    //         Message::DuplicationComplete { .. } => None,
+    //     }
+    // }
 
     fn initiate_system_op(
         &mut self,
@@ -216,81 +214,22 @@ impl ClientHandler {
     ) -> Option<GatewayCmd> {
         use SystemOp::*;
         match op {
+            ClientAuth(request) => self.auth.initiate(client, request, msg_id),
             Transfers(request) => Some(GatewayCmd::ForwardClientRequest(Message::Request {
-                request: Request::Node(NodeRequest::System(Transfers(request))),
+                request: Request::Gateway(GatewayRequest::System(Transfers(request))),
                 requester: client,
                 message_id: msg_id,
                 signature: None,
             })),
-            ClientAuth(request) => self.auth.initiate(client, request, msg_id),
-        }
-    }
-
-    fn finalise_system_op(
-        &mut self,
-        op: SystemOp,
-        client: PublicId,
-        msg_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        use SystemOp::*;
-        match op {
-            Transfers(_) => {
-                error!(
-                    "{}: Should not be handled at ClientHandler!! Received ({:?} {:?})(client {:?})",
-                    self,
-                    &op,
-                    msg_id,
-                    client
-                );
-                None
-            }
-            ClientAuth(request) => self.auth.finalise(client, request, msg_id),
-        }
-    }
-
-    // on consensus
-    fn finalise_client_request(
-        &mut self,
-        src: XorName,
-        requester: PublicId,
-        request: Request,
-        msg_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        trace!(
-            "{}: Received ({:?} {:?}) from src {} (client {:?})",
-            self,
-            &request,
-            msg_id,
-            src,
-            requester
-        );
-
-        if let Request::Node(node_request) = request {
-            match node_request {
-                NodeRequest::System(op) => self.finalise_system_op(op, requester, msg_id),
-                // Temporary
-                NodeRequest::Write(Write::Account(write)) => {
-                    self.login_packets.finalise_write(requester, write, msg_id)
-                }
-                // Temporary
-                NodeRequest::Read(Read::Account(read)) => {
-                    self.login_packets.read(requester, read, msg_id)
-                }
-                NodeRequest::Read(_) | NodeRequest::Write(_) => {
-                    // error!(
-                    //     "{}: Should not receive {:?} as a client handler.",
-                    //     self, request
-                    // );
-                    None
-                }
-            }
-        } else {
-            None
         }
     }
 }
 
-impl Display for ClientHandler {
+fn wrap(cmd: GatewayCmd) -> Option<ElderCmd> {
+    Some(ElderCmd::Gateway(cmd))
+}
+
+impl Display for Gateway {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

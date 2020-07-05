@@ -12,7 +12,7 @@ mod payment;
 mod transfers;
 
 use self::{
-    gateway::ClientHandler,
+    gateway::Gateway,
     metadata::Metadata,
     payment::DataPayment,
     transfers::{replica_manager::ReplicaManager, Transfers},
@@ -43,17 +43,9 @@ pub(crate) struct ElderDuties {
     id: NodePublicId,
     metadata: Metadata,
     transfers: Transfers,
-    gateway: ClientHandler,
+    gateway: Gateway,
     data_payment: DataPayment,
     routing: Rc<RefCell<Routing>>,
-}
-
-fn map_gw_cmd(cmd: Option<GatewayCmd>) -> Option<NodeCmd> {
-    Some(NodeCmd::Gateway(cmd?))
-}
-
-fn map_e_cmd(cmd: Option<ElderCmd>) -> Option<NodeCmd> {
-    Some(NodeCmd::Elder(cmd?))
 }
 
 impl ElderDuties {
@@ -64,14 +56,10 @@ impl ElderDuties {
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
-        let gateway = ClientHandler::new(
-            id.clone(),
-            &config,
-            &total_used_space,
-            init_mode,
-            routing.clone(),
-        )?;
+        // Gateway
+        let gateway = Gateway::new(id.clone(), &config, init_mode, routing.clone())?;
 
+        // Metadata
         let metadata = Metadata::new(
             id.clone(),
             &config,
@@ -92,9 +80,12 @@ impl ElderDuties {
             vec![],
             proof_chain.clone(),
         )?;
-
         let replica_manager = Rc::new(RefCell::new(replica_manager));
+
+        // Transfers
         let transfers = Transfers::new(id.clone(), replica_manager.clone());
+
+        // DataPayment
         let data_payment = DataPayment::new(id.clone(), replica_manager);
 
         Ok(Self {
@@ -111,23 +102,6 @@ impl ElderDuties {
     // ---------  iffy placing of gateway methods here...  ---------
     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
-    pub fn handle_client_message<R: CryptoRng + Rng>(
-        &mut self,
-        peer_addr: SocketAddr,
-        bytes: &Bytes,
-        rng: &mut R,
-    ) -> Option<NodeCmd> {
-        map_gw_cmd(self.gateway.handle_client_message(peer_addr, bytes, rng))
-    }
-
-    pub fn respond_to_gateway(&mut self, src: XorName, msg: Message) -> Option<NodeCmd> {
-        map_gw_cmd(self.gateway.receive_node_msg(src, msg))
-    }
-
-    pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
-        self.gateway.respond_to_client(message_id, response);
-    }
-
     pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
         self.gateway.handle_new_connection(peer_addr)
     }
@@ -136,8 +110,30 @@ impl ElderDuties {
         self.gateway.handle_connection_failure(peer_addr)
     }
 
-    pub fn handle_consensused_cmd(&mut self, action: ConsensusAction) -> Option<NodeCmd> {
-        map_gw_cmd(self.gateway.handle_consensused_cmd(action))
+    pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
+        self.gateway.respond_to_client(message_id, response);
+    }
+
+    // pub(crate) fn try_parse_client_msg<R: CryptoRng + Rng>(
+    //     &mut self,
+    //     peer_addr: SocketAddr,
+    //     bytes: &Bytes,
+    //     rng: &mut R,
+    // ) -> Option<ClientMsg> {
+    //     self.gateway.try_parse_client_msg(peer_addr, bytes, rng)
+    // }
+
+    pub fn receive_client_request<R: CryptoRng + Rng>(
+        &mut self,
+        peer_addr: SocketAddr,
+        bytes: &Bytes,
+        rng: &mut R,
+    ) -> Option<NodeCmd> {
+        wrap(self.gateway.receive_client_request(peer_addr, bytes, rng))
+    }
+
+    pub fn handle_consensused_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
+        wrap(self.gateway.handle_consensused_cmd(cmd))
     }
 
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -194,34 +190,40 @@ impl ElderDuties {
     fn handle_request(
         &mut self,
         src: SrcLocation,
-        requester: PublicId,
+        client: PublicId,
         request: Request,
-        message_id: MessageId,
+        msg_id: MessageId,
         accumulated_signature: Option<Signature>,
     ) -> Option<ElderCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
             self,
             request,
-            message_id,
+            msg_id,
             src,
-            requester
+            client,
         );
         use Request::*;
         match request.clone() {
-            //Client(client) => self.gateway... // Is handled by `fn handle_client_message(..)` above.
-            Gateway(write @ GatewayRequest::Write { .. }) => self.data_payment.handle_write(
-                src,
-                requester,
-                write,
-                message_id,
-                accumulated_signature,
-            ),
+            //Client(client) => self.gateway... // Is handled by `fn receive_client_request(..)` above.
+            Gateway(write @ GatewayRequest::Write { .. }) => {
+                self.data_payment
+                    .handle_write(src, client, write, msg_id, accumulated_signature)
+            }
+            // Gateway forwarding a client request to Section(R)
+            Gateway(GatewayRequest::System(SystemOp::Transfers(request))) => {
+                self.transfers.handle_request(client, request, msg_id)
+            }
+            // Gateway handling its own request.
+            Gateway(GatewayRequest::System(SystemOp::ClientAuth(request))) => {
+                self.gateway.handle_request(client, request, msg_id)
+            }
             Node(NodeRequest::Read(_)) | Node(NodeRequest::Write(_)) => self
                 .metadata
-                .handle_request(src, requester, request, message_id, accumulated_signature),
+                .handle_request(src, client, request, msg_id, accumulated_signature),
+            // Section(R_debit) propagating to Section(R_credit)
             Node(NodeRequest::System(SystemOp::Transfers(req))) => {
-                self.transfers.handle_request(requester, req, message_id)
+                self.transfers.handle_request(client, req, msg_id)
             }
             _ => None,
         }
@@ -256,6 +258,7 @@ impl ElderDuties {
                 Write(_) | GetIData(_) => self
                     .metadata
                     .handle_response(src, response, requester, message_id, proof),
+
                 _ => None,
             }
         } else {
@@ -278,6 +281,10 @@ impl ElderDuties {
             None
         }
     }
+}
+
+fn wrap(cmd: Option<GatewayCmd>) -> Option<NodeCmd> {
+    Some(NodeCmd::Elder(ElderCmd::Gateway(cmd?)))
 }
 
 impl Display for ElderDuties {

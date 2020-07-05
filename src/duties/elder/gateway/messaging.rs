@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::auth::ClientInfo;
+use super::{auth::ClientInfo, ClientMsg};
 use crate::{cmd::GatewayCmd, utils};
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
@@ -35,13 +35,6 @@ pub(super) struct Messaging {
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
 }
 
-pub(crate) struct ClientRequest {
-    pub client: ClientInfo,
-    pub request: Request,
-    pub message_id: MessageId,
-    pub signature: Option<Signature>,
-}
-
 impl Messaging {
     pub fn new(id: NodePublicId, routing_node: Rc<RefCell<Node>>) -> Self {
         Self {
@@ -54,12 +47,12 @@ impl Messaging {
         }
     }
 
-    pub fn try_parse_client_request<R: CryptoRng + Rng>(
+    pub fn try_parse_client_msg<R: CryptoRng + Rng>(
         &mut self,
         peer_addr: SocketAddr,
         bytes: &Bytes,
         rng: &mut R,
-    ) -> Option<ClientRequest> {
+    ) -> Option<ClientMsg> {
         if let Some(client) = self.clients.get(&peer_addr).cloned() {
             match bincode::deserialize(&bytes) {
                 Ok(Message::Request {
@@ -68,12 +61,14 @@ impl Messaging {
                     signature,
                 }) => {
                     if self.shall_handle_request(message_id, peer_addr) {
-                        return Some(ClientRequest {
-                            client,
-                            request,
-                            message_id,
-                            signature,
-                        });
+                        if let Request::Client(request) = request {
+                            return Some(ClientMsg {
+                                client,
+                                request,
+                                message_id,
+                                signature,
+                            });
+                        }
                     }
                 }
                 Ok(Message::Response { response, .. }) => {

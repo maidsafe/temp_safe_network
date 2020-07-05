@@ -24,7 +24,7 @@ pub(crate) enum Message {
         message_id: MessageId,
         signature: Option<(usize, SignatureShare)>,
     },
-    /// Wrapper for a response from Adults to DataHandlers, or from DataHandlers to ClientHandlers.
+    /// Wrapper for a response from Adults to DataHandlers, or from DataHandlers to Gateways.
     Response {
         response: Response,
         requester: PublicId,

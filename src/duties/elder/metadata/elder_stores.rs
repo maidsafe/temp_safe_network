@@ -7,10 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, map_storage::MapStorage, sequence_storage::SequenceStorage,
+    account_storage::AccountStorage, blob_register::BlobRegister, map_storage::MapStorage,
+    sequence_storage::SequenceStorage,
 };
 
 pub(super) struct ElderStores {
+    account_storage: AccountStorage,
     blob_register: BlobRegister,
     map_storage: MapStorage,
     sequence_storage: SequenceStorage,
@@ -18,15 +20,21 @@ pub(super) struct ElderStores {
 
 impl ElderStores {
     pub fn new(
+        account_storage: AccountStorage,
         blob_register: BlobRegister,
         map_storage: MapStorage,
         sequence_storage: SequenceStorage,
     ) -> Self {
         Self {
+            account_storage,
             blob_register,
             map_storage,
             sequence_storage,
         }
+    }
+
+    pub fn account_storage(&self) -> &AccountStorage {
+        &self.account_storage
     }
 
     pub fn blob_register(&self) -> &BlobRegister {
@@ -39,6 +47,10 @@ impl ElderStores {
 
     pub fn sequence_storage(&self) -> &SequenceStorage {
         &self.sequence_storage
+    }
+
+    pub fn account_storage_mut(&mut self) -> &mut AccountStorage {
+        &mut self.account_storage
     }
 
     pub fn blob_register_mut(&mut self) -> &mut BlobRegister {

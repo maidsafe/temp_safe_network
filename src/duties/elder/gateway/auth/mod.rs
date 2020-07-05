@@ -17,8 +17,8 @@ use crate::{
 use log::{error, warn};
 use safe_nd::{
     AppPermissions, AppPublicId, ClientAuth, ClientRequest, DataAuthKind, Error as NdError,
-    MessageId, MiscAuthKind, MoneyAuthKind, NodePublicId, PublicId, PublicKey, Request,
-    RequestAuthKind, Response, Signature, SystemOp,
+    GatewayRequest, MessageId, MiscAuthKind, MoneyAuthKind, NodePublicId, PublicId, PublicKey,
+    Request, RequestAuthKind, Response, Signature, SystemOp,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -61,7 +61,7 @@ impl Auth {
     pub fn authorise_app(
         &mut self,
         public_id: &PublicId,
-        request: &Request,
+        request: &ClientRequest,
         message_id: MessageId,
     ) -> Option<GatewayCmd> {
         let app_id = match public_id {
@@ -156,7 +156,7 @@ impl Auth {
         message_id: MessageId,
     ) -> Option<GatewayCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Request::Client(ClientRequest::System(SystemOp::ClientAuth(
+            request: Request::Gateway(GatewayRequest::System(SystemOp::ClientAuth(
                 ClientAuth::InsAuthKey {
                     key,
                     version: new_version,
@@ -195,7 +195,7 @@ impl Auth {
         message_id: MessageId,
     ) -> Option<GatewayCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Request::Client(ClientRequest::System(SystemOp::ClientAuth(
+            request: Request::Gateway(GatewayRequest::System(SystemOp::ClientAuth(
                 ClientAuth::DelAuthKey {
                     key,
                     version: new_version,
@@ -227,7 +227,7 @@ impl Auth {
     pub fn verify_signature(
         &mut self,
         public_id: PublicId,
-        request: &Request,
+        request: &ClientRequest,
         message_id: MessageId,
         signature: Option<Signature>,
     ) -> Option<GatewayCmd> {
@@ -276,7 +276,7 @@ impl Auth {
     fn is_valid_client_signature(
         &self,
         client_id: PublicId,
-        request: &Request,
+        request: &ClientRequest,
         message_id: &MessageId,
         signature: &Signature,
     ) -> bool {

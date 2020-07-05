@@ -13,9 +13,10 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Error as NdError, IData,
-    IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId, NodePublicId, NodeRequest,
-    PublicId, Read, Request, Response, SData, SDataAddress, SequenceRead, SequenceWrite, Write,
+    Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Error as NdError,
+    GatewayRequest, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId,
+    NodePublicId, NodeRequest, PublicId, Read, Request, Response, SData, SDataAddress,
+    SequenceRead, SequenceWrite, Write,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -115,7 +116,7 @@ impl Sequences {
         use SequenceWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
-            Delete(address) => self.initiate_deletion(client, address, message_id),
+            Delete(address) => self.initiate_deletion(client, address, message_id, debit_proof),
             SetPubPermissions { .. } | SetPrivPermissions { .. } | SetOwner { .. } | Edit(..) => {
                 self.initiate_mutation(client, write, message_id, debit_proof)
             }
@@ -128,7 +129,7 @@ impl Sequences {
         client: PublicId,
         chunk: SData,
         message_id: MessageId,
-        _debit_proof: DebitAgreementProof,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         let owner = utils::owner(&client)?;
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
@@ -145,7 +146,7 @@ impl Sequences {
             });
         }
 
-        let request = Self::wrap(SequenceWrite::New(chunk));
+        let request = Self::wrap(SequenceWrite::New(chunk), debit_proof);
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
@@ -159,6 +160,7 @@ impl Sequences {
         client_public_id: PublicId,
         address: SDataAddress,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         if address.is_pub() {
             return Some(GatewayCmd::RespondToClient {
@@ -168,7 +170,7 @@ impl Sequences {
         }
 
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Self::wrap(SequenceWrite::Delete(address)),
+            request: Self::wrap(SequenceWrite::Delete(address), debit_proof),
             client_public_id,
             message_id,
         }))
@@ -180,17 +182,20 @@ impl Sequences {
         client_public_id: PublicId,
         request: SequenceWrite,
         message_id: MessageId,
-        _debit_proof: DebitAgreementProof,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Self::wrap(request),
+            request: Self::wrap(request, debit_proof),
             client_public_id,
             message_id,
         }))
     }
 
-    fn wrap(write: SequenceWrite) -> Request {
-        Request::Node(NodeRequest::Write(Write::Sequence(write)))
+    fn wrap(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> Request {
+        Request::Gateway(GatewayRequest::Write {
+            write: Write::Sequence(write),
+            debit_agreement,
+        })
     }
 }
 
@@ -251,7 +256,9 @@ impl Blobs {
         use BlobWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
-            DeletePrivate(address) => self.initiate_deletion(client, address, message_id),
+            DeletePrivate(address) => {
+                self.initiate_deletion(client, address, message_id, debit_proof)
+            }
         }
     }
 
@@ -261,7 +268,7 @@ impl Blobs {
         client: PublicId,
         chunk: IData,
         message_id: MessageId,
-        _debit_proof: DebitAgreementProof,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         let owner = utils::owner(&client)?;
 
@@ -282,7 +289,7 @@ impl Blobs {
             }
         }
 
-        let request = Self::wrap(BlobWrite::New(chunk));
+        let request = Self::wrap(BlobWrite::New(chunk), debit_proof);
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
@@ -296,6 +303,7 @@ impl Blobs {
         client_public_id: PublicId,
         address: IDataAddress,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         if address.kind() == IDataKind::Pub {
             return Some(GatewayCmd::RespondToClient {
@@ -304,14 +312,17 @@ impl Blobs {
             });
         }
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Self::wrap(BlobWrite::DeletePrivate(address)),
+            request: Self::wrap(BlobWrite::DeletePrivate(address), debit_proof),
             client_public_id,
             message_id,
         }))
     }
 
-    fn wrap(write: BlobWrite) -> Request {
-        Request::Node(NodeRequest::Write(Write::Blob(write)))
+    fn wrap(write: BlobWrite, debit_agreement: DebitAgreementProof) -> Request {
+        Request::Gateway(GatewayRequest::Write {
+            write: Write::Blob(write),
+            debit_agreement,
+        })
     }
 }
 
@@ -333,10 +344,6 @@ pub(crate) struct Maps {
 impl Maps {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
-    }
-
-    fn wrap(write: MapWrite) -> Request {
-        Request::Node(NodeRequest::Write(Write::Map(write)))
     }
 
     // on client request
@@ -374,7 +381,7 @@ impl Maps {
             Edit { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
                 self.initiate_mutation(write, client, message_id, debit_proof)
             }
-            Delete(..) => self.initiate_deletion(write, client, message_id),
+            Delete(..) => self.initiate_deletion(write, client, message_id, debit_proof),
         }
     }
 
@@ -399,10 +406,10 @@ impl Maps {
         write: MapWrite,
         client_public_id: PublicId,
         message_id: MessageId,
-        _debit_proof: DebitAgreementProof,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Self::wrap(write),
+            request: Self::wrap(write, debit_proof),
             client_public_id,
             message_id,
         }))
@@ -414,9 +421,10 @@ impl Maps {
         write: MapWrite,
         client_public_id: PublicId,
         message_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Self::wrap(write),
+            request: Self::wrap(write, debit_proof),
             client_public_id,
             message_id,
         }))
@@ -428,7 +436,7 @@ impl Maps {
         client: PublicId,
         chunk: MData,
         message_id: MessageId,
-        _debit_proof: DebitAgreementProof,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
         let owner = utils::owner(&client)?;
 
@@ -446,13 +454,20 @@ impl Maps {
             });
         }
 
-        let request = Self::wrap(MapWrite::New(chunk));
+        let request = Self::wrap(MapWrite::New(chunk), debit_proof);
 
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
         }))
+    }
+
+    fn wrap(write: MapWrite, debit_agreement: DebitAgreementProof) -> Request {
+        Request::Gateway(GatewayRequest::Write {
+            write: Write::Map(write),
+            debit_agreement,
+        })
     }
 }
 
@@ -479,22 +494,88 @@ impl Accounts {
     // on client request
     pub fn initiate_read(
         &mut self,
-        _client: PublicId,
-        _read: AccountRead,
-        _msg_id: MessageId,
+        requester: PublicId,
+        read: AccountRead,
+        message_id: MessageId,
     ) -> Option<GatewayCmd> {
-        None
+        Some(GatewayCmd::ForwardClientRequest(Message::Request {
+            requester,
+            request: Request::Gateway(GatewayRequest::Read(Read::Account(read))),
+            message_id,
+            signature: None,
+        }))
     }
 
     // on client request
     pub fn initiate_write(
         &mut self,
-        _client: PublicId,
-        _write: AccountWrite,
-        _msg_id: MessageId,
-        _debit_proof: DebitAgreementProof,
+        client: PublicId,
+        write: AccountWrite,
+        msg_id: MessageId,
+        debit_proof: DebitAgreementProof,
     ) -> Option<GatewayCmd> {
-        None
+        use AccountWrite::*;
+        match write {
+            New(account) => self.initiate_creation(client, account, msg_id, debit_proof),
+            Update(updated_account) => {
+                self.initiate_update(client, updated_account, msg_id, debit_proof)
+            }
+        }
+    }
+
+    // on client request
+    fn initiate_creation(
+        &mut self,
+        client_public_id: PublicId,
+        account: Account,
+        message_id: MessageId,
+        debit_proof: DebitAgreementProof,
+    ) -> Option<GatewayCmd> {
+        if !account.size_is_valid() {
+            return Some(GatewayCmd::RespondToClient {
+                message_id,
+                response: Response::Write(Err(NdError::ExceededSize)),
+            });
+        }
+
+        let request = Self::wrap(AccountWrite::New(account), debit_proof);
+
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
+            request,
+            client_public_id,
+            message_id,
+        }))
+    }
+
+    // on client request
+    fn initiate_update(
+        &mut self,
+        client_public_id: PublicId,
+        updated_account: Account,
+        message_id: MessageId,
+        debit_proof: DebitAgreementProof,
+    ) -> Option<GatewayCmd> {
+        if !updated_account.size_is_valid() {
+            return Some(GatewayCmd::RespondToClient {
+                message_id,
+                response: Response::Write(Err(NdError::ExceededSize)),
+            });
+        }
+
+        let request = Self::wrap(AccountWrite::Update(updated_account), debit_proof);
+
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
+            request,
+            client_public_id,
+            message_id,
+        }))
+    }
+
+    fn wrap(write: AccountWrite, debit_agreement: DebitAgreementProof) -> Request {
+        Request::Gateway(GatewayRequest::Write {
+            write: Write::Account(write),
+            debit_agreement,
+        })
     }
 }
 

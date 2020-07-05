@@ -11,51 +11,39 @@ use safe_nd::{MessageId, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-// Need to Serialize/Deserialize to go through the consensus process.
-/// A ConsensusAction is something only
-/// taking place at the network Gateways.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum ConsensusAction {
-    /// When Gateway nodes consider a request
-    /// valid, they will vote for it to be forwarded.
-    /// As they reach consensus, this is then carried out.
-    Forward {
-        request: Request,
-        client_public_id: PublicId,
-        message_id: MessageId,
+/// Node internal cmds, about what requests to make.
+
+/// Any network node
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum NodeCmd {
+    Elder(ElderCmd),
+    Adult(AdultCmd),
+}
+
+/// Only Adults can issue
+/// these cmds.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum AdultCmd {
+    /// Send a response as an Adult to our section's Elders.
+    RespondToOurElders(Message),
+    /// Send the same request to each individual Adult.
+    SendToAdultPeers {
+        targets: BTreeSet<XorName>,
+        msg: Message,
     },
 }
 
-// #[derive(Debug)]
-// #[allow(clippy::large_enum_variant)]
-// pub(crate) enum Action {
-//     /// Vote for a cmd so we can process the deferred action on consensus.
-//     /// (Currently immediately.)
-//     VoteFor(ConsensusAction),
-//     /// Send a validated client request from gateway to the appropriate destination.
-//     ForwardClientRequest(Message),
-//     /// Send a response as an adult or elder to own section's elders.
-//     RespondToOurElders {
-//         msg: Message,
-//     },
-//     // Respond from Node to Gateway.
-//     RespondToGateway {
-//         sender: XorName,
-//         msg: Message,
-//     },
-//     /// Send the same request to each individual peer (used to send IData requests to adults).
-//     SendToAdults {
-//         targets: BTreeSet<XorName>,
-//         msg: Message,
-//     },
-//     RespondToClient {
-//         message_id: MessageId,
-//         response: Response,
-//     },
-// }
-
-/// Node internal cmds, about what requests to make.
-///
+/// Elder only cmds.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum ElderCmd {
+    Gateway(GatewayCmd),
+    Metadata(MetadataCmd),
+    Transfer(TransferCmd),
+    Payment(PaymentCmd),
+}
 
 /// The Gateway consists of
 /// the Elders in a section.
@@ -74,45 +62,54 @@ pub(crate) enum GatewayCmd {
     },
 }
 
-/// Elder only cmds.
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum ElderCmd {
+pub(crate) enum TransferCmd {
+    /// Send data to section after payment.
+    SendToSection(Message),
     /// Send a response from an Elder
     /// node to Gateway nodes.
     RespondToGateway { sender: XorName, msg: Message },
+}
+
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum PaymentCmd {
+    /// Send data to section after payment.
+    SendToSection(Message),
+    /// Send a response from an Elder
+    /// node to Gateway nodes.
+    RespondToGateway { sender: XorName, msg: Message },
+}
+
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum MetadataCmd {
     /// Send the same request to each individual Adult.
     SendToAdults {
         targets: BTreeSet<XorName>,
         msg: Message,
     },
-    /// Send a response to
-    /// our section's Elders, i.e. our peers.
-    RespondToElderPeers(Message),
-    /// Send a msg to Elders
-    /// most likely in another section (but could be our section as well!).
-    SendToSection(Message),
+    /// Send a response from an Elder
+    /// node to Gateway nodes.
+    RespondToGateway { sender: XorName, msg: Message },
 }
 
-/// Only Adults can issue
-/// these cmds.
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum AdultCmd {
-    /// Send a response as an Adult to our section's Elders.
-    RespondToOurElders(Message),
-    /// Send the same request to each individual Adult.
-    SendToAdultPeers {
-        targets: BTreeSet<XorName>,
-        msg: Message,
+// Need to Serialize/Deserialize to go through the consensus process.
+/// A ConsensusAction is something only
+/// taking place at the network Gateways.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) enum ConsensusAction {
+    /// When Gateway nodes consider a request
+    /// valid, they will vote for it to be forwarded.
+    /// As they reach consensus, this is then carried out.
+    Forward {
+        request: Request,
+        client_public_id: PublicId,
+        message_id: MessageId,
     },
 }
 
-/// Any network node
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum NodeCmd {
-    Elder(ElderCmd),
-    Adult(AdultCmd),
-    Gateway(GatewayCmd),
-}
+//     /// Send a response to
+//     /// our section's Elders, i.e. our peers.
+//     RespondToElderPeers(Message),

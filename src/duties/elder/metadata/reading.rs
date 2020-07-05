@@ -7,12 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
-    sequence_storage::SequenceStorage,
+    account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
+    map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::cmd::ElderCmd;
 use routing::SrcLocation;
-use safe_nd::{BlobRead, MapRead, MessageId, PublicId, Read, Request, SequenceRead};
+use safe_nd::{AccountRead, BlobRead, MapRead, MessageId, PublicId, Read, Request, SequenceRead};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Reading {
@@ -52,7 +52,7 @@ impl Reading {
             Blob(read) => self.blob(read, stores.blob_register()),
             Map(read) => self.map(read, stores.map_storage()),
             Sequence(read) => self.sequence(read, stores.sequence_storage()),
-            _ => None,
+            Account(read) => self.account(read, stores.account_storage()),
         }
     }
 
@@ -73,6 +73,10 @@ impl Reading {
     }
 
     fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<ElderCmd> {
+        storage.read(self.requester.clone(), read, self.message_id)
+    }
+
+    fn account(&self, read: &AccountRead, storage: &AccountStorage) -> Option<ElderCmd> {
         storage.read(self.requester.clone(), read, self.message_id)
     }
 }
