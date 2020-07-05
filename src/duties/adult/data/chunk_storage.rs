@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::Action, chunk_store::ImmutableChunkStore, node::Init, rpc::Rpc, Config, Result,
+    chunk_store::ImmutableChunkStore, cmd::AdultCmd, msg::Message, node::Init, Config, Result,
 };
 use log::{error, info};
 
@@ -55,7 +55,7 @@ impl ChunkStorage {
         message_id: MessageId,
         accumulated_signature: Option<&Signature>,
         request: Request,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         let result = if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -70,22 +70,19 @@ impl ChunkStorage {
         };
 
         match sender {
-            SrcLocation::Node(_) => Some(Action::RespondToOurDataHandlers {
-                rpc: Rpc::DuplicationComplete {
+            SrcLocation::Node(_) => {
+                Some(AdultCmd::RespondToOurElders(Message::DuplicationComplete {
                     response: Response::Write(result),
                     message_id,
                     proof: Some((*data.address(), (accumulated_signature?).clone())),
-                },
-            }),
-            SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
-                rpc: Rpc::Response {
-                    requester: requester.clone(),
-                    response: Response::Write(result),
-                    message_id,
-                    refund: None,
-                    proof: Some((request, (accumulated_signature?).clone())),
-                },
-            }),
+                }))
+            }
+            SrcLocation::Section(_) => Some(AdultCmd::RespondToOurElders(Message::Response {
+                requester: requester.clone(),
+                response: Response::Write(result),
+                message_id,
+                proof: Some((request, (accumulated_signature?).clone())),
+            })),
         }
     }
 
@@ -97,7 +94,7 @@ impl ChunkStorage {
         message_id: MessageId,
         request: Request,
         accumulated_signature: Option<&Signature>,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         let result = self
             .chunks
             .get(&address)
@@ -107,26 +104,22 @@ impl ChunkStorage {
             SrcLocation::Node(xorname) => {
                 let mut targets: BTreeSet<XorName> = Default::default();
                 let _ = targets.insert(XorName(xorname.0));
-                Some(Action::SendToPeers {
+                Some(AdultCmd::SendToAdultPeers {
                     targets,
-                    rpc: Rpc::Response {
+                    msg: Message::Response {
                         requester: requester.clone(),
                         response: Response::GetIData(result),
                         message_id,
-                        refund: None,
                         proof: Some((request, (accumulated_signature?).clone())),
                     },
                 })
             }
-            SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
-                rpc: Rpc::Response {
-                    requester: requester.clone(),
-                    response: Response::GetIData(result),
-                    message_id,
-                    refund: None,
-                    proof: Some((request, (accumulated_signature?).clone())),
-                },
-            }),
+            SrcLocation::Section(_) => Some(AdultCmd::RespondToOurElders(Message::Response {
+                requester: requester.clone(),
+                response: Response::GetIData(result),
+                message_id,
+                proof: Some((request, (accumulated_signature?).clone())),
+            })),
         }
     }
 
@@ -137,7 +130,7 @@ impl ChunkStorage {
         message_id: MessageId,
         request: Request,
         accumulated_signature: Option<&Signature>,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         let result = if self.chunks.has(&address) {
             self.chunks
                 .get(&address)
@@ -162,15 +155,12 @@ impl ChunkStorage {
             Ok(())
         };
 
-        Some(Action::RespondToOurDataHandlers {
-            rpc: Rpc::Response {
-                requester: requester.clone(),
-                response: Response::Write(result),
-                message_id,
-                refund: None,
-                proof: Some((request, (accumulated_signature?).clone())),
-            },
-        })
+        Some(AdultCmd::RespondToOurElders(Message::Response {
+            requester: requester.clone(),
+            response: Response::Write(result),
+            message_id,
+            proof: Some((request, (accumulated_signature?).clone())),
+        }))
     }
 }
 

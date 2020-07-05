@@ -18,10 +18,10 @@ use self::{
     messaging::Messaging,
 };
 use crate::{
-    action::{Action, ConsensusAction},
     chunk_store::LoginPacketChunkStore,
+    cmd::{ConsensusAction, GatewayCmd},
+    msg::Message,
     node::Init,
-    rpc::Rpc,
     Config, Result,
 };
 use bytes::Bytes;
@@ -94,31 +94,30 @@ impl ClientHandler {
         self.messaging.handle_connection_failure(peer_addr)
     }
 
-    pub fn receive_node_msg(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
-        match rpc {
-            Rpc::Request {
+    pub fn receive_node_msg(&mut self, src: XorName, msg: Message) -> Option<GatewayCmd> {
+        match msg {
+            Message::Request {
                 request,
                 requester,
                 message_id,
                 ..
             } => self.finalise_client_request(src, requester, request, message_id),
-            Rpc::Response {
+            Message::Response {
                 response,
                 requester,
                 message_id,
-                refund: _,
                 ..
             } => self
                 .messaging
                 .relay_reponse_to_client(src, &requester, response, message_id),
-            Rpc::Duplicate { .. } => None,
-            Rpc::DuplicationComplete { .. } => None,
+            Message::Duplicate { .. } => None,
+            Message::DuplicationComplete { .. } => None,
         }
     }
 
     /// Basically.. when Gateway nodes have agreed,
     /// they'll forward the request into the network.
-    pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
+    pub fn handle_consensused_cmd(&mut self, action: ConsensusAction) -> Option<GatewayCmd> {
         use ConsensusAction::*;
         trace!("{}: Consensused {:?}", self, action,);
         match action {
@@ -126,7 +125,7 @@ impl ClientHandler {
                 request,
                 client_public_id,
                 message_id,
-            } => Some(Action::ForwardClientRequest(Rpc::Request {
+            } => Some(GatewayCmd::ForwardClientRequest(Message::Request {
                 requester: client_public_id,
                 request,
                 message_id,
@@ -140,7 +139,7 @@ impl ClientHandler {
         peer_addr: SocketAddr,
         bytes: &Bytes,
         rng: &mut R,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let result = self
             .messaging
             .try_parse_client_request(peer_addr, bytes, rng);
@@ -163,7 +162,7 @@ impl ClientHandler {
         request: Request,
         msg_id: MessageId,
         signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from {}",
             self,
@@ -172,14 +171,14 @@ impl ClientHandler {
             client
         );
 
-        if let Some(action) =
-            self.auth
-                .verify_signature(client.clone(), &request, msg_id, signature)
+        if let Some(cmd) = self
+            .auth
+            .verify_signature(client.clone(), &request, msg_id, signature)
         {
-            return Some(action);
+            return Some(cmd);
         };
-        if let Some(action) = self.auth.authorise_app(&client, &request, msg_id) {
-            return Some(action);
+        if let Some(cmd) = self.auth.authorise_app(&client, &request, msg_id) {
+            return Some(cmd);
         }
 
         if let Request::Client(client_request) = request {
@@ -214,10 +213,10 @@ impl ClientHandler {
         op: SystemOp,
         client: PublicId,
         msg_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use SystemOp::*;
         match op {
-            Transfers(request) => Some(Action::ForwardClientRequest(Rpc::Request {
+            Transfers(request) => Some(GatewayCmd::ForwardClientRequest(Message::Request {
                 request: Request::Node(NodeRequest::System(Transfers(request))),
                 requester: client,
                 message_id: msg_id,
@@ -232,7 +231,7 @@ impl ClientHandler {
         op: SystemOp,
         client: PublicId,
         msg_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use SystemOp::*;
         match op {
             Transfers(_) => {
@@ -256,7 +255,7 @@ impl ClientHandler {
         requester: PublicId,
         request: Request,
         msg_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {} (client {:?})",
             self,

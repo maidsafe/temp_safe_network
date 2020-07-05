@@ -18,9 +18,9 @@ use self::{
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    action::{Action, ConsensusAction},
+    cmd::{ConsensusAction, ElderCmd, GatewayCmd, NodeCmd},
+    msg::Message,
     node::Init,
-    rpc::Rpc as Message,
     utils, Config, Result,
 };
 use bytes::Bytes;
@@ -46,6 +46,14 @@ pub(crate) struct ElderDuties {
     gateway: ClientHandler,
     data_payment: DataPayment,
     routing: Rc<RefCell<Routing>>,
+}
+
+fn map_gw_cmd(cmd: Option<GatewayCmd>) -> Option<NodeCmd> {
+    Some(NodeCmd::Gateway(cmd?))
+}
+
+fn map_e_cmd(cmd: Option<ElderCmd>) -> Option<NodeCmd> {
+    Some(NodeCmd::Elder(cmd?))
 }
 
 impl ElderDuties {
@@ -108,12 +116,12 @@ impl ElderDuties {
         peer_addr: SocketAddr,
         bytes: &Bytes,
         rng: &mut R,
-    ) -> Option<Action> {
-        self.gateway.handle_client_message(peer_addr, bytes, rng)
+    ) -> Option<NodeCmd> {
+        map_gw_cmd(self.gateway.handle_client_message(peer_addr, bytes, rng))
     }
 
-    pub fn respond_to_gateway(&mut self, src: XorName, msg: Message) -> Option<Action> {
-        self.gateway.receive_node_msg(src, msg)
+    pub fn respond_to_gateway(&mut self, src: XorName, msg: Message) -> Option<NodeCmd> {
+        map_gw_cmd(self.gateway.receive_node_msg(src, msg))
     }
 
     pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
@@ -128,8 +136,8 @@ impl ElderDuties {
         self.gateway.handle_connection_failure(peer_addr)
     }
 
-    pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
-        self.gateway.handle_consensused_action(action)
+    pub fn handle_consensused_cmd(&mut self, action: ConsensusAction) -> Option<NodeCmd> {
+        map_gw_cmd(self.gateway.handle_consensused_cmd(action))
     }
 
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -138,12 +146,12 @@ impl ElderDuties {
 
     /// Name of the node
     /// Age of the node
-    pub fn member_left(&mut self, name: XorName, _age: u8) -> Option<Vec<Action>> {
+    pub fn member_left(&mut self, name: XorName, _age: u8) -> Option<Vec<ElderCmd>> {
         self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self) -> Option<Action> {
+    pub fn elders_changed(&mut self) -> Option<ElderCmd> {
         let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();
@@ -162,7 +170,7 @@ impl ElderDuties {
         src: SrcLocation,
         msg: Message,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         match msg {
             Message::Request {
                 request,
@@ -190,7 +198,7 @@ impl ElderDuties {
         request: Request,
         message_id: MessageId,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
             self,
@@ -226,7 +234,7 @@ impl ElderDuties {
         requester: PublicId,
         message_id: MessageId,
         proof: Option<(Request, Signature)>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use Response::*;
         trace!(
             "{}: Received ({:?} {:?}) from {}",

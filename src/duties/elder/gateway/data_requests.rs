@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::{Action, ConsensusAction},
-    rpc::Rpc,
+    cmd::{ConsensusAction, GatewayCmd},
+    msg::Message,
     utils,
 };
 use log::trace;
@@ -43,7 +43,7 @@ impl Validation {
         client: PublicId,
         msg_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         match write {
             Write::Blob(write) => self
                 .blobs
@@ -65,7 +65,7 @@ impl Validation {
         read: Read,
         client: PublicId,
         msg_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         match read {
             Read::Blob(write) => self.blobs.initiate_read(client, write, msg_id),
             Read::Map(write) => self.maps.initiate_read(client, write, msg_id),
@@ -95,8 +95,8 @@ impl Sequences {
         requester: PublicId,
         request: SequenceRead,
         message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::ForwardClientRequest(Message::Request {
             requester,
             request: Request::Node(NodeRequest::Read(Read::Sequence(request))),
             message_id,
@@ -111,7 +111,7 @@ impl Sequences {
         write: SequenceWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use SequenceWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
@@ -129,7 +129,7 @@ impl Sequences {
         chunk: SData,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let owner = utils::owner(&client)?;
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
@@ -139,14 +139,14 @@ impl Sequences {
                 self,
                 client
             );
-            return Some(Action::RespondToClient {
+            return Some(GatewayCmd::RespondToClient {
                 message_id,
                 response: Response::Write(Err(NdError::InvalidOwners)),
             });
         }
 
         let request = Self::wrap(SequenceWrite::New(chunk));
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
@@ -159,15 +159,15 @@ impl Sequences {
         client_public_id: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         if address.is_pub() {
-            return Some(Action::RespondToClient {
+            return Some(GatewayCmd::RespondToClient {
                 message_id,
                 response: Response::Write(Err(NdError::InvalidOperation)),
             });
         }
 
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(SequenceWrite::Delete(address)),
             client_public_id,
             message_id,
@@ -181,8 +181,8 @@ impl Sequences {
         request: SequenceWrite,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(request),
             client_public_id,
             message_id,
@@ -220,7 +220,7 @@ impl Blobs {
         requester: PublicId,
         read: BlobRead,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         match read {
             BlobRead::Get(_) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
@@ -230,7 +230,7 @@ impl Blobs {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                Some(Action::ForwardClientRequest(Rpc::Request {
+                Some(GatewayCmd::ForwardClientRequest(Message::Request {
                     requester,
                     request: Request::Node(NodeRequest::Read(Read::Blob(read))),
                     message_id,
@@ -247,7 +247,7 @@ impl Blobs {
         write: BlobWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use BlobWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
@@ -262,7 +262,7 @@ impl Blobs {
         chunk: IData,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let owner = utils::owner(&client)?;
 
         // Assert that if the request was for UnpubIData, that the owner's public key has
@@ -275,7 +275,7 @@ impl Blobs {
                     self,
                     client
                 );
-                return Some(Action::RespondToClient {
+                return Some(GatewayCmd::RespondToClient {
                     message_id,
                     response: Response::Write(Err(NdError::InvalidOwners)),
                 });
@@ -283,7 +283,7 @@ impl Blobs {
         }
 
         let request = Self::wrap(BlobWrite::New(chunk));
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
@@ -296,14 +296,14 @@ impl Blobs {
         client_public_id: PublicId,
         address: IDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         if address.kind() == IDataKind::Pub {
-            return Some(Action::RespondToClient {
+            return Some(GatewayCmd::RespondToClient {
                 message_id,
                 response: Response::Write(Err(NdError::InvalidOperation)),
             });
         }
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(BlobWrite::DeletePrivate(address)),
             client_public_id,
             message_id,
@@ -345,7 +345,7 @@ impl Maps {
         client: PublicId,
         read: MapRead,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use MapRead::*;
         match read {
             Get(..)
@@ -367,7 +367,7 @@ impl Maps {
         write: MapWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use MapWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
@@ -379,8 +379,13 @@ impl Maps {
     }
 
     // client query
-    fn get(&mut self, read: MapRead, requester: PublicId, message_id: MessageId) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
+    fn get(
+        &mut self,
+        read: MapRead,
+        requester: PublicId,
+        message_id: MessageId,
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::ForwardClientRequest(Message::Request {
             requester,
             request: Request::Node(NodeRequest::Read(Read::Map(read))),
             message_id,
@@ -395,8 +400,8 @@ impl Maps {
         client_public_id: PublicId,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write),
             client_public_id,
             message_id,
@@ -409,8 +414,8 @@ impl Maps {
         write: MapWrite,
         client_public_id: PublicId,
         message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write),
             client_public_id,
             message_id,
@@ -424,7 +429,7 @@ impl Maps {
         chunk: MData,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let owner = utils::owner(&client)?;
 
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
@@ -435,7 +440,7 @@ impl Maps {
                 self,
                 client
             );
-            return Some(Action::RespondToClient {
+            return Some(GatewayCmd::RespondToClient {
                 message_id,
                 response: Response::Write(Err(NdError::InvalidOwners)),
             });
@@ -443,7 +448,7 @@ impl Maps {
 
         let request = Self::wrap(MapWrite::New(chunk));
 
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id: client.clone(),
             message_id,
@@ -477,7 +482,7 @@ impl Accounts {
         _client: PublicId,
         _read: AccountRead,
         _msg_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         None
     }
 
@@ -488,7 +493,7 @@ impl Accounts {
         _write: AccountWrite,
         _msg_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         None
     }
 }

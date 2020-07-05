@@ -10,7 +10,7 @@ pub mod replica_manager;
 
 //use super::{messaging::Messaging, replica_manager::ReplicaManager};
 use self::replica_manager::ReplicaManager;
-use crate::{action::Action, rpc::Rpc};
+use crate::{cmd::ElderCmd, msg::Message};
 //use log::{error, trace};
 #[cfg(not(feature = "simulated-payouts"))]
 use safe_nd::PublicKey;
@@ -80,7 +80,7 @@ impl Transfers {
     //     request: MoneyRequest,
     //     message_id: MessageId,
     // ) -> Option<Action> {
-    //     Some(Action::ForwardClientRequest(Rpc::Request {
+    //     Some(Action::ForwardClientRequest(Message::Request {
     //         request: Request::Node(NodeRequest::System(SystemOp::Transfers(request))),
     //         requester,
     //         message_id,
@@ -96,7 +96,7 @@ impl Transfers {
         request: MoneyRequest,
         message_id: MessageId,
         //messaging: &mut Messaging,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let mut messaging = Messaging {};
         match request {
             MoneyRequest::ValidateTransfer { signed_transfer } => {
@@ -135,7 +135,11 @@ impl Transfers {
     }
 
     /// Get the PublicKeySet of our replicas
-    fn get_replica_pks(&self, message_id: MessageId, messaging: &mut Messaging) -> Option<Action> {
+    fn get_replica_pks(
+        &self,
+        message_id: MessageId,
+        messaging: &mut Messaging,
+    ) -> Option<ElderCmd> {
         let result = self.replica.borrow().replicas_pk_set();
         let response = Response::GetReplicaKeys(result);
         messaging.respond_to_client(message_id, response);
@@ -148,7 +152,7 @@ impl Transfers {
         requester: PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let authorized = xorname == requester.public_key().into();
         let result = if !authorized {
             Err(NdError::NoSuchBalance)
@@ -159,7 +163,7 @@ impl Transfers {
                 .ok_or(NdError::NoSuchBalance)
         };
         let response = Response::GetBalance(result);
-        messaging.respond_to_client(message_id, response);
+        // messaging.respond_to_client(message_id, response);
         None
     }
 
@@ -170,7 +174,7 @@ impl Transfers {
         requester: PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let authorized = at == requester.public_key().into();
         let result = if !authorized {
             Err(NdError::NoSuchBalance)
@@ -185,7 +189,7 @@ impl Transfers {
                 }
         };
         let response = Response::GetHistory(result);
-        messaging.respond_to_client(message_id, response);
+        // messaging.respond_to_client(message_id, response);
         None
     }
 
@@ -197,15 +201,14 @@ impl Transfers {
         transfer: SignedTransfer,
         requester: &PublicId,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self.replica.borrow_mut().validate(transfer);
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *self.id.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 response: Response::TransferValidation(result),
                 requester: requester.clone(),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -219,14 +222,14 @@ impl Transfers {
         requester: PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         match self.replica.borrow_mut().register(proof) {
             Ok(event) => {
                 // sender is notified with a push msg (only delivered if recipient is online)
-                messaging.respond_to_client(message_id, Response::TransferRegistration(Ok(event)));
+                // messaging.respond_to_client(message_id, Response::TransferRegistration(Ok(event)));
 
                 // the transfer is then propagated, and will reach the recipient section
-                Some(Action::ForwardClientRequest(Rpc::Request {
+                Some(ElderCmd::SendToSection(Message::Request {
                     request: Request::Node(NodeRequest::System(SystemOp::Transfers(
                         MoneyRequest::PropagateTransfer {
                             proof: proof.clone(),
@@ -237,13 +240,12 @@ impl Transfers {
                     signature: None,
                 }))
             }
-            Err(err) => Some(Action::RespondToClientHandlers {
+            Err(err) => Some(ElderCmd::RespondToGateway {
                 sender: *self.id.name(),
-                rpc: Rpc::Response {
+                msg: Message::Response {
                     response: Response::TransferRegistration(Err(err)),
                     requester,
                     message_id,
-                    refund: None,
                     proof: None,
                 },
             }),
@@ -260,21 +262,20 @@ impl Transfers {
         requester: &PublicId,
         message_id: MessageId,
         messaging: &mut Messaging,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         // We will just validate the proofs and then apply the event.
         match self.replica.borrow_mut().receive_propagated(proof) {
             Ok(_event) => {
                 // notify recipient, with a push msg (only delivered if recipient is online)
-                messaging.notify_client(&XorName::from((&proof).to()), proof);
+                // messaging.notify_client(&XorName::from((&proof).to()), proof);
                 None
             }
-            Err(err) => Some(Action::RespondToClientHandlers {
+            Err(err) => Some(ElderCmd::RespondToGateway {
                 sender: *self.id.name(),
-                rpc: Rpc::Response {
+                msg: Message::Response {
                     response: Response::TransferPropagation(Err(err)),
                     requester: requester.clone(),
                     message_id,
-                    refund: None,
                     proof: None,
                 },
             }),
@@ -289,7 +290,7 @@ impl Transfers {
         _from: PublicKey,
         _request: &Request,
         _message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         None
     }
 

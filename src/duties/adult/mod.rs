@@ -9,7 +9,7 @@
 mod data;
 
 use self::data::Data;
-use crate::{action::Action, node::Init, rpc::Rpc as Message, Config, Result};
+use crate::{cmd::AdultCmd, msg::Message, node::Init, Config, Result};
 use routing::{Node as Routing, SrcLocation};
 use safe_nd::NodePublicId;
 use std::{
@@ -52,7 +52,7 @@ impl AdultDuties {
         src: SrcLocation,
         msg: Message,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         self.data.receive_msg(src, msg, accumulated_signature)
     }
 }

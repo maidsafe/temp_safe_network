@@ -10,7 +10,7 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::action::Action;
+use crate::cmd::ElderCmd;
 use routing::SrcLocation;
 use safe_nd::{BlobRead, MapRead, MessageId, PublicId, Read, Request, SequenceRead};
 use threshold_crypto::{PublicKey, Signature};
@@ -46,7 +46,7 @@ impl Reading {
         }
     }
 
-    pub fn get_result(&self, stores: &ElderStores) -> Option<Action> {
+    pub fn get_result(&self, stores: &ElderStores) -> Option<ElderCmd> {
         use Read::*;
         match &self.read {
             Blob(read) => self.blob(read, stores.blob_register()),
@@ -56,7 +56,7 @@ impl Reading {
         }
     }
 
-    fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<Action> {
+    fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<ElderCmd> {
         use BlobRead::*;
         match read {
             Get(address) => register.get(
@@ -68,11 +68,11 @@ impl Reading {
         }
     }
 
-    fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<Action> {
+    fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<ElderCmd> {
         storage.read(self.requester.clone(), read, self.message_id)
     }
 
-    fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<Action> {
+    fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<ElderCmd> {
         storage.read(self.requester.clone(), read, self.message_id)
     }
 }

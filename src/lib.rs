@@ -30,13 +30,13 @@
 #![recursion_limit = "128"]
 
 mod accumulator;
-mod action;
 mod chunk_store;
+mod cmd;
 mod config_handler;
 mod duties;
 mod error;
+mod msg;
 mod node;
-mod rpc;
 mod to_db_key;
 mod utils;
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::Init, rpc::Rpc, Result};
+use crate::{msg::Message, node::Init, Result};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -77,12 +77,12 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
 }
 
 /// Returns the requester's address.  An App's address is the name of its owner.
-pub(crate) fn requester_address(rpc: &Rpc) -> XorName {
-    match rpc {
-        Rpc::Request { ref requester, .. } | Rpc::Response { ref requester, .. } => {
+pub(crate) fn requester_address(msg: &Message) -> XorName {
+    match msg {
+        Message::Request { ref requester, .. } | Message::Response { ref requester, .. } => {
             *requester.name()
         }
-        Rpc::Duplicate { .. } | Rpc::DuplicationComplete { .. } => XorName::default(),
+        Message::Duplicate { .. } | Message::DuplicationComplete { .. } => XorName::default(),
     }
 }
 

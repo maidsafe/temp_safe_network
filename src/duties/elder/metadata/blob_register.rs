@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, node::Init, rpc::Rpc, utils, Config, Result, ToDbKey};
+use crate::{cmd::ElderCmd, msg::Message, node::Init, utils, Config, Result, ToDbKey};
 use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use rand::SeedableRng;
@@ -88,19 +88,18 @@ impl BlobRegister {
         data: IData,
         message_id: MessageId,
         request: Request,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            Some(Action::RespondToClientHandlers {
+            Some(ElderCmd::RespondToGateway {
                 sender: our_name,
-                rpc: Rpc::Response {
+                msg: Message::Response {
                     requester: client_id,
                     response: Response::Write(result),
                     message_id,
-                    refund: None,
                     proof: None,
                 },
             })
@@ -154,9 +153,9 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        Some(Action::SendToPeers {
+        Some(ElderCmd::SendToAdults {
             targets: target_holders,
-            rpc: Rpc::Request {
+            msg: Message::Request {
                 request,
                 requester,
                 message_id,
@@ -171,18 +170,16 @@ impl BlobRegister {
         address: IDataAddress,
         message_id: MessageId,
         request: Request,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let our_name = *self.id.name();
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            Some(Action::RespondToClientHandlers {
+            Some(ElderCmd::RespondToGateway {
                 sender: our_name,
-                rpc: Rpc::Response {
+                msg: Message::Response {
                     requester: client_id.clone(),
                     response: Response::Write(result),
                     message_id,
-                    // Deletion is free so no refund
-                    refund: None,
                     proof: None,
                 },
             })
@@ -200,9 +197,9 @@ impl BlobRegister {
             }
         };
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        Some(Action::SendToPeers {
+        Some(ElderCmd::SendToAdults {
             targets: metadata.holders,
-            rpc: Rpc::Request {
+            msg: Message::Request {
                 request,
                 requester,
                 message_id,
@@ -211,7 +208,7 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<Action>> {
+    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<ElderCmd>> {
         trace!(
             "Get the list of chunks holder {:?} was resposible for",
             holder
@@ -226,7 +223,7 @@ impl BlobRegister {
         let chunks_stored = self.remove_holder(holder);
 
         if let Ok(chunks_stored) = chunks_stored {
-            let mut actions = Vec::new();
+            let mut cmds = Vec::new();
 
             for (address, holders) in chunks_stored {
                 trace!("{:?} was resposible for : {:?}", holder, address);
@@ -240,18 +237,18 @@ impl BlobRegister {
 
                 let new_holders = self.get_new_holders_for_chunk(&address);
                 let signature = self.sign_with_signature_share(&utils::serialise(&address));
-                let duplicate_chunk_action = Action::SendToPeers {
+                let duplicate_chunk_cmds = ElderCmd::SendToAdults {
                     targets: new_holders,
-                    rpc: Rpc::Duplicate {
+                    msg: Message::Duplicate {
                         address,
                         holders,
                         message_id,
                         signature,
                     },
                 };
-                actions.push(duplicate_chunk_action);
+                cmds.push(duplicate_chunk_cmds);
             }
-            Some(actions)
+            Some(cmds)
         } else {
             None
         }
@@ -263,17 +260,16 @@ impl BlobRegister {
         address: IDataAddress,
         message_id: MessageId,
         request: Request,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let our_name = *self.id.name();
 
         let respond = |result: NdResult<IData>| {
-            Some(Action::RespondToClientHandlers {
+            Some(ElderCmd::RespondToGateway {
                 sender: our_name,
-                rpc: Rpc::Response {
+                msg: Message::Response {
                     requester: requester.clone(),
                     response: Response::GetIData(result),
                     message_id,
-                    refund: None,
                     proof: None,
                 },
             })
@@ -292,9 +288,9 @@ impl BlobRegister {
             }
         };
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        Some(Action::SendToPeers {
+        Some(ElderCmd::SendToAdults {
             targets: metadata.holders,
-            rpc: Rpc::Request {
+            msg: Message::Request {
                 request,
                 requester: requester.clone(),
                 message_id,
@@ -309,7 +305,7 @@ impl BlobRegister {
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         if result.is_ok() {
             let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
             if !chunk_metadata.holders.insert(sender) {
@@ -351,7 +347,7 @@ impl BlobRegister {
         result: NdResult<()>,
         message_id: MessageId,
         request: Request,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         match &request {
             Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
                 self.handle_store_result(*data.address(), sender, &result, message_id, requester)
@@ -370,7 +366,7 @@ impl BlobRegister {
         _result: &NdResult<()>,
         message_id: MessageId,
         requester: PublicId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         // TODO -
         // - if Ok, and this is the final of the three responses send success back to client handlers and
         //   then on to the client.  Note: there's no functionality in place yet to know whether
@@ -423,13 +419,12 @@ impl BlobRegister {
         }
 
         // Should we wait for multiple responses
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *idata_address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(Ok(())),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -442,7 +437,7 @@ impl BlobRegister {
         result: NdResult<()>,
         message_id: MessageId,
         requester: PublicId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         if let Err(err) = &result {
             warn!("{}: Node reports error deleting: {}", self, err);
         } else {
@@ -497,15 +492,12 @@ impl BlobRegister {
         }
 
         // TODO: Different responses from adults?
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *idata_address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                // Deleting data is free so, no refund
-                // This field can be put to use when deletion is incentivised
-                refund: None,
                 proof: None,
             },
         })
@@ -517,15 +509,14 @@ impl BlobRegister {
         message_id: MessageId,
         requester: PublicId,
         proof: (Request, Signature),
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let response = Response::GetIData(result);
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *self.id.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response,
                 message_id,
-                refund: None,
                 proof: Some(proof),
             },
         })

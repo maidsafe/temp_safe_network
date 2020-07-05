@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::auth::ClientInfo;
-use crate::{action::Action, utils};
+use crate::{cmd::GatewayCmd, utils};
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
@@ -118,7 +118,7 @@ impl Messaging {
     }
 
     pub fn shall_handle_request(&mut self, message_id: MessageId, peer_addr: SocketAddr) -> bool {
-        // We could receive a consensused vault rpc contains a client request,
+        // We could receive a consensused vault msg contains a client request,
         // before receiving the request from that client directly.
         if let Some(response) = self.pending_actions.remove(&message_id) {
             self.send(
@@ -204,7 +204,7 @@ impl Messaging {
         requester: &PublicId,
         response: Response,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use Response::*;
         trace!(
             "{}: Received ({:?} {:?}) to {} from {}",

@@ -11,8 +11,7 @@ mod auth_keys;
 pub use self::auth_keys::AuthKeysDb;
 
 use crate::{
-    action::{Action, ConsensusAction},
-    rpc::Rpc,
+    cmd::{ConsensusAction, GatewayCmd},
     utils,
 };
 use log::{error, warn};
@@ -43,7 +42,7 @@ impl Auth {
         client: PublicId,
         request: ClientAuth,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use ClientAuth::*;
         match request {
             ListAuthKeysAndVersion => self.list_keys_and_version(client, message_id),
@@ -64,7 +63,7 @@ impl Auth {
         public_id: &PublicId,
         request: &Request,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
             _ => return None,
@@ -96,7 +95,7 @@ impl Auth {
         };
 
         if let Err(error) = result {
-            Some(Action::RespondToClient {
+            Some(GatewayCmd::RespondToClient {
                 message_id,
                 response: request.error_response(error),
             })
@@ -106,11 +105,15 @@ impl Auth {
     }
 
     // client query
-    fn list_keys_and_version(&mut self, client: PublicId, message_id: MessageId) -> Option<Action> {
+    fn list_keys_and_version(
+        &mut self,
+        client: PublicId,
+        message_id: MessageId,
+    ) -> Option<GatewayCmd> {
         let result = Ok(self
             .auth_keys
             .list_keys_and_version(utils::client(&client)?));
-        Some(Action::RespondToClient {
+        Some(GatewayCmd::RespondToClient {
             message_id,
             response: Response::ListAuthKeysAndVersion(result),
         })
@@ -122,7 +125,7 @@ impl Auth {
         requester: PublicId,
         request: ClientAuth,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use ClientAuth::*;
         match request {
             InsAuthKey {
@@ -151,8 +154,8 @@ impl Auth {
         new_version: u64,
         permissions: AppPermissions,
         message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Request::Client(ClientRequest::System(SystemOp::ClientAuth(
                 ClientAuth::InsAuthKey {
                     key,
@@ -173,19 +176,13 @@ impl Auth {
         new_version: u64,
         permissions: AppPermissions,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let result =
             self.auth_keys
                 .insert(utils::client(&requester)?, key, new_version, permissions);
-        Some(Action::RespondToClientHandlers {
-            sender: *self.id.name(),
-            rpc: Rpc::Response {
-                response: Response::Write(result),
-                requester,
-                message_id,
-                refund: None,
-                proof: None,
-            },
+        Some(GatewayCmd::RespondToClient {
+            message_id,
+            response: Response::Write(result),
         })
     }
 
@@ -196,8 +193,8 @@ impl Auth {
         key: PublicKey,
         new_version: u64,
         message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Request::Client(ClientRequest::System(SystemOp::ClientAuth(
                 ClientAuth::DelAuthKey {
                     key,
@@ -216,19 +213,13 @@ impl Auth {
         key: PublicKey,
         new_version: u64,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let result = self
             .auth_keys
             .delete(utils::client(&requester)?, key, new_version);
-        Some(Action::RespondToClientHandlers {
-            sender: *self.id.name(),
-            rpc: Rpc::Response {
-                response: Response::Write(result),
-                requester,
-                message_id,
-                refund: None,
-                proof: None,
-            },
+        Some(GatewayCmd::RespondToClient {
+            message_id,
+            response: Response::Write(result),
         })
     }
 
@@ -239,7 +230,7 @@ impl Auth {
         request: &Request,
         message_id: MessageId,
         signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         match request.authorisation_kind() {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
@@ -256,7 +247,7 @@ impl Auth {
                 if valid {
                     None
                 } else {
-                    Some(Action::RespondToClient {
+                    Some(GatewayCmd::RespondToClient {
                         message_id,
                         response: request.error_response(NdError::InvalidSignature),
                     })

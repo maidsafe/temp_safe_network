@@ -6,17 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! RPC messages internal to Vaults.
+//! Messages internal to Vaults.
 
-use safe_nd::{DebitAgreementProof, IDataAddress, MessageId, PublicId, Request, Response, XorName};
+use safe_nd::{IDataAddress, MessageId, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use threshold_crypto::{Signature, SignatureShare};
 
-/// RPC messages exchanged between nodes.
+/// Messages exchanged between nodes.
 #[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) enum Rpc {
+pub(crate) enum Message {
     /// Wrapper for a forwarded client request, including the client's public identity.
     Request {
         request: Request,
@@ -29,7 +29,6 @@ pub(crate) enum Rpc {
         response: Response,
         requester: PublicId,
         message_id: MessageId,
-        refund: Option<DebitAgreementProof>,
         proof: Option<(Request, Signature)>,
     },
     /// Wrapper for a duplicate request, from elders to other nodes in the section.
@@ -47,10 +46,10 @@ pub(crate) enum Rpc {
     },
 }
 
-impl Rpc {
+impl Message {
     /// Returns the message ID
     pub(crate) fn message_id(&self) -> &MessageId {
-        use Rpc::*;
+        use Message::*;
         match self {
             Request { message_id, .. }
             | Duplicate { message_id, .. }

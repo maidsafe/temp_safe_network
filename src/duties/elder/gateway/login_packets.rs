@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::{Action, ConsensusAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
-    rpc::Rpc,
+    cmd::{ConsensusAction, GatewayCmd},
     utils,
 };
 use safe_nd::{
@@ -35,7 +34,7 @@ impl LoginPackets {
         client: PublicId,
         read: AccountRead,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use AccountRead::*;
         match read {
             Get(ref address) => self.get(client, address, message_id),
@@ -49,7 +48,7 @@ impl LoginPackets {
         write: AccountWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use AccountWrite::*;
         match write {
             New(login_packet) => {
@@ -67,11 +66,11 @@ impl LoginPackets {
         client: PublicId,
         address: &XorName,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let result = self
             .account(utils::own_key(&client)?, address)
             .map(Account::into_data_and_signature);
-        Some(Action::RespondToClient {
+        Some(GatewayCmd::RespondToClient {
             message_id,
             response: Response::GetLoginPacket(result),
         })
@@ -84,9 +83,9 @@ impl LoginPackets {
         account: Account,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         if !account.size_is_valid() {
-            return Some(Action::RespondToClient {
+            return Some(GatewayCmd::RespondToClient {
                 message_id,
                 response: Response::Write(Err(NdError::ExceededSize)),
             });
@@ -94,7 +93,7 @@ impl LoginPackets {
 
         let request = Self::wrap(AccountWrite::New(account));
 
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request,
             client_public_id,
             message_id,
@@ -108,7 +107,7 @@ impl LoginPackets {
         client: PublicId,
         write: AccountWrite,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         use AccountWrite::*;
         match write {
             New(ref account) => self.finalise_creation(client, account, message_id),
@@ -122,7 +121,7 @@ impl LoginPackets {
         requester: PublicId,
         account: &Account,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let result = if self.login_packets.has(account.address()) {
             Err(NdError::LoginPacketExists)
         } else {
@@ -131,15 +130,9 @@ impl LoginPackets {
                 .map_err(|error| error.to_string().into())
         };
 
-        Some(Action::RespondToClientHandlers {
-            sender: *account.address(),
-            rpc: Rpc::Response {
-                response: Response::Write(result),
-                requester,
-                message_id,
-                refund: None,
-                proof: None,
-            },
+        Some(GatewayCmd::RespondToClient {
+            message_id,
+            response: Response::Write(result),
         })
     }
 
@@ -150,8 +143,8 @@ impl LoginPackets {
         updated_account: Account,
         message_id: MessageId,
         _debit_proof: DebitAgreementProof,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::Forward {
+    ) -> Option<GatewayCmd> {
+        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(AccountWrite::Update(updated_account)),
             client_public_id,
             message_id,
@@ -165,7 +158,7 @@ impl LoginPackets {
         requester: PublicId,
         updated_account: &Account,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<GatewayCmd> {
         let result = self
             .account(utils::own_key(&requester)?, updated_account.address())
             .and_then(|_existing_login_packet| {
@@ -176,16 +169,9 @@ impl LoginPackets {
                     .put(&updated_account)
                     .map_err(|err| err.to_string().into())
             });
-        Some(Action::RespondToClientHandlers {
-            sender: *self.id.name(),
-            rpc: Rpc::Response {
-                response: Response::Write(result),
-                requester,
-                message_id,
-                // Updating the login packet is free
-                refund: None,
-                proof: None,
-            },
+        Some(GatewayCmd::RespondToClient {
+            message_id,
+            response: Response::Write(result),
         })
     }
 

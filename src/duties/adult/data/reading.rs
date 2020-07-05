@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{action::Action, utils};
+use crate::{cmd::AdultCmd, utils};
 use log::error;
 use routing::SrcLocation;
 use safe_nd::{BlobRead, MessageId, PublicId, Read, Request};
@@ -45,7 +45,7 @@ impl Reading {
         }
     }
 
-    pub fn get_result(&self, storage: &ChunkStorage) -> Option<Action> {
+    pub fn get_result(&self, storage: &ChunkStorage) -> Option<AdultCmd> {
         use Read::*;
         match &self.read {
             Blob(read) => self.blob(read, storage),
@@ -64,7 +64,7 @@ impl Reading {
         }
     }
 
-    fn blob(&self, read: &BlobRead, storage: &ChunkStorage) -> Option<Action> {
+    fn blob(&self, read: &BlobRead, storage: &ChunkStorage) -> Option<AdultCmd> {
         let BlobRead::Get(address) = read;
         if self.src.is_section() {
             // Since the requester is a node, this message was sent by the data handlers to us

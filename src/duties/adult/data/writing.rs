@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{action::Action, utils};
+use crate::{cmd::AdultCmd, utils};
 use log::error;
 use routing::SrcLocation;
 use safe_nd::{BlobWrite, MessageId, PublicId, Request, Write};
@@ -45,7 +45,7 @@ impl Writing {
         }
     }
 
-    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<Action> {
+    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<AdultCmd> {
         use Write::*;
         match &self.write {
             Blob(write) => self.blob(write, storage),
@@ -64,7 +64,7 @@ impl Writing {
         }
     }
 
-    fn blob(&self, write: &BlobWrite, storage: &mut ChunkStorage) -> Option<Action> {
+    fn blob(&self, write: &BlobWrite, storage: &mut ChunkStorage) -> Option<AdultCmd> {
         use BlobWrite::*;
         // Since the requester is a node, this message was sent by the data handlers to us
         // as a single data handler, implying that we're a data holder where the chunk is

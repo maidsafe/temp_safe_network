@@ -10,7 +10,7 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::action::Action;
+use crate::cmd::ElderCmd;
 use routing::SrcLocation;
 use safe_nd::{BlobWrite, MapWrite, MessageId, PublicId, Request, SequenceWrite, Write};
 use threshold_crypto::{PublicKey, Signature};
@@ -46,7 +46,7 @@ impl Writing {
         }
     }
 
-    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<Action> {
+    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<ElderCmd> {
         use Write::*;
         match self.write.clone() {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
@@ -56,7 +56,7 @@ impl Writing {
         }
     }
 
-    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<Action> {
+    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<ElderCmd> {
         use BlobWrite::*;
         match write {
             New(data) => register.store(
@@ -74,11 +74,15 @@ impl Writing {
         }
     }
 
-    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<Action> {
+    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<ElderCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 
-    fn sequence(&mut self, write: SequenceWrite, storage: &mut SequenceStorage) -> Option<Action> {
+    fn sequence(
+        &mut self,
+        write: SequenceWrite,
+        storage: &mut SequenceStorage,
+    ) -> Option<ElderCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 }

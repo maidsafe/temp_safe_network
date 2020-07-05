@@ -13,7 +13,7 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{action::Action, node::Init, rpc::Rpc as Message, utils, Config, Result};
+use crate::{cmd::ElderCmd, msg::Message, node::Init, utils, Config, Result};
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
@@ -67,7 +67,7 @@ impl Metadata {
         src: SrcLocation,
         msg: Message,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         match msg {
             Message::Request {
                 request,
@@ -100,7 +100,7 @@ impl Metadata {
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
+    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<ElderCmd>> {
         self.elder_stores.blob_register_mut().duplicate_chunks(node)
     }
 
@@ -111,7 +111,7 @@ impl Metadata {
         request: Request,
         message_id: MessageId,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
             self,
@@ -158,7 +158,7 @@ impl Metadata {
         requester: PublicId,
         message_id: MessageId,
         proof: Option<(Request, Signature)>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use Response::*;
         trace!(
             "{}: Received ({:?} {:?}) from {}",
@@ -213,16 +213,16 @@ impl Metadata {
         holders: BTreeSet<XorName>,
         message_id: MessageId,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         trace!(
             "Sending GetIData request for address: ({:?}) to {:?}",
             address,
             holders,
         );
         let our_id = self.id.clone();
-        Some(Action::SendToPeers {
+        Some(ElderCmd::SendToAdults {
             targets: holders,
-            rpc: Message::Request {
+            msg: Message::Request {
                 request: Request::Node(NodeRequest::Read(Read::Blob(BlobRead::Get(address)))),
                 requester: PublicId::Node(our_id),
                 message_id,
@@ -238,7 +238,7 @@ impl Metadata {
         message_id: MessageId,
         idata_address: IDataAddress,
         signature: Signature,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use Response::*;
         if self
             .routing_node

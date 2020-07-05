@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::Action,
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
+    cmd::ElderCmd,
+    msg::Message,
     node::Init,
-    rpc::Rpc,
     utils, Config, Result,
 };
 use log::error;
@@ -55,7 +55,7 @@ impl MapStorage {
         requester: PublicId,
         read: &MapRead,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use MapRead::*;
         match read {
             Get(address) => self.get(requester, *address, message_id),
@@ -77,7 +77,7 @@ impl MapStorage {
         requester: PublicId,
         write: MapWrite,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use MapWrite::*;
         match write {
             New(data) => self.create(requester, &data, message_id),
@@ -143,7 +143,7 @@ impl MapStorage {
         requester: PublicId,
         message_id: MessageId,
         mutation_fn: F,
-    ) -> Option<Action>
+    ) -> Option<ElderCmd>
     where
         F: FnOnce(MData) -> NdResult<MData>,
     {
@@ -161,13 +161,12 @@ impl MapStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -179,7 +178,7 @@ impl MapStorage {
         requester: PublicId,
         data: &MData,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -188,13 +187,12 @@ impl MapStorage {
                 .map_err(|error| error.to_string().into())
         };
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *data.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -205,7 +203,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         let result = self
@@ -223,14 +221,12 @@ impl MapStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                // Deletion is free so no refund
-                refund: None,
                 proof: None,
             },
         })
@@ -245,7 +241,7 @@ impl MapStorage {
         permissions: &MDataPermissionSet,
         version: u64,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.edit_chunk(&address, requester, message_id, move |mut data| {
@@ -263,7 +259,7 @@ impl MapStorage {
         user: PublicKey,
         version: u64,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.edit_chunk(&address, requester, message_id, move |mut data| {
@@ -280,7 +276,7 @@ impl MapStorage {
         address: MDataAddress,
         actions: MDataEntryActions,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.edit_chunk(&address, requester, message_id, move |mut data| {
@@ -295,16 +291,15 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetMData(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -316,18 +311,17 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.shell());
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetMDataShell(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -339,18 +333,17 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.version());
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetMDataVersion(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -363,7 +356,7 @@ impl MapStorage {
         address: MDataAddress,
         key: &[u8],
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::GetMDataValue(res.and_then(|data| {
@@ -381,13 +374,12 @@ impl MapStorage {
             }
         }));
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response,
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -399,18 +391,17 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.keys());
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::ListMDataKeys(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -422,7 +413,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::ListMDataValues(res.and_then(|data| match data {
@@ -430,13 +421,12 @@ impl MapStorage {
             MData::Unseq(md) => Ok(md.values().into()),
         }));
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response,
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -448,7 +438,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::ListMDataEntries(res.and_then(|data| match data {
@@ -456,13 +446,12 @@ impl MapStorage {
             MData::Unseq(md) => Ok(md.entries().clone().into()),
         }));
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response,
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -474,18 +463,17 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.permissions());
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::ListMDataPermissions(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -498,18 +486,17 @@ impl MapStorage {
         address: MDataAddress,
         user: PublicKey,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::ListMDataUserPermissions(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })

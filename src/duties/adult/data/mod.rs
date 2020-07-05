@@ -10,7 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{action::Action, node::Init, rpc::Rpc as Message, utils, Config, Result};
+use crate::{cmd::AdultCmd, msg::Message, node::Init, utils, Config, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use routing::{Node, SrcLocation};
@@ -54,7 +54,7 @@ impl Data {
         src: SrcLocation,
         msg: Message,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         match msg {
             Message::Request {
                 request,
@@ -80,7 +80,7 @@ impl Data {
         request: Request,
         message_id: MessageId,
         accumulated_signature: Option<Signature>,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
             self,
@@ -127,7 +127,7 @@ impl Data {
         requester: PublicId,
         message_id: MessageId,
         proof: Option<(Request, Signature)>,
-    ) -> Option<Action> {
+    ) -> Option<AdultCmd> {
         use Response::*;
         trace!(
             "{}: Received ({:?} {:?}) from {}",

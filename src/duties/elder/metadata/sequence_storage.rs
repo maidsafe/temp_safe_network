@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::Action,
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
+    cmd::ElderCmd,
+    msg::Message,
     node::Init,
-    rpc::Rpc,
     utils, Config, Result,
 };
 
@@ -55,7 +55,7 @@ impl SequenceStorage {
         requester: PublicId,
         read: &SequenceRead,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use SequenceRead::*;
         match read {
             Get(address) => self.get(requester, *address, message_id),
@@ -74,7 +74,7 @@ impl SequenceStorage {
         requester: PublicId,
         write: SequenceWrite,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         use SequenceWrite::*;
         match write {
             New(data) => self.store(requester, &data, message_id),
@@ -95,7 +95,7 @@ impl SequenceStorage {
         requester: PublicId,
         data: &SData,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -104,13 +104,12 @@ impl SequenceStorage {
                 .map_err(|error| error.to_string().into())
         };
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *data.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -121,16 +120,15 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self.get_chunk(&requester, address, SDataAction::Read);
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetSData(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -157,7 +155,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let requester_pk = *utils::own_key(&requester)?;
         let result = self
             .chunks
@@ -180,14 +178,12 @@ impl SequenceStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::Write(result),
                 message_id,
-                // Deletion is free so no refund
-                refund: None,
                 proof: None,
             },
         })
@@ -199,18 +195,17 @@ impl SequenceStorage {
         address: SDataAddress,
         range: (SDataIndex, SDataIndex),
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetSDataRange(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -221,7 +216,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| match sdata.last_entry() {
@@ -229,13 +224,12 @@ impl SequenceStorage {
                 None => Err(NdError::NoSuchEntry),
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetSDataLastEntry(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -246,7 +240,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
@@ -254,13 +248,12 @@ impl SequenceStorage {
                 sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetSDataOwner(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -272,7 +265,7 @@ impl SequenceStorage {
         address: SDataAddress,
         user: SDataUser,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
@@ -280,13 +273,12 @@ impl SequenceStorage {
                 sdata.user_permissions(user, index)
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response: Response::GetSDataUserPermissions(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -297,7 +289,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let response = {
             let result = self
                 .get_chunk(&requester, address, SDataAction::Read)
@@ -314,13 +306,12 @@ impl SequenceStorage {
             Response::GetSDataPermissions(result)
         };
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester,
                 response,
                 message_id,
-                refund: None,
                 proof: None,
             },
         })
@@ -331,7 +322,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataPubPermissions>,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -350,7 +341,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataPrivPermissions>,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -369,7 +360,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataOwner>,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -388,7 +379,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataEntry>,
         message_id: MessageId,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -409,7 +400,7 @@ impl SequenceStorage {
         action: SDataAction,
         message_id: MessageId,
         mutation_fn: F,
-    ) -> Option<Action>
+    ) -> Option<ElderCmd>
     where
         F: FnOnce(SData) -> NdResult<SData>,
     {
@@ -422,13 +413,12 @@ impl SequenceStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        Some(Action::RespondToClientHandlers {
+        Some(ElderCmd::RespondToGateway {
             sender: *address.name(),
-            rpc: Rpc::Response {
+            msg: Message::Response {
                 requester: requester.clone(),
                 response: Response::Write(result),
                 message_id,
-                refund: None,
                 proof: None,
             },
         })

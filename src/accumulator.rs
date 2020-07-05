@@ -1,4 +1,4 @@
-use crate::{rpc::Rpc, utils};
+use crate::{msg::Message, utils};
 use log::{error, info};
 use routing::Node;
 use safe_nd::{IDataAddress, MessageId, NodeRequest, PublicId, Read, Request, XorName};
@@ -31,13 +31,13 @@ impl Accumulator {
         }
     }
 
-    pub(crate) fn accumulate_request(&mut self, rpc: Rpc) -> Option<(Rpc, Signature)> {
-        if self.completed.contains(rpc.message_id()) {
-            info!("RPC already processed.");
+    pub(crate) fn accumulate_request(&mut self, msg: Message) -> Option<(Message, Signature)> {
+        if self.completed.contains(msg.message_id()) {
+            info!("Message already processed.");
             return None;
         }
-        match rpc {
-            Rpc::Request {
+        match msg {
+            Message::Request {
                 request,
                 requester,
                 message_id,
@@ -48,7 +48,7 @@ impl Accumulator {
                     // been accumulated at the Adult before the data is requested for duplication.
                     if let Request::Node(NodeRequest::Read(Read::Blob(_))) = &request {
                         Some((
-                            Rpc::Request {
+                            Message::Request {
                                 request,
                                 requester,
                                 message_id,
@@ -94,7 +94,7 @@ impl Accumulator {
                             if public_key_set.public_key().verify(&signature, &signed_data) {
                                 let _ = self.completed.insert(message_id);
                                 return Some((
-                                    Rpc::Request {
+                                    Message::Request {
                                         request,
                                         requester,
                                         message_id,
@@ -112,7 +112,7 @@ impl Accumulator {
                     None
                 }
             }
-            Rpc::Duplicate {
+            Message::Duplicate {
                 address,
                 holders,
                 message_id,
@@ -156,7 +156,7 @@ impl Accumulator {
                     if public_key_set.public_key().verify(&signature, &signed_data) {
                         let _ = self.completed.insert(message_id);
                         return Some((
-                            Rpc::Duplicate {
+                            Message::Duplicate {
                                 address,
                                 holders,
                                 message_id,
