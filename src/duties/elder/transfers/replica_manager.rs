@@ -18,7 +18,7 @@ use threshold_crypto::{PublicKeySet, SecretKeyShare};
 use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::{cmd::Action, msg::Message},
+    crate::{cmd::ElderCmd, cmd::TransferCmd, msg::Message},
     rand::thread_rng,
     safe_nd::{
         MessageId, PublicId, PublicKey, Response, Signature, SignatureShare, Transfer, XorName,
@@ -185,7 +185,7 @@ impl ReplicaManager {
         transfer: Transfer,
         message_id: MessageId,
         sender: XorName,
-    ) -> Option<Action> {
+    ) -> Option<ElderCmd> {
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();
@@ -215,16 +215,15 @@ impl ReplicaManager {
             }))
             .ok()?;
         // Respond to the Client with TransferRegistered
-        Some(Action::RespondToGateway {
+        Some(ElderCmd::Transfer(TransferCmd::RespondToGateway {
             sender,
             msg: Message::Response {
                 response: Response::TransferRegistration(Ok(TransferRegistered { debit_proof })),
                 requester,
                 message_id,
-                refund: None,
                 proof: None,
             },
-        })
+        }))
     }
 
     pub fn debit_without_proof(&mut self, transfer: Transfer) {

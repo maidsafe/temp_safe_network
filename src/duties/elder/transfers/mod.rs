@@ -15,11 +15,9 @@ use crate::{
     msg::Message,
 };
 //use log::{error, trace};
-#[cfg(not(feature = "simulated-payouts"))]
-use safe_nd::PublicKey;
 use safe_nd::{
     DebitAgreementProof, Error as NdError, Error, MessageId, NodePublicId, NodeRequest, PublicId,
-    Request, Response, SignedTransfer, SystemOp, Transfers as MoneyRequest,
+    PublicKey, Request, Response, SignedTransfer, SystemOp, Transfers as MoneyRequest,
 };
 use std::{
     cell::RefCell,
@@ -298,7 +296,7 @@ impl Transfers {
 
     #[cfg(feature = "simulated-payouts")]
     pub fn pay(&mut self, transfer: Transfer) {
-        self.replica.debit_without_proof(transfer)
+        self.replica.borrow_mut().debit_without_proof(transfer)
     }
 }
 
