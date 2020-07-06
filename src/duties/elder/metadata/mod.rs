@@ -43,6 +43,13 @@ use std::{
     rc::Rc,
 };
 
+/// This module is called `Metadata`
+/// as a preparation for the responsibilities
+/// it will have eventually, after `Data Hierarchy Refinement`
+/// has been implemented; where the data types are all simply
+/// the structures + their metadata - handled at `Elders` - with
+/// all underlying data being chunks stored at `Adults`.
+
 pub(crate) struct Metadata {
     id: NodePublicId,
     elder_stores: ElderStores,
