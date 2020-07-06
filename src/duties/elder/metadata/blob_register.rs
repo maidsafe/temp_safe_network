@@ -123,50 +123,43 @@ impl BlobRegister {
             })
         };
 
-        let mut target_holders = Default::default();
-
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
-        if self.metadata.exists(&(*data.address()).to_db_key()) {
-            let idata_metadata = self
-                .metadata
-                .get::<ChunkMetadata>(&*data.address().to_db_key());
-            if let Some(metadata) = idata_metadata {
-                if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
-                    if data.is_pub() {
-                        trace!(
-                            "{}: Replying success for Put {:?}, it already exists.",
-                            self,
-                            data
-                        );
-                        return respond(Ok(()));
-                    } else {
-                        return respond(Err(NdError::DataExists));
-                    }
+        let metadata = self.get_metadata_for(*data.address());
+        let target_holders = if let Ok(metadata) = metadata {
+            if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
+                if data.is_pub() {
+                    trace!(
+                        "{}: Replying success for Put {:?}, it already exists.",
+                        self,
+                        data
+                    );
+                    return respond(Ok(()));
                 } else {
-                    let mut existing_holders = metadata.holders;
-                    let closest_holders = self
-                        .get_holders_for_chunk(data.name())
-                        .iter()
-                        .cloned()
-                        .collect::<BTreeSet<_>>();
-
-                    for holder_xorname in closest_holders {
-                        if !existing_holders.contains(&holder_xorname)
-                            && existing_holders.len() < IMMUTABLE_DATA_COPY_COUNT
-                        {
-                            let _ = existing_holders.insert(holder_xorname);
-                        }
-                    }
-                    target_holders = existing_holders;
+                    return respond(Err(NdError::DataExists));
                 }
+            } else {
+                let mut existing_holders = metadata.holders;
+                let closest_holders = self
+                    .get_holders_for_chunk(data.name())
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+
+                for holder_xorname in closest_holders {
+                    if !existing_holders.contains(&holder_xorname)
+                        && existing_holders.len() < IMMUTABLE_DATA_COPY_COUNT
+                    {
+                        let _ = existing_holders.insert(holder_xorname);
+                    }
+                }
+                existing_holders
             }
         } else {
-            target_holders = self
-                .get_holders_for_chunk(data.name())
+            self.get_holders_for_chunk(data.name())
                 .iter()
                 .cloned()
-                .collect::<BTreeSet<_>>();
+                .collect::<BTreeSet<_>>()
         };
 
         info!("Storing {} copies of the data", target_holders.len());
