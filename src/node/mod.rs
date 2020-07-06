@@ -524,6 +524,26 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    fn handle_adult_cmd(&mut self, cmd: AdultCmd) -> Option<NodeCmd> {
+        use AdultCmd::*;
+        match cmd {
+            SendToAdultPeers { targets, msg } => self.send_to_nodes(targets, msg),
+            RespondToOurElders(msg) => {
+                self.send_to_section(&XorName(self.routing.borrow().id().name().0), msg)
+            }
+        }
+    }
+
+    fn handle_elder_cmd(&mut self, cmd: ElderCmd) -> Option<NodeCmd> {
+        use ElderCmd::*;
+        match cmd {
+            Gateway(cmd) => self.handle_gateway_cmd(cmd),
+            Metadata(cmd) => self.handle_metadata_cmd(cmd),
+            Transfer(cmd) => self.handle_transfer_cmd(cmd),
+            Payment(cmd) => self.handle_payment_cmd(cmd),
+        }
+    }
+
     fn handle_gateway_cmd(&mut self, cmd: GatewayCmd) -> Option<NodeCmd> {
         use GatewayCmd::*;
         match cmd {
@@ -567,35 +587,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
             RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
         }
-    }
-
-    fn handle_adult_cmd(&mut self, cmd: AdultCmd) -> Option<NodeCmd> {
-        use AdultCmd::*;
-        match cmd {
-            SendToAdultPeers { targets, msg } => self.send_to_nodes(targets, msg),
-            RespondToOurElders(msg) => {
-                self.send_to_section(&XorName(self.routing.borrow().id().name().0), msg)
-            }
-        }
-    }
-
-    fn handle_elder_cmd(&mut self, cmd: ElderCmd) -> Option<NodeCmd> {
-        use ElderCmd::*;
-        match cmd {
-            Gateway(cmd) => self.handle_gateway_cmd(cmd),
-            Metadata(cmd) => self.handle_metadata_cmd(cmd),
-            Transfer(cmd) => self.handle_transfer_cmd(cmd),
-            Payment(cmd) => self.handle_payment_cmd(cmd),
-        }
-        // RespondToElderPeers(msg) => {
-        //         let targets: BTreeSet<XorName> = self
-        //             .routing
-        //             .borrow()
-        //             .our_elders()
-        //             .map(|n| XorName(n.name().0))
-        //             .collect();
-        //         self.send_to_nodes(targets, msg)
-        //     }
     }
 
     fn forward_to_section(&mut self, dst_address: &XorName, msg: Message) -> Option<NodeCmd> {

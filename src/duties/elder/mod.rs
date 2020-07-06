@@ -258,7 +258,6 @@ impl ElderDuties {
                 Write(_) | GetIData(_) => self
                     .metadata
                     .handle_response(src, response, requester, message_id, proof),
-
                 _ => None,
             }
         } else {
