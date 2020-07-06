@@ -431,28 +431,19 @@ impl<R: CryptoRng + Rng> Node<R> {
         match bincode::deserialize::<Message>(&message) {
             Ok(msg) => match &msg {
                 Message::Request {
-                    request,
-                    requester,
-                    signature,
-                    ..
-                } => {
-                    if matches!(requester, PublicId::Node(_)) {
+                    request, signature, ..
+                } => match request {
+                    Request::Client(_) => unimplemented!("Should not receive: {:?}", request),
+                    Request::Gateway(_) => self.accumulate_msg(src, msg),
+                    Request::Node(_) => {
                         if let Some((_, signature)) = signature.clone() {
                             self.process_locally(src, msg, Some(signature.0))
                         } else {
                             error!("Signature missing from duplication GET request");
                             None
                         }
-                    } else {
-                        match request {
-                            Request::Node(NodeRequest::Read(Read::Blob(_)))
-                            | Request::Node(NodeRequest::Write(Write::Blob(_))) => {
-                                self.accumulate_msg(src, msg)
-                            }
-                            other => unimplemented!("Should not receive: {:?}", other),
-                        }
                     }
-                }
+                },
                 Message::Response { requester, .. } => {
                     self.forward_to_section(requester.name(), msg.clone())
                 }
