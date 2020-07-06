@@ -76,20 +76,9 @@ impl TransferActor {
 
         let public_key = pk.unwrap_or(identity.public_key());
 
-        let message_id = MessageId::new();
+        let request = Self::wrap_money_request(MoneyRequest::GetBalance(public_key));
 
-        let request = Self::wrap(MoneyRequest::GetBalance(public_key));
-        // TODO: remove this unwrap
-        let signature = Some(self.safe_key.sign(&unwrap::unwrap!(bincode::serialize(&(
-            &request, message_id
-        )))));
-
-        let message = Message::Request {
-            request,
-            message_id: message_id.clone(),
-            signature,
-        };
-
+        let (message, message_id) = Self::create_network_message(identity.clone(), request)?;
         let _bootstrapped = cm.bootstrap(identity).await;
 
         match cm.send(&pub_id, &message).await? {
@@ -129,9 +118,10 @@ impl TransferActor {
             "Signed transfer for send money: {:?}",
             signed_transfer.transfer
         );
-        let request = Self::wrap(MoneyRequest::ValidateTransfer { signed_transfer });
+        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer { signed_transfer });
 
-        let (message, _message_id) = self.create_network_message(request)?;
+        let (message, _message_id) =
+            TransferActor::create_network_message(safe_key.clone(), request)?;
 
         // TODO: make it clearer
         // #[cfg(feature = "mock-network")]
@@ -151,10 +141,12 @@ impl TransferActor {
             .await?;
 
         // Register the transfer on the network.
-        let register_transaction_request = Self::wrap(MoneyRequest::RegisterTransfer {
-            proof: debit_proof.clone(),
-        });
-        let (message, _message_id) = self.create_network_message(register_transaction_request)?;
+        let register_transaction_request =
+            Self::wrap_money_request(MoneyRequest::RegisterTransfer {
+                proof: debit_proof.clone(),
+            });
+        let (message, _message_id) =
+            TransferActor::create_network_message(safe_key.clone(), register_transaction_request)?;
         let safe_key = self.safe_key.clone();
         trace!(
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",

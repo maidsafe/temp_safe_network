@@ -25,29 +25,19 @@ use threshold_crypto::{PublicKeySet, SecretKey};
 
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {
+    /// Get our replica instance PK set
     pub async fn get_replica_keys(
         safe_key: SafeKey,
         mut cm: ConnectionManager,
     ) -> Result<PublicKeySet, CoreError> {
-        trace!("Gettin replica keys for {:?}", safe_key);
+        trace!("Getting replica keys for {:?}", safe_key);
 
-        let message_id = MessageId::new();
+        let request = Self::wrap_money_request(MoneyRequest::GetReplicaKeys(safe_key.public_key()));
 
-        let request = Self::wrap(MoneyRequest::GetReplicaKeys(safe_key.public_key()));
-
-        // TODO: remove this unwrap
-        let signature = Some(safe_key.sign(&unwrap::unwrap!(bincode::serialize(&(
-            &request, message_id
-        )))));
-
-        let message = Message::Request {
-            request,
-            message_id: message_id.clone(),
-            signature,
-        };
+        let (message, message_id) =
+            TransferActor::create_network_message(safe_key.clone(), request)?;
 
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
-
         let res = cm.send(&safe_key.public_id(), &message).await?;
 
         let r = match res {

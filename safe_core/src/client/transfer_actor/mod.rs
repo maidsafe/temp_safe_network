@@ -1,6 +1,6 @@
 use safe_nd::{
     ClientRequest, DebitAgreementProof, Message, MessageId, PublicId, PublicKey, Request, Response,
-    SystemOp, Transfers as MoneyRequest,
+    SystemOp, Transfers as MoneyRequest, Write,
 };
 
 use safe_transfers::{ActorEvent, ReplicaValidator, TransferActor as SafeTransferActor};
@@ -46,8 +46,8 @@ impl ReplicaValidator for ClientTransferValidator {
 }
 
 impl TransferActor {
-    fn wrap(req: MoneyRequest) -> Request {
-        Request::Client(ClientRequest::System(SystemOp::Transfers(req)))
+    fn wrap_money_request(req: MoneyRequest) -> ClientRequest {
+        ClientRequest::System(SystemOp::Transfers(req))
     }
 
     /// Get a payment proof
@@ -70,12 +70,13 @@ impl TransferActor {
         let public_key = self.safe_key.public_key();
         info!("Getting SafeTransfers history for pk: {:?}", public_key);
 
-        let request = Self::wrap(MoneyRequest::GetHistory {
+        let request = Self::wrap_money_request(MoneyRequest::GetHistory {
             at: public_key,
             since_version: 0,
         });
 
-        let (message, _messafe_id) = self.create_network_message(request)?;
+        let (message, _messafe_id) =
+            TransferActor::create_network_message(self.safe_key.clone(), request)?;
 
         let _bootstrapped = cm.bootstrap(self.safe_key.clone()).await;
 
@@ -113,17 +114,19 @@ impl TransferActor {
 
     // build, sign and send a validation type message, await appropriate response
     // TODO: remove old client sign req
-    fn create_network_message(
-        &mut self,
-        request: Request,
+    pub(crate) fn create_network_message(
+        safe_key: SafeKey,
+        request: ClientRequest,
     ) -> Result<(Message, MessageId), CoreError> {
         trace!("Creating signed network message");
-        let safe_key = self.safe_key.clone();
+
         let message_id = MessageId::new();
 
         let signature = Some(safe_key.sign(&unwrap::unwrap!(bincode::serialize(&(
             &request, message_id
         )))));
+
+        let request = Request::Client(request);
 
         let message = Message::Request {
             request,
@@ -154,13 +157,14 @@ impl TransferActor {
             .transfer(COST_OF_PUT, section_key)?
             .signed_transfer;
 
-        let request = Self::wrap(MoneyRequest::ValidateTransfer {
+        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer {
             signed_transfer: signed_transfer.clone(),
         });
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
-        let (transfer_message, message_id) = self.create_network_message(request)?;
+        let (transfer_message, message_id) =
+            TransferActor::create_network_message(safe_key.clone(), request)?;
 
         // setup connection manager
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;

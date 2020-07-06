@@ -25,7 +25,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_blob_write(BlobWrite::DeletePrivate(address), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -45,7 +45,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::Delete(address), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -65,7 +65,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_map_write(MapWrite::Delete(address), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -99,7 +99,7 @@ impl TransferActor {
             payment_proof.clone(),
         );
 
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
 
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
@@ -136,7 +136,7 @@ impl TransferActor {
             payment_proof.clone(),
         );
 
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
 
         // TODO what will be the correct reponse here?... We have it validated, so registered?
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
@@ -164,7 +164,7 @@ impl TransferActor {
 
         let req = wrap_map_write(MapWrite::Edit { address, changes }, payment_proof.clone());
 
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -187,7 +187,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::SetOwner(op), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -211,7 +211,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::SetPrivPermissions(op), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -235,7 +235,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::SetPubPermissions(op), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -259,7 +259,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::Edit(op), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -280,7 +280,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::New(data), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -301,7 +301,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_map_write(MapWrite::New(data), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
         println!("STORE MD COME IN..... response: {:?}", response);
         self.apply_success_write_locally(response, payment_proof)
@@ -322,7 +322,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_blob_write(BlobWrite::New(data), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -344,7 +344,7 @@ impl TransferActor {
         // The _actual_ request
         //---------------------------------
         let req = wrap_account_write(AccountWrite::New(account), payment_proof.clone());
-        let (message, _msg_id) = self.create_network_message(req)?;
+        let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let response = cm.send(&self.safe_key.public_id(), &message).await?;
 
         self.apply_success_write_locally(response, payment_proof)
@@ -406,46 +406,46 @@ mod tests {
     }
 }
 
-fn wrap_blob_read(read: BlobRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Blob(read)))
+fn wrap_blob_read(read: BlobRead) -> ClientRequest {
+    ClientRequest::Read(Read::Blob(read))
 }
 
-fn wrap_blob_write(write: BlobWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
+fn wrap_blob_write(write: BlobWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
+    ClientRequest::Write {
         write: Write::Blob(write),
         debit_agreement,
-    })
+    }
 }
 
-fn wrap_map_read(read: MapRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Map(read)))
+fn wrap_map_read(read: MapRead) -> ClientRequest {
+    ClientRequest::Read(Read::Map(read))
 }
 
-fn wrap_map_write(write: MapWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
+fn wrap_map_write(write: MapWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
+    ClientRequest::Write {
         write: Write::Map(write),
         debit_agreement,
-    })
+    }
 }
 
-fn wrap_seq_read(read: SequenceRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Sequence(read)))
+fn wrap_seq_read(read: SequenceRead) -> ClientRequest {
+    ClientRequest::Read(Read::Sequence(read))
 }
 
-fn wrap_seq_write(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
+fn wrap_seq_write(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
+    ClientRequest::Write {
         write: Write::Sequence(write),
         debit_agreement,
-    })
+    }
 }
 
-fn wrap_account_read(read: AccountRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Account(read)))
+fn wrap_account_read(read: AccountRead) -> ClientRequest {
+    ClientRequest::Read(Read::Account(read))
 }
 
-fn wrap_account_write(write: AccountWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
+fn wrap_account_write(write: AccountWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
+    ClientRequest::Write {
         write: Write::Account(write),
         debit_agreement,
-    })
+    }
 }

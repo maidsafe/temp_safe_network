@@ -50,11 +50,12 @@ impl TransferActor {
             id: self.simulated_farming_payout_dot,
         };
 
-        let simluated_farming_request = Self::wrap(MoneyRequest::SimulatePayout {
+        let simluated_farming_request = Self::wrap_money_request(MoneyRequest::SimulatePayout {
             transfer: simulated_transfer.clone(),
         });
 
-        let (message, _message_id) = self.create_network_message(simluated_farming_request)?;
+        let (message, _message_id) =
+            TransferActor::create_network_message(safe_key.clone(), simluated_farming_request)?;
 
         let pub_id = safe_key.public_id();
 
@@ -100,8 +101,9 @@ mod tests {
     #[cfg(feature = "simulated-payouts")]
     async fn transfer_actor_can_receive_simulated_farming_payout() -> Result<(), CoreError> {
         let (safe_key, cm) = get_keys_and_connection_manager().await;
-
-        let mut initial_actor = TransferActor::new(safe_key.clone(), cm.clone()).await?;
+        let mut initial_actor =
+            TransferActor::new_no_initial_balance(safe_key.clone(), cm.clone()).await?;
+        println!("actor");
 
         let _ = initial_actor
             .trigger_simulated_farming_payout(safe_key.public_key(), Money::from_str("100")?)
