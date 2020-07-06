@@ -16,7 +16,7 @@ use crate::{
 };
 //use log::{error, trace};
 use safe_nd::{
-    DebitAgreementProof, Error as NdError, Error, MessageId, NodePublicId, NodeRequest, PublicId,
+    DebitAgreementProof, Error as NdError, MessageId, NodePublicId, NodeRequest, PublicId,
     PublicKey, Request, Response, SignedTransfer, SystemOp, Transfers as MoneyRequest,
 };
 use std::{
@@ -73,22 +73,6 @@ impl Transfers {
             .ok()
     }
 
-    // /// Elders that aren't in the dst
-    // /// section, will forward the request.
-    // pub(super) fn initiate(
-    //     &mut self,
-    //     requester: PublicId,
-    //     request: MoneyRequest,
-    //     message_id: MessageId,
-    // ) -> Option<Action> {
-    //     Some(Action::ForwardClientRequest(Message::Request {
-    //         request: Request::Node(NodeRequest::System(SystemOp::Transfers(request))),
-    //         requester,
-    //         message_id,
-    //         signature: None,
-    //     }))
-    // }
-
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
     pub(super) fn handle_request(
@@ -125,17 +109,14 @@ impl Transfers {
     /// Get the PublicKeySet of our replicas
     fn get_replica_pks(
         &self,
-        public_key: PublicKey,
+        _public_key: PublicKey,
         requester: PublicId,
         // signature: Signature,
         message_id: MessageId,
     ) -> Option<ElderCmd> {
         // validate signature
 
-        let result = match self.replica.borrow().balance(&public_key) {
-            None => Err(Error::InvalidOperation),
-            Some(_) => self.replica.borrow().replicas_pk_set(),
-        };
+        let result = self.replica.borrow().replicas_pk_set();
         wrap(TransferCmd::RespondToGateway {
             sender: *self.id.name(),
             msg: Message::Response {
