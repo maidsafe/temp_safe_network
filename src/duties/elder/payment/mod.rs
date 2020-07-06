@@ -10,9 +10,10 @@ use super::transfers::replica_manager::ReplicaManager;
 use crate::{
     cmd::{ElderCmd, PaymentCmd},
     msg::Message,
+    utils,
 };
 use log::trace;
-use routing::SrcLocation;
+use routing::{Node as Routing, SrcLocation};
 use safe_nd::{
     Error, GatewayRequest, MessageId, NodePublicId, NodeRequest, PublicId, Request, Response,
 };
@@ -21,10 +22,11 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use threshold_crypto::Signature;
+use threshold_crypto::SignatureShare;
 
 pub(crate) struct DataPayment {
     id: NodePublicId,
+    routing: Rc<RefCell<Routing>>,
     replica: Rc<RefCell<ReplicaManager>>,
 }
 
@@ -37,8 +39,16 @@ pub(crate) struct DataPayment {
 /// will clear the payment, and thereafter the node forwards
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl DataPayment {
-    pub fn new(id: NodePublicId, replica: Rc<RefCell<ReplicaManager>>) -> Self {
-        Self { id, replica }
+    pub fn new(
+        id: NodePublicId,
+        routing: Rc<RefCell<Routing>>,
+        replica: Rc<RefCell<ReplicaManager>>,
+    ) -> Self {
+        Self {
+            id,
+            routing,
+            replica,
+        }
     }
 
     pub fn handle_write(
@@ -47,7 +57,6 @@ impl DataPayment {
         requester: PublicId,
         request: GatewayRequest,
         message_id: MessageId,
-        _accumulated_signature: Option<Signature>,
     ) -> Option<ElderCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
@@ -58,11 +67,23 @@ impl DataPayment {
             requester
         );
         use GatewayRequest::*;
-        match request {
+        match &request {
             Write {
                 write,
                 debit_agreement,
             } => {
+                // Make sure we are actually at the correct replicas,
+                // before executing the debit.
+                // (We could also add a method that executes both
+                // debit + credit atomically, but this is much simpler).
+                if self
+                    .replica
+                    .borrow()
+                    .balance(&debit_agreement.to())
+                    .is_none()
+                {
+                    return self.error_response(Error::NoSuchRecipient, requester, message_id);
+                }
                 if let Err(err) = self.replica.borrow_mut().register(&debit_agreement) {
                     return self.error_response(err, requester, message_id);
                 }
@@ -73,11 +94,12 @@ impl DataPayment {
                 {
                     return self.error_response(err, requester, message_id);
                 }
+                let signature = self.sign_with_signature_share(&utils::serialise(&request));
                 wrap(PaymentCmd::SendToSection(Message::Request {
-                    request: Request::Node(NodeRequest::Write(write)),
+                    request: Request::Node(NodeRequest::Write(write.clone())),
                     requester,
                     message_id,
-                    signature: None,
+                    signature,
                 }))
             }
             _ => None,
@@ -99,6 +121,15 @@ impl DataPayment {
                 proof: None,
             },
         })
+    }
+
+    fn sign_with_signature_share(&self, data: &[u8]) -> Option<(usize, SignatureShare)> {
+        let signature = self
+            .routing
+            .borrow()
+            .secret_key_share()
+            .map_or(None, |key| Some(key.sign(data)));
+        signature.map(|sig| (self.routing.borrow().our_index().unwrap_or(0), sig))
     }
 }
 

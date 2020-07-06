@@ -12,11 +12,10 @@ use super::{
 };
 use crate::cmd::ElderCmd;
 use routing::SrcLocation;
-use safe_nd::{AccountRead, BlobRead, MapRead, MessageId, PublicId, Read, Request, SequenceRead};
+use safe_nd::{AccountRead, BlobRead, MapRead, MessageId, PublicId, Read, SequenceRead};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Reading {
-    request: Request,
     _src: SrcLocation,
     requester: PublicId,
     read: Read,
@@ -30,13 +29,11 @@ impl Reading {
         read: Read,
         _src: SrcLocation,
         requester: PublicId,
-        request: Request,
         message_id: MessageId,
         _accumulated_signature: Option<Signature>,
         _public_key: Option<PublicKey>,
     ) -> Self {
         Self {
-            request,
             _src,
             requester,
             read,
@@ -57,15 +54,7 @@ impl Reading {
     }
 
     fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<ElderCmd> {
-        use BlobRead::*;
-        match read {
-            Get(address) => register.get(
-                &self.requester,
-                *address,
-                self.message_id,
-                self.request.clone(),
-            ),
-        }
+        register.read(self.requester.clone(), read, self.message_id)
     }
 
     fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<ElderCmd> {

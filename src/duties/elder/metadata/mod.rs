@@ -142,13 +142,12 @@ impl Metadata {
         );
         use NodeRequest::*;
         use Request::*;
-        match request.clone() {
+        match request {
             Node(Read(read)) => {
                 let reading = Reading::new(
                     read,
                     src,
                     requester,
-                    request,
                     message_id,
                     accumulated_signature,
                     self.public_key(),
@@ -160,7 +159,6 @@ impl Metadata {
                     write,
                     src,
                     requester,
-                    request,
                     message_id,
                     accumulated_signature,
                     self.public_key(),

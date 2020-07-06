@@ -25,7 +25,7 @@ use routing::{
     event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
     TransportEvent as ClientEvent,
 };
-use safe_nd::{NodeFullId, NodeRequest, PublicId, Read, Request, Write, XorName};
+use safe_nd::{NodeFullId, Request, XorName};
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeSet,

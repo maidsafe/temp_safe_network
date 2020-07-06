@@ -15,10 +15,11 @@ use crate::{
 use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use rand::SeedableRng;
-use routing::Node;
+use routing::Node as Routing;
 use safe_nd::{
-    BlobWrite, Error as NdError, IData, IDataAddress, MessageId, NodeFullId, NodePublicId,
-    NodeRequest, PublicId, PublicKey, Request, Response, Result as NdResult, Write, XorName,
+    BlobRead, BlobWrite, Error as NdError, IData, IDataAddress, MessageId, NodeFullId,
+    NodePublicId, NodeRequest, PublicId, PublicKey, Read, Request, Response, Result as NdResult,
+    Write, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -60,7 +61,7 @@ pub(super) struct BlobRegister {
     #[allow(unused)]
     full_adults: PickleDb,
     #[allow(unused)]
-    routing_node: Rc<RefCell<Node>>,
+    routing: Rc<RefCell<Routing>>,
 }
 
 impl BlobRegister {
@@ -68,7 +69,7 @@ impl BlobRegister {
         id: NodePublicId,
         config: &Config,
         init_mode: Init,
-        routing_node: Rc<RefCell<Node>>,
+        routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
@@ -83,16 +84,28 @@ impl BlobRegister {
             metadata,
             holders,
             full_adults,
-            routing_node,
+            routing,
         })
     }
 
-    pub(super) fn store(
+    pub(super) fn write(
+        &mut self,
+        requester: PublicId,
+        write: BlobWrite,
+        message_id: MessageId,
+    ) -> Option<ElderCmd> {
+        use BlobWrite::*;
+        match write {
+            New(data) => self.store(requester, data, message_id),
+            DeletePrivate(address) => self.delete(requester, address, message_id),
+        }
+    }
+
+    fn store(
         &mut self,
         requester: PublicId,
         data: IData,
         message_id: MessageId,
-        request: Request,
     ) -> Option<ElderCmd> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
@@ -157,6 +170,8 @@ impl BlobRegister {
         };
 
         info!("Storing {} copies of the data", target_holders.len());
+
+        let request = Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data))));
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
         wrap(MetadataCmd::SendToAdults {
             targets: target_holders,
@@ -169,12 +184,11 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn delete(
+    fn delete(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
-        request: Request,
     ) -> Option<ElderCmd> {
         let our_name = *self.id.name();
         let client_id = requester.clone();
@@ -201,6 +215,9 @@ impl BlobRegister {
                 return respond(Err(NdError::AccessDenied));
             }
         };
+        let request = Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::DeletePrivate(
+            address,
+        ))));
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
         wrap(MetadataCmd::SendToAdults {
             targets: metadata.holders,
@@ -259,12 +276,23 @@ impl BlobRegister {
         }
     }
 
-    pub(super) fn get(
+    pub(super) fn read(
+        &self,
+        requester: PublicId,
+        read: &BlobRead,
+        msg_id: MessageId,
+    ) -> Option<ElderCmd> {
+        use BlobRead::*;
+        match read {
+            Get(address) => self.get(&requester, *address, msg_id),
+        }
+    }
+
+    fn get(
         &self,
         requester: &PublicId,
         address: IDataAddress,
         message_id: MessageId,
-        request: Request,
     ) -> Option<ElderCmd> {
         let our_name = *self.id.name();
 
@@ -292,6 +320,8 @@ impl BlobRegister {
                 return respond(Err(NdError::AccessDenied));
             }
         };
+
+        let request = Request::Node(NodeRequest::Read(Read::Blob(BlobRead::Get(address))));
         let signature = self.sign_with_signature_share(&utils::serialise(&request));
         wrap(MetadataCmd::SendToAdults {
             targets: metadata.holders,
@@ -604,8 +634,8 @@ impl BlobRegister {
     // Returns `XorName`s of the target holders for an idata chunk.
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        let routing_node = self.routing_node.borrow_mut();
-        let mut closest_adults = routing_node
+        let routing = self.routing.borrow_mut();
+        let mut closest_adults = routing
             .our_adults_sorted_by_distance_to(&routing::XorName(target.0))
             .iter()
             .take(IMMUTABLE_DATA_ADULT_COPY_COUNT)
@@ -613,7 +643,7 @@ impl BlobRegister {
             .collect::<Vec<_>>();
 
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
-            let mut closest_elders = routing_node
+            let mut closest_elders = routing
                 .our_elders_sorted_by_distance_to(&routing::XorName(target.0))
                 .into_iter()
                 .take(IMMUTABLE_DATA_COPY_COUNT - closest_adults.len())
@@ -646,11 +676,11 @@ impl BlobRegister {
 
     fn sign_with_signature_share(&self, data: &[u8]) -> Option<(usize, SignatureShare)> {
         let signature = self
-            .routing_node
+            .routing
             .borrow()
             .secret_key_share()
             .map_or(None, |key| Some(key.sign(data)));
-        signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig))
+        signature.map(|sig| (self.routing.borrow().our_index().unwrap_or(0), sig))
     }
 }
 

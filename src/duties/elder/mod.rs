@@ -86,7 +86,7 @@ impl ElderDuties {
         let transfers = Transfers::new(id.clone(), replica_manager.clone());
 
         // DataPayment
-        let data_payment = DataPayment::new(id.clone(), replica_manager);
+        let data_payment = DataPayment::new(id.clone(), routing.clone(), replica_manager);
 
         Ok(Self {
             id,
@@ -207,8 +207,7 @@ impl ElderDuties {
         match request.clone() {
             //Client(client) => self.gateway... // Is handled by `fn receive_client_request(..)` above.
             Gateway(write @ GatewayRequest::Write { .. }) => {
-                self.data_payment
-                    .handle_write(src, client, write, msg_id, accumulated_signature)
+                self.data_payment.handle_write(src, client, write, msg_id) //, accumulated_signature)
             }
             // Gateway forwarding a client request to Section(R)
             Gateway(GatewayRequest::System(SystemOp::Transfers(request))) => {

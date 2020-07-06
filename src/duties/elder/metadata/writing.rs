@@ -12,13 +12,10 @@ use super::{
 };
 use crate::cmd::ElderCmd;
 use routing::SrcLocation;
-use safe_nd::{
-    AccountWrite, BlobWrite, MapWrite, MessageId, PublicId, Request, SequenceWrite, Write,
-};
+use safe_nd::{AccountWrite, BlobWrite, MapWrite, MessageId, PublicId, SequenceWrite, Write};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
-    request: Request,
     _src: SrcLocation,
     requester: PublicId,
     write: Write,
@@ -32,13 +29,11 @@ impl Writing {
         write: Write,
         _src: SrcLocation,
         requester: PublicId,
-        request: Request,
         message_id: MessageId,
         _accumulated_signature: Option<Signature>,
         _public_key: Option<PublicKey>,
     ) -> Self {
         Self {
-            request,
             _src,
             requester,
             write,
@@ -59,21 +54,7 @@ impl Writing {
     }
 
     fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<ElderCmd> {
-        use BlobWrite::*;
-        match write {
-            New(data) => register.store(
-                self.requester.clone(),
-                data,
-                self.message_id,
-                self.request.clone(),
-            ),
-            DeletePrivate(address) => register.delete(
-                self.requester.clone(),
-                address,
-                self.message_id,
-                self.request.clone(),
-            ),
-        }
+        register.write(self.requester.clone(), write, self.message_id)
     }
 
     fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<ElderCmd> {
