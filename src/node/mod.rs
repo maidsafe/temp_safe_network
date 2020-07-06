@@ -25,7 +25,7 @@ use routing::{
     event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
     TransportEvent as ClientEvent,
 };
-use safe_nd::{NodeFullId, NodeRequest, PublicId, Read, Request, Response, Write, XorName};
+use safe_nd::{NodeFullId, NodeRequest, PublicId, Read, Request, Write, XorName};
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeSet,
@@ -453,12 +453,9 @@ impl<R: CryptoRng + Rng> Node<R> {
                         }
                     }
                 }
-                Message::Response { response, .. } => match response {
-                    Response::Write(_) | Response::GetIData(_) => {
-                        self.process_locally(src, msg, None)
-                    }
-                    _ => unimplemented!("Should not receive: {:?}", response),
-                },
+                Message::Response { requester, .. } => {
+                    self.forward_to_section(requester.name(), msg.clone())
+                }
                 Message::Duplicate { .. } => self.accumulate_msg(src, msg),
                 Message::DuplicationComplete { .. } => self.process_locally(src, msg, None),
             },

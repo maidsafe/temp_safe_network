@@ -234,7 +234,7 @@ impl ElderDuties {
         src: SrcLocation,
         response: Response,
         requester: PublicId,
-        message_id: MessageId,
+        msg_id: MessageId,
         proof: Option<(Request, Signature)>,
     ) -> Option<ElderCmd> {
         use Response::*;
@@ -242,7 +242,7 @@ impl ElderDuties {
             "{}: Received ({:?} {:?}) from {}",
             self,
             response,
-            message_id,
+            msg_id,
             utils::get_source_name(src),
         );
         if let Some((request, signature)) = proof.as_ref() {
@@ -257,7 +257,16 @@ impl ElderDuties {
             match response {
                 Write(_) | GetIData(_) => self
                     .metadata
-                    .handle_response(src, response, requester, message_id, proof),
+                    .handle_response(src, response, requester, msg_id, proof),
+                GetBalance(_) | GetHistory(_) | GetReplicaKeys(_) => {
+                    Some(ElderCmd::Gateway(self.gateway.receive_node_response(
+                        utils::get_source_name(src),
+                        &requester,
+                        response,
+                        msg_id,
+                    )?))
+                }
+                // all other responses need to be handled as well...
                 _ => None,
             }
         } else {
