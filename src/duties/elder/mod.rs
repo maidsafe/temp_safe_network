@@ -24,7 +24,7 @@ use crate::{
     utils, Config, Result,
 };
 use bytes::Bytes;
-use log::{error, trace};
+use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, RoutingError, SrcLocation};
 use safe_nd::{
@@ -37,7 +37,7 @@ use std::{
     net::SocketAddr,
     rc::Rc,
 };
-use threshold_crypto::{PublicKey, Signature};
+use threshold_crypto::Signature;
 
 pub(crate) struct ElderDuties {
     id: NodePublicId,
@@ -142,8 +142,10 @@ impl ElderDuties {
 
     /// Name of the node
     /// Age of the node
-    pub fn member_left(&mut self, name: XorName, _age: u8) -> Option<Vec<ElderCmd>> {
-        self.metadata.trigger_chunk_duplication(XorName(name.0))
+    pub fn member_left(&mut self, _name: XorName, _age: u8) -> Option<Vec<ElderCmd>> {
+        None
+        // For now, we skip chunk duplication logic.
+        //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
 
     // Update our replica with the latest keys
@@ -236,7 +238,6 @@ impl ElderDuties {
         msg_id: MessageId,
         proof: Option<(Request, Signature)>,
     ) -> Option<ElderCmd> {
-        use Response::*;
         trace!(
             "{}: Received ({:?} {:?}) from {}",
             self,
@@ -244,48 +245,28 @@ impl ElderDuties {
             msg_id,
             utils::get_source_name(src),
         );
-        if let Some((request, signature)) = proof.as_ref() {
-            if !matches!(requester, PublicId::Node(_))
-                && self
-                    .validate_section_signature(&request, &signature)
-                    .is_none()
-            {
-                error!("Invalid section signature");
-                return None;
-            }
-            match response {
-                Write(_) | GetIData(_) => self
-                    .metadata
-                    .handle_response(src, response, requester, msg_id, proof),
-                GetBalance(_) | GetHistory(_) | GetReplicaKeys(_) => {
-                    Some(ElderCmd::Gateway(self.gateway.receive_node_response(
-                        utils::get_source_name(src),
-                        &requester,
-                        response,
-                        msg_id,
-                    )?))
-                }
-                // all other responses need to be handled as well...
-                _ => None,
-            }
-        } else {
-            error!("Missing section signature");
+        // For now, we skip data duplication logic.
+        if proof.is_some() {
             None
-        }
-    }
-
-    fn public_key(&self) -> Option<PublicKey> {
-        Some(self.routing.borrow().public_key_set().ok()?.public_key())
-    }
-
-    fn validate_section_signature(&self, request: &Request, signature: &Signature) -> Option<()> {
-        if self
-            .public_key()?
-            .verify(signature, &utils::serialise(request))
-        {
-            Some(())
+        // return match response {
+        //     Write(_) | GetIData(_) => self
+        //         .metadata
+        //         .handle_response(src, response, requester, msg_id, proof),
+        //     //
+        //     // ===== Invalid =====
+        //     //
+        //     ref _other => {
+        //         error!("{}: Is not expecting proof for {:?}.", self, response);
+        //         None
+        //     }
+        // };
         } else {
-            None
+            Some(ElderCmd::Gateway(self.gateway.receive_node_response(
+                utils::get_source_name(src),
+                &requester,
+                response,
+                msg_id,
+            )?))
         }
     }
 }
