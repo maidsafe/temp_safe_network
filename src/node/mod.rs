@@ -430,19 +430,10 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<NodeCmd> {
         match bincode::deserialize::<Message>(&message) {
             Ok(msg) => match &msg {
-                Message::Request {
-                    request, signature, ..
-                } => match request {
+                Message::Request { request, .. } => match request {
                     Request::Client(_) => unimplemented!("Should not receive: {:?}", request),
                     Request::Gateway(_) => self.accumulate_msg(src, msg),
-                    Request::Node(_) => {
-                        if let Some((_, signature)) = signature.clone() {
-                            self.process_locally(src, msg, Some(signature.0))
-                        } else {
-                            error!("Signature missing from duplication GET request");
-                            None
-                        }
-                    }
+                    Request::Node(_) => self.process_locally(src, msg, None), // NB: pass in the request signature to validate duplication requests
                 },
                 Message::Response { requester, .. } => {
                     self.forward_to_section(requester.name(), msg.clone())
