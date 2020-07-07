@@ -68,8 +68,6 @@ impl TransferActor {
                     Ok(transfer_response) => {
                         // If we're getting the payout for our own actor, update it here
                         if to == self.safe_key.public_key() {
-                            println!("actual transfer reponse::: {:?}", transfer_response);
-
                             // get full history from network and apply locally
                             self.get_history().await;
                         }
@@ -103,21 +101,20 @@ mod tests {
         let (safe_key, cm) = get_keys_and_connection_manager().await;
         let mut initial_actor =
             TransferActor::new_no_initial_balance(safe_key.clone(), cm.clone()).await?;
-        println!("actor");
 
         let _ = initial_actor
             .trigger_simulated_farming_payout(safe_key.public_key(), Money::from_str("100")?)
             .await?;
 
-        // 100 sent + initial 10 on creation from farming simulation
+        // 100 sent
         assert_eq!(
             initial_actor.get_local_balance().await,
-            Money::from_str("110")?
+            Money::from_str("100")?
         );
 
         assert_eq!(
             initial_actor.get_balance_from_network(None).await?,
-            Money::from_str("110")?
+            Money::from_str("100")?
         );
 
         Ok(())
