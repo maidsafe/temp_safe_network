@@ -16,6 +16,7 @@ use log::trace;
 use routing::{Node as Routing, SrcLocation};
 use safe_nd::{
     Error, GatewayRequest, MessageId, NodePublicId, NodeRequest, PublicId, Request, Response,
+    Result,
 };
 use std::{
     cell::RefCell,
@@ -51,6 +52,12 @@ impl DataPayment {
         }
     }
 
+    fn section_account_id(&self) -> Result<safe_nd::PublicKey> {
+        Ok(safe_nd::PublicKey::Bls(
+            self.replica.borrow().replicas_pk_set()?.public_key(),
+        ))
+    }
+
     pub fn handle_write(
         &mut self,
         src: SrcLocation,
@@ -76,13 +83,17 @@ impl DataPayment {
                 // before executing the debit.
                 // (We could also add a method that executes both
                 // debit + credit atomically, but this is much simpler).
-                if self
-                    .replica
-                    .borrow()
-                    .balance(&debit_agreement.from())
-                    .is_none()
-                {
-                    return self.error_response(Error::NoSuchRecipient, requester, message_id);
+                match self.section_account_id() {
+                    Ok(section) => {
+                        if debit_agreement.to() != section {
+                            return self.error_response(
+                                Error::NoSuchRecipient,
+                                requester,
+                                message_id,
+                            );
+                        }
+                    }
+                    _ => return self.error_response(Error::NoSuchRecipient, requester, message_id),
                 }
                 if let Err(err) = self.replica.borrow_mut().register(&debit_agreement) {
                     return self.error_response(err, requester, message_id);
