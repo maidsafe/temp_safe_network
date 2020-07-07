@@ -2057,7 +2057,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=separate_read_write#f27d986f63a5cd68439c5c39bd41e11e71d355c2"
+source = "git+https://github.com/oetyng/safe-nd.git?branch=separate_read_write#dbf504b7b3fc1944a053d8355ff6beaa73909d12"
 dependencies = [
  "bincode",
  "crdts",

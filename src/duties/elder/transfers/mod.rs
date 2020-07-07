@@ -241,7 +241,7 @@ impl Transfers {
     /// The only step that is triggered by a Replica.
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
-    /// the source, the transfer is propagated to the destionation.
+    /// the source, the transfer is propagated to the destination.
     pub(crate) fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,

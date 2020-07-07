@@ -79,7 +79,7 @@ impl DataPayment {
                 if self
                     .replica
                     .borrow()
-                    .balance(&debit_agreement.to())
+                    .balance(&debit_agreement.from())
                     .is_none()
                 {
                     return self.error_response(Error::NoSuchRecipient, requester, message_id);
