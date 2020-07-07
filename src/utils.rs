@@ -77,12 +77,25 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
 }
 
 /// Returns the requester's address.  An App's address is the name of its owner.
+#[allow(unused)]
 pub(crate) fn requester_address(msg: &Message) -> XorName {
     match msg {
         Message::Request { ref requester, .. } | Message::Response { ref requester, .. } => {
             *requester.name()
         }
         Message::Duplicate { .. } | Message::DuplicationComplete { .. } => XorName::default(),
+    }
+}
+
+/// Returns the dst address.
+pub(crate) fn dst_address(msg: &Message) -> Option<XorName> {
+    match msg {
+        Message::Request { ref request, .. } => match request.dst_address() {
+            Some(address) => Some(*address),
+            None => None,
+        },
+        Message::Response { ref requester, .. } => Some(*requester.name()),
+        Message::Duplicate { .. } | Message::DuplicationComplete { .. } => Some(XorName::default()),
     }
 }
 

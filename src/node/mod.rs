@@ -558,10 +558,13 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn handle_transfer_cmd(&mut self, cmd: TransferCmd) -> Option<NodeCmd> {
         use TransferCmd::*;
         match cmd {
-            SendToSection(msg) => {
-                let dst = utils::requester_address(&msg);
-                self.send_to_section(&dst, msg)
-            }
+            SendToSection(msg) => match utils::dst_address(&msg) {
+                Some(dst) => self.send_to_section(&dst, msg),
+                None => {
+                    error!("Unable to send to section: {:?}", msg);
+                    None // consider actually crashing here, this is not an acceptable error
+                }
+            },
             RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
         }
     }
@@ -569,10 +572,13 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn handle_payment_cmd(&mut self, cmd: PaymentCmd) -> Option<NodeCmd> {
         use PaymentCmd::*;
         match cmd {
-            SendToSection(msg) => {
-                let dst = utils::requester_address(&msg);
-                self.send_to_section(&dst, msg)
-            }
+            SendToSection(msg) => match utils::dst_address(&msg) {
+                Some(dst) => self.send_to_section(&dst, msg),
+                None => {
+                    error!("Unable to send to section: {:?}", msg);
+                    None // consider actually crashing here, this is not an acceptable error
+                }
+            },
             RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
         }
     }
@@ -624,11 +630,11 @@ impl<R: CryptoRng + Rng> Node<R> {
             )
             .map_or_else(
                 |err| {
-                    error!("Unable to respond to our data handlers: {:?}", err);
+                    error!("Unable to send to section: {:?}", err);
                     None
                 },
                 |()| {
-                    info!("Responded to our data handlers with: {:?}", msg);
+                    info!("Sent to section with: {:?}", msg);
                     None
                 },
             )
