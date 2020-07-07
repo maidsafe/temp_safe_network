@@ -9,7 +9,6 @@ use crate::errors::CoreError;
 
 use log::{debug, info, trace};
 
-
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {
     /// Get the account balance without querying the network

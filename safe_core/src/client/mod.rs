@@ -267,10 +267,8 @@ pub trait Client: Clone + Send + Sync {
         let transfer_result = actor.send_money(to, amount).await?;
 
         match transfer_result {
-            Response::TransferRegistration(result) => match result {
-                Ok(transfer) => Ok(transfer),
-                Err(error) => Err(CoreError::from(error)),
-            },
+            Response::TransferRegistration(Ok(transfer)) => Ok(transfer),
+            Response::TransferRegistration(Err(error)) => Err(CoreError::from(error)),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -297,12 +295,8 @@ pub trait Client: Clone + Send + Sync {
         let transfer_result = actor.send_money(to, amount).await?;
 
         match transfer_result {
-            // Ok(res) => match res {
-            Response::TransferRegistration(result) => match result {
-                Ok(transfer) => Ok(transfer),
-                Err(error) => Err(CoreError::from(error)),
-                // Err(error) => Err(CoreError::from(error)),
-            },
+            Response::TransferRegistration(Ok(transfer)) => Ok(transfer),
+            Response::TransferRegistration(Err(error)) => Err(CoreError::from(error)),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -331,10 +325,8 @@ pub trait Client: Clone + Send + Sync {
         let transfer_result = actor.send_money(new_balance_owner, amount).await?;
 
         match transfer_result {
-            Response::TransferRegistration(result) => match result {
-                Ok(transfer) => Ok(transfer),
-                Err(error) => Err(CoreError::from(error)),
-            },
+            Response::TransferRegistration(Ok(transfer)) => Ok(transfer),
+            Response::TransferRegistration(Err(error)) => Err(CoreError::from(error)),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
