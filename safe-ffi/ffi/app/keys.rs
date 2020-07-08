@@ -75,7 +75,6 @@ pub unsafe extern "C" fn keys_create(
 
 #[no_mangle]
 pub unsafe extern "C" fn keys_create_preload_test_coins(
-    app: *mut Safe,
     preload: *const c_char,
     user_data: *mut c_void,
     o_cb: extern "C" fn(
@@ -88,8 +87,9 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let preload_option = String::clone_from_repr_c(preload)?;
+        let mut app = Safe::default();
         let (xorurl, keypair) =
-            async_std::task::block_on((*app).keys_create_preload_test_coins(&preload_option))?;
+            async_std::task::block_on(app.keys_create_preload_test_coins(&preload_option))?;
         let xorurl_c_str = CString::new(xorurl)?;
         o_cb(
             user_data.0,
