@@ -132,6 +132,11 @@ impl ConnectionGroup {
         }
     }
 
+
+    pub async fn send_cmd(&mut self, msg_id: MessageId, msg: &Message) -> Result<(), CoreError> {
+            self.inner.lock().await.send_cmd(msg_id, msg).await
+    }
+
     /// Send transfer validation, which requires all responses to be handled for signature reconstruction.
     pub async fn send_for_validation(
         &mut self,
@@ -415,6 +420,25 @@ impl Connected {
         Ok(response_future)
     }
 
+    async fn send_cmd(
+        &mut self,
+        quic_p2p: &mut QuicP2p,
+        msg_id: MessageId,
+        msg: &Message,
+    ) -> Result<(), CoreError> {
+        trace!("Sending cmd message {:?}", msg_id);
+
+        let bytes = Bytes::from(unwrap!(serialize(msg)));
+        {
+            for peer in self.elders.values().map(Elder::peer) {
+                let token = rand::random();
+                quic_p2p.send(peer, bytes.clone(), token);
+            }
+        }
+
+        Ok(())
+    }
+
     async fn send_for_validation(
         &mut self,
         quic_p2p: &mut QuicP2p,
@@ -560,6 +584,20 @@ impl State {
         }
     }
 
+    async fn send_cmd(
+        &mut self,
+        quic_p2p: &mut QuicP2p,
+        msg_id: MessageId,
+        msg: &Message,
+    ) -> Result<(), CoreError> {
+        match self {
+            State::Connected(state) => state.send_cmd(quic_p2p, msg_id, msg).await,
+            // This message is not expected for the rest of states
+            _state => Err(CoreError::OperationForbidden),
+        }
+    }
+
+
     async fn send_for_validation(
         &mut self,
         quic_p2p: &mut QuicP2p,
@@ -635,6 +673,15 @@ impl Inner {
         msg: &Message,
     ) -> Result<channel::mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
         self.state.send(&mut self.quic_p2p, msg_id, msg).await
+    }
+
+
+    async fn send_cmd(
+        &mut self,
+        msg_id: MessageId,
+        msg: &Message,
+    ) -> Result<(), CoreError> {
+        self.state.send_cmd(&mut self.quic_p2p, msg_id, msg).await
     }
 
     async fn send_for_validation(

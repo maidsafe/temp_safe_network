@@ -26,7 +26,7 @@ impl TransferActor {
         &mut self,
         _to: PublicKey,
         _amount: Money,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         Err(CoreError::from(
             "Simulated payouts not available without 'simulated-payouts' feature flag",
         ))
@@ -38,7 +38,7 @@ impl TransferActor {
         &mut self,
         to: PublicKey,
         amount: Money,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         info!("Triggering a test farming payout to: {:?}", &to);
         let mut cm = self.connection_manager();
         let safe_key = self.safe_key.clone();
@@ -60,26 +60,15 @@ impl TransferActor {
         let pub_id = safe_key.public_id();
 
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
-        let res = cm.send(&pub_id, &message).await?;
+        let _ = cm.send_cmd(&pub_id, &message).await?;
 
-        match res.clone() {
-            Response::TransferRegistration(result) => {
-                match result {
-                    Ok(transfer_response) => {
-                        // If we're getting the payout for our own actor, update it here
-                        if to == self.safe_key.public_key() {
-                            // get full history from network and apply locally
-                            self.get_history().await;
-                        }
-                        Ok(res)
-                    }
-                    Err(error) => Err(CoreError::from(error)),
-                }
-            }
-            _ => Err(CoreError::from(
-                "Unexpected Reponse received to 'send money' request in ClientTransferActor",
-            )),
+        // If we're getting the payout for our own actor, update it here
+        if to == self.safe_key.public_key() {
+            // get full history from network and apply locally
+            self.get_history().await;
         }
+        Ok(())
+       
     }
 }
 

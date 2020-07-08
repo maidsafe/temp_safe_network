@@ -107,12 +107,7 @@ impl CoreClient {
             TransferActor::new(balance_client_id.clone(), connection_manager.clone()).await?;
         let transfer_actor = Some(the_actor.clone());
 
-        let response = the_actor.new_account(new_login_packet).await?;
-
-        match response {
-            Response::Write(res) => res?,
-            _ => return Err(CoreError::from("Unexpected response")),
-        };
+        let _ = the_actor.new_account(new_login_packet).await?;
 
         connection_manager.disconnect(&balance_pub_id).await?;
 

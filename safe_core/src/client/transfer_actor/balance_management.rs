@@ -2,7 +2,7 @@ use safe_nd::{
     DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, Response,
     SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
-use safe_transfers::ActorEvent;
+use safe_transfers::{ActorEvent,TransferInitiated};
 
 use crate::client::{Client, TransferActor};
 use crate::errors::CoreError;
@@ -85,7 +85,7 @@ impl TransferActor {
         &mut self,
         to: PublicKey,
         amount: Money,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         info!("Sending money");
         let mut cm = self.connection_manager();
 
@@ -95,33 +95,25 @@ impl TransferActor {
         // first make sure our balance  history is up to date
         self.get_history().await?;
 
-        debug!(
+        // let mut actor = self.transfer_actor.lock().await;
+
+        println!(
             "Debits form our actor at send: {:?}",
             self.transfer_actor.lock().await.debits_since(0)
         );
 
-        let signed_transfer = self
-            .transfer_actor
-            .lock()
-            .await
-            .transfer(amount, to)?
-            .signed_transfer;
+        let signed_transfer = self.transfer_actor.lock().await.transfer(amount, to)?.signed_transfer;
 
-        debug!(
+        println!(
             "Signed transfer for send money: {:?}",
             signed_transfer.transfer
         );
-        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer { signed_transfer });
+        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer { signed_transfer: signed_transfer.clone() });
 
         let (message, _message_id) =
             TransferActor::create_network_message(safe_key.clone(), request)?;
 
-        // TODO: make it clearer
-        // #[cfg(feature = "mock-network")]
-        // {
-        //     // no waiting on validation needed for mock
-        //     return cm.send(&safe_key.public_id(), &message).await;
-        // }
+            self.transfer_actor.lock().await.apply(ActorEvent::TransferInitiated(TransferInitiated {signed_transfer}));
 
         let debit_proof: DebitAgreementProof = self
             .await_validation(
@@ -145,28 +137,18 @@ impl TransferActor {
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",
             debit_proof
         );
-        let response = cm.send(&safe_key.public_id(), &message).await?;
 
-        // self.register_transfer_locally_on_ok(response, debit_proof).await
-        match response.clone() {
-            Response::TransferRegistration(result) => {
-                match result {
-                    Ok(_transfer_response) => {
-                        let mut actor = self.transfer_actor.lock().await;
-                        // First register with local actor, then reply.
-                        let register_event = actor.register(debit_proof)?;
+        let _ = cm.send_cmd(&safe_key.public_id(), &message).await?;
 
-                        actor.apply(ActorEvent::TransferRegistrationSent(register_event.clone()));
+        
+        let mut actor = self.transfer_actor.lock().await;
+        // First register with local actor, then reply.
+        let register_event = actor.register(debit_proof)?;
 
-                        Ok(response)
-                    }
-                    Err(error) => Err(CoreError::from(error)),
-                }
-            }
-            _ => Err(CoreError::from(
-                "Unexpected Reponse received to 'send money' request in ClientTransferActor",
-            )),
-        }
+        actor.apply(ActorEvent::TransferRegistrationSent(register_event.clone()));
+
+        Ok(())
+
     }
 }
 
@@ -217,6 +199,7 @@ mod tests {
 
         let mut initial_actor = TransferActor::new(safe_key.clone(), cm.clone()).await?;
 
+        println!("starting.....");
         let _ = initial_actor
             .send_money(safe_key2.public_key(), Money::from_str("1")?)
             .await?;
@@ -231,6 +214,9 @@ mod tests {
             initial_actor.get_balance_from_network(None).await?,
             Money::from_str("9")?
         );
+
+
+        println!("FIRST DONE!!!!!!!!!!!!!!");
 
         let _ = initial_actor
             .send_money(safe_key2.public_key(), Money::from_str("2")?)

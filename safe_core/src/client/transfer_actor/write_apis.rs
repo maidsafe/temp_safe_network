@@ -13,7 +13,7 @@ use log::info;
 /// Handle Write API requests for a given TransferActor.
 impl TransferActor {
     /// Delete mutable data user permission
-    pub async fn delete_blob(&mut self, address: IDataAddress) -> Result<Response, CoreError> {
+    pub async fn delete_blob(&mut self, address: IDataAddress) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -26,14 +26,14 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_blob_write(BlobWrite::DeletePrivate(address), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
     /// Delete sequence
-    pub async fn delete_sequence(&mut self, address: SDataAddress) -> Result<Response, CoreError> {
+    pub async fn delete_sequence(&mut self, address: SDataAddress) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -46,14 +46,14 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::Delete(address), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
     /// Delete sequence
-    pub async fn delete_map(&mut self, address: MDataAddress) -> Result<Response, CoreError> {
+    pub async fn delete_map(&mut self, address: MDataAddress) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -66,9 +66,9 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_map_write(MapWrite::Delete(address), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -78,7 +78,7 @@ impl TransferActor {
         address: MDataAddress,
         user: PublicKey,
         version: u64,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -101,9 +101,9 @@ impl TransferActor {
 
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
 
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -114,7 +114,7 @@ impl TransferActor {
         user: PublicKey,
         permissions: MDataPermissionSet,
         version: u64,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -139,9 +139,9 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
 
         // TODO what will be the correct reponse here?... We have it validated, so registered?
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -150,7 +150,7 @@ impl TransferActor {
         &mut self,
         address: MDataAddress,
         changes: MDataEntryActions,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -165,9 +165,9 @@ impl TransferActor {
         let req = wrap_map_write(MapWrite::Edit { address, changes }, payment_proof.clone());
 
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -175,7 +175,7 @@ impl TransferActor {
     pub async fn set_sequence_owner(
         &mut self,
         op: SDataWriteOp<SDataOwner>,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -188,9 +188,9 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::SetOwner(op), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -199,7 +199,7 @@ impl TransferActor {
     pub async fn edit_sequence_private_perms(
         &mut self,
         op: SDataWriteOp<SDataPrivPermissions>,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -212,9 +212,9 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::SetPrivPermissions(op), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -223,7 +223,7 @@ impl TransferActor {
     pub async fn edit_sequence_public_perms(
         &mut self,
         op: SDataWriteOp<SDataPubPermissions>,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -236,9 +236,9 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::SetPubPermissions(op), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
@@ -247,7 +247,7 @@ impl TransferActor {
     pub async fn append_to_sequence(
         &mut self,
         op: SDataWriteOp<Vec<u8>>,
-    ) -> Result<Response, CoreError> {
+    ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -260,15 +260,15 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::Edit(op), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
     /// Store a new public sequenced data object
     /// Wraps requests for payment validation and mutation
-    pub async fn new_sequence(&mut self, data: SData) -> Result<Response, CoreError> {
+    pub async fn new_sequence(&mut self, data: SData) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -281,15 +281,15 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_seq_write(SequenceWrite::New(data), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
     /// Store a new public mutable data object
     /// Wraps requests for payment validation and mutation
-    pub async fn new_map(&mut self, data: MData) -> Result<Response, CoreError> {
+    pub async fn new_map(&mut self, data: MData) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -302,15 +302,15 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_map_write(MapWrite::New(data), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
-        println!("STORE MD COME IN..... response: {:?}", response);
-        self.apply_success_write_locally(response, payment_proof)
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
+
+        self.apply_write_locally(payment_proof)
             .await
     }
 
     /// Store a new immutabledata object
     /// Wraps requests for payment validation and mutation
-    pub async fn new_blob(&mut self, data: IData) -> Result<Response, CoreError> {
+    pub async fn new_blob(&mut self, data: IData) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -323,15 +323,15 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_blob_write(BlobWrite::New(data), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
     /// Store a new login packet
     /// Wraps requests for payment validation and mutation
-    pub async fn new_account(&mut self, account: Account) -> Result<Response, CoreError> {
+    pub async fn new_account(&mut self, account: Account) -> Result<(), CoreError> {
         info!("Store login packet");
         let mut cm = self.connection_manager();
 
@@ -345,33 +345,26 @@ impl TransferActor {
         //---------------------------------
         let req = wrap_account_write(AccountWrite::New(account), payment_proof.clone());
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
-        let response = cm.send(&self.safe_key.public_id(), &message).await?;
+        let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_success_write_locally(response, payment_proof)
+        self.apply_write_locally(payment_proof)
             .await
     }
 
-    async fn apply_success_write_locally(
-        &mut self,
-        response: Response,
+    async fn apply_write_locally(&mut self,
         debit_proof: DebitAgreementProof,
-    ) -> Result<Response, CoreError> {
-        match response.clone() {
-            Response::Write(result) => {
+    ) -> Result<(), CoreError> {
+
                 let mut actor = self.transfer_actor.lock().await;
                 // First register with local actor, then reply.
                 let register_event = actor.register(debit_proof.clone())?;
 
                 actor.apply(ActorEvent::TransferRegistrationSent(register_event));
 
-                Ok(response)
-            }
-            _ => Err(CoreError::from(format!(
-                "Unexpected response received for write request: {:?}",
-                response
-            ))),
+                Ok(())
+          
         }
-    }
+    
 }
 
 // TODO: Do we need "new" to actually instantiate with a transfer?...

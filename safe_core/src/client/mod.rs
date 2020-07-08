@@ -243,9 +243,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.new_map(MData::Unseq(data)).await?;
+        actor.new_map(MData::Unseq(data)).await
 
-        check_mutation_response(res)
     }
 
     /// Transfer coin balance
@@ -254,7 +253,7 @@ pub trait Client: Clone + Send + Sync {
         // client_id: Option<&ClientFullId>,
         to: PublicKey,
         amount: Money,
-    ) -> Result<TransferRegistered, CoreError>
+    ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -264,13 +263,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let transfer_result = actor.send_money(to, amount).await?;
-
-        match transfer_result {
-            Response::TransferRegistration(Ok(transfer)) => Ok(transfer),
-            Response::TransferRegistration(Err(error)) => Err(CoreError::from(error)),
-            _ => Err(CoreError::ReceivedUnexpectedEvent),
-        }
+        actor.send_money(to, amount).await
     }
 
     /// Transfer coin balance
@@ -279,7 +272,7 @@ pub trait Client: Clone + Send + Sync {
         _from: Option<PublicKey>,
         to: PublicKey,
         amount: Money,
-    ) -> Result<TransferRegistered, CoreError>
+    ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -292,13 +285,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let transfer_result = actor.send_money(to, amount).await?;
-
-        match transfer_result {
-            Response::TransferRegistration(Ok(transfer)) => Ok(transfer),
-            Response::TransferRegistration(Err(error)) => Err(CoreError::from(error)),
-            _ => Err(CoreError::ReceivedUnexpectedEvent),
-        }
+        actor.send_money(to, amount).await
     }
 
     // TODO: is this API needed at all? Why not just transfer?
@@ -308,7 +295,7 @@ pub trait Client: Clone + Send + Sync {
         _client_id: Option<&ClientFullId>,
         new_balance_owner: PublicKey,
         amount: Money,
-    ) -> Result<TransferRegistered, CoreError>
+    ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -322,13 +309,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let transfer_result = actor.send_money(new_balance_owner, amount).await?;
+        actor.send_money(new_balance_owner, amount).await
 
-        match transfer_result {
-            Response::TransferRegistration(Ok(transfer)) => Ok(transfer),
-            Response::TransferRegistration(Err(error)) => Err(CoreError::from(error)),
-            _ => Err(CoreError::ReceivedUnexpectedEvent),
-        }
     }
 
     /// Get the current coin balance via TransferActor for this client.
@@ -376,9 +358,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.new_blob(idata).await?;
+        actor.new_blob(idata).await
 
-        check_mutation_response(res)
     }
 
     /// Get immutable data from the network. If the data exists locally in the cache then it will be
@@ -443,9 +424,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.delete_blob(IDataAddress::Unpub(name)).await?;
+        actor.delete_blob(IDataAddress::Unpub(name)).await
 
-        check_mutation_response(res)
     }
 
     /// Put sequenced mutable data to the network
@@ -460,9 +440,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.new_map(MData::Seq(data)).await?;
+        actor.new_map(MData::Seq(data)).await
 
-        check_mutation_response(res)
     }
 
     /// Fetch unpublished mutable data from the network
@@ -590,9 +569,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.edit_map_entries(address, mdata_actions).await?;
+        actor.edit_map_entries(address, mdata_actions).await
 
-        check_mutation_response(res)
     }
 
     /// Mutates unsequenced `MutableData` entries in bulk
@@ -616,9 +594,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.edit_map_entries(address, mdata_actions).await?;
+        actor.edit_map_entries(address, mdata_actions).await
 
-        check_mutation_response(res)
     }
 
     /// Get a shell (bare bones) version of `MutableData` from the network.
@@ -856,9 +833,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.new_sequence(data.clone()).await?;
-
-        check_mutation_response(res)?;
+        actor.new_sequence(data.clone()).await?;
 
         // Store in local Sequence CRDT replica
         let _ = self
@@ -891,9 +866,7 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.new_sequence(data.clone()).await?;
-
-        check_mutation_response(res)?;
+        actor.new_sequence(data.clone()).await?;
 
         // Store in local Sequence CRDT replica
         let _ = self
@@ -1005,9 +978,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.append_to_sequence(op).await?;
+        actor.append_to_sequence(op).await
 
-        check_mutation_response(res)
     }
 
     /// Get the set of Permissions of a Public Sequence.
@@ -1105,9 +1077,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.edit_sequence_public_perms(op).await?;
+        actor.edit_sequence_public_perms(op).await
 
-        check_mutation_response(res)
     }
 
     /// Set permissions to Private Sequence Data
@@ -1147,9 +1118,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.edit_sequence_private_perms(op).await?;
+        actor.edit_sequence_private_perms(op).await
 
-        check_mutation_response(res)
     }
 
     /// Get the owner of a Sequence.
@@ -1201,9 +1171,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.set_sequence_owner(op).await?;
+        actor.set_sequence_owner(op).await
 
-        check_mutation_response(res)
     }
 
     /// Delete Private Sequence Data from the Network
@@ -1220,9 +1189,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.delete_sequence(address).await?;
+        actor.delete_sequence(address).await
 
-        check_mutation_response(res)
     }
 
     // ========== END of Sequence Data functions =========
@@ -1261,11 +1229,10 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor
+        actor
             .set_map_user_perms(address, user, permissions, version)
-            .await?;
+            .await
 
-        check_mutation_response(res)
     }
 
     /// Updates or inserts a permissions set for a user
@@ -1285,9 +1252,8 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.delete_map_user_perms(address, user, version).await?;
+        actor.delete_map_user_perms(address, user, version).await
 
-        check_mutation_response(res)
     }
 
     /// Sends an ownership transfer request.
@@ -1362,21 +1328,10 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let transfer_result = actor
+        actor
             .trigger_simulated_farming_payout(self.public_key().await, amount)
-            .await;
+            .await
 
-        match transfer_result {
-            Ok(res) => match res {
-                Response::TransferRegistration(result) => match result {
-                    Ok(_) => Ok(()),
-                    Err(error) => Err(CoreError::from(error)),
-                },
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            },
-
-            Err(error) => Err(error),
-        }
     }
 }
 
@@ -1425,11 +1380,6 @@ pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<
     let response = actor
         .trigger_simulated_farming_payout(public_key, amount)
         .await?;
-
-    let _result = match response {
-        Response::TransferRegistration(res) => res.map(|_| Ok(()))?,
-        _ => Err(CoreError::from("Unexpected response")),
-    };
 
     cm.disconnect(&full_id.public_id()).await?;
 
@@ -1505,9 +1455,7 @@ pub trait AuthActions: Client + Clone + 'static {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        let res = actor.delete_map(address).await?;
-
-        check_mutation_response(res)
+        actor.delete_map(address).await
     }
 }
 
@@ -1914,13 +1862,10 @@ mod tests {
             .test_simulate_farming_payout_client(unwrap!(Money::from_str("50.0")))
             .await
             .unwrap();
-        let res = client
+        let _ = client
             .transfer_money(wallet_a_addr, unwrap!(Money::from_str("10")))
             .await;
-        match res {
-            Ok(transfer) => assert_eq!(transfer.amount(), unwrap!(Money::from_str("10"))),
-            res => panic!("Unexpected error: {:?}", res),
-        }
+
         let res = client.get_balance(None).await;
         let expected_amt = unwrap!(Money::from_str("40"));
         match res {
@@ -1954,15 +1899,13 @@ mod tests {
             unwrap!(Money::from_str("499.999999999"))
         ); // 500 - 1nano for encrypted-account-data
 
-        // Lets create our other account here....
 
-        // TODO: Setup actualy keys-only clients
-        let transfer = client
+        let _ = client
             .create_balance(None, bls_pk, unwrap!(Money::from_str("100.0")))
             .await
             .unwrap();
-        assert_eq!(transfer.amount(), unwrap!(Money::from_str("100")));
-        assert_eq!(
+
+            assert_eq!(
             client.get_balance(None).await.unwrap(),
             unwrap!(Money::from_str("399.999999999"))
         );
@@ -1971,12 +1914,11 @@ mod tests {
             unwrap!(Money::from_str("109.999999999"))
         );
 
-        let transfer = client2
+        let _ = client2
             .transfer_money(wallet1, unwrap!(Money::from_str("5.0")))
             .await
             .unwrap();
 
-        assert_eq!(transfer.amount(), unwrap!(Money::from_str("5.0")));
         let balance = client2.get_balance(None).await.unwrap();
         assert_eq!(balance, unwrap!(Money::from_str("104.999999999")));
         let balance = client.get_balance(None).await.unwrap();

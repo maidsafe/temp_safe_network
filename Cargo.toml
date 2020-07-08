@@ -14,7 +14,7 @@ members = ["safe_app", "safe_authenticator", "safe_authenticator_ffi", "safe_cor
 safe-nd = { git = "https://github.com/oetyng/safe-nd.git", branch = "separate_read_write" }
 # safe-nd = { git ="https://github.com/maidsafe/safe-nd", branch="at2", features=["simulated-payouts"] }
 # safe-nd = { git ="https://github.com/yoga07/safe-nd", branch="at2", features=["simulated-payouts"] }
-# safe-transfers = { path = "../safe-transfers"}
-safe-transfers = { git = "https://github.com/oetyng/safe-transfers.git", branch = "separate_read_write" }
+safe-transfers = { path = "../safe-transfers"}
+# safe-transfers = { git = "https://github.com/oetyng/safe-transfers.git", branch = "separate_read_write" }
 self_encryption = {git="https://github.com/maidsafe/self-encryption"}
 quic-p2p = {git="https://github.com/maidsafe/quic-p2p"}

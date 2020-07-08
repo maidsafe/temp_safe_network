@@ -17,11 +17,6 @@ use log::{info, trace};
 use std::sync::Arc;
 use threshold_crypto::{PublicKeySet, SecretKey};
 
-// #[cfg(feature = "simulated-payouts")]
-// #[cfg(feature = "simulated-payouts")]
-// #[cfg(feature = "simulated-payouts")]
-
-// pub mod write_apis;
 
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {

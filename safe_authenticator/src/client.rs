@@ -233,10 +233,6 @@ impl AuthClient {
         let client_full_id = create_client_id(&acc_locator.0);
         let client_pk = *client_full_id.public_id().public_key();
 
-        println!(
-            "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ actual owner pk: {:?}",
-            client_pk
-        );
         let client_full_id = SafeKey::client(client_full_id);
 
         let user_cred = UserCred::new(password, pin);
