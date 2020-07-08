@@ -17,6 +17,9 @@ package-version-artifacts-for-deploy:
 	mkdir -p deploy/prod
 	mkdir -p deploy/dev
 	./resources/package-deploy-artifacts.sh "safe-authd" "${SAFE_AUTHD_VERSION}"
+	./resources/package-deploy-artifacts.sh "safe-authd" "latest"
 	./resources/package-deploy-artifacts.sh "safe-cli" "${SAFE_CLI_VERSION}"
+	./resources/package-deploy-artifacts.sh "safe-cli" "latest"
 	./resources/package-deploy-artifacts.sh "safe-ffi" "${SAFE_FFI_VERSION}"
+	./resources/package-deploy-artifacts.sh "safe-ffi" "latest"
 	find deploy -name "safe-ffi-*.tar.gz" -exec rm '{}' \;
