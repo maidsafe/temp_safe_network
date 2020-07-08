@@ -22,12 +22,51 @@ pub mod wallet;
 pub mod xorurl;
 
 use super::common::{errors::Result, helpers::from_c_str_to_str_option};
+use ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::Safe;
+use safe_api::{
+    fetch::{XorUrlBase, XorUrlEncoder as NativeXorUrlEncoder},
+    parse_coins_amount, xorname_from_pk, BlsKeyPair as NativeBlsKeyPair, KeyPair as NativeKeyPair,
+};
+use safe_core::test_create_balance;
+use safe_nd::ClientFullId;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
 };
+
+#[no_mangle]
+pub unsafe extern "C" fn allocate_test_coins(
+    preload: *const c_char,
+    user_data: *mut c_void,
+    o_cb: extern "C" fn(
+        user_data: *mut c_void,
+        result: *const FfiResult,
+        xorurl: *const c_char,
+        safe_key: *const BlsKeyPair,
+    ),
+) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<()> {
+        let user_data = OpaqueCtx(user_data);
+        let preload = String::clone_from_repr_c(preload)?;
+        let amount = parse_coins_amount(&preload)?;
+        let keypair = NativeKeyPair::random();
+        let (pk, sk) = keypair.to_hex_key_pair()?;
+        let key_pair = Some(NativeBlsKeyPair { pk, sk });
+        let xorname = xorname_from_pk(keypair.pk);
+        async_std::task::block_on(test_create_balance(&ClientFullId::from(keypair.sk), amount))?;
+        let xorurl = NativeXorUrlEncoder::encode_safekey(xorname, XorUrlBase::Base32z)?;
+        let xorurl_c_str = CString::new(xorurl)?;
+        o_cb(
+            user_data.0,
+            FFI_RESULT_OK,
+            xorurl_c_str.as_ptr(),
+            &bls_key_pair_into_repr_c(&key_pair.as_ref().unwrap())?,
+        );
+        Ok(())
+    })
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn auth_app(

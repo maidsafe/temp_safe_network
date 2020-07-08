@@ -10,7 +10,7 @@
 use bincode::Error as SerialisationError;
 use ffi_utils::{ErrorCode, StringError};
 use safe_api::Error as NativeError;
-use safe_core::ipc::IpcError;
+use safe_core::{ipc::IpcError, CoreError};
 use std::{ffi::NulError, fmt};
 
 mod codes {
@@ -99,6 +99,12 @@ impl From<IpcError> for Error {
             IpcError::Unexpected(reason) => Self(NativeError::Unexpected(reason)),
             _ => Self(NativeError::Unexpected(format!("{:?}", err))),
         }
+    }
+}
+
+impl From<CoreError> for Error {
+    fn from(err: CoreError) -> Self {
+        Self(NativeError::Unexpected(format!("{:?}", err)))
     }
 }
 

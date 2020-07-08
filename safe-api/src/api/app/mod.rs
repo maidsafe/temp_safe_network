@@ -40,6 +40,7 @@ pub mod nrs_map;
 pub mod wallet;
 pub mod xorurl;
 pub use consts::DEFAULT_XORURL_BASE;
+pub use helpers::{parse_coins_amount, xorname_from_pk, KeyPair};
 pub use keys::BlsKeyPair;
 pub use nrs::ProcessedEntries;
 pub use safe_nd::{XorName, XOR_NAME_LEN};

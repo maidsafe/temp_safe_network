@@ -3247,8 +3247,8 @@ dependencies = [
  "relative-path",
  "safe-nd",
  "safe_app",
- "safe_authenticator",
- "safe_core",
+ "safe_authenticator 0.17.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe_core 0.42.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "threshold_crypto",
@@ -3357,8 +3357,9 @@ dependencies = [
  "log 0.4.8",
  "safe-api",
  "safe-nd",
+ "safe_authenticator 0.17.1 (git+https://github.com/maidsafe/safe_client_libs)",
  "safe_bindgen",
- "safe_core",
+ "safe_core 0.42.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "unwrap",
@@ -3411,10 +3412,33 @@ dependencies = [
  "miscreant",
  "rand 0.6.5",
  "safe-nd",
- "safe_core",
+ "safe_core 0.42.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "self_encryption",
  "serde",
  "serde_derive",
+ "threshold_crypto",
+ "tiny-keccak",
+ "tokio 0.2.21",
+ "unwrap",
+]
+
+[[package]]
+name = "safe_authenticator"
+version = "0.17.1"
+source = "git+https://github.com/maidsafe/safe_client_libs#9ff407420a1ef577c545d60881a9dea44488ed83"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "futures 0.3.5",
+ "futures-util",
+ "log 0.4.8",
+ "lru-cache",
+ "rand 0.6.5",
+ "safe-nd",
+ "safe_core 0.42.1 (git+https://github.com/maidsafe/safe_client_libs)",
+ "serde",
  "threshold_crypto",
  "tiny-keccak",
  "tokio 0.2.21",
@@ -3436,7 +3460,7 @@ dependencies = [
  "lru-cache",
  "rand 0.6.5",
  "safe-nd",
- "safe_core",
+ "safe_core 0.42.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "threshold_crypto",
  "tiny-keccak",
@@ -3459,6 +3483,47 @@ dependencies = [
  "syn 0.15.44",
  "toml 0.5.6",
  "unwrap",
+]
+
+[[package]]
+name = "safe_core"
+version = "0.42.1"
+source = "git+https://github.com/maidsafe/safe_client_libs#9ff407420a1ef577c545d60881a9dea44488ed83"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bytes 0.5.5",
+ "chrono",
+ "crossbeam-channel",
+ "data-encoding",
+ "directories 2.0.2",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "fs2",
+ "futures 0.3.5",
+ "futures-util",
+ "hmac",
+ "lazy_static",
+ "log 0.4.8",
+ "log4rs",
+ "lru",
+ "miscreant",
+ "pbkdf2",
+ "quic-p2p",
+ "rand 0.6.5",
+ "regex 1.3.9",
+ "safe-nd",
+ "self_encryption",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "sha3",
+ "threshold_crypto",
+ "tiny-keccak",
+ "tokio 0.2.21",
+ "unwrap",
+ "url 2.1.1",
+ "ws",
 ]
 
 [[package]]
