@@ -32,7 +32,7 @@ use std::{
 
 #[no_mangle]
 pub extern "C" fn auth_is_mock() -> bool {
-    cfg!(feature = "mock-network")
+    cfg!(feature = "scl-mock")
 }
 
 #[no_mangle]

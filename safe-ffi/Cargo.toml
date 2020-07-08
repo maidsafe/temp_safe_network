@@ -42,7 +42,3 @@ unwrap = "1.2.1"
 [features]
 bindings = ["safe_bindgen"]
 scl-mock = ["safe-api/scl-mock"]
-authenticator = ["safe-api/authenticator"]
-app = ["safe-api/app"]
-authd = ["safe-api/authd_client"]
-default = ["app", "authenticator"]
