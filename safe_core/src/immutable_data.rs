@@ -195,34 +195,260 @@ mod tests {
 
     // Test creating and retrieving a 1kb idata.
     #[tokio::test]
-    async fn create_and_retrieve_1kb() -> Result<(), CoreError> {
-        create_and_retrieve(1024).await
+    async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<(), CoreError> {
+        let size = 1024;
+
+        gen_data_then_map_create_and_retrieve(size, true, None).await?;
+
+        Ok(())
     }
 
-    // Test creating and retrieving a 1mb idata.
     #[tokio::test]
-    async fn create_and_retrieve_1mb() -> Result<(), CoreError> {
-        create_and_retrieve(1024 * 1024).await
+    async fn create_and_retrieve_1kb_unpub_unencrypted() -> Result<(), CoreError> {
+        let size = 1024;
+
+        gen_data_then_map_create_and_retrieve(size, false, None).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_unpub_encrypted() -> Result<(), CoreError> {
+        let size = 1024;
+
+        let key = shared_secretbox::gen_key();
+        gen_data_then_map_create_and_retrieve(size, false, Some(key)).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_pub_encrypted() -> Result<(), CoreError> {
+        let size = 1024;
+        let key = shared_secretbox::gen_key();
+        gen_data_then_map_create_and_retrieve(size, true, Some(key)).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_unencrypted_put_retrieval_of_encrypted(
+    ) -> Result<(), CoreError> {
+        let size = 1024;
+        let value = utils::generate_random_vector(size)?;
+
+        let value = value.clone();
+        let key = shared_secretbox::gen_key();
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, true, None).await?;
+        let address = *data.address();
+        client2.put_idata(data).await?;
+
+        let res = get_value(&client3, address, None, None, Some(key)).await;
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_encrypted_put_retrieval_of_unencrypted(
+    ) -> Result<(), CoreError> {
+        let size = 1024;
+        let value = utils::generate_random_vector(size)?;
+
+        let value = value.clone();
+        let key = shared_secretbox::gen_key();
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, true, Some(key)).await?;
+        let address = *data.address();
+        client2.put_idata(data).await?;
+
+        let res = get_value(&client3, address, None, None, None).await;
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_encrypted_put_pub_retrieval_of_unpub() -> Result<(), CoreError>
+    {
+        let size = 1024;
+        let value = utils::generate_random_vector(size)?;
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, true, None).await?;
+        let data_name = *data.name();
+        client2.put_idata(data).await?;
+
+        let address = IDataAddress::Unpub(data_name);
+        let res = get_value(&client3, address, None, None, None).await;
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_encrypted_put_unpub_retrieval_of_pub() -> Result<(), CoreError>
+    {
+        let size = 1024;
+
+        let value = utils::generate_random_vector(size)?;
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, false, None).await?;
+        let data_name = *data.name();
+        client2.put_idata(data).await?;
+
+        let address = IDataAddress::Pub(data_name);
+        let res = get_value(&client3, address, None, None, None).await;
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    // ----------------------------------------------------------------
+    // 10mb (ie. more than 1 chunk)
+    // ----------------------------------------------------------------
+
+    // Test creating and retrieving a 1kb idata.
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_pub_unencrypted() -> Result<(), CoreError> {
+        let size = 1024 * 1024 * 10;
+
+        gen_data_then_map_create_and_retrieve(size, true, None).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_unpub_unencrypted() -> Result<(), CoreError> {
+        let size = 1024 * 1024 * 10;
+
+        gen_data_then_map_create_and_retrieve(size, false, None).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_unpub_encrypted() -> Result<(), CoreError> {
+        let size = 1024 * 1024 * 10;
+
+        let key = shared_secretbox::gen_key();
+        gen_data_then_map_create_and_retrieve(size, false, Some(key)).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_pub_encrypted() -> Result<(), CoreError> {
+        let size = 1024 * 1024 * 10;
+        let key = shared_secretbox::gen_key();
+        gen_data_then_map_create_and_retrieve(size, true, Some(key)).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_unencrypted_put_retrieval_of_encrypted(
+    ) -> Result<(), CoreError> {
+        let size = 1024 * 1024 * 10;
+        let value = utils::generate_random_vector(size)?;
+
+        let value = value.clone();
+        let key = shared_secretbox::gen_key();
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, true, None).await?;
+        let address = *data.address();
+        client2.put_idata(data).await?;
+
+        let res = get_value(&client3, address, None, None, Some(key)).await;
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_encrypted_put_retrieval_of_unencrypted(
+    ) -> Result<(), CoreError> {
+        let size = 1024 * 1024 * 10;
+        let value = utils::generate_random_vector(size)?;
+
+        let value = value.clone();
+        let key = shared_secretbox::gen_key();
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, true, Some(key)).await?;
+        let address = *data.address();
+        client2.put_idata(data).await?;
+
+        let res = get_value(&client3, address, None, None, None).await;
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_encrypted_put_pub_retrieval_of_unpub() -> Result<(), CoreError>
+    {
+        let size = 1024 * 1024 * 10;
+        let value = utils::generate_random_vector(size)?;
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, true, None).await?;
+        let data_name = *data.name();
+        client2.put_idata(data).await?;
+
+        let address = IDataAddress::Unpub(data_name);
+        let res = get_value(&client3, address, None, None, None).await;
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_encrypted_put_unpub_retrieval_of_pub() -> Result<(), CoreError>
+    {
+        let size = 1024 * 1024 * 10;
+
+        let value = utils::generate_random_vector(size)?;
+
+        let client = random_client()?;
+        let client2 = client.clone();
+        let client3 = client.clone();
+
+        let data = create(&client, &value, false, None).await?;
+        let data_name = *data.name();
+        client2.put_idata(data).await?;
+
+        let address = IDataAddress::Pub(data_name);
+        let res = get_value(&client3, address, None, None, None).await;
+        assert!(res.is_err());
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn create_and_retrieve_index_based() -> Result<(), CoreError> {
         create_and_index_based_retrieve(1024).await
     }
-
-    // Test creating and retrieving a 2mb idata.
-    #[tokio::test]
-    async fn create_and_retrieve_2mb() -> Result<(), CoreError> {
-        create_and_retrieve(2 * 1024 * 1024).await
-    }
-
-    // Test creating and retrieving a 10mb idata.
-    #[cfg(not(debug_assertions))]
-    #[tokio::test]
-    async fn create_and_retrieve_10mb() -> Result<(), CoreError> {
-        create_and_retrieve(10 * 1024 * 1024).await
-    }
-
     async fn create_and_index_based_retrieve(size: usize) -> Result<(), CoreError> {
         let value = utils::generate_random_vector(size)?;
         {
@@ -261,96 +487,6 @@ mod tests {
             )
             .await?;
             assert_eq!(fetched_value, value2[size / 2..size].to_vec());
-        }
-
-        Ok(())
-    }
-
-    async fn create_and_retrieve(size: usize) -> Result<(), CoreError> {
-        // Published and unencrypted
-        gen_data_then_map_create_and_retrieve(size, true, None).await?;
-
-        // Unpublished and unencrypted
-        gen_data_then_map_create_and_retrieve(size, false, None).await?;
-
-        // Published and encrypted
-        {
-            let key = shared_secretbox::gen_key();
-            gen_data_then_map_create_and_retrieve(size, true, Some(key)).await?;
-        }
-
-        // Unpublished and encrypted
-        {
-            let key = shared_secretbox::gen_key();
-            gen_data_then_map_create_and_retrieve(size, false, Some(key)).await?;
-        }
-
-        let value = utils::generate_random_vector(size)?;
-
-        // Put unencrypted Retrieve encrypted - Should fail
-        {
-            let value = value.clone();
-            let key = shared_secretbox::gen_key();
-
-            let client = random_client()?;
-            let client2 = client.clone();
-            let client3 = client.clone();
-
-            let data = create(&client, &value, true, None).await?;
-            let address = *data.address();
-            client2.put_idata(data).await?;
-
-            let res = get_value(&client3, address, None, None, Some(key)).await;
-            assert!(res.is_err());
-        }
-
-        // Put encrypted Retrieve unencrypted - Should fail
-        {
-            let value = value.clone();
-            let key = shared_secretbox::gen_key();
-
-            let client = random_client()?;
-            let client2 = client.clone();
-            let client3 = client.clone();
-
-            let data = create(&client, &value, true, Some(key)).await?;
-            let address = *data.address();
-            client2.put_idata(data).await?;
-
-            let res = get_value(&client3, address, None, None, None).await;
-            assert!(res.is_err());
-        }
-
-        // Put published Retrieve unpublished - Should fail
-        {
-            let value = value.clone();
-
-            let client = random_client()?;
-            let client2 = client.clone();
-            let client3 = client.clone();
-
-            let data = create(&client, &value, true, None).await?;
-            let data_name = *data.name();
-            client2.put_idata(data).await?;
-
-            let address = IDataAddress::Unpub(data_name);
-            let res = get_value(&client3, address, None, None, None).await;
-            assert!(res.is_err());
-        }
-
-        // Put unpublished Retrieve published - Should fail
-        {
-            let client = random_client()?;
-            let client2 = client.clone();
-            let client3 = client.clone();
-
-            let data = create(&client, &value, false, None).await?;
-            let data_name = *data.name();
-            client2.put_idata(data).await?;
-
-            let address = IDataAddress::Pub(data_name);
-            let res = get_value(&client3, address, None, None, None).await;
-            assert!(res.is_err());
         }
 
         Ok(())
@@ -413,6 +549,9 @@ mod tests {
 
         // then the content should be what we put
         assert_eq!(value_after, value_before);
+
+        // sleep
+        std::thread::sleep(std::time::Duration::from_millis(5500));
 
         Ok(())
     }

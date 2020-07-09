@@ -17,7 +17,6 @@ use log::{info, trace};
 use std::sync::Arc;
 use threshold_crypto::{PublicKeySet, SecretKey};
 
-
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {
     /// Get our replica instance PK set
@@ -60,7 +59,6 @@ impl TransferActor {
 
         let replicas_pk_set =
             TransferActor::get_replica_keys(safe_key.clone(), connection_manager.clone()).await?;
-
 
         let validator = ClientTransferValidator {};
 

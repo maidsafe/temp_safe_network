@@ -28,8 +28,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Delete sequence
@@ -48,8 +47,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Delete sequence
@@ -68,8 +66,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Delete mutable data user permission
@@ -103,8 +100,7 @@ impl TransferActor {
 
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Set mutable data user permissions
@@ -141,8 +137,7 @@ impl TransferActor {
         // TODO what will be the correct reponse here?... We have it validated, so registered?
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Mutate mutable data user entries
@@ -167,8 +162,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Mutate sequence data owners
@@ -190,8 +184,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Mutate sequenced data private permissions
@@ -214,8 +207,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Mutate sequenced data public permissions
@@ -238,16 +230,12 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Append data to a sequenced data object
     /// Wraps requests for payment validation and mutation
-    pub async fn append_to_sequence(
-        &mut self,
-        op: SDataWriteOp<Vec<u8>>,
-    ) -> Result<(), CoreError> {
+    pub async fn append_to_sequence(&mut self, op: SDataWriteOp<Vec<u8>>) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -262,8 +250,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Store a new public sequenced data object
@@ -283,8 +270,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Store a new public mutable data object
@@ -304,8 +290,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Store a new immutabledata object
@@ -325,8 +310,7 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
     /// Store a new login packet
@@ -347,24 +331,21 @@ impl TransferActor {
         let (message, _msg_id) = TransferActor::create_network_message(self.safe_key.clone(), req)?;
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
-        self.apply_write_locally(payment_proof)
-            .await
+        self.apply_write_locally(payment_proof).await
     }
 
-    async fn apply_write_locally(&mut self,
+    async fn apply_write_locally(
+        &mut self,
         debit_proof: DebitAgreementProof,
     ) -> Result<(), CoreError> {
+        let mut actor = self.transfer_actor.lock().await;
+        // First register with local actor, then reply.
+        let register_event = actor.register(debit_proof.clone())?;
 
-                let mut actor = self.transfer_actor.lock().await;
-                // First register with local actor, then reply.
-                let register_event = actor.register(debit_proof.clone())?;
+        actor.apply(ActorEvent::TransferRegistrationSent(register_event));
 
-                actor.apply(ActorEvent::TransferRegistrationSent(register_event));
-
-                Ok(())
-          
-        }
-    
+        Ok(())
+    }
 }
 
 // TODO: Do we need "new" to actually instantiate with a transfer?...
@@ -399,19 +380,11 @@ mod tests {
     }
 }
 
-fn wrap_blob_read(read: BlobRead) -> ClientRequest {
-    ClientRequest::Read(Read::Blob(read))
-}
-
 fn wrap_blob_write(write: BlobWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
     ClientRequest::Write {
         write: Write::Blob(write),
         debit_agreement,
     }
-}
-
-fn wrap_map_read(read: MapRead) -> ClientRequest {
-    ClientRequest::Read(Read::Map(read))
 }
 
 fn wrap_map_write(write: MapWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
@@ -421,19 +394,11 @@ fn wrap_map_write(write: MapWrite, debit_agreement: DebitAgreementProof) -> Clie
     }
 }
 
-fn wrap_seq_read(read: SequenceRead) -> ClientRequest {
-    ClientRequest::Read(Read::Sequence(read))
-}
-
 fn wrap_seq_write(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {
     ClientRequest::Write {
         write: Write::Sequence(write),
         debit_agreement,
     }
-}
-
-fn wrap_account_read(read: AccountRead) -> ClientRequest {
-    ClientRequest::Read(Read::Account(read))
 }
 
 fn wrap_account_write(write: AccountWrite, debit_agreement: DebitAgreementProof) -> ClientRequest {

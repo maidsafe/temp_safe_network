@@ -2,7 +2,7 @@ use safe_nd::{
     DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, Response,
     SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
-use safe_transfers::{ActorEvent,TransferInitiated};
+use safe_transfers::{ActorEvent, TransferInitiated};
 
 use crate::client::{Client, TransferActor};
 use crate::errors::CoreError;
@@ -81,11 +81,7 @@ impl TransferActor {
     }
 
     /// Send money
-    pub async fn send_money(
-        &mut self,
-        to: PublicKey,
-        amount: Money,
-    ) -> Result<(), CoreError> {
+    pub async fn send_money(&mut self, to: PublicKey, amount: Money) -> Result<(), CoreError> {
         info!("Sending money");
         let mut cm = self.connection_manager();
 
@@ -102,18 +98,30 @@ impl TransferActor {
             self.transfer_actor.lock().await.debits_since(0)
         );
 
-        let signed_transfer = self.transfer_actor.lock().await.transfer(amount, to)?.signed_transfer;
+        let signed_transfer = self
+            .transfer_actor
+            .lock()
+            .await
+            .transfer(amount, to)?
+            .signed_transfer;
 
         println!(
             "Signed transfer for send money: {:?}",
             signed_transfer.transfer
         );
-        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer { signed_transfer: signed_transfer.clone() });
+        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer {
+            signed_transfer: signed_transfer.clone(),
+        });
 
         let (message, _message_id) =
             TransferActor::create_network_message(safe_key.clone(), request)?;
 
-            self.transfer_actor.lock().await.apply(ActorEvent::TransferInitiated(TransferInitiated {signed_transfer}));
+        self.transfer_actor
+            .lock()
+            .await
+            .apply(ActorEvent::TransferInitiated(TransferInitiated {
+                signed_transfer,
+            }));
 
         let debit_proof: DebitAgreementProof = self
             .await_validation(
@@ -140,7 +148,6 @@ impl TransferActor {
 
         let _ = cm.send_cmd(&safe_key.public_id(), &message).await?;
 
-        
         let mut actor = self.transfer_actor.lock().await;
         // First register with local actor, then reply.
         let register_event = actor.register(debit_proof)?;
@@ -148,7 +155,6 @@ impl TransferActor {
         actor.apply(ActorEvent::TransferRegistrationSent(register_event.clone()));
 
         Ok(())
-
     }
 }
 
@@ -214,7 +220,6 @@ mod tests {
             initial_actor.get_balance_from_network(None).await?,
             Money::from_str("9")?
         );
-
 
         println!("FIRST DONE!!!!!!!!!!!!!!");
 

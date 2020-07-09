@@ -64,7 +64,7 @@ impl ConnectionManager {
     pub async fn send_cmd(&mut self, pub_id: &PublicId, msg: &Message) -> Result<(), CoreError> {
         self.inner.lock().await.send_cmd(pub_id, msg).await
     }
-    
+
     /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`.
     pub async fn send_for_validation(
         &mut self,

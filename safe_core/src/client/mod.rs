@@ -99,43 +99,6 @@ async fn send_write(client: &impl Client, req: Request) -> Result<(), CoreError>
     }
 }
 
-// Parses out mutation responses and errors when something erroneous found
-fn check_mutation_response(response: Response) -> Result<(), CoreError> {
-    match response {
-        Response::Write(result) => {
-            trace!("mutation result: {:?}", result);
-            result.map_err(CoreError::from)
-        }
-        _ => Err(CoreError::ReceivedUnexpectedEvent),
-    }
-}
-
-// TODO: retrieve our actor for this clientID....
-
-async fn send_as_helper(
-    client: &impl Client,
-    request: Request,
-    client_id: Option<&ClientFullId>,
-) -> Result<Response, CoreError> {
-    let (message, identity) = match client_id {
-        Some(id) => (sign_request(request, id), SafeKey::client(id.clone())),
-        None => {
-            let msg = client.compose_message(request, true).await?;
-            let client_id = client.full_id().await;
-            (msg, client_id)
-        }
-    };
-
-    let pub_id = identity.public_id();
-
-    let inner = client.inner();
-
-    let cm = &mut inner.lock().await.connection_manager;
-
-    let _bootstrapped = cm.bootstrap(identity).await;
-    cm.send(&pub_id, &message).await
-}
-
 /// Trait providing an interface for self-authentication client implementations, so they can
 /// interface all requests from high-level APIs to the actual routing layer and manage all
 /// interactions with it. Clients are non-blocking, with an asynchronous API using the futures
@@ -244,7 +207,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.new_map(MData::Unseq(data)).await
-
     }
 
     /// Transfer coin balance
@@ -310,7 +272,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.send_money(new_balance_owner, amount).await
-
     }
 
     /// Get the current coin balance via TransferActor for this client.
@@ -359,7 +320,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.new_blob(idata).await
-
     }
 
     /// Get immutable data from the network. If the data exists locally in the cache then it will be
@@ -425,7 +385,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.delete_blob(IDataAddress::Unpub(name)).await
-
     }
 
     /// Put sequenced mutable data to the network
@@ -441,7 +400,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.new_map(MData::Seq(data)).await
-
     }
 
     /// Fetch unpublished mutable data from the network
@@ -570,7 +528,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.edit_map_entries(address, mdata_actions).await
-
     }
 
     /// Mutates unsequenced `MutableData` entries in bulk
@@ -595,7 +552,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.edit_map_entries(address, mdata_actions).await
-
     }
 
     /// Get a shell (bare bones) version of `MutableData` from the network.
@@ -979,7 +935,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.append_to_sequence(op).await
-
     }
 
     /// Get the set of Permissions of a Public Sequence.
@@ -1078,7 +1033,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.edit_sequence_public_perms(op).await
-
     }
 
     /// Set permissions to Private Sequence Data
@@ -1119,7 +1073,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.edit_sequence_private_perms(op).await
-
     }
 
     /// Get the owner of a Sequence.
@@ -1172,7 +1125,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.set_sequence_owner(op).await
-
     }
 
     /// Delete Private Sequence Data from the Network
@@ -1190,7 +1142,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.delete_sequence(address).await
-
     }
 
     // ========== END of Sequence Data functions =========
@@ -1232,7 +1183,6 @@ pub trait Client: Clone + Send + Sync {
         actor
             .set_map_user_perms(address, user, permissions, version)
             .await
-
     }
 
     /// Updates or inserts a permissions set for a user
@@ -1253,7 +1203,6 @@ pub trait Client: Clone + Send + Sync {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.delete_map_user_perms(address, user, version).await
-
     }
 
     /// Sends an ownership transfer request.
@@ -1331,7 +1280,6 @@ pub trait Client: Clone + Send + Sync {
         actor
             .trigger_simulated_farming_payout(self.public_key().await, amount)
             .await
-
     }
 }
 
@@ -1456,18 +1404,6 @@ pub trait AuthActions: Client + Clone + 'static {
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
         actor.delete_map(address).await
-    }
-}
-
-fn sign_request(request: Request, client_id: &ClientFullId) -> Message {
-    let message_id = MessageId::new();
-
-    let signature = Some(client_id.sign(&unwrap!(bincode::serialize(&(&request, message_id)))));
-
-    Message::Request {
-        request,
-        message_id,
-        signature,
     }
 }
 
@@ -1899,13 +1835,12 @@ mod tests {
             unwrap!(Money::from_str("499.999999999"))
         ); // 500 - 1nano for encrypted-account-data
 
-
         let _ = client
             .create_balance(None, bls_pk, unwrap!(Money::from_str("100.0")))
             .await
             .unwrap();
 
-            assert_eq!(
+        assert_eq!(
             client.get_balance(None).await.unwrap(),
             unwrap!(Money::from_str("399.999999999"))
         );
@@ -2168,6 +2103,7 @@ mod tests {
         client.put_seq_mutable_data(data).await?;
 
         let fetched_entries = client.list_seq_mdata_entries(name, tag).await?;
+
         assert_eq!(fetched_entries, entries);
         let entry_actions: MDataSeqEntryActions = MDataSeqEntryActions::new()
             .update(b"key1".to_vec(), b"newValue".to_vec(), 1)
@@ -2688,44 +2624,16 @@ fn wrap_blob_read(read: BlobRead) -> Request {
     Request::Client(ClientRequest::Read(Read::Blob(read)))
 }
 
-fn wrap_blob_write(write: BlobWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
-        write: Write::Blob(write),
-        debit_agreement,
-    })
-}
-
 fn wrap_map_read(read: MapRead) -> Request {
     Request::Client(ClientRequest::Read(Read::Map(read)))
-}
-
-fn wrap_map_write(write: MapWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
-        write: Write::Map(write),
-        debit_agreement,
-    })
 }
 
 fn wrap_seq_read(read: SequenceRead) -> Request {
     Request::Client(ClientRequest::Read(Read::Sequence(read)))
 }
 
-fn wrap_seq_write(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
-        write: Write::Sequence(write),
-        debit_agreement,
-    })
-}
-
 fn wrap_account_read(read: AccountRead) -> Request {
     Request::Client(ClientRequest::Read(Read::Account(read)))
-}
-
-fn wrap_account_write(write: AccountWrite, debit_agreement: DebitAgreementProof) -> Request {
-    Request::Client(ClientRequest::Write {
-        write: Write::Account(write),
-        debit_agreement,
-    })
 }
 
 fn wrap_client_auth(op: ClientAuth) -> Request {

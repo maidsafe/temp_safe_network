@@ -68,7 +68,6 @@ impl TransferActor {
             self.get_history().await;
         }
         Ok(())
-       
     }
 }
 

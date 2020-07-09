@@ -3,7 +3,9 @@ use safe_nd::{
     SystemOp, Transfers as MoneyRequest, Write,
 };
 
-use safe_transfers::{ActorEvent, ReplicaValidator, TransferActor as SafeTransferActor, TransferInitiated};
+use safe_transfers::{
+    ActorEvent, ReplicaValidator, TransferActor as SafeTransferActor, TransferInitiated,
+};
 
 use crate::client::ConnectionManager;
 use crate::client::{Client, SafeKey, COST_OF_PUT};
@@ -151,7 +153,10 @@ impl TransferActor {
         let section_key = PublicKey::Bls(self.replicas_pk_set.public_key());
         // let mut actor = self.transfer_actor.lock().await;
 
-        let signed_transfer = self.transfer_actor.lock().await
+        let signed_transfer = self
+            .transfer_actor
+            .lock()
+            .await
             .transfer(COST_OF_PUT, section_key)?
             .signed_transfer;
 
@@ -164,8 +169,12 @@ impl TransferActor {
         let (transfer_message, message_id) =
             TransferActor::create_network_message(safe_key.clone(), request)?;
 
-
-        self.transfer_actor.lock().await.apply(ActorEvent::TransferInitiated(TransferInitiated {signed_transfer}));
+        self.transfer_actor
+            .lock()
+            .await
+            .apply(ActorEvent::TransferInitiated(TransferInitiated {
+                signed_transfer,
+            }));
 
         // setup connection manager
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
@@ -174,6 +183,7 @@ impl TransferActor {
             .await_validation(message_id, &safe_key.public_id(), &transfer_message)
             .await?;
 
+        debug!("payment proof retrieved");
         Ok(payment_proof)
     }
 

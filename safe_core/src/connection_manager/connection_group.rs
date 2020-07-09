@@ -132,9 +132,8 @@ impl ConnectionGroup {
         }
     }
 
-
     pub async fn send_cmd(&mut self, msg_id: MessageId, msg: &Message) -> Result<(), CoreError> {
-            self.inner.lock().await.send_cmd(msg_id, msg).await
+        self.inner.lock().await.send_cmd(msg_id, msg).await
     }
 
     /// Send transfer validation, which requires all responses to be handled for signature reconstruction.
@@ -597,7 +596,6 @@ impl State {
         }
     }
 
-
     async fn send_for_validation(
         &mut self,
         quic_p2p: &mut QuicP2p,
@@ -675,18 +673,12 @@ impl Inner {
         self.state.send(&mut self.quic_p2p, msg_id, msg).await
     }
 
-
-    async fn send_cmd(
-        &mut self,
-        msg_id: MessageId,
-        msg: &Message,
-    ) -> Result<(), CoreError> {
-        
+    async fn send_cmd(&mut self, msg_id: MessageId, msg: &Message) -> Result<(), CoreError> {
         let response = self.state.send_cmd(&mut self.quic_p2p, msg_id, msg).await;
 
-        // arbitrary delay to simplify test writing
-        #[cfg(feature="testing")]
-        std::thread::sleep(Duration::from_millis(4500));
+        // arbitrary delay to allow network to catchup & simplify test writing
+        #[cfg(feature = "testing")]
+        std::thread::sleep(Duration::from_millis(5500));
 
         response
     }
