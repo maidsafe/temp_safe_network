@@ -2239,7 +2239,7 @@ mod tests {
     // }
 
     #[tokio::test]
-    pub async fn idata_deletions_should_be_free() -> Result<(), CoreError> {
+    pub async fn idata_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let idata = UnpubImmutableData::new(
@@ -2255,13 +2255,13 @@ mod tests {
 
         // make sure we have _some_ balance
         assert_ne!(balance_before_delete, Money::from_str("0")?);
-        assert_eq!(balance_before_delete, new_balance);
+        assert_ne!(balance_before_delete, new_balance);
 
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn mdata_deletions_should_be_free() -> Result<(), CoreError> {
+    pub async fn mdata_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = random_client()?;
@@ -2277,13 +2277,13 @@ mod tests {
 
         // make sure we have _some_ balance
         assert_ne!(balance_before_delete, Money::from_str("0")?);
-        assert_eq!(balance_before_delete, new_balance);
+        assert_ne!(balance_before_delete, new_balance);
 
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn sdata_deletions_should_be_free() -> Result<(), CoreError> {
+    pub async fn sdata_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = random_client()?;
@@ -2297,7 +2297,7 @@ mod tests {
 
         // make sure we have _some_ balance
         assert_ne!(balance_before_delete, Money::from_str("0")?);
-        assert_eq!(balance_before_delete, new_balance);
+        assert_ne!(balance_before_delete, new_balance);
 
         Ok(())
     }

@@ -678,7 +678,7 @@ impl Inner {
 
         // arbitrary delay to allow network to catchup & simplify test writing
         #[cfg(feature = "testing")]
-        std::thread::sleep(Duration::from_millis(5500));
+        std::thread::sleep(Duration::from_millis(15500));
 
         response
     }
