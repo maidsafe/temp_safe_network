@@ -10,8 +10,8 @@ use crate::{msg::Message, node::Init, Result};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use routing::SrcLocation;
-use safe_nd::{ClientPublicId, PublicId, PublicKey, XorName};
+use routing::{SrcLocation, Node as Routing};
+use safe_nd::{ClientPublicId, PublicId, PublicKey, XorName, SignatureShare};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -105,4 +105,14 @@ pub(crate) fn get_source_name(src: SrcLocation) -> XorName {
     } else {
         XorName::default()
     }
+}
+
+pub(crate) fn sign(routing: &Routing, data: &[u8]) -> Option<SignatureShare> {
+    let signature = routing
+        .secret_key_share()
+        .map_or(None, |key| Some(key.sign(data)));
+    signature.map(|sig| SignatureShare {
+            index: self.routing.borrow().our_index().unwrap_or(0),
+            share: sig,
+        })
 }

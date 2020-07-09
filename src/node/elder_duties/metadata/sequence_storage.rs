@@ -55,7 +55,7 @@ impl SequenceStorage {
         requester: PublicId,
         read: &SequenceRead,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use SequenceRead::*;
         match read {
             Get(address) => self.get(requester, *address, message_id),
@@ -74,7 +74,7 @@ impl SequenceStorage {
         requester: PublicId,
         write: SequenceWrite,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use SequenceWrite::*;
         match write {
             New(data) => self.store(requester, &data, message_id),
@@ -95,7 +95,7 @@ impl SequenceStorage {
         requester: PublicId,
         data: &SData,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -120,7 +120,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self.get_chunk(&requester, address, SDataAction::Read);
 
         wrap(MetadataCmd::RespondToGateway {
@@ -155,7 +155,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let requester_pk = *utils::own_key(&requester)?;
         let result = self
             .chunks
@@ -195,7 +195,7 @@ impl SequenceStorage {
         address: SDataAddress,
         range: (SDataIndex, SDataIndex),
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
@@ -216,7 +216,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| match sdata.last_entry() {
@@ -240,7 +240,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
@@ -265,7 +265,7 @@ impl SequenceStorage {
         address: SDataAddress,
         user: SDataUser,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
@@ -289,7 +289,7 @@ impl SequenceStorage {
         requester: PublicId,
         address: SDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let response = {
             let result = self
                 .get_chunk(&requester, address, SDataAction::Read)
@@ -322,7 +322,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataPubPermissions>,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -341,7 +341,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataPrivPermissions>,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -360,7 +360,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataOwner>,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -379,7 +379,7 @@ impl SequenceStorage {
         requester: &PublicId,
         mutation_op: SDataWriteOp<SDataEntry>,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let address = mutation_op.address;
         self.edit_chunk(
             &requester,
@@ -400,7 +400,7 @@ impl SequenceStorage {
         action: SDataAction,
         message_id: MessageId,
         mutation_fn: F,
-    ) -> Option<ElderCmd>
+    ) -> Option<NodeCmd>
     where
         F: FnOnce(SData) -> NdResult<SData>,
     {
@@ -425,7 +425,7 @@ impl SequenceStorage {
     }
 }
 
-fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
     Some(ElderCmd::Metadata(cmd))
 }
 

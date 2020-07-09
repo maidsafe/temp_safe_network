@@ -12,13 +12,13 @@ use super::{
 };
 use crate::cmd::ElderCmd;
 use routing::SrcLocation;
-use safe_nd::{AccountRead, BlobRead, MapRead, MessageId, PublicId, Read, SequenceRead};
+use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MessageId, PublicId, SequenceRead};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Reading {
     _src: SrcLocation,
     requester: PublicId,
-    read: Read,
+    read: DataQuery,
     message_id: MessageId,
     _accumulated_signature: Option<Signature>,
     _public_key: Option<PublicKey>,
@@ -26,7 +26,7 @@ pub(super) struct Reading {
 
 impl Reading {
     pub fn new(
-        read: Read,
+        query: DataQuery,
         _src: SrcLocation,
         requester: PublicId,
         message_id: MessageId,
@@ -36,16 +36,16 @@ impl Reading {
         Self {
             _src,
             requester,
-            read,
+            query,
             message_id,
             _accumulated_signature,
             _public_key,
         }
     }
 
-    pub fn get_result(&self, stores: &ElderStores) -> Option<ElderCmd> {
-        use Read::*;
-        match &self.read {
+    pub fn get_result(&self, stores: &ElderStores) -> Option<NodeCmd> {
+        use DataQuery::*;
+        match &self.query {
             Blob(read) => self.blob(read, stores.blob_register()),
             Map(read) => self.map(read, stores.map_storage()),
             Sequence(read) => self.sequence(read, stores.sequence_storage()),
@@ -53,19 +53,19 @@ impl Reading {
         }
     }
 
-    fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<ElderCmd> {
+    fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<NodeCmd> {
         register.read(self.requester.clone(), read, self.message_id)
     }
 
-    fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<ElderCmd> {
+    fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<NodeCmd> {
         storage.read(self.requester.clone(), read, self.message_id)
     }
 
-    fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<ElderCmd> {
+    fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<NodeCmd> {
         storage.read(self.requester.clone(), read, self.message_id)
     }
 
-    fn account(&self, read: &AccountRead, storage: &AccountStorage) -> Option<ElderCmd> {
+    fn account(&self, read: &AccountRead, storage: &AccountStorage) -> Option<NodeCmd> {
         storage.read(self.requester.clone(), read, self.message_id)
     }
 }

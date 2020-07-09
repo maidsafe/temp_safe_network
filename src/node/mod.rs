@@ -6,6 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod adult_duties;
+mod elder_duties;
+mod remote_msg_eval;
+
 use crate::{
     accumulator::Accumulator,
     cmd::{
@@ -13,7 +17,8 @@ use crate::{
         TransferCmd,
     },
     duties::{adult::AdultDuties, elder::ElderDuties},
-    msg::Message,
+    Messaging,
+    remote_msg_eval::RemoteMsgEvaluation,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -25,7 +30,10 @@ use routing::{
     event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
     TransportEvent as ClientEvent,
 };
-use safe_nd::{NodeFullId, Request, XorName};
+use safe_nd::{
+    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, NodeFullId, Query,
+    XorName, Signature,
+};
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeSet,
@@ -35,7 +43,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
-use threshold_crypto::Signature;
+//use threshold_crypto::Signature;
 
 const STATE_FILENAME: &str = "state";
 
@@ -75,6 +83,8 @@ pub struct Node<R: CryptoRng + Rng> {
     client_receiver: Receiver<ClientEvent>,
     command_receiver: Receiver<Command>,
     routing: Rc<RefCell<Routing>>,
+    messaging: Rc<RefCell<Messaging>>,
+    remote_msg_eval: RemoteMsgEvaluation,
     rng: R,
 }
 
@@ -119,6 +129,10 @@ impl<R: CryptoRng + Rng> Node<R> {
             State::Infant
         };
 
+        let messaging = Messaging::new(routing.clone());
+        let messaging = Rc::new(RefCell::new(messaging));
+        let remote_msg_eval = RemoteMsgEvaluation::new(routing.clone());
+
         let node = Self {
             id,
             root_dir: root_dir.to_path_buf(),
@@ -127,10 +141,95 @@ impl<R: CryptoRng + Rng> Node<R> {
             client_receiver,
             command_receiver,
             routing,
+            messaging,
+            remote_msg_eval,
             rng,
         };
         node.dump_state()?;
         Ok(node)
+    }
+
+    /// Returns our connection info.
+    pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
+        self.routing.borrow_mut()
+            .our_connection_info()
+            .map_err(From::from)
+    }
+
+    /// Returns whether routing node is in elder state.
+    pub fn is_elder(&mut self) -> bool {
+        self.routing.borrow().is_elder()
+    }
+
+    /// Returns whether node is in adult state.
+    #[allow(unused)]
+    pub fn is_adult(&self) -> bool {
+        if let State::Adult { .. } = self.state {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
+        match &mut self.state {
+            State::Adult { ref mut duties, .. } => Some(duties),
+            _ => None,
+        }
+    }
+
+    fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
+        match &mut self.state {
+            State::Elder { ref mut duties, .. } => Some(duties),
+            _ => None,
+        }
+    }
+
+    fn step_routing(&mut self, event: RoutingEvent) {
+        debug!("Received routing event: {:?}", event);
+        let result = self.handle_routing_event(event);
+        self.step_cmds(result);
+    }
+
+    fn step_client(&mut self, event: ClientEvent) {
+        let result = self.handle_client_event(event);
+        self.step_cmds(result);
+    }
+
+    fn promote_to_adult(&mut self) -> Result<()> {
+        let mut config = Config::default();
+        config.set_root_dir(self.root_dir.clone());
+        let total_used_space = Rc::new(Cell::new(0));
+        let duties = AdultDuties::new(
+            self.id.public_id().clone(),
+            &config,
+            &total_used_space,
+            Init::New,
+            self.routing.clone(),
+        )?;
+        self.state = State::Adult {
+            duties,
+            accumulator: Accumulator::new(self.routing.clone()),
+        };
+        Ok(())
+    }
+
+    fn promote_to_elder(&mut self) -> Result<()> {
+        let mut config = Config::default();
+        config.set_root_dir(self.root_dir.clone());
+        let total_used_space = Rc::new(Cell::new(0));
+        let duties = ElderDuties::new(
+            self.id.public_id().clone(),
+            &config,
+            &total_used_space,
+            Init::New,
+            self.routing.clone(),
+        )?;
+        self.state = State::Elder {
+            duties,
+            accumulator: Accumulator::new(self.routing.clone()),
+        };
+        Ok(())
     }
 
     /// Runs the main event loop. Blocks until the node is terminated.
@@ -178,65 +277,6 @@ impl<R: CryptoRng + Rng> Node<R> {
                 }
             }
         }
-    }
-
-    /// Returns our connection info.
-    pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing
-            .borrow_mut()
-            .our_connection_info()
-            .map_err(From::from)
-    }
-
-    /// Returns whether routing node is in elder state.
-    pub fn is_elder(&mut self) -> bool {
-        self.routing.borrow().is_elder()
-    }
-
-    /// Returns whether node is in adult state.
-    #[allow(unused)]
-    pub fn is_adult(&self) -> bool {
-        if let State::Adult { .. } = self.state {
-            true
-        } else {
-            false
-        }
-    }
-
-    fn promote_to_adult(&mut self) -> Result<()> {
-        let mut config = Config::default();
-        config.set_root_dir(self.root_dir.clone());
-        let total_used_space = Rc::new(Cell::new(0));
-        let duties = AdultDuties::new(
-            self.id.public_id().clone(),
-            &config,
-            &total_used_space,
-            Init::New,
-            self.routing.clone(),
-        )?;
-        self.state = State::Adult {
-            duties,
-            accumulator: Accumulator::new(self.routing.clone()),
-        };
-        Ok(())
-    }
-
-    fn promote_to_elder(&mut self) -> Result<()> {
-        let mut config = Config::default();
-        config.set_root_dir(self.root_dir.clone());
-        let total_used_space = Rc::new(Cell::new(0));
-        let duties = ElderDuties::new(
-            self.id.public_id().clone(),
-            &config,
-            &total_used_space,
-            Init::New,
-            self.routing.clone(),
-        )?;
-        self.state = State::Elder {
-            duties,
-            accumulator: Accumulator::new(self.routing.clone()),
-        };
-        Ok(())
     }
 
     /// Processes any outstanding network events and returns. Does not block.
@@ -294,30 +334,12 @@ impl<R: CryptoRng + Rng> Node<R> {
         _processed
     }
 
-    fn step_routing(&mut self, event: RoutingEvent) {
-        debug!("Received routing event: {:?}", event);
-        let result = self.handle_routing_event(event);
-        self.step_cmds(result);
-    }
-
-    fn step_client(&mut self, event: ClientEvent) {
-        let result = self.handle_client_event(event);
-        self.step_cmds(result);
-    }
-
-    fn step_cmds(&mut self, cmd: Option<NodeCmd>) {
-        let mut next_cmd = cmd;
-        while let Some(cmd) = next_cmd {
-            next_cmd = self.handle_cmd(cmd);
-        }
-    }
-
     fn handle_routing_event(&mut self, event: RoutingEvent) -> Option<NodeCmd> {
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<ConsensusAction>(&custom_event) {
                     Ok(consensused_cmd) => {
-                        self.elder_duties()?.handle_consensused_cmd(consensused_cmd)
+                        self.elder_duties()?.gateway().handle_consensused_cmd(consensused_cmd)
                     }
                     Err(e) => {
                         error!("Invalid ConsensusAction passed from Routing: {:?}", e);
@@ -339,7 +361,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 trace!("A node has left the section. Node: {:?}", name);
                 if let Some(cmds) = self.elder_duties()?.member_left(XorName(name.0), age) {
                     for cmd in cmds {
-                        let result = self.handle_elder_cmd(cmd);
+                        let result = self.handle_cmd(cmd);
                         self.step_cmds(result);
                     }
                 };
@@ -365,86 +387,84 @@ impl<R: CryptoRng + Rng> Node<R> {
             ),
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
-                    "Received message: {:8?}\n Sent from {:?} to {:?}",
+                    "Received MsgEnvelope: {:8?}\n Sent from {:?} to {:?}",
                     HexFmt(&content),
                     src,
                     dst
                 );
-                self.handle_routing_message(src, content)
+                self.remote_msg_eval
+                    .msg(src, content)
             }
             RoutingEvent::EldersChanged { .. } => {
-                Some(NodeCmd::Elder(self.elder_duties()?.elders_changed()?))
+                self.elder_duties()?.elders_changed()
             }
             // Ignore all other events
             _ => None,
         }
     }
 
-    fn accumulate_msg(&mut self, src: SrcLocation, msg: Message) -> Option<NodeCmd> {
-        let id = *self.routing.borrow().id().name();
-        info!(
-            "{}: Accumulating signatures for {:?}",
-            &id,
-            msg.message_id()
-        );
-        if let Some((accumulated_msg, signature)) = self.accumulator()?.accumulate_request(msg) {
-            info!(
-                "Got enough signatures for {:?}",
-                accumulated_msg.message_id()
-            );
-            let prefix = match src {
-                SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
-                SrcLocation::Section(prefix) => prefix,
-            };
-            self.process_locally(
-                SrcLocation::Section(prefix),
-                accumulated_msg,
-                Some(signature),
-            )
+    fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<NodeCmd> {    
+        match bincode::deserialize::<MsgEnvelope>(&content) {
+            Ok(msg) => {
+                self.handle_remote_msg(msg)
+            }
+            Err(e) => {
+                error!(
+                    "Error deserializing routing MsgEnvelope into msg type: {:?}",
+                    e
+                );
+                None
+            }
+        }
+    }
+    fn handle_remote_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+        if self.remote_msg_eval.should_forward_to_network(msg) {
+            // Any type of msg that is not process locally.
+            self.messaging.borrow_mut().send_to_network(msg)
+        } else if self.remote_msg_eval.should_go_to_gateway() {
+            // Client auth operations (Temporarily handled here, will be at app layer (Authenticator)).
+            self.elder_duties()?.gateway().handle_auth_cmd(
+                src, msg,
+                None, // Gateway Elders should just execute and return the result, for client to accumulate.
+            )?
+        } else if self.remote_msg_eval.should_go_to_data_payment(msg) {
+            // Incoming msg from `Gateway`!
+            self.elder_duties()?.data_payment().pay_for_data(msg) // Payment Elders should just execute and send onwards.
+        } else if self.remote_msg_eval.should_go_to_metadata_write(msg) {
+            // Incoming msg from `Payment`!
+            self.accumulate_msg(src, msg) // Metadata Elders accumulate the msgs from Payment Elders.
+        } else if self.remote_msg_eval.should_go_to_chunk_write(msg) {
+            // Incoming msg from `Metadata`!
+            self.adult_duties()?.receive_msg(
+                src, msg,
+                None, // NB: pass in the request signature to validate duplication requests
+            )?
+        } else if self.remote_msg_eval.should_push_to_client(msg) {
+            // From network to client!
+            self.elder_duties()?.gateway().push_to_client(msg)?
+        } else if self.remote_msg_eval.should_go_to_rewards() {
+            self.elder_duties()?.rewards()
         } else {
+            error!("Unknown message: {:?}", msg.message.id());
             None
         }
     }
 
-    fn process_locally(
-        &mut self,
-        src: SrcLocation,
-        msg: Message,
-        accumulated_sig: Option<Signature>,
-    ) -> Option<NodeCmd> {
-        match self.state {
-            State::Elder { .. } => Some(NodeCmd::Elder(self.elder_duties()?.receive_msg(
-                src,
-                msg,
-                accumulated_sig,
-            )?)),
-            State::Adult { .. } => Some(NodeCmd::Adult(self.adult_duties()?.receive_msg(
-                src,
-                msg,
-                accumulated_sig,
-            )?)),
-            _ => None,
-        }
-    }
-
-    fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<NodeCmd> {
-        match bincode::deserialize::<Message>(&message) {
-            Ok(msg) => match &msg {
-                Message::Request { request, .. } => match request {
-                    Request::Client(_) => unimplemented!("Should not receive: {:?}", request),
-                    Request::Gateway(_) => self.accumulate_msg(src, msg),
-                    Request::Node(_) => self.process_locally(src, msg, None), // NB: pass in the request signature to validate duplication requests
-                },
-                Message::Response { requester, .. } => {
-                    self.forward_to_section(requester.name(), msg.clone())
-                }
-                Message::Duplicate { .. } => self.accumulate_msg(src, msg),
-                Message::DuplicationComplete { .. } => self.process_locally(src, msg, None),
-            },
-            Err(e) => {
-                error!("Error deserializing routing message into msg type: {:?}", e);
-                None
-            }
+    fn accumulate_msg(&mut self, src: SrcLocation, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let id = *self.routing.borrow().id().name();
+        info!("{}: Accumulating signatures for {:?}", &id, msg.message.id());
+        if let Some((accumulated_msg, _signature)) = self.accumulator()?.accumulate_cmd(msg) {
+            info!(
+                "Got enough signatures for {:?}",
+                accumulated_msg.message.id()
+            );
+            // let prefix = match src {
+            //     SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
+            //     SrcLocation::Section(prefix) => prefix,
+            // };
+            self.handle_remote_msg(msg)
+        } else {
+            None
         }
     }
 
@@ -454,22 +474,24 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
         let elder_duties = self.elder_duties()?;
         match event {
-            ConnectedTo { peer } => elder_duties.handle_new_connection(peer.peer_addr()),
+            ConnectedTo { peer } => elder_duties.gateway().handle_new_connection(peer.peer_addr()),
             ConnectionFailure { peer, .. } => {
-                elder_duties.handle_connection_failure(peer.peer_addr());
+                elder_duties.gateway().handle_connection_failure(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                return elder_duties.receive_client_request(peer.peer_addr(), &msg, &mut rng);
+                let gateway = elder_duties.gateway();
+                let parsed = gateway.try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
+                gateway.handle_client_msg(parsed.client, parsed.msg)
             }
             SentUserMessage { peer, .. } => {
                 trace!(
-                    "{}: Succesfully sent message to: {}",
+                    "{}: Succesfully sent Message to: {}",
                     self,
                     peer.peer_addr()
                 );
             }
             UnsentUserMessage { peer, .. } => {
-                info!("{}: Not sent message to: {}", self, peer.peer_addr());
+                info!("{}: Not sent Message to: {}", self, peer.peer_addr());
             }
             BootstrapFailure | BootstrappedTo { .. } => {
                 error!("unexpected bootstrapping client event")
@@ -479,207 +501,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
         }
         None
-    }
-
-    #[allow(dead_code)]
-    fn vote_for_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
-        self.routing
-            .borrow_mut()
-            .vote_for_user_event(utils::serialise(&cmd))
-            .map_or_else(
-                |_err| {
-                    error!("Cannot vote. node is not an elder");
-                    None
-                },
-                |()| None,
-            )
-    }
-
-    fn handle_cmd(&mut self, cmd: NodeCmd) -> Option<NodeCmd> {
-        use NodeCmd::*;
-        match cmd {
-            Adult(cmd) => self.handle_adult_cmd(cmd),
-            Elder(cmd) => self.handle_elder_cmd(cmd),
-        }
-    }
-
-    fn handle_adult_cmd(&mut self, cmd: AdultCmd) -> Option<NodeCmd> {
-        use AdultCmd::*;
-        match cmd {
-            SendToAdultPeers { targets, msg } => self.send_to_nodes(targets, msg),
-            RespondToOurElders(msg) => {
-                self.send_to_section(&XorName(self.routing.borrow().id().name().0), msg)
-            }
-        }
-    }
-
-    fn handle_elder_cmd(&mut self, cmd: ElderCmd) -> Option<NodeCmd> {
-        use ElderCmd::*;
-        match cmd {
-            Gateway(cmd) => self.handle_gateway_cmd(cmd),
-            Metadata(cmd) => self.handle_metadata_cmd(cmd),
-            Transfer(cmd) => self.handle_transfer_cmd(cmd),
-            Payment(cmd) => self.handle_payment_cmd(cmd),
-        }
-    }
-
-    fn handle_gateway_cmd(&mut self, cmd: GatewayCmd) -> Option<NodeCmd> {
-        use GatewayCmd::*;
-        match cmd {
-            VoteFor(cmd) => self.vote_for_cmd(cmd), // self.elder_duties()?.handle_consensused_cmd(cmd),
-            ForwardClientRequest(msg) => self.forward_client_request(msg),
-            RespondToClient {
-                message_id,
-                response,
-            } => {
-                self.elder_duties()?.respond_to_client(message_id, response);
-                None
-            }
-        }
-    }
-
-    fn handle_metadata_cmd(&mut self, cmd: MetadataCmd) -> Option<NodeCmd> {
-        use MetadataCmd::*;
-        match cmd {
-            SendToAdults { targets, msg } => self.send_to_nodes(targets, msg),
-            RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
-        }
-    }
-
-    fn handle_transfer_cmd(&mut self, cmd: TransferCmd) -> Option<NodeCmd> {
-        use TransferCmd::*;
-        match cmd {
-            SendToSection(msg) => match utils::dst_address(&msg) {
-                Some(dst) => self.send_to_section(&dst, msg),
-                None => {
-                    error!("Unable to send to section: {:?}", msg);
-                    None // consider actually crashing here, this is not an acceptable error
-                }
-            },
-            RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
-        }
-    }
-
-    fn handle_payment_cmd(&mut self, cmd: PaymentCmd) -> Option<NodeCmd> {
-        use PaymentCmd::*;
-        match cmd {
-            SendToSection(msg) => match utils::dst_address(&msg) {
-                Some(dst) => self.send_to_section(&dst, msg),
-                None => {
-                    error!("Unable to send to section: {:?}", msg);
-                    None // consider actually crashing here, this is not an acceptable error
-                }
-            },
-            RespondToGateway { sender, msg } => self.send_to_section(&sender, msg),
-        }
-    }
-
-    fn forward_to_section(&mut self, dst_address: &XorName, msg: Message) -> Option<NodeCmd> {
-        let is_our_section = self.self_is_handler_for(dst_address);
-        // let is_request = if let Message::Request { .. } = &msg {
-        //     true
-        // } else { false };
-        if is_our_section {
-            return self.process_locally(
-                SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                msg,
-                None,
-            );
-        } else {
-            self.send_to_section(dst_address, msg)
-        }
-    }
-
-    // fn forward_to_node(&mut self, dst_address: XorName, msg: Message) -> Option<NodeCmd> {
-    //     if &dst_address == self.id.public_id().name() {
-    //         let result = self.accumulate_msg(
-    //             SrcLocation::Node(routing::XorName(dst_address.0)),
-    //             msg.clone(),
-    //         );
-    //         self.step_cmds(result);
-    //     } else {
-    //         self.send_to_node(dst_address, msg);
-    //     }
-    //     None
-    // }
-
-    fn send_to_nodes(&mut self, targets: BTreeSet<XorName>, msg: Message) -> Option<NodeCmd> {
-        for target in targets {
-            self.send_to_node(target, msg.clone());
-        }
-        None
-    }
-
-    fn send_to_section(&self, dst: &XorName, msg: Message) -> Option<NodeCmd> {
-        let name = *self.routing.borrow().id().name();
-        self.routing
-            .borrow_mut()
-            .send_message(
-                SrcLocation::Node(name),
-                DstLocation::Section(routing::XorName(dst.0)),
-                utils::serialise(&msg),
-            )
-            .map_or_else(
-                |err| {
-                    error!("Unable to send to section: {:?}", err);
-                    None
-                },
-                |()| {
-                    info!("Sent to section with: {:?}", msg);
-                    None
-                },
-            )
-    }
-
-    fn send_to_node(&self, target: XorName, msg: Message) {
-        let name = *self.routing.borrow().id().name();
-        self.routing
-            .borrow_mut()
-            .send_message(
-                SrcLocation::Node(name),
-                DstLocation::Node(routing::XorName(target.0)),
-                utils::serialise(&msg),
-            )
-            .map_or_else(
-                |err| {
-                    error!("Unable to send message to Peer: {:?}", err);
-                    //None
-                },
-                |()| {
-                    info!("Sent message to Peer {:?} from node {:?}", target, name);
-                    //None
-                },
-            )
-    }
-
-    fn forward_client_request(&mut self, msg: Message) -> Option<NodeCmd> {
-        trace!("{} received a client request {:?}", self, msg);
-        let msg_clone = msg.clone();
-        let dst_address = if let Message::Request { ref request, .. } = msg_clone {
-            match request.dst_address() {
-                Some(address) => address,
-                None => {
-                    error!("{}: Logic error - no data handler address available.", self);
-                    return None;
-                }
-            }
-        } else {
-            error!(
-                "{}: Logic error - expected Request, but got something else.",
-                self
-            );
-            return None;
-        };
-
-        self.forward_to_section(&dst_address, msg)
-    }
-
-    fn self_is_handler_for(&self, address: &XorName) -> bool {
-        let xorname = routing::XorName(address.0);
-        match self.routing.borrow().matches_our_prefix(&xorname) {
-            Ok(result) => result,
-            _ => false,
-        }
     }
 
     fn accumulator(&mut self) -> Option<&mut Accumulator> {
@@ -696,17 +517,47 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
-        match &mut self.state {
-            State::Adult { ref mut duties, .. } => Some(duties),
-            _ => None,
+    pub fn step_cmds(&mut self, cmd: Option<NodeCmd>) {
+        let mut next_cmd = cmd;
+        while let Some(cmd) = next_cmd {
+            next_cmd = self.handle_cmd(cmd);
         }
     }
 
-    fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
-        match &mut self.state {
-            State::Elder { ref mut duties, .. } => Some(duties),
-            _ => None,
+    pub fn vote_for_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
+        self.routing
+            .borrow_mut()
+            .vote_for_user_event(utils::serialise(&cmd))
+            .map_or_else(
+                |_err| {
+                    error!("Cannot vote. node is not an elder");
+                    None
+                },
+                |()| None,
+            )
+    }
+
+    pub fn handle_cmd(&mut self, cmd: NodeCmd) -> Option<NodeCmd> {
+        use NodeCmd::*;
+        match cmd {
+            SendToClient(msg) => {
+                if self.is_handler_for(msg.origin.address()) {
+                    self.messaging.borrow_mut().send_to_client(msg)
+                } else {
+                    Some(NodeCmd::SendToSection(msg))
+                }
+            },
+            SendToNode(msg) => self.messaging.borrow_mut().send_to_node(msg),
+            SendToAdults { msgs } => self.messaging.borrow_mut().send_to_nodes(msgs),
+            SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),
+            VoteFor(cmd) => self.vote_for_cmd(cmd),
+        }
+    }
+
+    fn is_handler_for(&self, address: Address) -> bool {
+        match address {
+            Address::Client(xorname) => self.remote_msg_eval.self_is_handler_for(xorname),
+            _ => false,
         }
     }
 

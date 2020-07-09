@@ -28,7 +28,7 @@ pub(super) struct AccountStorage {
     chunks: AccountChunkStore,
 }
 
-fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
     Some(ElderCmd::Metadata(cmd))
 }
 
@@ -55,7 +55,7 @@ impl AccountStorage {
         client: PublicId,
         read: &AccountRead,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use AccountRead::*;
         match read {
             Get(ref address) => self.get(client, address, message_id),
@@ -67,7 +67,7 @@ impl AccountStorage {
         requester: PublicId,
         address: &XorName,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .account(utils::own_key(&requester)?, address)
             .map(Account::into_data_and_signature);
@@ -88,7 +88,7 @@ impl AccountStorage {
         client: PublicId,
         write: AccountWrite,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use AccountWrite::*;
         match write {
             New(ref account) => self.create(client, account, message_id),
@@ -101,7 +101,7 @@ impl AccountStorage {
         requester: PublicId,
         account: &Account,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
         } else {
@@ -126,7 +126,7 @@ impl AccountStorage {
         requester: PublicId,
         updated_account: &Account,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .account(utils::own_key(&requester)?, updated_account.address())
             .and_then(|_existing_login_packet| {

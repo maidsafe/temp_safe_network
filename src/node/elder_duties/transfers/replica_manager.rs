@@ -91,14 +91,18 @@ impl ReplicaManager {
     }
 
     pub(crate) fn validate(&mut self, transfer: SignedTransfer) -> Result<TransferValidated> {
-        let event = self.replica.validate(transfer)?;
-        match self.persist(ReplicaEvent::TransferValidated(event.clone())) {
-            Ok(()) => Ok(event),
-            Err(err) => Err(err),
+        let result = self.replica.validate(transfer);
+        if let Ok(Some(event)) = result {
+            match self.persist(ReplicaEvent::TransferValidated(event.clone())) {
+                Ok(()) => Ok(event),
+                Err(err) => Err(err),
+            }
+        } else {
+            result
         }
     }
 
-    pub(crate) fn register(&mut self, proof: &DebitAgreementProof) -> Result<TransferRegistered> {
+    pub(crate) fn register(&mut self, proof: &DebitAgreementProof) -> Result<Option<TransferRegistered>> {
         let serialized = bincode::serialize(&proof.signed_transfer)
             .map_err(|e| Error::NetworkOther(e.to_string()))?;
         let sig = proof
@@ -110,7 +114,7 @@ impl ReplicaManager {
             })?;
         let section_keys = self.section_proof_chain.clone();
 
-        let event = self.replica.clone().register(proof, move || {
+        let result = self.replica.clone().register(proof, move || {
             let key = section_keys
                 .keys()
                 .find(|&key_in_chain| key_in_chain == &proof.replica_key.public_key());
@@ -120,18 +124,22 @@ impl ReplicaManager {
                 // PublicKey provided by the transfer was never a part of the Section retrospectively.
                 false
             }
-        })?;
+        });
 
-        match self.persist(ReplicaEvent::TransferRegistered(event.clone())) {
-            Ok(()) => Ok(event),
-            Err(err) => Err(err),
+        if let Ok(Some(event)) = result {
+            match self.persist(ReplicaEvent::TransferRegistered(event.clone())) {
+                Ok(()) => Ok(event),
+                Err(err) => Err(err),
+            }
+        } else {
+            result
         }
     }
 
     pub(crate) fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,
-    ) -> Result<TransferPropagated> {
+    ) -> Result<Option<TransferPropagated>> {
         let serialized = bincode::serialize(&proof.signed_transfer)
             .map_err(|e| Error::NetworkOther(e.to_string()))?;
         let section_keys = self.section_proof_chain.clone();
@@ -143,7 +151,7 @@ impl ReplicaManager {
                 Error::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
             })?;
 
-        let event = self.replica.receive_propagated(proof, move || {
+        let result = self.replica.receive_propagated(proof, move || {
             let key = section_keys
                 .keys()
                 .find(|&key_in_chain| key_in_chain == &proof.replica_key.public_key());
@@ -157,11 +165,15 @@ impl ReplicaManager {
                 // PublicKey provided by the transfer was never a part of the Section retrospectively.
                 None
             }
-        })?;
+        });
 
-        match self.persist(ReplicaEvent::TransferPropagated(event.clone())) {
-            Ok(()) => Ok(event),
-            Err(err) => Err(err),
+        if let Ok(Some(event)) = result {
+            match self.persist(ReplicaEvent::TransferPropagated(event.clone())) {
+                Ok(()) => Ok(Some(event)),
+                Err(err) => Err(err),
+            }
+        } else {
+            result
         }
     }
 
@@ -172,7 +184,7 @@ impl ReplicaManager {
     }
 
     /// Get the replica's PK set
-    pub fn replicas_pk_set(&self) -> Result<PublicKeySet> {
+    pub fn replicas_pk_set(&self) -> Option<PublicKeySet> {
         self.replica.replicas_pk_set()
     }
 }
@@ -185,7 +197,7 @@ impl ReplicaManager {
         transfer: Transfer,
         message_id: MessageId,
         sender: XorName,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();

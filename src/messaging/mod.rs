@@ -14,7 +14,7 @@ use rand::{CryptoRng, Rng};
 use routing::Node;
 use safe_nd::{
     DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId,
-    PublicId, Request, Response, Signature, TransferNotification, XorName,
+    PublicId, MsgEnvelope, Signature, XorName, Result,
 };
 use serde::Serialize;
 use std::{
@@ -30,7 +30,7 @@ pub(super) struct Messaging {
     routing_node: Rc<RefCell<Node>>,
     clients: HashMap<SocketAddr, ClientInfo>,
     pending_msg_ids: HashMap<MessageId, SocketAddr>,
-    pending_actions: HashMap<MessageId, Response>,
+    pending_actions: HashMap<MessageId, MsgEnvelope>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
 }
@@ -54,74 +54,78 @@ impl Messaging {
         rng: &mut R,
     ) -> Option<ClientMsg> {
         if let Some(client) = self.clients.get(&peer_addr).cloned() {
-            match bincode::deserialize(&bytes) {
-                Ok(Message::Request {
-                    request,
-                    message_id,
-                    signature,
-                }) => {
-                    if self.shall_handle_request(message_id, peer_addr) {
-                        if let Request::Client(request) = request {
-                            return Some(ClientMsg {
-                                client,
-                                request,
-                                message_id,
-                                signature,
-                            });
-                        }
-                    }
-                }
-                Ok(Message::Response { response, .. }) => {
-                    info!(
-                        "{}: {} invalidly sent {:?}",
-                        self, client.public_id, response
-                    );
-                }
-                Ok(Message::TransferNotification { payload, .. }) => {
-                    info!(
-                        "{}: {} invalidly sent {:?}",
-                        self, client.public_id, payload
-                    );
-                }
-                Err(err) => {
-                    info!(
-                        "{}: Unable to deserialise message from {}: {}",
-                        self, client.public_id, err
-                    );
-                }
-            }
+            self.try_get_client_msg()
         } else {
-            match bincode::deserialize(&bytes) {
-                Ok(HandshakeRequest::Bootstrap(client_id)) => {
-                    self.try_bootstrap(peer_addr, &client_id);
-                }
-                Ok(HandshakeRequest::Join(client_id)) => {
-                    self.try_join(peer_addr, client_id, rng);
-                }
-                Ok(HandshakeRequest::ChallengeResult(signature)) => {
-                    self.handle_challenge(peer_addr, &signature);
-                }
-                Err(err) => {
-                    info!(
-                        "{}: Unable to deserialise handshake request from {}: {}",
-                        self, peer_addr, err
-                    );
-                }
-            }
+            self.try_handle_handshake(&bytes);
+            None
+        }
+    }
+
+    fn try_get_client_msg(&mut self, bytes: &Bytes, peer_addr: SocketAddr) -> Option<ClientMsg> {
+        let msg = self.try_deserialize_msg(bytes)?;
+        if self.shall_handle_request(msg.message.id(), peer_addr) {
+            trace!(
+                "{}: Received ({:?} {:?}) from {}",
+                self,
+                "msg.get_type()",
+                msg.message.id(),
+                client
+            );
+            return Some(ClientMsg { client, msg });
         }
         None
+    }
+
+    fn try_deserialize_msg(&mut self, bytes: &Bytes) -> Option<MsgEnvelope> {
+        match bincode::deserialize(&bytes) {
+            Ok(msg @ MsgEnvelope { message: Message::Cmd, .. }) => Some(msg),
+            Ok(msg @ MsgEnvelope { message: Message::Query, .. }) => Some(msg),
+            Ok(msg @ MsgEnvelope { message: Message::Event, .. })
+            Ok(msg @ MsgEnvelope { message: Message::CmdError, .. }) 
+            Ok(msg @ MsgEnvelope { message: Message::QueryResponse, .. }) => {
+                info!(
+                    "{}: {} invalidly sent {:?}",
+                    self, client.public_id, msg
+                );
+                None
+            }
+            Err(err) => {
+                info!(
+                    "{}: Unable to deserialise message from {}: {}",
+                    self, client.public_id, err
+                );
+                None
+            }
+        }
+    }
+
+    fn try_handle_handshake(&mut self, bytes: &Bytes) {
+        match bincode::deserialize(&bytes) {
+            Ok(HandshakeRequest::Bootstrap(client_id)) => {
+                self.try_bootstrap(peer_addr, &client_id);
+            }
+            Ok(HandshakeRequest::Join(client_id)) => {
+                self.try_join(peer_addr, client_id, rng);
+            }
+            Ok(HandshakeRequest::ChallengeResult(signature)) => {
+                self.handle_challenge(peer_addr, &signature);
+            }
+            Err(err) => {
+                info!(
+                    "{}: Unable to deserialise handshake request from {}: {}",
+                    self, peer_addr, err
+                );
+            }
+        }
     }
 
     pub fn shall_handle_request(&mut self, message_id: MessageId, peer_addr: SocketAddr) -> bool {
         // We could receive a consensused vault msg contains a client request,
         // before receiving the request from that client directly.
-        if let Some(response) = self.pending_actions.remove(&message_id) {
+        if let Some(msg) = self.pending_actions.remove(&message_id) {
             self.send(
                 peer_addr,
-                &Message::Response {
-                    response,
-                    message_id,
-                },
+                &msg,
             );
             return false;
         }
@@ -163,93 +167,35 @@ impl Messaging {
         }
     }
 
-    #[allow(unused)]
-    pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
-        for client_id in self.lookup_client_and_its_apps(client) {
-            self.send_notification_to_client(&client_id, &TransferNotification(receipt.clone()));
-        }
-    }
+    // #[allow(unused)]
+    // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
+    //     for client_id in self.lookup_client_and_its_apps(client) {
+    //         self.send_notification_to_client(&client_id, &TransferNotification(receipt.clone()));
+    //     }
+    // }
 
-    pub fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
-        let peer_addr = match self.pending_msg_ids.remove(&message_id) {
+    pub fn send_to_client(&mut self, msg: MsgEnvelope) -> Result<()> {
+        let msg_id = msg.message.id();
+        match msg.destination() {
+            Address::Client { .. } => (),
+            _ => {
+                error!("{} for message-id {:?}, Invalid destination.", self, msg_id);
+                return Err(Error::InvalidOperation),
+            }
+        };
+        let peer_addr = match self.pending_msg_ids.remove(&msg_id) {
             Some(peer_addr) => peer_addr,
             None => {
                 info!(
                     "{} for message-id {:?}, Unable to find the client to respond to.",
-                    self, message_id
+                    self, msg_id
                 );
-                let _ = self.pending_actions.insert(message_id, response);
-                return;
+                let _ = self.pending_actions.insert(msg_id, msg);
+                return Err(Error::KeyNotFound),
             }
         };
 
-        self.send(
-            peer_addr,
-            &Message::Response {
-                response,
-                message_id,
-            },
-        )
-    }
-
-    /// Relay response from other node to the client.
-    pub fn relay_reponse_to_client(
-        &mut self,
-        data_handlers: XorName,
-        requester: &PublicId,
-        response: Response,
-        message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        use Response::*;
-        trace!(
-            "{}: Received ({:?} {:?}) to {} from {}",
-            self,
-            response,
-            message_id,
-            requester,
-            data_handlers
-        );
-
-        match response {
-            // Transfer the response from data handlers to clients
-            GetIData(..)
-            | GetSData(..)
-            | GetSDataRange(..)
-            | GetSDataLastEntry(..)
-            | GetSDataOwner(..)
-            | GetSDataUserPermissions(..)
-            | GetSDataPermissions(..)
-            | GetMData(..)
-            | GetMDataShell(..)
-            | GetMDataVersion(..)
-            | ListMDataEntries(..)
-            | ListMDataKeys(..)
-            | ListMDataValues(..)
-            | ListMDataUserPermissions(..)
-            | ListMDataPermissions(..)
-            | GetMDataValue(..)
-            | Write(..)
-            | GetBalance(_)
-            | GetReplicaKeys(_)
-            | GetHistory(_)
-            | TransferValidation(..)
-            | TransferDebitAgreementProof(..)
-            | TransferRegistration(..)
-            | TransferPropagation(..) => {
-                self.respond_to_client(message_id, response);
-                None
-            }
-            //
-            // ===== Invalid =====
-            //
-            GetLoginPacket(_) | ListAuthKeysAndVersion(_) => {
-                error!(
-                    "{}: Should not receive {:?} as a client handler.",
-                    self, response
-                );
-                None
-            }
-        }
+        Ok(self.send(peer_addr, &msg))
     }
 
     /// Handles a received challenge response.
@@ -357,30 +303,30 @@ impl Messaging {
         }
     }
 
-    pub(crate) fn send_notification_to_client(
-        &mut self,
-        client_id: &PublicId,
-        notification: &TransferNotification,
-    ) {
-        let peer_addrs = self.lookup_client_peer_addrs(&client_id);
+    // pub(crate) fn send_notification_to_client(
+    //     &mut self,
+    //     client_id: &PublicId,
+    //     notification: &TransferNotification,
+    // ) {
+    //     let peer_addrs = self.lookup_client_peer_addrs(&client_id);
 
-        if peer_addrs.is_empty() {
-            warn!(
-                "{}: can't notify {} as none of the instances of the client is connected.",
-                self, client_id
-            );
-            return;
-        };
+    //     if peer_addrs.is_empty() {
+    //         warn!(
+    //             "{}: can't notify {} as none of the instances of the client is connected.",
+    //             self, client_id
+    //         );
+    //         return;
+    //     };
 
-        for peer_addr in peer_addrs {
-            self.send(
-                peer_addr,
-                &Message::TransferNotification {
-                    payload: notification.clone(),
-                },
-            )
-        }
-    }
+    //     for peer_addr in peer_addrs {
+    //         self.send(
+    //             peer_addr,
+    //             &Message::TransferNotification {
+    //                 payload: notification.clone(),
+    //             },
+    //         )
+    //     }
+    // }
 
     fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
         self.clients

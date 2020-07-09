@@ -12,13 +12,13 @@ use super::{
 };
 use crate::cmd::ElderCmd;
 use routing::SrcLocation;
-use safe_nd::{AccountWrite, BlobWrite, MapWrite, MessageId, PublicId, SequenceWrite, Write};
+use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MessageId, PublicId, SequenceWrite};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
     _src: SrcLocation,
     requester: PublicId,
-    write: Write,
+    cmd: DataCmd,
     message_id: MessageId,
     _accumulated_signature: Option<Signature>,
     _public_key: Option<PublicKey>,
@@ -26,7 +26,7 @@ pub(super) struct Writing {
 
 impl Writing {
     pub fn new(
-        write: Write,
+        cmd: DataCmd,
         _src: SrcLocation,
         requester: PublicId,
         message_id: MessageId,
@@ -36,16 +36,16 @@ impl Writing {
         Self {
             _src,
             requester,
-            write,
+            cmd,
             message_id,
             _accumulated_signature,
             _public_key,
         }
     }
 
-    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<ElderCmd> {
-        use Write::*;
-        match self.write.clone() {
+    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<NodeCmd> {
+        use DataCmd::*;
+        match self.cmd.clone() {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
             Map(write) => self.map(write, stores.map_storage_mut()),
             Sequence(write) => self.sequence(write, stores.sequence_storage_mut()),
@@ -53,11 +53,11 @@ impl Writing {
         }
     }
 
-    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<ElderCmd> {
+    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<NodeCmd> {
         register.write(self.requester.clone(), write, self.message_id)
     }
 
-    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<ElderCmd> {
+    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<NodeCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 
@@ -65,11 +65,11 @@ impl Writing {
         &mut self,
         write: SequenceWrite,
         storage: &mut SequenceStorage,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 
-    fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<ElderCmd> {
+    fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<NodeCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 }

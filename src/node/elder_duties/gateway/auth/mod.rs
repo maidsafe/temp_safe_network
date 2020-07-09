@@ -16,9 +16,10 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, ClientAuth, ClientRequest, DataAuthKind, Error as NdError,
-    GatewayRequest, MessageId, MiscAuthKind, MoneyAuthKind, NodePublicId, PublicId, PublicKey,
-    Request, RequestAuthKind, Response, Signature, SystemOp,
+    AppPermissions, AppPublicId, AuthCmd, AuthQuery, ClientAuth, CmdError,
+    DataAuthKind, Duty, ElderDuty, Error as NdError, Message, MessageId,
+    MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, NodePublicId, PublicId, PublicKey,
+    RequestAuthKind, Signature, Cmd, QueryResponse,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -37,39 +38,58 @@ impl Auth {
         Self { id, auth_keys }
     }
 
-    pub fn initiate(
+    pub(super) fn initiate(
         &mut self,
         client: PublicId,
-        request: ClientAuth,
+        msg: MsgEnvelope,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        use ClientAuth::*;
-        match request {
-            ListAuthKeysAndVersion => self.list_keys_and_version(client, message_id),
-            InsAuthKey {
-                key,
-                version,
-                permissions,
-            } => self.initiate_key_insertion(client, key, version, permissions, message_id),
-            DelAuthKey { key, version } => {
-                self.initiate_key_deletion(client, key, version, message_id)
+    ) -> Option<NodeCmd> {
+        let auth_cmd = match msg.message {
+            Message::Cmd { cmd: Cmd::Auth(auth_cmd), .. } => auth_cmd,
+            _ => return None,
+        };
+        use AuthCmd::*;
+        match auth_cmd {
+            InsAuthKey { .. }
+            | DelAuthKey { .. } => {
+                self.set_proxy(&mut msg);
+                Some(GatewayCmd::VoteFor(ConsensusAction::Forward(msg)))
             }
         }
+    }
+
+    pub fn query(
+        &mut self,
+        client: PublicId,
+        msg: MsgEnvelope,
+    ) -> Option<NodeCmd> {
+        self.list_keys_and_version(client, message_id)
     }
 
     // If the client is app, check if it is authorised to perform the given request.
     pub fn authorise_app(
         &mut self,
         public_id: &PublicId,
-        request: &ClientRequest,
+        msg: &MsgEnvelope,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
             _ => return None,
         };
 
-        let result = match request.authorisation_kind() {
+        match msg.most_recent_sender() {
+            MsgSender::Client { .. } => (),
+            _ => return None,
+        };
+
+        let auth_kind = match msg.message {
+            Message::Cmd { cmd, .. } => cmd.authorisation_kind(),
+            Message::Query { query, .. } => query.authorisation_kind(),
+            _ => return None,
+        };
+
+        let result = match auth_kind {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => Ok(()),
             RequestAuthKind::Data(DataAuthKind::PrivateRead) => {
                 self.check_app_permissions(app_id, |_| true)
@@ -95,10 +115,23 @@ impl Auth {
         };
 
         if let Err(error) = result {
-            Some(GatewayCmd::RespondToClient {
-                message_id,
-                response: request.error_response(error),
-            })
+            let message = Message::CmdError {
+                error: CmdError::Auth(error),
+                id: MessageId::new(), // or hash of msg.message.id() ? But will that be problem at client? hash(self.id() + msg.id()) is better
+                correlation_id: msg.message.id(),
+                cmd_origin: msg.origin.address(),
+            };
+            // origin signs the message, while proxies sign the envelope
+            let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
+            let cmd_error = MsgEnvelope {
+                message,
+                origin: MsgSender {
+                    id: id.public_id().public_key(),
+                    duty: Duty::Elder(ElderDuty::Gateway),
+                    signature,
+                },
+            };
+            Some(GatewayCmd::PushToClient(cmd_error))
         } else {
             None
         }
@@ -108,119 +141,62 @@ impl Auth {
     fn list_keys_and_version(
         &mut self,
         client: PublicId,
-        message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+        msg: MsgEnvelope,
+    ) -> Option<NodeCmd> {
+        use AuthQuery::*;
+        match msg.message {
+            Message::Query { cmd: Query::Auth(ListAuthKeysAndVersion), .. } => (),
+            _ => return None,
+        };
         let result = Ok(self
             .auth_keys
             .list_keys_and_version(utils::client(&client)?));
-        Some(GatewayCmd::RespondToClient {
-            message_id,
-            response: Response::ListAuthKeysAndVersion(result),
-        })
+        Some(NodeCmd::SendToClient(MsgEnvelope {
+            message: Message::QueryResponse {
+                response: QueryResponse::ListAuthKeysAndVersion(result),
+                id: MessageId::new(),
+                /// ID of causing query.
+                correlation_id: msg.message.id(),
+                /// The sender of the causing query.
+                query_origin: msg.origin,
+            },
+            origin: MsgSender {
+                id: ,
+                duty: Duty::Elder(ElderDuty::Gateway),
+                signature,
+            },
+            proxies: Default::default(),
+        }))
     }
 
     // on consensus
     pub(super) fn finalise(
         &mut self,
         requester: PublicId,
-        request: ClientAuth,
+        msg: MsgEnvelope,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        use ClientAuth::*;
-        match request {
+    ) -> Option<NodeCmd> {
+        use AuthCmd::*;
+        let auth_cmd = match msg.message {
+            Message::Cmd { cmd: Cmd::Auth(auth_cmd), .. } => auth_cmd,
+            _ => return None,
+        };
+        match auth_cmd {
             InsAuthKey {
                 key,
                 version,
                 permissions,
-            } => self.finalise_key_insertion(requester, key, version, permissions, message_id),
+            } => {
+                let result = self.auth_keys
+                    .insert(utils::client(&requester)?, key, new_version, permissions);
+                None
+            },
             DelAuthKey { key, version } => {
-                self.finalise_key_deletion(requester, key, version, message_id)
-            }
-            ListAuthKeysAndVersion => {
-                error!(
-                    "{}: Should not receive {:?} as a client handler.",
-                    self, request
-                );
+                let result = self.auth_keys
+                    .delete(utils::client(&requester)?, key, new_version);
                 None
             }
         }
-    }
-
-    // on client request
-    fn initiate_key_insertion(
-        &self,
-        client_public_id: PublicId,
-        key: PublicKey,
-        new_version: u64,
-        permissions: AppPermissions,
-        message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Request::Gateway(GatewayRequest::System(SystemOp::ClientAuth(
-                ClientAuth::InsAuthKey {
-                    key,
-                    version: new_version,
-                    permissions,
-                },
-            ))),
-            client_public_id,
-            message_id,
-        }))
-    }
-
-    // on consensus
-    fn finalise_key_insertion(
-        &mut self,
-        requester: PublicId,
-        key: PublicKey,
-        new_version: u64,
-        permissions: AppPermissions,
-        message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        let result =
-            self.auth_keys
-                .insert(utils::client(&requester)?, key, new_version, permissions);
-        Some(GatewayCmd::RespondToClient {
-            message_id,
-            response: Response::Write(result),
-        })
-    }
-
-    // on client request
-    fn initiate_key_deletion(
-        &mut self,
-        client_public_id: PublicId,
-        key: PublicKey,
-        new_version: u64,
-        message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
-            request: Request::Gateway(GatewayRequest::System(SystemOp::ClientAuth(
-                ClientAuth::DelAuthKey {
-                    key,
-                    version: new_version,
-                },
-            ))),
-            client_public_id,
-            message_id,
-        }))
-    }
-
-    // on consensus
-    pub fn finalise_key_deletion(
-        &mut self,
-        requester: PublicId,
-        key: PublicKey,
-        new_version: u64,
-        message_id: MessageId,
-    ) -> Option<GatewayCmd> {
-        let result = self
-            .auth_keys
-            .delete(utils::client(&requester)?, key, new_version);
-        Some(GatewayCmd::RespondToClient {
-            message_id,
-            response: Response::Write(result),
-        })
     }
 
     // Verify that valid signature is provided if the request requires it.
@@ -230,7 +206,7 @@ impl Auth {
         request: &ClientRequest,
         message_id: MessageId,
         signature: Option<Signature>,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         match request.authorisation_kind() {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
@@ -276,10 +252,14 @@ impl Auth {
     fn is_valid_client_signature(
         &self,
         client_id: PublicId,
-        request: &ClientRequest,
-        message_id: &MessageId,
-        signature: &Signature,
+        msg: &MsgEnvelope,
     ) -> bool {
+        let signature = match msg.origin {
+            MsgSender::Client {
+                signature, ..
+            } => signature,
+            _ => return false,
+        };
         let pub_key = match utils::own_key(&client_id) {
             Some(pk) => pk,
             None => {
@@ -287,16 +267,26 @@ impl Auth {
                 return false;
             }
         };
-        match pub_key.verify(signature, utils::serialise(&(request, message_id))) {
+        match pub_key.verify(&signature, utils::serialise(&msg.message)) {
             Ok(_) => true,
             Err(error) => {
                 warn!(
                     "{}: ({:?}/{:?}) from {} is invalid: {}",
-                    self, request, message_id, client_id, error
+                    self, "msg.get_type()", msg.message.id(), client_id, error
                 );
                 false
             }
         }
+    }
+
+    fn set_proxy(&self, msg: &mut MsgEnvelope) {
+        // origin signs the message, while proxies sign the envelope
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&msg));
+        msg.add_proxy(MsgSender {
+            id: self.id.into(),
+            duty: Duty::Elder(ElderDuty::Gateway),
+            signature,
+        })
     }
 }
 

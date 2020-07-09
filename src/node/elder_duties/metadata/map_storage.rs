@@ -55,7 +55,7 @@ impl MapStorage {
         requester: PublicId,
         read: &MapRead,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use MapRead::*;
         match read {
             Get(address) => self.get(requester, *address, message_id),
@@ -77,7 +77,7 @@ impl MapStorage {
         requester: PublicId,
         write: MapWrite,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use MapWrite::*;
         match write {
             New(data) => self.create(requester, &data, message_id),
@@ -143,7 +143,7 @@ impl MapStorage {
         requester: PublicId,
         message_id: MessageId,
         mutation_fn: F,
-    ) -> Option<ElderCmd>
+    ) -> Option<NodeCmd>
     where
         F: FnOnce(MData) -> NdResult<MData>,
     {
@@ -178,7 +178,7 @@ impl MapStorage {
         requester: PublicId,
         data: &MData,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -203,7 +203,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         let result = self
@@ -241,7 +241,7 @@ impl MapStorage {
         permissions: &MDataPermissionSet,
         version: u64,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.edit_chunk(&address, requester, message_id, move |mut data| {
@@ -259,7 +259,7 @@ impl MapStorage {
         user: PublicKey,
         version: u64,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.edit_chunk(&address, requester, message_id, move |mut data| {
@@ -276,7 +276,7 @@ impl MapStorage {
         address: MDataAddress,
         actions: MDataEntryActions,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let requester_pk = *utils::own_key(&requester)?;
 
         self.edit_chunk(&address, requester, message_id, move |mut data| {
@@ -291,7 +291,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         wrap(MetadataCmd::RespondToGateway {
@@ -311,7 +311,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.shell());
@@ -333,7 +333,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.version());
@@ -356,7 +356,7 @@ impl MapStorage {
         address: MDataAddress,
         key: &[u8],
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::GetMDataValue(res.and_then(|data| {
@@ -391,7 +391,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.keys());
@@ -413,7 +413,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::ListMDataValues(res.and_then(|data| match data {
@@ -438,7 +438,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
 
         let response = Response::ListMDataEntries(res.and_then(|data| match data {
@@ -463,7 +463,7 @@ impl MapStorage {
         requester: PublicId,
         address: MDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .map(|data| data.permissions());
@@ -486,7 +486,7 @@ impl MapStorage {
         address: MDataAddress,
         user: PublicKey,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let result = self
             .get_chunk(&address, &requester, MDataAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
@@ -503,7 +503,7 @@ impl MapStorage {
     }
 }
 
-fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
     Some(ElderCmd::Metadata(cmd))
 }
 

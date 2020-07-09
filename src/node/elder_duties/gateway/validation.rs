@@ -15,7 +15,7 @@ use log::trace;
 use safe_nd::{
     Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Error as NdError,
     GatewayRequest, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId,
-    NodePublicId, NodeRequest, PublicId, Read, Request, Response, SData, SDataAddress,
+    NodePublicId, NodeRequest, PublicId, Read, SData, SDataAddress,
     SequenceRead, SequenceWrite, Write,
 };
 use std::fmt::{self, Display, Formatter};
@@ -40,21 +40,21 @@ impl Validation {
 
     pub fn initiate_write(
         &mut self,
-        write: Write,
+        cmd: DataCmd,
         client: PublicId,
         msg_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
-        match write {
-            Write::Blob(write) => self
+    ) -> Option<NodeCmd> {
+        match cmd {
+            DataCmd::Blob(write) => self
                 .blobs
                 .initiate_write(client, write, msg_id, debit_proof),
-            Write::Map(write) => self.maps.initiate_write(client, write, msg_id, debit_proof),
-            Write::Sequence(write) => {
+            DataCmd::Map(write) => self.maps.initiate_write(client, write, msg_id, debit_proof),
+            DataCmd::Sequence(write) => {
                 self.sequences
                     .initiate_write(client, write, msg_id, debit_proof)
             }
-            Write::Account(write) => {
+            DataCmd::Account(write) => {
                 self.accounts
                     .initiate_write(client, write, msg_id, debit_proof)
             }
@@ -63,15 +63,15 @@ impl Validation {
 
     pub fn initiate_read(
         &mut self,
-        read: Read,
+        read: DataQuery,
         client: PublicId,
         msg_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         match read {
-            Read::Blob(write) => self.blobs.initiate_read(client, write, msg_id),
-            Read::Map(write) => self.maps.initiate_read(client, write, msg_id),
-            Read::Sequence(write) => self.sequences.initiate_read(client, write, msg_id),
-            Read::Account(read) => self.accounts.initiate_read(client, read, msg_id),
+            DataQuery::Blob(write) => self.blobs.initiate_read(client, write, msg_id),
+            DataQuery::Map(write) => self.maps.initiate_read(client, write, msg_id),
+            DataQuery::Sequence(write) => self.sequences.initiate_read(client, write, msg_id),
+            DataQuery::Account(read) => self.accounts.initiate_read(client, read, msg_id),
         }
     }
 }
@@ -96,7 +96,7 @@ impl Sequences {
         requester: PublicId,
         request: SequenceRead,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         Some(GatewayCmd::ForwardClientRequest(Message::Request {
             requester,
             request: Request::Node(NodeRequest::Read(Read::Sequence(request))),
@@ -112,7 +112,7 @@ impl Sequences {
         write: SequenceWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         use SequenceWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
@@ -130,7 +130,7 @@ impl Sequences {
         chunk: SData,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         let owner = utils::owner(&client)?;
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
@@ -161,7 +161,7 @@ impl Sequences {
         address: SDataAddress,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         if address.is_pub() {
             return Some(GatewayCmd::RespondToClient {
                 message_id,
@@ -183,7 +183,7 @@ impl Sequences {
         request: SequenceWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(request, debit_proof),
             client_public_id,
@@ -225,7 +225,7 @@ impl Blobs {
         requester: PublicId,
         read: BlobRead,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         match read {
             BlobRead::Get(_) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
@@ -252,7 +252,7 @@ impl Blobs {
         write: BlobWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         use BlobWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
@@ -269,7 +269,7 @@ impl Blobs {
         chunk: IData,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         let owner = utils::owner(&client)?;
 
         // Assert that if the request was for UnpubIData, that the owner's public key has
@@ -304,7 +304,7 @@ impl Blobs {
         address: IDataAddress,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         if address.kind() == IDataKind::Pub {
             return Some(GatewayCmd::RespondToClient {
                 message_id,
@@ -352,7 +352,7 @@ impl Maps {
         client: PublicId,
         read: MapRead,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         use MapRead::*;
         match read {
             Get(..)
@@ -374,7 +374,7 @@ impl Maps {
         write: MapWrite,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         use MapWrite::*;
         match write {
             New(chunk) => self.initiate_creation(client, chunk, message_id, debit_proof),
@@ -391,7 +391,7 @@ impl Maps {
         read: MapRead,
         requester: PublicId,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         Some(GatewayCmd::ForwardClientRequest(Message::Request {
             requester,
             request: Request::Node(NodeRequest::Read(Read::Map(read))),
@@ -407,7 +407,7 @@ impl Maps {
         client_public_id: PublicId,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write, debit_proof),
             client_public_id,
@@ -422,7 +422,7 @@ impl Maps {
         client_public_id: PublicId,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         Some(GatewayCmd::VoteFor(ConsensusAction::Forward {
             request: Self::wrap(write, debit_proof),
             client_public_id,
@@ -437,7 +437,7 @@ impl Maps {
         chunk: MData,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         let owner = utils::owner(&client)?;
 
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
@@ -497,7 +497,7 @@ impl Accounts {
         requester: PublicId,
         read: AccountRead,
         message_id: MessageId,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         Some(GatewayCmd::ForwardClientRequest(Message::Request {
             requester,
             request: Request::Gateway(GatewayRequest::Read(Read::Account(read))),
@@ -513,7 +513,7 @@ impl Accounts {
         write: AccountWrite,
         msg_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         use AccountWrite::*;
         match write {
             New(account) => self.initiate_creation(client, account, msg_id, debit_proof),
@@ -530,7 +530,7 @@ impl Accounts {
         account: Account,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         if !account.size_is_valid() {
             return Some(GatewayCmd::RespondToClient {
                 message_id,
@@ -554,7 +554,7 @@ impl Accounts {
         updated_account: Account,
         message_id: MessageId,
         debit_proof: DebitAgreementProof,
-    ) -> Option<GatewayCmd> {
+    ) -> Option<NodeCmd> {
         if !updated_account.size_is_valid() {
             return Some(GatewayCmd::RespondToClient {
                 message_id,

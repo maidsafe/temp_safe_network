@@ -18,7 +18,7 @@ use rand::SeedableRng;
 use routing::Node as Routing;
 use safe_nd::{
     BlobRead, BlobWrite, Error as NdError, IData, IDataAddress, MessageId, NodeFullId,
-    NodePublicId, NodeRequest, PublicId, PublicKey, Read, Request, Response, Result as NdResult,
+    NodePublicId, NodeRequest, PublicId, PublicKey, Read, Result as NdResult,
     Write, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,7 @@ impl BlobRegister {
         requester: PublicId,
         write: BlobWrite,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(requester, data, message_id),
@@ -106,7 +106,16 @@ impl BlobRegister {
         requester: PublicId,
         data: IData,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
+        wrap(MetadataCmd::AccumulateReward { data: data.value() })
+    }
+
+    fn store_old(
+        &mut self,
+        requester: PublicId,
+        data: IData,
+        message_id: MessageId,
+    ) -> Option<NodeCmd> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
 
@@ -182,7 +191,7 @@ impl BlobRegister {
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let our_name = *self.id.name();
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
@@ -223,7 +232,7 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<ElderCmd>> {
+    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<NodeCmd>> {
         trace!(
             "Get the list of chunks holder {:?} was resposible for",
             holder
@@ -274,7 +283,7 @@ impl BlobRegister {
         requester: PublicId,
         read: &BlobRead,
         msg_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(&requester, *address, msg_id),
@@ -286,7 +295,7 @@ impl BlobRegister {
         requester: &PublicId,
         address: IDataAddress,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let our_name = *self.id.name();
 
         let respond = |result: NdResult<IData>| {
@@ -333,7 +342,7 @@ impl BlobRegister {
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         if result.is_ok() {
             let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
             if !chunk_metadata.holders.insert(sender) {
@@ -375,7 +384,7 @@ impl BlobRegister {
         result: NdResult<()>,
         message_id: MessageId,
         request: Request,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         match &request {
             Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
                 self.handle_store_result(*data.address(), sender, &result, message_id, requester)
@@ -394,7 +403,7 @@ impl BlobRegister {
         _result: &NdResult<()>,
         message_id: MessageId,
         requester: PublicId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         // TODO -
         // - if Ok, and this is the final of the three responses send success back to client handlers and
         //   then on to the client.  Note: there's no functionality in place yet to know whether
@@ -465,7 +474,7 @@ impl BlobRegister {
         result: NdResult<()>,
         message_id: MessageId,
         requester: PublicId,
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         if let Err(err) = &result {
             warn!("{}: Node reports error deleting: {}", self, err);
         } else {
@@ -537,7 +546,7 @@ impl BlobRegister {
         message_id: MessageId,
         requester: PublicId,
         proof: (Request, Signature),
-    ) -> Option<ElderCmd> {
+    ) -> Option<NodeCmd> {
         let response = Response::GetIData(result);
         wrap(MetadataCmd::RespondToGateway {
             sender: *self.id.name(),
@@ -677,7 +686,7 @@ impl BlobRegister {
     }
 }
 
-fn wrap(cmd: MetadataCmd) -> Option<ElderCmd> {
+fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
     Some(ElderCmd::Metadata(cmd))
 }
 
