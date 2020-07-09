@@ -26,13 +26,13 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct Data {
+pub(crate) struct Chunks {
     id: NodePublicId,
     chunk_storage: ChunkStorage,
     routing_node: Rc<RefCell<Node>>,
 }
 
-impl Data {
+impl Chunks {
     pub fn new(
         id: NodePublicId,
         config: &Config,

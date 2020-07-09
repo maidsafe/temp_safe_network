@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod data;
+mod chunks;
 
-use self::data::Data;
+use self::chunks::Chunks;
 use crate::{cmd::AdultCmd, msg::Message, node::Init, Config, Result};
 use routing::{Node as Routing, SrcLocation};
 use safe_nd::NodePublicId;
@@ -21,7 +21,7 @@ use threshold_crypto::Signature;
 
 pub(crate) struct AdultDuties {
     id: NodePublicId,
-    data: Data,
+    chunks: Chunks,
     _routing: Rc<RefCell<Routing>>,
 }
 
@@ -33,7 +33,7 @@ impl AdultDuties {
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
-        let data = Data::new(
+        let chunks = Chunks::new(
             id.clone(),
             &config,
             &total_used_space,
@@ -42,7 +42,7 @@ impl AdultDuties {
         )?;
         Ok(Self {
             id,
-            data,
+            chunks,
             _routing: routing,
         })
     }
@@ -53,7 +53,7 @@ impl AdultDuties {
         msg: Message,
         accumulated_signature: Option<Signature>,
     ) -> Option<AdultCmd> {
-        self.data.receive_msg(src, msg, accumulated_signature)
+        self.chunks.receive_msg(src, msg, accumulated_signature)
     }
 }
 
