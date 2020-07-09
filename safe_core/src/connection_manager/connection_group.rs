@@ -681,7 +681,14 @@ impl Inner {
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<(), CoreError> {
-        self.state.send_cmd(&mut self.quic_p2p, msg_id, msg).await
+        
+        let response = self.state.send_cmd(&mut self.quic_p2p, msg_id, msg).await;
+
+        // arbitrary delay to simplify test writing
+        #[cfg(feature="testing")]
+        std::thread::sleep(Duration::from_millis(4500));
+
+        response
     }
 
     async fn send_for_validation(
