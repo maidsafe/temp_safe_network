@@ -8,14 +8,14 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    cmd::{ElderCmd, MetadataCmd},
+    cmd::{NodeCmd, MetadataCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
 };
 
 use safe_nd::{
-    Error as NdError, MessageId, NodePublicId, PublicId, Response, Result as NdResult, SData,
+    Error as NdError, MessageId, NodePublicId, PublicId, Result as NdResult, SData,
     SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions,
     SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp, SequenceRead,
     SequenceWrite,
@@ -426,7 +426,7 @@ impl SequenceStorage {
 }
 
 fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Metadata(cmd))
+    Some(NodeCmd::Metadata(cmd))
 }
 
 impl Display for SequenceStorage {

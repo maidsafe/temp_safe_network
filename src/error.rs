@@ -8,7 +8,7 @@
 
 use crate::chunk_store;
 use quick_error::quick_error;
-use safe_nd::{self, Request, Response};
+use safe_nd::{self, Request};
 use std::io;
 
 quick_error! {
@@ -66,14 +66,14 @@ quick_error! {
             display("Routing error: {:?}", error)
             from()
         }
-        /// Unknown Request type.
-        UnknownRequestType(request: Request) {
-            display("Unknown Request type: {:?}", request)
-        }
-        /// Unknown Response type.
-        UnknownResponseType(response: Response) {
-            display("Unknown Response type: {:?}", response)
-        }
+        // /// Unknown Request type.
+        // UnknownRequestType(request: Request) {
+        //     display("Unknown Request type: {:?}", request)
+        // }
+        // /// Unknown Response type.
+        // UnknownResponseType(response: Response) {
+        //     display("Unknown Response type: {:?}", response)
+        // }
         /// Message is invalid.
         InvalidMessage {}
         /// Account doesn't exist.

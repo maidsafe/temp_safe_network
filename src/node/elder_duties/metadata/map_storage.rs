@@ -8,7 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
-    cmd::{ElderCmd, MetadataCmd},
+    cmd::{NodeCmd, MetadataCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -17,7 +17,7 @@ use log::error;
 
 use safe_nd::{
     Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions, MDataPermissionSet,
-    MDataValue, MapRead, MapWrite, MessageId, NodePublicId, PublicId, PublicKey, Response,
+    MDataValue, MapRead, MapWrite, MessageId, NodePublicId, PublicId, PublicKey,
     Result as NdResult,
 };
 
@@ -504,7 +504,7 @@ impl MapStorage {
 }
 
 fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Metadata(cmd))
+    Some(NodeCmd::Metadata(cmd))
 }
 
 impl Display for MapStorage {

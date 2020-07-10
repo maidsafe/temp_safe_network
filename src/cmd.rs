@@ -12,6 +12,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// Node internal cmds, about what requests to make.
+/// Any network node
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum NodeCmdChain {
+    Single(NodeCmd),
+    Multiple(Vec<NodeCmd>),
+}
 
 /// Any network node
 #[derive(Debug)]
@@ -24,7 +31,7 @@ pub(crate) enum NodeCmd {
     /// Send to a section.
     SendToSection(MsgEnvelope),
     /// Send the same request to each individual Adult.
-    SendToAdults { msgs: BTreeSet<MsgEnvelope> },
+    SendToAdults { targets: BTreeSet<XorName>, msg: MsgEnvelope },
     /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
     VoteFor(ConsensusAction),

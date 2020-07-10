@@ -52,7 +52,7 @@ impl AuthKeysDb {
     }
 
     /// If the specified auth_key doesn't exist, a default `AuthKeysAsTuple` is returned.
-    pub fn list_keys_and_version(&self, client_id: &ClientPublicId) -> AuthKeysAsTuple {
+    pub fn list_keys_and_version(&self, client_id: &PublicKey) -> AuthKeysAsTuple {
         let db_key = client_id.to_db_key();
         self.db
             .get::<AuthKeys>(&db_key)
@@ -64,7 +64,7 @@ impl AuthKeysDb {
     /// doesn't already exist.
     pub fn insert(
         &mut self,
-        client_id: &ClientPublicId,
+        client_id: &PublicKey,
         key: PublicKey,
         new_version: u64,
         permissions: AppPermissions,
@@ -87,7 +87,7 @@ impl AuthKeysDb {
     /// exist.
     pub fn delete(
         &mut self,
-        client_id: &ClientPublicId,
+        client_id: &PublicKey,
         key: PublicKey,
         new_version: u64,
     ) -> NdResult<()> {

@@ -138,7 +138,7 @@ impl DataPayment {
 }
 
 fn wrap(cmd: PaymentCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Payment(cmd))
+    Some(NodeCmd::Payment(cmd))
 }
 
 impl Display for DataPayment {

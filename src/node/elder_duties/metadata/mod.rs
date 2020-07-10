@@ -15,7 +15,7 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
-    cmd::{ElderCmd, MetadataCmd},
+    cmd::{NodeCmd, MetadataCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -275,7 +275,7 @@ impl Metadata {
 }
 
 fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Metadata(cmd))
+    Some(NodeCmd::Metadata(cmd))
 }
 
 impl Display for Metadata {

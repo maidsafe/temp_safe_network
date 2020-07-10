@@ -16,11 +16,11 @@ use self::{
     gateway::Gateway,
     metadata::Metadata,
     payment::DataPayment,
-    rewards::Rewards;
+    rewards::Rewards,
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    cmd::{ConsensusAction, ElderCmd, GatewayCmd, NodeCmd},
+    cmd::{ConsensusAction, NodeCmd, GatewayCmd, NodeCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -30,7 +30,7 @@ use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, RoutingError, SrcLocation};
 use safe_nd::{
-    GatewayRequest, Message, MessageId, NodePublicId, NodeRequest, PublicId, SystemOp, XorName,
+    Message, MessageId, NodePublicId, PublicId, XorName,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -91,7 +91,7 @@ impl ElderDuties {
         let data_payment = DataPayment::new(id.clone(), routing.clone(), replica_manager);
 
         let actor = TransferActor::new();
-        let rewards = Rewards::new(actor)
+        let rewards = Rewards::new(actor);
 
         Ok(Self {
             id,
@@ -119,47 +119,6 @@ impl ElderDuties {
         self.transfers
     }
 
-    // -------------------------------------------------------------
-    // ---------  iffy placing of gateway methods here...  ---------
-    // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-
-    // pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
-    //     self.gateway.handle_new_connection(peer_addr)
-    // }
-
-    // pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
-    //     self.gateway.handle_connection_failure(peer_addr)
-    // }
-
-    // pub(crate) fn send_to_client(&mut self, message_id: MessageId, response: Response) {
-    //     self.gateway.send_to_client(message_id, response);
-    // }
-
-    // pub(crate) fn try_parse_client_msg<R: CryptoRng + Rng>(
-    //     &mut self,
-    //     peer_addr: SocketAddr,
-    //     bytes: &Bytes,
-    //     rng: &mut R,
-    // ) -> Option<ClientMsg> {
-    //     self.gateway.try_parse_client_msg(peer_addr, bytes, rng)
-    // }
-
-    // pub fn handle_client_msg(
-    //     &mut self,
-    //     client: PublicId,
-    //     msg: MsgEnvelope,
-    // ) -> Option<NodeCmd> {
-    //     self.gateway.handle_client_msg(client, msg)
-    // }
-
-    // pub fn handle_consensused_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
-    //     self.gateway.handle_consensused_cmd(cmd)
-    // }
-
-    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    // ---------  iffy placing of gateway methods here... ----------
-    // -------------------------------------------------------------
-
     /// Name of the node
     /// Age of the node
     pub fn member_left(&mut self, _name: XorName, _age: u8) -> Option<Vec<NodeCmd>> {
@@ -182,91 +141,6 @@ impl ElderDuties {
         )?;
         None
     }
-
-    // fn handle_request(
-    //     &mut self,
-    //     src: SrcLocation,
-    //     client: PublicId,
-    //     request: Request,
-    //     msg_id: MessageId,
-    //     accumulated_signature: Option<Signature>,
-    // ) -> Option<NodeCmd> {
-    //     trace!(
-    //         "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
-    //         self,
-    //         request,
-    //         msg_id,
-    //         src,
-    //         client,
-    //     );
-    //     use Request::*;
-    //     match request.clone() {
-    //         //Client(client) => self.gateway... // Is handled by `fn receive_client_request(..)` above.
-    //         Gateway(write @ GatewayRequest::Write { .. }) => {
-    //             self.data_payment.handle_write(src, client, write, msg_id) //, accumulated_signature)
-    //         }
-    //         // Gateway forwarding a client request to Section(R)
-    //         Gateway(GatewayRequest::System(SystemOp::Transfers(request))) => {
-    //             self.transfers.handle_request(client, request, msg_id)
-    //         }
-    //         // Gateway handling its own request.
-    //         Gateway(GatewayRequest::System(SystemOp::ClientAuth(request))) => {
-    //             self.gateway.handle_request(client, request, msg_id)
-    //         }
-    //         Node(NodeRequest::Read(_)) | Node(NodeRequest::Write(_)) => self
-    //             .metadata
-    //             .handle_request(src, client, request, msg_id, accumulated_signature),
-    //         // Section(R_debit) propagating to Section(R_credit)
-    //         Node(NodeRequest::System(SystemOp::Transfers(req))) => {
-    //             self.transfers.handle_request(client, req, msg_id)
-    //         }
-    //         _ => None,
-    //     }
-    // }
-
-    // fn handle_response(
-    //     &mut self,
-    //     src: SrcLocation,
-    //     response: Response,
-    //     requester: PublicId,
-    //     msg_id: MessageId,
-    //     proof: Option<(Request, Signature)>,
-    // ) -> Option<NodeCmd> {
-    //     trace!(
-    //         "{}: Received ({:?} {:?}) from {}",
-    //         self,
-    //         response,
-    //         msg_id,
-    //         utils::get_source_name(src),
-    //     );
-    //     // For now, we skip data duplication logic.
-    //     if proof.is_some() {
-    //         None
-    //     // return match response {
-    //     //     Write(_) | GetIData(_) => self
-    //     //         .metadata
-    //     //         .handle_response(src, response, requester, msg_id, proof),
-    //     //     //
-    //     //     // ===== Invalid =====
-    //     //     //
-    //     //     ref _other => {
-    //     //         error!("{}: Is not expecting proof for {:?}.", self, response);
-    //     //         None
-    //     //     }
-    //     // };
-    //     } else {
-    //         Some(ElderCmd::Gateway(self.gateway.receive_node_response(
-    //             utils::get_source_name(src),
-    //             &requester,
-    //             response,
-    //             msg_id,
-    //         )?))
-    //     }
-    // }
-}
-
-fn wrap(cmd: Option<NodeCmd>) -> Option<NodeCmd> {
-    Some(NodeCmd::Elder(ElderCmd::Gateway(cmd?)))
 }
 
 impl Display for ElderDuties {

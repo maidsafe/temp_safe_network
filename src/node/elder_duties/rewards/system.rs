@@ -1,5 +1,5 @@
 
-use safe_farming::{Accumulation, AccumulationEvent, RewardCounter, Work};
+use safe_farming::{Accumulation, AccumulationEvent, RewardCounter, RewardAlgo, Work};
 use safe_nd::{AccountId, Result};
 use std::collections::HashMap;
 

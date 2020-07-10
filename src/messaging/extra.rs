@@ -13,13 +13,13 @@ mod remote_msg_eval;
 use crate::{
     accumulator::Accumulator,
     cmd::{
-        AdultCmd, ConsensusAction, ElderCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
+        NodeCmd, ConsensusAction, NodeCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
         TransferCmd,
     },
     duties::{adult::AdultDuties, elder::ElderDuties},
     internal_cmds::InternalCmds,
     messaging::Messaging,
-    remote_msg_eval::RemoteMsgEvaluation,
+    remote_msg_eval::RemoteMsgEval,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};

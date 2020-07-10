@@ -1,33 +1,54 @@
 
 
-use safe_nd::{AccountId, Money, TransferValidated};
-use safe_transfers::TransferActor;
-use crate::cmd::{ElderCmd, RewardCmd};
+use crate::{cmd::NodeCmd, utils};
+use safe_nd::{
+    AccountId, Money, TransferValidated, Message, 
+    MsgEnvelope, MsgSender, NetworkCmd, ElderDuty, Duty, MessageId,
+    PublicKey,
+};
+use safe_transfers::{ActorEvent, TransferActor, ReplicaValidator};
+use routing::Node as Routing;
+use std::{
+    cell::RefCell,
+    fmt::{self, Display, Formatter},
+    rc::Rc,
+};
 
 pub(super) struct SectionFunds {
-    actor: TransferActor,
+    id: PublicKey,
+    actor: TransferActor<Validator>,
+    routing: Rc<RefCell<Routing>>,
 }
 
 impl SectionFunds {
 
+    pub fn new(id: PublicKey, actor: TransferActor<Validator>, routing: Rc<RefCell<Routing>>) -> Self {
+        Self {
+            id,
+            actor,
+            routing,
+        }
+    }
+
     pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<NodeCmd> {
         match self.actor.transfer(amount, to) {
             Ok(Some(event)) => {
-                self.actor.apply(event);
-                let message = Message::NetworkCmd(NetworkCmd::InitiateRewardPayout {
-                    signed_transfer: event.signed_transfer
-                });
-                let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
+                self.actor.apply(ActorEvent::TransferInitiated(event));
+                let message = Message::NetworkCmd { 
+                    cmd: NetworkCmd::InitiateRewardPayout(event.signed_transfer), 
+                    id: MessageId::new()
+                };
+                let signature = utils::sign(self.routing.borrow(), &utils::serialise(&message))?;
                 let msg = MsgEnvelope {
                     message,
                     origin: MsgSender::Node {
-                        id,
+                        id: self.id,
                         duty: Duty::Elder(ElderDuty::Rewards),
                         signature,
                     },
                     proxies: Default::default(),
                 };
-                wrap(RewardCmd::SendToSection(msg))
+                Some(NodeCmd::SendToSection(msg))
             }
             Ok(None) => None,
             Err(error) => {
@@ -39,22 +60,23 @@ impl SectionFunds {
     pub fn receive(&mut self, validation: TransferValidated) -> Option<NodeCmd> {
         match self.actor.receive(validation) {
             Ok(Some(event)) => {
-                self.actor.apply(event);
+                self.actor.apply(ActorEvent::TransferValidationReceived(event));
                 let proof = event.proof?;
-                let message = Message::NetworkCmd(NetworkCmd::FinaliseRewardPayout {
-                    debit_agreement: proof
-                });
-                let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
+                let message = Message::NetworkCmd { 
+                    cmd: NetworkCmd::FinaliseRewardPayout(proof), 
+                    id: MessageId::new()
+                };
+                let signature = utils::sign(self.routing.borrow(), &utils::serialise(&message))?;
                 let msg = MsgEnvelope {
                     message,
                     origin: MsgSender::Node {
-                        id,
+                        id: self.id,
                         duty: Duty::Elder(ElderDuty::Rewards),
                         signature,
                     },
                     proxies: Default::default(),
                 };
-                wrap(RewardCmd::SendToSection(msg))
+                Some(NodeCmd::SendToSection(msg))
             }
             Ok(None) => None,
             Err(error) => {
@@ -62,17 +84,4 @@ impl SectionFunds {
             }
         }
     }
-    
-    // fn sign_with_signature_share(&self, data: &[u8]) -> Option<(usize, SignatureShare)> {
-    //     let signature = self
-    //         .routing
-    //         .borrow()
-    //         .secret_key_share()
-    //         .map_or(None, |key| Some(key.sign(data)));
-    //     signature.map(|sig| (self.routing.borrow().our_index().unwrap_or(0), sig))
-    // }
-}
-
-fn wrap(cmd: RewardCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Reward(cmd))
 }

@@ -18,10 +18,10 @@ use threshold_crypto::{PublicKeySet, SecretKeyShare};
 use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::{cmd::ElderCmd, cmd::TransferCmd, msg::Message},
+    crate::{cmd::NodeCmd, cmd::TransferCmd, msg::Message},
     rand::thread_rng,
     safe_nd::{
-        MessageId, PublicId, PublicKey, Response, Signature, SignatureShare, Transfer, XorName,
+        MessageId, PublicId, PublicKey, Signature, SignatureShare, Transfer, XorName,
     },
     threshold_crypto::{SecretKey, SecretKeySet},
 };
@@ -227,7 +227,7 @@ impl ReplicaManager {
             }))
             .ok()?;
         // Respond to the Client with TransferRegistered
-        Some(ElderCmd::Transfer(TransferCmd::RespondToGateway {
+        Some(NodeCmd::Transfer(TransferCmd::RespondToGateway {
             sender,
             msg: Message::Response {
                 response: Response::TransferRegistration(Ok(TransferRegistered { debit_proof })),

@@ -40,9 +40,7 @@ impl Auth {
 
     pub(super) fn initiate(
         &mut self,
-        client: PublicId,
         msg: MsgEnvelope,
-        message_id: MessageId,
     ) -> Option<NodeCmd> {
         let auth_cmd = match msg.message {
             Message::Cmd { cmd: Cmd::Auth(auth_cmd), .. } => auth_cmd,
@@ -53,17 +51,9 @@ impl Auth {
             InsAuthKey { .. }
             | DelAuthKey { .. } => {
                 self.set_proxy(&mut msg);
-                Some(GatewayCmd::VoteFor(ConsensusAction::Forward(msg)))
+                Some(NodeCmd::VoteFor(ConsensusAction::Forward(msg)))
             }
         }
-    }
-
-    pub fn query(
-        &mut self,
-        client: PublicId,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
-        self.list_keys_and_version(client, message_id)
     }
 
     // If the client is app, check if it is authorised to perform the given request.
@@ -114,33 +104,12 @@ impl Auth {
             RequestAuthKind::None => Err(NdError::AccessDenied),
         };
 
-        if let Err(error) = result {
-            let message = Message::CmdError {
-                error: CmdError::Auth(error),
-                id: MessageId::new(), // or hash of msg.message.id() ? But will that be problem at client? hash(self.id() + msg.id()) is better
-                correlation_id: msg.message.id(),
-                cmd_origin: msg.origin.address(),
-            };
-            // origin signs the message, while proxies sign the envelope
-            let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
-            let cmd_error = MsgEnvelope {
-                message,
-                origin: MsgSender {
-                    id: id.public_id().public_key(),
-                    duty: Duty::Elder(ElderDuty::Gateway),
-                    signature,
-                },
-            };
-            Some(GatewayCmd::PushToClient(cmd_error))
-        } else {
-            None
-        }
+        self.ok_or_error(result, msg.message.id(), msg.origin.address())
     }
 
     // client query
-    fn list_keys_and_version(
+    pub fn list_keys_and_version(
         &mut self,
-        client: PublicId,
         msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         use AuthQuery::*;
@@ -150,36 +119,34 @@ impl Auth {
         };
         let result = Ok(self
             .auth_keys
-            .list_keys_and_version(utils::client(&client)?));
-        Some(NodeCmd::SendToClient(MsgEnvelope {
-            message: Message::QueryResponse {
-                response: QueryResponse::ListAuthKeysAndVersion(result),
-                id: MessageId::new(),
-                /// ID of causing query.
-                correlation_id: msg.message.id(),
-                /// The sender of the causing query.
-                query_origin: msg.origin,
-            },
-            origin: MsgSender {
-                id: ,
-                duty: Duty::Elder(ElderDuty::Gateway),
-                signature,
-            },
-            proxies: Default::default(),
-        }))
+            .list_keys_and_version(msg.origin.id()));
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::ListAuthKeysAndVersion(result),
+            id: MessageId::new(),
+            /// ID of causing query.
+            correlation_id: msg.message.id(),
+            /// The sender of the causing query.
+            query_origin: msg.origin,
+        })
     }
 
     // on consensus
     pub(super) fn finalise(
         &mut self,
-        requester: PublicId,
         msg: MsgEnvelope,
-        message_id: MessageId,
     ) -> Option<NodeCmd> {
         use AuthCmd::*;
         let auth_cmd = match msg.message {
             Message::Cmd { cmd: Cmd::Auth(auth_cmd), .. } => auth_cmd,
             _ => return None,
+        };
+        let auth_error = |error: NdError| {
+            self.wrap(Message::CmdError {
+                error: CmdError::Auth(error),
+                id: MessageId::new(),
+                cmd_origin: msg.origin.address(),
+                correlation_id: msg.id(),
+            })
         };
         match auth_cmd {
             InsAuthKey {
@@ -187,14 +154,18 @@ impl Auth {
                 version,
                 permissions,
             } => {
-                let result = self.auth_keys
-                    .insert(utils::client(&requester)?, key, new_version, permissions);
-                None
+                match self.auth_keys
+                    .insert(msg.origin.id(), key, new_version, permissions) {
+                        Ok(()) => None,
+                        Err(error) => auth_error(error),
+                    }
             },
             DelAuthKey { key, version } => {
-                let result = self.auth_keys
-                    .delete(utils::client(&requester)?, key, new_version);
-                None
+                match self.auth_keys
+                    .delete(msg.origin.id(), key, new_version) {
+                        Ok(()) => None,
+                        Err(error) => auth_error(error),
+                    }
             }
         }
     }
@@ -281,12 +252,43 @@ impl Auth {
 
     fn set_proxy(&self, msg: &mut MsgEnvelope) {
         // origin signs the message, while proxies sign the envelope
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&msg));
-        msg.add_proxy(MsgSender {
-            id: self.id.into(),
+        msg.add_proxy(self.sign(msg))
+    }
+
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToClient(msg))
+    }
+
+    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
+        MsgSender::Node {
+            id: self.public_key(),
             duty: Duty::Elder(ElderDuty::Gateway),
             signature,
-        })
+        }
+    }
+    
+    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        let message = Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Auth(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        };
+        self.wrap(message)
+    }
+
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 

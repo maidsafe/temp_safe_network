@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    cmd::{ElderCmd, MetadataCmd},
+    cmd::{NodeCmd, MetadataCmd},
     msg::Message,
     node::Init,
     utils, Config, Result, ToDbKey,
@@ -18,8 +18,9 @@ use rand::SeedableRng;
 use routing::Node as Routing;
 use safe_nd::{
     BlobRead, BlobWrite, Error as NdError, IData, IDataAddress, MessageId, NodeFullId,
-    NodePublicId, NodeRequest, PublicId, PublicKey, Read, Result as NdResult,
-    Write, XorName,
+    NodePublicId, PublicId, PublicKey, Read, Result as NdResult,
+    Write, XorName, Message, MsgSender, MsgEnvelope, Duty, ElderDuty, QueryResponse, Query,
+    CmdError, DataError, NetworkCmd,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -51,11 +52,6 @@ struct HolderMetadata {
 
 pub(super) struct BlobRegister {
     id: NodePublicId,
-    // idata_elder_ops: BTreeMap<MessageId, IDataAddress>,
-    // idata_client_ops: BTreeMap<MessageId, IDataOp>,
-    // Responses from BlobStorages might arrive before we send a request.
-    // This will hold the responses that are processed once the request arrives.
-    // early_responses: BTreeMap<MessageId, Vec<(XorName, IDataResult)>>,
     metadata: PickleDb,
     holders: PickleDb,
     #[allow(unused)]
@@ -78,9 +74,6 @@ impl BlobRegister {
 
         Ok(Self {
             id,
-            // idata_elder_ops: Default::default(),
-            // idata_client_ops: Default::default(),
-            // early_responses: Default::default(),
             metadata,
             holders,
             full_adults,
@@ -90,45 +83,27 @@ impl BlobRegister {
 
     pub(super) fn write(
         &mut self,
-        requester: PublicId,
         write: BlobWrite,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(requester, data, message_id),
-            DeletePrivate(address) => self.delete(requester, address, message_id),
+            New(data) => self.store(data, msg),
+            DeletePrivate(address) => self.delete(address, msg),
         }
     }
 
     fn store(
         &mut self,
-        requester: PublicId,
         data: IData,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        wrap(MetadataCmd::AccumulateReward { data: data.value() })
-    }
-
-    fn store_old(
-        &mut self,
-        requester: PublicId,
-        data: IData,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        // We're acting as data handler, received request from client handlers
-        let our_name = *self.id.name();
-
-        let client_id = requester.clone();
-        let respond = |result: NdResult<()>| {
-            wrap(MetadataCmd::RespondToGateway {
-                sender: our_name,
-                msg: Message::Response {
-                    requester: client_id,
-                    response: Response::Write(result),
-                    message_id,
-                    proof: None,
-                },
+        let cmd_error = |error: NdError| {
+            self.wrap(Message::CmdError {
+                error: CmdError::Data(error),
+                id: MessageId::new(),
+                cmd_origin: msg.origin.address(),
+                correlation_id: msg.id(),
             })
         };
 
@@ -139,13 +114,13 @@ impl BlobRegister {
             if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
                 if data.is_pub() {
                     trace!(
-                        "{}: Replying success for Put {:?}, it already exists.",
+                        "{}: All good, {:?}, chunk already exists.",
                         self,
                         data
                     );
-                    return respond(Ok(()));
+                    return None;
                 } else {
-                    return respond(Err(NdError::DataExists));
+                    return cmd_error(NdError::DataExists);
                 }
             } else {
                 let mut existing_holders = metadata.holders;
@@ -173,167 +148,112 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        let request = Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data))));
-        let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        wrap(MetadataCmd::SendToAdults {
-            targets: target_holders,
-            msg: Message::Request {
-                request,
-                requester,
-                message_id,
-                signature,
-            },
-        })
+        self.set_proxy(msg);
+        Some(NodeCmd::SendToAdults { targets: metadata.holders, msg })
     }
 
     fn delete(
         &mut self,
-        requester: PublicId,
         address: IDataAddress,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        let our_name = *self.id.name();
-        let client_id = requester.clone();
-        let respond = |result: NdResult<()>| {
-            wrap(MetadataCmd::RespondToGateway {
-                sender: our_name,
-                msg: Message::Response {
-                    requester: client_id.clone(),
-                    response: Response::Write(result),
-                    message_id,
-                    proof: None,
-                },
+        let cmd_error = |error: NdError| {
+            self.wrap(Message::CmdError {
+                error: CmdError::Data(error),
+                id: MessageId::new(),
+                cmd_origin: msg.origin.address(),
+                correlation_id: msg.id(),
             })
         };
 
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
-            Err(error) => return respond(Err(error)),
+            Err(error) => return cmd_error(error),
         };
 
         if let Some(data_owner) = metadata.owner {
-            let request_key = utils::own_key(&requester)?;
-            if data_owner != *request_key {
-                return respond(Err(NdError::AccessDenied));
+            if data_owner != msg.origin.id() {
+                return cmd_error(NdError::AccessDenied);
             }
         };
-        let request = Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::DeletePrivate(
-            address,
-        ))));
-        let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        wrap(MetadataCmd::SendToAdults {
-            targets: metadata.holders,
-            msg: Message::Request {
-                request,
-                requester,
-                message_id,
-                signature,
-            },
-        })
+        
+        self.set_proxy(msg);
+        Some(NodeCmd::SendToAdults { targets: metadata.holders, msg })
     }
 
     pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<NodeCmd>> {
-        trace!(
-            "Get the list of chunks holder {:?} was resposible for",
-            holder
-        );
-        // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
-        // This is only used for the requester field and it should not be used for encryption / signing.
-        let mut rng = rand::rngs::StdRng::from_seed(holder.0);
-        let node_id = NodeFullId::new(&mut rng);
-        let requester = PublicId::Node(node_id.public_id().clone());
-        trace!("Generated NodeID {:?} to get chunk copy", &requester);
+        trace!("Duplicating chunks of holder {:?}", holder);
 
-        let chunks_stored = self.remove_holder(holder);
-
-        if let Ok(chunks_stored) = chunks_stored {
-            let mut cmds = Vec::new();
-
-            for (address, holders) in chunks_stored {
-                trace!("{:?} was resposible for : {:?}", holder, address);
-
+        let chunks_stored = match self.remove_holder(holder) {
+            Ok(chunks) => chunks,
+            _ => return None,
+        };
+        let cmds: Vec<_> = chunks_stored.into_iter()
+            .map(|(address, holders)| self.get_duplication_msgs(address, holders))
+            .flatten()
+            .collect();
+        
+        Some(cmds)
+    }
+    
+    fn get_duplication_msgs(&self, address: IDataAddress, current_holders: BTreeSet<XorName>) -> Vec<Message> {
+        self.get_new_holders_for_chunk(&address)
+            .into_iter()
+            .map(|new_holder| {
                 let mut hash_bytes = Vec::new();
                 hash_bytes.extend_from_slice(&address.name().0);
-                hash_bytes.extend_from_slice(&holder.0);
-
+                hash_bytes.extend_from_slice(&new_holder.0);
                 let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
-                trace!("Generated MsgID {:?} to duplicate chunks", &message_id);
-
-                let new_holders = self.get_new_holders_for_chunk(&address);
-                let signature = self.sign_with_signature_share(&utils::serialise(&address));
-                let duplicate_chunk_cmds = ElderCmd::Metadata(MetadataCmd::SendToAdults {
-                    targets: new_holders,
-                    msg: Message::Duplicate {
+                Message::NetworkCmd { 
+                    cmd: NetworkCmd::DuplicateChunk { 
+                        new_holder,
                         address,
-                        holders,
-                        message_id,
-                        signature,
+                        fetch_from_holders: current_holders,
                     },
-                });
-                cmds.push(duplicate_chunk_cmds);
-            }
-            Some(cmds)
-        } else {
-            None
-        }
+                    id: message_id,
+            }})
+            .filter_map(|message| self.wrap(message))
+            .collect()
     }
 
     pub(super) fn read(
         &self,
-        requester: PublicId,
         read: &BlobRead,
-        msg_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         use BlobRead::*;
         match read {
-            Get(address) => self.get(&requester, *address, msg_id),
+            Get(address) => self.get(*address, msg),
         }
     }
 
     fn get(
         &self,
-        requester: &PublicId,
         address: IDataAddress,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        let our_name = *self.id.name();
-
-        let respond = |result: NdResult<IData>| {
-            wrap(MetadataCmd::RespondToGateway {
-                sender: our_name,
-                msg: Message::Response {
-                    requester: requester.clone(),
-                    response: Response::GetIData(result),
-                    message_id,
-                    proof: None,
-                },
+        let query_error = |error: NdError| {
+            self.wrap(Message::QueryResponse {
+                response: QueryResponse::GetBlob(Err(error)),
+                id: MessageId::new(),
+                query_origin: msg.origin.address(),
+                correlation_id: msg.id(),
             })
         };
 
-        // We're acting as data handler, received request from client handlers
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
-            Err(error) => return respond(Err(error)),
+            Err(error) => return query_error(error),
         };
 
         if let Some(data_owner) = metadata.owner {
-            let request_key = utils::own_key(&requester)?;
-            if data_owner != *request_key {
-                return respond(Err(NdError::AccessDenied));
+            if data_owner != msg.origin.id() {
+                return query_error(NdError::AccessDenied),
             }
         };
 
-        let request = Request::Node(NodeRequest::Read(Read::Blob(BlobRead::Get(address))));
-        let signature = self.sign_with_signature_share(&utils::serialise(&request));
-        wrap(MetadataCmd::SendToAdults {
-            targets: metadata.holders,
-            msg: Message::Request {
-                request,
-                requester: requester.clone(),
-                message_id,
-                signature,
-            },
-        })
+        self.set_proxy(msg);
+        Some(NodeCmd::SendToAdults { targets: metadata.holders, msg })
     }
 
     pub(super) fn update_holders(
@@ -351,11 +271,9 @@ impl BlobRegister {
                     self, sender, address
                 );
             }
-
             if let Err(error) = self.metadata.set(&address.to_db_key(), &chunk_metadata) {
                 warn!("{}: Failed to write metadata to DB: {:?}", self, error);
             }
-
             let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
             if !holders_metadata.chunks.insert(address) {
                 warn!(
@@ -363,7 +281,6 @@ impl BlobRegister {
                     self, sender, &address
                 );
             }
-
             if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
                 warn!(
                     "{}: Failed to write holder metadata to DB: {:?}",
@@ -396,168 +313,168 @@ impl BlobRegister {
         }
     }
 
-    pub(super) fn handle_store_result(
-        &mut self,
-        idata_address: IDataAddress,
-        sender: XorName,
-        _result: &NdResult<()>,
-        message_id: MessageId,
-        requester: PublicId,
-    ) -> Option<NodeCmd> {
-        // TODO -
-        // - if Ok, and this is the final of the three responses send success back to client handlers and
-        //   then on to the client.  Note: there's no functionality in place yet to know whether
-        //   this is the last response or not.
-        // - if Ok, and this is not the last response, just return `None` here.
-        // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
-        //   next closest non-full adult, or elder if none.  Also update the metadata for this
-        //   chunk.  Not known yet where we'll get the chunk from to do that.
-        //
-        // For phase 1, we can leave many of these unanswered.
+    // pub(super) fn handle_store_result(
+    //     &mut self,
+    //     idata_address: IDataAddress,
+    //     sender: XorName,
+    //     _result: &NdResult<()>,
+    //     message_id: MessageId,
+    //     requester: PublicId,
+    // ) -> Option<NodeCmd> {
+    //     // TODO -
+    //     // - if Ok, and this is the final of the three responses send success back to client handlers and
+    //     //   then on to the client.  Note: there's no functionality in place yet to know whether
+    //     //   this is the last response or not.
+    //     // - if Ok, and this is not the last response, just return `None` here.
+    //     // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
+    //     //   next closest non-full adult, or elder if none.  Also update the metadata for this
+    //     //   chunk.  Not known yet where we'll get the chunk from to do that.
+    //     //
+    //     // For phase 1, we can leave many of these unanswered.
 
-        // TODO - we'll assume `result` is success for phase 1.
-        let db_key = idata_address.to_db_key();
-        let mut metadata = self.get_metadata_for(idata_address).unwrap_or_default();
-        if idata_address.is_unpub() {
-            metadata.owner = Some(*utils::own_key(&requester)?);
-        }
+    //     // TODO - we'll assume `result` is success for phase 1.
+    //     let db_key = idata_address.to_db_key();
+    //     let mut metadata = self.get_metadata_for(idata_address).unwrap_or_default();
+    //     if idata_address.is_unpub() {
+    //         metadata.owner = Some(*utils::own_key(&requester)?);
+    //     }
 
-        if !metadata.holders.insert(sender) {
-            warn!(
-                "{}: {} already registered as a holder for {:?}",
-                self, sender, &idata_address
-            );
-        }
+    //     if !metadata.holders.insert(sender) {
+    //         warn!(
+    //             "{}: {} already registered as a holder for {:?}",
+    //             self, sender, &idata_address
+    //         );
+    //     }
 
-        if let Err(error) = self.metadata.set(&db_key, &metadata) {
-            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-            // TODO - send failure back to client handlers (hopefully won't accumulate), or
-            //        maybe self-terminate if we can't fix this error?
-        }
-        debug!(
-            "{:?}, Entry {:?} has {:?} holders",
-            self.id,
-            idata_address,
-            metadata.holders.len()
-        );
+    //     if let Err(error) = self.metadata.set(&db_key, &metadata) {
+    //         warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+    //         // TODO - send failure back to client handlers (hopefully won't accumulate), or
+    //         //        maybe self-terminate if we can't fix this error?
+    //     }
+    //     debug!(
+    //         "{:?}, Entry {:?} has {:?} holders",
+    //         self.id,
+    //         idata_address,
+    //         metadata.holders.len()
+    //     );
 
-        // We're acting as data handler, received request from client handlers
-        let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
+    //     // We're acting as data handler, received request from client handlers
+    //     let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
 
-        if !holders_metadata.chunks.insert(idata_address) {
-            warn!(
-                "{}: {} already registered as a holder for {:?}",
-                self, sender, &idata_address
-            );
-        }
+    //     if !holders_metadata.chunks.insert(idata_address) {
+    //         warn!(
+    //             "{}: {} already registered as a holder for {:?}",
+    //             self, sender, &idata_address
+    //         );
+    //     }
 
-        if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
-            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-        }
+    //     if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
+    //         warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+    //     }
 
-        // Should we wait for multiple responses
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *idata_address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(Ok(())),
-                message_id,
-                proof: None,
-            },
-        })
-    }
+    //     // Should we wait for multiple responses
+    //     wrap(MetadataCmd::RespondToGateway {
+    //         sender: *idata_address.name(),
+    //         msg: Message::Response {
+    //             requester,
+    //             response: Response::Write(Ok(())),
+    //             message_id,
+    //             proof: None,
+    //         },
+    //     })
+    // }
 
-    pub(super) fn handle_delete_result(
-        &mut self,
-        idata_address: IDataAddress,
-        sender: XorName,
-        result: NdResult<()>,
-        message_id: MessageId,
-        requester: PublicId,
-    ) -> Option<NodeCmd> {
-        if let Err(err) = &result {
-            warn!("{}: Node reports error deleting: {}", self, err);
-        } else {
-            let db_key = idata_address.to_db_key();
-            let metadata = self.get_metadata_for(idata_address);
+    // pub(super) fn handle_delete_result(
+    //     &mut self,
+    //     idata_address: IDataAddress,
+    //     sender: XorName,
+    //     result: NdResult<()>,
+    //     message_id: MessageId,
+    //     requester: PublicId,
+    // ) -> Option<NodeCmd> {
+    //     if let Err(err) = &result {
+    //         warn!("{}: Node reports error deleting: {}", self, err);
+    //     } else {
+    //         let db_key = idata_address.to_db_key();
+    //         let metadata = self.get_metadata_for(idata_address);
 
-            if let Ok(mut metadata) = metadata {
-                let holder = self.get_holder(sender);
+    //         if let Ok(mut metadata) = metadata {
+    //             let holder = self.get_holder(sender);
 
-                // Remove the chunk from the holder metadata
-                if let Ok(mut holder) = holder {
-                    let _ = holder.chunks.remove(&idata_address);
+    //             // Remove the chunk from the holder metadata
+    //             if let Ok(mut holder) = holder {
+    //                 let _ = holder.chunks.remove(&idata_address);
 
-                    if holder.chunks.is_empty() {
-                        if let Err(error) = self.holders.rem(&sender.to_db_key()) {
-                            warn!(
-                                "{}: Failed to delete holder metadata from DB: {:?}",
-                                self, error
-                            );
-                        }
-                    } else if let Err(error) = self.holders.set(&sender.to_db_key(), &holder) {
-                        warn!(
-                            "{}: Failed to write holder metadata to DB: {:?}",
-                            self, error
-                        );
-                    }
-                }
+    //                 if holder.chunks.is_empty() {
+    //                     if let Err(error) = self.holders.rem(&sender.to_db_key()) {
+    //                         warn!(
+    //                             "{}: Failed to delete holder metadata from DB: {:?}",
+    //                             self, error
+    //                         );
+    //                     }
+    //                 } else if let Err(error) = self.holders.set(&sender.to_db_key(), &holder) {
+    //                     warn!(
+    //                         "{}: Failed to write holder metadata to DB: {:?}",
+    //                         self, error
+    //                     );
+    //                 }
+    //             }
 
-                // Remove the holder from the chunk metadata
-                if !metadata.holders.remove(&sender) {
-                    warn!(
-                        "{}: {} is not registered as a holder for {:?}",
-                        self, sender, &idata_address
-                    );
-                }
-                if metadata.holders.is_empty() {
-                    if let Err(error) = self.metadata.rem(&db_key) {
-                        warn!(
-                            "{}: Failed to delete chunk metadata from DB: {:?}",
-                            self, error
-                        );
-                        // TODO - Send failure back to client handlers?
-                    }
-                } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
-                    warn!(
-                        "{}: Failed to write chunk metadata to DB: {:?}",
-                        self, error
-                    );
-                    // TODO - Send failure back to client handlers?
-                }
-            };
-        }
+    //             // Remove the holder from the chunk metadata
+    //             if !metadata.holders.remove(&sender) {
+    //                 warn!(
+    //                     "{}: {} is not registered as a holder for {:?}",
+    //                     self, sender, &idata_address
+    //                 );
+    //             }
+    //             if metadata.holders.is_empty() {
+    //                 if let Err(error) = self.metadata.rem(&db_key) {
+    //                     warn!(
+    //                         "{}: Failed to delete chunk metadata from DB: {:?}",
+    //                         self, error
+    //                     );
+    //                     // TODO - Send failure back to client handlers?
+    //                 }
+    //             } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+    //                 warn!(
+    //                     "{}: Failed to write chunk metadata to DB: {:?}",
+    //                     self, error
+    //                 );
+    //                 // TODO - Send failure back to client handlers?
+    //             }
+    //         };
+    //     }
 
-        // TODO: Different responses from adults?
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *idata_address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
-    }
+    //     // TODO: Different responses from adults?
+    //     wrap(MetadataCmd::RespondToGateway {
+    //         sender: *idata_address.name(),
+    //         msg: Message::Response {
+    //             requester,
+    //             response: Response::Write(result),
+    //             message_id,
+    //             proof: None,
+    //         },
+    //     })
+    // }
 
-    pub(super) fn handle_get_result(
-        &self,
-        result: NdResult<IData>,
-        message_id: MessageId,
-        requester: PublicId,
-        proof: (Request, Signature),
-    ) -> Option<NodeCmd> {
-        let response = Response::GetIData(result);
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *self.id.name(),
-            msg: Message::Response {
-                requester,
-                response,
-                message_id,
-                proof: Some(proof),
-            },
-        })
-    }
+    // pub(super) fn handle_get_result(
+    //     &self,
+    //     result: NdResult<IData>,
+    //     message_id: MessageId,
+    //     requester: PublicId,
+    //     proof: (Request, Signature),
+    // ) -> Option<NodeCmd> {
+    //     let response = Response::GetIData(result);
+    //     wrap(MetadataCmd::RespondToGateway {
+    //         sender: *self.id.name(),
+    //         msg: Message::Response {
+    //             requester,
+    //             response,
+    //             message_id,
+    //             proof: Some(proof),
+    //         },
+    //     })
+    // }
 
     // Updates the metadata of the chunks help by a node that left.
     // Returns the list of chunks that were held along with the remaining holders.
@@ -684,10 +601,47 @@ impl BlobRegister {
             .map_or(None, |key| Some(key.sign(data)));
         signature.map(|sig| (self.routing.borrow().our_index().unwrap_or(0), sig))
     }
-}
+    
+    fn set_proxy(&self, msg: &mut MsgEnvelope) {
+        // origin signs the message, while proxies sign the envelope
+        msg.add_proxy(self.sign(msg))
+    }
 
-fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Metadata(cmd))
+    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        let message = Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        };
+        self.wrap(message)
+    }
+
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
+        MsgSender::Node {
+            id: self.public_key(),
+            duty: Duty::Elder(ElderDuty::Metadata),
+            signature,
+        }
+    }
+    
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
+    }
 }
 
 impl Display for BlobRegister {

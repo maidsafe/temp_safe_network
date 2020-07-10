@@ -10,7 +10,7 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::cmd::ElderCmd;
+use crate::cmd::NodeCmd;
 use routing::SrcLocation;
 use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MessageId, PublicId, SequenceWrite};
 use threshold_crypto::{PublicKey, Signature};

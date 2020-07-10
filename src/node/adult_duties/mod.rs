@@ -9,15 +9,14 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{cmd::AdultCmd, msg::Message, node::Init, Config, Result};
+use crate::{cmd::NodeCmd, node::Init, Config, Result};
 use routing::{Node as Routing, SrcLocation};
-use safe_nd::NodePublicId;
+use safe_nd::{NodePublicId, MsgEnvelope};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use threshold_crypto::Signature;
 
 pub(crate) struct AdultDuties {
     id: NodePublicId,
@@ -49,11 +48,9 @@ impl AdultDuties {
 
     pub fn receive_msg(
         &mut self,
-        src: SrcLocation,
-        msg: Message,
-        accumulated_signature: Option<Signature>,
-    ) -> Option<AdultCmd> {
-        self.chunks.receive_msg(src, msg, accumulated_signature)
+        msg: MsgEnvelope,
+    ) -> Option<NodeCmd> {
+        self.chunks.receive_msg(msg)
     }
 }
 

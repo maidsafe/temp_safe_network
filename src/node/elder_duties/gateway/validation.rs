@@ -14,9 +14,9 @@ use crate::{
 use log::trace;
 use safe_nd::{
     Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Error as NdError,
-    GatewayRequest, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId,
-    NodePublicId, NodeRequest, PublicId, Read, SData, SDataAddress,
-    SequenceRead, SequenceWrite, Write,
+    IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId,
+    NodePublicId, PublicId, Read, SData, SDataAddress, NodeCmd,
+    SequenceRead, SequenceWrite, Write, MsgSender, MsgEnvelope, Message, Duty, ElderDuty,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -38,25 +38,29 @@ impl Validation {
         }
     }
 
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) {
+
+    }
+
     pub fn initiate_write(
         &mut self,
         cmd: DataCmd,
-        client: PublicId,
         msg_id: MessageId,
+        origin: MsgSender,
         debit_proof: DebitAgreementProof,
     ) -> Option<NodeCmd> {
         match cmd {
             DataCmd::Blob(write) => self
                 .blobs
-                .initiate_write(client, write, msg_id, debit_proof),
-            DataCmd::Map(write) => self.maps.initiate_write(client, write, msg_id, debit_proof),
+                .initiate_write(write, msg_id, origin, debit_proof),
+            DataCmd::Map(write) => self.maps.initiate_write(write, msg_id, origin, debit_proof),
             DataCmd::Sequence(write) => {
                 self.sequences
-                    .initiate_write(client, write, msg_id, debit_proof)
+                    .initiate_write(write, msg_id, origin, debit_proof)
             }
             DataCmd::Account(write) => {
                 self.accounts
-                    .initiate_write(client, write, msg_id, debit_proof)
+                    .initiate_write(write, msg_id, origin, debit_proof)
             }
         }
     }
@@ -64,14 +68,13 @@ impl Validation {
     pub fn initiate_read(
         &mut self,
         read: DataQuery,
-        client: PublicId,
-        msg_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         match read {
-            DataQuery::Blob(write) => self.blobs.initiate_read(client, write, msg_id),
-            DataQuery::Map(write) => self.maps.initiate_read(client, write, msg_id),
-            DataQuery::Sequence(write) => self.sequences.initiate_read(client, write, msg_id),
-            DataQuery::Account(read) => self.accounts.initiate_read(client, read, msg_id),
+            DataQuery::Blob(read) => self.blobs.initiate_read(read, msg),
+            DataQuery::Map(read) => self.maps.initiate_read(read, msg),
+            DataQuery::Sequence(read) => self.sequences.initiate_read(read, msg),
+            DataQuery::Account(read) => self.accounts.initiate_read(read, msg),
         }
     }
 }
@@ -93,16 +96,11 @@ impl Sequences {
     // client query
     pub fn initiate_read(
         &mut self,
-        requester: PublicId,
-        request: SequenceRead,
-        message_id: MessageId,
+        read: SequenceRead,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        Some(GatewayCmd::ForwardClientRequest(Message::Request {
-            requester,
-            request: Request::Node(NodeRequest::Read(Read::Sequence(request))),
-            message_id,
-            signature: None,
-        }))
+        self.set_proxy(msg);
+        Some(NodeCmd::SendToSection(msg))
     }
 
     // on client request
@@ -190,12 +188,46 @@ impl Sequences {
             message_id,
         }))
     }
+    
+    fn set_proxy(&self, msg: &mut MsgEnvelope) {
+        // origin signs the message, while proxies sign the envelope
+        msg.add_proxy(self.sign(msg))
+    }
 
-    fn wrap(write: SequenceWrite, debit_agreement: DebitAgreementProof) -> Request {
-        Request::Gateway(GatewayRequest::Write {
-            write: Write::Sequence(write),
-            debit_agreement,
-        })
+    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        let message = Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        };
+        self.wrap(message)
+    }
+
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
+        MsgSender::Node {
+            id: self.public_key(),
+            duty: Duty::Elder(ElderDuty::Gateway),
+            signature,
+        }
+    }
+    
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 
@@ -265,9 +297,9 @@ impl Blobs {
     // on client request
     fn initiate_creation(
         &mut self,
-        client: PublicId,
         chunk: IData,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
         debit_proof: DebitAgreementProof,
     ) -> Option<NodeCmd> {
         let owner = utils::owner(&client)?;

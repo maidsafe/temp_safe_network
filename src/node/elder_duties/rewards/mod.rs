@@ -8,12 +8,14 @@
 
 mod section_funds;
 mod system;
+mod validator;
 
-use node::messaging::Messaging;
-use crate::{section_funds::SectionFunds, system::FarmingSystem, cmd::{ElderCmd, RewardCmd}};
+use crate::node::messaging::Messaging;
+use crate::cmd::NodeCmd;
+use super::{section_funds::SectionFunds, system::FarmingSystem, validator::Validator};
 use safe_transfers::TransferActor;
-use safe_farming::{Accumulation, AccumulationEvent, RewardCounter, Money};
-use safe_nd::{AccountId, Result, MsgEnvelope, MsgSender, Message, NetworkCmd, Duty, ElderDuty};
+use safe_farming::{Accumulation, AccumulationEvent, RewardCounter, StorageRewards};
+use safe_nd::{XorName, AccountId, Result, MsgEnvelope, MsgSender, Message, NetworkCmd, Duty, ElderDuty, Money};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -28,7 +30,7 @@ pub(super) struct Rewards {
 }
 
 impl Rewards {
-    pub fn new(actor: TransferActor) -> Self {
+    pub fn new(actor: TransferActor<Validator>) -> Self {
         let acc = Accumulation::new(Default::default(), Default::default());
         let base_cost = Money::from_nano(1);
         let algo = StorageRewards::new(base_cost);
@@ -105,5 +107,5 @@ impl Rewards {
 }
 
 fn wrap(cmd: RewardCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Reward(cmd))
+    Some(NodeCmd::Reward(cmd))
 }

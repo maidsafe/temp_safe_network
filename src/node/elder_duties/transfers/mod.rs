@@ -11,7 +11,7 @@ pub mod replica_manager;
 //use super::{messaging::Messaging, replica_manager::ReplicaManager};
 use self::replica_manager::ReplicaManager;
 use crate::{
-    cmd::{ElderCmd, TransferCmd as TCmd},
+    cmd::{NodeCmd, TransferCmd as TCmd},
     msg::Message,
 };
 //use log::{error, trace};
@@ -328,7 +328,7 @@ impl Transfers {
 }
 
 fn wrap(cmd: TCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Transfer(cmd))
+    Some(NodeCmd::Transfer(cmd))
 }
 
 impl Display for Transfers {

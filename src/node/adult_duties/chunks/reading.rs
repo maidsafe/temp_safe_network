@@ -7,45 +7,29 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::AdultCmd, utils};
+use crate::{cmd::NodeCmd, utils};
 use log::error;
 use routing::SrcLocation;
-use safe_nd::{BlobRead, MessageId, PublicId, Read, Request};
+use safe_nd::{BlobRead, MessageId, Read, MsgSender, PublicKey, Signature};
 use serde::Serialize;
-use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Reading {
-    request: Request,
-    src: SrcLocation,
-    requester: PublicId,
     read: Read,
-    message_id: MessageId,
-    accumulated_signature: Option<Signature>,
-    public_key: Option<PublicKey>,
+    msg: MsgEnvelope,
 }
 
 impl Reading {
     pub fn new(
         read: Read,
-        src: SrcLocation,
-        requester: PublicId,
-        request: Request,
-        message_id: MessageId,
-        accumulated_signature: Option<Signature>,
-        public_key: Option<PublicKey>,
+        msg: MsgEnvelope,
     ) -> Self {
         Self {
-            request,
-            src,
-            requester,
             read,
-            message_id,
-            accumulated_signature,
-            public_key,
+            msg,
         }
     }
 
-    pub fn get_result(&self, storage: &ChunkStorage) -> Option<AdultCmd> {
+    pub fn get_result(&self, storage: &ChunkStorage) -> Option<NodeCmd> {
         use Read::*;
         match &self.read {
             Blob(read) => self.blob(read, storage),
@@ -54,49 +38,43 @@ impl Reading {
     }
 
     fn verify<T: Serialize>(&self, data: &T) -> bool {
-        if let Some(sig) = self.accumulated_signature.as_ref() {
-            match self.public_key {
-                Some(key) => key.verify(sig, &utils::serialise(data)),
-                None => false,
-            }
-        } else {
-            false
+        match self.msg.most_recent_sender() {
+            MsgSender::Section {
+                id,
+                signature,
+                ..
+            } => id.verify(signature, &utils::serialise(data)),
+            _ => false
         }
     }
 
-    fn blob(&self, read: &BlobRead, storage: &ChunkStorage) -> Option<AdultCmd> {
+    fn blob(&self, read: &BlobRead, storage: &ChunkStorage) -> Option<NodeCmd> {
         let BlobRead::Get(address) = read;
         if self.src.is_section() {
-            // Since the requester is a node, this message was sent by the data handlers to us
-            // as a single data handler, implying that we're a data holder where the chunk is
-            // stored.
-            if self.verify(&self.request) {
+            if self.verify(&self.msg.message) {
                 storage.get(
-                    self.src,
                     *address,
-                    &self.requester,
-                    self.message_id,
-                    self.request.clone(),
-                    self.accumulated_signature.as_ref(),
+                    self.msg.id(),
+                    self.msg.origin,
                 )
             } else {
                 error!("Accumulated signature is invalid!");
                 None
             }
-        } else if matches!(self.requester, PublicId::Node(_)) {
-            if self.verify(&address) {
-                storage.get(
-                    self.src,
-                    *address,
-                    &self.requester,
-                    self.message_id,
-                    self.request.clone(),
-                    self.accumulated_signature.as_ref(),
-                )
-            } else {
-                error!("Accumulated signature is invalid!");
-                None
-            }
+        // } else if matches!(self.requester, PublicId::Node(_)) {
+        //     if self.verify(&address) {
+        //         storage.get(
+        //             self.src,
+        //             *address,
+        //             &self.requester,
+        //             self.message_id,
+        //             self.request.clone(),
+        //             self.accumulated_signature.as_ref(),
+        //         )
+        //     } else {
+        //         error!("Accumulated signature is invalid!");
+        //         None
+        //     }
         } else {
             None
         }

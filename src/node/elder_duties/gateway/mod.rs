@@ -14,7 +14,7 @@ use self::{
     validation::Validation,
 };
 use crate::{
-    cmd::{ConsensusAction, ElderCmd, GatewayCmd},
+    cmd::{ConsensusAction, NodeCmd},
     msg::Message,
     node::Init,
     Config, Result,
@@ -25,8 +25,9 @@ use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::{
-    AuthCmd, AuthQuery, ClientAuth, ClientRequest, Cmd, GatewayRequest, Message, MessageId,
-    NodePublicId, PublicId, Query, Signature, SystemOp, XorName,
+    AuthCmd, AuthQuery, ClientAuth, Cmd,
+    Message, MessageId, NodePublicId, PublicId, Query, Signature, 
+    XorName,
 };
 use std::{
     cell::RefCell,
@@ -81,11 +82,6 @@ impl Gateway {
         self.messaging.handle_connection_failure(peer_addr)
     }
 
-    /// Respond to client
-    pub(crate) fn send_to_client(&mut self, message_id: MessageId, response: Response) {
-        self.messaging.send_to_client(message_id, response);
-    }
-
     pub fn try_parse_client_msg<R: CryptoRng + Rng>(&mut self,
         peer_addr: SocketAddr,
         bytes: &Bytes,
@@ -94,6 +90,34 @@ impl Gateway {
         self
             .messaging
             .try_parse_client_msg(peer_addr, bytes, rng)
+    }
+
+    pub fn push_to_client(
+        &mut self,
+        msg: MsgEnvelope,
+    ) -> Option<NodeCmd> {
+        self.messaging.send_to_client(msg)
+    }
+    
+    /// If a request within GatewayCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
+    /// was a GatewayRequest destined to our section, this is where the actual request will end up.
+    pub fn handle_auth_cmd(
+        &mut self,
+        client: PublicId,
+        cmd: AuthCmd,
+        msg_id: MessageId,
+    ) -> Option<NodeCmd> {
+        self.auth.finalise(client, cmd, msg_id)
+    }
+
+    /// Basically.. when Gateway nodes have agreed,
+    /// they'll forward the request into the network.
+    pub fn handle_consensused_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
+        use ConsensusAction::*;
+        trace!("{}: Consensused {:?}", self, cmd);
+        match cmd {
+            Forward(msg) => Some(NodeCmd::SendToSection(msg)),
+        }
     }
 
     /// Receive client request
@@ -117,15 +141,15 @@ impl Gateway {
 
         match msg.message {
             Message::Cmd {
-                cmd: Cmd::Auth(auth_cmd),
+                cmd: Cmd::Auth(_),
                 id,
                 ..
-            } => self.auth.cmd(client, auth_cmd, id),
+            } => self.auth.initiate(msg),
             Message::Query {
-                query: Query::Auth(auth_query),
+                query: Query::Auth(_),
                 id,
                 ..
-            } => self.auth.query(client, auth_query, id),
+            } => self.auth.list_keys_and_version(msg),
             Message::Cmd {
                 cmd: Cmd::Data { cmd, payment },
                 id,
@@ -140,46 +164,6 @@ impl Gateway {
         }
     }
 
-    /// Basically.. when Gateway nodes have agreed,
-    /// they'll forward the request into the network.
-    pub fn handle_consensused_cmd(&mut self, action: ConsensusAction) -> Option<NodeCmd> {
-        use ConsensusAction::*;
-        trace!("{}: Consensused {:?}", self, action,);
-        match action {
-            Forward {
-                request,
-                client_public_id,
-                message_id,
-            } => Some(GatewayCmd::ForwardClientRequest(Message::Request {
-                requester: client_public_id,
-                request,
-                message_id,
-                signature: None,
-            })),
-        }
-    }
-
-    /// If a request within GatewayCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
-    /// was a GatewayRequest destined to our section, this is where the actual request will end up.
-    pub fn handle_auth_cmd(
-        &mut self,
-        client: PublicId,
-        cmd: AuthCmd,
-        msg_id: MessageId,
-    ) -> Option<NodeCmd> {
-        wrap(self.auth.finalise(client, cmd, msg_id)?)
-    }
-
-    pub fn push_to_client(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
-        self.messaging.send_to_client(msg)
-    }
-}
-
-fn wrap(cmd: GatewayCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Gateway(cmd))
 }
 
 impl Display for Gateway {

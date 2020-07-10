@@ -6,15 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{msg::Message, node::Init, Result};
+use crate::{node::Init, Result};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::{SrcLocation, Node as Routing};
-use safe_nd::{ClientPublicId, PublicId, PublicKey, XorName, SignatureShare};
+use safe_nd::{ClientPublicId, PublicId, PublicKey, XorName, SignatureShare, Signature};
 use serde::Serialize;
-use std::{fs, path::Path};
 use unwrap::unwrap;
+use std::{
+    cell::Ref,
+    fs, path::Path,
+};
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
@@ -76,29 +79,6 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
     }
 }
 
-/// Returns the requester's address.  An App's address is the name of its owner.
-#[allow(unused)]
-pub(crate) fn requester_address(msg: &Message) -> XorName {
-    match msg {
-        Message::Request { ref requester, .. } | Message::Response { ref requester, .. } => {
-            *requester.name()
-        }
-        Message::Duplicate { .. } | Message::DuplicationComplete { .. } => XorName::default(),
-    }
-}
-
-/// Returns the dst address.
-pub(crate) fn dst_address(msg: &Message) -> Option<XorName> {
-    match msg {
-        Message::Request { ref request, .. } => match request.dst_address() {
-            Some(address) => Some(*address),
-            None => None,
-        },
-        Message::Response { ref requester, .. } => Some(*requester.name()),
-        Message::Duplicate { .. } | Message::DuplicationComplete { .. } => Some(XorName::default()),
-    }
-}
-
 pub(crate) fn get_source_name(src: SrcLocation) -> XorName {
     if let SrcLocation::Node(xorname) = src {
         XorName(xorname.0)
@@ -107,12 +87,12 @@ pub(crate) fn get_source_name(src: SrcLocation) -> XorName {
     }
 }
 
-pub(crate) fn sign(routing: &Routing, data: &[u8]) -> Option<SignatureShare> {
+pub(crate) fn sign(routing: Ref<Routing>, data: &[u8]) -> Option<Signature> {
     let signature = routing
         .secret_key_share()
         .map_or(None, |key| Some(key.sign(data)));
-    signature.map(|sig| SignatureShare {
-            index: self.routing.borrow().our_index().unwrap_or(0),
+    signature.map(|sig| Signature::BlsShare(SignatureShare {
+            index: routing.our_index().unwrap_or(0),
             share: sig,
-        })
+        }))
 }

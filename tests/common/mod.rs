@@ -24,8 +24,8 @@ use mock_quic_p2p::{self as quic_p2p, Event, Network, OurType, Peer, QuicP2p};
 use routing::{self, Node, NodeConfig, TransportConfig as NetworkConfig};
 use safe_nd::{
     AppFullId, AppPublicId, ClientFullId, ClientPublicId, Error, HandshakeRequest,
-    HandshakeResponse, Message, MessageId, Money, MoneyRequest, PublicId, PublicKey, Request,
-    Response, Signature, TransferId, TransferNotification, TransferRegistered,
+    HandshakeResponse, Message, MessageId, Money, PublicId, PublicKey, Signature, TransferId,
+    TransferRegistered,
 };
 #[cfg(feature = "mock")]
 use safe_vault::mock_routing::{ConsensusGroup, ConsensusGroupRef};

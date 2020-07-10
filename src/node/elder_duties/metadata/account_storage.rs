@@ -8,14 +8,14 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
-    cmd::{ElderCmd, MetadataCmd},
-    msg::Message,
+    cmd::NodeCmd,
     node::Init,
     utils, Config, Result,
 };
 use safe_nd::{
     Account, AccountRead, AccountWrite, Error as NdError, MessageId, NodePublicId, PublicId,
-    PublicKey, Response, Result as NdResult, XorName,
+    PublicKey, Result as NdResult, XorName, QueryResponse, Message, MsgEnvelope, MsgSender,
+    Signature, ElderDuty, Duty,
 };
 use std::{
     cell::Cell,
@@ -26,10 +26,6 @@ use std::{
 pub(super) struct AccountStorage {
     id: NodePublicId,
     chunks: AccountChunkStore,
-}
-
-fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(ElderCmd::Metadata(cmd))
 }
 
 impl AccountStorage {
@@ -52,101 +48,85 @@ impl AccountStorage {
 
     pub(super) fn read(
         &self,
-        client: PublicId,
         read: &AccountRead,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         use AccountRead::*;
         match read {
-            Get(ref address) => self.get(client, address, message_id),
+            Get(ref address) => self.get(address, msg_id, origin),
         }
     }
 
     fn get(
         &self,
-        requester: PublicId,
         address: &XorName,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .account(utils::own_key(&requester)?, address)
+            .account(origin.id(), address)
             .map(Account::into_data_and_signature);
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address,
-            msg: Message::Response {
-                requester,
-                response: Response::GetLoginPacket(result),
-                message_id,
-                proof: None,
-            },
-        })
+        let message = Message::QueryResponse {
+            id: MessageId::new(),
+            response: QueryResponse::GetAccount(result),
+            correlation_id: msg_id,
+            query_origin: origin,
+        };
+        self.wrap(message)
     }
 
     pub(super) fn write(
         &mut self,
-        client: PublicId,
         write: AccountWrite,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         use AccountWrite::*;
         match write {
-            New(ref account) => self.create(client, account, message_id),
-            Update(updated_account) => self.update(client, &updated_account, message_id),
+            New(ref account) => self.create(account, msg_id, origin),
+            Update(updated_account) => self.update(&updated_account, msg_id, origin),
         }
     }
 
     fn create(
         &mut self,
-        requester: PublicId,
         account: &Account,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
-        } else {
+        } else if account.owner != origin.id() {
+            Err(NdError::InvalidOwners)
+        } else { // also check the signature
             self.chunks
                 .put(account)
                 .map_err(|error| error.to_string().into())
         };
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *account.address(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn update(
         &mut self,
-        requester: PublicId,
         updated_account: &Account,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .account(utils::own_key(&requester)?, updated_account.address())
-            .and_then(|_existing_login_packet| {
+            .account(origin.id(), updated_account.address())
+            .and_then(|existing_account| {
                 if !updated_account.size_is_valid() {
-                    return Err(NdError::ExceededSize);
+                    Err(NdError::ExceededSize)
+                } else if updated_account.owner != existing_account.owner {
+                    Err(NdError::InvalidOwners)
+                } else { // also check the signature
+                    self.chunks
+                        .put(&updated_account)
+                        //.map_err(|err| err.to_string().into())
                 }
-                self.chunks
-                    .put(&updated_account)
-                    .map_err(|err| err.to_string().into())
             });
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *updated_account.address(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn account(&self, requester_pub_key: &PublicKey, address: &XorName) -> NdResult<Account> {
@@ -163,6 +143,42 @@ impl AccountStorage {
                     Err(NdError::AccessDenied)
                 }
             })
+    }
+
+    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        let message = Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        };
+        self.wrap(message)
+    }
+
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign(&self, message: Message) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
+        MsgSender::Node {
+            id: self.public_key(),
+            duty: Duty::Elder(ElderDuty::Metadata),
+            signature,
+        }
+    }
+    
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 

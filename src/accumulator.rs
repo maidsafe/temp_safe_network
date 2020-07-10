@@ -65,6 +65,8 @@ impl Accumulator {
                 }
 
                 let (_, _, signatures) = self.messages.get(&msg_id)?;
+                // NB: This is wrong! pk set should come with the sig share.
+                // use routing::ProofShare etc.
                 let public_key_set = self.routing_node.borrow().public_key_set().ok()?.clone();
                 info!(
                     "Got {} signatures. We need {}",
@@ -90,8 +92,6 @@ impl Accumulator {
                         let _ = self.completed.insert(msg_id);
                         let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
                         let signature = safe_nd::Signature::Bls(signature);
-                        let duty = Duty::Elder(ElderDuty::Gateway);
-                        //msg.add_proxy(MsgSender::Section { id, duty, signature });
                         return Some((msg, signature));
                     } else {
                         error!("Accumulated signature is invalid");

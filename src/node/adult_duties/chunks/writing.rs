@@ -7,45 +7,30 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::AdultCmd, utils};
+use crate::{cmd::NodeCmd, utils};
 use log::error;
 use routing::SrcLocation;
-use safe_nd::{BlobWrite, MessageId, PublicId, Request, Write};
+use safe_nd::{BlobWrite, MessageId, MsgEnvelope, Write};
 use serde::Serialize;
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
-    request: Request,
-    src: SrcLocation,
-    requester: PublicId,
     write: Write,
-    message_id: MessageId,
-    accumulated_signature: Option<Signature>,
-    public_key: Option<PublicKey>,
+    msg: MsgEnvelope,
 }
 
 impl Writing {
     pub fn new(
         write: Write,
-        src: SrcLocation,
-        requester: PublicId,
-        request: Request,
-        message_id: MessageId,
-        accumulated_signature: Option<Signature>,
-        public_key: Option<PublicKey>,
+        msg: MsgEnvelope,
     ) -> Self {
         Self {
-            request,
-            src,
-            requester,
             write,
-            message_id,
-            accumulated_signature,
-            public_key,
+            msg,
         }
     }
 
-    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<AdultCmd> {
+    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<NodeCmd> {
         use Write::*;
         match &self.write {
             Blob(write) => self.blob(write, storage),
@@ -54,34 +39,25 @@ impl Writing {
     }
 
     fn verify<T: Serialize>(&self, data: &T) -> bool {
-        if let Some(sig) = self.accumulated_signature.as_ref() {
-            match self.public_key {
-                Some(key) => key.verify(sig, &utils::serialise(data)),
-                None => false,
-            }
-        } else {
-            false
+        match self.msg.most_recent_sender() {
+            MsgSender::Section {
+                id,
+                signature,
+                ..
+            } => id.verify(signature, &utils::serialise(data)),
+            _ => false
         }
     }
 
-    fn blob(&self, write: &BlobWrite, storage: &mut ChunkStorage) -> Option<AdultCmd> {
+    fn blob(&self, write: &BlobWrite, storage: &mut ChunkStorage) -> Option<NodeCmd> {
         use BlobWrite::*;
-        // Since the requester is a node, this message was sent by the data handlers to us
-        // as a single data handler, implying that we're a data holder where the chunk is
-        // stored.
-        if !self.src.is_section() {
-            return None;
-        }
         match write {
             New(data) => {
-                if self.verify(&self.request) {
+                if self.verify(&self.msg) {
                     storage.store(
-                        self.src,
                         &data,
-                        &self.requester,
-                        self.message_id,
-                        self.accumulated_signature.as_ref(),
-                        self.request.clone(),
+                        self.msg.id(),
+                        self.msg.origin,
                     )
                 } else {
                     error!(
@@ -95,10 +71,8 @@ impl Writing {
                 if self.verify(&address) {
                     storage.delete(
                         *address,
-                        &self.requester,
-                        self.message_id,
-                        self.request.clone(),
-                        self.accumulated_signature.as_ref(),
+                        self.msg.id(),
+                        self.msg.origin,
                     )
                 } else {
                     error!("Accumulated signature is invalid!");

@@ -8,17 +8,17 @@
 
 mod adult_duties;
 mod elder_duties;
-mod remote_msg_eval;
+mod msg_eval;
 
 use crate::{
     accumulator::Accumulator,
     cmd::{
-        AdultCmd, ConsensusAction, ElderCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
+        NodeCmd, ConsensusAction, NodeCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
         TransferCmd,
     },
     duties::{adult::AdultDuties, elder::ElderDuties},
     Messaging,
-    remote_msg_eval::RemoteMsgEvaluation,
+    msg_eval::{RemoteMsgEval, EvalOptions},
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -43,7 +43,6 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
-//use threshold_crypto::Signature;
 
 const STATE_FILENAME: &str = "state";
 
@@ -84,7 +83,7 @@ pub struct Node<R: CryptoRng + Rng> {
     command_receiver: Receiver<Command>,
     routing: Rc<RefCell<Routing>>,
     messaging: Rc<RefCell<Messaging>>,
-    remote_msg_eval: RemoteMsgEvaluation,
+    msg_eval: RemoteMsgEval,
     rng: R,
 }
 
@@ -131,7 +130,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
         let messaging = Messaging::new(routing.clone());
         let messaging = Rc::new(RefCell::new(messaging));
-        let remote_msg_eval = RemoteMsgEvaluation::new(routing.clone());
+        let msg_eval = RemoteMsgEval::new(routing.clone());
 
         let node = Self {
             id,
@@ -142,7 +141,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             command_receiver,
             routing,
             messaging,
-            remote_msg_eval,
+            msg_eval,
             rng,
         };
         node.dump_state()?;
@@ -374,6 +373,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 info!("No. of Elders: {}", elder_count);
                 info!("No. of Adults: {}", adult_count);
                 None
+                // this here is where we query source section for the reward counter
             }
             RoutingEvent::Connected(_) => self.promote_to_adult().map_or_else(
                 |err| {
@@ -392,8 +392,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     src,
                     dst
                 );
-                self.remote_msg_eval
-                    .msg(src, content)
+                self.handle_remote_msg(src, content)
             }
             RoutingEvent::EldersChanged { .. } => {
                 self.elder_duties()?.elders_changed()
@@ -417,51 +416,46 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
         }
     }
+
     fn handle_remote_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
-        if self.remote_msg_eval.should_forward_to_network(msg) {
-            // Any type of msg that is not process locally.
-            self.messaging.borrow_mut().send_to_network(msg)
-        } else if self.remote_msg_eval.should_go_to_gateway() {
-            // Client auth operations (Temporarily handled here, will be at app layer (Authenticator)).
-            self.elder_duties()?.gateway().handle_auth_cmd(
-                src, msg,
-                None, // Gateway Elders should just execute and return the result, for client to accumulate.
-            )?
-        } else if self.remote_msg_eval.should_go_to_data_payment(msg) {
-            // Incoming msg from `Gateway`!
-            self.elder_duties()?.data_payment().pay_for_data(msg) // Payment Elders should just execute and send onwards.
-        } else if self.remote_msg_eval.should_go_to_metadata_write(msg) {
-            // Incoming msg from `Payment`!
-            self.accumulate_msg(src, msg) // Metadata Elders accumulate the msgs from Payment Elders.
-        } else if self.remote_msg_eval.should_go_to_chunk_write(msg) {
-            // Incoming msg from `Metadata`!
-            self.adult_duties()?.receive_msg(
-                src, msg,
-                None, // NB: pass in the request signature to validate duplication requests
-            )?
-        } else if self.remote_msg_eval.should_push_to_client(msg) {
-            // From network to client!
-            self.elder_duties()?.gateway().push_to_client(msg)?
-        } else if self.remote_msg_eval.should_go_to_rewards() {
-            self.elder_duties()?.rewards()
-        } else {
-            error!("Unknown message: {:?}", msg.message.id());
-            None
+        use EvalOptions::*;
+        match self.msg_eval.evaluate(msg) {
+            ForwardToNetwork(msg) => self.messaging.borrow_mut().send_to_network(msg),
+            RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(msg),
+            RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(msg),
+            AccumulateForMetadata(msg) => self.accumulate_msg(src, msg),
+            RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(msg),
+            AccumulateForAdult(msg) => self.accumulate_msg(src, msg),
+            RunAtMetadata(msg) => self.adult_duties()?.receive_msg(msg),
+            PushToClient(msg) => self.elder_duties()?.gateway().push_to_client(msg),
+            RunAtRewards(msg) => unimplemented!(),
+            Unknown => {
+                error!("Unknown message destination: {:?}", msg.message.id());
+                None
+            }
         }
     }
 
     fn accumulate_msg(&mut self, src: SrcLocation, msg: MsgEnvelope) -> Option<NodeCmd> {
         let id = *self.routing.borrow().id().name();
         info!("{}: Accumulating signatures for {:?}", &id, msg.message.id());
-        if let Some((accumulated_msg, _signature)) = self.accumulator()?.accumulate_cmd(msg) {
+        if let Some((accumulated_msg, signature)) = self.accumulator()?.accumulate_cmd(msg) {
             info!(
                 "Got enough signatures for {:?}",
                 accumulated_msg.message.id()
             );
-            // let prefix = match src {
-            //     SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
-            //     SrcLocation::Section(prefix) => prefix,
-            // };
+            // upgrade sender to Section, since it accumulated
+            let sender = match msg.most_recent_sender() {
+                MsgSender::Node { duty, .. } => MsgSender::Section {
+                    id,
+                    duty,
+                    signature,
+                },
+                _ => return None, // invalid use case, we only accumulate from Nodes
+            };
+            // consider msg.pop_proxy() to remove the Node
+            // or we just set the last proxy always
+            msg.add_proxy(sender);
             self.handle_remote_msg(msg)
         } else {
             None
@@ -556,7 +550,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     fn is_handler_for(&self, address: Address) -> bool {
         match address {
-            Address::Client(xorname) => self.remote_msg_eval.self_is_handler_for(xorname),
+            Address::Client(xorname) => self.msg_eval.self_is_handler_for(xorname),
             _ => false,
         }
     }

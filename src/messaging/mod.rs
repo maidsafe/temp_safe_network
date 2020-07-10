@@ -56,7 +56,7 @@ impl Messaging {
         if let Some(client) = self.clients.get(&peer_addr).cloned() {
             self.try_get_client_msg()
         } else {
-            self.try_handle_handshake(&bytes);
+            self.try_handle_handshake(&bytes, peer_addr);
             None
         }
     }
@@ -78,11 +78,11 @@ impl Messaging {
 
     fn try_deserialize_msg(&mut self, bytes: &Bytes) -> Option<MsgEnvelope> {
         match bincode::deserialize(&bytes) {
-            Ok(msg @ MsgEnvelope { message: Message::Cmd, .. }) => Some(msg),
-            Ok(msg @ MsgEnvelope { message: Message::Query, .. }) => Some(msg),
-            Ok(msg @ MsgEnvelope { message: Message::Event, .. })
-            Ok(msg @ MsgEnvelope { message: Message::CmdError, .. }) 
-            Ok(msg @ MsgEnvelope { message: Message::QueryResponse, .. }) => {
+            Ok(msg @ MsgEnvelope { message: Message::Cmd { .. }, .. }) => Some(msg),
+            Ok(msg @ MsgEnvelope { message: Message::Query { .. }, .. }) => Some(msg),
+            Ok(msg @ MsgEnvelope { message: Message::Event { .. }, .. })
+            Ok(msg @ MsgEnvelope { message: Message::CmdError { .. }, .. }) 
+            Ok(msg @ MsgEnvelope { message: Message::QueryResponse { .. }, .. }) => {
                 info!(
                     "{}: {} invalidly sent {:?}",
                     self, client.public_id, msg
@@ -99,7 +99,7 @@ impl Messaging {
         }
     }
 
-    fn try_handle_handshake(&mut self, bytes: &Bytes) {
+    fn try_handle_handshake<R: CryptoRng + Rng>(&mut self, bytes: &Bytes, peer_addr: SocketAddr, rng: &mut R) {
         match bincode::deserialize(&bytes) {
             Ok(HandshakeRequest::Bootstrap(client_id)) => {
                 self.try_bootstrap(peer_addr, &client_id);

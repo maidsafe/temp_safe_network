@@ -7,14 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::ImmutableChunkStore, cmd::AdultCmd, msg::Message, node::Init, Config, Result,
+    chunk_store::ImmutableChunkStore, cmd::NodeCmd, node::Init, Config, Result,
 };
 use log::{error, info};
 
 use routing::SrcLocation;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
-    XorName,
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId,
+    XorName, Message, NetworkCmd, MsgSender, Duty, AdultDuty, MsgEnvelope, PublicKey,
+    CmdError, NetworkCmdError, QueryResponse,
 };
 use std::{
     cell::Cell,
@@ -49,118 +50,171 @@ impl ChunkStorage {
 
     pub(crate) fn store(
         &mut self,
-        sender: SrcLocation,
         data: &IData,
-        requester: &PublicId,
-        message_id: MessageId,
-        accumulated_signature: Option<&Signature>,
-        request: Request,
-    ) -> Option<AdultCmd> {
-        let result = if self.chunks.has(data.address()) {
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
+        match self.try_store(data) {
+            Ok(()) => None,
+            Err(error) => {
+                let message = Message::CmdError {
+                    id: MessageId::new(),
+                    error: CmdError::Data(error),
+                    correlation_id: msg.id(),
+                    cmd_origin: msg.origin,
+                };
+                self.wrap(message)
+            }
+        }
+    }
+
+    pub(crate) fn take_duplicate(
+        &mut self,
+        data: &IData,
+        msg_id: MessageId,
+        origin: MsgSender,
+        accumulated_signature: &Signature,
+    ) -> Option<NodeCmd> {
+        let message = match self.try_store(data) {
+            Ok(()) => {
+                Message::NetworkEvent { 
+                    cmd: NetworkEvent::DuplicationComplete {
+                        chunk: data.address(),
+                        proof: accumulated_signature.clone(),
+                    },
+                    id: MessageId::new(),
+                    correlation_id: message_id,
+                }
+            },
+            Err(error) => {
+                Message::NetworkCmdError {
+                    id: MessageId::new(),
+                    error: NetworkCmdError::DuplicateChunk {
+                        address: data.address(),
+                        error,
+                    },
+                    correlation_id: msg_id,
+                    cmd_origin: origin,
+                }
+            }
+        };
+        self.wrap(message)
+    }
+
+    fn try_store(&mut self, data: &IData) -> Result<()> {
+        if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
                 data.address()
             );
-            Ok(())
-        } else {
-            self.chunks
-                .put(&data)
-                .map_err(|error| error.to_string().into())
-        };
-
-        match sender {
-            SrcLocation::Node(_) => {
-                Some(AdultCmd::RespondToOurElders(Message::DuplicationComplete {
-                    response: Response::Write(result),
-                    message_id,
-                    proof: Some((*data.address(), (accumulated_signature?).clone())),
-                }))
-            }
-            SrcLocation::Section(_) => Some(AdultCmd::RespondToOurElders(Message::Response {
-                requester: requester.clone(),
-                response: Response::Write(result),
-                message_id,
-                proof: Some((request, (accumulated_signature?).clone())),
-            })),
+            return None;
         }
+        self.chunks.put(&data)
     }
 
     pub(crate) fn get(
         &self,
-        sender: SrcLocation,
         address: IDataAddress,
-        requester: &PublicId,
-        message_id: MessageId,
-        request: Request,
-        accumulated_signature: Option<&Signature>,
-    ) -> Option<AdultCmd> {
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
         let result = self
             .chunks
-            .get(&address)
-            .map_err(|error| error.to_string().into());
-
-        match sender {
-            SrcLocation::Node(xorname) => {
-                let mut targets: BTreeSet<XorName> = Default::default();
-                let _ = targets.insert(XorName(xorname.0));
-                Some(AdultCmd::SendToAdultPeers {
-                    targets,
-                    msg: Message::Response {
-                        requester: requester.clone(),
-                        response: Response::GetIData(result),
-                        message_id,
-                        proof: Some((request, (accumulated_signature?).clone())),
-                    },
-                })
-            }
-            SrcLocation::Section(_) => Some(AdultCmd::RespondToOurElders(Message::Response {
-                requester: requester.clone(),
-                response: Response::GetIData(result),
-                message_id,
-                proof: Some((request, (accumulated_signature?).clone())),
-            })),
-        }
+            .get(&address);
+        let message = Message::QueryResponse {
+            id: MessageId::new(),
+            response: QueryResponse::GetBlob(result),
+            correlation_id: msg_id,
+            query_origin: origin,
+        };
+        self.wrap(message)
     }
+
+    // pub(crate) fn get_for_duplciation(
+    //     &self,
+    //     address: IDataAddress,
+    //     msg: MsgEnvelope,
+    // ) -> Option<NodeCmd> {
+        
+    //     match self.chunks.get(&address) {
+
+    //     }
+
+    //     let mut targets: BTreeSet<XorName> = Default::default();
+    //     let _ = targets.insert(XorName(xorname.0));
+    //     Some(NodeCmd::SendToNode {
+    //         targets,
+    //         msg: Message::QueryResponse {
+    //             requester: requester.clone(),
+    //             response: Response::GetIData(result),
+    //             message_id,
+    //             proof: Some((request, (accumulated_signature?).clone())),
+    //         },
+    //     })
+    // }
 
     pub(crate) fn delete(
         &mut self,
         address: IDataAddress,
-        requester: &PublicId,
-        message_id: MessageId,
-        request: Request,
-        accumulated_signature: Option<&Signature>,
-    ) -> Option<AdultCmd> {
-        let result = if self.chunks.has(&address) {
-            self.chunks
-                .get(&address)
-                .map_err(|error| error.to_string().into())
-                .and_then(|data| match data {
-                    IData::Unpub(ref _data) => Ok(()),
-                    _ => {
-                        error!(
-                            "{}: Invalid DeleteUnpub(IData::Pub) encountered: {:?}",
-                            self, message_id
-                        );
-                        Err(NdError::InvalidOperation)
-                    }
-                })
-                .and_then(|_| {
-                    self.chunks
-                        .delete(&address)
-                        .map_err(|error| error.to_string().into())
-                })
-        } else {
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
+        if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
-            Ok(())
+            return None;
+        }
+        let result = self.chunks
+            .get(&address)
+            .and_then(|data| match data {
+                IData::Unpub(_) => Ok(()),
+                _ => {
+                    error!(
+                        "{}: Invalid DeletePrivate(IData::Public) encountered: {:?}",
+                        self, message_id
+                    );
+                    Err(NdError::InvalidOperation)
+                }
+            })
+            .and_then(|_| {
+                self.chunks
+                    .delete(&address)
+            });
+        
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
         };
+        
+        let message = Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        };
+        self.wrap(message)
+    }
 
-        Some(AdultCmd::RespondToOurElders(Message::Response {
-            requester: requester.clone(),
-            response: Response::Write(result),
-            message_id,
-            proof: Some((request, (accumulated_signature?).clone())),
-        }))
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign(&self, message: Message) -> MsgSender {
+        let signature = Signature;
+        MsgSender::Node {
+            id: self.public_key(),
+            duty: Duty::Adult(AdultDuty::ChunkStorage),
+            signature,
+        }
+    }
+    
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Ed25519(self.id.public_id().ed25519_public_key())
     }
 }
 
