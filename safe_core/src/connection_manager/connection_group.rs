@@ -28,9 +28,6 @@ use safe_nd::{
     PublicId, Request, RequestType, Response,
 };
 
-use tokio::time::timeout;
-
-// use std::iter::Iterator;
 use futures_util::stream::StreamExt;
 use std::{
     collections::HashMap,
@@ -45,11 +42,6 @@ use std::{
 };
 
 use unwrap::unwrap;
-
-// use safe_transfers::();
-
-/// Request timeout in seconds.
-pub const REQUEST_TIMEOUT_SECS: u64 = 180;
 
 lazy_static! {
     static ref GROUP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -115,21 +107,13 @@ impl ConnectionGroup {
         // user block here to drop lock asap
         let mut receiver_future = { self.inner.lock().await.send(msg_id, msg).await? };
 
-        // TODO reimpl timeout here
-        let response_future = async {
-            let mut response = Err(CoreError::RequestTimeout);
-            while let Some((res, _message_id)) = receiver_future.next().await {
-                response = Ok(res);
-                receiver_future.close();
-            }
-
-            response
-        };
-
-        match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response_future).await {
-            Ok(response) => response.map_err(|err| CoreError::from(format!("{}", err))),
-            Err(_) => Err(CoreError::RequestTimeout),
+        let mut response = Err(CoreError::from("No response received."));
+        while let Some((res, _message_id)) = receiver_future.next().await {
+            response = Ok(res);
+            receiver_future.close();
         }
+
+        response
     }
 
     pub async fn send_cmd(&mut self, msg_id: MessageId, msg: &Message) -> Result<(), CoreError> {
@@ -153,34 +137,26 @@ impl ConnectionGroup {
                 .await?
         };
 
-        // wrap receiver for a timeout
-        let response_future = async {
-            let mut response = Err(CoreError::from("No debit agreement proof received"));
+        let mut response = Err(CoreError::from("No debit agreement proof received"));
 
-            while let Some((res, message_id)) = receiver_future.next().await {
-                // Let the actor handle receipt of each response from elders
+        while let Some((res, message_id)) = receiver_future.next().await {
+            // Let the actor handle receipt of each response from elders
 
-                match transfer_actor
-                    .handle_validation_response(res, &message_id)
-                    .await
-                {
-                    Ok(proof) => {
-                        if let Some(debit_agreement_proof) = proof {
-                            receiver_future.close();
-                            response = Ok(debit_agreement_proof)
-                        };
-                    }
-                    Err(error) => response = Err(error),
+            match transfer_actor
+                .handle_validation_response(res, &message_id)
+                .await
+            {
+                Ok(proof) => {
+                    if let Some(debit_agreement_proof) = proof {
+                        receiver_future.close();
+                        response = Ok(debit_agreement_proof)
+                    };
                 }
+                Err(error) => response = Err(error),
             }
-
-            response
-        };
-
-        match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response_future).await {
-            Ok(response) => response.map_err(|err| CoreError::from(format!("{}", err))),
-            Err(_) => Err(CoreError::RequestTimeout),
         }
+
+        response
     }
 
     /// Terminate the QUIC connections gracefully.
@@ -678,7 +654,7 @@ impl Inner {
 
         // arbitrary delay to allow network to catchup & simplify test writing
         #[cfg(feature = "testing")]
-        std::thread::sleep(Duration::from_millis(15500));
+        std::thread::sleep(Duration::from_millis(5500));
 
         response
     }

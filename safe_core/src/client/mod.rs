@@ -81,6 +81,11 @@ pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
 async fn send(client: &impl Client, request: Request) -> Result<Response, CoreError> {
     // `sign` should be false for GETs on published data, true otherwise.
     let sign = request.get_type() != RequestType::PublicRead;
+
+    println!("-->>Request going out: {:?}", request);
+    //tmp verify our sigs...
+    // let sig =
+
     let request = client.compose_message(request, sign).await?;
     let inner = client.inner();
     let cm = &mut inner.lock().await.connection_manager;
@@ -156,10 +161,20 @@ pub trait Client: Clone + Send + Sync {
     /// This function adds the requester signature and message ID.
     async fn compose_message(&self, request: Request, sign: bool) -> Result<Message, CoreError> {
         let message_id = MessageId::new();
+
         let signature = if sign {
-            let serialised_req =
-                bincode::serialize(&(&request, message_id)).map_err(CoreError::from)?;
-            Some(self.full_id().await.sign(&serialised_req))
+            match request.clone() {
+                Request::Client(req) => {
+                    let serialised_req =
+                        bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
+                    Some(self.full_id().await.sign(&serialised_req))
+                }
+                Request::Node(req) => {
+                    let serialised_req =
+                        bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
+                    Some(self.full_id().await.sign(&serialised_req))
+                }
+            }
         } else {
             None
         };
@@ -2569,7 +2584,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sdata_delete_test() -> Result<(), CoreError> {
+    pub async fn sdata_can_delete_private_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
@@ -2586,19 +2601,28 @@ mod tests {
         client.delete_sdata(address).await?;
 
         match client.get_sdata(address).await {
-            Err(CoreError::DataError(SndError::NoSuchData)) => {}
+            Err(CoreError::DataError(SndError::NoSuchData)) => Ok(()),
             Err(err) => {
                 return Err(CoreError::from(format!(
                     "Unexpected error returned when deleting a nonexisting Private Sequence: {}",
                     err
                 )))
             }
-            Ok(_) => {
+            Ok(res) => {
                 return Err(CoreError::from(
                     "Unexpectedly retrieved a deleted Private Sequence!",
                 ))
             }
         }
+    }
+
+    #[tokio::test]
+    pub async fn sdata_cannot_delete_public_test() -> Result<(), CoreError> {
+        let client = random_client()?;
+
+        let name = XorName(rand::random());
+        let tag = 15000;
+        let owner = client.public_key().await;
 
         // store a Public Sequence
         let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
@@ -2607,15 +2631,18 @@ mod tests {
         let sdata = client.get_sdata(address).await?;
         assert!(sdata.is_pub());
 
-        match client.delete_sdata(address).await {
+        client.delete_sdata(address).await?;
+
+        // Check that our data still exists.
+        match client.get_sdata(address).await {
             Err(CoreError::DataError(SndError::InvalidOperation)) => Ok(()),
             Err(err) => {
                 return Err(CoreError::from(format!(
-                    "Unexpected error returned when attempting to delete a Public Sequence: {}",
+                    "Unexpected error returned when attempting to get a Public Sequence: {}",
                     err
                 )))
             }
-            Ok(()) => Err(CoreError::from("Unexpectedly deleted a Public Sequence!")),
+            Ok(data) => Ok(()),
         }
     }
 }
