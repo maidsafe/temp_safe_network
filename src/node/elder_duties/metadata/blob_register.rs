@@ -6,19 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    cmd::{MetadataCmd, NodeCmd},
-    msg::Message,
-    node::Init,
-    utils, Config, Result, ToDbKey,
-};
+use crate::{cmd::NodeCmd, node::Init, utils, Config, Result, ToDbKey};
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use routing::Node as Routing;
 use safe_nd::{
     BlobRead, BlobWrite, CmdError, DataError, Duty, ElderDuty, Error as NdError, IData,
-    IDataAddress, Message, MessageId, MsgEnvelope, MsgSender, NetworkCmd, NodePublicId, PublicId,
-    PublicKey, QueryResponse, Read, Result as NdResult, Write, XorName,
+    IDataAddress, Message, MessageId, MsgEnvelope, MsgSender, NetworkCmd, NodePublicId, PublicKey,
+    QueryResponse, Read, Result as NdResult, Write, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -27,7 +22,6 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use threshold_crypto::SignatureShare;
 use tiny_keccak::sha3_256;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
@@ -134,7 +128,7 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        self.set_proxy(msg);
+        let msg = self.set_proxy(msg);
         Some(NodeCmd::SendToAdults {
             targets: metadata.holders,
             msg,
@@ -162,7 +156,7 @@ impl BlobRegister {
             }
         };
 
-        self.set_proxy(msg);
+        let msg = self.set_proxy(msg);
         Some(NodeCmd::SendToAdults {
             targets: metadata.holders,
             msg,
@@ -238,7 +232,7 @@ impl BlobRegister {
             }
         };
 
-        self.set_proxy(msg);
+        let msg = self.set_proxy(msg);
         Some(NodeCmd::SendToAdults {
             targets: metadata.holders,
             msg,

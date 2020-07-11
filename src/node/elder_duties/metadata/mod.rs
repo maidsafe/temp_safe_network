@@ -14,12 +14,7 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{
-    cmd::{MetadataCmd, NodeCmd},
-    msg::Message,
-    node::Init,
-    Config, Result,
-};
+use crate::{cmd::NodeCmd, node::Init, Config, Result};
 
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;

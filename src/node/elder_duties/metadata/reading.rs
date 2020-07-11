@@ -11,8 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::cmd::NodeCmd;
-use routing::SrcLocation;
-use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MessageId, MsgEnvelope, SequenceRead};
+use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MsgEnvelope, SequenceRead};
 
 pub(super) struct Reading {
     query: DataQuery,

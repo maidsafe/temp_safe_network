@@ -6,20 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod internal_cmds;
-mod messaging;
-mod remote_msg_eval;
-
 use crate::{
     accumulator::Accumulator,
-    cmd::{
-        NodeCmd, ConsensusAction, NodeCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
-        TransferCmd,
-    },
+    cmd::{NodeCmd, ConsensusAction},
     duties::{adult::AdultDuties, elder::ElderDuties},
-    internal_cmds::InternalCmds,
-    messaging::Messaging,
-    remote_msg_eval::RemoteMsgEval,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};

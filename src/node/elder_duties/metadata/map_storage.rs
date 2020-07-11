@@ -8,8 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
-    cmd::{MetadataCmd, NodeCmd},
-    msg::Message,
+    cmd::NodeCmd,
     node::Init,
     utils, Config, Result,
 };

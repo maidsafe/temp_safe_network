@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::NodeCmd, msg::Message, utils};
+use crate::{cmd::NodeCmd, utils};
 use routing::Node as Routing;
 use safe_nd::{
     Cmd, CmdError, Duty, ElderDuty, Error, Message, MessageId, MsgEnvelope, MsgSender,

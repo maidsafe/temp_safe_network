@@ -8,19 +8,17 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    cmd::{MetadataCmd, NodeCmd},
-    msg::Message,
+    cmd::NodeCmd,
     node::Init,
     utils, Config, Result,
 };
-
 use safe_nd::{
-    Error as NdError, MSgEnvelope, MessageId, MsgSender, NodePublicId, PublicId, QueryResponse,
-    Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner,
-    SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp,
-    SequenceRead, SequenceWrite,
+    Error as NdError, MSgEnvelope, MessageId, MsgEnvelope, MsgSender, NodePublicId, PublicKey,
+    QueryResponse, Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex,
+    SDataOwner, SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser,
+    SDataWriteOp, SequenceRead, SequenceWrite,
 };
-
+use serde::Serialize;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -113,7 +111,6 @@ impl SequenceStorage {
         &self,
         address: SDataAddress,
         action: SDataAction,
-        msg_id: MessageId,
         origin: MsgSender,
     ) -> Result<SData, NdError> {
         //let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
@@ -131,7 +128,7 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let requester_pk = *utils::own_key(&requester)?;
+        //let requester_pk = *utils::own_key(&requester)?;
         let result = self
             .chunks
             .get(&address)
@@ -144,7 +141,7 @@ impl SequenceStorage {
                 if sdata.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    sdata.check_is_last_owner(requester_pk)
+                    sdata.check_is_last_owner(origin.id())
                 }
             })
             .and_then(|_| {
@@ -268,10 +265,9 @@ impl SequenceStorage {
     ) -> Option<NodeCmd> {
         let address = write_op.address;
         let result = self.edit_chunk(
-            &requester,
             address,
             SDataAction::ManagePermissions,
-            message_id,
+            origin,
             move |mut sdata| sdata.apply_crdt_pub_perms_op(write_op.crdt_op),
         );
         self.ok_or_error(result, msg_id, origin)
@@ -336,7 +332,7 @@ impl SequenceStorage {
     where
         F: FnOnce(SData) -> NdResult<()>,
     {
-        self.get_chunk(address, action, msg_id, origin)
+        self.get_chunk(address, action, origin)
             .and_then(write_fn)
             .and_then(move |sdata| {
                 self.chunks

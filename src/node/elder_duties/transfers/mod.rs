@@ -9,10 +9,7 @@
 pub mod replica_manager;
 
 use self::replica_manager::ReplicaManager;
-use crate::{
-    cmd::{NodeCmd, TransferCmd as TCmd},
-    msg::Message,
-};
+use crate::cmd::NodeCmd;
 use safe_nd::{
     Cmd, CmdError, DebitAgreementProof, Error, Event, Message, MessageId, MsgEnvelope, MsgSender,
     NetworkCmd, NetworkCmdError, NodePublicId, PublicKey, Query, QueryResponse, SignedTransfer,

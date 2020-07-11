@@ -8,6 +8,7 @@
 
 mod gateway;
 mod metadata;
+mod msg_util;
 mod payment;
 mod rewards;
 mod transfers;
@@ -19,12 +20,7 @@ use self::{
     rewards::Rewards,
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
-use crate::{
-    cmd::{GatewayCmd, NodeCmd},
-    msg::Message,
-    node::Init,
-    Config, Result,
-};
+use crate::{cmd::NodeCmd, node::Init, Config, Result};
 use routing::{Node as Routing, RoutingError};
 use safe_nd::{NodePublicId, XorName};
 use std::{

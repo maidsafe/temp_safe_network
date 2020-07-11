@@ -15,7 +15,6 @@ use self::{
 };
 use crate::{
     cmd::{ConsensusAction, NodeCmd},
-    msg::Message,
     node::Init,
     Config, Messaging, Result,
 };
@@ -23,7 +22,7 @@ use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{AuthCmd, ClientAuth, Cmd, Message, MessageId, NodePublicId, PublicId, Query};
+use safe_nd::{AuthCmd, ClientAuth, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},

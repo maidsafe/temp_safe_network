@@ -10,15 +10,12 @@ mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
 
-use crate::{
-    cmd::{ConsensusAction, GatewayCmd},
-    utils,
-};
-use log::{error, warn};
+use crate::{cmd::ConsensusAction, utils};
+use log::warn;
 use safe_nd::{
     AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind, Duty, ElderDuty,
     Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
-    NodePublicId, PublicId, PublicKey, QueryResponse, RequestAuthKind, Signature,
+    NodePublicId, PublicId, PublicKey, QueryResponse, RequestAuthKind,
 };
 use std::fmt::{self, Display, Formatter};
 
