@@ -21,8 +21,7 @@ use std::{
 };
 
 pub(crate) struct DataPayment {
-    id: NodePublicId,
-    routing: Rc<RefCell<Routing>>,
+    keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
 }
 
@@ -36,14 +35,15 @@ pub(crate) struct DataPayment {
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl DataPayment {
     pub fn new(
-        id: NodePublicId,
-        routing: Rc<RefCell<Routing>>,
+        keys: NodeKeys,
         replica: Rc<RefCell<ReplicaManager>>,
+        decisions: ElderMsgDecisions,
     ) -> Self {
+        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Payment);
         Self {
-            id,
-            routing,
+            keys,
             replica,
+            decisions,
         }
     }
 
@@ -59,50 +59,29 @@ impl DataPayment {
         // before executing the debit.
         // (We could also add a method that executes both
         // debit + credit atomically, but this is much simpler).
-        match self.section_account_id() {
+        let result match self.section_account_id() {
             Ok(section) => {
                 if payment.to() != section {
-                    return self.error_response(
-                        TransferRegistration(Error::NoSuchRecipient),
-                        msg.id(),
-                        msg.origin,
-                    );
+                    Some(TransferRegistration(Error::NoSuchRecipient))
                 }
+                None
             }
-            _ => {
-                return self.error_response(
-                    TransferRegistration(Error::NoSuchRecipient),
-                    msg.id(),
-                    msg.origin,
-                )
-            }
+            _ => Some(TransferRegistration(Error::NoSuchRecipient))
         };
+        if let Some(err) = result {
+            let error = CmdError::Transfer(err);
+            return self.decisions.error(error, msg.id(), msg.origin);
+        }
         if let Err(err) = self.replica_mut().register(&payment) {
-            return self.error_response(TransferRegistration(err), msg.id(), msg.origin);
+            let error = CmdError::Transfer(TransferRegistration(err));
+            return self.decisions.error(error, msg.id(), msg.origin);
         }
+        // Cannot use TransferPropagation error, since it's is not a client error... To be solved.
         if let Err(err) = self.replica_mut().receive_propagated(&payment) {
-            return self.error_response(
-                TransferRegistration(err), // CAnnot use TransferPropagation, since it's is not a client error... To be solved.
-                msg.id(),
-                msg.origin,
-            );
+            let error = CmdError::Transfer(TransferRegistration(err));
+            return self.decisions.error(error, msg.id(), msg.origin);
         }
-        self.set_proxy(&msg);
-        NodeCmd::SendToSection(msg)
-    }
-
-    fn error_response(
-        &self,
-        error: TransferError,
-        correlation_id: MessageId,
-        cmd_origin: MsgSender,
-    ) -> Option<NodeCmd> {
-        self.wrap(Message::CmdError {
-            error: CmdError::Transfer(error),
-            id: MessageId::new(),
-            correlation_id,
-            cmd_origin,
-        })
+        self.decisions.forward(msg)
     }
 
     fn section_account_id(&self) -> Result<PublicKey> {
@@ -113,52 +92,6 @@ impl DataPayment {
 
     fn replica_mut(&mut self) -> &mut ReplicaManager {
         self.replica.borrow_mut()
-    }
-
-    fn set_proxy(&self, msg: &mut MsgEnvelope) {
-        // origin signs the message, while proxies sign the envelope
-        msg.add_proxy(self.sign(msg))
-    }
-
-    fn ok_or_error(
-        &self,
-        result: Result<()>,
-        msg_id: MessageId,
-        origin: MsgSender,
-    ) -> Option<NodeCmd> {
-        let error = match result {
-            Ok(()) => return None,
-            Err(error) => error,
-        };
-        let message = Message::CmdError {
-            id: MessageId::new(),
-            error: CmdError::Data(error),
-            correlation_id: msg_id,
-            cmd_origin: origin,
-        };
-        self.wrap(message)
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToSection(msg))
-    }
-
-    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Elder(ElderDuty::Payment),
-            signature,
-        }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 

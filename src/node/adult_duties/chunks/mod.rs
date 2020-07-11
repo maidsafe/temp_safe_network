@@ -55,12 +55,19 @@ impl Chunks {
             msg.id(),
         );
         match msg.message {
-            Message::Query(Query::Data(DataQuery::Blob(read))) => {
+            Message::Query {
+                query: Query::Data(DataQuery::Blob(read)),
+                ..
+            } => {
                 let reading = Reading::new(read, msg);
                 reading.get_result(&self.chunk_storage)
             }
             Message::Cmd {
-                cmd: Cmd::Data(DataCmd::Blob(write)),
+                cmd:
+                    Cmd::Data {
+                        cmd: DataCmd::Blob(write),
+                        ..
+                    },
                 ..
             } => {
                 let writing = Writing::new(write, msg);
@@ -158,7 +165,7 @@ impl Chunks {
     // }
 }
 
-impl Display for Data {
+impl Display for Chunks {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

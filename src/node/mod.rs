@@ -15,6 +15,7 @@ use crate::{
     cmd::{ConsensusAction, NodeCmd},
     duties::{adult::AdultDuties, elder::ElderDuties},
     duty_finder::{EvalOptions, RemoteMsgEval},
+    keys::NodeKeys,
     utils, Config, Messaging, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -100,11 +101,13 @@ impl<R: CryptoRng + Rng> Node<R> {
         let root_dir = root_dir.as_path();
 
         let routing = Rc::new(RefCell::new(routing));
+        let id = Rc::new(RefCell::new(id));
+        let keys = NodeKeys::new(id.clone());
 
         let state = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
             let duties = ElderDuties::new(
-                id.public_id().clone(),
+                keys.clone(),
                 &config,
                 &total_used_space,
                 init_mode,

@@ -9,14 +9,15 @@
 mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
-
+use super::msg_decisions::ElderMsgDecisions;
 use crate::{cmd::ConsensusAction, utils};
 use log::warn;
 use safe_nd::{
     AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind, Duty, ElderDuty,
     Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
-    NodePublicId, PublicId, PublicKey, QueryResponse, RequestAuthKind,
+    NodeCmd, NodeFullId, PublicId, PublicKey, QueryResponse, RequestAuthKind,
 };
+use serde::Serialize;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone, Debug)]
@@ -25,12 +26,14 @@ pub struct ClientInfo {
 }
 
 pub(super) struct Auth {
-    id: NodePublicId,
+    id: NodeFullId,
     auth_keys: AuthKeysDb,
+    decisions: ElderMsgDecisions,
 }
 
 impl Auth {
     pub fn new(id: NodePublicId, auth_keys: AuthKeysDb) -> Self {
+        let decision = ElderMsgDecisions::new(id, ElderDuty::Gateway);
         Self { id, auth_keys }
     }
 
@@ -44,10 +47,7 @@ impl Auth {
         };
         use AuthCmd::*;
         match auth_cmd {
-            InsAuthKey { .. } | DelAuthKey { .. } => {
-                self.set_proxy(&mut msg);
-                Some(NodeCmd::VoteFor(ConsensusAction::Forward(msg)))
-            }
+            InsAuthKey { .. } | DelAuthKey { .. } => self.decision.vote(msg),
         }
     }
 
@@ -92,7 +92,14 @@ impl Auth {
             RequestAuthKind::None => Err(NdError::AccessDenied),
         };
 
-        self.ok_or_error(result, msg.message.id(), msg.origin.address())
+        if let Err(error) = result {
+            self.decision.error(
+                CmdError::Auth(error),
+                msg.message.id(),
+                msg.origin.address(),
+            )
+        }
+        None
     }
 
     // client query
@@ -105,7 +112,7 @@ impl Auth {
             _ => return None,
         };
         let result = Ok(self.auth_keys.list_keys_and_version(msg.origin.id()));
-        self.wrap(Message::QueryResponse {
+        self.decision.send(Message::QueryResponse {
             response: QueryResponse::ListAuthKeysAndVersion(result),
             id: MessageId::new(),
             /// ID of causing query.
@@ -125,46 +132,36 @@ impl Auth {
             } => auth_cmd,
             _ => return None,
         };
-        let auth_error = |error: NdError| {
-            self.wrap(Message::CmdError {
-                error: CmdError::Auth(error),
-                id: MessageId::new(),
-                cmd_origin: msg.origin.address(),
-                correlation_id: msg.id(),
-            })
-        };
-        match auth_cmd {
+        let result = match auth_cmd {
             InsAuthKey {
                 key,
                 version,
                 permissions,
-            } => {
-                match self
-                    .auth_keys
-                    .insert(msg.origin.id(), key, new_version, permissions)
-                {
-                    Ok(()) => None,
-                    Err(error) => auth_error(error),
-                }
-            }
-            DelAuthKey { key, version } => {
-                match self.auth_keys.delete(msg.origin.id(), key, new_version) {
-                    Ok(()) => None,
-                    Err(error) => auth_error(error),
-                }
-            }
+            } => self
+                .auth_keys
+                .insert(msg.origin.id(), key, version, permissions),
+            DelAuthKey { key, version } => self.auth_keys.delete(msg.origin.id(), key, version),
+        };
+        if let Err(error) = result {
+            self.decision.error(
+                CmdError::Auth(error),
+                msg.message.id(),
+                msg.origin.address(),
+            )
         }
+        None
     }
 
     // Verify that valid signature is provided if the request requires it.
     pub fn verify_client_signature(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
-        match request.authorisation_kind() {
+        match msg.authorisation_kind() {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
                 if self.is_valid_client_signature(msg) {
                     None
                 } else {
-                    self.wrap(Message::CmdError)
+                    self.decision
+                        .error(CmdError::Auth(NdError::AccessDenied), msg.id(), msg.origin)
                 }
             }
         }
@@ -204,58 +201,12 @@ impl Auth {
                     self,
                     "msg.get_type()",
                     msg.message.id(),
-                    pub_key,
+                    msg.origin.id(),
                     error
                 );
                 false
             }
         }
-    }
-
-    fn set_proxy(&self, msg: &mut MsgEnvelope) {
-        // origin signs the message, while proxies sign the envelope
-        msg.add_proxy(self.sign(msg))
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToClient(msg))
-    }
-
-    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Elder(ElderDuty::Gateway),
-            signature,
-        }
-    }
-
-    fn ok_or_error(
-        &self,
-        result: Result<()>,
-        msg_id: MessageId,
-        origin: MsgSender,
-    ) -> Option<NodeCmd> {
-        let error = match result {
-            Ok(()) => return None,
-            Err(error) => error,
-        };
-        let message = Message::CmdError {
-            id: MessageId::new(),
-            error: CmdError::Auth(error),
-            correlation_id: msg_id,
-            cmd_origin: origin,
-        };
-        self.wrap(message)
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 

@@ -6,14 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::msg_util::ElderMsgUtil;
-use crate::{cmd::ConsensusAction, utils};
+use super::msg_decisions::ElderMsgDecisions;
 use log::trace;
 use safe_nd::{
-    Account, AccountRead, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DebitAgreementProof,
-    Duty, Duty, ElderDuty, ElderDuty, Error as NdError, IData, IDataAddress, IDataKind, MData,
-    MapRead, MapWrite, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodePublicId, PublicId,
-    Read, SData, SDataAddress, SequenceRead, SequenceWrite, Write,
+    Account, AccountRead, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery, ElderDuty,
+    Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message,
+    MsgEnvelope, NodeCmd, NodeFullId, Read, SData, SDataAddress, SequenceRead, SequenceWrite,
+    Write,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -26,12 +25,13 @@ pub(crate) struct Validation {
 }
 
 impl Validation {
-    pub fn new(msg_util: ElderMsgUtil) -> Self {
+    pub fn new(id: NodeFullId) -> Self {
+        let decision = ElderMsgDecisions::new(id, ElderDuty::Gateway);
         Self {
-            blobs: Blobs::new(msg_util.clone()),
-            maps: Maps::new(msg_util.clone()),
-            sequences: Sequences::new(msg_util.clone()),
-            accounts: Accounts::new(msg_util),
+            blobs: Blobs::new(decision.clone()),
+            maps: Maps::new(decision.clone()),
+            sequences: Sequences::new(decision.clone()),
+            accounts: Accounts::new(decision),
         }
     }
 
@@ -75,21 +75,23 @@ impl Validation {
 
 #[derive(Clone)]
 pub(crate) struct Sequences {
-    msg_util: ElderMsgUtil,
+    decisions: ElderMsgDecisions,
 }
 
 impl Sequences {
-    pub fn new(msg_util: ElderMsgUtil) -> Self {
-        Self { msg_util }
+    pub fn new(decisions: ElderMsgDecisions) -> Self {
+        Self { decision }
     }
 
     // client query
-    pub fn initiate_read(&mut self, read: SequenceRead, msg: MsgEnvelope) -> Option<NodeCmd> {
-        self.msg_util.wrap_forward(msg)
+    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let _ = self.extract_read(msg)?;
+        self.decision.forward(msg)
     }
 
     // on client request
     pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let write = self.extract_write(msg)?;
         use SequenceWrite::*;
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
@@ -108,28 +110,28 @@ impl Sequences {
             trace!(
                 "{}: {} attempted to store Sequence with invalid owners.",
                 self,
-                client
+                msg.origin.id()
             );
             return self
-                .msg_util
+                .decision
                 .error(NdError::InvalidOwners, msg.id(), msg.origin);
         }
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     // on client request
     fn initiate_deletion(&mut self, address: SDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         if address.is_pub() {
             return self
-                .msg_util
+                .decision
                 .error(NdError::InvalidOperation, msg.id(), msg.origin);
         }
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     // on client request
     fn initiate_edit(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<SequenceRead> {
@@ -173,18 +175,18 @@ impl Display for Sequences {
 
 #[derive(Clone)]
 pub(crate) struct Blobs {
-    msg_util: ElderMsgUtil,
+    decisions: ElderMsgDecisions,
 }
 
 impl Blobs {
-    pub fn new(msg_util: ElderMsgUtil) -> Self {
-        Self { msg_util }
+    pub fn new(decisions: ElderMsgDecisions) -> Self {
+        Self { decision }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let read = self.extract_read(msg)?;
-        self.msg_util.forward(msg)
+        self.decision.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
         // since it's free for anyone to get.  However, as a means of spam prevention, we
         // could change this so that signatures are required, and the signatures would need
@@ -210,26 +212,26 @@ impl Blobs {
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
         // by their Client owners.
         if let IData::Unpub(ref unpub_chunk) = &chunk {
-            if unpub_chunk.owner() != origin.id() {
+            if unpub_chunk.owner() != msg.origin.id() {
                 trace!(
                     "{}: {} attempted Put UnpubIData with invalid owners field.",
                     self,
-                    client
+                    msg.origin.id()
                 );
-                self.msg_util
+                self.decision
                     .error(NdError::InvalidOwners, msg.id(), msg.origin)
             }
         }
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     // on client request
     fn initiate_deletion(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         if address.kind() == IDataKind::Pub {
-            self.msg_util
+            self.decision
                 .error(NdError::InvalidOperation, msg.id(), msg.origin)
         }
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<BlobRead> {
@@ -273,18 +275,18 @@ impl Display for Blobs {
 
 #[derive(Clone)]
 pub(crate) struct Maps {
-    msg_util: ElderMsgUtil,
+    decisions: ElderMsgDecisions,
 }
 
 impl Maps {
-    pub fn new(msg_util: ElderMsgUtil) -> Self {
-        Self { msg_util }
+    pub fn new(decisions: ElderMsgDecisions) -> Self {
+        Self { decision }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let read = self.extract_read(msg)?;
-        self.msg_util.forward(msg)
+        self.decision.forward(msg)
     }
 
     // on client request
@@ -294,7 +296,7 @@ impl Maps {
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
             Delete(..) | Edit { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
-                self.msg_util.vote(msg)
+                self.decision.vote(msg)
             }
         }
     }
@@ -307,12 +309,12 @@ impl Maps {
             trace!(
                 "{}: {} attempted to store Map with invalid owners field.",
                 self,
-                client
+                msg.origin.id()
             );
             return self.error(NdError::InvalidOwners, msg.id(), msg.origin);
         }
 
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<MapRead> {
@@ -356,18 +358,18 @@ impl Display for Maps {
 
 #[derive(Clone)]
 pub(super) struct Accounts {
-    msg_util: ElderMsgUtil,
+    decisions: ElderMsgDecisions,
 }
 
 impl Accounts {
-    pub fn new(msg_util: ElderMsgUtil) -> Self {
-        Self { msg_util }
+    pub fn new(decisions: ElderMsgDecisions) -> Self {
+        Self { decision }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         if self.is_account_read(msg) {
-            self.msg_util.vote(msg)
+            self.decision.vote(msg)
         } else {
             None
         }
@@ -379,7 +381,7 @@ impl Accounts {
         if !account.size_is_valid() {
             return self.error(NdError::ExceededSize, msg.id(), msg.origin);
         }
-        self.msg_util.vote(msg)
+        self.decision.vote(msg)
     }
 
     fn is_account_read(&self, msg: MsgEnvelope) -> bool {
@@ -392,6 +394,7 @@ impl Accounts {
     }
 
     fn extract_account_write(&self, msg: MsgEnvelope) -> Option<Account> {
+        use AccountWrite::*;
         match msg.message {
             Message::Cmd {
                 cmd:

@@ -22,10 +22,7 @@ use std::{
     rc::Rc,
 };
 
-pub(super) struct AccountStorage {
-    id: NodePublicId,
-    chunks: AccountChunkStore,
-}
+pub(super) struct AccountStorage {}
 
 impl AccountStorage {
     pub fn new(
@@ -42,6 +39,7 @@ impl AccountStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
+        let decision = ElderMsgDecisions::new(id, ElderDuty::Metadata);
         Ok(Self { id, chunks })
     }
 

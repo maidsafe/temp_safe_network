@@ -13,7 +13,7 @@ use crate::{
     utils, Config, Result,
 };
 use safe_nd::{
-    Error as NdError, MSgEnvelope, MessageId, MsgEnvelope, MsgSender, NodePublicId, PublicKey,
+    Error as NdError, Message, MessageId, MsgEnvelope, MsgSender, NodePublicId, PublicKey,
     QueryResponse, Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex,
     SDataOwner, SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser,
     SDataWriteOp, SequenceRead, SequenceWrite,

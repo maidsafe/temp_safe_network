@@ -248,10 +248,6 @@ impl Metadata {
     // }
 }
 
-fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(NodeCmd::Metadata(cmd))
-}
-
 impl Display for Metadata {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())

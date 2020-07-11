@@ -8,7 +8,7 @@
 
 mod gateway;
 mod metadata;
-mod msg_util;
+mod msg_decisions;
 mod payment;
 mod rewards;
 mod transfers;
@@ -20,7 +20,7 @@ use self::{
     rewards::Rewards,
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
-use crate::{cmd::NodeCmd, node::Init, Config, Result};
+use crate::{cmd::NodeCmd, keys::NodeKeys, node::Init, Config, Result};
 use routing::{Node as Routing, RoutingError};
 use safe_nd::{NodePublicId, XorName};
 use std::{
@@ -30,7 +30,7 @@ use std::{
 };
 
 pub(crate) struct ElderDuties {
-    id: NodePublicId,
+    keys: NodeKeys,
     metadata: Metadata,
     transfers: Transfers,
     gateway: Gateway,
@@ -41,24 +41,47 @@ pub(crate) struct ElderDuties {
 
 impl ElderDuties {
     pub fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
         // Gateway
-        let gateway = Gateway::new(id.clone(), &config, init_mode, routing.clone())?;
+        let gateway = Gateway::new(keys.clone(), &config, init_mode, routing.clone())?;
 
         // Metadata
         let metadata = Metadata::new(
-            id.clone(),
+            keys.clone(),
             &config,
             &total_used_space,
             init_mode,
             routing.clone(),
         )?;
 
+        // (AT2 Replicas)
+        let replica_manager = Self::replica_manager(routing);
+
+        // Transfers
+        let transfers = Transfers::new(keys.clone(), replica_manager.clone());
+
+        // DataPayment
+        let data_payment = DataPayment::new(keys.clone(), routing.clone(), replica_manager);
+
+        let actor = TransferActor::new();
+        let rewards = Rewards::new(keys.clone(), actor);
+
+        Ok(Self {
+            keys,
+            gateway,
+            metadata,
+            transfers,
+            data_payment,
+            routing: routing.clone(),
+        })
+    }
+
+    fn replica_manager(routing: Rc<RefCell<Routing>>) -> Rc<RefCell<ReplicaManager>> {
         let node = routing.borrow();
         let public_key_set = node.public_key_set()?;
         let secret_key_share = node.secret_key_share()?;
@@ -71,25 +94,7 @@ impl ElderDuties {
             vec![],
             proof_chain.clone(),
         )?;
-        let replica_manager = Rc::new(RefCell::new(replica_manager));
-
-        // Transfers
-        let transfers = Transfers::new(id.clone(), replica_manager.clone());
-
-        // DataPayment
-        let data_payment = DataPayment::new(id.clone(), routing.clone(), replica_manager);
-
-        let actor = TransferActor::new();
-        let rewards = Rewards::new(actor);
-
-        Ok(Self {
-            id,
-            gateway,
-            metadata,
-            transfers,
-            data_payment,
-            routing: routing.clone(),
-        })
+        Rc::new(RefCell::new(replica_manager))
     }
 
     pub fn gateway(&mut self) -> &mut Gateway {

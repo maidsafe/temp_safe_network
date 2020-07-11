@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::msg_decisions::AdultMsgDecisions;
 use crate::{chunk_store::ImmutableChunkStore, cmd::NodeCmd, node::Init, Config, Result};
 use log::{error, info};
-
 use safe_nd::{
     AdultDuty, CmdError, Duty, Error as NdError, IData, IDataAddress, Message, MessageId,
     MsgEnvelope, MsgSender, NetworkCmdError, NodePublicId, PublicKey, QueryResponse,
@@ -23,6 +23,7 @@ use threshold_crypto::Signature;
 pub(crate) struct ChunkStorage {
     id: NodePublicId,
     chunks: ImmutableChunkStore,
+    decisions: AdultMsgDecisions,
 }
 
 impl ChunkStorage {
@@ -40,7 +41,12 @@ impl ChunkStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, chunks })
+        let decisions = AdultMsgDecisions::new(id, AdultDuty::ChunkStorage);
+        Ok(Self {
+            id,
+            chunks,
+            decisions,
+        })
     }
 
     pub(crate) fn store(
@@ -49,18 +55,14 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<NodeCmd> {
-        match self.try_store(data) {
-            Ok(()) => None,
-            Err(error) => {
-                let message = Message::CmdError {
-                    id: MessageId::new(),
-                    error: CmdError::Data(error),
-                    correlation_id: msg.id(),
-                    cmd_origin: msg.origin,
-                };
-                self.wrap(message)
-            }
+        if let Err(error) = self.try_store(data) {
+            self.decision.error(
+                CmdError::Data(error),
+                msg.message.id(),
+                msg.origin.address(),
+            )
         }
+        None
     }
 
     pub(crate) fn take_duplicate(
@@ -89,7 +91,7 @@ impl ChunkStorage {
                 cmd_origin: origin,
             },
         };
-        self.wrap(message)
+        self.decisions.send(message)
     }
 
     fn try_store(&mut self, data: &IData) -> Result<()> {
@@ -111,13 +113,12 @@ impl ChunkStorage {
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self.chunks.get(&address);
-        let message = Message::QueryResponse {
+        self.decisions.send(Message::QueryResponse {
             id: MessageId::new(),
             response: QueryResponse::GetBlob(result),
             correlation_id: msg_id,
             query_origin: origin,
-        };
-        self.wrap(message)
+        })
     }
 
     // pub(crate) fn get_for_duplciation(
@@ -168,40 +169,14 @@ impl ChunkStorage {
             })
             .and_then(|_| self.chunks.delete(&address));
 
-        let error = match result {
-            Ok(()) => return None,
-            Err(error) => error,
-        };
-
-        let message = Message::CmdError {
-            id: MessageId::new(),
-            error: CmdError::Data(error),
-            correlation_id: msg_id,
-            cmd_origin: origin,
-        };
-        self.wrap(message)
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToSection(msg))
-    }
-
-    fn sign(&self, message: Message) -> MsgSender {
-        let signature = Signature;
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Adult(AdultDuty::ChunkStorage),
-            signature,
+        if let Err(error) = result {
+            self.decision.error(
+                CmdError::Data(error),
+                msg.message.id(),
+                msg.origin.address(),
+            )
         }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Ed25519(self.id.public_id().ed25519_public_key())
+        None
     }
 }
 
