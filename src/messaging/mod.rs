@@ -176,7 +176,7 @@ impl Messaging {
             Address::Client { .. } => (),
             _ => {
                 error!("{} for message-id {:?}, Invalid destination.", self, msg_id);
-                return Err(Error::InvalidOperation),
+                return Err(Error::InvalidOperation);
             }
         };
         let peer_addr = match self.pending_msg_ids.remove(&msg_id) {
@@ -187,7 +187,7 @@ impl Messaging {
                     self, msg_id
                 );
                 let _ = self.pending_actions.insert(msg_id, msg);
-                return Err(Error::KeyNotFound),
+                return Err(Error::KeyNotFound);
             }
         };
 

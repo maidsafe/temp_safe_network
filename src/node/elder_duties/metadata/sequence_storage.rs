@@ -15,9 +15,10 @@ use crate::{
 };
 
 use safe_nd::{
-    Error as NdError, MessageId, NodePublicId, PublicId, Result as NdResult, SData, SDataAction,
-    SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions, SDataPrivPermissions,
-    SDataPubPermissions, SDataUser, SDataWriteOp, SequenceRead, SequenceWrite,
+    Error as NdError, MSgEnvelope, MessageId, MsgSender, NodePublicId, PublicId, QueryResponse,
+    Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner,
+    SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp,
+    SequenceRead, SequenceWrite,
 };
 
 use std::{
@@ -51,50 +52,43 @@ impl SequenceStorage {
 
     pub(super) fn read(
         &self,
-        requester: PublicId,
         read: &SequenceRead,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         use SequenceRead::*;
         match read {
-            Get(address) => self.get(requester, *address, message_id),
-            GetRange { address, range } => self.get_range(requester, *address, *range, message_id),
-            GetLastEntry(address) => self.get_last_entry(requester, *address, message_id),
-            GetOwner(address) => self.get_owner(requester, *address, message_id),
+            Get(address) => self.get(*address, msg_id, origin),
+            GetRange { address, range } => self.get_range(*address, *range, msg_id, origin),
+            GetLastEntry(address) => self.get_last_entry(*address, msg_id, origin),
+            GetOwner(address) => self.get_owner(*address, msg_id, origin),
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(requester, *address, *user, message_id)
+                self.get_user_permissions(*address, *user, msg_id, origin)
             }
-            GetPermissions(address) => self.get_permissions(requester, *address, message_id),
+            GetPermissions(address) => self.get_permissions(*address, msg_id, origin),
         }
     }
 
     pub(super) fn write(
         &mut self,
-        requester: PublicId,
         write: SequenceWrite,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         use SequenceWrite::*;
         match write {
-            New(data) => self.store(requester, &data, message_id),
-            Edit(operation) => self.edit(&requester, operation, message_id),
-            Delete(address) => self.delete(requester, address, message_id),
-            SetOwner(operation) => self.set_owner(&requester, operation, message_id),
-            SetPubPermissions(operation) => {
-                self.set_public_permissions(&requester, operation, message_id)
-            }
+            New(data) => self.store(&data, msg_id, origin),
+            Edit(operation) => self.edit(operation, msg_id, origin),
+            Delete(address) => self.delete(address, msg_id, origin),
+            SetOwner(operation) => self.set_owner(operation, msg_id, origin),
+            SetPubPermissions(operation) => self.set_public_permissions(operation, msg_id, origin),
             SetPrivPermissions(operation) => {
-                self.set_private_permissions(&requester, operation, message_id)
+                self.set_private_permissions(operation, msg_id, origin)
             }
         }
     }
 
-    fn store(
-        &mut self,
-        requester: PublicId,
-        data: &SData,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn store(&mut self, data: &SData, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -102,58 +96,40 @@ impl SequenceStorage {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *data.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg_id, origin)
     }
 
-    fn get(
-        &self,
-        requester: PublicId,
-        address: SDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        let result = self.get_chunk(&requester, address, SDataAction::Read);
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetSData(result),
-                message_id,
-                proof: None,
-            },
+    fn get(&self, address: SDataAddress, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+        let result = self.get_chunk(address, SDataAction::Read, msg_id, origin);
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::GetSData(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
         })
     }
 
     fn get_chunk(
         &self,
-        requester: &PublicId,
         address: SDataAddress,
         action: SDataAction,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Result<SData, NdError> {
-        let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
+        //let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
         let data = self.chunks.get(&address).map_err(|error| match error {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             _ => error.to_string().into(),
         })?;
-
-        data.check_permission(action, *requester_key)?;
+        data.check_permission(action, origin.id())?;
         Ok(data)
     }
 
     fn delete(
         &mut self,
-        requester: PublicId,
         address: SDataAddress,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let requester_pk = *utils::own_key(&requester)?;
         let result = self
@@ -177,255 +153,242 @@ impl SequenceStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn get_range(
         &self,
-        requester: PublicId,
         address: SDataAddress,
         range: (SDataIndex, SDataIndex),
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&requester, address, SDataAction::Read)
+            .get_chunk(address, SDataAction::Read, msg_id, origin)
             .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetSDataRange(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::GetSDataRange(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
         })
     }
 
     fn get_last_entry(
         &self,
-        requester: PublicId,
         address: SDataAddress,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&requester, address, SDataAction::Read)
+            .get_chunk(address, SDataAction::Read, msg_id, origin)
             .and_then(|sdata| match sdata.last_entry() {
                 Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
                 None => Err(NdError::NoSuchEntry),
             });
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetSDataLastEntry(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::GetSDataLastEntry(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
         })
     }
 
     fn get_owner(
         &self,
-        requester: PublicId,
         address: SDataAddress,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&requester, address, SDataAction::Read)
+            .get_chunk(address, SDataAction::Read, msg_id, origin)
             .and_then(|sdata| {
                 let index = sdata.owners_index() - 1;
                 sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetSDataOwner(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::GetSDataOwner(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
         })
     }
 
     fn get_user_permissions(
         &self,
-        requester: PublicId,
         address: SDataAddress,
         user: SDataUser,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&requester, address, SDataAction::Read)
+            .get_chunk(address, SDataAction::Read, msg_id, origin)
             .and_then(|sdata| {
                 let index = sdata.permissions_index() - 1;
                 sdata.user_permissions(user, index)
             });
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetSDataUserPermissions(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::GetSDataUserPermissions(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
         })
     }
 
     fn get_permissions(
         &self,
-        requester: PublicId,
         address: SDataAddress,
-        message_id: MessageId,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let response = {
-            let result = self
-                .get_chunk(&requester, address, SDataAction::Read)
-                .and_then(|sdata| {
-                    let index = sdata.permissions_index() - 1;
-                    let res = if sdata.is_pub() {
-                        SDataPermissions::from(sdata.pub_permissions(index)?.clone())
-                    } else {
-                        SDataPermissions::from(sdata.priv_permissions(index)?.clone())
-                    };
-
-                    Ok(res)
-                });
-            Response::GetSDataPermissions(result)
-        };
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response,
-                message_id,
-                proof: None,
-            },
+        let result = self
+            .get_chunk(address, SDataAction::Read)
+            .and_then(|sdata| {
+                let index = sdata.permissions_index() - 1;
+                let res = if sdata.is_pub() {
+                    SDataPermissions::from(sdata.pub_permissions(index)?.clone())
+                } else {
+                    SDataPermissions::from(sdata.priv_permissions(index)?.clone())
+                };
+                Ok(res)
+            });
+        self.wrap(Message::QueryResponse {
+            response: QueryResponse::GetSDataPermissions(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
         })
     }
 
     fn set_public_permissions(
         &mut self,
-        requester: &PublicId,
-        mutation_op: SDataWriteOp<SDataPubPermissions>,
-        message_id: MessageId,
+        write_op: SDataWriteOp<SDataPubPermissions>,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let address = mutation_op.address;
-        self.edit_chunk(
+        let address = write_op.address;
+        let result = self.edit_chunk(
             &requester,
             address,
             SDataAction::ManagePermissions,
             message_id,
-            move |mut sdata| {
-                sdata.apply_crdt_pub_perms_op(mutation_op.crdt_op)?;
-                Ok(sdata)
-            },
-        )
+            move |mut sdata| sdata.apply_crdt_pub_perms_op(write_op.crdt_op),
+        );
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn set_private_permissions(
         &mut self,
-        requester: &PublicId,
-        mutation_op: SDataWriteOp<SDataPrivPermissions>,
-        message_id: MessageId,
+        write_op: SDataWriteOp<SDataPrivPermissions>,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let address = mutation_op.address;
-        self.edit_chunk(
-            &requester,
+        let address = write_op.address;
+        let result = self.edit_chunk(
             address,
             SDataAction::ManagePermissions,
-            message_id,
-            move |mut sdata| {
-                sdata.apply_crdt_priv_perms_op(mutation_op.crdt_op)?;
-                Ok(sdata)
-            },
-        )
+            origin,
+            move |mut sdata| sdata.apply_crdt_priv_perms_op(write_op.crdt_op),
+        );
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn set_owner(
         &mut self,
-        requester: &PublicId,
-        mutation_op: SDataWriteOp<SDataOwner>,
-        message_id: MessageId,
+        write_op: SDataWriteOp<SDataOwner>,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let address = mutation_op.address;
-        self.edit_chunk(
-            &requester,
+        let address = write_op.address;
+        let result = self.edit_chunk(
             address,
             SDataAction::ManagePermissions,
-            message_id,
+            origin,
             move |mut sdata| {
-                sdata.apply_crdt_owner_op(mutation_op.crdt_op);
-                Ok(sdata)
+                sdata.apply_crdt_owner_op(write_op.crdt_op);
+                Ok(())
             },
-        )
+        );
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn edit(
         &mut self,
-        requester: &PublicId,
-        mutation_op: SDataWriteOp<SDataEntry>,
-        message_id: MessageId,
+        write_op: SDataWriteOp<SDataEntry>,
+        msg_id: MessageId,
+        origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let address = mutation_op.address;
-        self.edit_chunk(
-            &requester,
-            address,
-            SDataAction::Append,
-            message_id,
-            move |mut sdata| {
-                sdata.apply_crdt_op(mutation_op.crdt_op);
-                Ok(sdata)
-            },
-        )
+        let address = write_op.address;
+        let result = self.edit_chunk(address, SDataAction::Append, origin, move |mut sdata| {
+            sdata.apply_crdt_op(write_op.crdt_op);
+            Ok(())
+        });
+        self.ok_or_error(result, msg_id, origin)
     }
 
     fn edit_chunk<F>(
         &mut self,
-        requester: &PublicId,
         address: SDataAddress,
         action: SDataAction,
-        message_id: MessageId,
-        mutation_fn: F,
-    ) -> Option<NodeCmd>
+        origin: MsgSender,
+        write_fn: F,
+    ) -> NdResult<SData>
     where
-        F: FnOnce(SData) -> NdResult<SData>,
+        F: FnOnce(SData) -> NdResult<()>,
     {
-        let result = self
-            .get_chunk(requester, address, action)
-            .and_then(mutation_fn)
+        self.get_chunk(address, action, msg_id, origin)
+            .and_then(write_fn)
             .and_then(move |sdata| {
                 self.chunks
                     .put(&sdata)
                     .map_err(|error| error.to_string().into())
-            });
+            })
+    }
 
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester: requester.clone(),
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
+    fn set_proxy(&self, msg: &mut MsgEnvelope) {
+        // origin signs the message, while proxies sign the envelope
+        msg.add_proxy(self.sign(msg))
+    }
+
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        self.wrap(Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
         })
     }
-}
 
-fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(NodeCmd::Metadata(cmd))
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
+        MsgSender::Node {
+            id: self.public_key(),
+            duty: Duty::Elder(ElderDuty::Metadata),
+            signature,
+        }
+    }
+
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
+    }
 }
 
 impl Display for SequenceStorage {

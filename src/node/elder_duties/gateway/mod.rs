@@ -90,15 +90,16 @@ impl Gateway {
         self.messaging.send_to_client(msg)
     }
 
-    /// If a request within GatewayCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
-    /// was a GatewayRequest destined to our section, this is where the actual request will end up.
+    /// Temporary, while Authenticator is not implemented at app layer.
+    /// If a request within NodeCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
+    /// was made by Gateway and destined to our section, this is where the actual request will end up.
     pub fn handle_auth_cmd(
         &mut self,
-        client: PublicId,
-        cmd: AuthCmd,
-        msg_id: MessageId,
+        _client: PublicId,
+        _cmd: AuthCmd,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        self.auth.finalise(client, cmd, msg_id)
+        self.auth.finalise(msg)
     }
 
     /// Basically.. when Gateway nodes have agreed,
@@ -113,17 +114,11 @@ impl Gateway {
 
     /// Receive client request
     pub fn handle_client_msg(&mut self, client: PublicId, msg: MsgEnvelope) -> Option<NodeCmd> {
-        if let MsgSender::Client { signature, .. } = msg.origin {
-            if let Some(cmd) =
-                self.auth
-                    .verify_signature(client.clone(), &request, msg_id, signature)
-            {
-                return Some(cmd);
-            };
-        }
-
-        if let Some(cmd) = self.auth.authorise_app(&client, &request, msg_id) {
-            return Some(cmd);
+        if let Some(error) = self.auth.verify_client_signature(msg) {
+            return Some(error);
+        };
+        if let Some(error) = self.auth.authorise_app(&client, msg) {
+            return Some(error);
         }
 
         match msg.message {

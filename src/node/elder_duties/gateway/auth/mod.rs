@@ -55,22 +55,15 @@ impl Auth {
     }
 
     // If the client is app, check if it is authorised to perform the given request.
-    pub fn authorise_app(
-        &mut self,
-        public_id: &PublicId,
-        msg: &MsgEnvelope,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    pub fn authorise_app(&mut self, public_id: &PublicId, msg: &MsgEnvelope) -> Option<NodeCmd> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
             _ => return None,
         };
-
         match msg.most_recent_sender() {
             MsgSender::Client { .. } => (),
             _ => return None,
         };
-
         let auth_kind = match msg.message {
             Message::Cmd { cmd, .. } => cmd.authorisation_kind(),
             Message::Query { query, .. } => query.authorisation_kind(),
@@ -167,33 +160,14 @@ impl Auth {
     }
 
     // Verify that valid signature is provided if the request requires it.
-    pub fn verify_signature(
-        &mut self,
-        public_id: PublicId,
-        request: &ClientRequest,
-        message_id: MessageId,
-        signature: Option<Signature>,
-    ) -> Option<NodeCmd> {
+    pub fn verify_client_signature(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         match request.authorisation_kind() {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
-                let valid = if let Some(signature) = signature {
-                    self.is_valid_client_signature(public_id, request, &message_id, &signature)
-                } else {
-                    warn!(
-                        "{}: ({:?}/{:?}) from {} is unsigned",
-                        self, request, message_id, public_id
-                    );
-                    false
-                };
-
-                if valid {
+                if self.is_valid_client_signature(msg) {
                     None
                 } else {
-                    Some(GatewayCmd::RespondToClient {
-                        message_id,
-                        response: request.error_response(NdError::InvalidSignature),
-                    })
+                    self.wrap(Message::CmdError)
                 }
             }
         }
@@ -216,19 +190,16 @@ impl Auth {
         }
     }
 
-    fn is_valid_client_signature(&self, client_id: PublicId, msg: &MsgEnvelope) -> bool {
+    fn is_valid_client_signature(&self, msg: &MsgEnvelope) -> bool {
         let signature = match msg.origin {
             MsgSender::Client { signature, .. } => signature,
             _ => return false,
         };
-        let pub_key = match utils::own_key(&client_id) {
-            Some(pk) => pk,
-            None => {
-                error!("{}: Logic error.  This should be unreachable.", self);
-                return false;
-            }
-        };
-        match pub_key.verify(&signature, utils::serialise(&msg.message)) {
+        match msg
+            .origin
+            .id()
+            .verify(&signature, utils::serialise(&msg.message))
+        {
             Ok(_) => true,
             Err(error) => {
                 warn!(
@@ -236,7 +207,7 @@ impl Auth {
                     self,
                     "msg.get_type()",
                     msg.message.id(),
-                    client_id,
+                    pub_key,
                     error
                 );
                 false

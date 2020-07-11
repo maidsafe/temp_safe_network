@@ -18,19 +18,19 @@ use crate::{
     cmd::{MetadataCmd, NodeCmd},
     msg::Message,
     node::Init,
-    utils, Config, Result,
+    Config, Result,
 };
+
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use reading::Reading;
-use routing::{Node, SrcLocation};
+use routing::Node;
 use sequence_storage::SequenceStorage;
 use writing::Writing;
 
-use safe_nd::{Cmd, Message, NodePublicId, NodeRequest, PublicId, Read, XorName};
-use threshold_crypto::{PublicKey, Signature};
+use safe_nd::{Cmd, Message, MsgEnvelope, NodePublicId, Read, XorName};
 
 use std::{
     cell::{Cell, RefCell},
@@ -80,21 +80,16 @@ impl Metadata {
     pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let msg_id = msg.message.id();
         match msg.message {
-            Message::Cmd(Cmd::Data { cmd, .. }) => {
+            Message::Cmd {
+                cmd: Cmd::Data { cmd, .. },
+            } => {
                 let mut writing = Writing::new(cmd, msg);
                 writing.get_result(&mut self.elder_stores)
             }
             Message::Query {
                 query: Query::Data { query, .. },
             } => {
-                let reading = Reading::new(
-                    query,
-                    src,
-                    requester,
-                    msg_id,
-                    accumulated_signature,
-                    self.public_key(),
-                );
+                let reading = Reading::new(query, msg);
                 reading.get_result(&self.elder_stores)
             }
         }

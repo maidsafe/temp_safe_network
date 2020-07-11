@@ -78,7 +78,7 @@ impl RemoteMsgEval {
     fn should_forward_to_network(&self, msg: MsgEnvelope) -> bool {
         use Address::*;
         let destined_for_network = match msg.destination() {
-            Client(_) => false,
+            Client(address) => !self.self_is_handler_for(&address),
             Node(address) => routing::XorName(address.0) != *self.routing.borrow().id().name(),
             Section(address) => !self.self_is_handler_for(&address),
         };
@@ -190,7 +190,7 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
-        let is_data_cmd = match msg.message {
+        let is_chunk_cmd = match msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -202,7 +202,7 @@ impl RemoteMsgEval {
             _ => false,
         };
         // && we are Adult && self_is_handler_for(msg.destination())
-        is_data_cmd && from_metadata_elders
+        is_chunk_cmd && from_metadata_elders
     }
 
     /// When the write requests from Elders has been accumulated
@@ -215,7 +215,7 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
-        let is_data_cmd = match msg.message {
+        let is_chunk_cmd = match msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -227,7 +227,7 @@ impl RemoteMsgEval {
             _ => false,
         };
         // && we are Adult && self_is_handler_for(msg.destination())
-        is_data_cmd && from_metadata_elders
+        is_chunk_cmd && from_metadata_elders
     }
 
     fn should_run_at_rewards(&self, msg: MsgEnvelope) -> bool {

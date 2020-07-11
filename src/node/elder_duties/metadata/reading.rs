@@ -12,35 +12,16 @@ use super::{
 };
 use crate::cmd::NodeCmd;
 use routing::SrcLocation;
-use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MessageId, PublicId, SequenceRead};
-use threshold_crypto::{PublicKey, Signature};
+use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MessageId, MsgEnvelope, SequenceRead};
 
 pub(super) struct Reading {
-    _src: SrcLocation,
-    requester: PublicId,
-    read: DataQuery,
-    message_id: MessageId,
-    _accumulated_signature: Option<Signature>,
-    _public_key: Option<PublicKey>,
+    query: DataQuery,
+    msg: MsgEnvelope,
 }
 
 impl Reading {
-    pub fn new(
-        query: DataQuery,
-        _src: SrcLocation,
-        requester: PublicId,
-        message_id: MessageId,
-        _accumulated_signature: Option<Signature>,
-        _public_key: Option<PublicKey>,
-    ) -> Self {
-        Self {
-            _src,
-            requester,
-            query,
-            message_id,
-            _accumulated_signature,
-            _public_key,
-        }
+    pub fn new(query: DataQuery, msg: MsgEnvelope) -> Self {
+        Self { query, msg }
     }
 
     pub fn get_result(&self, stores: &ElderStores) -> Option<NodeCmd> {
@@ -54,18 +35,18 @@ impl Reading {
     }
 
     fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<NodeCmd> {
-        register.read(self.requester.clone(), read, self.message_id)
+        register.read(read, self.msg) // since the data is sent on to adults, the entire msg is passed in
     }
 
     fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<NodeCmd> {
-        storage.read(self.requester.clone(), read, self.message_id)
+        storage.read(read, self.msg_id, self.msg.origin) // map data currently stay at elders, so the msg is not needed
     }
 
     fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<NodeCmd> {
-        storage.read(self.requester.clone(), read, self.message_id)
+        storage.read(read, self.msg_id, self.msg.origin) // sequence data currently stay at elders, so the msg is not needed
     }
 
     fn account(&self, read: &AccountRead, storage: &AccountStorage) -> Option<NodeCmd> {
-        storage.read(self.requester.clone(), read, self.message_id)
+        storage.read(read, self.msg_id, self.msg.origin) // account data currently stay at elders, so the msg is not needed
     }
 }

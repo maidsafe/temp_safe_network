@@ -13,14 +13,12 @@ use crate::{
     node::Init,
     utils, Config, Result,
 };
-use log::error;
-
 use safe_nd::{
     CmdError, Duty, ElderDuty, Error as NdError, MData, MDataAction, MDataAddress,
     MDataEntryActions, MDataPermissionSet, MDataValue, MapRead, MapWrite, Message, MessageId,
     MsgEnvelope, MsgSender, NodePublicId, PublicKey, QueryResponse, Result as NdResult,
 };
-
+use serde::Serialize;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -50,24 +48,19 @@ impl MapStorage {
         Ok(Self { id, chunks })
     }
 
-    pub(super) fn read(
-        &self,
-        requester: PublicId,
-        read: &MapRead,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    pub(super) fn read(&self, read: &MapRead, msg: MsgEnvelope) -> Option<NodeCmd> {
         use MapRead::*;
         match read {
-            Get(address) => self.get(requester, *address, message_id),
-            GetValue { address, ref key } => self.get_value(requester, *address, key, message_id),
-            GetShell(address) => self.get_shell(requester, *address, message_id),
-            GetVersion(address) => self.get_version(requester, *address, message_id),
-            ListEntries(address) => self.list_entries(requester, *address, message_id),
-            ListKeys(address) => self.list_keys(requester, *address, message_id),
-            ListValues(address) => self.list_values(requester, *address, message_id),
-            ListPermissions(address) => self.list_permissions(requester, *address, message_id),
+            Get(address) => self.get(*address, msg),
+            GetValue { address, ref key } => self.get_value(*address, key, msg),
+            GetShell(address) => self.get_shell(*address, msg),
+            GetVersion(address) => self.get_version(*address, msg),
+            ListEntries(address) => self.list_entries(*address, msg),
+            ListKeys(address) => self.list_keys(*address, msg),
+            ListValues(address) => self.list_values(*address, msg),
+            ListPermissions(address) => self.list_permissions(*address, msg),
             ListUserPermissions { address, user } => {
-                self.list_user_permissions(requester, *address, *user, message_id)
+                self.list_user_permissions(*address, *user, msg)
             }
         }
     }
@@ -82,20 +75,13 @@ impl MapStorage {
                 user,
                 ref permissions,
                 version,
-            } => self.set_user_permissions(
-                requester,
-                address,
-                user,
-                permissions,
-                version,
-                message_id,
-            ),
+            } => self.set_user_permissions(address, user, permissions, version, msg.id()),
             DelUserPermissions {
                 address,
                 user,
                 version,
-            } => self.delete_user_permissions(requester, address, user, version, message_id),
-            Edit { address, changes } => self.edit_entries(requester, address, changes, message_id),
+            } => self.delete_user_permissions(address, user, version, msg.id()),
+            Edit { address, changes } => self.edit_entries(address, changes, msg.id()),
         }
     }
 
@@ -190,7 +176,7 @@ impl MapStorage {
         version: u64,
         msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        self.edit_chunk(&address, msg.origin, message_id, move |mut data| {
+        self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
             data.check_permissions(MDataAction::ManagePermissions, msg.origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
@@ -344,9 +330,9 @@ impl MapStorage {
     /// Get MData user permissions.
     fn list_user_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &origin.id(), MDataAction::Read)?
+            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
             .and_then(|data| {
-                data.user_permissions(origin.id())
+                data.user_permissions(msg.origin.id())
                     .map(MDataPermissionSet::clone)
             });
         self.wrap(Message::QueryResponse {

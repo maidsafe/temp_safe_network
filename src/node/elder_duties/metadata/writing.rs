@@ -11,9 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::cmd::NodeCmd;
-use routing::SrcLocation;
-use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MessageId, MsgEnvelope, SequenceWrite};
-use threshold_crypto::{PublicKey, Signature};
+use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite};
 
 pub(super) struct Writing {
     cmd: DataCmd,
@@ -21,7 +19,7 @@ pub(super) struct Writing {
 }
 
 impl Writing {
-    pub fn new(cmd: DataCmd, msg: MsgEnveloper) -> Self {
+    pub fn new(cmd: DataCmd, msg: MsgEnvelope) -> Self {
         Self { cmd, msg }
     }
 

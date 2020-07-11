@@ -234,7 +234,7 @@ impl BlobRegister {
 
         if let Some(data_owner) = metadata.owner {
             if data_owner != msg.origin.id() {
-                return query_error(NdError::AccessDenied),
+                return query_error(NdError::AccessDenied);
             }
         };
 
@@ -283,24 +283,24 @@ impl BlobRegister {
         None
     }
 
-    pub(super) fn handle_write_result(
-        &mut self,
-        sender: XorName,
-        requester: PublicId,
-        result: NdResult<()>,
-        message_id: MessageId,
-        request: Request,
-    ) -> Option<NodeCmd> {
-        match &request {
-            Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
-                self.handle_store_result(*data.address(), sender, &result, message_id, requester)
-            }
-            Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::DeletePrivate(address)))) => {
-                self.handle_delete_result(*address, sender, result, message_id, requester)
-            }
-            _ => None,
-        }
-    }
+    // pub(super) fn handle_write_result(
+    //     &mut self,
+    //     sender: XorName,
+    //     requester: PublicId,
+    //     result: NdResult<()>,
+    //     message_id: MessageId,
+    //     request: Request,
+    // ) -> Option<NodeCmd> {
+    //     match &request {
+    //         Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
+    //             self.handle_store_result(*data.address(), sender, &result, message_id, requester)
+    //         }
+    //         Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::DeletePrivate(address)))) => {
+    //             self.handle_delete_result(*address, sender, result, message_id, requester)
+    //         }
+    //         _ => None,
+    //     }
+    // }
 
     // pub(super) fn handle_store_result(
     //     &mut self,
@@ -580,15 +580,6 @@ impl BlobRegister {
                 .collect();
         }
         closest_holders
-    }
-
-    fn sign_with_signature_share(&self, data: &[u8]) -> Option<(usize, SignatureShare)> {
-        let signature = self
-            .routing
-            .borrow()
-            .secret_key_share()
-            .map_or(None, |key| Some(key.sign(data)));
-        signature.map(|sig| (self.routing.borrow().our_index().unwrap_or(0), sig))
     }
 
     fn set_proxy(&self, msg: &mut MsgEnvelope) {
