@@ -10,15 +10,15 @@ use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
     cmd::NodeCmd,
     node::Init,
-    utils, Config, Result,
+    Config, Result,
+    msg_decisions::ElderMsgDecisions;
 };
 use safe_nd::{
-    Error as NdError, Message, MessageId, MsgEnvelope, MsgSender, NodePublicId, PublicKey,
+    Error as NdError, Message, MessageId, MsgSender, NodePublicId,
     QueryResponse, Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex,
     SDataOwner, SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser,
-    SDataWriteOp, SequenceRead, SequenceWrite,
+    SDataWriteOp, SequenceRead, SequenceWrite, CmdError,
 };
-use serde::Serialize;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -28,6 +28,7 @@ use std::{
 pub(super) struct SequenceStorage {
     id: NodePublicId,
     chunks: SequenceChunkStore,
+    decisions: ElderMsgDecisions,
 }
 
 impl SequenceStorage {
@@ -36,6 +37,7 @@ impl SequenceStorage {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
+        decisions: ElderMsgDecisions,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
@@ -45,7 +47,7 @@ impl SequenceStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, chunks })
+        Ok(Self { id, chunks, decisions })
     }
 
     pub(super) fn read(
@@ -98,9 +100,9 @@ impl SequenceStorage {
     }
 
     fn get(&self, address: SDataAddress, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
-        let result = self.get_chunk(address, SDataAction::Read, msg_id, origin);
-        self.wrap(Message::QueryResponse {
-            response: QueryResponse::GetSData(result),
+        let result = self.get_chunk(address, SDataAction::Read, origin);
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetSequence(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -118,7 +120,7 @@ impl SequenceStorage {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             _ => error.to_string().into(),
         })?;
-        data.check_permission(action, origin.id())?;
+        data.check_permission(action, *origin.id())?;
         Ok(data)
     }
 
@@ -141,7 +143,7 @@ impl SequenceStorage {
                 if sdata.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    sdata.check_is_last_owner(origin.id())
+                    sdata.check_is_last_owner(*origin.id())
                 }
             })
             .and_then(|_| {
@@ -161,10 +163,10 @@ impl SequenceStorage {
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(address, SDataAction::Read, msg_id, origin)
+            .get_chunk(address, SDataAction::Read, origin)
             .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
-        self.wrap(Message::QueryResponse {
-            response: QueryResponse::GetSDataRange(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetSequenceRange(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -178,13 +180,13 @@ impl SequenceStorage {
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(address, SDataAction::Read, msg_id, origin)
+            .get_chunk(address, SDataAction::Read, origin)
             .and_then(|sdata| match sdata.last_entry() {
                 Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
                 None => Err(NdError::NoSuchEntry),
             });
-        self.wrap(Message::QueryResponse {
-            response: QueryResponse::GetSDataLastEntry(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetSequenceLastEntry(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -198,13 +200,13 @@ impl SequenceStorage {
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(address, SDataAction::Read, msg_id, origin)
+            .get_chunk(address, SDataAction::Read, origin)
             .and_then(|sdata| {
                 let index = sdata.owners_index() - 1;
                 sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
-        self.wrap(Message::QueryResponse {
-            response: QueryResponse::GetSDataOwner(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetSequenceOwner(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -219,13 +221,13 @@ impl SequenceStorage {
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(address, SDataAction::Read, msg_id, origin)
+            .get_chunk(address, SDataAction::Read, origin)
             .and_then(|sdata| {
                 let index = sdata.permissions_index() - 1;
                 sdata.user_permissions(user, index)
             });
-        self.wrap(Message::QueryResponse {
-            response: QueryResponse::GetSDataUserPermissions(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetSequenceUserPermissions(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -239,7 +241,7 @@ impl SequenceStorage {
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(address, SDataAction::Read)
+            .get_chunk(address, SDataAction::Read, origin)
             .and_then(|sdata| {
                 let index = sdata.permissions_index() - 1;
                 let res = if sdata.is_pub() {
@@ -249,8 +251,8 @@ impl SequenceStorage {
                 };
                 Ok(res)
             });
-        self.wrap(Message::QueryResponse {
-            response: QueryResponse::GetSDataPermissions(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetSequencePermissions(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -268,7 +270,10 @@ impl SequenceStorage {
             address,
             SDataAction::ManagePermissions,
             origin,
-            move |mut sdata| sdata.apply_crdt_pub_perms_op(write_op.crdt_op),
+            move |mut sdata| {
+                sdata.apply_crdt_pub_perms_op(write_op.crdt_op)?;
+                Ok(sdata)
+            },
         );
         self.ok_or_error(result, msg_id, origin)
     }
@@ -284,7 +289,10 @@ impl SequenceStorage {
             address,
             SDataAction::ManagePermissions,
             origin,
-            move |mut sdata| sdata.apply_crdt_priv_perms_op(write_op.crdt_op),
+            move |mut sdata| {
+                sdata.apply_crdt_priv_perms_op(write_op.crdt_op)?;
+                Ok(sdata)
+            },
         );
         self.ok_or_error(result, msg_id, origin)
     }
@@ -302,7 +310,7 @@ impl SequenceStorage {
             origin,
             move |mut sdata| {
                 sdata.apply_crdt_owner_op(write_op.crdt_op);
-                Ok(())
+                Ok(sdata)
             },
         );
         self.ok_or_error(result, msg_id, origin)
@@ -317,7 +325,7 @@ impl SequenceStorage {
         let address = write_op.address;
         let result = self.edit_chunk(address, SDataAction::Append, origin, move |mut sdata| {
             sdata.apply_crdt_op(write_op.crdt_op);
-            Ok(())
+            Ok(sdata)
         });
         self.ok_or_error(result, msg_id, origin)
     }
@@ -328,62 +336,35 @@ impl SequenceStorage {
         action: SDataAction,
         origin: MsgSender,
         write_fn: F,
-    ) -> NdResult<SData>
+    ) -> NdResult<()>
     where
-        F: FnOnce(SData) -> NdResult<()>,
+        F: FnOnce(SData) -> NdResult<SData>,
     {
         self.get_chunk(address, action, origin)
             .and_then(write_fn)
             .and_then(move |sdata| {
                 self.chunks
                     .put(&sdata)
-                    .map_err(|error| error.to_string().into())
+                    .map_err(|error| error.to_string().into()
             })
     }
 
-    fn set_proxy(&self, msg: &mut MsgEnvelope) {
-        // origin signs the message, while proxies sign the envelope
-        msg.add_proxy(self.sign(msg))
-    }
-
-    fn ok_or_error(
+    fn ok_or_error<T>(
         &self,
-        result: Result<()>,
+        result: NdResult<T>,
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<NodeCmd> {
         let error = match result {
-            Ok(()) => return None,
+            Ok(_) => return None,
             Err(error) => error,
         };
-        self.wrap(Message::CmdError {
+        self.decisions.send(Message::CmdError {
             id: MessageId::new(),
             error: CmdError::Data(error),
             correlation_id: msg_id,
-            cmd_origin: origin,
+            cmd_origin: origin.address(),
         })
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToSection(msg))
-    }
-
-    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Elder(ElderDuty::Metadata),
-            signature,
-        }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 

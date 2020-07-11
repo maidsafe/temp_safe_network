@@ -10,14 +10,14 @@ use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
     cmd::NodeCmd,
     node::Init,
-    utils, Config, Result,
+    Config, Result,
+    msg_decisions::ElderMsgDecisions;
 };
 use safe_nd::{
-    CmdError, Duty, ElderDuty, Error as NdError, MData, MDataAction, MDataAddress,
+    CmdError, Error as NdError, MData, MDataAction, MDataAddress,
     MDataEntryActions, MDataPermissionSet, MDataValue, MapRead, MapWrite, Message, MessageId,
     MsgEnvelope, MsgSender, NodePublicId, PublicKey, QueryResponse, Result as NdResult,
 };
-use serde::Serialize;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -25,16 +25,16 @@ use std::{
 };
 
 pub(super) struct MapStorage {
-    id: NodePublicId,
     chunks: MutableChunkStore,
+    decisions: ElderMsgDecisions,
 }
 
 impl MapStorage {
     pub(super) fn new(
-        id: NodePublicId,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
+        decisions: ElderMsgDecisions,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
@@ -44,7 +44,7 @@ impl MapStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, chunks })
+        Ok(Self { chunks, decisions })
     }
 
     pub(super) fn read(&self, read: &MapRead, msg: MsgEnvelope) -> Option<NodeCmd> {
@@ -74,13 +74,13 @@ impl MapStorage {
                 user,
                 ref permissions,
                 version,
-            } => self.set_user_permissions(address, user, permissions, version, msg.id()),
+            } => self.set_user_permissions(address, user, permissions, version, msg),
             DelUserPermissions {
                 address,
                 user,
                 version,
-            } => self.delete_user_permissions(address, user, version, msg.id()),
-            Edit { address, changes } => self.edit_entries(address, changes, msg.id()),
+            } => self.delete_user_permissions(address, user, version, msg),
+            Edit { address, changes } => self.edit_entries(address, changes, msg),
         }
     }
 
@@ -103,7 +103,7 @@ impl MapStorage {
                 })
                 .and_then(move |mdata| {
                     mdata
-                        .check_permissions(action, origin.id())
+                        .check_permissions(action, *origin.id())
                         .map(move |_| mdata)
                 }),
         )
@@ -157,7 +157,7 @@ impl MapStorage {
                 error => error.to_string().into(),
             })
             .and_then(move |mdata| {
-                mdata.check_is_owner(msg.origin.id())?;
+                mdata.check_is_owner(*msg.origin.id())?;
                 self.chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
@@ -176,7 +176,7 @@ impl MapStorage {
         msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
-            data.check_permissions(MDataAction::ManagePermissions, msg.origin.id())?;
+            data.check_permissions(MDataAction::ManagePermissions, *msg.origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
         })
@@ -191,7 +191,7 @@ impl MapStorage {
         msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
-            data.check_permissions(MDataAction::ManagePermissions, msg.origin.id())?;
+            data.check_permissions(MDataAction::ManagePermissions, *msg.origin.id())?;
             data.del_user_permissions(user, version)?;
             Ok(data)
         })
@@ -205,51 +205,51 @@ impl MapStorage {
         msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
         self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
-            data.mutate_entries(actions, msg.origin.id())?;
+            data.mutate_entries(actions, *msg.origin.id())?;
             Ok(data)
         })
     }
 
     /// Get entire MData.
     fn get(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
-        let result = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::GetMap(result),
+        let result = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetMap(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData shell.
     fn get_shell(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
+            .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.shell());
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::GetMapShell(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetMapShell(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData version.
     fn get_version(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
+            .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.version());
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::GetMapVersion(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetMapVersion(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData value.
     fn get_value(&self, address: MDataAddress, key: &[u8], msg: MsgEnvelope) -> Option<NodeCmd> {
-        let res = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => md
                 .get(key)
@@ -262,94 +262,89 @@ impl MapStorage {
                 .map(MDataValue::from)
                 .ok_or_else(|| NdError::NoSuchEntry),
         });
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::GetMapValue(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::GetMapValue(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData keys.
     fn list_keys(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
+            .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.keys());
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::ListMapKeys(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::ListMapKeys(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData values.
     fn list_values(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
-        let res = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.values().into()),
             MData::Unseq(md) => Ok(md.values().into()),
         });
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::ListMapValues(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::ListMapValues(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData entries.
     fn list_entries(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
-        let res = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.entries().clone().into()),
             MData::Unseq(md) => Ok(md.entries().clone().into()),
         });
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::ListMapEntries(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::ListMapEntries(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData permissions.
     fn list_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
+            .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.permissions());
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::ListMapPermissions(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::ListMapPermissions(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
     /// Get MData user permissions.
-    fn list_user_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn list_user_permissions(&self, address: MDataAddress, user: PublicKey, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
+            .get_chunk(&address, msg.origin, MDataAction::Read)?
             .and_then(|data| {
-                data.user_permissions(msg.origin.id())
+                data.user_permissions(user)
                     .map(MDataPermissionSet::clone)
             });
-        self.wrap(Message::QueryResponse {
-            query: QueryResponse::ListMapUserPermissions(result),
+        self.decisions.send(Message::QueryResponse {
+            response: QueryResponse::ListMapUserPermissions(result),
             id: MessageId::new(),
             correlation_id: msg.id(),
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
-    }
-
-    fn set_proxy(&self, msg: &mut MsgEnvelope) {
-        // origin signs the message, while proxies sign the envelope
-        msg.add_proxy(self.sign(msg))
     }
 
     fn ok_or_error(
         &self,
-        result: Result<()>,
+        result: NdResult<()>,
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<NodeCmd> {
@@ -357,39 +352,17 @@ impl MapStorage {
             Ok(()) => return None,
             Err(error) => error,
         };
-        self.wrap(Message::CmdError {
+        self.decisions.send(Message::CmdError {
             id: MessageId::new(),
             error: CmdError::Data(error),
             correlation_id: msg_id,
-            cmd_origin: origin,
+            cmd_origin: origin.address(),
         })
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToSection(msg))
-    }
-
-    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Elder(ElderDuty::Metadata),
-            signature,
-        }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Bls(self.id.public_id().bls_public_key())
     }
 }
 
 impl Display for MapStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "MapStorage")
     }
 }

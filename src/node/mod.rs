@@ -108,6 +108,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             let total_used_space = Rc::new(Cell::new(0));
             let duties = ElderDuties::new(
                 keys.clone(),
+                keypair,
                 &config,
                 &total_used_space,
                 init_mode,

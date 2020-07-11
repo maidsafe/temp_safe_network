@@ -14,8 +14,7 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{cmd::NodeCmd, node::Init, Config, Result};
-
+use crate::{node::Init, Config, Result, cmd::NodeCmd, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
@@ -25,7 +24,7 @@ use routing::Node;
 use sequence_storage::SequenceStorage;
 use writing::Writing;
 
-use safe_nd::{Cmd, Message, MsgEnvelope, NodePublicId, Read, XorName};
+use safe_nd::{Cmd, Message, MsgEnvelope, XorName, Query, ElderDuty};
 
 use std::{
     cell::{Cell, RefCell},
@@ -41,24 +40,26 @@ use std::{
 /// all underlying data being chunks stored at `Adults`.
 
 pub(crate) struct Metadata {
-    id: NodePublicId,
+    keys: NodeKeys,
     elder_stores: ElderStores,
     routing_node: Rc<RefCell<Node>>,
+    decisions: ElderMsgDecisions,
 }
 
 impl Metadata {
     pub fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
-        let account_storage = AccountStorage::new(id.clone(), config, total_used_space, init_mode)?;
-        let blob_register = BlobRegister::new(id.clone(), config, init_mode, routing_node.clone())?;
-        let map_storage = MapStorage::new(id.clone(), config, total_used_space, init_mode)?;
+        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Metadata);
+        let account_storage = AccountStorage::new(config, total_used_space, init_mode, decisions.clone())?;
+        let blob_register = BlobRegister::new(config, init_mode, routing_node.clone(), decisions.clone())?;
+        let map_storage = MapStorage::new(config, total_used_space, init_mode, decisions.clone())?;
         let sequence_storage =
-            SequenceStorage::new(id.clone(), config, total_used_space, init_mode)?;
+            SequenceStorage::new(config, total_used_space, init_mode), decisions.clone()?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,
@@ -66,9 +67,10 @@ impl Metadata {
             sequence_storage,
         );
         Ok(Self {
-            id,
+            keys,
             elder_stores,
             routing_node,
+            decisions,
         })
     }
 
@@ -76,13 +78,13 @@ impl Metadata {
         let msg_id = msg.message.id();
         match msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, .. },
+                cmd: Cmd::Data { cmd, .. }, ..
             } => {
                 let mut writing = Writing::new(cmd, msg);
                 writing.get_result(&mut self.elder_stores)
             }
             Message::Query {
-                query: Query::Data { query, .. },
+                query: Query::Data(query), ..
             } => {
                 let reading = Reading::new(query, msg);
                 reading.get_result(&self.elder_stores)
@@ -250,6 +252,6 @@ impl Metadata {
 
 impl Display for Metadata {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

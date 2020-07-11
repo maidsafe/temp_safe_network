@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::msg::Message;
-use safe_nd::XorName;
+use safe_nd::{MsgEnvelope, XorName, NodeCmd};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 

@@ -51,7 +51,7 @@ impl ReplicaManager {
                     key_index,
                     peer_replicas.clone(),
                     events,
-                );
+                )?;
                 Ok(Self {
                     store,
                     replica,
@@ -79,7 +79,7 @@ impl ReplicaManager {
     ) -> Result<()> {
         match self.store.try_load() {
             Ok(events) => {
-                self.replica = Replica::from_history(secret_key, index, peer_replicas, events);
+                self.replica = Replica::from_history(secret_key, index, peer_replicas, events)?;
                 self.section_proof_chain = section_proof_chain;
                 //info!("Successfully updated Replica details on churn");
                 Ok(())
@@ -88,11 +88,11 @@ impl ReplicaManager {
         }
     }
 
-    pub(crate) fn validate(&mut self, transfer: SignedTransfer) -> Result<TransferValidated> {
+    pub(crate) fn validate(&mut self, transfer: SignedTransfer) -> Result<Option<TransferValidated>> {
         let result = self.replica.validate(transfer);
         if let Ok(Some(event)) = result {
             match self.persist(ReplicaEvent::TransferValidated(event.clone())) {
-                Ok(()) => Ok(event),
+                Ok(()) => Ok(Some(event)),
                 Err(err) => Err(err),
             }
         } else {
@@ -129,7 +129,7 @@ impl ReplicaManager {
 
         if let Ok(Some(event)) = result {
             match self.persist(ReplicaEvent::TransferRegistered(event.clone())) {
-                Ok(()) => Ok(event),
+                Ok(()) => Ok(Some(event)),
                 Err(err) => Err(err),
             }
         } else {

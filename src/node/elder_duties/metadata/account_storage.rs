@@ -10,11 +10,12 @@ use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
     cmd::NodeCmd,
     node::Init,
-    utils, Config, Result,
+    Config, Result,
+    msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
-    Account, AccountRead, AccountWrite, Duty, ElderDuty, Error as NdError, Message, MessageId,
-    MsgEnvelope, MsgSender, NodePublicId, PublicKey, QueryResponse, Result as NdResult, XorName,
+    Account, AccountRead, AccountWrite, Error as NdError, Message, MessageId,
+    PublicKey, QueryResponse, Result as NdResult, XorName, MsgSender, CmdError,
 };
 use std::{
     cell::Cell,
@@ -22,14 +23,17 @@ use std::{
     rc::Rc,
 };
 
-pub(super) struct AccountStorage {}
+pub(super) struct AccountStorage {
+    chunks: AccountChunkStore,
+    decisions: ElderMsgDecisions,
+}
 
 impl AccountStorage {
     pub fn new(
-        id: NodePublicId,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
+        decisions: ElderMsgDecisions,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
@@ -39,8 +43,7 @@ impl AccountStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        let decision = ElderMsgDecisions::new(id, ElderDuty::Metadata);
-        Ok(Self { id, chunks })
+        Ok(Self { chunks, decisions })
     }
 
     pub(super) fn read(
@@ -59,13 +62,12 @@ impl AccountStorage {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);
-        let message = Message::QueryResponse {
+        self.decisions.send(Message::QueryResponse {
             id: MessageId::new(),
             response: QueryResponse::GetAccount(result),
             correlation_id: msg_id,
-            query_origin: origin,
-        };
-        self.wrap(message)
+            query_origin: origin.address(),
+        })
     }
 
     pub(super) fn write(
@@ -89,7 +91,7 @@ impl AccountStorage {
     ) -> Option<NodeCmd> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
-        } else if account.owner != origin.id() {
+        } else if account.owner() != origin.id() {
             Err(NdError::InvalidOwners)
         } else {
             // also check the signature
@@ -111,12 +113,12 @@ impl AccountStorage {
             .and_then(|existing_account| {
                 if !updated_account.size_is_valid() {
                     Err(NdError::ExceededSize)
-                } else if updated_account.owner != existing_account.owner {
+                } else if updated_account.owner() != existing_account.owner() {
                     Err(NdError::InvalidOwners)
                 } else {
                     // also check the signature
                     self.chunks.put(&updated_account)
-                    //.map_err(|err| err.to_string().into())
+                        .map_err(|err| err.to_string().into())
                 }
             });
         self.ok_or_error(result, msg_id, origin)
@@ -140,48 +142,24 @@ impl AccountStorage {
 
     fn ok_or_error(
         &self,
-        result: Result<()>,
+        result: NdResult<()>,
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let error = match result {
-            Ok(()) => return None,
-            Err(error) => error,
-        };
-        let message = Message::CmdError {
-            id: MessageId::new(),
-            error: CmdError::Data(error),
-            correlation_id: msg_id,
-            cmd_origin: origin,
-        };
-        self.wrap(message)
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToSection(msg))
-    }
-
-    fn sign(&self, message: Message) -> MsgSender {
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Elder(ElderDuty::Metadata),
-            signature,
+        if let Err(error) = result {
+            self.decisions.send(Message::CmdError {
+                id: MessageId::new(),
+                error: CmdError::Data(error),
+                correlation_id: msg_id,
+                cmd_origin: origin.address(),
+            })
         }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Bls(self.id.public_id().bls_public_key())
+        None
     }
 }
 
 impl Display for AccountStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "AccountStorage")
     }
 }

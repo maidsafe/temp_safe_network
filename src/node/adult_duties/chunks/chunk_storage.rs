@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::msg_decisions::AdultMsgDecisions;
+use crate::msg_decisions::AdultMsgDecisions;
 use crate::{chunk_store::ImmutableChunkStore, cmd::NodeCmd, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
-    AdultDuty, CmdError, Duty, Error as NdError, IData, IDataAddress, Message, MessageId,
-    MsgEnvelope, MsgSender, NetworkCmdError, NodePublicId, PublicKey, QueryResponse,
+    AdultDuty, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
+    MsgSender, NetworkCmdError, NodePublicId, QueryResponse, NetworkEvent,
 };
 use std::{
     cell::Cell,
@@ -58,8 +58,8 @@ impl ChunkStorage {
         if let Err(error) = self.try_store(data) {
             self.decision.error(
                 CmdError::Data(error),
-                msg.message.id(),
-                msg.origin.address(),
+                msg_id,
+                origin.address(),
             )
         }
         None
@@ -79,7 +79,7 @@ impl ChunkStorage {
                     proof: accumulated_signature.clone(),
                 },
                 id: MessageId::new(),
-                correlation_id: message_id,
+                correlation_id: msg_id,
             },
             Err(error) => Message::NetworkCmdError {
                 id: MessageId::new(),
@@ -162,7 +162,7 @@ impl ChunkStorage {
                 _ => {
                     error!(
                         "{}: Invalid DeletePrivate(IData::Public) encountered: {:?}",
-                        self, message_id
+                        self, msg_id
                     );
                     Err(NdError::InvalidOperation)
                 }
@@ -172,8 +172,8 @@ impl ChunkStorage {
         if let Err(error) = result {
             self.decision.error(
                 CmdError::Data(error),
-                msg.message.id(),
-                msg.origin.address(),
+                msg_id,
+                origin.address(),
             )
         }
         None

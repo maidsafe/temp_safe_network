@@ -40,8 +40,10 @@ impl NodeKeys {
     pub fn sign<T: Serialize>(&self, data: &T) -> Signature {
         let data = utils::serialise(data);
         let bls = self.keys.borrow().sign_using_bls(&data);
-        if bls.is_none() {
-            self.keys.borrow().sign_using_ed25519(&data),
+        if let Some(signature) = bls {
+            signature
+        } else {
+            self.keys.borrow().sign_using_ed25519(&data)
         }
     }
 }

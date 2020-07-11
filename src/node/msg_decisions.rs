@@ -56,6 +56,14 @@ impl MsgDecisions {
         Some(NodeCmd::SendToSection(msg))
     }
 
+    pub fn send_to_adults(&self, targets: BTreeSet<XorName>, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let msg = self.set_proxy(msg);
+        Some(NodeCmd::SendToAdults{
+            targets,
+            msg,
+        })
+    }
+
     pub fn error(&self,
         error: CmdError,
         msg_id: MessageId,

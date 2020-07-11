@@ -2142,7 +2142,7 @@ dependencies = [
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=messaging_refactor#b0f5b4d78bee56c732ba108f1c4147643ffeea2e"
+source = "git+https://github.com/oetyng/safe-nd.git?branch=messaging_refactor#651bdf58e3cda662e0017927816567d429fefe69"
 dependencies = [
  "bincode",
  "crdts",
@@ -2160,7 +2160,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-transfers?branch=messaging_refactor#37c484f0c6e1ca2e233bc960a685a1223bcefb79"
+source = "git+https://github.com/oetyng/safe-transfers?branch=messaging_refactor#67607af66c6b853fbba31ebfb22fa622116d346c"
 dependencies = [
  "bincode",
  "crdts",

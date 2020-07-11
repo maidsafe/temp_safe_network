@@ -9,15 +9,14 @@
 mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
-use super::msg_decisions::ElderMsgDecisions;
-use crate::{cmd::ConsensusAction, utils};
+use crate::msg_decisions::ElderMsgDecisions;
+use crate::utils;
 use log::warn;
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind, Duty, ElderDuty,
+    AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind, ElderDuty,
     Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
-    NodeCmd, NodeFullId, PublicId, PublicKey, QueryResponse, RequestAuthKind,
+    NodeCmd, NodeFullId, PublicId, QueryResponse, RequestAuthKind,
 };
-use serde::Serialize;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone, Debug)]
@@ -26,15 +25,14 @@ pub struct ClientInfo {
 }
 
 pub(super) struct Auth {
-    id: NodeFullId,
+    keys: NodeKeys,
     auth_keys: AuthKeysDb,
     decisions: ElderMsgDecisions,
 }
 
 impl Auth {
-    pub fn new(id: NodePublicId, auth_keys: AuthKeysDb) -> Self {
-        let decision = ElderMsgDecisions::new(id, ElderDuty::Gateway);
-        Self { id, auth_keys }
+    pub fn new(keys: NodeKeys, auth_keys: AuthKeysDb, decisions: ElderMsgDecisions) -> Self {
+        Self { keys, auth_keys, decisions }
     }
 
     pub(super) fn initiate(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
@@ -47,7 +45,7 @@ impl Auth {
         };
         use AuthCmd::*;
         match auth_cmd {
-            InsAuthKey { .. } | DelAuthKey { .. } => self.decision.vote(msg),
+            InsAuthKey { .. } | DelAuthKey { .. } => self.decisions.vote(msg),
         }
     }
 
@@ -93,7 +91,7 @@ impl Auth {
         };
 
         if let Err(error) = result {
-            self.decision.error(
+            self.decisions.error(
                 CmdError::Auth(error),
                 msg.message.id(),
                 msg.origin.address(),
@@ -106,19 +104,19 @@ impl Auth {
     pub fn list_keys_and_version(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         match msg.message {
             Message::Query {
-                cmd: Query::Auth(ListAuthKeysAndVersion),
+                query: Query::Auth(ListAuthKeysAndVersion),
                 ..
             } => (),
             _ => return None,
         };
         let result = Ok(self.auth_keys.list_keys_and_version(msg.origin.id()));
-        self.decision.send(Message::QueryResponse {
+        self.decisions.send(Message::QueryResponse {
             response: QueryResponse::ListAuthKeysAndVersion(result),
             id: MessageId::new(),
             /// ID of causing query.
             correlation_id: msg.message.id(),
             /// The sender of the causing query.
-            query_origin: msg.origin,
+            query_origin: msg.origin.address(),
         })
     }
 
@@ -137,13 +135,14 @@ impl Auth {
                 key,
                 version,
                 permissions,
+                ..
             } => self
                 .auth_keys
                 .insert(msg.origin.id(), key, version, permissions),
-            DelAuthKey { key, version } => self.auth_keys.delete(msg.origin.id(), key, version),
+            DelAuthKey { key, version, .. } => self.auth_keys.delete(msg.origin.id(), key, version),
         };
         if let Err(error) = result {
-            self.decision.error(
+            self.decisions.error(
                 CmdError::Auth(error),
                 msg.message.id(),
                 msg.origin.address(),
@@ -157,10 +156,10 @@ impl Auth {
         match msg.authorisation_kind() {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
-                if self.is_valid_client_signature(msg) {
+                if self.is_valid_client_signature(&msg) {
                     None
                 } else {
-                    self.decision
+                    self.decisions
                         .error(CmdError::Auth(NdError::AccessDenied), msg.id(), msg.origin)
                 }
             }
@@ -212,6 +211,6 @@ impl Auth {
 
 impl Display for Auth {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id)
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{auth::ClientInfo, ClientMsg};
-use crate::{cmd::GatewayCmd, utils};
+use crate::utils;
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node;
 use safe_nd::{
     HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope, NodePublicId, PublicId,
-    Result, Signature, XorName,
+    Result, Signature, XorName, Error, Address,
 };
 use serde::Serialize;
 use std::{

@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::msg_decisions::ElderMsgDecisions;
+use crate::msg_decisions::ElderMsgDecisions;
 use log::trace;
 use safe_nd::{
-    Account, AccountRead, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery, ElderDuty,
+    Account, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery, ElderDuty,
     Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message,
     MsgEnvelope, NodeCmd, NodeFullId, Read, SData, SDataAddress, SequenceRead, SequenceWrite,
-    Write,
+    Write, Query,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -25,17 +25,16 @@ pub(crate) struct Validation {
 }
 
 impl Validation {
-    pub fn new(id: NodeFullId) -> Self {
-        let decision = ElderMsgDecisions::new(id, ElderDuty::Gateway);
+    pub fn new(decisions: ElderMsgDecisions) -> Self {
         Self {
-            blobs: Blobs::new(decision.clone()),
-            maps: Maps::new(decision.clone()),
-            sequences: Sequences::new(decision.clone()),
-            accounts: Accounts::new(decision),
+            blobs: Blobs::new(decisions.clone()),
+            maps: Maps::new(decisions.clone()),
+            sequences: Sequences::new(decisions.clone()),
+            accounts: Accounts::new(decisions),
         }
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let message = msg.message;
         match &message {
             Message::Cmd {
@@ -43,14 +42,14 @@ impl Validation {
                 ..
             } => self.initiate_write(cmd, msg),
             Message::Query {
-                query: Query::Data { query, .. },
+                query: Query::Data(query),
                 ..
             } => self.initiate_read(query, msg),
             _ => return None,
         }
     }
 
-    fn initiate_write(&mut self, cmd: DataCmd, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_write(&mut self, cmd: DataCmd, msg: MsgEnvelope) -> Option<NodeCmd> {
         match cmd {
             DataCmd::Blob(_) => self.blobs.initiate_write(msg),
             DataCmd::Map(_) => self.maps.initiate_write(msg),
@@ -59,7 +58,7 @@ impl Validation {
         }
     }
 
-    fn initiate_read(&mut self, query: DataQuery, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, query: DataQuery, msg: MsgEnvelope) -> Option<NodeCmd> {
         match query {
             DataQuery::Blob(_) => self.blobs.initiate_read(msg),
             DataQuery::Map(_) => self.maps.initiate_read(msg),
@@ -80,13 +79,13 @@ pub(crate) struct Sequences {
 
 impl Sequences {
     pub fn new(decisions: ElderMsgDecisions) -> Self {
-        Self { decision }
+        Self { decisions }
     }
 
     // client query
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let _ = self.extract_read(msg)?;
-        self.decision.forward(msg)
+        self.decisions.forward(msg)
     }
 
     // on client request
@@ -106,50 +105,47 @@ impl Sequences {
     fn initiate_creation(&mut self, chunk: SData, msg: MsgEnvelope) -> Option<NodeCmd> {
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
-        if chunk.check_is_last_owner(msg.origin.id()).is_err() {
+        if chunk.check_is_last_owner(*msg.origin.id()).is_err() {
             trace!(
                 "{}: {} attempted to store Sequence with invalid owners.",
                 self,
                 msg.origin.id()
             );
             return self
-                .decision
-                .error(NdError::InvalidOwners, msg.id(), msg.origin);
+                .decisions
+                .error(CmdError::Data(NdError::InvalidOwners), msg.id(), msg.origin);
         }
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     // on client request
     fn initiate_deletion(&mut self, address: SDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         if address.is_pub() {
             return self
-                .decision
-                .error(NdError::InvalidOperation, msg.id(), msg.origin);
+                .decisions
+                .error(CmdError::Data(NdError::InvalidOperation), msg.id(), msg.origin);
         }
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     // on client request
     fn initiate_edit(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<SequenceRead> {
-        let write = match msg.message {
+        match msg.message {
             Message::Query {
                 query:
-                    Query::Data {
-                        query: DataQuery::Sequence(query),
-                        ..
-                    },
+                    Query::Data(DataQuery::Sequence(query)),
                 ..
             } => Some(query),
             _ => return None,
-        };
+        }
     }
 
     fn extract_write(&self, msg: MsgEnvelope) -> Option<SequenceWrite> {
-        let write = match msg.message {
+        match msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -159,13 +155,13 @@ impl Sequences {
                 ..
             } => Some(write),
             _ => return None,
-        };
+        }
     }
 }
 
 impl Display for Sequences {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "Sequences")
     }
 }
 
@@ -180,13 +176,13 @@ pub(crate) struct Blobs {
 
 impl Blobs {
     pub fn new(decisions: ElderMsgDecisions) -> Self {
-        Self { decision }
+        Self { decisions }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let read = self.extract_read(msg)?;
-        self.decision.forward(msg)
+        self.decisions.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
         // since it's free for anyone to get.  However, as a means of spam prevention, we
         // could change this so that signatures are required, and the signatures would need
@@ -218,38 +214,35 @@ impl Blobs {
                     self,
                     msg.origin.id()
                 );
-                self.decision
-                    .error(NdError::InvalidOwners, msg.id(), msg.origin)
+                self.decisions
+                    .error(CmdError::Data(NdError::InvalidOwners), msg.id(), msg.origin)
             }
         }
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     // on client request
     fn initiate_deletion(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         if address.kind() == IDataKind::Pub {
-            self.decision
-                .error(NdError::InvalidOperation, msg.id(), msg.origin)
+            self.decisions
+                .error(CmdError::Data(NdError::InvalidOperation), msg.id(), msg.origin)
         }
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<BlobRead> {
-        let write = match msg.message {
+        match msg.message {
             Message::Query {
                 query:
-                    Query::Data {
-                        query: DataQuery::Blob(query),
-                        ..
-                    },
+                    Query::Data(DataQuery::Blob(query)),
                 ..
             } => Some(query),
             _ => return None,
-        };
+        }
     }
 
     fn extract_write(&self, msg: MsgEnvelope) -> Option<BlobWrite> {
-        let write = match msg.message {
+        match msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -259,13 +252,13 @@ impl Blobs {
                 ..
             } => Some(write),
             _ => return None,
-        };
+        }
     }
 }
 
 impl Display for Blobs {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "Blobs")
     }
 }
 
@@ -280,13 +273,13 @@ pub(crate) struct Maps {
 
 impl Maps {
     pub fn new(decisions: ElderMsgDecisions) -> Self {
-        Self { decision }
+        Self { decisions }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let read = self.extract_read(msg)?;
-        self.decision.forward(msg)
+        self.decisions.forward(msg)
     }
 
     // on client request
@@ -296,7 +289,7 @@ impl Maps {
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
             Delete(..) | Edit { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
-                self.decision.vote(msg)
+                self.decisions.vote(msg)
             }
         }
     }
@@ -305,34 +298,31 @@ impl Maps {
     fn initiate_creation(&mut self, chunk: MData, msg: MsgEnvelope) -> Option<NodeCmd> {
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
-        if chunk.owner() != msg.origin.id() {
+        if chunk.owner() != *msg.origin.id() {
             trace!(
                 "{}: {} attempted to store Map with invalid owners field.",
                 self,
                 msg.origin.id()
             );
-            return self.error(NdError::InvalidOwners, msg.id(), msg.origin);
+            return self.decisions.error(CmdError::Data(NdError::InvalidOwners), msg.id(), msg.origin);
         }
 
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<MapRead> {
-        let write = match msg.message {
+        match msg.message {
             Message::Query {
                 query:
-                    Query::Data {
-                        query: DataQuery::Map(query),
-                        ..
-                    },
+                    Query::Data(DataQuery::Map(query)),
                 ..
             } => Some(query),
             _ => return None,
-        };
+        }
     }
 
     fn extract_write(&self, msg: MsgEnvelope) -> Option<MapWrite> {
-        let write = match msg.message {
+        match msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -342,13 +332,13 @@ impl Maps {
                 ..
             } => Some(write),
             _ => return None,
-        };
+        }
     }
 }
 
 impl Display for Maps {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "Maps")
     }
 }
 
@@ -363,13 +353,13 @@ pub(super) struct Accounts {
 
 impl Accounts {
     pub fn new(decisions: ElderMsgDecisions) -> Self {
-        Self { decision }
+        Self { decisions }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         if self.is_account_read(msg) {
-            self.decision.vote(msg)
+            self.decisions.vote(msg)
         } else {
             None
         }
@@ -379,9 +369,9 @@ impl Accounts {
     pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let account = self.extract_account_write(msg)?;
         if !account.size_is_valid() {
-            return self.error(NdError::ExceededSize, msg.id(), msg.origin);
+            return self.decisions.error(CmdError::Data(NdError::ExceededSize), msg.id(), msg.origin);
         }
-        self.decision.vote(msg)
+        self.decisions.vote(msg)
     }
 
     fn is_account_read(&self, msg: MsgEnvelope) -> bool {
@@ -414,6 +404,6 @@ impl Accounts {
 
 impl Display for Accounts {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "Accounts")
     }
 }

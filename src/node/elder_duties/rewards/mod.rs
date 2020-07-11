@@ -10,12 +10,12 @@ mod section_funds;
 mod system;
 mod validator;
 
-use super::{section_funds::SectionFunds, system::FarmingSystem, validator::Validator};
-use crate::cmd::NodeCmd;
+use self::{section_funds::SectionFunds, system::FarmingSystem, validator::Validator};
+use crate::{cmd::NodeCmd, msg_decisions::ElderMsgDecisions, keys::NodeKeys};
 use crate::node::messaging::Messaging;
 use safe_farming::{Accumulation, RewardCounter, StorageRewards};
 use safe_nd::{
-    AccountId, Duty, ElderDuty, Message, Money, MsgEnvelope, MsgSender, NetworkCmd, XorName,
+    AccountId, ElderDuty, Money, XorName,
 };
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
@@ -24,19 +24,22 @@ pub(super) struct Rewards {
     farming: FarmingSystem<StorageRewards>,
     node_accounts: HashMap<XorName, AccountId>,
     section_funds: SectionFunds,
+    decisions: ElderMsgDecisions,
 }
 
 impl Rewards {
-    pub fn new(actor: TransferActor<Validator>) -> Self {
+    pub fn new(keys: NodeKeys, actor: TransferActor<Validator>) -> Self {
+        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Rewards);
         let acc = Accumulation::new(Default::default(), Default::default());
         let base_cost = Money::from_nano(1);
         let algo = StorageRewards::new(base_cost);
         let farming = FarmingSystem::new(algo, acc);
-        let section_funds = SectionFunds::new(actor);
+        let section_funds = SectionFunds::new(actor, decisions.clone());
         Self {
             farming,
             node_accounts: Default::default(),
             section_funds,
+            decisions,
         }
     }
 
@@ -45,15 +48,15 @@ impl Rewards {
     /// the owner on the network.
     pub fn add_account(&mut self, id: AccountId, counter: RewardCounter) -> Option<NodeCmd> {
         let work = counter.work;
-        match self.system.add_account(id, work) {
-            Ok() => (),
+        match self.farming.add_account(id, work) {
+            Ok(_) => (),
             Err(err) => {
                 // todo: NetworkCmdError
                 return None;
             }
         };
         if counter.reward > Money::zero() {
-            self.section_funds.payout_rewards(counter.reward, id)
+            return self.section_funds.initiate_reward_payout(counter.reward, id);
         }
         None
     }
@@ -62,8 +65,8 @@ impl Rewards {
         let num_bytes = data.len() as u64;
         let data_hash = data;
         let factor = 2.0;
-        match self.system.reward(data_hash, num_bytes, factor) {
-            Ok() => None,
+        match self.farming.reward(data_hash, num_bytes, factor) {
+            Ok(_) => None,
             Err(err) => {
                 // todo: NetworkCmdError
                 return None;

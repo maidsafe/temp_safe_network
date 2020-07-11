@@ -7,13 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::NodeCmd, utils};
-use routing::Node as Routing;
+use crate::{cmd::NodeCmd, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
 use safe_nd::{
-    Cmd, CmdError, Duty, ElderDuty, Error, Message, MessageId, MsgEnvelope, MsgSender,
-    NodePublicId, PublicKey, Result, TransferError,
+    Cmd, ElderDuty, Message, MsgEnvelope,
+    PublicKey, Result, TransferError, Error,
 };
-use serde::Serialize;
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -23,6 +21,7 @@ use std::{
 pub(crate) struct DataPayment {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
+    decisions: ElderMsgDecisions,
 }
 
 /// An Elder in S(R) is responsible for
@@ -50,7 +49,7 @@ impl DataPayment {
     pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let (cmd, payment) = match msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, payment },
+                cmd: Cmd::Data { cmd, payment }, ..
             } => (cmd, payment),
             _ => return None,
         };
@@ -85,18 +84,19 @@ impl DataPayment {
     }
 
     fn section_account_id(&self) -> Result<PublicKey> {
-        Ok(PublicKey::Bls(
-            self.replica.borrow().replicas_pk_set()?.public_key(),
-        ))
+        match self.replica.borrow().replicas_pk_set() {
+            Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
+            None => Err(Error::NoSuchKey),
+        }
     }
 
     fn replica_mut(&mut self) -> &mut ReplicaManager {
-        self.replica.borrow_mut()
+        &mut self.replica.borrow_mut()
     }
 }
 
 impl Display for DataPayment {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id)
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

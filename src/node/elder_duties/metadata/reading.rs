@@ -38,14 +38,14 @@ impl Reading {
     }
 
     fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<NodeCmd> {
-        storage.read(read, self.msg_id, self.msg.origin) // map data currently stay at elders, so the msg is not needed
+        storage.read(read, self.msg) // map data currently stay at elders, so the msg is not needed
     }
 
     fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<NodeCmd> {
-        storage.read(read, self.msg_id, self.msg.origin) // sequence data currently stay at elders, so the msg is not needed
+        storage.read(read, self.msg.id(), self.msg.origin) // sequence data currently stay at elders, so the msg is not needed
     }
 
     fn account(&self, read: &AccountRead, storage: &AccountStorage) -> Option<NodeCmd> {
-        storage.read(read, self.msg_id, self.msg.origin) // account data currently stay at elders, so the msg is not needed
+        storage.read(read, self.msg.id(), self.msg.origin) // account data currently stay at elders, so the msg is not needed
     }
 }

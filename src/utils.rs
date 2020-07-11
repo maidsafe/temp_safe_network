@@ -84,12 +84,6 @@ pub(crate) fn get_source_name(src: SrcLocation) -> XorName {
     }
 }
 
-pub(crate) fn ed_sign(routing: Ref<Routing>, data: &[u8]) -> Option<Signature> {
-    let signature = routing
-        .secret_key_share()
-        .map_or(None, |key| Some(Signature::Ed25519(key.sign(data))));
-}
-
 pub(crate) fn bls_sign(routing: Ref<Routing>, data: &[u8]) -> Option<Signature> {
     let signature = routing
         .secret_key_share()

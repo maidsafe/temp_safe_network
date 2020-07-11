@@ -42,10 +42,10 @@ impl Writing {
     }
 
     fn sequence(&mut self, write: SequenceWrite, storage: &mut SequenceStorage) -> Option<NodeCmd> {
-        storage.write(self.requester.clone(), write, self.message_id)
+        storage.write(write, self.msg.id(), self.msg.origin)
     }
 
     fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<NodeCmd> {
-        storage.write(self.requester.clone(), write, self.message_id)
+        storage.write(write, self.msg.id(), self.msg.origin)
     }
 }

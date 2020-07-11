@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::NodeCmd, node::Init, utils, Config, Result, ToDbKey};
+use crate::{cmd::NodeCmd, node::Init, utils, Config, Result, ToDbKey, msg_decisions::ElderMsgDecisions};
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use routing::Node as Routing;
 use safe_nd::{
-    BlobRead, BlobWrite, CmdError, DataError, Duty, ElderDuty, Error as NdError, IData,
-    IDataAddress, Message, MessageId, MsgEnvelope, MsgSender, NetworkCmd, NodePublicId, PublicKey,
+    BlobRead, BlobWrite, CmdError, DataError, Error as NdError, IData,
+    IDataAddress, Message, MessageId, MsgEnvelope, NetworkCmd, NodePublicId, PublicKey,
     QueryResponse, Read, Result as NdResult, Write, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -43,21 +43,20 @@ struct HolderMetadata {
 }
 
 pub(super) struct BlobRegister {
-    id: NodePublicId,
     metadata: PickleDb,
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    #[allow(unused)]
     routing: Rc<RefCell<Routing>>,
+    decisions: ElderMsgDecisions,
 }
 
 impl BlobRegister {
     pub(super) fn new(
-        id: NodePublicId,
         config: &Config,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
+        decisions: ElderMsgDecisions,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
@@ -65,11 +64,11 @@ impl BlobRegister {
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
         Ok(Self {
-            id,
             metadata,
             holders,
             full_adults,
             routing,
+            decisions,
         })
     }
 
@@ -83,7 +82,7 @@ impl BlobRegister {
 
     fn store(&mut self, data: IData, msg: MsgEnvelope) -> Option<NodeCmd> {
         let cmd_error = |error: NdError| {
-            self.wrap(Message::CmdError {
+            self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
                 cmd_origin: msg.origin.address(),
@@ -93,8 +92,7 @@ impl BlobRegister {
 
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
-        let metadata = self.get_metadata_for(*data.address());
-        let target_holders = if let Ok(metadata) = metadata {
+        let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()) {
             if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
                 if data.is_pub() {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
@@ -128,16 +126,12 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        let msg = self.set_proxy(msg);
-        Some(NodeCmd::SendToAdults {
-            targets: metadata.holders,
-            msg,
-        })
+        self.decisions.send_to_adults(target_holders, msg)
     }
 
     fn delete(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let cmd_error = |error: NdError| {
-            self.wrap(Message::CmdError {
+            self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
                 cmd_origin: msg.origin.address(),
@@ -151,16 +145,12 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != msg.origin.id() {
+            if data_owner != *msg.origin.id() {
                 return cmd_error(NdError::AccessDenied);
             }
         };
 
-        let msg = self.set_proxy(msg);
-        Some(NodeCmd::SendToAdults {
-            targets: metadata.holders,
-            msg,
-        })
+        self.decisions.send_to_adults(metadata.holders, msg)
     }
 
     pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<NodeCmd>> {
@@ -183,7 +173,7 @@ impl BlobRegister {
         &self,
         address: IDataAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> Vec<Message> {
+    ) -> Vec<NodeCmd> {
         self.get_new_holders_for_chunk(&address)
             .into_iter()
             .map(|new_holder| {
@@ -200,7 +190,7 @@ impl BlobRegister {
                     id: message_id,
                 }
             })
-            .filter_map(|message| self.wrap(message))
+            .filter_map(|message| self.decisions.send(message))
             .collect()
     }
 
@@ -213,7 +203,7 @@ impl BlobRegister {
 
     fn get(&self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let query_error = |error: NdError| {
-            self.wrap(Message::QueryResponse {
+            self.decisions.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
                 id: MessageId::new(),
                 query_origin: msg.origin.address(),
@@ -227,16 +217,12 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != msg.origin.id() {
+            if data_owner != *msg.origin.id() {
                 return query_error(NdError::AccessDenied);
             }
         };
 
-        let msg = self.set_proxy(msg);
-        Some(NodeCmd::SendToAdults {
-            targets: metadata.holders,
-            msg,
-        })
+        self.decisions.send_to_adults(metadata.holders, msg)
     }
 
     pub(super) fn update_holders(
@@ -575,55 +561,10 @@ impl BlobRegister {
         }
         closest_holders
     }
-
-    fn set_proxy(&self, msg: &mut MsgEnvelope) {
-        // origin signs the message, while proxies sign the envelope
-        msg.add_proxy(self.sign(msg))
-    }
-
-    fn ok_or_error(
-        &self,
-        result: Result<()>,
-        msg_id: MessageId,
-        origin: MsgSender,
-    ) -> Option<NodeCmd> {
-        let error = match result {
-            Ok(()) => return None,
-            Err(error) => error,
-        };
-        self.wrap(Message::CmdError {
-            id: MessageId::new(),
-            error: CmdError::Data(error),
-            correlation_id: msg_id,
-            cmd_origin: origin,
-        })
-    }
-
-    fn wrap(&self, message: Message) -> Option<NodeCmd> {
-        let msg = MsgEnvelope {
-            message,
-            origin: self.sign(message),
-            proxies: Default::default(),
-        };
-        Some(NodeCmd::SendToSection(msg))
-    }
-
-    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
-        MsgSender::Node {
-            id: self.public_key(),
-            duty: Duty::Elder(ElderDuty::Metadata),
-            signature,
-        }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        PublicKey::Bls(self.id.public_id().bls_public_key())
-    }
 }
 
 impl Display for BlobRegister {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", "BlobRegister")
     }
 }

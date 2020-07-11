@@ -17,12 +17,14 @@ use crate::{
     cmd::{ConsensusAction, NodeCmd},
     node::Init,
     Config, Messaging, Result,
+    keys::NodeKeys,
+    msg_decisions::ElderMsgDecisions,
 };
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{AuthCmd, ClientAuth, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
+use safe_nd::{ElderDuty, AuthCmd, ClientAuth, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -31,7 +33,7 @@ use std::{
 };
 
 pub(crate) struct Gateway {
-    id: NodePublicId,
+    keys: NodeKeys,
     auth: Auth,
     data: Validation,
     messaging: Rc<RefCell<Messaging>>,
@@ -44,7 +46,7 @@ pub(crate) struct ClientMsg {
 
 impl Gateway {
     pub fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
@@ -53,11 +55,12 @@ impl Gateway {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
-        let auth = Auth::new(id.clone(), auth_keys_db);
-        let data = Validation::new(id.clone());
+        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Gateway);
+        let auth = Auth::new(keys.clone(), auth_keys_db, decisions);
+        let data = Validation::new(decisions);
 
         let gateway = Self {
-            id,
+            keys,
             auth,
             data,
             messaging,
@@ -135,12 +138,12 @@ impl Gateway {
                 cmd: Cmd::Data { cmd, payment },
                 id,
                 ..
-            } => self.data.initiate_write(cmd, client, id, payment),
+            } => self.data.initiate_write(cmd, msg),
             Message::Query {
                 query: Query::Data(data_query),
                 id,
                 ..
-            } => self.data.initiate_read(client, data_query, id),
+            } => self.data.initiate_read(data_query, msg),
             _ => None, // error..!
         }
     }
@@ -148,6 +151,6 @@ impl Gateway {
 
 impl Display for Gateway {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

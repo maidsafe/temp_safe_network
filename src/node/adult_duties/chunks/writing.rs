@@ -9,7 +9,7 @@
 use super::chunk_storage::ChunkStorage;
 use crate::{cmd::NodeCmd, utils};
 use log::error;
-use safe_nd::{BlobWrite, MsgEnvelope, Write};
+use safe_nd::{BlobWrite, MsgEnvelope, Write, MsgSender};
 use serde::Serialize;
 
 pub(super) struct Writing {

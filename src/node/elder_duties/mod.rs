@@ -17,12 +17,14 @@ use self::{
     gateway::Gateway,
     metadata::Metadata,
     payment::DataPayment,
-    rewards::Rewards,
+    rewards::{Rewards, Validator},
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{cmd::NodeCmd, keys::NodeKeys, node::Init, Config, Result};
 use routing::{Node as Routing, RoutingError};
-use safe_nd::{NodePublicId, XorName};
+use safe_transfers::TransferActor;
+use safe_nd::{XorName, Keypair, BlsKeypairShare};
+use threshold_crypto::{self, serde_impl::SerdeSecret};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -60,7 +62,7 @@ impl ElderDuties {
         )?;
 
         // (AT2 Replicas)
-        let replica_manager = Self::replica_manager(routing);
+        let replica_manager = Self::replica_manager(routing)?;
 
         // Transfers
         let transfers = Transfers::new(keys.clone(), replica_manager.clone());
@@ -68,7 +70,10 @@ impl ElderDuties {
         // DataPayment
         let data_payment = DataPayment::new(keys.clone(), routing.clone(), replica_manager);
 
-        let actor = TransferActor::new();
+        // Rewards
+        let keypair = key_pair(routing)?;
+        let pk_set = replica_manager.borrow().replicas_pk_set().unwrap();
+        let actor = TransferActor::new(keypair, pk_set, Validator { });
         let rewards = Rewards::new(keys.clone(), actor);
 
         Ok(Self {
@@ -77,11 +82,25 @@ impl ElderDuties {
             metadata,
             transfers,
             data_payment,
+            rewards,
             routing: routing.clone(),
         })
     }
 
-    fn replica_manager(routing: Rc<RefCell<Routing>>) -> Rc<RefCell<ReplicaManager>> {
+    fn key_pair(routing: Rc<RefCell<Routing>>) -> Result<Keypair> {
+        let node = routing.borrow();
+        let index = node.our_index()?;
+        let bls_secret_key = node.secret_key_share()?;
+        let secret = SerdeSecret(bls_secret_key);
+        let public = bls_secret_key.public_key_share()
+        Ok(Keypair::BlsShare(BlsKeypairShare {
+            index,
+            secret,
+            public,
+        }))
+    }
+
+    fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
         let node = routing.borrow();
         let public_key_set = node.public_key_set()?;
         let secret_key_share = node.secret_key_share()?;
@@ -98,19 +117,19 @@ impl ElderDuties {
     }
 
     pub fn gateway(&mut self) -> &mut Gateway {
-        self.gateway
+        &mut self.gateway
     }
 
     pub fn data_payment(&mut self) -> &mut DataPayment {
-        self.data_payment
+        &mut self.data_payment
     }
 
     pub fn metadata(&mut self) -> &mut Metadata {
-        self.metadata
+        &mut self.metadata
     }
 
     pub fn transfers(&mut self) -> &mut Transfers {
-        self.transfers
+        &mut self.transfers
     }
 
     /// Name of the node
@@ -139,6 +158,6 @@ impl ElderDuties {
 
 impl Display for ElderDuties {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }
