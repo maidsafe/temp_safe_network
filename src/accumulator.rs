@@ -2,8 +2,7 @@ use crate::{msg::Message as VaultMsg, utils};
 use log::{error, info};
 use routing::Node;
 use safe_nd::{
-    Duty, ElderDuty, IDataAddress, Message, MessageId, MsgEnvelope, MsgSender, PublicId, Signature,
-    SignatureShare, XorName,
+    IDataAddress, Message, MessageId, MsgEnvelope, MsgSender, Signature, SignatureShare, XorName,
 };
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap, HashSet};

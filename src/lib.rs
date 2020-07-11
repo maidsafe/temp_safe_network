@@ -34,10 +34,10 @@ mod chunk_store;
 mod cmd;
 mod config_handler;
 mod error;
+mod messaging;
 mod node;
 mod to_db_key;
 mod utils;
-mod messaging;
 
 pub(crate) use to_db_key::ToDbKey;
 

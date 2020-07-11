@@ -7,18 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{
-    cmd::NodeCmd,
-    msg::Message,
-    utils,
-};
-use log::trace;
-use routing::{Node as Routing, SrcLocation};
+use crate::{cmd::NodeCmd, msg::Message, utils};
+use routing::Node as Routing;
 use safe_nd::{
-    Error, MessageId, NodePublicId, PublicId, Message,
-    Result, MsgEnvelope, Cmd, MsgSender, Duty, ElderDuty, 
-    CmdError, TransferError, SignatureShare,
+    Cmd, CmdError, Duty, ElderDuty, Error, Message, MessageId, MsgEnvelope, MsgSender,
+    NodePublicId, PublicKey, Result, TransferError,
 };
+use serde::Serialize;
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -52,17 +47,10 @@ impl DataPayment {
         }
     }
 
-    fn section_account_id(&self) -> Result<safe_nd::PublicKey> {
-        Ok(safe_nd::PublicKey::Bls(
-            self.replica.borrow().replicas_pk_set()?.public_key(),
-        ))
-    }
-
-    pub fn pay_for_data(&mut self,
-        msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let (cmd, payment) = match msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, payment }
+                cmd: Cmd::Data { cmd, payment },
             } => (cmd, payment),
             _ => return None,
         };
@@ -73,26 +61,31 @@ impl DataPayment {
         // debit + credit atomically, but this is much simpler).
         match self.section_account_id() {
             Ok(section) => {
-                if debit_agreement.to() != section {
+                if payment.to() != section {
                     return self.error_response(
-                        TransferRegistration(Error::NoSuchRecipient), 
-                        message_id, msg.origin
+                        TransferRegistration(Error::NoSuchRecipient),
+                        msg.id(),
+                        msg.origin,
                     );
                 }
             }
-            _ => return self.error_response(TransferRegistration(Error::NoSuchRecipient), 
-                message_id, msg.origin),
+            _ => {
+                return self.error_response(
+                    TransferRegistration(Error::NoSuchRecipient),
+                    msg.id(),
+                    msg.origin,
+                )
+            }
+        };
+        if let Err(err) = self.replica_mut().register(&payment) {
+            return self.error_response(TransferRegistration(err), msg.id(), msg.origin);
         }
-        if let Err(err) = self.replica_mut().register(&debit_agreement) {
-            return self.error_response(TransferRegistration(err), 
-            message_id, msg.origin);
-        }
-        if let Err(err) = self
-            .replica_mut()
-            .receive_propagated(&debit_agreement)
-        {
-            return self.error_response(TransferPropagation(err), 
-            message_id, msg.origin);
+        if let Err(err) = self.replica_mut().receive_propagated(&payment) {
+            return self.error_response(
+                TransferRegistration(err), // CAnnot use TransferPropagation, since it's is not a client error... To be solved.
+                msg.id(),
+                msg.origin,
+            );
         }
         self.set_proxy(&msg);
         NodeCmd::SendToSection(msg)
@@ -104,41 +97,69 @@ impl DataPayment {
         correlation_id: MessageId,
         cmd_origin: MsgSender,
     ) -> Option<NodeCmd> {
-        NodeCmd::SendToClient(MsgEnvelope {
-            message: Message::CmdError { 
-                error: CmdError::Transfer(error),
-                id: MessageId::new(),
-                correlation_id,
-                cmd_origin, 
-            },
-            origin: MsgSender {
-                id:, 
-                duty: Duty::Elder(ElderDuty::Payment),
-                signature,
-            },
-            proxies: Default::default(),
+        self.wrap(Message::CmdError {
+            error: CmdError::Transfer(error),
+            id: MessageId::new(),
+            correlation_id,
+            cmd_origin,
         })
+    }
+
+    fn section_account_id(&self) -> Result<PublicKey> {
+        Ok(PublicKey::Bls(
+            self.replica.borrow().replicas_pk_set()?.public_key(),
+        ))
     }
 
     fn replica_mut(&mut self) -> &mut ReplicaManager {
-        self
-            .replica
-            .borrow_mut()
+        self.replica.borrow_mut()
     }
-    
+
     fn set_proxy(&self, msg: &mut MsgEnvelope) {
         // origin signs the message, while proxies sign the envelope
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&msg));
-        msg.add_proxy(MsgSender {
-            id: self.id.into(),
+        msg.add_proxy(self.sign(msg))
+    }
+
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        let message = Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        };
+        self.wrap(message)
+    }
+
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
+        MsgSender::Node {
+            id: self.public_key(),
             duty: Duty::Elder(ElderDuty::Payment),
             signature,
-        })
+        }
     }
-}
 
-fn wrap(cmd: PaymentCmd) -> Option<NodeCmd> {
-    Some(NodeCmd::Payment(cmd))
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
+    }
 }
 
 impl Display for DataPayment {

@@ -7,19 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_duties;
+mod duty_finder;
 mod elder_duties;
-mod msg_eval;
 
 use crate::{
     accumulator::Accumulator,
-    cmd::{
-        NodeCmd, ConsensusAction, NodeCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
-        TransferCmd,
-    },
+    cmd::{ConsensusAction, NodeCmd},
     duties::{adult::AdultDuties, elder::ElderDuties},
-    Messaging,
-    msg_eval::{RemoteMsgEval, EvalOptions},
-    utils, Config, Result,
+    duty_finder::{EvalOptions, RemoteMsgEval},
+    utils, Config, Messaging, Result,
 };
 use crossbeam_channel::{Receiver, Select};
 use hex_fmt::HexFmt;
@@ -27,16 +23,11 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use routing::{
-    event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
-    TransportEvent as ClientEvent,
+    event::Event as RoutingEvent, Node as Routing, SrcLocation, TransportEvent as ClientEvent,
 };
-use safe_nd::{
-    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, NodeFullId, Query,
-    XorName, Signature,
-};
+use safe_nd::{Address, DataCmd, MsgEnvelope, MsgSender, NodeFullId, XorName};
 use std::{
     cell::{Cell, RefCell},
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     fs,
     net::SocketAddr,
@@ -150,7 +141,8 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing.borrow_mut()
+        self.routing
+            .borrow_mut()
             .our_connection_info()
             .map_err(From::from)
     }
@@ -337,9 +329,10 @@ impl<R: CryptoRng + Rng> Node<R> {
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<ConsensusAction>(&custom_event) {
-                    Ok(consensused_cmd) => {
-                        self.elder_duties()?.gateway().handle_consensused_cmd(consensused_cmd)
-                    }
+                    Ok(consensused_cmd) => self
+                        .elder_duties()?
+                        .gateway()
+                        .handle_consensused_cmd(consensused_cmd),
                     Err(e) => {
                         error!("Invalid ConsensusAction passed from Routing: {:?}", e);
                         None
@@ -394,19 +387,15 @@ impl<R: CryptoRng + Rng> Node<R> {
                 );
                 self.handle_remote_msg(src, content)
             }
-            RoutingEvent::EldersChanged { .. } => {
-                self.elder_duties()?.elders_changed()
-            }
+            RoutingEvent::EldersChanged { .. } => self.elder_duties()?.elders_changed(),
             // Ignore all other events
             _ => None,
         }
     }
 
-    fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<NodeCmd> {    
+    fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<NodeCmd> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
-            Ok(msg) => {
-                self.handle_remote_msg(msg)
-            }
+            Ok(msg) => self.handle_remote_msg(msg),
             Err(e) => {
                 error!(
                     "Error deserializing routing MsgEnvelope into msg type: {:?}",
@@ -423,9 +412,9 @@ impl<R: CryptoRng + Rng> Node<R> {
             ForwardToNetwork(msg) => self.messaging.borrow_mut().send_to_network(msg),
             RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(msg),
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(msg),
-            AccumulateForMetadata(msg) => self.accumulate_msg(src, msg),
+            AccumulateForMetadata(msg) => self.accumulate_msg(msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(msg),
-            AccumulateForAdult(msg) => self.accumulate_msg(src, msg),
+            AccumulateForAdult(msg) => self.accumulate_msg(msg),
             RunAtMetadata(msg) => self.adult_duties()?.receive_msg(msg),
             PushToClient(msg) => self.elder_duties()?.gateway().push_to_client(msg),
             RunAtRewards(msg) => unimplemented!(),
@@ -436,9 +425,13 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn accumulate_msg(&mut self, src: SrcLocation, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn accumulate_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let id = *self.routing.borrow().id().name();
-        info!("{}: Accumulating signatures for {:?}", &id, msg.message.id());
+        info!(
+            "{}: Accumulating signatures for {:?}",
+            &id,
+            msg.message.id()
+        );
         if let Some((accumulated_msg, signature)) = self.accumulator()?.accumulate_cmd(msg) {
             info!(
                 "Got enough signatures for {:?}",
@@ -468,9 +461,13 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
         let elder_duties = self.elder_duties()?;
         match event {
-            ConnectedTo { peer } => elder_duties.gateway().handle_new_connection(peer.peer_addr()),
+            ConnectedTo { peer } => elder_duties
+                .gateway()
+                .handle_new_connection(peer.peer_addr()),
             ConnectionFailure { peer, .. } => {
-                elder_duties.gateway().handle_connection_failure(peer.peer_addr());
+                elder_duties
+                    .gateway()
+                    .handle_connection_failure(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
                 let gateway = elder_duties.gateway();
@@ -538,9 +535,9 @@ impl<R: CryptoRng + Rng> Node<R> {
                 if self.is_handler_for(msg.origin.address()) {
                     self.messaging.borrow_mut().send_to_client(msg)
                 } else {
-                    Some(NodeCmd::SendToSection(msg))
+                    Some(SendToSection(msg))
                 }
-            },
+            }
             SendToNode(msg) => self.messaging.borrow_mut().send_to_node(msg),
             SendToAdults { msgs } => self.messaging.borrow_mut().send_to_nodes(msgs),
             SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),

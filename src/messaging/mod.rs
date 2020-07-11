@@ -13,8 +13,8 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node;
 use safe_nd::{
-    DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId,
-    PublicId, MsgEnvelope, Signature, XorName, Result,
+    HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope, NodePublicId, PublicId,
+    Result, Signature, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -53,53 +53,52 @@ impl Messaging {
         bytes: &Bytes,
         rng: &mut R,
     ) -> Option<ClientMsg> {
-        if let Some(client) = self.clients.get(&peer_addr).cloned() {
-            self.try_get_client_msg()
-        } else {
-            self.try_handle_handshake(&bytes, peer_addr);
-            None
-        }
-    }
-
-    fn try_get_client_msg(&mut self, bytes: &Bytes, peer_addr: SocketAddr) -> Option<ClientMsg> {
-        let msg = self.try_deserialize_msg(bytes)?;
-        if self.shall_handle_request(msg.message.id(), peer_addr) {
-            trace!(
-                "{}: Received ({:?} {:?}) from {}",
-                self,
-                "msg.get_type()",
-                msg.message.id(),
-                client
-            );
-            return Some(ClientMsg { client, msg });
-        }
+        match self.clients.get(&peer_addr).cloned() {
+            None => self.try_handle_handshake(&bytes, peer_addr),
+            Some(client) => {
+                let msg = self.try_deserialize_msg(bytes)?;
+                if self.shall_handle_request(msg.message.id(), peer_addr) {
+                    trace!(
+                        "{}: Received ({:?} {:?}) from {}",
+                        self,
+                        "msg.get_type()",
+                        msg.message.id(),
+                        client
+                    );
+                    return Some(ClientMsg { peer_addr, msg });
+                }
+            }
+        };
         None
     }
 
     fn try_deserialize_msg(&mut self, bytes: &Bytes) -> Option<MsgEnvelope> {
         match bincode::deserialize(&bytes) {
-            Ok(msg @ MsgEnvelope { message: Message::Cmd { .. }, .. }) => Some(msg),
-            Ok(msg @ MsgEnvelope { message: Message::Query { .. }, .. }) => Some(msg),
-            Ok(msg @ MsgEnvelope { message: Message::Event { .. }, .. })
-            Ok(msg @ MsgEnvelope { message: Message::CmdError { .. }, .. }) 
-            Ok(msg @ MsgEnvelope { message: Message::QueryResponse { .. }, .. }) => {
-                info!(
-                    "{}: {} invalidly sent {:?}",
-                    self, client.public_id, msg
-                );
-                None
-            }
-            Err(err) => {
-                info!(
-                    "{}: Unable to deserialise message from {}: {}",
-                    self, client.public_id, err
-                );
-                None
-            }
+            Ok(
+                msg
+                @
+                MsgEnvelope {
+                    message: Message::Cmd { .. },
+                    ..
+                },
+            ) => Some(msg),
+            Ok(
+                msg
+                @
+                MsgEnvelope {
+                    message: Message::Query { .. },
+                    ..
+                },
+            ) => Some(msg),
         }
     }
 
-    fn try_handle_handshake<R: CryptoRng + Rng>(&mut self, bytes: &Bytes, peer_addr: SocketAddr, rng: &mut R) {
+    fn try_handle_handshake<R: CryptoRng + Rng>(
+        &mut self,
+        bytes: &Bytes,
+        peer_addr: SocketAddr,
+        rng: &mut R,
+    ) {
         match bincode::deserialize(&bytes) {
             Ok(HandshakeRequest::Bootstrap(client_id)) => {
                 self.try_bootstrap(peer_addr, &client_id);
@@ -123,10 +122,7 @@ impl Messaging {
         // We could receive a consensused vault msg contains a client request,
         // before receiving the request from that client directly.
         if let Some(msg) = self.pending_actions.remove(&message_id) {
-            self.send(
-                peer_addr,
-                &msg,
-            );
+            self.send(peer_addr, &msg);
             return false;
         }
 

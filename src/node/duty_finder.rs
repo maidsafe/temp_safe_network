@@ -6,48 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod internal_cmds;
-mod messaging;
-mod remote_msg_eval;
+use routing::Node as Routing;
+use safe_nd::{Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
+use std::{cell::RefCell, rc::Rc};
 
-use crate::{
-    accumulator::Accumulator,
-    cmd::{
-        NodeCmd, ConsensusAction, NodeCmd, GatewayCmd, MetadataCmd, NodeCmd, PaymentCmd,
-        TransferCmd,
-    },
-    duties::{adult::AdultDuties, elder::ElderDuties},
-    internal_cmds::InternalCmds,
-    messaging::Messaging,
-    remote_msg_eval::RemoteMsgEval,
-    utils, Config, Result,
-};
-use crossbeam_channel::{Receiver, Select};
-use hex_fmt::HexFmt;
-use log::{debug, error, info, trace, warn};
-use rand::{CryptoRng, Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
-use routing::{
-    event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
-    TransportEvent as ClientEvent,
-};
-use safe_nd::{
-    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, NodeFullId, Query,
-    XorName,
-};
-use std::{
-    cell::{Cell, RefCell},
-    collections::BTreeSet,
-    fmt::{self, Display, Formatter},
-    fs,
-    net::SocketAddr,
-    path::PathBuf,
-    rc::Rc,
-};
-use threshold_crypto::Signature;
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum NodeDuties {
+    Infant,
+    Adult,
+    Elder,
+}
 
 pub(crate) struct RemoteMsgEval {
+    msg: MsgEnvelope,
     routing: Rc<RefCell<Routing>>,
+    state: NodeDuties,
 }
 
 pub(crate) enum EvalOptions {
@@ -68,33 +41,34 @@ impl RemoteMsgEval {
         Self { routing }
     }
 
-    pub fn evaluate(msg: MsgEnvelope) -> EvalOptions {
+    // todo: , duties: NodeDuties
+    pub fn evaluate(&self, msg: MsgEnvelope) -> EvalOptions {
         if self.should_forward_to_network(msg) {
             // Any type of msg that is not process locally.
             EvalOptions::ForwardToNetwork(msg)
-        } else if self.should_go_to_gateway() {
+        } else if self.should_run_at_gateway() {
             // Client auth operations (Temporarily handled here, will be at app layer (Authenticator)).
             // Gateway Elders should just execute and return the result, for client to accumulate.
             EvalOptions::RunAtGateway(msg)
-        } else if self.should_go_to_data_payment(msg) {
+        } else if self.should_run_at_data_payment(msg) {
             // Incoming msg from `Gateway`!
             EvalOptions::RunAtPayment(msg) // Payment Elders should just execute and send onwards.
         } else if self.should_accumulate_for_metadata_write(msg) {
             // Incoming msg from `Payment`!
             EvalOptions::AccumulateForMetadata(msg) // Metadata Elders accumulate the msgs from Payment Elders.
-        } else if self.should_go_to_metadata_write(msg) {
+        } else if self.should_run_at_metadata_write(msg) {
             // Accumulated msg from `Payment`!
             EvalOptions::RunAtMetadata(msg)
         } else if self.should_accumulate_for_chunk_write(msg) {
             // Incoming msg from `Metadata`!
             EvalOptions::AccumulateForAdult(msg) // Adults accumulate the msgs from Metadata Elders.
-        } else if self.should_go_to_chunk_write(msg) {
+        } else if self.should_run_at_chunk_write(msg) {
             // Accumulated msg from `Metadata`!
             EvalOptions::RunAtAdult(msg)
         } else if self.should_push_to_client(msg) {
             // From network to client!
             EvalOptions::PushToClient(msg)
-        } else if self.should_go_to_rewards() {
+        } else if self.should_run_at_rewards() {
             EvalOptions::RunAtRewards(msg)
         } else {
             EvalOptions::Unknown
@@ -122,7 +96,8 @@ impl RemoteMsgEval {
         destined_for_network || (from_client && !is_auth_cmd)
     }
 
-    fn should_go_to_gateway(&self, msg: MsgEnvelope) -> bool {
+    // todo: eval all msg types!
+    fn should_run_at_gateway(&self, msg: MsgEnvelope) -> bool {
         let from_client = match msg.most_recent_sender() {
             MsgSender::Client { .. } => true,
             _ => false,
@@ -134,16 +109,17 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
+        // && we are Elder && self_is_handler_for(msg.destination())
         from_client && is_auth_cmd
     }
 
     /// We do not accumulate these request, they are executed
-    /// at once (i.e. payment carried out) and sent on to 
+    /// at once (i.e. payment carried out) and sent on to
     /// Metadata section. (They however, will accumulate those msgs.)
     /// The reason for this is that the payment request is already signed
-    /// by the client and validated by its replicas, 
+    /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
-    fn should_go_to_data_payment(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_data_payment(&self, msg: MsgEnvelope) -> bool {
         let from_gateway_elders = match msg.most_recent_sender() {
             MsgSender::Node {
                 duty: Duty::Elder(ElderDuty::Gateway),
@@ -158,6 +134,7 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
+        // && we are Elder && self_is_handler_for(msg.destination())
         is_data_cmd && from_gateway_elders
     }
 
@@ -178,13 +155,14 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
+        // && we are Elder && self_is_handler_for(msg.destination())
         is_data_cmd && from_payment_elder
     }
 
-    /// After the data write sent from Payment Elders has been 
+    /// After the data write sent from Payment Elders has been
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
-    fn should_go_to_metadata_write(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_metadata_write(&self, msg: MsgEnvelope) -> bool {
         let from_payment_elders = match msg.most_recent_sender() {
             MsgSender::Section {
                 duty: Duty::Elder(ElderDuty::Payment),
@@ -199,6 +177,7 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
+        // && we are Elder && self_is_handler_for(msg.destination())
         is_data_cmd && from_payment_elders
     }
 
@@ -222,12 +201,13 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
+        // && we are Adult && self_is_handler_for(msg.destination())
         is_data_cmd && from_metadata_elders
     }
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    fn should_go_to_chunk_write(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_chunk_write(&self, msg: MsgEnvelope) -> bool {
         let from_metadata_elders = match msg.most_recent_sender() {
             MsgSender::Section {
                 duty: Duty::Elder(ElderDuty::Metadata),
@@ -246,7 +226,12 @@ impl RemoteMsgEval {
             } => true,
             _ => false,
         };
+        // && we are Adult && self_is_handler_for(msg.destination())
         is_data_cmd && from_metadata_elders
+    }
+
+    fn should_run_at_rewards(&self, msg: MsgEnvelope) -> bool {
+        unimplemented!()
     }
 
     fn should_push_to_client(&self, msg: MsgEnvelope) -> bool {

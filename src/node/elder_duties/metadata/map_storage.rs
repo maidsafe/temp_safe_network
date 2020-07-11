@@ -8,7 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
-    cmd::{NodeCmd, MetadataCmd},
+    cmd::{MetadataCmd, NodeCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -16,9 +16,9 @@ use crate::{
 use log::error;
 
 use safe_nd::{
-    Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions, MDataPermissionSet,
-    MDataValue, MapRead, MapWrite, MessageId, NodePublicId, PublicId, PublicKey,
-    Result as NdResult,
+    CmdError, Duty, ElderDuty, Error as NdError, MData, MDataAction, MDataAddress,
+    MDataEntryActions, MDataPermissionSet, MDataValue, MapRead, MapWrite, Message, MessageId,
+    MsgEnvelope, MsgSender, NodePublicId, PublicKey, QueryResponse, Result as NdResult,
 };
 
 use std::{
@@ -72,16 +72,11 @@ impl MapStorage {
         }
     }
 
-    pub(super) fn write(
-        &mut self,
-        requester: PublicId,
-        write: MapWrite,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    pub(super) fn write(&mut self, write: MapWrite, msg: MsgEnvelope) -> Option<NodeCmd> {
         use MapWrite::*;
         match write {
-            New(data) => self.create(requester, &data, message_id),
-            Delete(address) => self.delete(requester, address, message_id),
+            New(data) => self.create(&data, msg),
+            Delete(address) => self.delete(address, msg),
             SetUserPermissions {
                 address,
                 user,
@@ -111,16 +106,9 @@ impl MapStorage {
     fn get_chunk(
         &self,
         address: &MDataAddress,
-        requester: &PublicId,
+        origin: MsgSender,
         action: MDataAction,
     ) -> Option<NdResult<MData>> {
-        let requester_pk = if let Some(pk) = utils::own_key(&requester) {
-            pk
-        } else {
-            error!("Logic error: requester {:?} must not be Node", requester);
-            return None;
-        };
-
         Some(
             self.chunks
                 .get(&address)
@@ -130,7 +118,7 @@ impl MapStorage {
                 })
                 .and_then(move |mdata| {
                     mdata
-                        .check_permissions(action, *requester_pk)
+                        .check_permissions(action, origin.id())
                         .map(move |_| mdata)
                 }),
         )
@@ -140,8 +128,8 @@ impl MapStorage {
     fn edit_chunk<F>(
         &mut self,
         address: &MDataAddress,
-        requester: PublicId,
-        message_id: MessageId,
+        origin: MsgSender,
+        msg_id: MessageId,
         mutation_fn: F,
     ) -> Option<NodeCmd>
     where
@@ -160,25 +148,11 @@ impl MapStorage {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg_id, origin)
     }
 
     /// Put MData.
-    fn create(
-        &mut self,
-        requester: PublicId,
-        data: &MData,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn create(&mut self, data: &MData, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -186,26 +160,10 @@ impl MapStorage {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *data.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg.id(), msg.origin)
     }
 
-    fn delete(
-        &mut self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        let requester_pk = *utils::own_key(&requester)?;
-
+    fn delete(&mut self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
             .chunks
             .get(&address)
@@ -214,38 +172,26 @@ impl MapStorage {
                 error => error.to_string().into(),
             })
             .and_then(move |mdata| {
-                mdata.check_is_owner(requester_pk)?;
-
+                mdata.check_is_owner(msg.origin.id())?;
                 self.chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });
 
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::Write(result),
-                message_id,
-                proof: None,
-            },
-        })
+        self.ok_or_error(result, msg.id(), msg.origin)
     }
 
     /// Set MData user permissions.
     fn set_user_permissions(
         &mut self,
-        requester: PublicId,
         address: MDataAddress,
         user: PublicKey,
         permissions: &MDataPermissionSet,
         version: u64,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        let requester_pk = *utils::own_key(&requester)?;
-
-        self.edit_chunk(&address, requester, message_id, move |mut data| {
-            data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
+        self.edit_chunk(&address, msg.origin, message_id, move |mut data| {
+            data.check_permissions(MDataAction::ManagePermissions, msg.origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
         })
@@ -254,16 +200,13 @@ impl MapStorage {
     /// Delete MData user permissions.
     fn delete_user_permissions(
         &mut self,
-        requester: PublicId,
         address: MDataAddress,
         user: PublicKey,
         version: u64,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        let requester_pk = *utils::own_key(&requester)?;
-
-        self.edit_chunk(&address, requester, message_id, move |mut data| {
-            data.check_permissions(MDataAction::ManagePermissions, requester_pk)?;
+        self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
+            data.check_permissions(MDataAction::ManagePermissions, msg.origin.id())?;
             data.del_user_permissions(user, version)?;
             Ok(data)
         })
@@ -272,239 +215,192 @@ impl MapStorage {
     /// Edit MData.
     fn edit_entries(
         &mut self,
-        requester: PublicId,
         address: MDataAddress,
         actions: MDataEntryActions,
-        message_id: MessageId,
+        msg: MsgEnvelope,
     ) -> Option<NodeCmd> {
-        let requester_pk = *utils::own_key(&requester)?;
-
-        self.edit_chunk(&address, requester, message_id, move |mut data| {
-            data.mutate_entries(actions, requester_pk)?;
+        self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
+            data.mutate_entries(actions, msg.origin.id())?;
             Ok(data)
         })
     }
 
     /// Get entire MData.
-    fn get(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        let result = self.get_chunk(&address, &requester, MDataAction::Read)?;
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetMData(result),
-                message_id,
-                proof: None,
-            },
+    fn get(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let result = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::GetMap(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData shell.
-    fn get_shell(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn get_shell(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
             .map(|data| data.shell());
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetMDataShell(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::GetMapShell(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData version.
-    fn get_version(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn get_version(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
             .map(|data| data.version());
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::GetMDataVersion(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::GetMapVersion(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData value.
-    fn get_value(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        key: &[u8],
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
-
-        let response = Response::GetMDataValue(res.and_then(|data| {
-            match data {
-                MData::Seq(md) => md
-                    .get(key)
-                    .cloned()
-                    .map(MDataValue::from)
-                    .ok_or_else(|| NdError::NoSuchEntry),
-                MData::Unseq(md) => md
-                    .get(key)
-                    .cloned()
-                    .map(MDataValue::from)
-                    .ok_or_else(|| NdError::NoSuchEntry),
-            }
-        }));
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response,
-                message_id,
-                proof: None,
-            },
+    fn get_value(&self, address: MDataAddress, key: &[u8], msg: MsgEnvelope) -> Option<NodeCmd> {
+        let res = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        let result = res.and_then(|data| match data {
+            MData::Seq(md) => md
+                .get(key)
+                .cloned()
+                .map(MDataValue::from)
+                .ok_or_else(|| NdError::NoSuchEntry),
+            MData::Unseq(md) => md
+                .get(key)
+                .cloned()
+                .map(MDataValue::from)
+                .ok_or_else(|| NdError::NoSuchEntry),
+        });
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::GetMapValue(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData keys.
-    fn list_keys(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn list_keys(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
             .map(|data| data.keys());
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::ListMDataKeys(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::ListMapKeys(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData values.
-    fn list_values(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
-
-        let response = Response::ListMDataValues(res.and_then(|data| match data {
+    fn list_values(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let res = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.values().into()),
             MData::Unseq(md) => Ok(md.values().into()),
-        }));
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response,
-                message_id,
-                proof: None,
-            },
+        });
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::ListMapValues(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData entries.
-    fn list_entries(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
-        let res = self.get_chunk(&address, &requester, MDataAction::Read)?;
-
-        let response = Response::ListMDataEntries(res.and_then(|data| match data {
+    fn list_entries(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+        let res = self.get_chunk(&address, &msg.origin.id(), MDataAction::Read)?;
+        let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.entries().clone().into()),
             MData::Unseq(md) => Ok(md.entries().clone().into()),
-        }));
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response,
-                message_id,
-                proof: None,
-            },
+        });
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::ListMapEntries(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData permissions.
-    fn list_permissions(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn list_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &requester, MDataAction::Read)?
+            .get_chunk(&address, &msg.origin.id(), MDataAction::Read)?
             .map(|data| data.permissions());
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::ListMDataPermissions(result),
-                message_id,
-                proof: None,
-            },
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::ListMapPermissions(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
 
     /// Get MData user permissions.
-    fn list_user_permissions(
-        &self,
-        requester: PublicId,
-        address: MDataAddress,
-        user: PublicKey,
-        message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    fn list_user_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
         let result = self
-            .get_chunk(&address, &requester, MDataAction::Read)?
-            .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
-
-        wrap(MetadataCmd::RespondToGateway {
-            sender: *address.name(),
-            msg: Message::Response {
-                requester,
-                response: Response::ListMDataUserPermissions(result),
-                message_id,
-                proof: None,
-            },
+            .get_chunk(&address, &origin.id(), MDataAction::Read)?
+            .and_then(|data| {
+                data.user_permissions(origin.id())
+                    .map(MDataPermissionSet::clone)
+            });
+        self.wrap(Message::QueryResponse {
+            query: QueryResponse::ListMapUserPermissions(result),
+            id: MessageId::new(),
+            correlation_id: msg.id(),
+            query_origin: msg.origin,
         })
     }
-}
 
-fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {
-    Some(NodeCmd::Metadata(cmd))
+    fn set_proxy(&self, msg: &mut MsgEnvelope) {
+        // origin signs the message, while proxies sign the envelope
+        msg.add_proxy(self.sign(msg))
+    }
+
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
+        let error = match result {
+            Ok(()) => return None,
+            Err(error) => error,
+        };
+        self.wrap(Message::CmdError {
+            id: MessageId::new(),
+            error: CmdError::Data(error),
+            correlation_id: msg_id,
+            cmd_origin: origin,
+        })
+    }
+
+    fn wrap(&self, message: Message) -> Option<NodeCmd> {
+        let msg = MsgEnvelope {
+            message,
+            origin: self.sign(message),
+            proxies: Default::default(),
+        };
+        Some(NodeCmd::SendToSection(msg))
+    }
+
+    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(data));
+        MsgSender::Node {
+            id: self.public_key(),
+            duty: Duty::Elder(ElderDuty::Metadata),
+            signature,
+        }
+    }
+
+    fn public_key(&self) -> PublicKey {
+        PublicKey::Bls(self.id.public_id().bls_public_key())
+    }
 }
 
 impl Display for MapStorage {

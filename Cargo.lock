@@ -2142,7 +2142,7 @@ dependencies = [
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=messaging_refactor#9338645fd247ca0428dbf9fa681dc3a4f5e06411"
+source = "git+https://github.com/oetyng/safe-nd.git?branch=messaging_refactor#8d98b67de637ae176defb50d548c27d07077fc27"
 dependencies = [
  "bincode",
  "crdts",

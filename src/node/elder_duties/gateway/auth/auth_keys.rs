@@ -9,9 +9,7 @@
 use crate::{node::Init, utils, Result, ToDbKey};
 use log::{trace, warn};
 use pickledb::PickleDb;
-use safe_nd::{
-    AppPermissions, AppPublicId, ClientPublicId, Error as NdError, PublicKey, Result as NdResult,
-};
+use safe_nd::{AppPermissions, AppPublicId, Error as NdError, PublicKey, Result as NdResult};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},

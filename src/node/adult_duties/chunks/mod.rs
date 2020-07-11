@@ -10,15 +10,14 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{cmd::NodeCmd, node::Init, utils, Config, Result};
+use crate::{cmd::NodeCmd, node::Init, Config, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
-use routing::{Node, SrcLocation};
+use routing::Node;
 use writing::Writing;
 
-use log::{debug, error, trace};
-use safe_nd::{MessageId, NodePublicId, Query, MsgEnvelope, Message, DataQuery, PublicId, Cmd, DataCmd};
-use threshold_crypto::{PublicKey, Signature};
+use log::trace;
+use safe_nd::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, NodePublicId, Query};
 
 use std::{
     cell::{Cell, RefCell},
@@ -49,10 +48,7 @@ impl Chunks {
         })
     }
 
-    pub fn receive_msg(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
             self,
@@ -60,17 +56,14 @@ impl Chunks {
         );
         match msg.message {
             Message::Query(Query::Data(DataQuery::Blob(read))) => {
-                let reading = Reading::new(
-                    read,
-                    msg,
-                );
+                let reading = Reading::new(read, msg);
                 reading.get_result(&self.chunk_storage)
             }
-            Message::Cmd { cmd: Cmd::Data(DataCmd::Blob(write)), .. } => {
-                let writing = Writing::new(
-                    write,
-                    msg,
-                );
+            Message::Cmd {
+                cmd: Cmd::Data(DataCmd::Blob(write)),
+                ..
+            } => {
+                let writing = Writing::new(write, msg);
                 writing.get_result(&mut self.chunk_storage)
             }
             _ => None,

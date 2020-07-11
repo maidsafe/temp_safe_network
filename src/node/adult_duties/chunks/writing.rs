@@ -9,10 +9,8 @@
 use super::chunk_storage::ChunkStorage;
 use crate::{cmd::NodeCmd, utils};
 use log::error;
-use routing::SrcLocation;
-use safe_nd::{BlobWrite, MessageId, MsgEnvelope, Write};
+use safe_nd::{BlobWrite, MsgEnvelope, Write};
 use serde::Serialize;
-use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
     write: Write,
@@ -20,14 +18,8 @@ pub(super) struct Writing {
 }
 
 impl Writing {
-    pub fn new(
-        write: Write,
-        msg: MsgEnvelope,
-    ) -> Self {
-        Self {
-            write,
-            msg,
-        }
+    pub fn new(write: Write, msg: MsgEnvelope) -> Self {
+        Self { write, msg }
     }
 
     pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<NodeCmd> {
@@ -40,12 +32,10 @@ impl Writing {
 
     fn verify<T: Serialize>(&self, data: &T) -> bool {
         match self.msg.most_recent_sender() {
-            MsgSender::Section {
-                id,
-                signature,
-                ..
-            } => id.verify(signature, &utils::serialise(data)),
-            _ => false
+            MsgSender::Section { id, signature, .. } => {
+                id.verify(signature, &utils::serialise(data))
+            }
+            _ => false,
         }
     }
 
@@ -54,11 +44,7 @@ impl Writing {
         match write {
             New(data) => {
                 if self.verify(&self.msg) {
-                    storage.store(
-                        &data,
-                        self.msg.id(),
-                        self.msg.origin,
-                    )
+                    storage.store(&data, self.msg.id(), self.msg.origin)
                 } else {
                     error!(
                         "Accumulated signature for {:?} is invalid!",
@@ -69,11 +55,7 @@ impl Writing {
             }
             DeletePrivate(address) => {
                 if self.verify(&address) {
-                    storage.delete(
-                        *address,
-                        self.msg.id(),
-                        self.msg.origin,
-                    )
+                    storage.delete(*address, self.msg.id(), self.msg.origin)
                 } else {
                     error!("Accumulated signature is invalid!");
                     None

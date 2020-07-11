@@ -6,20 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    chunk_store::ImmutableChunkStore, cmd::NodeCmd, node::Init, Config, Result,
-};
+use crate::{chunk_store::ImmutableChunkStore, cmd::NodeCmd, node::Init, Config, Result};
 use log::{error, info};
 
-use routing::SrcLocation;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId,
-    XorName, Message, NetworkCmd, MsgSender, Duty, AdultDuty, MsgEnvelope, PublicKey,
-    CmdError, NetworkCmdError, QueryResponse,
+    AdultDuty, CmdError, Duty, Error as NdError, IData, IDataAddress, Message, MessageId,
+    MsgEnvelope, MsgSender, NetworkCmdError, NodePublicId, PublicKey, QueryResponse,
 };
 use std::{
     cell::Cell,
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -76,27 +71,23 @@ impl ChunkStorage {
         accumulated_signature: &Signature,
     ) -> Option<NodeCmd> {
         let message = match self.try_store(data) {
-            Ok(()) => {
-                Message::NetworkEvent { 
-                    cmd: NetworkEvent::DuplicationComplete {
-                        chunk: data.address(),
-                        proof: accumulated_signature.clone(),
-                    },
-                    id: MessageId::new(),
-                    correlation_id: message_id,
-                }
+            Ok(()) => Message::NetworkEvent {
+                cmd: NetworkEvent::DuplicationComplete {
+                    chunk: data.address(),
+                    proof: accumulated_signature.clone(),
+                },
+                id: MessageId::new(),
+                correlation_id: message_id,
             },
-            Err(error) => {
-                Message::NetworkCmdError {
-                    id: MessageId::new(),
-                    error: NetworkCmdError::DuplicateChunk {
-                        address: data.address(),
-                        error,
-                    },
-                    correlation_id: msg_id,
-                    cmd_origin: origin,
-                }
-            }
+            Err(error) => Message::NetworkCmdError {
+                id: MessageId::new(),
+                error: NetworkCmdError::DuplicateChunk {
+                    address: data.address(),
+                    error,
+                },
+                correlation_id: msg_id,
+                cmd_origin: origin,
+            },
         };
         self.wrap(message)
     }
@@ -119,9 +110,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<NodeCmd> {
-        let result = self
-            .chunks
-            .get(&address);
+        let result = self.chunks.get(&address);
         let message = Message::QueryResponse {
             id: MessageId::new(),
             response: QueryResponse::GetBlob(result),
@@ -136,7 +125,7 @@ impl ChunkStorage {
     //     address: IDataAddress,
     //     msg: MsgEnvelope,
     // ) -> Option<NodeCmd> {
-        
+
     //     match self.chunks.get(&address) {
 
     //     }
@@ -164,7 +153,8 @@ impl ChunkStorage {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
             return None;
         }
-        let result = self.chunks
+        let result = self
+            .chunks
             .get(&address)
             .and_then(|data| match data {
                 IData::Unpub(_) => Ok(()),
@@ -176,16 +166,13 @@ impl ChunkStorage {
                     Err(NdError::InvalidOperation)
                 }
             })
-            .and_then(|_| {
-                self.chunks
-                    .delete(&address)
-            });
-        
+            .and_then(|_| self.chunks.delete(&address));
+
         let error = match result {
             Ok(()) => return None,
             Err(error) => error,
         };
-        
+
         let message = Message::CmdError {
             id: MessageId::new(),
             error: CmdError::Data(error),
@@ -212,7 +199,7 @@ impl ChunkStorage {
             signature,
         }
     }
-    
+
     fn public_key(&self) -> PublicKey {
         PublicKey::Ed25519(self.id.public_id().ed25519_public_key())
     }

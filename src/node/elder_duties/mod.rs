@@ -9,8 +9,8 @@
 mod gateway;
 mod metadata;
 mod payment;
-mod transfers;
 mod rewards;
+mod transfers;
 
 use self::{
     gateway::Gateway,
@@ -20,25 +20,18 @@ use self::{
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    cmd::{ConsensusAction, NodeCmd, GatewayCmd, NodeCmd},
+    cmd::{GatewayCmd, NodeCmd},
     msg::Message,
     node::Init,
-    utils, Config, Result,
+    Config, Result,
 };
-use bytes::Bytes;
-use log::trace;
-use rand::{CryptoRng, Rng};
-use routing::{Node as Routing, RoutingError, SrcLocation};
-use safe_nd::{
-    Message, MessageId, NodePublicId, PublicId, XorName,
-};
+use routing::{Node as Routing, RoutingError};
+use safe_nd::{NodePublicId, XorName};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
-    net::SocketAddr,
     rc::Rc,
 };
-use threshold_crypto::Signature;
 
 pub(crate) struct ElderDuties {
     id: NodePublicId,

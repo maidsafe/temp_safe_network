@@ -20,9 +20,7 @@ use routing::SectionProofChain;
 use {
     crate::{cmd::NodeCmd, cmd::TransferCmd, msg::Message},
     rand::thread_rng,
-    safe_nd::{
-        MessageId, PublicId, PublicKey, Signature, SignatureShare, Transfer, XorName,
-    },
+    safe_nd::{MessageId, PublicId, PublicKey, Signature, SignatureShare, Transfer, XorName},
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 
@@ -102,7 +100,10 @@ impl ReplicaManager {
         }
     }
 
-    pub(crate) fn register(&mut self, proof: &DebitAgreementProof) -> Result<Option<TransferRegistered>> {
+    pub(crate) fn register(
+        &mut self,
+        proof: &DebitAgreementProof,
+    ) -> Result<Option<TransferRegistered>> {
         let serialized = bincode::serialize(&proof.signed_transfer)
             .map_err(|e| Error::NetworkOther(e.to_string()))?;
         let sig = proof

@@ -13,10 +13,10 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Error as NdError,
-    IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, MessageId,
-    NodePublicId, PublicId, Read, SData, SDataAddress, NodeCmd,
-    SequenceRead, SequenceWrite, Write, MsgSender, MsgEnvelope, Message, Duty, ElderDuty,
+    Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, Duty, ElderDuty,
+    Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message, MessageId,
+    MsgEnvelope, MsgSender, NodeCmd, NodePublicId, PublicId, Read, SData, SDataAddress,
+    SequenceRead, SequenceWrite, Write,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -38,9 +38,7 @@ impl Validation {
         }
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) {
-
-    }
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) {}
 
     pub fn initiate_write(
         &mut self,
@@ -65,11 +63,7 @@ impl Validation {
         }
     }
 
-    pub fn initiate_read(
-        &mut self,
-        read: DataQuery,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, read: DataQuery, msg: MsgEnvelope) -> Option<NodeCmd> {
         match read {
             DataQuery::Blob(read) => self.blobs.initiate_read(read, msg),
             DataQuery::Map(read) => self.maps.initiate_read(read, msg),
@@ -94,11 +88,7 @@ impl Sequences {
     }
 
     // client query
-    pub fn initiate_read(
-        &mut self,
-        read: SequenceRead,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, read: SequenceRead, msg: MsgEnvelope) -> Option<NodeCmd> {
         self.set_proxy(msg);
         Some(NodeCmd::SendToSection(msg))
     }
@@ -188,13 +178,18 @@ impl Sequences {
             message_id,
         }))
     }
-    
+
     fn set_proxy(&self, msg: &mut MsgEnvelope) {
         // origin signs the message, while proxies sign the envelope
         msg.add_proxy(self.sign(msg))
     }
 
-    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
         let error = match result {
             Ok(()) => return None,
             Err(error) => error,
@@ -225,7 +220,7 @@ impl Sequences {
             signature,
         }
     }
-    
+
     fn public_key(&self) -> PublicKey {
         PublicKey::Bls(self.id.public_id().bls_public_key())
     }

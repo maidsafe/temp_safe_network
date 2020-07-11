@@ -16,10 +16,9 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, AuthQuery, ClientAuth, CmdError,
-    DataAuthKind, Duty, ElderDuty, Error as NdError, Message, MessageId,
-    MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, NodePublicId, PublicId, PublicKey,
-    RequestAuthKind, Signature, Cmd, QueryResponse,
+    AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind, Duty, ElderDuty,
+    Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
+    NodePublicId, PublicId, PublicKey, QueryResponse, RequestAuthKind, Signature,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -38,18 +37,17 @@ impl Auth {
         Self { id, auth_keys }
     }
 
-    pub(super) fn initiate(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub(super) fn initiate(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let auth_cmd = match msg.message {
-            Message::Cmd { cmd: Cmd::Auth(auth_cmd), .. } => auth_cmd,
+            Message::Cmd {
+                cmd: Cmd::Auth(auth_cmd),
+                ..
+            } => auth_cmd,
             _ => return None,
         };
         use AuthCmd::*;
         match auth_cmd {
-            InsAuthKey { .. }
-            | DelAuthKey { .. } => {
+            InsAuthKey { .. } | DelAuthKey { .. } => {
                 self.set_proxy(&mut msg);
                 Some(NodeCmd::VoteFor(ConsensusAction::Forward(msg)))
             }
@@ -108,18 +106,15 @@ impl Auth {
     }
 
     // client query
-    pub fn list_keys_and_version(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
-        use AuthQuery::*;
+    pub fn list_keys_and_version(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         match msg.message {
-            Message::Query { cmd: Query::Auth(ListAuthKeysAndVersion), .. } => (),
+            Message::Query {
+                cmd: Query::Auth(ListAuthKeysAndVersion),
+                ..
+            } => (),
             _ => return None,
         };
-        let result = Ok(self
-            .auth_keys
-            .list_keys_and_version(msg.origin.id()));
+        let result = Ok(self.auth_keys.list_keys_and_version(msg.origin.id()));
         self.wrap(Message::QueryResponse {
             response: QueryResponse::ListAuthKeysAndVersion(result),
             id: MessageId::new(),
@@ -131,13 +126,13 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub(super) fn finalise(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         use AuthCmd::*;
         let auth_cmd = match msg.message {
-            Message::Cmd { cmd: Cmd::Auth(auth_cmd), .. } => auth_cmd,
+            Message::Cmd {
+                cmd: Cmd::Auth(auth_cmd),
+                ..
+            } => auth_cmd,
             _ => return None,
         };
         let auth_error = |error: NdError| {
@@ -154,18 +149,19 @@ impl Auth {
                 version,
                 permissions,
             } => {
-                match self.auth_keys
-                    .insert(msg.origin.id(), key, new_version, permissions) {
-                        Ok(()) => None,
-                        Err(error) => auth_error(error),
-                    }
-            },
+                match self
+                    .auth_keys
+                    .insert(msg.origin.id(), key, new_version, permissions)
+                {
+                    Ok(()) => None,
+                    Err(error) => auth_error(error),
+                }
+            }
             DelAuthKey { key, version } => {
-                match self.auth_keys
-                    .delete(msg.origin.id(), key, new_version) {
-                        Ok(()) => None,
-                        Err(error) => auth_error(error),
-                    }
+                match self.auth_keys.delete(msg.origin.id(), key, new_version) {
+                    Ok(()) => None,
+                    Err(error) => auth_error(error),
+                }
             }
         }
     }
@@ -220,15 +216,9 @@ impl Auth {
         }
     }
 
-    fn is_valid_client_signature(
-        &self,
-        client_id: PublicId,
-        msg: &MsgEnvelope,
-    ) -> bool {
+    fn is_valid_client_signature(&self, client_id: PublicId, msg: &MsgEnvelope) -> bool {
         let signature = match msg.origin {
-            MsgSender::Client {
-                signature, ..
-            } => signature,
+            MsgSender::Client { signature, .. } => signature,
             _ => return false,
         };
         let pub_key = match utils::own_key(&client_id) {
@@ -243,7 +233,11 @@ impl Auth {
             Err(error) => {
                 warn!(
                     "{}: ({:?}/{:?}) from {} is invalid: {}",
-                    self, "msg.get_type()", msg.message.id(), client_id, error
+                    self,
+                    "msg.get_type()",
+                    msg.message.id(),
+                    client_id,
+                    error
                 );
                 false
             }
@@ -272,8 +266,13 @@ impl Auth {
             signature,
         }
     }
-    
-    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
         let error = match result {
             Ok(()) => return None,
             Err(error) => error,

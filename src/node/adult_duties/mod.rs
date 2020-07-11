@@ -10,8 +10,8 @@ mod chunks;
 
 use self::chunks::Chunks;
 use crate::{cmd::NodeCmd, node::Init, Config, Result};
-use routing::{Node as Routing, SrcLocation};
-use safe_nd::{NodePublicId, MsgEnvelope};
+use routing::Node as Routing;
+use safe_nd::{MsgEnvelope, NodePublicId};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -46,10 +46,7 @@ impl AdultDuties {
         })
     }
 
-    pub fn receive_msg(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         self.chunks.receive_msg(msg)
     }
 }

@@ -10,18 +10,15 @@ mod section_funds;
 mod system;
 mod validator;
 
-use crate::node::messaging::Messaging;
-use crate::cmd::NodeCmd;
 use super::{section_funds::SectionFunds, system::FarmingSystem, validator::Validator};
-use safe_transfers::TransferActor;
-use safe_farming::{Accumulation, AccumulationEvent, RewardCounter, StorageRewards};
-use safe_nd::{XorName, AccountId, Result, MsgEnvelope, MsgSender, Message, NetworkCmd, Duty, ElderDuty, Money};
-use std::{
-    cell::RefCell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-    collections::HashMap,
+use crate::cmd::NodeCmd;
+use crate::node::messaging::Messaging;
+use safe_farming::{Accumulation, RewardCounter, StorageRewards};
+use safe_nd::{
+    AccountId, Duty, ElderDuty, Message, Money, MsgEnvelope, MsgSender, NetworkCmd, XorName,
 };
+use safe_transfers::TransferActor;
+use std::collections::HashMap;
 
 pub(super) struct Rewards {
     farming: FarmingSystem<StorageRewards>,
@@ -61,12 +58,10 @@ impl Rewards {
         None
     }
 
-    pub fn reward(
-        &mut self,
-        data: Vec<u8>,
-    ) -> Option<NodeCmd> {
+    pub fn reward(&mut self, data: Vec<u8>) -> Option<NodeCmd> {
         let num_bytes = data.len() as u64;
         let data_hash = data;
+        let factor = 2.0;
         match self.system.reward(data_hash, num_bytes, factor) {
             Ok() => None,
             Err(err) => {
@@ -76,36 +71,34 @@ impl Rewards {
         }
     }
 
-    /// On node relocation, claim the node farming account
-    /// rewards, and send it to the new section.
+    /// On node relocation, receiving section queries for the
+    /// node counter, and asks to claim the node farming account
+    /// rewards, and for the old section to send it to the new section.
     pub fn relocate(&mut self, old_node_id: XorName, new_node_id: XorName) -> Option<NodeCmd> {
-        let account_id = self.node_accounts.get(&old_node_id)?;
-        let counter = match self.claim(account_id) {
-            Ok(counter) => counter,
-            Err(err) => {
-                // todo: NetworkCmdError
-                return None;
-            }
-        };
-        let message = Message::NetworkCmd(NetworkCmd::ReceiveWorker {
-            new_node_id,
-            account_id,
-            counter,
-        });
-        let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
-        let msg = MsgEnvelope {
-            message,
-            origin: MsgSender::Node {
-                id,
-                duty: Duty::Elder(ElderDuty::Rewards),
-                signature,
-            },
-            proxies: Default::default(),
-        };
-        wrap(RewardCmd::SendToSection(msg))
+        unimplemented!()
+        // let account_id = self.node_accounts.get(&old_node_id)?;
+        // let counter = match self.claim(account_id) {
+        //     Ok(counter) => counter,
+        //     Err(err) => {
+        //         // todo: NetworkCmdError
+        //         return None;
+        //     }
+        // };
+        // let message = Message::NetworkCmd { cmd: NetworkCmd::ReceiveWorker {
+        //     new_node_id,
+        //     account_id,
+        //     counter,
+        // });
+        // let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
+        // let msg = MsgEnvelope {
+        //     message,
+        //     origin: MsgSender::Node {
+        //         id,
+        //         duty: Duty::Elder(ElderDuty::Rewards),
+        //         signature,
+        //     },
+        //     proxies: Default::default(),
+        // };
+        // Some(NodeCmd::SendToSection(msg))
     }
-}
-
-fn wrap(cmd: RewardCmd) -> Option<NodeCmd> {
-    Some(NodeCmd::Reward(cmd))
 }

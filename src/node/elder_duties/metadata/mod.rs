@@ -15,7 +15,7 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
-    cmd::{NodeCmd, MetadataCmd},
+    cmd::{MetadataCmd, NodeCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
@@ -29,16 +29,11 @@ use routing::{Node, SrcLocation};
 use sequence_storage::SequenceStorage;
 use writing::Writing;
 
-use log::{error, trace};
-use safe_nd::{
-    BlobRead, Cmd, IDataAddress, Message, MessageId, NodePublicId, NodeRequest, PublicId, Read,
-    XorName,
-};
-use threshold_crypto::{PublicKey, Signature, SignatureShare};
+use safe_nd::{Cmd, Message, NodePublicId, NodeRequest, PublicId, Read, XorName};
+use threshold_crypto::{PublicKey, Signature};
 
 use std::{
     cell::{Cell, RefCell},
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -82,27 +77,16 @@ impl Metadata {
         })
     }
 
-    pub fn receive_msg(
-        &mut self,
-        src: SrcLocation,
-        msg: MsgEnvelope,
-        requester: PublicId,
-        accumulated_signature: Option<Signature>,
-    ) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         let msg_id = msg.message.id();
         match msg.message {
             Message::Cmd(Cmd::Data { cmd, .. }) => {
-                let mut writing = Writing::new(
-                    write,
-                    src,
-                    requester,
-                    msg_id,
-                    accumulated_signature,
-                    self.public_key(),
-                );
+                let mut writing = Writing::new(cmd, msg);
                 writing.get_result(&mut self.elder_stores)
             }
-            Message::Query(Query::Data { query, .. }) => {
+            Message::Query {
+                query: Query::Data { query, .. },
+            } => {
                 let reading = Reading::new(
                     query,
                     src,
@@ -252,26 +236,26 @@ impl Metadata {
     //     }
     // }
 
-    fn public_key(&self) -> Option<PublicKey> {
-        Some(
-            self.routing_node
-                .borrow()
-                .public_key_set()
-                .ok()?
-                .public_key(),
-        )
-    }
+    // fn public_key(&self) -> Option<PublicKey> {
+    //     Some(
+    //         self.routing_node
+    //             .borrow()
+    //             .public_key_set()
+    //             .ok()?
+    //             .public_key(),
+    //     )
+    // }
 
-    fn validate_section_signature(&self, request: &Request, signature: &Signature) -> Option<()> {
-        if self
-            .public_key()?
-            .verify(signature, &utils::serialise(request))
-        {
-            Some(())
-        } else {
-            None
-        }
-    }
+    // fn validate_section_signature(&self, signature: &Signature) -> Option<()> {
+    //     if self
+    //         .public_key()?
+    //         .verify(signature, &utils::serialise(request))
+    //     {
+    //         Some(())
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
 fn wrap(cmd: MetadataCmd) -> Option<NodeCmd> {

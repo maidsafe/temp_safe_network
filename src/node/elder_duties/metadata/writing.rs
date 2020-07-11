@@ -12,35 +12,17 @@ use super::{
 };
 use crate::cmd::NodeCmd;
 use routing::SrcLocation;
-use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MessageId, PublicId, SequenceWrite};
+use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MessageId, MsgEnvelope, SequenceWrite};
 use threshold_crypto::{PublicKey, Signature};
 
 pub(super) struct Writing {
-    _src: SrcLocation,
-    requester: PublicId,
     cmd: DataCmd,
-    message_id: MessageId,
-    _accumulated_signature: Option<Signature>,
-    _public_key: Option<PublicKey>,
+    msg: MsgEnvelope,
 }
 
 impl Writing {
-    pub fn new(
-        cmd: DataCmd,
-        _src: SrcLocation,
-        requester: PublicId,
-        message_id: MessageId,
-        _accumulated_signature: Option<Signature>,
-        _public_key: Option<PublicKey>,
-    ) -> Self {
-        Self {
-            _src,
-            requester,
-            cmd,
-            message_id,
-            _accumulated_signature,
-            _public_key,
-        }
+    pub fn new(cmd: DataCmd, msg: MsgEnveloper) -> Self {
+        Self { cmd, msg }
     }
 
     pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<NodeCmd> {
@@ -54,18 +36,14 @@ impl Writing {
     }
 
     fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<NodeCmd> {
-        register.write(self.requester.clone(), write, self.message_id)
+        register.write(write, self.msg)
     }
 
     fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<NodeCmd> {
-        storage.write(self.requester.clone(), write, self.message_id)
+        storage.write(write, self.msg)
     }
 
-    fn sequence(
-        &mut self,
-        write: SequenceWrite,
-        storage: &mut SequenceStorage,
-    ) -> Option<NodeCmd> {
+    fn sequence(&mut self, write: SequenceWrite, storage: &mut SequenceStorage) -> Option<NodeCmd> {
         storage.write(self.requester.clone(), write, self.message_id)
     }
 

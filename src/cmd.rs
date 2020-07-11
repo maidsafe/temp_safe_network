@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::msg::Message;
-use safe_nd::{MessageId, PublicId, XorName};
+use safe_nd::XorName;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -31,7 +31,10 @@ pub(crate) enum NodeCmd {
     /// Send to a section.
     SendToSection(MsgEnvelope),
     /// Send the same request to each individual Adult.
-    SendToAdults { targets: BTreeSet<XorName>, msg: MsgEnvelope },
+    SendToAdults {
+        targets: BTreeSet<XorName>,
+        msg: MsgEnvelope,
+    },
     /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
     VoteFor(ConsensusAction),

@@ -10,14 +10,11 @@ use crate::{node::Init, Result};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use routing::{SrcLocation, Node as Routing};
-use safe_nd::{ClientPublicId, PublicId, PublicKey, XorName, SignatureShare, Signature};
+use routing::{Node as Routing, SrcLocation};
+use safe_nd::{ClientPublicId, PublicId, PublicKey, Signature, SignatureShare, XorName};
 use serde::Serialize;
+use std::{cell::Ref, fs, path::Path};
 use unwrap::unwrap;
-use std::{
-    cell::Ref,
-    fs, path::Path,
-};
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
@@ -91,8 +88,10 @@ pub(crate) fn sign(routing: Ref<Routing>, data: &[u8]) -> Option<Signature> {
     let signature = routing
         .secret_key_share()
         .map_or(None, |key| Some(key.sign(data)));
-    signature.map(|sig| Signature::BlsShare(SignatureShare {
+    signature.map(|sig| {
+        Signature::BlsShare(SignatureShare {
             index: routing.our_index().unwrap_or(0),
             share: sig,
-        }))
+        })
+    })
 }

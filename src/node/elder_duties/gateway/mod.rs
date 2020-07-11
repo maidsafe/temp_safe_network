@@ -17,18 +17,13 @@ use crate::{
     cmd::{ConsensusAction, NodeCmd},
     msg::Message,
     node::Init,
-    Config, Result,
-    Messaging,
+    Config, Messaging, Result,
 };
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{
-    AuthCmd, AuthQuery, ClientAuth, Cmd,
-    Message, MessageId, NodePublicId, PublicId, Query, Signature, 
-    XorName,
-};
+use safe_nd::{AuthCmd, ClientAuth, Cmd, Message, MessageId, NodePublicId, PublicId, Query};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -82,23 +77,19 @@ impl Gateway {
         self.messaging.handle_connection_failure(peer_addr)
     }
 
-    pub fn try_parse_client_msg<R: CryptoRng + Rng>(&mut self,
+    pub fn try_parse_client_msg<R: CryptoRng + Rng>(
+        &mut self,
         peer_addr: SocketAddr,
         bytes: &Bytes,
         rng: &mut R,
     ) -> Option<ClientMsg> {
-        self
-            .messaging
-            .try_parse_client_msg(peer_addr, bytes, rng)
+        self.messaging.try_parse_client_msg(peer_addr, bytes, rng)
     }
 
-    pub fn push_to_client(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub fn push_to_client(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
         self.messaging.send_to_client(msg)
     }
-    
+
     /// If a request within GatewayCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
     /// was a GatewayRequest destined to our section, this is where the actual request will end up.
     pub fn handle_auth_cmd(
@@ -121,11 +112,7 @@ impl Gateway {
     }
 
     /// Receive client request
-    pub fn handle_client_msg(
-        &mut self,
-        client: PublicId,
-        msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    pub fn handle_client_msg(&mut self, client: PublicId, msg: MsgEnvelope) -> Option<NodeCmd> {
         if let MsgSender::Client { signature, .. } = msg.origin {
             if let Some(cmd) =
                 self.auth
@@ -163,7 +150,6 @@ impl Gateway {
             _ => None, // error..!
         }
     }
-
 }
 
 impl Display for Gateway {

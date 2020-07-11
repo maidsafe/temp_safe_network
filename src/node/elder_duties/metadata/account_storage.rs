@@ -13,9 +13,8 @@ use crate::{
     utils, Config, Result,
 };
 use safe_nd::{
-    Account, AccountRead, AccountWrite, Error as NdError, MessageId, NodePublicId, PublicId,
-    PublicKey, Result as NdResult, XorName, QueryResponse, Message, MsgEnvelope, MsgSender,
-    Signature, ElderDuty, Duty,
+    Account, AccountRead, AccountWrite, Duty, ElderDuty, Error as NdError, Message, MessageId,
+    MsgEnvelope, MsgSender, NodePublicId, PublicKey, QueryResponse, Result as NdResult, XorName,
 };
 use std::{
     cell::Cell,
@@ -58,12 +57,7 @@ impl AccountStorage {
         }
     }
 
-    fn get(
-        &self,
-        address: &XorName,
-        msg_id: MessageId,
-        origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    fn get(&self, address: &XorName, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);
@@ -99,7 +93,8 @@ impl AccountStorage {
             Err(NdError::LoginPacketExists)
         } else if account.owner != origin.id() {
             Err(NdError::InvalidOwners)
-        } else { // also check the signature
+        } else {
+            // also check the signature
             self.chunks
                 .put(account)
                 .map_err(|error| error.to_string().into())
@@ -120,10 +115,10 @@ impl AccountStorage {
                     Err(NdError::ExceededSize)
                 } else if updated_account.owner != existing_account.owner {
                     Err(NdError::InvalidOwners)
-                } else { // also check the signature
-                    self.chunks
-                        .put(&updated_account)
-                        //.map_err(|err| err.to_string().into())
+                } else {
+                    // also check the signature
+                    self.chunks.put(&updated_account)
+                    //.map_err(|err| err.to_string().into())
                 }
             });
         self.ok_or_error(result, msg_id, origin)
@@ -145,7 +140,12 @@ impl AccountStorage {
             })
     }
 
-    fn ok_or_error(&self, result: Result<()>, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<NodeCmd> {
         let error = match result {
             Ok(()) => return None,
             Err(error) => error,
@@ -176,7 +176,7 @@ impl AccountStorage {
             signature,
         }
     }
-    
+
     fn public_key(&self) -> PublicKey {
         PublicKey::Bls(self.id.public_id().bls_public_key())
     }

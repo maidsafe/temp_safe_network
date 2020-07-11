@@ -9,8 +9,7 @@
 use super::chunk_storage::ChunkStorage;
 use crate::{cmd::NodeCmd, utils};
 use log::error;
-use routing::SrcLocation;
-use safe_nd::{BlobRead, MessageId, Read, MsgSender, PublicKey, Signature};
+use safe_nd::{BlobRead, MsgSender, Read};
 use serde::Serialize;
 
 pub(super) struct Reading {
@@ -19,14 +18,8 @@ pub(super) struct Reading {
 }
 
 impl Reading {
-    pub fn new(
-        read: Read,
-        msg: MsgEnvelope,
-    ) -> Self {
-        Self {
-            read,
-            msg,
-        }
+    pub fn new(read: Read, msg: MsgEnvelope) -> Self {
+        Self { read, msg }
     }
 
     pub fn get_result(&self, storage: &ChunkStorage) -> Option<NodeCmd> {
@@ -39,12 +32,10 @@ impl Reading {
 
     fn verify<T: Serialize>(&self, data: &T) -> bool {
         match self.msg.most_recent_sender() {
-            MsgSender::Section {
-                id,
-                signature,
-                ..
-            } => id.verify(signature, &utils::serialise(data)),
-            _ => false
+            MsgSender::Section { id, signature, .. } => {
+                id.verify(signature, &utils::serialise(data))
+            }
+            _ => false,
         }
     }
 
@@ -52,11 +43,7 @@ impl Reading {
         let BlobRead::Get(address) = read;
         if self.src.is_section() {
             if self.verify(&self.msg.message) {
-                storage.get(
-                    *address,
-                    self.msg.id(),
-                    self.msg.origin,
-                )
+                storage.get(*address, self.msg.id(), self.msg.origin)
             } else {
                 error!("Accumulated signature is invalid!");
                 None

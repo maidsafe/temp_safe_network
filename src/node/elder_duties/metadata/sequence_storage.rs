@@ -8,17 +8,16 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    cmd::{NodeCmd, MetadataCmd},
+    cmd::{MetadataCmd, NodeCmd},
     msg::Message,
     node::Init,
     utils, Config, Result,
 };
 
 use safe_nd::{
-    Error as NdError, MessageId, NodePublicId, PublicId, Result as NdResult, SData,
-    SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions,
-    SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp, SequenceRead,
-    SequenceWrite,
+    Error as NdError, MessageId, NodePublicId, PublicId, Result as NdResult, SData, SDataAction,
+    SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions, SDataPrivPermissions,
+    SDataPubPermissions, SDataUser, SDataWriteOp, SequenceRead, SequenceWrite,
 };
 
 use std::{
