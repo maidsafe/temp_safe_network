@@ -14,7 +14,7 @@ use self::{
     validation::Validation,
 };
 use crate::{
-    cmd::{ConsensusAction, NodeCmd},
+    cmd::{GroupDecision, OutboundMsg},
     node::Init,
     Config, Messaging, Result,
     keys::NodeKeys,
@@ -23,7 +23,6 @@ use crate::{
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
-use routing::Node as Routing;
 use safe_nd::{ElderDuty, AuthCmd, ClientAuth, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
 use std::{
     cell::RefCell,
@@ -49,14 +48,14 @@ impl Gateway {
         keys: NodeKeys,
         config: &Config,
         init_mode: Init,
-        routing: Rc<RefCell<Routing>>,
         messaging: Rc<RefCell<Messaging>>,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
+
         let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Gateway);
-        let auth = Auth::new(keys.clone(), auth_keys_db, decisions);
+        let auth = Auth::new(keys.clone(), auth_keys_db, decisions.clone());
         let data = Validation::new(decisions);
 
         let gateway = Self {
@@ -88,34 +87,32 @@ impl Gateway {
         self.messaging.try_parse_client_msg(peer_addr, bytes, rng)
     }
 
-    pub fn push_to_client(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn push_to_client(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         self.messaging.send_to_client(msg)
     }
 
     /// Temporary, while Authenticator is not implemented at app layer.
-    /// If a request within NodeCmd::ForwardClientRequest issued by us in `handle_consensused_cmd`
+    /// If a request within OutboundMsg::ForwardClientRequest issued by us in `handle_consensused_cmd`
     /// was made by Gateway and destined to our section, this is where the actual request will end up.
     pub fn handle_auth_cmd(
         &mut self,
-        _client: PublicId,
-        _cmd: AuthCmd,
         msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         self.auth.finalise(msg)
     }
 
     /// Basically.. when Gateway nodes have agreed,
     /// they'll forward the request into the network.
-    pub fn handle_consensused_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
-        use ConsensusAction::*;
+    pub fn handle_consensused_cmd(&mut self, cmd: GroupDecision) -> Option<OutboundMsg> {
+        use GroupDecision::*;
         trace!("{}: Consensused {:?}", self, cmd);
         match cmd {
-            Forward(msg) => Some(NodeCmd::SendToSection(msg)),
+            Forward(msg) => Some(OutboundMsg::SendToSection(msg)),
         }
     }
 
     /// Receive client request
-    pub fn handle_client_msg(&mut self, client: PublicId, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn handle_client_msg(&mut self, client: PublicId, msg: MsgEnvelope) -> Option<OutboundMsg> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error);
         };

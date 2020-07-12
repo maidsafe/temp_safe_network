@@ -1,5 +1,5 @@
 use super::validator::Validator;
-use crate::{cmd::NodeCmd, msg_decicions::ElderMsgDecisions, keys::NodeKeys};
+use crate::{cmd::OutboundMsg, msg_decicions::ElderMsgDecisions, keys::NodeKeys};
 use safe_nd::{
     AccountId, Message, MessageId, Money,
     TransferValidated, NetworkCmd,
@@ -20,7 +20,7 @@ impl SectionFunds {
         Self { actor, decisions }
     }
 
-    pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<NodeCmd> {
+    pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<OutboundMsg> {
         match self.actor.transfer(amount, to) {
             Ok(Some(event)) => {
                 self.actor.apply(TransferInitiated(event));
@@ -34,7 +34,7 @@ impl SectionFunds {
         }
     }
 
-    pub fn receive(&mut self, validation: TransferValidated) -> Option<NodeCmd> {
+    pub fn receive(&mut self, validation: TransferValidated) -> Option<OutboundMsg> {
         match self.actor.receive(validation) {
             Ok(Some(event)) => {
                 self.actor.apply(TransferValidationReceived(event));

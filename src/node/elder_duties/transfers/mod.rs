@@ -6,14 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod replica_manager;
-
-use self::replica_manager::ReplicaManager;
-use crate::{cmd::NodeCmd, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
+use super::super::services::
+pub use self::replica_manager::ReplicaManager;
+use crate::{cmd::OutboundMsg, keys::NodeKeys, node::elder_duties::msg_decisions::ElderMsgDecisions};
 use safe_nd::{
     Cmd, CmdError, DebitAgreementProof, Error, Event, Message, MessageId, MsgEnvelope, MsgSender,
     NetworkCmd, NetworkCmdError, PublicKey, Query, QueryResponse, SignedTransfer,
-    TransferCmd, TransferQuery, ElderDuty,
+    TransferCmd, TransferQuery, ElderDuty, TransferError,
 };
 use std::{
     cell::RefCell,
@@ -25,7 +24,6 @@ use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
-use TranferError::*;
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -74,13 +72,13 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub(super) fn handle_request(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn handle_request(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => self.handle_client_cmd(cmd, msg),
-            Message::NetworkCmd { cmd, .. } => self.handle_network_cmd(cmd),
+            Message::NetworkCmd { cmd, .. } => self.handle_network_cmd(cmd, msg.id(), msg.origin),
             Message::Query {
                 query: Query::Transfer(query), ..
             } => self.handle_client_query(query, msg),
@@ -88,9 +86,9 @@ impl Transfers {
         }
     }
 
-    fn handle_network_cmd(&mut self, cmd: NetworkCmd) -> Option<NodeCmd> {
+    fn handle_network_cmd(&mut self, cmd: NetworkCmd, msg_id: MessageId, origin: MsgSender) -> Option<OutboundMsg> {
         match cmd {
-            NetworkCmd::PropagateTransfer(proof) => self.receive_propagated(&proof, msg.id(), msg.origin),
+            NetworkCmd::PropagateTransfer(proof) => self.receive_propagated(&proof, msg_id, origin),
             NetworkCmd::InitiateRewardPayout {
                 signed_transfer,
                 ..
@@ -112,7 +110,7 @@ impl Transfers {
         }
     }
 
-    fn handle_client_cmd(&mut self, cmd: TransferCmd, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn handle_client_cmd(&mut self, cmd: TransferCmd, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match cmd {
             TransferCmd::ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer, msg.id(), msg.origin)
@@ -126,7 +124,7 @@ impl Transfers {
         }
     }
 
-    fn handle_client_query(&mut self, query: TransferQuery, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn handle_client_query(&mut self, query: TransferQuery, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match query {
             TransferQuery::GetBalance(public_key) => self.balance(public_key, msg),
             TransferQuery::GetReplicaKeys(public_key) => self.get_replica_pks(public_key, msg),
@@ -135,7 +133,7 @@ impl Transfers {
     }
 
     /// Get the PublicKeySet of our replicas
-    fn get_replica_pks(&self, _public_key: PublicKey, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn get_replica_pks(&self, _public_key: PublicKey, msg: MsgEnvelope) -> Option<OutboundMsg> {
         // validate signature
         let result = match self.replica.borrow().replicas_pk_set() {
             None => Err(Error::NoSuchKey),
@@ -149,7 +147,7 @@ impl Transfers {
         })
     }
 
-    fn balance(&self, public_key: PublicKey, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn balance(&self, public_key: PublicKey, msg: MsgEnvelope) -> Option<OutboundMsg> {
         // validate signature
         let result = self
             .replica
@@ -169,7 +167,7 @@ impl Transfers {
         public_key: PublicKey,
         _since_version: usize,
         msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         // validate signature
         let result = match self
             .replica
@@ -195,7 +193,7 @@ impl Transfers {
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::Event {
@@ -208,7 +206,7 @@ impl Transfers {
             },
             Err(error) => Message::CmdError {
                 id: MessageId::new(),
-                error: CmdError::Transfer(TransferValidation(error)),
+                error: CmdError::Transfer(TransferError::TransferValidation(error)),
                 correlation_id: msg_id,
                 cmd_origin: origin.address(),
             },
@@ -223,7 +221,7 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         let message = match self.replica.borrow_mut().register(proof) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NetworkCmd {
@@ -232,7 +230,7 @@ impl Transfers {
             },
             Err(error) => Message::CmdError {
                 id: MessageId::new(),
-                error: CmdError::Transfer(TransferRegistration(error)),
+                error: CmdError::Transfer(TransferError::TransferRegistration(error)),
                 correlation_id: msg_id,
                 cmd_origin: origin.address(),
             },
@@ -249,7 +247,7 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.borrow_mut().receive_propagated(proof) {
             Ok(Some(event)) => return None,

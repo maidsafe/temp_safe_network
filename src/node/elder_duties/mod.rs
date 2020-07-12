@@ -8,7 +8,6 @@
 
 mod gateway;
 mod metadata;
-mod msg_decisions;
 mod payment;
 mod rewards;
 mod transfers;
@@ -20,10 +19,10 @@ use self::{
     rewards::{Rewards, Validator},
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
-use crate::{cmd::NodeCmd, keys::NodeKeys, node::Init, Config, Result};
+use crate::{cmd::OutboundMsg, messaging::Messaging, services::SectionMembers, keys::NodeKeys, node::Init, Config, utils, Result};
 use routing::{Node as Routing, RoutingError};
 use safe_transfers::TransferActor;
-use safe_nd::{XorName, Keypair, BlsKeypairShare};
+use safe_nd::XorName;
 use threshold_crypto::{self, serde_impl::SerdeSecret};
 use std::{
     cell::{Cell, RefCell},
@@ -48,17 +47,19 @@ impl ElderDuties {
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
+        messaging: Rc<RefCell<Messaging>>,
     ) -> Result<Self> {
         // Gateway
-        let gateway = Gateway::new(keys.clone(), &config, init_mode, routing.clone())?;
+        let gateway = Gateway::new(keys.clone(), &config, init_mode, messaging.clone())?;
 
+        let section_members = SectionMembers::new(routing.clone());
         // Metadata
         let metadata = Metadata::new(
             keys.clone(),
             &config,
             &total_used_space,
             init_mode,
-            routing.clone(),
+            section_members,
         )?;
 
         // (AT2 Replicas)
@@ -68,10 +69,10 @@ impl ElderDuties {
         let transfers = Transfers::new(keys.clone(), replica_manager.clone());
 
         // DataPayment
-        let data_payment = DataPayment::new(keys.clone(), routing.clone(), replica_manager);
+        let data_payment = DataPayment::new(keys.clone(), replica_manager);
 
         // Rewards
-        let keypair = key_pair(routing)?;
+        let keypair = utils::key_pair(routing.clone())?
         let pk_set = replica_manager.borrow().replicas_pk_set().unwrap();
         let actor = TransferActor::new(keypair, pk_set, Validator { });
         let rewards = Rewards::new(keys.clone(), actor);
@@ -87,19 +88,6 @@ impl ElderDuties {
         })
     }
 
-    fn key_pair(routing: Rc<RefCell<Routing>>) -> Result<Keypair> {
-        let node = routing.borrow();
-        let index = node.our_index()?;
-        let bls_secret_key = node.secret_key_share()?;
-        let secret = SerdeSecret(bls_secret_key);
-        let public = bls_secret_key.public_key_share()
-        Ok(Keypair::BlsShare(BlsKeypairShare {
-            index,
-            secret,
-            public,
-        }))
-    }
-
     fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
         let node = routing.borrow();
         let public_key_set = node.public_key_set()?;
@@ -113,7 +101,7 @@ impl ElderDuties {
             vec![],
             proof_chain.clone(),
         )?;
-        Rc::new(RefCell::new(replica_manager))
+        Ok(Rc::new(RefCell::new(replica_manager)))
     }
 
     pub fn gateway(&mut self) -> &mut Gateway {
@@ -134,14 +122,14 @@ impl ElderDuties {
 
     /// Name of the node
     /// Age of the node
-    pub fn member_left(&mut self, _name: XorName, _age: u8) -> Option<Vec<NodeCmd>> {
+    pub fn member_left(&mut self, _name: XorName, _age: u8) -> Option<Vec<OutboundMsg>> {
         None
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self) -> Option<NodeCmd> {
+    pub fn elders_changed(&mut self) -> Option<OutboundMsg> {
         let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();

@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod validator;
 mod section_funds;
 mod system;
-mod validator;
 
-use self::{section_funds::SectionFunds, system::FarmingSystem, validator::Validator};
-use crate::{cmd::NodeCmd, msg_decisions::ElderMsgDecisions, keys::NodeKeys};
-use crate::node::messaging::Messaging;
+pub use self::{system::FarmingSystem, validator::Validator};
+use self::section_funds::SectionFunds;
+use crate::{messaging::Messaging, cmd::OutboundMsg, node::services::msg_decisions::ElderMsgDecisions, node::keys::NodeKeys};
 use safe_farming::{Accumulation, RewardCounter, StorageRewards};
 use safe_nd::{
     AccountId, ElderDuty, Money, XorName,
@@ -46,7 +46,7 @@ impl Rewards {
     /// Work is the total work associated with this account id.
     /// It is a strictly incrementing value during the lifetime of
     /// the owner on the network.
-    pub fn add_account(&mut self, id: AccountId, counter: RewardCounter) -> Option<NodeCmd> {
+    pub fn add_account(&mut self, id: AccountId, counter: RewardCounter) -> Option<OutboundMsg> {
         let work = counter.work;
         match self.farming.add_account(id, work) {
             Ok(_) => (),
@@ -61,7 +61,7 @@ impl Rewards {
         None
     }
 
-    pub fn reward(&mut self, data: Vec<u8>) -> Option<NodeCmd> {
+    pub fn reward(&mut self, data: Vec<u8>) -> Option<OutboundMsg> {
         let num_bytes = data.len() as u64;
         let data_hash = data;
         let factor = 2.0;
@@ -77,7 +77,7 @@ impl Rewards {
     /// On node relocation, receiving section queries for the
     /// node counter, and asks to claim the node farming account
     /// rewards, and for the old section to send it to the new section.
-    pub fn relocate(&mut self, old_node_id: XorName, new_node_id: XorName) -> Option<NodeCmd> {
+    pub fn relocate(&mut self, old_node_id: XorName, new_node_id: XorName) -> Option<OutboundMsg> {
         unimplemented!()
         // let account_id = self.node_accounts.get(&old_node_id)?;
         // let counter = match self.claim(account_id) {
@@ -102,6 +102,6 @@ impl Rewards {
         //     },
         //     proxies: Default::default(),
         // };
-        // Some(NodeCmd::SendToSection(msg))
+        // Some(OutboundMsg::SendToSection(msg))
     }
 }

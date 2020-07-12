@@ -9,10 +9,10 @@
 use crate::msg_decisions::ElderMsgDecisions;
 use log::trace;
 use safe_nd::{
-    Account, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery, ElderDuty,
+    Account, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery,
     Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message,
-    MsgEnvelope, NodeCmd, NodeFullId, Read, SData, SDataAddress, SequenceRead, SequenceWrite,
-    Write, Query,
+    MsgEnvelope, OutboundMsg, Read, SData, SDataAddress, SequenceRead, SequenceWrite,
+    Write, Query, CmdError,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -34,7 +34,7 @@ impl Validation {
         }
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let message = msg.message;
         match &message {
             Message::Cmd {
@@ -49,7 +49,7 @@ impl Validation {
         }
     }
 
-    pub fn initiate_write(&mut self, cmd: DataCmd, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_write(&mut self, cmd: DataCmd, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match cmd {
             DataCmd::Blob(_) => self.blobs.initiate_write(msg),
             DataCmd::Map(_) => self.maps.initiate_write(msg),
@@ -58,7 +58,7 @@ impl Validation {
         }
     }
 
-    pub fn initiate_read(&mut self, query: DataQuery, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, query: DataQuery, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match query {
             DataQuery::Blob(_) => self.blobs.initiate_read(msg),
             DataQuery::Map(_) => self.maps.initiate_read(msg),
@@ -83,13 +83,13 @@ impl Sequences {
     }
 
     // client query
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let _ = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let write = self.extract_write(msg)?;
         use SequenceWrite::*;
         match write {
@@ -102,7 +102,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: SData, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn initiate_creation(&mut self, chunk: SData, msg: MsgEnvelope) -> Option<OutboundMsg> {
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*msg.origin.id()).is_err() {
@@ -119,7 +119,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_deletion(&mut self, address: SDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn initiate_deletion(&mut self, address: SDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         if address.is_pub() {
             return self
                 .decisions
@@ -129,7 +129,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_edit(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn initiate_edit(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         self.decisions.vote(msg)
     }
 
@@ -180,7 +180,7 @@ impl Blobs {
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let read = self.extract_read(msg)?;
         self.decisions.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
@@ -193,7 +193,7 @@ impl Blobs {
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let write = self.extract_write(msg)?;
         use BlobWrite::*;
         match write {
@@ -203,7 +203,7 @@ impl Blobs {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: IData, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn initiate_creation(&mut self, chunk: IData, msg: MsgEnvelope) -> Option<OutboundMsg> {
         // Assert that if the request was for UnpubIData, that the owner's public key has
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
         // by their Client owners.
@@ -222,7 +222,7 @@ impl Blobs {
     }
 
     // on client request
-    fn initiate_deletion(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn initiate_deletion(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         if address.kind() == IDataKind::Pub {
             self.decisions
                 .error(CmdError::Data(NdError::InvalidOperation), msg.id(), msg.origin)
@@ -277,13 +277,13 @@ impl Maps {
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let read = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         use MapWrite::*;
         let write = self.extract_write(msg)?;
         match write {
@@ -295,7 +295,7 @@ impl Maps {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: MData, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn initiate_creation(&mut self, chunk: MData, msg: MsgEnvelope) -> Option<OutboundMsg> {
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
         if chunk.owner() != *msg.origin.id() {
@@ -357,7 +357,7 @@ impl Accounts {
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         if self.is_account_read(msg) {
             self.decisions.vote(msg)
         } else {
@@ -366,7 +366,7 @@ impl Accounts {
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let account = self.extract_account_write(msg)?;
         if !account.size_is_valid() {
             return self.decisions.error(CmdError::Data(NdError::ExceededSize), msg.id(), msg.origin);

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::msg::Message;
-use safe_nd::{MsgEnvelope, XorName, NodeCmd};
+use safe_nd::{MsgEnvelope, XorName, OutboundMsg};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -15,15 +15,15 @@ use std::collections::BTreeSet;
 /// Any network node
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum NodeCmdChain {
-    Single(NodeCmd),
-    Multiple(Vec<NodeCmd>),
+pub(crate) enum OutboundMsgChain {
+    Single(OutboundMsg),
+    Multiple(Vec<OutboundMsg>),
 }
 
 /// Any network node
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum NodeCmd {
+pub(crate) enum OutboundMsg {
     /// Send to a client.
     SendToClient(MsgEnvelope),
     /// Send to a single node.
@@ -37,49 +37,16 @@ pub(crate) enum NodeCmd {
     },
     /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
-    VoteFor(ConsensusAction),
+    VoteFor(GroupDecision),
 }
 
 // Need to Serialize/Deserialize to go through the consensus process.
-/// A ConsensusAction is something only
+/// A GroupDecision is something only
 /// taking place at the network Gateways.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum ConsensusAction {
+#[derive(Debug, Clone, Serialize, Deserialize)] // Debug, 
+pub(crate) enum GroupDecision {
     /// When Gateway nodes consider a request
     /// valid, they will vote for it to be forwarded.
     /// As they reach consensus, this is then carried out.
     Forward(MsgEnvelope),
 }
-
-// /// The Gateway consists of
-// /// the Elders in a section.
-// #[derive(Debug)]
-// #[allow(clippy::large_enum_variant)]
-// pub(crate) enum GatewayCmd {
-//     /// Vote for a cmd so we can process the deferred action on consensus.
-//     /// (Currently immediately.)
-//     VoteFor(ConsensusAction),
-//     /// Send a validated client request from Gateway to the appropriate destination nodes.
-//     ForwardClientMsg(MsgEnvelope),
-//     /// Send a msg to client.
-//     PushToClient(MsgEnvelope),
-// }
-
-// #[derive(Debug)]
-// #[allow(clippy::large_enum_variant)]
-// pub(crate) enum MetadataCmd {
-//     /// Send the same request to each individual Adult.
-//     SendToAdults {
-//         targets: BTreeSet<XorName>,
-//         msg: MsgEnvelope,
-//     },
-//     /// Accumulate rewards after Adults have
-//     /// stored the data.
-//     AccumulateReward { data_hash: Vec<u8>, num_bytes: u64 },
-//     /// Send to sectioon (used for errors).
-//     SendToSection(MsgEnvelope),
-// }
-
-//     /// Send a response to
-//     /// our section's Elders, i.e. our peers.
-//     RespondToElderPeers(Message),

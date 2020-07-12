@@ -10,7 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{cmd::NodeCmd, node::Init, Config, Result};
+use crate::{cmd::OutboundMsg, node::Init, Config, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use routing::Node;
@@ -48,7 +48,7 @@ impl Chunks {
         })
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         trace!(
             "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
             self,
@@ -84,7 +84,7 @@ impl Chunks {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",

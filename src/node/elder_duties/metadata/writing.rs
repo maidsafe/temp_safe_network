@@ -10,7 +10,7 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::cmd::NodeCmd;
+use crate::cmd::OutboundMsg;
 use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite};
 
 pub(super) struct Writing {
@@ -23,7 +23,7 @@ impl Writing {
         Self { cmd, msg }
     }
 
-    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<NodeCmd> {
+    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<OutboundMsg> {
         use DataCmd::*;
         match self.cmd.clone() {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
@@ -33,19 +33,19 @@ impl Writing {
         }
     }
 
-    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<NodeCmd> {
+    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<OutboundMsg> {
         register.write(write, self.msg)
     }
 
-    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<NodeCmd> {
+    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<OutboundMsg> {
         storage.write(write, self.msg)
     }
 
-    fn sequence(&mut self, write: SequenceWrite, storage: &mut SequenceStorage) -> Option<NodeCmd> {
+    fn sequence(&mut self, write: SequenceWrite, storage: &mut SequenceStorage) -> Option<OutboundMsg> {
         storage.write(write, self.msg.id(), self.msg.origin)
     }
 
-    fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<NodeCmd> {
+    fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<OutboundMsg> {
         storage.write(write, self.msg.id(), self.msg.origin)
     }
 }

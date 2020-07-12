@@ -9,7 +9,7 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{cmd::NodeCmd, node::Init, Config, Result};
+use crate::{cmd::OutboundMsg, node::Init, Config, Result};
 use routing::Node as Routing;
 use safe_nd::{MsgEnvelope, NodePublicId};
 use std::{
@@ -46,7 +46,7 @@ impl AdultDuties {
         })
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         self.chunks.receive_msg(msg)
     }
 }

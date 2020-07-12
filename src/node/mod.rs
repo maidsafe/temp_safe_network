@@ -7,16 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_duties;
-mod duty_finder;
+mod services;
 mod elder_duties;
+mod keys;
 
+use self::{adult_duties::AdultDuties, elder_duties::ElderDuties, keys::NodeKeys, services::{
+    section_members::SectionMembers, 
+    duty_finder::{InboundMsg, InboundMsgAnalysis}}];
 use crate::{
     accumulator::Accumulator,
-    cmd::{ConsensusAction, NodeCmd},
-    duties::{adult::AdultDuties, elder::ElderDuties},
-    duty_finder::{EvalOptions, RemoteMsgEval},
-    keys::NodeKeys,
-    utils, Config, Messaging, Result,
+    cmd::{GroupDecision, OutboundMsg},
+    utils, Config, messaging::Messaging, Result,
 };
 use crossbeam_channel::{Receiver, Select};
 use hex_fmt::HexFmt;
@@ -26,7 +27,7 @@ use rand_chacha::ChaChaRng;
 use routing::{
     event::Event as RoutingEvent, Node as Routing, SrcLocation, TransportEvent as ClientEvent,
 };
-use safe_nd::{Address, DataCmd, MsgEnvelope, MsgSender, NodeFullId, XorName};
+use safe_nd::{Address, MsgEnvelope, MsgSender, NodeFullId, XorName};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -68,6 +69,7 @@ pub enum Command {
 /// Main node struct.
 pub struct Node<R: CryptoRng + Rng> {
     id: NodeFullId,
+    keys: NodeKeys,
     root_dir: PathBuf,
     state: State,
     event_receiver: Receiver<RoutingEvent>,
@@ -75,7 +77,7 @@ pub struct Node<R: CryptoRng + Rng> {
     command_receiver: Receiver<Command>,
     routing: Rc<RefCell<Routing>>,
     messaging: Rc<RefCell<Messaging>>,
-    msg_eval: RemoteMsgEval,
+    msg_analysis: InboundMsgAnalysis,
     rng: R,
 }
 
@@ -101,18 +103,21 @@ impl<R: CryptoRng + Rng> Node<R> {
         let root_dir = root_dir.as_path();
 
         let routing = Rc::new(RefCell::new(routing));
-        let id = Rc::new(RefCell::new(id));
-        let keys = NodeKeys::new(id.clone());
+        let keypair = Rc::new(RefCell::new(utils::key_pair(routing.clone())?));
+        let keys = NodeKeys::new(keypair);
+
+        let messaging = Messaging::new(routing.clone());
+        let messaging = Rc::new(RefCell::new(messaging));
 
         let state = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
             let duties = ElderDuties::new(
                 keys.clone(),
-                keypair,
                 &config,
                 &total_used_space,
                 init_mode,
                 routing.clone(),
+                messaging.clone(),
             )?;
             State::Elder {
                 duties,
@@ -123,12 +128,11 @@ impl<R: CryptoRng + Rng> Node<R> {
             State::Infant
         };
 
-        let messaging = Messaging::new(routing.clone());
-        let messaging = Rc::new(RefCell::new(messaging));
-        let msg_eval = RemoteMsgEval::new(routing.clone());
+        let msg_analysis = InboundMsgAnalysis::new(routing.clone());
 
         let node = Self {
             id,
+            keys: keys.clone(),
             root_dir: root_dir.to_path_buf(),
             state,
             event_receiver,
@@ -136,7 +140,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             command_receiver,
             routing,
             messaging,
-            msg_eval,
+            msg_analysis,
             rng,
         };
         node.dump_state()?;
@@ -182,13 +186,13 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     fn step_routing(&mut self, event: RoutingEvent) {
         debug!("Received routing event: {:?}", event);
-        let result = self.handle_routing_event(event);
-        self.step_cmds(result);
+        let result = self.process_network_event(event);
+        self.send_while_any(result);
     }
 
     fn step_client(&mut self, event: ClientEvent) {
-        let result = self.handle_client_event(event);
-        self.step_cmds(result);
+        let result = self.process_client_event(event);
+        self.send_while_any(result);
     }
 
     fn promote_to_adult(&mut self) -> Result<()> {
@@ -214,11 +218,12 @@ impl<R: CryptoRng + Rng> Node<R> {
         config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
         let duties = ElderDuties::new(
-            self.id.public_id().clone(),
+            self.keys.clone(),
             &config,
             &total_used_space,
             Init::New,
             self.routing.clone(),
+            self.messaging.clone(),
         )?;
         self.state = State::Elder {
             duties,
@@ -329,16 +334,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         _processed
     }
 
-    fn handle_routing_event(&mut self, event: RoutingEvent) -> Option<NodeCmd> {
+    fn process_network_event(&mut self, event: RoutingEvent) -> Option<OutboundMsg> {
         match event {
             RoutingEvent::Consensus(custom_event) => {
-                match bincode::deserialize::<ConsensusAction>(&custom_event) {
+                match bincode::deserialize::<GroupDecision>(&custom_event) {
                     Ok(consensused_cmd) => self
                         .elder_duties()?
                         .gateway()
                         .handle_consensused_cmd(consensused_cmd),
                     Err(e) => {
-                        error!("Invalid ConsensusAction passed from Routing: {:?}", e);
+                        error!("Invalid GroupDecision passed from Routing: {:?}", e);
                         None
                     }
                 }
@@ -357,8 +362,8 @@ impl<R: CryptoRng + Rng> Node<R> {
                 trace!("A node has left the section. Node: {:?}", name);
                 if let Some(cmds) = self.elder_duties()?.member_left(XorName(name.0), age) {
                     for cmd in cmds {
-                        let result = self.handle_cmd(cmd);
-                        self.step_cmds(result);
+                        let result = self.send(cmd);
+                        self.send_while_any(result);
                     }
                 };
                 None
@@ -389,7 +394,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     src,
                     dst
                 );
-                self.handle_remote_msg(src, content)
+                self.handle_serialized_msg(src, content)
             }
             RoutingEvent::EldersChanged { .. } => self.elder_duties()?.elders_changed(),
             // Ignore all other events
@@ -397,7 +402,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<NodeCmd> {
+    fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<OutboundMsg> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => self.handle_remote_msg(msg),
             Err(e) => {
@@ -410,17 +415,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn handle_remote_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
-        use EvalOptions::*;
-        match self.msg_eval.evaluate(msg) {
-            ForwardToNetwork(msg) => self.messaging.borrow_mut().send_to_network(msg),
+    fn handle_remote_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+        use InboundMsg::*;
+        match self.msg_analysis.evaluate(msg) {
+            Accumulate(msg) => self.accumulate_msg(msg),
+            PushToClient(msg) => OutboundMsg::SendToClient(msg),
+            ForwardToNetwork(msg) => OutboundMsg::SendToSection(msg),
             RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(msg),
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(msg),
-            AccumulateForMetadata(msg) => self.accumulate_msg(msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(msg),
-            AccumulateForAdult(msg) => self.accumulate_msg(msg),
-            RunAtMetadata(msg) => self.adult_duties()?.receive_msg(msg),
-            PushToClient(msg) => self.elder_duties()?.gateway().push_to_client(msg),
+            RunAtAdult(msg) => self.adult_duties()?.receive_msg(msg),
             RunAtRewards(msg) => unimplemented!(),
             Unknown => {
                 error!("Unknown message destination: {:?}", msg.message.id());
@@ -429,8 +433,8 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn accumulate_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
-        let id = *self.routing.borrow().id().name();
+    fn accumulate_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+        let id = self.keys.public_key();
         info!(
             "{}: Accumulating signatures for {:?}",
             &id,
@@ -445,22 +449,21 @@ impl<R: CryptoRng + Rng> Node<R> {
             let sender = match msg.most_recent_sender() {
                 MsgSender::Node { duty, .. } => MsgSender::Section {
                     id,
-                    duty,
+                    duty: *duty,
                     signature,
                 },
                 _ => return None, // invalid use case, we only accumulate from Nodes
             };
             // consider msg.pop_proxy() to remove the Node
             // or we just set the last proxy always
-            msg.add_proxy(sender);
-            self.handle_remote_msg(msg)
+            self.handle_remote_msg(msg.with_proxy(sender))
         } else {
             None
         }
     }
 
     /// Will only act on this (i.e. return an action) if node is currently an Elder.
-    fn handle_client_event(&mut self, event: ClientEvent) -> Option<NodeCmd> {
+    fn process_client_event(&mut self, event: ClientEvent) -> Option<OutboundMsg> {
         use ClientEvent::*;
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
         let elder_duties = self.elder_duties()?;
@@ -476,7 +479,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             NewMessage { peer, msg } => {
                 let gateway = elder_duties.gateway();
                 let parsed = gateway.try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
-                gateway.handle_client_msg(parsed.client, parsed.msg)
+                return gateway.handle_client_msg(parsed.client.public_id, parsed.msg);
             }
             SentUserMessage { peer, .. } => {
                 trace!(
@@ -512,14 +515,14 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    pub fn step_cmds(&mut self, cmd: Option<NodeCmd>) {
+    pub fn send_while_any(&mut self, cmd: Option<OutboundMsg>) {
         let mut next_cmd = cmd;
         while let Some(cmd) = next_cmd {
-            next_cmd = self.handle_cmd(cmd);
+            next_cmd = self.send(cmd);
         }
     }
 
-    pub fn vote_for_cmd(&mut self, cmd: ConsensusAction) -> Option<NodeCmd> {
+    pub fn vote_for(&mut self, cmd: GroupDecision) -> Option<OutboundMsg> {
         self.routing
             .borrow_mut()
             .vote_for_user_event(utils::serialise(&cmd))
@@ -532,26 +535,26 @@ impl<R: CryptoRng + Rng> Node<R> {
             )
     }
 
-    pub fn handle_cmd(&mut self, cmd: NodeCmd) -> Option<NodeCmd> {
-        use NodeCmd::*;
-        match cmd {
+    pub fn send(&mut self, outbound: OutboundMsg) -> Option<OutboundMsg> {
+        use OutboundMsg::*;
+        match outbound {
             SendToClient(msg) => {
                 if self.is_handler_for(msg.origin.address()) {
-                    self.messaging.borrow_mut().send_to_client(msg)
+                    self.elder_duties()?.gateway().push_to_client(msg)
                 } else {
                     Some(SendToSection(msg))
                 }
             }
             SendToNode(msg) => self.messaging.borrow_mut().send_to_node(msg),
-            SendToAdults { msgs } => self.messaging.borrow_mut().send_to_nodes(msgs),
+            SendToAdults { targets, msg } => self.messaging.borrow_mut().send_to_nodes(targets, msg),
             SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),
-            VoteFor(cmd) => self.vote_for_cmd(cmd),
+            VoteFor(decision) => self.vote_for(decision),
         }
     }
 
     fn is_handler_for(&self, address: Address) -> bool {
         match address {
-            Address::Client(xorname) => self.msg_eval.self_is_handler_for(xorname),
+            Address::Client(xorname) => self.msg_analysis.self_is_handler_for(xorname),
             _ => false,
         }
     }

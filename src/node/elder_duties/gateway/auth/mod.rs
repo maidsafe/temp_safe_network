@@ -9,13 +9,12 @@
 mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
-use crate::msg_decisions::ElderMsgDecisions;
-use crate::utils;
+use crate::{utils, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
 use log::warn;
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind, ElderDuty,
+    AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind,
     Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
-    NodeCmd, NodeFullId, PublicId, QueryResponse, RequestAuthKind,
+    OutboundMsg, PublicId, QueryResponse, RequestAuthKind, Query,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -35,7 +34,7 @@ impl Auth {
         Self { keys, auth_keys, decisions }
     }
 
-    pub(super) fn initiate(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn initiate(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let auth_cmd = match msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(auth_cmd),
@@ -50,7 +49,7 @@ impl Auth {
     }
 
     // If the client is app, check if it is authorised to perform the given request.
-    pub fn authorise_app(&mut self, public_id: &PublicId, msg: &MsgEnvelope) -> Option<NodeCmd> {
+    pub fn authorise_app(&mut self, public_id: &PublicId, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
             _ => return None,
@@ -101,7 +100,7 @@ impl Auth {
     }
 
     // client query
-    pub fn list_keys_and_version(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn list_keys_and_version(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match msg.message {
             Message::Query {
                 query: Query::Auth(ListAuthKeysAndVersion),
@@ -121,7 +120,7 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn finalise(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         use AuthCmd::*;
         let auth_cmd = match msg.message {
             Message::Cmd {
@@ -152,7 +151,7 @@ impl Auth {
     }
 
     // Verify that valid signature is provided if the request requires it.
-    pub fn verify_client_signature(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn verify_client_signature(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match msg.authorisation_kind() {
             RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
             _ => {

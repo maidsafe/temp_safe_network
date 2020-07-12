@@ -8,7 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
-    cmd::NodeCmd,
+    cmd::OutboundMsg,
     node::Init,
     Config, Result,
     msg_decisions::ElderMsgDecisions;
@@ -47,7 +47,7 @@ impl MapStorage {
         Ok(Self { chunks, decisions })
     }
 
-    pub(super) fn read(&self, read: &MapRead, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn read(&self, read: &MapRead, msg: MsgEnvelope) -> Option<OutboundMsg> {
         use MapRead::*;
         match read {
             Get(address) => self.get(*address, msg),
@@ -64,7 +64,7 @@ impl MapStorage {
         }
     }
 
-    pub(super) fn write(&mut self, write: MapWrite, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn write(&mut self, write: MapWrite, msg: MsgEnvelope) -> Option<OutboundMsg> {
         use MapWrite::*;
         match write {
             New(data) => self.create(&data, msg),
@@ -116,7 +116,7 @@ impl MapStorage {
         origin: MsgSender,
         msg_id: MessageId,
         mutation_fn: F,
-    ) -> Option<NodeCmd>
+    ) -> Option<OutboundMsg>
     where
         F: FnOnce(MData) -> NdResult<MData>,
     {
@@ -137,7 +137,7 @@ impl MapStorage {
     }
 
     /// Put MData.
-    fn create(&mut self, data: &MData, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn create(&mut self, data: &MData, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -148,7 +148,7 @@ impl MapStorage {
         self.ok_or_error(result, msg.id(), msg.origin)
     }
 
-    fn delete(&mut self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn delete(&mut self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self
             .chunks
             .get(&address)
@@ -174,7 +174,7 @@ impl MapStorage {
         permissions: &MDataPermissionSet,
         version: u64,
         msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
             data.check_permissions(MDataAction::ManagePermissions, *msg.origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
@@ -189,7 +189,7 @@ impl MapStorage {
         user: PublicKey,
         version: u64,
         msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
             data.check_permissions(MDataAction::ManagePermissions, *msg.origin.id())?;
             data.del_user_permissions(user, version)?;
@@ -203,7 +203,7 @@ impl MapStorage {
         address: MDataAddress,
         actions: MDataEntryActions,
         msg: MsgEnvelope,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         self.edit_chunk(&address, msg.origin, msg.id(), move |mut data| {
             data.mutate_entries(actions, *msg.origin.id())?;
             Ok(data)
@@ -211,7 +211,7 @@ impl MapStorage {
     }
 
     /// Get entire MData.
-    fn get(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn get(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetMap(result),
@@ -222,7 +222,7 @@ impl MapStorage {
     }
 
     /// Get MData shell.
-    fn get_shell(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn get_shell(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.shell());
@@ -235,7 +235,7 @@ impl MapStorage {
     }
 
     /// Get MData version.
-    fn get_version(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn get_version(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.version());
@@ -248,7 +248,7 @@ impl MapStorage {
     }
 
     /// Get MData value.
-    fn get_value(&self, address: MDataAddress, key: &[u8], msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn get_value(&self, address: MDataAddress, key: &[u8], msg: MsgEnvelope) -> Option<OutboundMsg> {
         let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => md
@@ -271,7 +271,7 @@ impl MapStorage {
     }
 
     /// Get MData keys.
-    fn list_keys(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn list_keys(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.keys());
@@ -284,7 +284,7 @@ impl MapStorage {
     }
 
     /// Get MData values.
-    fn list_values(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn list_values(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.values().into()),
@@ -299,7 +299,7 @@ impl MapStorage {
     }
 
     /// Get MData entries.
-    fn list_entries(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn list_entries(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.entries().clone().into()),
@@ -314,7 +314,7 @@ impl MapStorage {
     }
 
     /// Get MData permissions.
-    fn list_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn list_permissions(&self, address: MDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, msg.origin, MDataAction::Read)?
             .map(|data| data.permissions());
@@ -327,7 +327,7 @@ impl MapStorage {
     }
 
     /// Get MData user permissions.
-    fn list_user_permissions(&self, address: MDataAddress, user: PublicKey, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn list_user_permissions(&self, address: MDataAddress, user: PublicKey, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, msg.origin, MDataAction::Read)?
             .and_then(|data| {
@@ -347,7 +347,7 @@ impl MapStorage {
         result: NdResult<()>,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         let error = match result {
             Ok(()) => return None,
             Err(error) => error,

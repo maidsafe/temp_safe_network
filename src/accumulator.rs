@@ -30,7 +30,7 @@ impl Accumulator {
     }
 
     pub(crate) fn accumulate_cmd(&mut self, msg: MsgEnvelope) -> Option<(MsgEnvelope, Signature)> {
-        let msg_id = msg.message.message_id();
+        let msg_id = msg.id();
         if self.completed.contains(&msg_id) {
             info!("Message already processed.");
             return None;

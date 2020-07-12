@@ -14,18 +14,15 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{node::Init, Config, Result, cmd::NodeCmd, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
+use crate::{node::Init, services::SectionMembers, Config, Result, cmd::OutboundMsg, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use reading::Reading;
-use routing::Node;
 use sequence_storage::SequenceStorage;
 use writing::Writing;
-
 use safe_nd::{Cmd, Message, MsgEnvelope, XorName, Query, ElderDuty};
-
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -42,7 +39,6 @@ use std::{
 pub(crate) struct Metadata {
     keys: NodeKeys,
     elder_stores: ElderStores,
-    routing_node: Rc<RefCell<Node>>,
     decisions: ElderMsgDecisions,
 }
 
@@ -52,11 +48,11 @@ impl Metadata {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
-        routing_node: Rc<RefCell<Node>>,
+        section_members: SectionMembers,
     ) -> Result<Self> {
         let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Metadata);
         let account_storage = AccountStorage::new(config, total_used_space, init_mode, decisions.clone())?;
-        let blob_register = BlobRegister::new(config, init_mode, routing_node.clone(), decisions.clone())?;
+        let blob_register = BlobRegister::new(config, init_mode, section_members, decisions.clone())?;
         let map_storage = MapStorage::new(config, total_used_space, init_mode, decisions.clone())?;
         let sequence_storage =
             SequenceStorage::new(config, total_used_space, init_mode), decisions.clone()?;
@@ -69,12 +65,11 @@ impl Metadata {
         Ok(Self {
             keys,
             elder_stores,
-            routing_node,
             decisions,
         })
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let msg_id = msg.message.id();
         match msg.message {
             Message::Cmd {
@@ -96,7 +91,7 @@ impl Metadata {
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
     #[allow(unused)]
-    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<NodeCmd>> {
+    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<OutboundMsg>> {
         self.elder_stores.blob_register_mut().duplicate_chunks(node)
     }
 
@@ -116,7 +111,7 @@ impl Metadata {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",
@@ -171,7 +166,7 @@ impl Metadata {
     //     holders: BTreeSet<XorName>,
     //     message_id: MessageId,
     //     accumulated_signature: Option<Signature>,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     trace!(
     //         "Sending GetIData request for address: ({:?}) to {:?}",
     //         address,
@@ -196,10 +191,10 @@ impl Metadata {
     //     message_id: MessageId,
     //     idata_address: IDataAddress,
     //     signature: Signature,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     use Response::*;
     //     if self
-    //         .routing_node
+    //         .routing
     //         .borrow()
     //         .public_key_set()
     //         .ok()?
@@ -230,7 +225,7 @@ impl Metadata {
 
     // fn public_key(&self) -> Option<PublicKey> {
     //     Some(
-    //         self.routing_node
+    //         self.routing
     //             .borrow()
     //             .public_key_set()
     //             .ok()?

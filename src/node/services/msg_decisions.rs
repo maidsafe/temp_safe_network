@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//use crate::{cmd::ConsensusAction, utils};
+//use crate::{cmd::GroupDecision, utils};
 use safe_nd::{AdultDuty, DataCmd, Duty, ElderDuty, Read, Write};
 
 #[derive(Clone)]
@@ -37,28 +37,28 @@ impl MsgDecisions {
         }
     }
 
-    pub fn vote(&self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn vote(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let msg = self.set_proxy(msg);
-        Some(NodeCmd::VoteFor(ConsensusAction::Forward(msg)))
+        Some(OutboundMsg::VoteFor(GroupDecision::Forward(msg)))
     }
 
-    pub fn forward(&self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn forward(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let msg = self.set_proxy(msg);
-        Some(NodeCmd::SendToSection(msg))
+        Some(OutboundMsg::SendToSection(msg))
     }
 
-    pub fn send(&self, message: Message) -> Option<NodeCmd> {
+    pub fn send(&self, message: Message) -> Option<OutboundMsg> {
         let msg = MsgEnvelope {
             message,
             origin: self.sign(message),
             proxies: Default::default(),
         };
-        Some(NodeCmd::SendToSection(msg))
+        Some(OutboundMsg::SendToSection(msg))
     }
 
-    pub fn send_to_adults(&self, targets: BTreeSet<XorName>, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn send_to_adults(&self, targets: BTreeSet<XorName>, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let msg = self.set_proxy(msg);
-        Some(NodeCmd::SendToAdults{
+        Some(OutboundMsg::SendToAdults{
             targets,
             msg,
         })
@@ -68,7 +68,7 @@ impl MsgDecisions {
         error: CmdError,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         self.wrap(Message::CmdError {
             id: MessageId::new(),
             error,
@@ -87,7 +87,7 @@ impl MsgDecisions {
     }
 
     fn set_proxy(&self, msg: &MsgEnvelope) -> MsgEnvelope {
-    // origin signs the message, while proxies sign the envelope
+        // origin signs the message, while proxies sign the envelope
         msg.with_proxy(self.sign(msg))
     }
 }

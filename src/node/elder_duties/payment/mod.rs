@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::NodeCmd, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
+use crate::{cmd::OutboundMsg, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
 use safe_nd::{
     Cmd, ElderDuty, Message, MsgEnvelope,
     PublicKey, Result, TransferError, Error,
@@ -36,7 +36,6 @@ impl DataPayment {
     pub fn new(
         keys: NodeKeys,
         replica: Rc<RefCell<ReplicaManager>>,
-        decisions: ElderMsgDecisions,
     ) -> Self {
         let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Payment);
         Self {
@@ -46,14 +45,13 @@ impl DataPayment {
         }
     }
 
-    pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let (cmd, payment) = match msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, payment }, ..
             } => (cmd, payment),
             _ => return None,
         };
-        use TransferError::*;
         // Make sure we are actually at the correct replicas,
         // before executing the debit.
         // (We could also add a method that executes both

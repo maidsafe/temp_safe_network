@@ -2,7 +2,7 @@ use safe_farming::{Accumulation, AccumulationEvent, RewardAlgo, RewardCounter, W
 use safe_nd::{AccountId, Result};
 use std::collections::HashMap;
 
-struct FarmingSystem<A: RewardAlgo> {
+pub struct FarmingSystem<A: RewardAlgo> {
     farming_algo: A,
     accumulation: Accumulation,
 }

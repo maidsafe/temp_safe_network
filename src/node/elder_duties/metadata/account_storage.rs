@@ -8,7 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
-    cmd::NodeCmd,
+    cmd::OutboundMsg,
     node::Init,
     Config, Result,
     msg_decisions::ElderMsgDecisions,
@@ -51,14 +51,14 @@ impl AccountStorage {
         read: &AccountRead,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         use AccountRead::*;
         match read {
             Get(ref address) => self.get(address, msg_id, origin),
         }
     }
 
-    fn get(&self, address: &XorName, msg_id: MessageId, origin: MsgSender) -> Option<NodeCmd> {
+    fn get(&self, address: &XorName, msg_id: MessageId, origin: MsgSender) -> Option<OutboundMsg> {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);
@@ -75,7 +75,7 @@ impl AccountStorage {
         write: AccountWrite,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         use AccountWrite::*;
         match write {
             New(ref account) => self.create(account, msg_id, origin),
@@ -88,7 +88,7 @@ impl AccountStorage {
         account: &Account,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
         } else if account.owner() != origin.id() {
@@ -107,7 +107,7 @@ impl AccountStorage {
         updated_account: &Account,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         let result = self
             .account(origin.id(), updated_account.address())
             .and_then(|existing_account| {
@@ -145,7 +145,7 @@ impl AccountStorage {
         result: NdResult<()>,
         msg_id: MessageId,
         origin: MsgSender,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         if let Err(error) = result {
             self.decisions.send(Message::CmdError {
                 id: MessageId::new(),

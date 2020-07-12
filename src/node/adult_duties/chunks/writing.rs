@@ -7,60 +7,52 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::NodeCmd, utils};
+use crate::{cmd::OutboundMsg, utils};
 use log::error;
-use safe_nd::{BlobWrite, MsgEnvelope, Write, MsgSender};
+use safe_nd::{BlobWrite, MsgEnvelope, MsgSender};
 use serde::Serialize;
 
 pub(super) struct Writing {
-    write: Write,
+    write: BlobWrite,
     msg: MsgEnvelope,
 }
 
 impl Writing {
-    pub fn new(write: Write, msg: MsgEnvelope) -> Self {
+    pub fn new(write: BlobWrite, msg: MsgEnvelope) -> Self {
         Self { write, msg }
     }
 
-    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<NodeCmd> {
-        use Write::*;
-        match &self.write {
-            Blob(write) => self.blob(write, storage),
-            _ => None,
-        }
-    }
-
-    fn verify<T: Serialize>(&self, data: &T) -> bool {
-        match self.msg.most_recent_sender() {
-            MsgSender::Section { id, signature, .. } => {
-                id.verify(signature, &utils::serialise(data))
-            }
-            _ => false,
-        }
-    }
-
-    fn blob(&self, write: &BlobWrite, storage: &mut ChunkStorage) -> Option<NodeCmd> {
+    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<OutboundMsg> {
         use BlobWrite::*;
-        match write {
+        match self.write {
             New(data) => {
                 if self.verify(&self.msg) {
                     storage.store(&data, self.msg.id(), self.msg.origin)
                 } else {
                     error!(
                         "Accumulated signature for {:?} is invalid!",
-                        &self.message_id
+                        &self.msg.id()
                     );
                     None
                 }
             }
             DeletePrivate(address) => {
                 if self.verify(&address) {
-                    storage.delete(*address, self.msg.id(), self.msg.origin)
+                    storage.delete(address, self.msg.id(), self.msg.origin)
                 } else {
                     error!("Accumulated signature is invalid!");
                     None
                 }
             }
+        }
+    }
+
+    fn verify<T: Serialize>(&self, data: &T) -> bool {
+        match self.msg.most_recent_sender() {
+            MsgSender::Section { id, signature, .. } => {
+                id.verify(signature, &utils::serialise(data)).is_ok()
+            }
+            _ => false,
         }
     }
 }

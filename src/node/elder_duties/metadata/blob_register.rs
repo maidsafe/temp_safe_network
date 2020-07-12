@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::NodeCmd, node::Init, utils, Config, Result, ToDbKey, msg_decisions::ElderMsgDecisions};
+use crate::{cmd::OutboundMsg, node::Init, utils, Config, Result, ToDbKey, services::SectionMembers, msg_decisions::ElderMsgDecisions};
 use log::{info, trace, warn};
 use pickledb::PickleDb;
-use routing::Node as Routing;
 use safe_nd::{
     BlobRead, BlobWrite, CmdError, DataError, Error as NdError, IData,
-    IDataAddress, Message, MessageId, MsgEnvelope, NetworkCmd, NodePublicId, PublicKey,
+    IDataAddress, Message, MessageId, MsgEnvelope, NetworkCmd, PublicKey,
     QueryResponse, Read, Result as NdResult, Write, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -47,16 +46,16 @@ pub(super) struct BlobRegister {
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    routing: Rc<RefCell<Routing>>,
     decisions: ElderMsgDecisions,
+    section_members: SectionMembers,
 }
 
 impl BlobRegister {
     pub(super) fn new(
         config: &Config,
         init_mode: Init,
-        routing: Rc<RefCell<Routing>>,
         decisions: ElderMsgDecisions,
+        section_members: SectionMembers,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
@@ -67,12 +66,12 @@ impl BlobRegister {
             metadata,
             holders,
             full_adults,
-            routing,
+            section_members,
             decisions,
         })
     }
 
-    pub(super) fn write(&mut self, write: BlobWrite, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn write(&mut self, write: BlobWrite, msg: MsgEnvelope) -> Option<OutboundMsg> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg),
@@ -80,7 +79,7 @@ impl BlobRegister {
         }
     }
 
-    fn store(&mut self, data: IData, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn store(&mut self, data: IData, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -129,7 +128,7 @@ impl BlobRegister {
         self.decisions.send_to_adults(target_holders, msg)
     }
 
-    fn delete(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn delete(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -153,7 +152,7 @@ impl BlobRegister {
         self.decisions.send_to_adults(metadata.holders, msg)
     }
 
-    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<NodeCmd>> {
+    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<OutboundMsg>> {
         trace!("Duplicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
@@ -173,7 +172,7 @@ impl BlobRegister {
         &self,
         address: IDataAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> Vec<NodeCmd> {
+    ) -> Vec<OutboundMsg> {
         self.get_new_holders_for_chunk(&address)
             .into_iter()
             .map(|new_holder| {
@@ -194,14 +193,14 @@ impl BlobRegister {
             .collect()
     }
 
-    pub(super) fn read(&self, read: &BlobRead, msg: MsgEnvelope) -> Option<NodeCmd> {
+    pub(super) fn read(&self, read: &BlobRead, msg: MsgEnvelope) -> Option<OutboundMsg> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg),
         }
     }
 
-    fn get(&self, address: IDataAddress, msg: MsgEnvelope) -> Option<NodeCmd> {
+    fn get(&self, address: IDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let query_error = |error: NdError| {
             self.decisions.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
@@ -231,7 +230,7 @@ impl BlobRegister {
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Option<NodeCmd> {
+    ) -> Option<OutboundMsg> {
         if result.is_ok() {
             let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
             if !chunk_metadata.holders.insert(sender) {
@@ -270,7 +269,7 @@ impl BlobRegister {
     //     result: NdResult<()>,
     //     message_id: MessageId,
     //     request: Request,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     match &request {
     //         Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
     //             self.handle_store_result(*data.address(), sender, &result, message_id, requester)
@@ -289,7 +288,7 @@ impl BlobRegister {
     //     _result: &NdResult<()>,
     //     message_id: MessageId,
     //     requester: PublicId,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     // TODO -
     //     // - if Ok, and this is the final of the three responses send success back to client handlers and
     //     //   then on to the client.  Note: there's no functionality in place yet to know whether
@@ -360,7 +359,7 @@ impl BlobRegister {
     //     result: NdResult<()>,
     //     message_id: MessageId,
     //     requester: PublicId,
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     if let Err(err) = &result {
     //         warn!("{}: Node reports error deleting: {}", self, err);
     //     } else {
@@ -432,7 +431,7 @@ impl BlobRegister {
     //     message_id: MessageId,
     //     requester: PublicId,
     //     proof: (Request, Signature),
-    // ) -> Option<NodeCmd> {
+    // ) -> Option<OutboundMsg> {
     //     let response = Response::GetIData(result);
     //     wrap(MetadataCmd::RespondToGateway {
     //         sender: *self.id.name(),
@@ -522,22 +521,13 @@ impl BlobRegister {
     // Returns `XorName`s of the target holders for an idata chunk.
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        let routing = self.routing.borrow_mut();
-        let mut closest_adults = routing
-            .our_adults_sorted_by_distance_to(&routing::XorName(target.0))
-            .iter()
-            .take(IMMUTABLE_DATA_ADULT_COPY_COUNT)
-            .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>();
-
+        let take = IMMUTABLE_DATA_ADULT_COPY_COUNT;
+        let mut closest_adults = self.section_members
+            .our_adults_sorted_by_distance_to(&target, take);
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
-            let mut closest_elders = routing
-                .our_elders_sorted_by_distance_to(&routing::XorName(target.0))
-                .into_iter()
-                .take(IMMUTABLE_DATA_COPY_COUNT - closest_adults.len())
-                .map(|p2p_node| XorName(p2p_node.name().0))
-                .collect::<Vec<_>>();
-
+            let take = IMMUTABLE_DATA_COPY_COUNT - closest_adults.len();
+            let mut closest_elders = self.section_members
+                .our_elders_sorted_by_distance_to(&target.0, take);
             closest_adults.append(&mut closest_elders);
             closest_adults
         } else {

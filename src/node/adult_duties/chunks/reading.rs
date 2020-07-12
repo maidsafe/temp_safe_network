@@ -7,41 +7,23 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::NodeCmd, utils};
-use log::error;
-use safe_nd::{BlobRead, MsgEnvelope, MsgSender, Read};
+use crate::{cmd::OutboundMsg, utils};
+use safe_nd::{BlobRead, MsgEnvelope, MsgSender};
 use serde::Serialize;
 
 pub(super) struct Reading {
-    read: Read,
+    read: BlobRead,
     msg: MsgEnvelope,
 }
 
 impl Reading {
-    pub fn new(read: Read, msg: MsgEnvelope) -> Self {
+    pub fn new(read: BlobRead, msg: MsgEnvelope) -> Self {
         Self { read, msg }
     }
 
-    pub fn get_result(&self, storage: &ChunkStorage) -> Option<NodeCmd> {
-        use Read::*;
-        match &self.read {
-            Blob(read) => self.blob(read, storage),
-            _ => None,
-        }
-    }
-
-    fn verify<T: Serialize>(&self, data: &T) -> bool {
-        match self.msg.most_recent_sender() {
-            MsgSender::Section { id, signature, .. } => {
-                id.verify(signature, &utils::serialise(data))
-            }
-            _ => false,
-        }
-    }
-
-    fn blob(&self, read: &BlobRead, storage: &ChunkStorage) -> Option<NodeCmd> {
-        let BlobRead::Get(address) = read;
-        if self.src.is_section() {
+    pub fn get_result(&self, storage: &ChunkStorage) -> Option<OutboundMsg> {
+        let BlobRead::Get(address) = self.read;
+        if let Address::Section(_) => self.msg.most_recent_sender().address() {
             if self.verify(&self.msg.message) {
                 storage.get(*address, self.msg.id(), self.msg.origin)
             } else {
@@ -64,6 +46,15 @@ impl Reading {
         //     }
         } else {
             None
+        }
+    }
+
+    fn verify<T: Serialize>(&self, data: &T) -> bool {
+        match self.msg.most_recent_sender() {
+            MsgSender::Section { id, signature, .. } => {
+                id.verify(signature, &utils::serialise(data)).is_ok()
+            }
+            _ => false,
         }
     }
 }
