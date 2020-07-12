@@ -11,15 +11,18 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::{Node as Routing, SrcLocation};
-use safe_nd::{ClientPublicId, BlsKeypairShare, PublicId, PublicKey, Keypair, Signature, SignatureShare, XorName};
+use safe_nd::{
+    BlsKeypairShare, ClientPublicId, Keypair, PublicId, PublicKey, Signature, SignatureShare,
+    XorName,
+};
 use serde::Serialize;
-use threshold_crypto::{self, serde_impl::SerdeSecret};
 use std::{
     cell::{Cell, Ref, RefCell},
     fs,
     path::Path,
     rc::Rc,
 };
+use threshold_crypto::{self, serde_impl::SerdeSecret};
 use unwrap::unwrap;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
@@ -114,4 +117,3 @@ pub(crate) fn key_pair(routing: Rc<RefCell<Routing>>) -> Result<Keypair> {
         public,
     }))
 }
-

@@ -7,18 +7,24 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_duties;
-mod msg_analysis;
-mod msg_decisions;
 mod elder_duties;
 mod keys;
+mod msg_analysis;
+mod msg_decisions;
 mod section_members;
 
 use crate::{
-    node::{adult_duties::AdultDuties, elder_duties::ElderDuties, keys::NodeKeys,
-    section_members::SectionMembers, msg_analysis::{InboundMsg, InboundMsgAnalysis}},
     accumulator::Accumulator,
     cmd::{GroupDecision, OutboundMsg},
-    utils, Config, messaging::Messaging, Result,
+    messaging::Messaging,
+    node::{
+        adult_duties::AdultDuties,
+        elder_duties::ElderDuties,
+        keys::NodeKeys,
+        msg_analysis::{InboundMsg, InboundMsgAnalysis},
+        section_members::SectionMembers,
+    },
+    utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
 use hex_fmt::HexFmt;
@@ -547,7 +553,9 @@ impl<R: CryptoRng + Rng> Node<R> {
                 }
             }
             SendToNode(msg) => self.messaging.borrow_mut().send_to_node(msg),
-            SendToAdults { targets, msg } => self.messaging.borrow_mut().send_to_nodes(targets, msg),
+            SendToAdults { targets, msg } => {
+                self.messaging.borrow_mut().send_to_nodes(targets, msg)
+            }
             SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),
             VoteFor(decision) => self.vote_for(decision),
         }

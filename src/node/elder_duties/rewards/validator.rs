@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_transfers::ReplicaValidator;
 use safe_nd::PublicKey;
+use safe_transfers::ReplicaValidator;
 
 pub struct Validator {}
 

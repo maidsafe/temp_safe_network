@@ -10,8 +10,9 @@ pub mod gateway;
 
 use crate::{
     accumulator::Accumulator,
-    cmd::{OutboundMsg, GroupDecision},
-    node::adult_duties::AdultDuties, node::elder_duties::ElderDuties,
+    cmd::{GroupDecision, OutboundMsg},
+    node::adult_duties::AdultDuties,
+    node::elder_duties::ElderDuties,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -91,11 +92,7 @@ impl Messaging {
         };
         self.routing
             .borrow_mut()
-            .send_message(
-                SrcLocation::Node(name),
-                dst,
-                utils::serialise(&msg),
-            )
+            .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .map_or_else(
                 |err| {
                     error!("Unable to send MsgEnvelope to Peer: {:?}", err);
@@ -112,7 +109,9 @@ impl Messaging {
         let name = *self.routing.borrow().id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
-            Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(routing::XorName(xorname.0)),
+            Address::Client(xorname) | Address::Section(xorname) => {
+                DstLocation::Section(routing::XorName(xorname.0))
+            }
         };
         self.routing
             .borrow_mut()

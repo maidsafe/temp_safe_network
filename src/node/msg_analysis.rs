@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::Node as Routing;
-use safe_nd::{Address, Cmd, Query, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
+use safe_nd::{
+    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, Query, XorName,
+};
 use std::{cell::RefCell, rc::Rc};
 
 #[allow(clippy::large_enum_variant)]
@@ -239,7 +241,7 @@ impl InboundMsgAnalysis {
             } => true,
             _ => false,
         };
-        
+
         is_chunk_cmd() && from_metadata_section() && self.is_dst_for(msg) && self.is_adult()
     }
 
@@ -282,11 +284,14 @@ impl InboundMsgAnalysis {
         let our_name = self.routing.borrow().name();
         if self.routing.borrow().is_elder() {
             NodeDuties::Elder
-        } else if self.routing.borrow()
+        } else if self
+            .routing
+            .borrow()
             .our_adults()
             .map(|c| c.name())
             .collect::<Vec<_>>()
-            .contains(&our_name) {
+            .contains(&our_name)
+        {
             NodeDuties::Adult
         } else {
             NodeDuties::Infant

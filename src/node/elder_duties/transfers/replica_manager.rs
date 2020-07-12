@@ -88,7 +88,10 @@ impl ReplicaManager {
         }
     }
 
-    pub(crate) fn validate(&mut self, transfer: SignedTransfer) -> Result<Option<TransferValidated>> {
+    pub(crate) fn validate(
+        &mut self,
+        transfer: SignedTransfer,
+    ) -> Result<Option<TransferValidated>> {
         let result = self.replica.validate(transfer);
         if let Ok(Some(event)) = result {
             match self.persist(ReplicaEvent::TransferValidated(event.clone())) {

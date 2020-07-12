@@ -9,11 +9,13 @@
 mod replica_manager;
 
 pub use self::replica_manager::ReplicaManager;
-use crate::{cmd::OutboundMsg, keys::NodeKeys, node::elder_duties::msg_decisions::ElderMsgDecisions};
+use crate::{
+    cmd::OutboundMsg, keys::NodeKeys, node::elder_duties::msg_decisions::ElderMsgDecisions,
+};
 use safe_nd::{
-    Cmd, CmdError, DebitAgreementProof, Error, Event, Message, MessageId, MsgEnvelope, MsgSender,
-    NetworkCmd, NetworkCmdError, PublicKey, Query, QueryResponse, SignedTransfer,
-    TransferCmd, TransferQuery, ElderDuty, TransferError,
+    Cmd, CmdError, DebitAgreementProof, ElderDuty, Error, Event, Message, MessageId, MsgEnvelope,
+    MsgSender, NetworkCmd, NetworkCmdError, PublicKey, Query, QueryResponse, SignedTransfer,
+    TransferCmd, TransferError, TransferQuery,
 };
 use std::{
     cell::RefCell,
@@ -55,7 +57,11 @@ pub(crate) struct Transfers {
 impl Transfers {
     pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Transfer);
-        Self { keys, replica, decisions }
+        Self {
+            keys,
+            replica,
+            decisions,
+        }
     }
 
     pub fn update_replica_on_churn(
@@ -81,13 +87,19 @@ impl Transfers {
             } => self.handle_client_cmd(cmd, msg),
             Message::NetworkCmd { cmd, .. } => self.handle_network_cmd(cmd, msg.id(), msg.origin),
             Message::Query {
-                query: Query::Transfer(query), ..
+                query: Query::Transfer(query),
+                ..
             } => self.handle_client_query(query, msg),
             _ => None,
         }
     }
 
-    fn handle_network_cmd(&mut self, cmd: NetworkCmd, msg_id: MessageId, origin: MsgSender) -> Option<OutboundMsg> {
+    fn handle_network_cmd(
+        &mut self,
+        cmd: NetworkCmd,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<OutboundMsg> {
         match cmd {
             NetworkCmd::PropagateTransfer(proof) => self.receive_propagated(&proof, msg_id, origin),
             NetworkCmd::InitiateRewardPayout {
@@ -101,7 +113,7 @@ impl Transfers {
                     Ok(None) => None,
                     Ok(Some(event)) => {
                         // the transfer is then propagated, and will reach the recipient section
-                        self.decisions.send(Message::NetworkCmd { 
+                        self.decisions.send(Message::NetworkCmd {
                             cmd: NetworkCmd::PropagateTransfer(proof),
                             id: MessageId::new(),
                         })
@@ -125,7 +137,11 @@ impl Transfers {
         }
     }
 
-    fn handle_client_query(&mut self, query: TransferQuery, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn handle_client_query(
+        &mut self,
+        query: TransferQuery,
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         match query {
             TransferQuery::GetBalance(public_key) => self.balance(public_key, msg),
             TransferQuery::GetReplicaKeys(public_key) => self.get_replica_pks(public_key, msg),

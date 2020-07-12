@@ -9,13 +9,13 @@
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
     cmd::OutboundMsg,
+    node::msg_decisions::ElderMsgDecisions,
     node::Init,
     Config, Result,
-    node::msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
-    Account, AccountRead, AccountWrite, Error as NdError, Message, MessageId,
-    PublicKey, QueryResponse, Result as NdResult, XorName, MsgSender, CmdError,
+    Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
+    PublicKey, QueryResponse, Result as NdResult, XorName,
 };
 use std::{
     cell::Cell,
@@ -117,7 +117,8 @@ impl AccountStorage {
                     Err(NdError::InvalidOwners)
                 } else {
                     // also check the signature
-                    self.chunks.put(&updated_account)
+                    self.chunks
+                        .put(&updated_account)
                         .map_err(|err| err.to_string().into())
                 }
             });

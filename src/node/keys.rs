@@ -7,12 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::utils;
-use safe_nd::{Signature, Keypair, PublicKey};
+use safe_nd::{Keypair, PublicKey, Signature};
 use serde::Serialize;
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
 pub(super) struct NodeKeys {
@@ -21,9 +18,7 @@ pub(super) struct NodeKeys {
 
 impl NodeKeys {
     pub fn new(keys: Rc<RefCell<Keypair>>) -> Self {
-        Self {
-            keys
-        }
+        Self { keys }
     }
 
     pub fn public_key(&self) -> PublicKey {

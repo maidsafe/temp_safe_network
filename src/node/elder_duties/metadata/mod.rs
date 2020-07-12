@@ -14,20 +14,23 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{node::Init, node::section_members::SectionMembers, Config, Result, cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
+use crate::{
+    cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions,
+    node::section_members::SectionMembers, node::Init, Config, Result,
+};
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use reading::Reading;
+use safe_nd::{Cmd, ElderDuty, Message, MsgEnvelope, Query, XorName};
 use sequence_storage::SequenceStorage;
-use writing::Writing;
-use safe_nd::{Cmd, Message, MsgEnvelope, XorName, Query, ElderDuty};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use writing::Writing;
 
 /// This module is called `Metadata`
 /// as a preparation for the responsibilities
@@ -51,8 +54,10 @@ impl Metadata {
         section_members: SectionMembers,
     ) -> Result<Self> {
         let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Metadata);
-        let account_storage = AccountStorage::new(config, total_used_space, init_mode, decisions.clone())?;
-        let blob_register = BlobRegister::new(config, init_mode, section_members, decisions.clone())?;
+        let account_storage =
+            AccountStorage::new(config, total_used_space, init_mode, decisions.clone())?;
+        let blob_register =
+            BlobRegister::new(config, init_mode, section_members, decisions.clone())?;
         let map_storage = MapStorage::new(config, total_used_space, init_mode, decisions.clone())?;
         let sequence_storage =
             SequenceStorage::new(config, total_used_space, init_mode, decisions.clone())?;
@@ -73,13 +78,15 @@ impl Metadata {
         let msg_id = msg.message.id();
         match msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, .. }, ..
+                cmd: Cmd::Data { cmd, .. },
+                ..
             } => {
                 let mut writing = Writing::new(cmd, msg);
                 writing.get_result(&mut self.elder_stores)
             }
             Message::Query {
-                query: Query::Data(query), ..
+                query: Query::Data(query),
+                ..
             } => {
                 let reading = Reading::new(query, msg);
                 reading.get_result(&self.elder_stores)

@@ -1,9 +1,6 @@
 use super::validator::Validator;
-use crate::{cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions, node::keys::NodeKeys};
-use safe_nd::{
-    AccountId, Message, MessageId, Money,
-    TransferValidated, NetworkCmd,
-};
+use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
+use safe_nd::{AccountId, Message, MessageId, Money, NetworkCmd, TransferValidated};
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
 
@@ -13,10 +10,7 @@ pub(super) struct SectionFunds {
 }
 
 impl SectionFunds {
-    pub fn new(
-        actor: TransferActor<Validator>,
-        decisions: ElderMsgDecisions,
-    ) -> Self {
+    pub fn new(actor: TransferActor<Validator>, decisions: ElderMsgDecisions) -> Self {
         Self { actor, decisions }
     }
 

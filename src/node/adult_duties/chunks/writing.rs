@@ -29,10 +29,7 @@ impl Writing {
                 if self.verify(&self.msg) {
                     storage.store(&data, self.msg.id(), self.msg.origin)
                 } else {
-                    error!(
-                        "Accumulated signature for {:?} is invalid!",
-                        &self.msg.id()
-                    );
+                    error!("Accumulated signature for {:?} is invalid!", &self.msg.id());
                     None
                 }
             }

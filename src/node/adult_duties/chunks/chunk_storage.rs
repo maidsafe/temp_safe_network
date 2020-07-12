@@ -10,9 +10,8 @@ use crate::node::msg_decisions::AdultMsgDecisions;
 use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
-    AdultDuty, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
-    MsgSender, NetworkCmdError, NodePublicId, QueryResponse, NetworkEvent, Signature,
-    Result as NdResult,
+    AdultDuty, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId, MsgSender,
+    NetworkCmdError, NetworkEvent, NodePublicId, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
     cell::Cell,
@@ -56,11 +55,8 @@ impl ChunkStorage {
         origin: MsgSender,
     ) -> Option<OutboundMsg> {
         if let Err(error) = self.try_store(data) {
-            self.decisions.error(
-                CmdError::Data(error),
-                msg_id,
-                origin.address(),
-            )
+            self.decisions
+                .error(CmdError::Data(error), msg_id, origin.address())
         }
         None
     }
@@ -103,7 +99,9 @@ impl ChunkStorage {
             );
             return Err(NdError::DataExists);
         }
-        self.chunks.put(&data).map_err(|error| error.to_string().into())
+        self.chunks
+            .put(&data)
+            .map_err(|error| error.to_string().into())
     }
 
     pub(crate) fn get(
@@ -112,7 +110,8 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<OutboundMsg> {
-        let result = self.chunks
+        let result = self
+            .chunks
             .get(&address)
             .map_err(|error| error.to_string().into());
         self.decisions.send(Message::QueryResponse {
@@ -173,11 +172,8 @@ impl ChunkStorage {
             .map_err(|error| error.to_string().into());
 
         if let Err(error) = result {
-            self.decisions.error(
-                CmdError::Data(error),
-                msg_id,
-                origin.address(),
-            )
+            self.decisions
+                .error(CmdError::Data(error), msg_id, origin.address())
         }
         None
     }

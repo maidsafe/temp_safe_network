@@ -15,15 +15,16 @@ use self::{
 };
 use crate::{
     cmd::{GroupDecision, OutboundMsg},
-    node::Init,
-    Config, messaging::Messaging, Result,
+    messaging::Messaging,
     node::keys::NodeKeys,
     node::msg_decisions::ElderMsgDecisions,
+    node::Init,
+    Config, Result,
 };
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
-use safe_nd::{ElderDuty, AuthCmd, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
+use safe_nd::{AuthCmd, Cmd, ElderDuty, Message, MsgEnvelope, NodePublicId, PublicId, Query};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -94,10 +95,7 @@ impl Gateway {
     /// Temporary, while Authenticator is not implemented at app layer.
     /// If a request within OutboundMsg::ForwardClientRequest issued by us in `handle_consensused_cmd`
     /// was made by Gateway and destined to our section, this is where the actual request will end up.
-    pub fn handle_auth_cmd(
-        &mut self,
-        msg: MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    pub fn handle_auth_cmd(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         self.auth.finalise(msg)
     }
 

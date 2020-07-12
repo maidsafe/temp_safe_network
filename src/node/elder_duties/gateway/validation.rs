@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::msg_decisions::ElderMsgDecisions, cmd::OutboundMsg};
+use crate::{cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions};
 use log::trace;
 use safe_nd::{
-    Account, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery,
+    Account, AccountWrite, BlobRead, BlobWrite, Cmd, CmdError, DataCmd, DataQuery,
     Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message,
-    MsgEnvelope, SData, SDataAddress, SequenceRead, SequenceWrite,
-    Query, CmdError,
+    MsgEnvelope, Query, SData, SDataAddress, SequenceRead, SequenceWrite,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -111,19 +110,27 @@ impl Sequences {
                 self,
                 msg.origin.id()
             );
-            return self
-                .decisions
-                .error(CmdError::Data(NdError::InvalidOwners), msg.id(), msg.origin);
+            return self.decisions.error(
+                CmdError::Data(NdError::InvalidOwners),
+                msg.id(),
+                msg.origin,
+            );
         }
         self.decisions.vote(msg)
     }
 
     // on client request
-    fn initiate_deletion(&mut self, address: SDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_deletion(
+        &mut self,
+        address: SDataAddress,
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         if address.is_pub() {
-            return self
-                .decisions
-                .error(CmdError::Data(NdError::InvalidOperation), msg.id(), msg.origin);
+            return self.decisions.error(
+                CmdError::Data(NdError::InvalidOperation),
+                msg.id(),
+                msg.origin,
+            );
         }
         self.decisions.vote(msg)
     }
@@ -136,8 +143,7 @@ impl Sequences {
     fn extract_read(&self, msg: MsgEnvelope) -> Option<SequenceRead> {
         match msg.message {
             Message::Query {
-                query:
-                    Query::Data(DataQuery::Sequence(query)),
+                query: Query::Data(DataQuery::Sequence(query)),
                 ..
             } => Some(query),
             _ => return None,
@@ -222,10 +228,17 @@ impl Blobs {
     }
 
     // on client request
-    fn initiate_deletion(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_deletion(
+        &mut self,
+        address: IDataAddress,
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         if address.kind() == IDataKind::Pub {
-            self.decisions
-                .error(CmdError::Data(NdError::InvalidOperation), msg.id(), msg.origin)
+            self.decisions.error(
+                CmdError::Data(NdError::InvalidOperation),
+                msg.id(),
+                msg.origin,
+            )
         }
         self.decisions.vote(msg)
     }
@@ -233,8 +246,7 @@ impl Blobs {
     fn extract_read(&self, msg: MsgEnvelope) -> Option<BlobRead> {
         match msg.message {
             Message::Query {
-                query:
-                    Query::Data(DataQuery::Blob(query)),
+                query: Query::Data(DataQuery::Blob(query)),
                 ..
             } => Some(query),
             _ => return None,
@@ -304,7 +316,11 @@ impl Maps {
                 self,
                 msg.origin.id()
             );
-            return self.decisions.error(CmdError::Data(NdError::InvalidOwners), msg.id(), msg.origin);
+            return self.decisions.error(
+                CmdError::Data(NdError::InvalidOwners),
+                msg.id(),
+                msg.origin,
+            );
         }
 
         self.decisions.vote(msg)
@@ -313,8 +329,7 @@ impl Maps {
     fn extract_read(&self, msg: MsgEnvelope) -> Option<MapRead> {
         match msg.message {
             Message::Query {
-                query:
-                    Query::Data(DataQuery::Map(query)),
+                query: Query::Data(DataQuery::Map(query)),
                 ..
             } => Some(query),
             _ => return None,
@@ -369,7 +384,11 @@ impl Accounts {
     pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let account = self.extract_account_write(msg)?;
         if !account.size_is_valid() {
-            return self.decisions.error(CmdError::Data(NdError::ExceededSize), msg.id(), msg.origin);
+            return self.decisions.error(
+                CmdError::Data(NdError::ExceededSize),
+                msg.id(),
+                msg.origin,
+            );
         }
         self.decisions.vote(msg)
     }

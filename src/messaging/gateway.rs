@@ -6,15 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::elder_duties::gateway::auth::{ClientInfo, ClientMsg}};
+use crate::node::elder_duties::gateway::auth::{ClientInfo, ClientMsg};
 use crate::utils;
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node;
 use safe_nd::{
-    HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope, NodePublicId, PublicId,
-    Result, Signature, XorName, Error, Address,
+    Address, Error, HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope,
+    NodePublicId, PublicId, Result, Signature, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -174,7 +174,11 @@ impl Gateway {
         match msg.destination() {
             Address::Client { .. } => (),
             _ => {
-                error!("{} for message-id {:?}, Invalid destination.", self, msg.id());
+                error!(
+                    "{} for message-id {:?}, Invalid destination.",
+                    self,
+                    msg.id()
+                );
                 return Err(Error::InvalidOperation);
             }
         };
@@ -183,7 +187,11 @@ impl Gateway {
             | Message::CmdError { correlation_id, .. }
             | Message::QueryResponse { correlation_id, .. } => correlation_id,
             _ => {
-                error!("{} for message-id {:?}, Invalid message for client.", self, msg.id());
+                error!(
+                    "{} for message-id {:?}, Invalid message for client.",
+                    self,
+                    msg.id()
+                );
                 return Err(Error::InvalidOperation);
             }
         };

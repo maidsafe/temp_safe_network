@@ -42,7 +42,7 @@ pub(crate) enum OutboundMsg {
 // Need to Serialize/Deserialize to go through the consensus process.
 /// A GroupDecision is something only
 /// taking place at the network Gateways.
-#[derive(Debug, Clone, Serialize, Deserialize)] // Debug, 
+#[derive(Debug, Clone, Serialize, Deserialize)] // Debug,
 pub(crate) enum GroupDecision {
     /// When Gateway nodes consider a request
     /// valid, they will vote for it to be forwarded.

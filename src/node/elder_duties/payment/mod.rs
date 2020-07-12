@@ -8,10 +8,7 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
-use safe_nd::{
-    Cmd, ElderDuty, Message, MsgEnvelope,
-    PublicKey, Result, TransferError, Error,
-};
+use safe_nd::{Cmd, ElderDuty, Error, Message, MsgEnvelope, PublicKey, Result, TransferError};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -33,10 +30,7 @@ pub(crate) struct DataPayment {
 /// will clear the payment, and thereafter the node forwards
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl DataPayment {
-    pub fn new(
-        keys: NodeKeys,
-        replica: Rc<RefCell<ReplicaManager>>,
-    ) -> Self {
+    pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Payment);
         Self {
             keys,
@@ -48,7 +42,8 @@ impl DataPayment {
     pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let (cmd, payment) = match msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, payment }, ..
+                cmd: Cmd::Data { cmd, payment },
+                ..
             } => (cmd, payment),
             _ => return None,
         };
@@ -63,7 +58,7 @@ impl DataPayment {
                 }
                 None
             }
-            _ => Some(TransferRegistration(Error::NoSuchRecipient))
+            _ => Some(TransferRegistration(Error::NoSuchRecipient)),
         };
         if let Some(err) = result {
             let error = CmdError::Transfer(err);

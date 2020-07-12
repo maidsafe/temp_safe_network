@@ -15,28 +15,25 @@ pub(crate) struct SectionMembers {
 }
 
 impl SectionMembers {
-
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
-        Self {
-            routing
-        }
+        Self { routing }
     }
 
     pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<&XorName> {
         self.routing
-                .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
-                .into_iter()
-                .take(count)
-                .map(|p2p_node| XorName(p2p_node.name().0))
-                .collect::<Vec<_>>()
+            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
     }
 
     pub fn our_elders_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<&XorName> {
         routing
-                .our_elders_sorted_by_distance_to(&routing::XorName(target.0))
-                .into_iter()
-                .take(count)
-                .map(|p2p_node| XorName(p2p_node.name().0))
-                .collect::<Vec<_>>()
+            .our_elders_sorted_by_distance_to(&routing::XorName(target.0))
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
     }
 }

@@ -6,13 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::OutboundMsg, node::Init, utils, Config, Result, ToDbKey, node::section_members::SectionMembers, node::msg_decisions::ElderMsgDecisions};
+use crate::{
+    cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions,
+    node::section_members::SectionMembers, node::Init, utils, Config, Result, ToDbKey,
+};
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    BlobRead, BlobWrite, CmdError, Error as NdError, IData,
-    IDataAddress, Message, MessageId, MsgEnvelope, NetworkCmd, PublicKey,
-    QueryResponse, Result as NdResult, XorName,
+    BlobRead, BlobWrite, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
+    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -522,11 +524,13 @@ impl BlobRegister {
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = IMMUTABLE_DATA_ADULT_COPY_COUNT;
-        let mut closest_adults = self.section_members
+        let mut closest_adults = self
+            .section_members
             .our_adults_sorted_by_distance_to(&target, take);
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
             let take = IMMUTABLE_DATA_COPY_COUNT - closest_adults.len();
-            let mut closest_elders = self.section_members
+            let mut closest_elders = self
+                .section_members
                 .our_elders_sorted_by_distance_to(&target.0, take);
             closest_adults.append(&mut closest_elders);
             closest_adults

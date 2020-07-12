@@ -6,17 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod validator;
 mod section_funds;
 mod system;
+mod validator;
 
-pub use self::{system::FarmingSystem, validator::Validator};
 use self::section_funds::SectionFunds;
-use crate::{messaging::Messaging, cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions, node::keys::NodeKeys};
-use safe_farming::{Accumulation, RewardCounter, StorageRewards};
-use safe_nd::{
-    AccountId, ElderDuty, Money, XorName,
+pub use self::{system::FarmingSystem, validator::Validator};
+use crate::{
+    cmd::OutboundMsg, messaging::Messaging, node::keys::NodeKeys,
+    node::msg_decisions::ElderMsgDecisions,
 };
+use safe_farming::{Accumulation, RewardCounter, StorageRewards};
+use safe_nd::{AccountId, ElderDuty, Money, XorName};
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
 
@@ -56,7 +57,9 @@ impl Rewards {
             }
         };
         if counter.reward > Money::zero() {
-            return self.section_funds.initiate_reward_payout(counter.reward, id);
+            return self
+                .section_funds
+                .initiate_reward_payout(counter.reward, id);
         }
         None
     }

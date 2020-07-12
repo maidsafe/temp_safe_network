@@ -9,12 +9,13 @@
 mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
-use crate::{utils, cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
+use crate::{
+    cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions, utils,
+};
 use log::warn;
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind,
-    Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
-    PublicId, QueryResponse, Query,
+    AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind, Error as NdError, Message,
+    MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, PublicId, Query, QueryResponse,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -31,7 +32,11 @@ pub(super) struct Auth {
 
 impl Auth {
     pub fn new(keys: NodeKeys, auth_keys: AuthKeysDb, decisions: ElderMsgDecisions) -> Self {
-        Self { keys, auth_keys, decisions }
+        Self {
+            keys,
+            auth_keys,
+            decisions,
+        }
     }
 
     pub(super) fn initiate(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
@@ -49,7 +54,11 @@ impl Auth {
     }
 
     // If the client is app, check if it is authorised to perform the given request.
-    pub fn authorise_app(&mut self, public_id: &PublicId, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn authorise_app(
+        &mut self,
+        public_id: &PublicId,
+        msg: &MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
             _ => return None,
@@ -158,8 +167,11 @@ impl Auth {
                 if self.is_valid_client_signature(&msg) {
                     None
                 } else {
-                    self.decisions
-                        .error(CmdError::Auth(NdError::AccessDenied), msg.id(), msg.origin)
+                    self.decisions.error(
+                        CmdError::Auth(NdError::AccessDenied),
+                        msg.id(),
+                        msg.origin,
+                    )
                 }
             }
         }

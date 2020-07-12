@@ -19,16 +19,19 @@ use self::{
     rewards::{Rewards, Validator},
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
-use crate::{cmd::OutboundMsg, messaging::Messaging, node::section_members::SectionMembers, node::keys::NodeKeys, node::Init, Config, utils, Result};
+use crate::{
+    cmd::OutboundMsg, messaging::Messaging, node::keys::NodeKeys,
+    node::section_members::SectionMembers, node::Init, utils, Config, Result,
+};
 use routing::{Node as Routing, RoutingError};
-use safe_transfers::TransferActor;
 use safe_nd::XorName;
-use threshold_crypto::{self, serde_impl::SerdeSecret};
+use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use threshold_crypto::{self, serde_impl::SerdeSecret};
 
 pub(crate) struct ElderDuties {
     keys: NodeKeys,
@@ -74,7 +77,7 @@ impl ElderDuties {
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
         let pk_set = replica_manager.borrow().replicas_pk_set().unwrap();
-        let actor = TransferActor::new(keypair, pk_set, Validator { });
+        let actor = TransferActor::new(keypair, pk_set, Validator {});
         let rewards = Rewards::new(keys.clone(), actor);
 
         Ok(Self {

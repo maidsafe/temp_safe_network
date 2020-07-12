@@ -9,14 +9,14 @@
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
     cmd::OutboundMsg,
+    node::msg_decisions::ElderMsgDecisions,
     node::Init,
     Config, Result,
-    node::msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
-    CmdError, Error as NdError, MData, MDataAction, MDataAddress,
-    MDataEntryActions, MDataPermissionSet, MDataValue, MapRead, MapWrite, Message, MessageId,
-    MsgEnvelope, MsgSender, NodePublicId, PublicKey, QueryResponse, Result as NdResult,
+    CmdError, Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions,
+    MDataPermissionSet, MDataValue, MapRead, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
+    NodePublicId, PublicKey, QueryResponse, Result as NdResult,
 };
 use std::{
     cell::Cell,
@@ -248,7 +248,12 @@ impl MapStorage {
     }
 
     /// Get MData value.
-    fn get_value(&self, address: MDataAddress, key: &[u8], msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn get_value(
+        &self,
+        address: MDataAddress,
+        key: &[u8],
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         let res = self.get_chunk(&address, msg.origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => md
@@ -327,13 +332,15 @@ impl MapStorage {
     }
 
     /// Get MData user permissions.
-    fn list_user_permissions(&self, address: MDataAddress, user: PublicKey, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn list_user_permissions(
+        &self,
+        address: MDataAddress,
+        user: PublicKey,
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, msg.origin, MDataAction::Read)?
-            .and_then(|data| {
-                data.user_permissions(user)
-                    .map(MDataPermissionSet::clone)
-            });
+            .and_then(|data| data.user_permissions(user).map(MDataPermissionSet::clone));
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::ListMapUserPermissions(result),
             id: MessageId::new(),

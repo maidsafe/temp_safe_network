@@ -41,11 +41,19 @@ impl Writing {
         storage.write(write, self.msg)
     }
 
-    fn sequence(&mut self, write: SequenceWrite, storage: &mut SequenceStorage) -> Option<OutboundMsg> {
+    fn sequence(
+        &mut self,
+        write: SequenceWrite,
+        storage: &mut SequenceStorage,
+    ) -> Option<OutboundMsg> {
         storage.write(write, self.msg.id(), self.msg.origin)
     }
 
-    fn account(&mut self, write: AccountWrite, storage: &mut AccountStorage) -> Option<OutboundMsg> {
+    fn account(
+        &mut self,
+        write: AccountWrite,
+        storage: &mut AccountStorage,
+    ) -> Option<OutboundMsg> {
         storage.write(write, self.msg.id(), self.msg.origin)
     }
 }

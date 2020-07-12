@@ -9,15 +9,15 @@
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
     cmd::OutboundMsg,
+    node::msg_decisions::ElderMsgDecisions,
     node::Init,
     Config, Result,
-    node::msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
-    Error as NdError, Message, MessageId, MsgSender, NodePublicId,
-    QueryResponse, Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex,
-    SDataOwner, SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser,
-    SDataWriteOp, SequenceRead, SequenceWrite, CmdError,
+    CmdError, Error as NdError, Message, MessageId, MsgSender, NodePublicId, QueryResponse,
+    Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner,
+    SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp,
+    SequenceRead, SequenceWrite,
 };
 use std::{
     cell::Cell,
@@ -47,7 +47,11 @@ impl SequenceStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, chunks, decisions })
+        Ok(Self {
+            id,
+            chunks,
+            decisions,
+        })
     }
 
     pub(super) fn read(
@@ -99,7 +103,12 @@ impl SequenceStorage {
         self.ok_or_error(result, msg_id, origin)
     }
 
-    fn get(&self, address: SDataAddress, msg_id: MessageId, origin: MsgSender) -> Option<OutboundMsg> {
+    fn get(
+        &self,
+        address: SDataAddress,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = self.get_chunk(address, SDataAction::Read, origin);
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetSequence(result),
@@ -179,12 +188,12 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: MsgSender,
     ) -> Option<OutboundMsg> {
-        let result = self
-            .get_chunk(address, SDataAction::Read, origin)
-            .and_then(|sdata| match sdata.last_entry() {
-                Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
-                None => Err(NdError::NoSuchEntry),
-            });
+        let result =
+            self.get_chunk(address, SDataAction::Read, origin)
+                .and_then(|sdata| match sdata.last_entry() {
+                    Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
+                    None => Err(NdError::NoSuchEntry),
+                });
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceLastEntry(result),
             id: MessageId::new(),
