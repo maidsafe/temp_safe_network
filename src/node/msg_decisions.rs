@@ -53,7 +53,43 @@ impl AdultMsgDecisions {
     }
 }
 
-impl ElderMsgDecisions {}
+impl ElderMsgDecisions {
+    pub fn new(keys: NodeKeys, duty: ElderDuty) -> Self {
+        let util = MsgDecisions::new(keys, Duty::Elder(duty));
+        Self { util }
+    }
+
+    pub fn vote(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+        let msg = self.util.set_proxy(msg);
+        Some(OutboundMsg::VoteFor(GroupDecision::Forward(msg)))
+    }
+
+    pub fn forward(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+        let msg = self.util.set_proxy(msg);
+        Some(OutboundMsg::SendToSection(msg))
+    }
+
+    pub fn send(&self, message: Message) -> Option<OutboundMsg> {
+        self.util.send(msg)
+    }
+
+    pub fn send_to_adults(
+        &self,
+        targets: BTreeSet<XorName>,
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
+        self.util.send_to_adults(targets, msg)
+    }
+
+    pub fn error(
+        &self,
+        error: CmdError,
+        msg_id: MessageId,
+        origin: MsgSender,
+    ) -> Option<OutboundMsg> {
+        self.util.error(error, msg_id, origin)
+    }
+}
 
 impl MsgDecisions {
     pub fn new(keys: NodeKeys, duty: Duty) Self {
