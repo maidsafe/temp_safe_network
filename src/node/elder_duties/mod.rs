@@ -20,7 +20,7 @@ use self::{
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    cmd::OutboundMsg, messaging::Messaging, node::keys::NodeKeys,
+    cmd::OutboundMsg, messaging::ClientMessaging, node::keys::NodeKeys,
     node::section_members::SectionMembers, node::Init, utils, Config, Result,
 };
 use routing::{Node as Routing, RoutingError};
@@ -50,10 +50,10 @@ impl ElderDuties {
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
-        messaging: Rc<RefCell<Messaging>>,
+        messaging: ClientMessaging,
     ) -> Result<Self> {
         // Gateway
-        let gateway = Gateway::new(keys.clone(), &config, init_mode, messaging.clone())?;
+        let gateway = Gateway::new(keys.clone(), &config, init_mode, messaging)?;
 
         let section_members = SectionMembers::new(routing.clone());
         // Metadata

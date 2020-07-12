@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod replica_manager;
+pub mod replica_manager;
 
 pub use self::replica_manager::ReplicaManager;
 use crate::{
-    cmd::OutboundMsg, keys::NodeKeys, node::elder_duties::msg_decisions::ElderMsgDecisions,
+    cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
     Cmd, CmdError, DebitAgreementProof, ElderDuty, Error, Event, Message, MessageId, MsgEnvelope,
@@ -101,24 +101,18 @@ impl Transfers {
         origin: MsgSender,
     ) -> Option<OutboundMsg> {
         match cmd {
-            NetworkCmd::PropagateTransfer(proof) => self.receive_propagated(&proof, msg_id, origin),
-            NetworkCmd::InitiateRewardPayout {
-                signed_transfer,
-                ..
-            } => ,
-            NetworkCmd::FinaliseRewardPayout{
-                debit_agreement,
-                ..
-            } => match self.replica.borrow_mut().register(proof) {
+            NetworkCmd::PropagateTransfer(debit_proof) => self.receive_propagated(&debit_proof, msg_id, origin),
+            NetworkCmd::InitiateRewardPayout(signed_transfer) => None, // TODO
+            NetworkCmd::FinaliseRewardPayout(debit_proof) => match self.replica.borrow_mut().register(&debit_proof) {
                     Ok(None) => None,
                     Ok(Some(event)) => {
                         // the transfer is then propagated, and will reach the recipient section
                         self.decisions.send(Message::NetworkCmd {
-                            cmd: NetworkCmd::PropagateTransfer(proof),
+                            cmd: NetworkCmd::PropagateTransfer(event.debit_proof),
                             id: MessageId::new(),
                         })
                     }
-                    Err(err) => self.decisions.error(CmdError::Transfer(error), msg_id, origin),
+                    Err(error) => self.decisions.error(CmdError::Transfer(TransferError::TransferRegistration(error)), msg_id, origin),
                 }
         }
     }

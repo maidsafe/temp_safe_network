@@ -15,14 +15,9 @@ use crate::{
 use log::warn;
 use safe_nd::{
     AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind, Error as NdError, Message,
-    MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, PublicId, Query, QueryResponse,
+    MessageId, AuthorisationKind, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, PublicId, Query, QueryResponse,
 };
 use std::fmt::{self, Display, Formatter};
-
-#[derive(Clone, Debug)]
-pub struct ClientInfo {
-    pub public_id: PublicId,
-}
 
 pub(super) struct Auth {
     keys: NodeKeys,
@@ -74,36 +69,34 @@ impl Auth {
         };
 
         let result = match auth_kind {
-            RequestAuthKind::Data(DataAuthKind::PublicRead) => Ok(()),
-            RequestAuthKind::Data(DataAuthKind::PrivateRead) => {
+            AuthorisationKind::Data(DataAuthKind::PublicRead) => Ok(()),
+            AuthorisationKind::Data(DataAuthKind::PrivateRead) => {
                 self.check_app_permissions(app_id, |_| true)
             }
-            RequestAuthKind::Money(MoneyAuthKind::ReadBalance) => {
+            AuthorisationKind::Money(MoneyAuthKind::ReadBalance) => {
                 self.check_app_permissions(app_id, |perms| perms.read_balance)
             }
-            RequestAuthKind::Money(MoneyAuthKind::ReadHistory) => {
+            AuthorisationKind::Money(MoneyAuthKind::ReadHistory) => {
                 self.check_app_permissions(app_id, |perms| perms.read_transfer_history)
             }
-            RequestAuthKind::Data(DataAuthKind::Write) => {
+            AuthorisationKind::Data(DataAuthKind::Write) => {
                 self.check_app_permissions(app_id, |perms| perms.data_mutations)
             }
-            RequestAuthKind::Money(MoneyAuthKind::Transfer) => {
+            AuthorisationKind::Money(MoneyAuthKind::Transfer) => {
                 self.check_app_permissions(app_id, |perms| perms.transfer_money)
             }
-            RequestAuthKind::Misc(MiscAuthKind::WriteAndTransfer) => self
+            AuthorisationKind::Misc(MiscAuthKind::WriteAndTransfer) => self
                 .check_app_permissions(app_id, |perms| {
                     perms.transfer_money && perms.data_mutations
                 }),
-            RequestAuthKind::Misc(MiscAuthKind::ManageAppKeys) => Err(NdError::AccessDenied),
-            RequestAuthKind::None => Err(NdError::AccessDenied),
+            AuthorisationKind::Misc(MiscAuthKind::ManageAppKeys) => Err(NdError::AccessDenied),
+            AuthorisationKind::None => Err(NdError::AccessDenied),
         };
 
         if let Err(error) = result {
-            self.decisions.error(
-                CmdError::Auth(error),
-                msg.message.id(),
-                msg.origin.address(),
-            )
+            return self
+                .decisions
+                .error(CmdError::Auth(error), msg.message.id(), msg.origin);
         }
         None
     }
@@ -150,11 +143,9 @@ impl Auth {
             DelAuthKey { key, version, .. } => self.auth_keys.delete(msg.origin.id(), key, version),
         };
         if let Err(error) = result {
-            self.decisions.error(
-                CmdError::Auth(error),
-                msg.message.id(),
-                msg.origin.address(),
-            )
+            return self
+                .decisions
+                .error(CmdError::Auth(error), msg.message.id(), msg.origin);
         }
         None
     }
@@ -162,7 +153,7 @@ impl Auth {
     // Verify that valid signature is provided if the request requires it.
     pub fn verify_client_signature(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         match msg.authorisation_kind() {
-            RequestAuthKind::Data(DataAuthKind::PublicRead) => None,
+            AuthorisationKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
                 if self.is_valid_client_signature(&msg) {
                     None

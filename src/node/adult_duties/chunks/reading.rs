@@ -8,7 +8,8 @@
 
 use super::chunk_storage::ChunkStorage;
 use crate::{cmd::OutboundMsg, utils};
-use safe_nd::{BlobRead, MsgEnvelope, MsgSender};
+use log::error;
+use safe_nd::{BlobRead, MsgEnvelope, MsgSender, Address};
 use serde::Serialize;
 
 pub(super) struct Reading {
@@ -25,7 +26,7 @@ impl Reading {
         let BlobRead::Get(address) = self.read;
         if let Address::Section(_) = self.msg.most_recent_sender().address() {
             if self.verify(&self.msg.message) {
-                storage.get(*address, self.msg.id(), self.msg.origin)
+                storage.get(address, self.msg.id(), self.msg.origin)
             } else {
                 error!("Accumulated signature is invalid!");
                 None

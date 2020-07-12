@@ -12,6 +12,7 @@ use crate::{
     node::msg_decisions::ElderMsgDecisions,
     node::Init,
     Config, Result,
+    node::keys::NodeKeys,
 };
 use safe_nd::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, NodePublicId, QueryResponse,
@@ -26,14 +27,14 @@ use std::{
 };
 
 pub(super) struct SequenceStorage {
-    id: NodePublicId,
+    keys: NodeKeys,
     chunks: SequenceChunkStore,
     decisions: ElderMsgDecisions,
 }
 
 impl SequenceStorage {
     pub(super) fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
@@ -48,7 +49,7 @@ impl SequenceStorage {
             init_mode,
         )?;
         Ok(Self {
-            id,
+            keys,
             chunks,
             decisions,
         })
@@ -379,6 +380,6 @@ impl SequenceStorage {
 
 impl Display for SequenceStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

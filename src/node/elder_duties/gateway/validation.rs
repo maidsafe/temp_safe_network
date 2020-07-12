@@ -39,11 +39,11 @@ impl Validation {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
                 ..
-            } => self.initiate_write(cmd, msg),
+            } => self.initiate_write(*cmd, msg),
             Message::Query {
                 query: Query::Data(query),
                 ..
-            } => self.initiate_read(query, msg),
+            } => self.initiate_read(*query, msg),
             _ => return None,
         }
     }
@@ -220,8 +220,11 @@ impl Blobs {
                     self,
                     msg.origin.id()
                 );
-                self.decisions
-                    .error(CmdError::Data(NdError::InvalidOwners), msg.id(), msg.origin)
+                return self.decisions.error(
+                    CmdError::Data(NdError::InvalidOwners),
+                    msg.id(),
+                    msg.origin,
+                );
             }
         }
         self.decisions.vote(msg)
@@ -233,14 +236,15 @@ impl Blobs {
         address: IDataAddress,
         msg: MsgEnvelope,
     ) -> Option<OutboundMsg> {
-        if address.kind() == IDataKind::Pub {
+        if address.kind() == IDataKind::Unpub {
+            self.decisions.vote(msg)
+        } else {
             self.decisions.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
                 msg.origin,
             )
         }
-        self.decisions.vote(msg)
     }
 
     fn extract_read(&self, msg: MsgEnvelope) -> Option<BlobRead> {

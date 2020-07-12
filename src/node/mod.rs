@@ -16,7 +16,7 @@ mod section_members;
 use crate::{
     accumulator::Accumulator,
     cmd::{GroupDecision, OutboundMsg},
-    messaging::Messaging,
+    messaging::{Messaging, ClientMessaging},
     node::{
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
@@ -124,7 +124,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 &total_used_space,
                 init_mode,
                 routing.clone(),
-                messaging.clone(),
+                ClientMessaging::new(id.public_id().clone(), routing.clone()),
             )?;
             State::Elder {
                 duties,
@@ -207,7 +207,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
         let duties = AdultDuties::new(
-            self.id.public_id().clone(),
+            self.keys.clone(),
             &config,
             &total_used_space,
             Init::New,
@@ -230,7 +230,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             &total_used_space,
             Init::New,
             self.routing.clone(),
-            self.messaging.clone(),
+            ClientMessaging::new(self.id.public_id().clone(), self.routing.clone()),
         )?;
         self.state = State::Elder {
             duties,

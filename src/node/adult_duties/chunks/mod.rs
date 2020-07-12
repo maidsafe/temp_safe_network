@@ -10,7 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{cmd::OutboundMsg, node::Init, Config, Result};
+use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::Init, Config, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use routing::Node;
@@ -26,23 +26,24 @@ use std::{
 };
 
 pub(crate) struct Chunks {
-    id: NodePublicId,
+    keys: NodeKeys,
     chunk_storage: ChunkStorage,
     routing_node: Rc<RefCell<Node>>,
 }
 
 impl Chunks {
     pub fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
-        let chunk_storage = ChunkStorage::new(id.clone(), config, total_used_space, init_mode)?;
+        let chunk_storage =
+            ChunkStorage::new(keys.clone(), config, total_used_space, init_mode)?;
 
         Ok(Self {
-            id,
+            keys,
             chunk_storage,
             routing_node,
         })
@@ -168,6 +169,6 @@ impl Chunks {
 
 impl Display for Chunks {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

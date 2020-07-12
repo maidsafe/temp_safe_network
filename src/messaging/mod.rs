@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod gateway;
+pub mod client;
 
+pub use client::{ClientInfo, ClientMessaging, ClientMsg};
 use crate::{
     accumulator::Accumulator,
     cmd::{GroupDecision, OutboundMsg},
-    node::adult_duties::AdultDuties,
-    node::elder_duties::ElderDuties,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -58,7 +57,7 @@ impl Messaging {
     }
 
     pub fn send_to_nodes(
-        &mut self,
+        &self,
         targets: BTreeSet<XorName>,
         msg: MsgEnvelope,
     ) -> Option<OutboundMsg> {

@@ -148,12 +148,12 @@ impl AccountStorage {
         origin: MsgSender,
     ) -> Option<OutboundMsg> {
         if let Err(error) = result {
-            self.decisions.send(Message::CmdError {
+            return self.decisions.send(Message::CmdError {
                 id: MessageId::new(),
                 error: CmdError::Data(error),
                 correlation_id: msg_id,
                 cmd_origin: origin.address(),
-            })
+            });
         }
         None
     }

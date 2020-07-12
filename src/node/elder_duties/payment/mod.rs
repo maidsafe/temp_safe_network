@@ -8,7 +8,7 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
-use safe_nd::{Cmd, ElderDuty, Error, Message, MsgEnvelope, PublicKey, Result, TransferError};
+use safe_nd::{Cmd, ElderDuty, Error, Message, MsgEnvelope, CmdError, PublicKey, Result, TransferError};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -40,6 +40,7 @@ impl DataPayment {
     }
 
     pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+        use TransferError::*;
         let (cmd, payment) = match msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, payment },
@@ -55,8 +56,9 @@ impl DataPayment {
             Ok(section) => {
                 if payment.to() != section {
                     Some(TransferRegistration(Error::NoSuchRecipient))
+                } else {
+                    None
                 }
-                None
             }
             _ => Some(TransferRegistration(Error::NoSuchRecipient)),
         };

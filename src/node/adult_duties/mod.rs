@@ -9,7 +9,7 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{cmd::OutboundMsg, node::Init, Config, Result};
+use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::Init, Config, Result};
 use routing::Node as Routing;
 use safe_nd::{MsgEnvelope, NodePublicId};
 use std::{
@@ -19,28 +19,28 @@ use std::{
 };
 
 pub(crate) struct AdultDuties {
-    id: NodePublicId,
+    keys: NodeKeys,
     chunks: Chunks,
     _routing: Rc<RefCell<Routing>>,
 }
 
 impl AdultDuties {
     pub fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
         let chunks = Chunks::new(
-            id.clone(),
+            keys.clone(),
             &config,
             &total_used_space,
             init_mode,
             routing.clone(),
         )?;
         Ok(Self {
-            id,
+            keys,
             chunks,
             _routing: routing,
         })
@@ -53,6 +53,6 @@ impl AdultDuties {
 
 impl Display for AdultDuties {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

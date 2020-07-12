@@ -6,12 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::elder_duties::gateway::auth::{ClientInfo, ClientMsg};
 use crate::utils;
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
-use routing::Node;
+use routing::Node as Routing;
 use safe_nd::{
     Address, Error, HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope,
     NodePublicId, PublicId, Result, Signature, XorName,
@@ -25,9 +24,26 @@ use std::{
     rc::Rc,
 };
 
-pub(super) struct Gateway {
+#[derive(Clone, Debug)]
+pub struct ClientMsg {
+    pub client: ClientInfo,
+    pub msg: MsgEnvelope,
+}
+
+#[derive(Clone, Debug)]
+pub struct ClientInfo {
+    pub public_id: PublicId,
+}
+
+impl Display for ClientInfo {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.public_id.name())
+    }
+}
+
+pub struct ClientMessaging {
     id: NodePublicId,
-    routing_node: Rc<RefCell<Node>>,
+    routing: Rc<RefCell<Routing>>,
     clients: HashMap<SocketAddr, ClientInfo>,
     pending_msg_ids: HashMap<MessageId, SocketAddr>,
     pending_actions: HashMap<MessageId, MsgEnvelope>,
@@ -35,11 +51,11 @@ pub(super) struct Gateway {
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
 }
 
-impl Gateway {
-    pub fn new(id: NodePublicId, routing_node: Rc<RefCell<Node>>) -> Self {
+impl ClientMessaging {
+    pub fn new(id: NodePublicId, routing: Rc<RefCell<Routing>>) -> Self {
         Self {
             id,
-            routing_node,
+            routing,
             clients: HashMap::<SocketAddr, ClientInfo>::new(),
             pending_msg_ids: Default::default(),
             pending_actions: Default::default(),
@@ -63,9 +79,9 @@ impl Gateway {
                         self,
                         "msg.get_type()",
                         msg.message.id(),
-                        client
+                        client,
                     );
-                    return Some(ClientMsg { peer_addr, msg });
+                    return Some(ClientMsg { client, msg });
                 }
             }
         };
@@ -224,7 +240,7 @@ impl Gateway {
                         self, peer_addr, public_id
                     );
                     if let Err(err) = self
-                        .routing_node
+                        .routing
                         .borrow_mut()
                         .disconnect_from_client(peer_addr)
                     {
@@ -244,7 +260,7 @@ impl Gateway {
                         self, public_id, peer_addr, err
                     );
                     if let Err(err) = self
-                        .routing_node
+                        .routing
                         .borrow_mut()
                         .disconnect_from_client(peer_addr)
                     {
@@ -258,7 +274,7 @@ impl Gateway {
                 self, peer_addr
             );
             if let Err(err) = self
-                .routing_node
+                .routing
                 .borrow_mut()
                 .disconnect_from_client(peer_addr)
             {
@@ -275,7 +291,7 @@ impl Gateway {
         rng: &mut R,
     ) {
         if !self
-            .routing_node
+            .routing
             .borrow()
             .matches_our_prefix(&routing::XorName(client_id.name().0))
             .unwrap_or(false)
@@ -285,7 +301,7 @@ impl Gateway {
                 client_id, peer_addr
             );
             let _ = self
-                .routing_node
+                .routing
                 .borrow_mut()
                 .disconnect_from_client(peer_addr);
         }
@@ -304,7 +320,7 @@ impl Gateway {
         let msg = Bytes::from(msg);
 
         if let Err(e) = self
-            .routing_node
+            .routing
             .borrow_mut()
             .send_message_to_client(recipient, msg, 0)
         {
@@ -368,13 +384,13 @@ impl Gateway {
 
     fn try_bootstrap(&mut self, peer_addr: SocketAddr, client_id: &PublicId) {
         if !self
-            .routing_node
+            .routing
             .borrow()
             .matches_our_prefix(&routing::XorName(client_id.name().0))
             .unwrap_or(false)
         {
             let closest_known_elders = self
-                .routing_node
+                .routing
                 .borrow()
                 .our_elders_sorted_by_distance_to(&routing::XorName(client_id.name().0))
                 .into_iter()
@@ -394,7 +410,7 @@ impl Gateway {
             }
         } else {
             let elders = self
-                .routing_node
+                .routing
                 .borrow_mut()
                 .our_elders()
                 .map(|p2p_node| {
@@ -408,7 +424,7 @@ impl Gateway {
     }
 }
 
-impl Display for Gateway {
+impl Display for ClientMessaging {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }

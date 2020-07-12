@@ -531,7 +531,7 @@ impl BlobRegister {
             let take = IMMUTABLE_DATA_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
                 .section_members
-                .our_elders_sorted_by_distance_to(&target.0, take);
+                .our_elders_sorted_by_distance_to(&target, take);
             closest_adults.append(&mut closest_elders);
             closest_adults
         } else {

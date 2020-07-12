@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::msg_decisions::AdultMsgDecisions;
+use crate::node::{msg_decisions::AdultMsgDecisions, keys::NodeKeys};
 use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
@@ -20,14 +20,14 @@ use std::{
 };
 
 pub(crate) struct ChunkStorage {
-    id: NodePublicId,
+    keys: NodeKeys,
     chunks: ImmutableChunkStore,
     decisions: AdultMsgDecisions,
 }
 
 impl ChunkStorage {
     pub(crate) fn new(
-        id: NodePublicId,
+        keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
@@ -40,9 +40,9 @@ impl ChunkStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        let decisions = AdultMsgDecisions::new(id, AdultDuty::ChunkStorage);
+        let decisions = AdultMsgDecisions::new(keys.clone(), AdultDuty::ChunkStorage);
         Ok(Self {
-            id,
+            keys,
             chunks,
             decisions,
         })
@@ -55,8 +55,7 @@ impl ChunkStorage {
         origin: MsgSender,
     ) -> Option<OutboundMsg> {
         if let Err(error) = self.try_store(data) {
-            self.decisions
-                .error(CmdError::Data(error), msg_id, origin.address())
+            return self.decisions.error(CmdError::Data(error), msg_id, origin);
         }
         None
     }
@@ -155,25 +154,24 @@ impl ChunkStorage {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
             return None;
         }
-        let result = self
-            .chunks
-            .get(&address)
-            .and_then(|data| match data {
-                IData::Unpub(_) => Ok(()),
-                _ => {
-                    error!(
-                        "{}: Invalid DeletePrivate(IData::Public) encountered: {:?}",
-                        self, msg_id
-                    );
-                    Err(NdError::InvalidOperation)
-                }
-            })
-            .and_then(|_| self.chunks.delete(&address))
-            .map_err(|error| error.to_string().into());
-
+        
+        let result = match self.chunks.get(&address) {
+            Ok(IData::Unpub(_)) => {
+                self.chunks.delete(&address).map_err(|error| error.to_string().into())
+            },
+            Ok(_) => {
+                error!(
+                    "{}: Invalid DeletePrivate(IData::Public) encountered: {:?}",
+                    self, msg_id
+                );
+                Err(NdError::InvalidOperation)
+            }
+            _ => Err(NdError::NoSuchKey),
+            //err @ Err(_) => err.map_err(|error| error.to_string().into()),
+        };
+         
         if let Err(error) = result {
-            self.decisions
-                .error(CmdError::Data(error), msg_id, origin.address())
+            return self.decisions.error(CmdError::Data(error), msg_id, origin);
         }
         None
     }
@@ -181,6 +179,6 @@ impl ChunkStorage {
 
 impl Display for ChunkStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "{}", self.keys.public_key())
     }
 }

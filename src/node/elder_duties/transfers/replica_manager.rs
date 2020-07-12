@@ -24,7 +24,7 @@ use {
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 
-pub(super) struct ReplicaManager {
+pub struct ReplicaManager {
     store: EventStore,
     replica: Replica,
     section_proof_chain: SectionProofChain,

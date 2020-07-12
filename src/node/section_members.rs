@@ -8,6 +8,7 @@
 
 use routing::Node as Routing;
 use safe_nd::{Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
 pub(crate) struct SectionMembers {
@@ -19,8 +20,9 @@ impl SectionMembers {
         Self { routing }
     }
 
-    pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<&XorName> {
+    pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
         self.routing
+            .borrow()
             .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
             .into_iter()
             .take(count)
@@ -28,9 +30,10 @@ impl SectionMembers {
             .collect::<Vec<_>>()
     }
 
-    pub fn our_elders_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<&XorName> {
-        routing
-            .our_elders_sorted_by_distance_to(&routing::XorName(target.0))
+    pub fn our_elders_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
+        self.routing
+            .borrow()
+            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
             .into_iter()
             .take(count)
             .map(|p2p_node| XorName(p2p_node.name().0))

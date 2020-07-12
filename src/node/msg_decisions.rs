@@ -6,8 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::keys::NodeKeys;
-use safe_nd::{AdultDuty, DataCmd, Duty, ElderDuty};
+use crate::{utils, cmd::{GroupDecision, OutboundMsg}, node::keys::NodeKeys};
+use safe_nd::{
+    AdultDuty, CmdError, DataCmd, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
+    XorName,
+};
+use serde::Serialize;
+use std::collections::BTreeSet;
 
 #[derive(Clone)]
 pub(super) struct ElderMsgDecisions {
@@ -32,7 +37,7 @@ impl AdultMsgDecisions {
     }
 
     pub fn send(&self, message: Message) -> Option<OutboundMsg> {
-        self.util.send(msg)
+        self.util.send(message)
     }
 
     pub fn send_to_adults(
@@ -60,17 +65,17 @@ impl ElderMsgDecisions {
     }
 
     pub fn vote(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let msg = self.util.set_proxy(msg);
+        let msg = self.util.set_proxy(&msg);
         Some(OutboundMsg::VoteFor(GroupDecision::Forward(msg)))
     }
 
     pub fn forward(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let msg = self.util.set_proxy(msg);
+        let msg = self.util.set_proxy(&msg);
         Some(OutboundMsg::SendToSection(msg))
     }
 
     pub fn send(&self, message: Message) -> Option<OutboundMsg> {
-        self.util.send(msg)
+        self.util.send(message)
     }
 
     pub fn send_to_adults(
@@ -92,31 +97,30 @@ impl ElderMsgDecisions {
 }
 
 impl MsgDecisions {
-    pub fn new(keys: NodeKeys, duty: Duty) Self {
-        Self {
-            keys,
-            duty,
-        }
+    pub fn new(keys: NodeKeys, duty: Duty) -> Self {
+        Self { keys, duty }
     }
 
     pub fn send(&self, message: Message) -> Option<OutboundMsg> {
         let msg = MsgEnvelope {
             message,
-            origin: self.sign(message),
+            origin: self.sign(&message),
             proxies: Default::default(),
         };
         Some(OutboundMsg::SendToSection(msg))
     }
 
-    pub fn send_to_adults(&self, targets: BTreeSet<XorName>, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let msg = self.set_proxy(msg);
-        Some(OutboundMsg::SendToAdults{
-            targets,
-            msg,
-        })
+    pub fn send_to_adults(
+        &self,
+        targets: BTreeSet<XorName>,
+        msg: MsgEnvelope,
+    ) -> Option<OutboundMsg> {
+        let msg = self.set_proxy(&msg);
+        Some(OutboundMsg::SendToAdults { targets, msg })
     }
 
-    pub fn error(&self,
+    pub fn error(
+        &self,
         error: CmdError,
         msg_id: MessageId,
         origin: MsgSender,
@@ -125,7 +129,7 @@ impl MsgDecisions {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,
-            cmd_origin: origin,
+            cmd_origin: origin.address(),
         })
     }
 
@@ -139,7 +143,7 @@ impl MsgDecisions {
     }
 
     fn set_proxy(&self, msg: &MsgEnvelope) -> MsgEnvelope {
-    // origin signs the message, while proxies sign the envelope
+        // origin signs the message, while proxies sign the envelope
         msg.with_proxy(self.sign(msg))
     }
 }

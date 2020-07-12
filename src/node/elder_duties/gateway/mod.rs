@@ -10,12 +10,12 @@ mod auth;
 mod validation;
 
 use self::{
-    auth::{Auth, AuthKeysDb, ClientInfo},
+    auth::{Auth, AuthKeysDb},
     validation::Validation,
 };
 use crate::{
     cmd::{GroupDecision, OutboundMsg},
-    messaging::Messaging,
+    messaging::{ClientMsg, ClientInfo, ClientMessaging},
     node::keys::NodeKeys,
     node::msg_decisions::ElderMsgDecisions,
     node::Init,
@@ -36,12 +36,7 @@ pub(crate) struct Gateway {
     keys: NodeKeys,
     auth: Auth,
     data: Validation,
-    messaging: Rc<RefCell<Messaging>>,
-}
-
-pub(crate) struct ClientMsg {
-    pub client: ClientInfo,
-    pub msg: MsgEnvelope,
+    messaging: ClientMessaging,
 }
 
 impl Gateway {
@@ -49,7 +44,7 @@ impl Gateway {
         keys: NodeKeys,
         config: &Config,
         init_mode: Init,
-        messaging: Rc<RefCell<Messaging>>,
+        messaging: ClientMessaging,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
@@ -85,11 +80,14 @@ impl Gateway {
         bytes: &Bytes,
         rng: &mut R,
     ) -> Option<ClientMsg> {
-        self.messaging.try_parse_client_msg(peer_addr, bytes, rng)
+        self.messaging
+            .try_parse_client_msg(peer_addr, bytes, rng)
     }
 
     pub fn push_to_client(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        self.messaging.send_to_client(msg)
+        // TODO: Handle this result
+        let _ = self.messaging.send_to_client(msg);
+        None
     }
 
     /// Temporary, while Authenticator is not implemented at app layer.
@@ -114,7 +112,7 @@ impl Gateway {
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error);
         };
-        if let Some(error) = self.auth.authorise_app(&client, msg) {
+        if let Some(error) = self.auth.authorise_app(&client, &msg) {
             return Some(error);
         }
 
