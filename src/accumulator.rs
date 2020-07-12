@@ -1,4 +1,4 @@
-use crate::{msg::Message as VaultMsg, utils};
+use crate::utils;
 use log::{error, info};
 use routing::Node;
 use safe_nd::{

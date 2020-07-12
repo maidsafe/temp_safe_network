@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::msg::Message;
-use safe_nd::{MsgEnvelope, XorName, OutboundMsg};
+use safe_nd::{MsgEnvelope, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 

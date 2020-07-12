@@ -14,7 +14,7 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
-use crate::{node::Init, services::SectionMembers, Config, Result, cmd::OutboundMsg, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
+use crate::{node::Init, node::section_members::SectionMembers, Config, Result, cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
@@ -55,7 +55,7 @@ impl Metadata {
         let blob_register = BlobRegister::new(config, init_mode, section_members, decisions.clone())?;
         let map_storage = MapStorage::new(config, total_used_space, init_mode, decisions.clone())?;
         let sequence_storage =
-            SequenceStorage::new(config, total_used_space, init_mode), decisions.clone()?;
+            SequenceStorage::new(config, total_used_space, init_mode, decisions.clone())?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,

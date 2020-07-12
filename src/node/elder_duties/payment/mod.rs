@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::OutboundMsg, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
+use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use safe_nd::{
     Cmd, ElderDuty, Message, MsgEnvelope,
     PublicKey, Result, TransferError, Error,
@@ -56,7 +56,7 @@ impl DataPayment {
         // before executing the debit.
         // (We could also add a method that executes both
         // debit + credit atomically, but this is much simpler).
-        let result match self.section_account_id() {
+        let result = match self.section_account_id() {
             Ok(section) => {
                 if payment.to() != section {
                     Some(TransferRegistration(Error::NoSuchRecipient))

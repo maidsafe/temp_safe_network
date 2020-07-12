@@ -12,7 +12,7 @@ mod system;
 
 pub use self::{system::FarmingSystem, validator::Validator};
 use self::section_funds::SectionFunds;
-use crate::{messaging::Messaging, cmd::OutboundMsg, node::services::msg_decisions::ElderMsgDecisions, node::keys::NodeKeys};
+use crate::{messaging::Messaging, cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions, node::keys::NodeKeys};
 use safe_farming::{Accumulation, RewardCounter, StorageRewards};
 use safe_nd::{
     AccountId, ElderDuty, Money, XorName,

@@ -8,10 +8,9 @@
 
 use routing::Node as Routing;
 use safe_nd::{Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
-use std::
 
 #[derive(Clone)]
-pub(super) struct SectionMembers {
+pub(crate) struct SectionMembers {
     routing: Rc<RefCell<Routing>>,
 }
 

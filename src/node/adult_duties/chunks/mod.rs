@@ -50,9 +50,10 @@ impl Chunks {
 
     pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         trace!(
-            "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
+            "{}: Received ({:?} from src {:?}",
             self,
             msg.id(),
+            msg.most_recent_sender().address(),
         );
         match msg.message {
             Message::Query {

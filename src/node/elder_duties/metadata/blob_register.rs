@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::OutboundMsg, node::Init, utils, Config, Result, ToDbKey, services::SectionMembers, msg_decisions::ElderMsgDecisions};
+use crate::{cmd::OutboundMsg, node::Init, utils, Config, Result, ToDbKey, node::section_members::SectionMembers, node::msg_decisions::ElderMsgDecisions};
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    BlobRead, BlobWrite, CmdError, DataError, Error as NdError, IData,
+    BlobRead, BlobWrite, CmdError, Error as NdError, IData,
     IDataAddress, Message, MessageId, MsgEnvelope, NetworkCmd, PublicKey,
-    QueryResponse, Read, Result as NdResult, Write, XorName,
+    QueryResponse, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{

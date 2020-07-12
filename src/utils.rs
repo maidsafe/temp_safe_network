@@ -107,7 +107,7 @@ pub(crate) fn key_pair(routing: Rc<RefCell<Routing>>) -> Result<Keypair> {
     let index = node.our_index()?;
     let bls_secret_key = node.secret_key_share()?;
     let secret = SerdeSecret(*bls_secret_key);
-    let public = bls_secret_key.public_key_share()
+    let public = bls_secret_key.public_key_share();
     Ok(Keypair::BlsShare(BlsKeypairShare {
         index,
         secret,

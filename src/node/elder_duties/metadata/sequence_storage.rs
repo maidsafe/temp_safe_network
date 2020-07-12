@@ -11,7 +11,7 @@ use crate::{
     cmd::OutboundMsg,
     node::Init,
     Config, Result,
-    msg_decisions::ElderMsgDecisions;
+    node::msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
     Error as NdError, Message, MessageId, MsgSender, NodePublicId,
@@ -345,7 +345,7 @@ impl SequenceStorage {
             .and_then(move |sdata| {
                 self.chunks
                     .put(&sdata)
-                    .map_err(|error| error.to_string().into()
+                    .map_err(|error| error.to_string().into())
             })
     }
 

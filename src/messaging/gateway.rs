@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{auth::ClientInfo, ClientMsg};
+use crate::{node::elder_duties::gateway::auth::{ClientInfo, ClientMsg}};
 use crate::utils;
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
@@ -171,11 +171,19 @@ impl Gateway {
     // }
 
     pub fn send_to_client(&mut self, msg: MsgEnvelope) -> Result<()> {
-        let correlation_id = msg.correlation_id();
         match msg.destination() {
             Address::Client { .. } => (),
             _ => {
                 error!("{} for message-id {:?}, Invalid destination.", self, msg.id());
+                return Err(Error::InvalidOperation);
+            }
+        };
+        let correlation_id = match msg.message {
+            Message::Event { correlation_id, .. }
+            | Message::CmdError { correlation_id, .. }
+            | Message::QueryResponse { correlation_id, .. } => correlation_id,
+            _ => {
+                error!("{} for message-id {:?}, Invalid message for client.", self, msg.id());
                 return Err(Error::InvalidOperation);
             }
         };

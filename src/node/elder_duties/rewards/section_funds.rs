@@ -1,5 +1,5 @@
 use super::validator::Validator;
-use crate::{cmd::OutboundMsg, msg_decicions::ElderMsgDecisions, keys::NodeKeys};
+use crate::{cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions, node::keys::NodeKeys};
 use safe_nd::{
     AccountId, Message, MessageId, Money,
     TransferValidated, NetworkCmd,

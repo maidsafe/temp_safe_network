@@ -11,7 +11,7 @@ pub mod gateway;
 use crate::{
     accumulator::Accumulator,
     cmd::{OutboundMsg, GroupDecision},
-    duties::{adult::AdultDuties, elder::ElderDuties},
+    node::adult_duties::AdultDuties, node::elder_duties::ElderDuties,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
@@ -49,38 +49,25 @@ impl Messaging {
 
     pub fn send(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let name = *self.routing.borrow().id().name();
-        let dst = match msg.destination() {
-            Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
-            Address::Section(xorname) => DstLocation::Section(routing::XorName(xorname.0)),
-            Address::Client(xorname) => DstLocation::Direct(routing::XorName(xorname.0)), 
-        };
-        self.routing
-            .borrow_mut()
-            .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
-            .map_or_else(
-                |err| {
-                    error!("Unable to send to section: {:?}", err);
-                    None
-                },
-                |()| {
-                    info!("Sent to section with: {:?}", msg);
-                    None
-                },
-            )
+        match msg.destination() {
+            Address::Node(_) => self.send_to_node(msg),
+            Address::Section(_) => self.send_to_network(msg),
+            Address::Client(_) => return Some(OutboundMsg::SendToClient(msg)),
+        }
     }
 
     pub fn send_to_nodes(
         &mut self,
         targets: BTreeSet<XorName>,
         msg: MsgEnvelope,
-    ) {
+    ) -> Option<OutboundMsg> {
         let name = self.routing.borrow().id().name();
         for target in targets {
             self.routing
                 .borrow_mut()
                 .send_message(
                     SrcLocation::Node(*name),
-                    DstLocation::Node(target),
+                    DstLocation::Node(routing::XorName(target.0)),
                     utils::serialise(&msg),
                 )
                 .map_or_else(
@@ -90,15 +77,17 @@ impl Messaging {
                     |()| {
                         info!("Sent MsgEnvelope to Peer {:?} from node {:?}", target, name);
                     },
-                )
+                );
         }
+        None
     }
 
-    pub fn send_to_node(&self, msg: MsgEnvelope) {
+    pub fn send_to_node(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
         let name = *self.routing.borrow().id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
-            _ => return,
+            Address::Section(xorname) => return Some(OutboundMsg::SendToSection(msg)),
+            Address::Client(xorname) => return Some(OutboundMsg::SendToClient(msg)),
         };
         self.routing
             .borrow_mut()
@@ -110,11 +99,11 @@ impl Messaging {
             .map_or_else(
                 |err| {
                     error!("Unable to send MsgEnvelope to Peer: {:?}", err);
-                    //None
+                    None
                 },
                 |()| {
                     info!("Sent MsgEnvelope to Peer {:?} from node {:?}", dst, name);
-                    //None
+                    None
                 },
             )
     }
@@ -139,26 +128,4 @@ impl Messaging {
                 },
             )
     }
-
-    // fn forward_client_request(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-    //     trace!("{} received a client request {:?}", self, msg);
-    //     let msg_clone = msg.clone();
-    //     let dst_address = if let MsgEnvelope::Request { ref request, .. } = msg_clone {
-    //         match request.dst_address() {
-    //             Some(address) => address,
-    //             None => {
-    //                 error!("{}: Logic error - no data handler address available.", self);
-    //                 return None;
-    //             }
-    //         }
-    //     } else {
-    //         error!(
-    //             "{}: Logic error - expected Request, but got something else.",
-    //             self
-    //         );
-    //         return None;
-    //     };
-
-    //     self.forward_to_section(&dst_address, msg)
-    // }
 }

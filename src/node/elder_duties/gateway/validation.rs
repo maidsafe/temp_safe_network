@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::msg_decisions::ElderMsgDecisions;
+use crate::{node::msg_decisions::ElderMsgDecisions, cmd::OutboundMsg};
 use log::trace;
 use safe_nd::{
     Account, AccountWrite, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery,
     Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message,
-    MsgEnvelope, OutboundMsg, Read, SData, SDataAddress, SequenceRead, SequenceWrite,
-    Write, Query, CmdError,
+    MsgEnvelope, SData, SDataAddress, SequenceRead, SequenceWrite,
+    Query, CmdError,
 };
 use std::fmt::{self, Display, Formatter};
 

@@ -19,7 +19,7 @@ use self::{
     rewards::{Rewards, Validator},
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
-use crate::{cmd::OutboundMsg, messaging::Messaging, services::SectionMembers, keys::NodeKeys, node::Init, Config, utils, Result};
+use crate::{cmd::OutboundMsg, messaging::Messaging, node::section_members::SectionMembers, node::keys::NodeKeys, node::Init, Config, utils, Result};
 use routing::{Node as Routing, RoutingError};
 use safe_transfers::TransferActor;
 use safe_nd::XorName;
@@ -72,7 +72,7 @@ impl ElderDuties {
         let data_payment = DataPayment::new(keys.clone(), replica_manager);
 
         // Rewards
-        let keypair = utils::key_pair(routing.clone())?
+        let keypair = utils::key_pair(routing.clone())?;
         let pk_set = replica_manager.borrow().replicas_pk_set().unwrap();
         let actor = TransferActor::new(keypair, pk_set, Validator { });
         let rewards = Rewards::new(keys.clone(), actor);

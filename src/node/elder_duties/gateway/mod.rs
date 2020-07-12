@@ -16,14 +16,14 @@ use self::{
 use crate::{
     cmd::{GroupDecision, OutboundMsg},
     node::Init,
-    Config, Messaging, Result,
-    keys::NodeKeys,
-    msg_decisions::ElderMsgDecisions,
+    Config, messaging::Messaging, Result,
+    node::keys::NodeKeys,
+    node::msg_decisions::ElderMsgDecisions,
 };
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
-use safe_nd::{ElderDuty, AuthCmd, ClientAuth, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
+use safe_nd::{ElderDuty, AuthCmd, Cmd, Message, MsgEnvelope, NodePublicId, PublicId, Query};
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},

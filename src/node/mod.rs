@@ -7,14 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_duties;
-mod services;
+mod msg_analysis;
+mod msg_decisions;
 mod elder_duties;
 mod keys;
+mod section_members;
 
-use self::{adult_duties::AdultDuties, elder_duties::ElderDuties, keys::NodeKeys, services::{
-    section_members::SectionMembers, 
-    duty_finder::{InboundMsg, InboundMsgAnalysis}}];
 use crate::{
+    node::{adult_duties::AdultDuties, elder_duties::ElderDuties, keys::NodeKeys,
+    section_members::SectionMembers, msg_analysis::{InboundMsg, InboundMsgAnalysis}},
     accumulator::Accumulator,
     cmd::{GroupDecision, OutboundMsg},
     utils, Config, messaging::Messaging, Result,
@@ -419,8 +420,8 @@ impl<R: CryptoRng + Rng> Node<R> {
         use InboundMsg::*;
         match self.msg_analysis.evaluate(msg) {
             Accumulate(msg) => self.accumulate_msg(msg),
-            PushToClient(msg) => OutboundMsg::SendToClient(msg),
-            ForwardToNetwork(msg) => OutboundMsg::SendToSection(msg),
+            SendToClient(msg) => Some(OutboundMsg::SendToClient(msg)),
+            ForwardToNetwork(msg) => Some(OutboundMsg::SendToSection(msg)),
             RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(msg),
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(msg),
@@ -539,7 +540,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         use OutboundMsg::*;
         match outbound {
             SendToClient(msg) => {
-                if self.is_handler_for(msg.origin.address()) {
+                if self.msg_analysis.is_dst_for(msg) {
                     self.elder_duties()?.gateway().push_to_client(msg)
                 } else {
                     Some(SendToSection(msg))
@@ -549,13 +550,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             SendToAdults { targets, msg } => self.messaging.borrow_mut().send_to_nodes(targets, msg),
             SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),
             VoteFor(decision) => self.vote_for(decision),
-        }
-    }
-
-    fn is_handler_for(&self, address: Address) -> bool {
-        match address {
-            Address::Client(xorname) => self.msg_analysis.self_is_handler_for(xorname),
-            _ => false,
         }
     }
 

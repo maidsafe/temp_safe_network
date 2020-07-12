@@ -23,7 +23,7 @@ impl Reading {
 
     pub fn get_result(&self, storage: &ChunkStorage) -> Option<OutboundMsg> {
         let BlobRead::Get(address) = self.read;
-        if let Address::Section(_) => self.msg.most_recent_sender().address() {
+        if let Address::Section(_) = self.msg.most_recent_sender().address() {
             if self.verify(&self.msg.message) {
                 storage.get(*address, self.msg.id(), self.msg.origin)
             } else {

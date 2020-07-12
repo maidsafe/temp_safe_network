@@ -11,7 +11,7 @@ use crate::{
     cmd::OutboundMsg,
     node::Init,
     Config, Result,
-    msg_decisions::ElderMsgDecisions;
+    node::msg_decisions::ElderMsgDecisions,
 };
 use safe_nd::{
     CmdError, Error as NdError, MData, MDataAction, MDataAddress,

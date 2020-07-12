@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::msg_decisions::AdultMsgDecisions;
+use crate::node::msg_decisions::AdultMsgDecisions;
 use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{

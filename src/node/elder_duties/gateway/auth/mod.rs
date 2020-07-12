@@ -9,12 +9,12 @@
 mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
-use crate::{utils, keys::NodeKeys, msg_decisions::ElderMsgDecisions};
+use crate::{utils, cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use log::warn;
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, ClientAuth, Cmd, CmdError, DataAuthKind,
+    AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind,
     Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender,
-    OutboundMsg, PublicId, QueryResponse, RequestAuthKind, Query,
+    PublicId, QueryResponse, Query,
 };
 use std::fmt::{self, Display, Formatter};
 

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::Node as Routing;
-use safe_nd::{Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
+use safe_nd::{Address, Cmd, Query, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
 use std::{cell::RefCell, rc::Rc};
 
 #[allow(clippy::large_enum_variant)]
@@ -17,20 +17,18 @@ pub(crate) enum NodeDuties {
     Elder,
 }
 
-pub(super) struct InboundMsgAnalysis {
-    msg: MsgEnvelope,
+pub(crate) struct InboundMsgAnalysis {
     routing: Rc<RefCell<Routing>>,
-    state: NodeDuties,
 }
 
-pub(super) enum InboundMsg {
+pub(crate) enum InboundMsg {
     Accumulate(MsgEnvelope),
     ForwardToNetwork(MsgEnvelope),
     RunAtGateway(MsgEnvelope),
     RunAtPayment(MsgEnvelope),
     RunAtMetadata(MsgEnvelope),
     RunAtAdult(MsgEnvelope),
-    PushToClient(MsgEnvelope),
+    SendToClient(MsgEnvelope),
     RunAtRewards(MsgEnvelope),
     Unknown,
 }
@@ -38,6 +36,10 @@ pub(super) enum InboundMsg {
 impl InboundMsgAnalysis {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
         Self { routing }
+    }
+
+    pub fn is_dst_for(&self, msg: MsgEnvelope) -> bool {
+        self.self_is_handler_for(&msg.destination().xorname())
     }
 
     // todo: , duties: NodeDuties
@@ -49,8 +51,8 @@ impl InboundMsgAnalysis {
             InboundMsg::ForwardToNetwork(msg)
         } else if self.should_push_to_client(msg) {
             // From network to client!
-            InboundMsg::PushToClient(msg)
-        } else if self.should_run_at_gateway() {
+            InboundMsg::SendToClient(msg)
+        } else if self.should_run_at_gateway(msg) {
             // Client auth operations (Temporarily handled here, will be at app layer (Authenticator)).
             // Gateway Elders should just execute and return the result, for client to accumulate.
             InboundMsg::RunAtGateway(msg)
@@ -63,7 +65,7 @@ impl InboundMsgAnalysis {
         } else if self.should_run_at_chunk_write(msg) {
             // Accumulated msg from `Metadata`!
             InboundMsg::RunAtAdult(msg)
-        } else if self.should_run_at_rewards() {
+        } else if self.should_run_at_rewards(msg) {
             InboundMsg::RunAtRewards(msg)
         } else {
             InboundMsg::Unknown
@@ -95,7 +97,7 @@ impl InboundMsgAnalysis {
             } => true,
             _ => false,
         };
-        
+
         destined_for_network() || (from_client() && !is_auth_cmd())
     }
 
@@ -252,10 +254,6 @@ impl InboundMsgAnalysis {
         }
     }
 
-    fn is_dst_for(&self, msg: MsgEnvelope) -> bool {
-        self.self_is_handler_for(&msg.destination().xorname())
-    }
-
     fn self_is_handler_for(&self, address: &XorName) -> bool {
         let xorname = routing::XorName(address.0);
         match self.routing.borrow().matches_our_prefix(&xorname) {
@@ -284,7 +282,11 @@ impl InboundMsgAnalysis {
         let our_name = self.routing.borrow().name();
         if self.routing.borrow().is_elder() {
             NodeDuties::Elder
-        } else if self.routing.borrow().our_adults().map(|c| c.name()).collect().contains(our_name) {
+        } else if self.routing.borrow()
+            .our_adults()
+            .map(|c| c.name())
+            .collect::<Vec<_>>()
+            .contains(&our_name) {
             NodeDuties::Adult
         } else {
             NodeDuties::Infant

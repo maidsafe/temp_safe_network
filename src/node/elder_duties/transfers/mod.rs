@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::services::
+mod replica_manager;
+
 pub use self::replica_manager::ReplicaManager;
 use crate::{cmd::OutboundMsg, keys::NodeKeys, node::elder_duties::msg_decisions::ElderMsgDecisions};
 use safe_nd::{
