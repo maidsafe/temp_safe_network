@@ -1994,17 +1994,12 @@ mod tests {
         Ok(())
     }
 
-    // 1. Create a mutable data with some permissions and store it on the network.
-    // 2. Modify the permissions of a user in the permission set.
-    // 3. Fetch the list of permissions and verify the edit.
-    // 4. Delete a user's permissions from the permission set and verify the deletion.
+
     #[tokio::test]
-    pub async fn mdata_permissions_test() -> Result<(), CoreError> {
+    pub async fn mdata_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<(), CoreError> {
         let client = random_client()?;
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
-        let name = XorName(rand::random());
-        let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MDataPermissionSet::new()
             .allow(MDataAction::Read)
@@ -2017,6 +2012,54 @@ mod tests {
         let _ = permissions.insert(user, permission_set.clone());
         let _ = permissions.insert(random_user, permission_set);
 
+        let test_data_name = XorName(rand::random());
+        let test_data_with_different_owner_than_client = SeqMutableData::new_with_data(
+            test_data_name.clone(),
+            15000,
+            Default::default(),
+            permissions,
+            random_pk,
+        );
+
+        client.put_seq_mutable_data(test_data_with_different_owner_than_client.clone()).await?;
+        let res = client.get_seq_mdata_shell(test_data_name, 1500).await;
+        match res {
+            Err(CoreError::DataError(SndError::NoSuchData)) => (),
+            Ok(_) => panic!("Unexpected Success: Validating owners should fail"),
+            Err(e) => panic!("Unexpected: {:?}", e),
+        };
+
+        // TODO: Refunds not yet in place.... Reenable this check when that's the case
+
+        // Check money was not taken
+        // let balance = client.get_balance(None).await?;
+        // let expected_bal = calculate_new_balance(start_bal, Some(2), None);
+        // assert_eq!(balance, expected_bal);
+
+        Ok(())
+
+    }
+
+    // 1. Create a mutable data with some permissions and store it on the network.
+    // 2. Modify the permissions of a user in the permission set.
+    // 3. Fetch the list of permissions and verify the edit.
+    // 4. Delete a user's permissions from the permission set and verify the deletion.
+    #[tokio::test]
+    pub async fn mdata_can_modify_permissions_test() -> Result<(), CoreError> {
+        let client = random_client()?;
+        let name = XorName(rand::random());
+        let tag = 15001;
+        let mut permissions: BTreeMap<_, _> = Default::default();
+        let permission_set = MDataPermissionSet::new()
+            .allow(MDataAction::Read)
+            .allow(MDataAction::Insert)
+            .allow(MDataAction::ManagePermissions);
+        let user = client.public_key().await;
+        let random_user = gen_bls_keypair().public_key();
+
+        let _ = permissions.insert(user, permission_set.clone());
+        let _ = permissions.insert(random_user, permission_set);
+
         let data = SeqMutableData::new_with_data(
             name,
             tag,
@@ -2024,27 +2067,8 @@ mod tests {
             permissions.clone(),
             client.public_key().await,
         );
-        let test_data = SeqMutableData::new_with_data(
-            XorName(rand::random()),
-            15000,
-            Default::default(),
-            permissions,
-            random_pk,
-        );
 
         client.put_seq_mutable_data(data).await?;
-
-        let res = client.put_seq_mutable_data(test_data.clone()).await;
-        match res {
-            Err(CoreError::DataError(SndError::InvalidOwners)) => (),
-            Ok(_) => panic!("Unexpected Success: Validating owners should fail"),
-            Err(e) => panic!("Unexpected: {:?}", e),
-        };
-
-        // Check if money are refunded
-        let balance = client.get_balance(None).await?;
-        let expected_bal = calculate_new_balance(start_bal, Some(2), None);
-        assert_eq!(balance, expected_bal);
 
         let new_perm_set = MDataPermissionSet::new()
             .allow(MDataAction::ManagePermissions)
