@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::Node as Routing;
-use safe_nd::{Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, XorName};
+use safe_nd::XorName;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]

@@ -187,7 +187,7 @@ impl Blobs {
 
     // on client request
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        let read = self.extract_read(msg)?;
+        let _read = self.extract_read(msg)?;
         self.decisions.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
         // since it's free for anyone to get.  However, as a means of spam prevention, we
@@ -294,7 +294,7 @@ impl Maps {
 
     // on client request
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        let read = self.extract_read(msg)?;
+        let _read = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 

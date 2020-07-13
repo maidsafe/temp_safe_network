@@ -10,14 +10,14 @@ use safe_nd::{MsgEnvelope, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-/// Node internal cmds, about what requests to make.
-/// Any network node
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum OutboundMsgChain {
-    Single(OutboundMsg),
-    Multiple(Vec<OutboundMsg>),
-}
+// /// Node internal cmds, about what requests to make.
+// /// Any network node
+// #[derive(Debug)]
+// #[allow(clippy::large_enum_variant)]
+// pub(crate) enum OutboundMsgChain {
+//     Single(OutboundMsg),
+//     Multiple(Vec<OutboundMsg>),
+// }
 
 /// Any network node
 #[derive(Debug)]

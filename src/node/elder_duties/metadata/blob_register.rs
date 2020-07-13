@@ -14,14 +14,12 @@ use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     BlobRead, BlobWrite, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
-    MsgEnvelope, MsgSender, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
+    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
-    rc::Rc,
 };
 use tiny_keccak::sha3_256;
 

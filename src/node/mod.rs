@@ -22,7 +22,6 @@ use crate::{
         elder_duties::ElderDuties,
         keys::NodeKeys,
         msg_analysis::{InboundMsg, InboundMsgAnalysis},
-        section_members::SectionMembers,
     },
     utils, Config, Result,
 };
@@ -32,7 +31,7 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use routing::{
-    event::Event as RoutingEvent, Node as Routing, SrcLocation, TransportEvent as ClientEvent,
+    event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent,
 };
 use safe_nd::{MsgEnvelope, MsgSender, NodeFullId, XorName};
 use std::{
@@ -211,7 +210,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             &config,
             &total_used_space,
             Init::New,
-            self.routing.clone(),
         )?;
         self.state = State::Adult {
             duties,
@@ -435,7 +433,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(&msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(&msg),
             RunAtAdult(msg) => self.adult_duties()?.receive_msg(&msg),
-            RunAtRewards(msg) => None, //unimplemented.. //self.elder_duties()?.rewards().receive_msg(&msg),
+            RunAtRewards(_msg) => None, //unimplemented.. //self.elder_duties()?.rewards().receive_msg(&msg),
             RunAtTransfers(msg) => self.elder_duties()?.transfers().receive_msg(&msg),
             Unknown => {
                 error!("Unknown message destination: {:?}", msg.message.id());

@@ -31,7 +31,6 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use threshold_crypto::{self, serde_impl::SerdeSecret};
 
 pub(crate) struct ElderDuties {
     keys: NodeKeys,

@@ -15,7 +15,7 @@ use self::{
 };
 use crate::{
     cmd::{GroupDecision, OutboundMsg},
-    messaging::{ClientInfo, ClientMessaging, ClientMsg},
+    messaging::{ClientMessaging, ClientMsg},
     node::keys::NodeKeys,
     node::msg_decisions::ElderMsgDecisions,
     node::Init,
@@ -24,12 +24,10 @@ use crate::{
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
-use safe_nd::{AuthCmd, Cmd, ElderDuty, Message, MsgEnvelope, NodePublicId, PublicId, Query};
+use safe_nd::{Cmd, ElderDuty, Message, MsgEnvelope, PublicId, Query};
 use std::{
-    cell::RefCell,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    rc::Rc,
 };
 
 pub(crate) struct Gateway {

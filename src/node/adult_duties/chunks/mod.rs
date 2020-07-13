@@ -13,14 +13,13 @@ mod writing;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::Init, Config, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
-use routing::Node;
 use writing::Writing;
 
 use log::trace;
-use safe_nd::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, NodePublicId, Query};
+use safe_nd::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -28,7 +27,6 @@ use std::{
 pub(crate) struct Chunks {
     keys: NodeKeys,
     chunk_storage: ChunkStorage,
-    routing_node: Rc<RefCell<Node>>,
 }
 
 impl Chunks {
@@ -37,14 +35,12 @@ impl Chunks {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
-        routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
         let chunk_storage = ChunkStorage::new(keys.clone(), config, total_used_space, init_mode)?;
 
         Ok(Self {
             keys,
             chunk_storage,
-            routing_node,
         })
     }
 

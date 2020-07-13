@@ -104,14 +104,14 @@ impl Transfers {
             PropagateTransfer(debit_proof) => {
                 self.receive_propagated(&debit_proof, msg_id, &origin)
             }
-            InitiateRewardPayout(signed_transfer) => None, // TODO
+            InitiateRewardPayout(_signed_transfer) => None, // TODO
             FinaliseRewardPayout(debit_proof) => {
                 match self.replica.borrow_mut().register(&debit_proof) {
                     Ok(None) => None,
                     Ok(Some(event)) => {
                         // the transfer is then propagated, and will reach the recipient section
                         self.decisions.send(Message::NetworkCmd {
-                            cmd: NetworkCmd::PropagateTransfer(event.debit_proof),
+                            cmd: PropagateTransfer(event.debit_proof),
                             id: MessageId::new(),
                         })
                     }

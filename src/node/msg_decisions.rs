@@ -12,7 +12,7 @@ use crate::{
     utils,
 };
 use safe_nd::{
-    AdultDuty, CmdError, DataCmd, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
+    AdultDuty, CmdError, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
     XorName,
 };
 use serde::Serialize;

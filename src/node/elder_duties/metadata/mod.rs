@@ -26,7 +26,7 @@ use reading::Reading;
 use safe_nd::{Cmd, ElderDuty, Message, MsgEnvelope, Query, XorName};
 use sequence_storage::SequenceStorage;
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };

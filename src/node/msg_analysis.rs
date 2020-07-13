@@ -263,7 +263,7 @@ impl InboundMsgAnalysis {
         is_chunk_cmd() && from_metadata_section() && self.is_dst_for(msg) && self.is_adult()
     }
 
-    fn should_run_at_rewards(&self, msg: &MsgEnvelope) -> bool {
+    fn should_run_at_rewards(&self, _msg: &MsgEnvelope) -> bool {
         false //unimplemented
     }
 

@@ -11,7 +11,7 @@ use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Conf
 use log::{error, info};
 use safe_nd::{
     AdultDuty, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId, MsgSender,
-    NetworkCmdError, NetworkEvent, NodePublicId, QueryResponse, Result as NdResult, Signature,
+    NetworkCmdError, NetworkEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
     cell::Cell,

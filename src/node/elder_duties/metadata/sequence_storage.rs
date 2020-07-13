@@ -15,7 +15,7 @@ use crate::{
     Config, Result,
 };
 use safe_nd::{
-    CmdError, Error as NdError, Message, MessageId, MsgSender, NodePublicId, QueryResponse,
+    CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse,
     Result as NdResult, SData, SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner,
     SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp,
     SequenceRead, SequenceWrite,

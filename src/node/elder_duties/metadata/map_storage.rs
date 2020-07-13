@@ -16,7 +16,7 @@ use crate::{
 use safe_nd::{
     CmdError, Error as NdError, MData, MDataAction, MDataAddress, MDataEntryActions,
     MDataPermissionSet, MDataValue, MapRead, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
-    NodePublicId, PublicKey, QueryResponse, Result as NdResult,
+    PublicKey, QueryResponse, Result as NdResult,
 };
 use std::{
     cell::Cell,

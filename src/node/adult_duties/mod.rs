@@ -10,10 +10,9 @@ mod chunks;
 
 use self::chunks::Chunks;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::Init, Config, Result};
-use routing::Node as Routing;
-use safe_nd::{MsgEnvelope, NodePublicId};
+use safe_nd::MsgEnvelope;
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -21,7 +20,6 @@ use std::{
 pub(crate) struct AdultDuties {
     keys: NodeKeys,
     chunks: Chunks,
-    _routing: Rc<RefCell<Routing>>,
 }
 
 impl AdultDuties {
@@ -30,19 +28,16 @@ impl AdultDuties {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
-        routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
         let chunks = Chunks::new(
             keys.clone(),
             &config,
             &total_used_space,
             init_mode,
-            routing.clone(),
         )?;
         Ok(Self {
             keys,
             chunks,
-            _routing: routing,
         })
     }
 

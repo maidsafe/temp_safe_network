@@ -1,5 +1,5 @@
 use super::validator::Validator;
-use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
+use crate::{cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions};
 use safe_nd::{AccountId, Message, MessageId, Money, NetworkCmd, TransferValidated};
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
@@ -30,7 +30,7 @@ impl SectionFunds {
                 }
             }
             Ok(None) => None,
-            Err(error) => None, // for now, but should give NetworkCmdError
+            Err(_error) => None, // for now, but should give NetworkCmdError
         }
     }
 
@@ -50,7 +50,7 @@ impl SectionFunds {
                 }
             }
             Ok(None) => None,
-            Err(error) => None, // for now, but should give NetworkCmdError
+            Err(_error) => None, // for now, but should give NetworkCmdError
         }
     }
 }

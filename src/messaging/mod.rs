@@ -9,34 +9,23 @@
 pub mod client;
 
 use crate::{
-    accumulator::Accumulator,
-    cmd::{GroupDecision, OutboundMsg},
-    utils, Config, Result,
+    cmd::OutboundMsg,
+    utils,
 };
 pub use client::{ClientInfo, ClientMessaging, ClientMsg};
-use crossbeam_channel::{Receiver, Select};
-use hex_fmt::HexFmt;
-use log::{debug, error, info, trace, warn};
-use rand::{CryptoRng, Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
+use log::{error, info};
 use routing::{
-    event::Event as RoutingEvent, DstLocation, Node as Routing, Prefix, SrcLocation,
-    TransportEvent as ClientEvent,
+    DstLocation, Node as Routing, SrcLocation,
 };
 use safe_nd::{
-    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, NodeFullId, Query,
+    Address, MsgEnvelope,
     XorName,
 };
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     collections::BTreeSet,
-    fmt::{self, Display, Formatter},
-    fs,
-    net::SocketAddr,
-    path::PathBuf,
     rc::Rc,
 };
-use threshold_crypto::Signature;
 
 pub(super) struct Messaging {
     routing: Rc<RefCell<Routing>>,
