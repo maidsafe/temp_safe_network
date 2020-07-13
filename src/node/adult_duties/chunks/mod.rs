@@ -39,8 +39,7 @@ impl Chunks {
         init_mode: Init,
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
-        let chunk_storage =
-            ChunkStorage::new(keys.clone(), config, total_used_space, init_mode)?;
+        let chunk_storage = ChunkStorage::new(keys.clone(), config, total_used_space, init_mode)?;
 
         Ok(Self {
             keys,

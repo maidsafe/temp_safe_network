@@ -11,16 +11,9 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{
-    BlsKeypairShare, Keypair, PublicId, PublicKey,
-};
+use safe_nd::{BlsKeypairShare, Keypair, PublicId, PublicKey};
 use serde::Serialize;
-use std::{
-    cell::RefCell,
-    fs,
-    path::Path,
-    rc::Rc,
-};
+use std::{cell::RefCell, fs, path::Path, rc::Rc};
 use threshold_crypto::{self, serde_impl::SerdeSecret};
 use unwrap::unwrap;
 

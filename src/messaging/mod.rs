@@ -8,12 +8,12 @@
 
 pub mod client;
 
-pub use client::{ClientInfo, ClientMessaging, ClientMsg};
 use crate::{
     accumulator::Accumulator,
     cmd::{GroupDecision, OutboundMsg},
     utils, Config, Result,
 };
+pub use client::{ClientInfo, ClientMessaging, ClientMsg};
 use crossbeam_channel::{Receiver, Select};
 use hex_fmt::HexFmt;
 use log::{debug, error, info, trace, warn};

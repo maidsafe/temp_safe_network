@@ -8,7 +8,9 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
-use safe_nd::{Cmd, ElderDuty, Error, Message, MsgEnvelope, CmdError, PublicKey, Result, TransferError};
+use safe_nd::{
+    Cmd, CmdError, ElderDuty, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
+};
 use std::{
     cell::{RefCell, RefMut},
     fmt::{self, Display, Formatter},
@@ -54,12 +56,10 @@ impl DataPayment {
         // (We could also add a method that executes both
         // debit + credit atomically, but this is much simpler).
         let recipient_is_not_section = match self.section_account_id() {
-            Ok(section) => {
-                payment.to() != section
-            }
+            Ok(section) => payment.to() != section,
             _ => true, // this would be strange, is it even possible?
         };
-        
+
         if recipient_is_not_section {
             let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
             return self.decisions.error(error, msg.id(), &msg.origin);
@@ -69,12 +69,16 @@ impl DataPayment {
             Ok(_) => match self.replica_mut().receive_propagated(&payment) {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
-            }
+            },
             Err(error) => Err(error), // not using TransferPropagation error, since that is for NetworkCmds, so wouldn't be returned to client.
         };
         match result {
             Ok(_) => self.decisions.forward(msg),
-            Err(error) => self.decisions.error(CmdError::Transfer(TransferRegistration(error)), msg.id(), &msg.origin),
+            Err(error) => self.decisions.error(
+                CmdError::Transfer(TransferRegistration(error)),
+                msg.id(),
+                &msg.origin,
+            ),
         }
     }
 

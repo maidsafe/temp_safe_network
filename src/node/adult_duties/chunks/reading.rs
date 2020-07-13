@@ -9,7 +9,7 @@
 use super::chunk_storage::ChunkStorage;
 use crate::{cmd::OutboundMsg, utils};
 use log::error;
-use safe_nd::{BlobRead, MsgEnvelope, MsgSender, Address};
+use safe_nd::{Address, BlobRead, MsgEnvelope, MsgSender};
 use serde::Serialize;
 
 pub(super) struct Reading {

@@ -15,7 +15,7 @@ use self::{
 };
 use crate::{
     cmd::{GroupDecision, OutboundMsg},
-    messaging::{ClientMsg, ClientInfo, ClientMessaging},
+    messaging::{ClientInfo, ClientMessaging, ClientMsg},
     node::keys::NodeKeys,
     node::msg_decisions::ElderMsgDecisions,
     node::Init,
@@ -80,8 +80,7 @@ impl Gateway {
         bytes: &Bytes,
         rng: &mut R,
     ) -> Option<ClientMsg> {
-        self.messaging
-            .try_parse_client_msg(peer_addr, bytes, rng)
+        self.messaging.try_parse_client_msg(peer_addr, bytes, rng)
     }
 
     pub fn push_to_client(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
@@ -108,7 +107,11 @@ impl Gateway {
     }
 
     /// Receive client request
-    pub fn handle_client_msg(&mut self, client: PublicId, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn handle_client_msg(
+        &mut self,
+        client: PublicId,
+        msg: &MsgEnvelope,
+    ) -> Option<OutboundMsg> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error);
         };
@@ -118,8 +121,7 @@ impl Gateway {
 
         match &msg.message {
             Message::Cmd {
-                cmd: Cmd::Auth(_),
-                ..
+                cmd: Cmd::Auth(_), ..
             } => self.auth.initiate(msg),
             Message::Query {
                 query: Query::Auth(_),

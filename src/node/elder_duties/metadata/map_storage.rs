@@ -64,8 +64,12 @@ impl MapStorage {
         }
     }
 
-    pub(super) fn write(&mut self, write: MapWrite, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    pub(super) fn write(
+        &mut self,
+        write: MapWrite,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         use MapWrite::*;
         match write {
             New(data) => self.create(&data, msg_id, origin),
@@ -138,8 +142,12 @@ impl MapStorage {
     }
 
     /// Put MData.
-    fn create(&mut self, data: &MData, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn create(
+        &mut self,
+        data: &MData,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -150,9 +158,13 @@ impl MapStorage {
         self.ok_or_error(result, msg_id, origin)
     }
 
-    fn delete(&mut self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
-            let result = self
+    fn delete(
+        &mut self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
+        let result = self
             .chunks
             .get(&address)
             .map_err(|e| match e {
@@ -217,8 +229,12 @@ impl MapStorage {
     }
 
     /// Get entire MData.
-    fn get(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn get(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = self.get_chunk(&address, origin, MDataAction::Read)?;
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetMap(result),
@@ -229,8 +245,12 @@ impl MapStorage {
     }
 
     /// Get MData shell.
-    fn get_shell(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn get_shell(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, origin, MDataAction::Read)?
             .map(|data| data.shell());
@@ -243,8 +263,12 @@ impl MapStorage {
     }
 
     /// Get MData version.
-    fn get_version(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn get_version(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, origin, MDataAction::Read)?
             .map(|data| data.version());
@@ -286,8 +310,12 @@ impl MapStorage {
     }
 
     /// Get MData keys.
-    fn list_keys(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn list_keys(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, origin, MDataAction::Read)?
             .map(|data| data.keys());
@@ -300,8 +328,12 @@ impl MapStorage {
     }
 
     /// Get MData values.
-    fn list_values(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn list_values(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let res = self.get_chunk(&address, origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.values().into()),
@@ -316,8 +348,12 @@ impl MapStorage {
     }
 
     /// Get MData entries.
-    fn list_entries(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn list_entries(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let res = self.get_chunk(&address, origin, MDataAction::Read)?;
         let result = res.and_then(|data| match data {
             MData::Seq(md) => Ok(md.entries().clone().into()),
@@ -332,8 +368,12 @@ impl MapStorage {
     }
 
     /// Get MData permissions.
-    fn list_permissions(&self, address: MDataAddress, msg_id: MessageId,
-        origin: &MsgSender) -> Option<OutboundMsg> {
+    fn list_permissions(
+        &self,
+        address: MDataAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(&address, origin, MDataAction::Read)?
             .map(|data| data.permissions());

@@ -21,7 +21,7 @@ pub(crate) enum NodeDuties {
 
 /// Currently, this is only evaluating
 /// remote msgs from the network, i.e.
-/// it is not evaluating msgs sent 
+/// it is not evaluating msgs sent
 /// directly from the client.
 pub(crate) struct InboundMsgAnalysis {
     routing: Rc<RefCell<Routing>>,
@@ -51,7 +51,7 @@ impl InboundMsgAnalysis {
 
     /// Currently, this is only evaluating
     /// remote msgs from the network, i.e.
-    /// it is not evaluating msgs sent 
+    /// it is not evaluating msgs sent
     /// directly from the client.
     pub fn evaluate(&self, msg: &MsgEnvelope) -> InboundMsg {
         if self.should_accumulate(msg) {
@@ -121,7 +121,10 @@ impl InboundMsgAnalysis {
             _ => false,
         };
         let agreed_by_gateway_section = || match msg.most_recent_sender() {
-            MsgSender::Section { duty: Duty::Elder(ElderDuty::Gateway), .. } => true,
+            MsgSender::Section {
+                duty: Duty::Elder(ElderDuty::Gateway),
+                ..
+            } => true,
             _ => false,
         };
         let is_auth_cmd = || match msg.message {
@@ -132,7 +135,11 @@ impl InboundMsgAnalysis {
             _ => false,
         };
 
-        from_client() && agreed_by_gateway_section() && is_auth_cmd() && self.is_dst_for(msg) && self.is_elder()
+        from_client()
+            && agreed_by_gateway_section()
+            && is_auth_cmd()
+            && self.is_dst_for(msg)
+            && self.is_elder()
     }
 
     /// We do not accumulate these request, they are executed

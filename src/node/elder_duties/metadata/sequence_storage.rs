@@ -9,10 +9,10 @@
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
     cmd::OutboundMsg,
+    node::keys::NodeKeys,
     node::msg_decisions::ElderMsgDecisions,
     node::Init,
     Config, Result,
-    node::keys::NodeKeys,
 };
 use safe_nd::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, NodePublicId, QueryResponse,
@@ -93,7 +93,12 @@ impl SequenceStorage {
         }
     }
 
-    fn store(&mut self, data: &SData, msg_id: MessageId, origin: &MsgSender) -> Option<OutboundMsg> {
+    fn store(
+        &mut self,
+        data: &SData,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {

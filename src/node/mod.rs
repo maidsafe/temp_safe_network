@@ -16,7 +16,7 @@ mod section_members;
 use crate::{
     accumulator::Accumulator,
     cmd::{GroupDecision, OutboundMsg},
-    messaging::{Messaging, ClientMessaging},
+    messaging::{ClientMessaging, Messaging},
     node::{
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
@@ -428,7 +428,10 @@ impl<R: CryptoRng + Rng> Node<R> {
             Accumulate(msg) => self.accumulate_msg(&msg),
             SendToClient(msg) => Some(OutboundMsg::SendToClient(msg)),
             ForwardToNetwork(msg) => Some(OutboundMsg::SendToSection(msg)),
-            RunAtGateway(msg) => self.elder_duties()?.gateway().finalise_agreed_auth_cmd(&msg),
+            RunAtGateway(msg) => self
+                .elder_duties()?
+                .gateway()
+                .finalise_agreed_auth_cmd(&msg),
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(&msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(&msg),
             RunAtAdult(msg) => self.adult_duties()?.receive_msg(&msg),

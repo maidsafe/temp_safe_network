@@ -47,7 +47,7 @@ impl Validation {
     //     }
     // }
 
-    // Called directly from 
+    // Called directly from
     pub fn initiate_write(&mut self, cmd: &DataCmd, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match cmd {
             DataCmd::Blob(_) => self.blobs.initiate_write(msg),

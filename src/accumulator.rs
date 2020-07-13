@@ -56,7 +56,11 @@ impl Accumulator {
                 // } else {
                 match self.messages.entry(msg_id) {
                     Entry::Vacant(entry) => {
-                        let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![signature.clone()]));
+                        let _ = entry.insert((
+                            msg.clone(),
+                            msg.origin.clone(),
+                            vec![signature.clone()],
+                        ));
                     }
                     Entry::Occupied(mut entry) => {
                         let (_, _, signatures) = entry.get_mut();

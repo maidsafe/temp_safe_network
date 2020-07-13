@@ -14,8 +14,9 @@ use crate::{
 };
 use log::warn;
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind, Error as NdError, Message, AuthQuery,
-    MessageId, AuthorisationKind, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, PublicId, Query, QueryResponse,
+    AppPermissions, AppPublicId, AuthCmd, AuthQuery, AuthorisationKind, Cmd, CmdError,
+    DataAuthKind, Error as NdError, Message, MessageId, MiscAuthKind, MoneyAuthKind, MsgEnvelope,
+    MsgSender, PublicId, Query, QueryResponse,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -140,7 +141,9 @@ impl Auth {
             } => self
                 .auth_keys
                 .insert(msg.origin.id(), *key, *version, *permissions),
-            DelAuthKey { key, version, .. } => self.auth_keys.delete(msg.origin.id(), *key, *version),
+            DelAuthKey { key, version, .. } => {
+                self.auth_keys.delete(msg.origin.id(), *key, *version)
+            }
         };
         if let Err(error) = result {
             return self

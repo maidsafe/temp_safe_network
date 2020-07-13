@@ -14,7 +14,7 @@ use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     BlobRead, BlobWrite, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
-    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName, MsgSender,
+    MsgEnvelope, MsgSender, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{

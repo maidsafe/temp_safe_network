@@ -9,9 +9,7 @@
 pub mod replica_manager;
 
 pub use self::replica_manager::ReplicaManager;
-use crate::{
-    cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions,
-};
+use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use safe_nd::{
     Cmd, CmdError, DebitAgreementProof, ElderDuty, Error, Event, Message, MessageId, MsgEnvelope,
     MsgSender, NetworkCmd, NetworkCmdError, PublicKey, Query, QueryResponse, SignedTransfer,
@@ -103,9 +101,12 @@ impl Transfers {
         use NetworkCmd::*;
         match cmd {
             DuplicateChunk { .. } => None, // should not end up here
-            PropagateTransfer(debit_proof) => self.receive_propagated(&debit_proof, msg_id, &origin),
+            PropagateTransfer(debit_proof) => {
+                self.receive_propagated(&debit_proof, msg_id, &origin)
+            }
             InitiateRewardPayout(signed_transfer) => None, // TODO
-            FinaliseRewardPayout(debit_proof) => match self.replica.borrow_mut().register(&debit_proof) {
+            FinaliseRewardPayout(debit_proof) => {
+                match self.replica.borrow_mut().register(&debit_proof) {
                     Ok(None) => None,
                     Ok(Some(event)) => {
                         // the transfer is then propagated, and will reach the recipient section
@@ -114,8 +115,13 @@ impl Transfers {
                             id: MessageId::new(),
                         })
                     }
-                    Err(error) => self.decisions.error(CmdError::Transfer(TransferError::TransferRegistration(error)), msg_id, &origin),
+                    Err(error) => self.decisions.error(
+                        CmdError::Transfer(TransferError::TransferRegistration(error)),
+                        msg_id,
+                        &origin,
+                    ),
                 }
+            }
         }
     }
 

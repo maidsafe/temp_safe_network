@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{msg_decisions::AdultMsgDecisions, keys::NodeKeys};
+use crate::node::{keys::NodeKeys, msg_decisions::AdultMsgDecisions};
 use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
@@ -154,11 +154,12 @@ impl ChunkStorage {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
             return None;
         }
-        
+
         let result = match self.chunks.get(&address) {
-            Ok(IData::Unpub(_)) => {
-                self.chunks.delete(&address).map_err(|error| error.to_string().into())
-            },
+            Ok(IData::Unpub(_)) => self
+                .chunks
+                .delete(&address)
+                .map_err(|error| error.to_string().into()),
             Ok(_) => {
                 error!(
                     "{}: Invalid DeletePrivate(IData::Public) encountered: {:?}",
@@ -169,7 +170,7 @@ impl ChunkStorage {
             _ => Err(NdError::NoSuchKey),
             //err @ Err(_) => err.map_err(|error| error.to_string().into()),
         };
-         
+
         if let Err(error) = result {
             return self.decisions.error(CmdError::Data(error), msg_id, &origin);
         }

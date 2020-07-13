@@ -13,7 +13,7 @@ use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::{
     Address, Error, HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope,
-    NodePublicId, PublicId, Result, Signature, XorName, MsgSender,
+    MsgSender, NodePublicId, PublicId, Result, Signature, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -242,11 +242,7 @@ impl ClientMessaging {
                         "{}: Client on {} identifies as a node: {}, hence disconnect from it.",
                         self, peer_addr, public_id
                     );
-                    if let Err(err) = self
-                        .routing
-                        .borrow_mut()
-                        .disconnect_from_client(peer_addr)
-                    {
+                    if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
                         warn!("{}: Could not disconnect client: {:?}", self, err);
                     }
                     return;
@@ -262,11 +258,7 @@ impl ClientMessaging {
                         "{}: Challenge failed for {} on {}: {}",
                         self, public_id, peer_addr, err
                     );
-                    if let Err(err) = self
-                        .routing
-                        .borrow_mut()
-                        .disconnect_from_client(peer_addr)
-                    {
+                    if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
                         warn!("{}: Could not disconnect client: {:?}", self, err);
                     }
                 }
@@ -276,11 +268,7 @@ impl ClientMessaging {
                 "{}: {} supplied challenge response without us providing it.",
                 self, peer_addr
             );
-            if let Err(err) = self
-                .routing
-                .borrow_mut()
-                .disconnect_from_client(peer_addr)
-            {
+            if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
                 warn!("{}: Could not disconnect client: {:?}", self, err);
             }
         }
@@ -303,10 +291,7 @@ impl ClientMessaging {
                 "Client {} ({}) wants to join us but we are not its client handler",
                 client_id, peer_addr
             );
-            let _ = self
-                .routing
-                .borrow_mut()
-                .disconnect_from_client(peer_addr);
+            let _ = self.routing.borrow_mut().disconnect_from_client(peer_addr);
         }
         let challenge = utils::random_vec(rng, 8);
         self.send(

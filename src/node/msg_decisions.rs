@@ -6,7 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, cmd::{GroupDecision, OutboundMsg}, node::keys::NodeKeys};
+use crate::{
+    cmd::{GroupDecision, OutboundMsg},
+    node::keys::NodeKeys,
+    utils,
+};
 use safe_nd::{
     AdultDuty, CmdError, DataCmd, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
     XorName,
