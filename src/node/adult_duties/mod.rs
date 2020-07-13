@@ -29,16 +29,8 @@ impl AdultDuties {
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
-        let chunks = Chunks::new(
-            keys.clone(),
-            &config,
-            &total_used_space,
-            init_mode,
-        )?;
-        Ok(Self {
-            keys,
-            chunks,
-        })
+        let chunks = Chunks::new(keys.clone(), &config, &total_used_space, init_mode)?;
+        Ok(Self { keys, chunks })
     }
 
     pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {

@@ -30,9 +30,7 @@ use hex_fmt::HexFmt;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use routing::{
-    event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent,
-};
+use routing::{event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent};
 use safe_nd::{MsgEnvelope, MsgSender, NodeFullId, XorName};
 use std::{
     cell::{Cell, RefCell},
@@ -205,12 +203,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut config = Config::default();
         config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
-        let duties = AdultDuties::new(
-            self.keys.clone(),
-            &config,
-            &total_used_space,
-            Init::New,
-        )?;
+        let duties = AdultDuties::new(self.keys.clone(), &config, &total_used_space, Init::New)?;
         self.state = State::Adult {
             duties,
             accumulator: Accumulator::new(self.routing.clone()),

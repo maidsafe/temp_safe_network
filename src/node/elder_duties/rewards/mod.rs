@@ -12,10 +12,7 @@ mod validator;
 
 use self::section_funds::SectionFunds;
 pub use self::{system::FarmingSystem, validator::Validator};
-use crate::{
-    cmd::OutboundMsg, node::keys::NodeKeys,
-    node::msg_decisions::ElderMsgDecisions,
-};
+use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use safe_farming::{Accumulation, RewardCounter, StorageRewards};
 use safe_nd::{AccountId, ElderDuty, Money, XorName};
 use safe_transfers::TransferActor;
@@ -80,7 +77,11 @@ impl Rewards {
     /// On node relocation, receiving section queries for the
     /// node counter, and asks to claim the node farming account
     /// rewards, and for the old section to send it to the new section.
-    pub fn relocate(&mut self, _old_node_id: XorName, _new_node_id: XorName) -> Option<OutboundMsg> {
+    pub fn relocate(
+        &mut self,
+        _old_node_id: XorName,
+        _new_node_id: XorName,
+    ) -> Option<OutboundMsg> {
         unimplemented!()
         // let account_id = self.node_accounts.get(&old_node_id)?;
         // let counter = match self.claim(account_id) {

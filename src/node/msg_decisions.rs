@@ -12,8 +12,7 @@ use crate::{
     utils,
 };
 use safe_nd::{
-    AdultDuty, CmdError, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
-    XorName,
+    AdultDuty, CmdError, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender, XorName,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;
