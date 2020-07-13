@@ -146,7 +146,7 @@ impl Sequences {
                 query: Query::Data(DataQuery::Sequence(query)),
                 ..
             } => Some(query.clone()),
-            _ => return None,
+            _ => None,
         }
     }
 
@@ -160,7 +160,7 @@ impl Sequences {
                     },
                 ..
             } => Some(write.clone()),
-            _ => return None,
+            _ => None,
         }
     }
 }
@@ -253,7 +253,7 @@ impl Blobs {
                 query: Query::Data(DataQuery::Blob(query)),
                 ..
             } => Some(query.clone()),
-            _ => return None,
+            _ => None,
         }
     }
 
@@ -267,7 +267,7 @@ impl Blobs {
                     },
                 ..
             } => Some(write.clone()),
-            _ => return None,
+            _ => None,
         }
     }
 }
@@ -336,7 +336,7 @@ impl Maps {
                 query: Query::Data(DataQuery::Map(query)),
                 ..
             } => Some(query.clone()),
-            _ => return None,
+            _ => None,
         }
     }
 

@@ -27,7 +27,7 @@ pub struct Rewards {
 
 impl Rewards {
     pub fn new(keys: NodeKeys, actor: TransferActor<Validator>) -> Self {
-        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Rewards);
+        let decisions = ElderMsgDecisions::new(keys, ElderDuty::Rewards);
         let acc = Accumulation::new(Default::default(), Default::default());
         let base_cost = Money::from_nano(1);
         let algo = StorageRewards::new(base_cost);
@@ -67,10 +67,7 @@ impl Rewards {
         let factor = 2.0;
         match self.farming.reward(data_hash, num_bytes, factor) {
             Ok(_) => None,
-            Err(_err) => {
-                // todo: NetworkCmdError
-                return None;
-            }
+            Err(_err) => None, // todo: NetworkCmdError
         }
     }
 

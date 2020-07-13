@@ -325,8 +325,7 @@ impl InboundMsgAnalysis {
             .borrow()
             .our_adults()
             .map(|c| c.name())
-            .collect::<Vec<_>>()
-            .contains(&self.routing.borrow().name())
+            .any(|x| x == self.routing.borrow().name())
         {
             NodeDuties::Adult
         } else {

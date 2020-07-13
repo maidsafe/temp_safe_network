@@ -136,7 +136,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
         let node = Self {
             id,
-            keys: keys.clone(),
+            keys,
             root_dir: root_dir.to_path_buf(),
             state,
             event_receiver,

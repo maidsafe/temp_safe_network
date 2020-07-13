@@ -86,7 +86,7 @@ impl ElderDuties {
             transfers,
             data_payment,
             rewards,
-            routing: routing.clone(),
+            routing,
         })
     }
 

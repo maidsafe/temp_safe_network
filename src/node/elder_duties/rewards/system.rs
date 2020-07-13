@@ -60,7 +60,7 @@ impl<A: RewardAlgo> FarmingSystem<A> {
         let accounts_work: HashMap<AccountId, Work> = self
             .accumulation
             .get_all()
-            .into_iter()
+            .iter()
             .map(|(id, acc)| (*id, acc.work))
             .collect();
         // calculate the work cost for the number of bytes to store

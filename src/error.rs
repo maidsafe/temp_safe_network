@@ -8,7 +8,6 @@
 
 use crate::chunk_store;
 use quick_error::quick_error;
-use safe_nd;
 use std::io;
 
 quick_error! {

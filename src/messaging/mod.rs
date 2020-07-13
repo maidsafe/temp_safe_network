@@ -28,7 +28,7 @@ impl Messaging {
         match msg.destination() {
             Address::Node(_) => self.send_to_node(msg),
             Address::Section(_) => self.send_to_network(msg),
-            Address::Client(_) => return Some(OutboundMsg::SendToClient(msg)),
+            Address::Client(_) => Some(OutboundMsg::SendToClient(msg)),
         }
     }
 

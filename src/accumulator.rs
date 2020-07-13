@@ -96,7 +96,7 @@ impl Accumulator {
                         let _ = self.completed.insert(msg_id);
                         //let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
                         let signature = safe_nd::Signature::Bls(signature);
-                        return Some((msg.clone(), signature));
+                        return Some((msg, signature));
                     } else {
                         error!("Accumulated signature is invalid");
                     }
