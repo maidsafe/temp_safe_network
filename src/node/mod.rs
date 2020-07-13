@@ -34,7 +34,7 @@ use rand_chacha::ChaChaRng;
 use routing::{
     event::Event as RoutingEvent, Node as Routing, SrcLocation, TransportEvent as ClientEvent,
 };
-use safe_nd::{Address, MsgEnvelope, MsgSender, NodeFullId, XorName};
+use safe_nd::{MsgEnvelope, MsgSender, NodeFullId, XorName};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -348,7 +348,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     Ok(consensused_cmd) => self
                         .elder_duties()?
                         .gateway()
-                        .handle_consensused_cmd(consensused_cmd),
+                        .handle_group_decision(consensused_cmd),
                     Err(e) => {
                         error!("Invalid GroupDecision passed from Routing: {:?}", e);
                         None
@@ -401,7 +401,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     src,
                     dst
                 );
-                self.handle_serialized_msg(src, content)
+                self.handle_serialized_msg(content)
             }
             RoutingEvent::EldersChanged { .. } => self.elder_duties()?.elders_changed(),
             // Ignore all other events
@@ -409,7 +409,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<OutboundMsg> {
+    fn handle_serialized_msg(&mut self, content: Vec<u8>) -> Option<OutboundMsg> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => self.handle_remote_msg(&msg),
             Err(e) => {
@@ -428,11 +428,12 @@ impl<R: CryptoRng + Rng> Node<R> {
             Accumulate(msg) => self.accumulate_msg(&msg),
             SendToClient(msg) => Some(OutboundMsg::SendToClient(msg)),
             ForwardToNetwork(msg) => Some(OutboundMsg::SendToSection(msg)),
-            RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(&msg),
+            RunAtGateway(msg) => self.elder_duties()?.gateway().finalise_agreed_auth_cmd(&msg),
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(&msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(&msg),
             RunAtAdult(msg) => self.adult_duties()?.receive_msg(&msg),
-            RunAtRewards(msg) => unimplemented!(),
+            RunAtRewards(msg) => None, //unimplemented.. //self.elder_duties()?.rewards().receive_msg(&msg),
+            RunAtTransfers(msg) => self.elder_duties()?.transfers().receive_msg(&msg),
             Unknown => {
                 error!("Unknown message destination: {:?}", msg.message.id());
                 None
@@ -522,6 +523,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    ///
     pub fn send_while_any(&mut self, cmd: Option<OutboundMsg>) {
         let mut next_cmd = cmd;
         while let Some(cmd) = next_cmd {
@@ -529,6 +531,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
+    ///
     pub fn vote_for(&mut self, cmd: GroupDecision) -> Option<OutboundMsg> {
         self.routing
             .borrow_mut()
@@ -542,6 +545,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             )
     }
 
+    ///
     pub fn send(&mut self, outbound: OutboundMsg) -> Option<OutboundMsg> {
         use OutboundMsg::*;
         match outbound {

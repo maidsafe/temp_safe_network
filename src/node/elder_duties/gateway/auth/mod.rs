@@ -14,7 +14,7 @@ use crate::{
 };
 use log::warn;
 use safe_nd::{
-    AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind, Error as NdError, Message,
+    AppPermissions, AppPublicId, AuthCmd, Cmd, CmdError, DataAuthKind, Error as NdError, Message, AuthQuery,
     MessageId, AuthorisationKind, MiscAuthKind, MoneyAuthKind, MsgEnvelope, MsgSender, PublicId, Query, QueryResponse,
 };
 use std::fmt::{self, Display, Formatter};
@@ -105,7 +105,7 @@ impl Auth {
     pub fn list_keys_and_version(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match &msg.message {
             Message::Query {
-                query: Query::Auth(ListAuthKeysAndVersion),
+                query: Query::Auth(AuthQuery::ListAuthKeysAndVersion { .. }),
                 ..
             } => (),
             _ => return None,

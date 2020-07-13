@@ -90,21 +90,21 @@ impl Gateway {
         None
     }
 
-    /// Temporary, while Authenticator is not implemented at app layer.
-    /// If a request within OutboundMsg::ForwardClientRequest issued by us in `handle_consensused_cmd`
-    /// was made by Gateway and destined to our section, this is where the actual request will end up.
-    pub fn handle_auth_cmd(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        self.auth.finalise(msg)
-    }
-
     /// Basically.. when Gateway nodes have agreed,
     /// they'll forward the request into the network.
-    pub fn handle_consensused_cmd(&mut self, cmd: GroupDecision) -> Option<OutboundMsg> {
+    pub fn handle_group_decision(&mut self, cmd: GroupDecision) -> Option<OutboundMsg> {
         use GroupDecision::*;
-        trace!("{}: Consensused {:?}", self, cmd);
+        trace!("{}: Group decided on {:?}", self, cmd);
         match cmd {
             Forward(msg) => Some(OutboundMsg::SendToSection(msg)),
         }
+    }
+
+    /// Temporary, while Authenticator is not implemented at app layer.
+    /// If a request within OutboundMsg::ForwardClientRequest issued by us in `handle_group_decision`
+    /// was made by Gateway and destined to our section, this is where the actual request will end up.
+    pub fn finalise_agreed_auth_cmd(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        self.auth.finalise(msg)
     }
 
     /// Receive client request
@@ -119,22 +119,18 @@ impl Gateway {
         match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(_),
-                id,
                 ..
             } => self.auth.initiate(msg),
             Message::Query {
                 query: Query::Auth(_),
-                id,
                 ..
             } => self.auth.list_keys_and_version(msg),
             Message::Cmd {
-                cmd: Cmd::Data { cmd, payment },
-                id,
+                cmd: Cmd::Data { cmd, .. },
                 ..
             } => self.data.initiate_write(cmd, msg),
             Message::Query {
                 query: Query::Data(data_query),
-                id,
                 ..
             } => self.data.initiate_read(data_query, msg),
             _ => None, // error..!

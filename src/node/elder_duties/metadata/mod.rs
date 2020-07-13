@@ -80,7 +80,6 @@ impl Metadata {
     }
 
     pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        let msg_id = msg.message.id();
         match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },

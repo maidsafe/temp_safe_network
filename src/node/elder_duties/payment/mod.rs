@@ -42,11 +42,11 @@ impl DataPayment {
     // The code in this method is very messy, needs to be cleand up.
     pub fn pay_for_data(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use TransferError::*;
-        let (cmd, payment) = match &msg.message {
+        let payment = match &msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, payment },
+                cmd: Cmd::Data { payment, .. },
                 ..
-            } => (cmd, payment),
+            } => payment,
             _ => return None,
         };
         // Make sure we are actually at the correct replicas,

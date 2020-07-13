@@ -74,8 +74,8 @@ impl Accumulator {
                     public_key_set.threshold() + 1
                 );
                 if signatures.len() > public_key_set.threshold() {
-                    let (request, requester, signatures) = self.messages.remove(&msg_id)?;
-                    let signed_data = utils::serialise(&request);
+                    let (msg, _sender, signatures) = self.messages.remove(&msg_id)?;
+                    let signed_data = utils::serialise(&msg);
                     for sig in &signatures {
                         if !public_key_set
                             .public_key_share(sig.index)
@@ -90,7 +90,7 @@ impl Accumulator {
                         .ok()?;
                     if public_key_set.public_key().verify(&signature, &signed_data) {
                         let _ = self.completed.insert(msg_id);
-                        let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
+                        //let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
                         let signature = safe_nd::Signature::Bls(signature);
                         return Some((msg.clone(), signature));
                     } else {

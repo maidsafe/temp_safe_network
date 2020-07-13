@@ -48,7 +48,6 @@ impl Messaging {
     }
 
     pub fn send(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let name = *self.routing.borrow().id().name();
         match msg.destination() {
             Address::Node(_) => self.send_to_node(msg),
             Address::Section(_) => self.send_to_network(msg),
@@ -86,8 +85,8 @@ impl Messaging {
         let name = *self.routing.borrow().id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
-            Address::Section(xorname) => return Some(OutboundMsg::SendToSection(msg)),
-            Address::Client(xorname) => return Some(OutboundMsg::SendToClient(msg)),
+            Address::Section(_) => return Some(OutboundMsg::SendToSection(msg)),
+            Address::Client(_) => return Some(OutboundMsg::SendToClient(msg)),
         };
         self.routing
             .borrow_mut()

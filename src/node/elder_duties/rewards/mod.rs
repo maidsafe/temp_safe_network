@@ -21,7 +21,7 @@ use safe_nd::{AccountId, ElderDuty, Money, XorName};
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
 
-pub(super) struct Rewards {
+pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
     node_accounts: HashMap<XorName, AccountId>,
     section_funds: SectionFunds,

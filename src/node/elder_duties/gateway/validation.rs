@@ -33,20 +33,21 @@ impl Validation {
         }
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        match &msg.message {
-            Message::Cmd {
-                cmd: Cmd::Data { cmd, .. },
-                ..
-            } => self.initiate_write(cmd, msg),
-            Message::Query {
-                query: Query::Data(query),
-                ..
-            } => self.initiate_read(query, msg),
-            _ => return None,
-        }
-    }
+    // pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    //     match &msg.message {
+    //         Message::Cmd {
+    //             cmd: Cmd::Data { cmd, .. },
+    //             ..
+    //         } => self.initiate_write(cmd, msg),
+    //         Message::Query {
+    //             query: Query::Data(query),
+    //             ..
+    //         } => self.initiate_read(query, msg),
+    //         _ => return None,
+    //     }
+    // }
 
+    // Called directly from 
     pub fn initiate_write(&mut self, cmd: &DataCmd, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match cmd {
             DataCmd::Blob(_) => self.blobs.initiate_write(msg),

@@ -10,14 +10,13 @@ use crate::{node::Init, Result};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use routing::{Node as Routing, SrcLocation};
+use routing::Node as Routing;
 use safe_nd::{
-    BlsKeypairShare, ClientPublicId, Keypair, PublicId, PublicKey, Signature, SignatureShare,
-    XorName,
+    BlsKeypairShare, Keypair, PublicId, PublicKey,
 };
 use serde::Serialize;
 use std::{
-    cell::{Cell, Ref, RefCell},
+    cell::RefCell,
     fs,
     path::Path,
     rc::Rc,
@@ -56,25 +55,6 @@ pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
     unwrap!(bincode::serialize(data))
 }
 
-/// Returns the client's public ID, the owner's public ID, or None depending on whether `public_id`
-/// represents a Client, App or Node respectively.
-pub(crate) fn owner(public_id: &PublicId) -> Option<&ClientPublicId> {
-    match public_id {
-        PublicId::Node(_) => None,
-        PublicId::Client(pub_id) => Some(pub_id),
-        PublicId::App(pub_id) => Some(pub_id.owner()),
-    }
-}
-
-/// Returns the client's ID if `public_id` represents a Client, or None if it represents an App or
-/// Node.
-pub(crate) fn client(public_id: &PublicId) -> Option<&ClientPublicId> {
-    match public_id {
-        PublicId::Node(_) | PublicId::App(_) => None,
-        PublicId::Client(pub_id) => Some(pub_id),
-    }
-}
-
 /// Returns the client's or app's public key if `public_id` represents a Client or App respectively,
 /// or None if it represents a Node.
 pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
@@ -83,26 +63,6 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
         PublicId::Client(ref client) => Some(client.public_key()),
         PublicId::App(ref app) => Some(app.public_key()),
     }
-}
-
-pub(crate) fn get_source_name(src: SrcLocation) -> XorName {
-    if let SrcLocation::Node(xorname) = src {
-        XorName(xorname.0)
-    } else {
-        XorName::default()
-    }
-}
-
-pub(crate) fn bls_sign(routing: Ref<Routing>, data: &[u8]) -> Option<Signature> {
-    let signature = routing
-        .secret_key_share()
-        .map_or(None, |key| Some(key.sign(data)));
-    signature.map(|sig| {
-        Signature::BlsShare(SignatureShare {
-            index: routing.our_index().unwrap_or(0),
-            share: sig,
-        })
-    })
 }
 
 pub(crate) fn key_pair(routing: Rc<RefCell<Routing>>) -> Result<Keypair> {

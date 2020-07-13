@@ -40,13 +40,13 @@ impl AdultMsgDecisions {
         self.inner.send(message)
     }
 
-    pub fn send_to_adults(
-        &self,
-        targets: BTreeSet<XorName>,
-        msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
-        self.inner.send_to_adults(targets, msg)
-    }
+    // pub fn send_to_adults(
+    //     &self,
+    //     targets: BTreeSet<XorName>,
+    //     msg: &MsgEnvelope,
+    // ) -> Option<OutboundMsg> {
+    //     self.inner.send_to_adults(targets, msg)
+    // }
 
     pub fn error(
         &self,

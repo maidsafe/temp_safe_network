@@ -79,7 +79,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub(super) fn handle_request(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match msg.message.clone() {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),

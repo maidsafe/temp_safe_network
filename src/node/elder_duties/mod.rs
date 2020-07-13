@@ -123,6 +123,10 @@ impl ElderDuties {
         &mut self.transfers
     }
 
+    pub fn rewards(&mut self) -> &mut Rewards {
+        &mut self.rewards
+    }
+
     /// Name of the node
     /// Age of the node
     pub fn member_left(&mut self, _name: XorName, _age: u8) -> Option<Vec<OutboundMsg>> {

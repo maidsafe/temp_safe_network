@@ -19,6 +19,10 @@ pub(crate) enum NodeDuties {
     Elder,
 }
 
+/// Currently, this is only evaluating
+/// remote msgs from the network, i.e.
+/// it is not evaluating msgs sent 
+/// directly from the client.
 pub(crate) struct InboundMsgAnalysis {
     routing: Rc<RefCell<Routing>>,
 }
@@ -32,6 +36,7 @@ pub(crate) enum InboundMsg {
     RunAtAdult(MsgEnvelope),
     SendToClient(MsgEnvelope),
     RunAtRewards(MsgEnvelope),
+    RunAtTransfers(MsgEnvelope),
     Unknown,
 }
 
@@ -44,7 +49,10 @@ impl InboundMsgAnalysis {
         self.self_is_handler_for(&msg.destination().xorname())
     }
 
-    // todo: , duties: NodeDuties
+    /// Currently, this is only evaluating
+    /// remote msgs from the network, i.e.
+    /// it is not evaluating msgs sent 
+    /// directly from the client.
     pub fn evaluate(&self, msg: &MsgEnvelope) -> InboundMsg {
         if self.should_accumulate(msg) {
             InboundMsg::Accumulate(msg.clone())
@@ -54,9 +62,10 @@ impl InboundMsgAnalysis {
         } else if self.should_push_to_client(msg) {
             // From network to client!
             InboundMsg::SendToClient(msg.clone())
-        } else if self.should_run_at_gateway(msg) {
-            // Client auth operations (Temporarily handled here, will be at app layer (Authenticator)).
-            // Gateway Elders should just execute and return the result, for client to accumulate.
+        } else if self.should_run_at_gateway_auth(msg) {
+            // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
+            // The auth cmd has been agreed by the Gateway section.
+            // (All other client msgs are handled when received from client).
             InboundMsg::RunAtGateway(msg.clone())
         } else if self.should_run_at_data_payment(msg) {
             // Incoming msg from `Gateway`!
@@ -69,6 +78,8 @@ impl InboundMsgAnalysis {
             InboundMsg::RunAtAdult(msg.clone())
         } else if self.should_run_at_rewards(msg) {
             InboundMsg::RunAtRewards(msg.clone())
+        } else if self.should_run_at_transfers(msg) {
+            InboundMsg::RunAtTransfers(msg.clone())
         } else {
             InboundMsg::Unknown
         }
@@ -104,24 +115,24 @@ impl InboundMsgAnalysis {
     }
 
     // todo: eval all msg types!
-    fn should_run_at_gateway(&self, msg: &MsgEnvelope) -> bool {
-        let from_client = || match msg.most_recent_sender() {
+    fn should_run_at_gateway_auth(&self, msg: &MsgEnvelope) -> bool {
+        let from_client = || match msg.origin {
             MsgSender::Client { .. } => true,
             _ => false,
         };
-        let is_auth_msg = || match msg.message {
+        let agreed_by_gateway_section = || match msg.most_recent_sender() {
+            MsgSender::Section { duty: Duty::Elder(ElderDuty::Gateway), .. } => true,
+            _ => false,
+        };
+        let is_auth_cmd = || match msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth { .. },
-                ..
-            }
-            | Message::Query {
-                query: Query::Auth { .. },
                 ..
             } => true,
             _ => false,
         };
 
-        from_client() && is_auth_msg() && self.is_dst_for(msg) && self.is_elder()
+        from_client() && agreed_by_gateway_section() && is_auth_cmd() && self.is_dst_for(msg) && self.is_elder()
     }
 
     /// We do not accumulate these request, they are executed
@@ -246,7 +257,26 @@ impl InboundMsgAnalysis {
     }
 
     fn should_run_at_rewards(&self, msg: &MsgEnvelope) -> bool {
-        unimplemented!()
+        false //unimplemented
+    }
+
+    fn should_run_at_transfers(&self, msg: &MsgEnvelope) -> bool {
+        let from_single_gateway_elder = || match msg.most_recent_sender() {
+            MsgSender::Node {
+                duty: Duty::Elder(ElderDuty::Gateway),
+                ..
+            } => true,
+            _ => false,
+        };
+        let is_transfer = || match msg.message {
+            Message::Cmd {
+                cmd: Cmd::Transfer(_),
+                ..
+            } => true,
+            _ => false,
+        };
+
+        is_transfer() && from_single_gateway_elder() && self.is_dst_for(msg) && self.is_elder()
     }
 
     fn should_push_to_client(&self, msg: &MsgEnvelope) -> bool {
