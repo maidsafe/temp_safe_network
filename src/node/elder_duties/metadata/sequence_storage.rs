@@ -59,18 +59,18 @@ impl SequenceStorage {
         &self,
         read: &SequenceRead,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         use SequenceRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin),
-            GetRange { address, range } => self.get_range(*address, *range, msg_id, origin),
-            GetLastEntry(address) => self.get_last_entry(*address, msg_id, origin),
-            GetOwner(address) => self.get_owner(*address, msg_id, origin),
+            Get(address) => self.get(*address, msg_id, &origin),
+            GetRange { address, range } => self.get_range(*address, *range, msg_id, &origin),
+            GetLastEntry(address) => self.get_last_entry(*address, msg_id, &origin),
+            GetOwner(address) => self.get_owner(*address, msg_id, &origin),
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, origin)
+                self.get_user_permissions(*address, *user, msg_id, &origin)
             }
-            GetPermissions(address) => self.get_permissions(*address, msg_id, origin),
+            GetPermissions(address) => self.get_permissions(*address, msg_id, &origin),
         }
     }
 
@@ -78,7 +78,7 @@ impl SequenceStorage {
         &mut self,
         write: SequenceWrite,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         use SequenceWrite::*;
         match write {
@@ -93,7 +93,7 @@ impl SequenceStorage {
         }
     }
 
-    fn store(&mut self, data: &SData, msg_id: MessageId, origin: MsgSender) -> Option<OutboundMsg> {
+    fn store(&mut self, data: &SData, msg_id: MessageId, origin: &MsgSender) -> Option<OutboundMsg> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -101,14 +101,14 @@ impl SequenceStorage {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, &origin)
     }
 
     fn get(
         &self,
         address: SDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self.get_chunk(address, SDataAction::Read, origin);
         self.decisions.send(Message::QueryResponse {
@@ -123,7 +123,7 @@ impl SequenceStorage {
         &self,
         address: SDataAddress,
         action: SDataAction,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Result<SData, NdError> {
         //let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
         let data = self.chunks.get(&address).map_err(|error| match error {
@@ -138,7 +138,7 @@ impl SequenceStorage {
         &mut self,
         address: SDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         //let requester_pk = *utils::own_key(&requester)?;
         let result = self
@@ -162,7 +162,7 @@ impl SequenceStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, &origin)
     }
 
     fn get_range(
@@ -170,7 +170,7 @@ impl SequenceStorage {
         address: SDataAddress,
         range: (SDataIndex, SDataIndex),
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(address, SDataAction::Read, origin)
@@ -187,7 +187,7 @@ impl SequenceStorage {
         &self,
         address: SDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result =
             self.get_chunk(address, SDataAction::Read, origin)
@@ -207,7 +207,7 @@ impl SequenceStorage {
         &self,
         address: SDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(address, SDataAction::Read, origin)
@@ -228,7 +228,7 @@ impl SequenceStorage {
         address: SDataAddress,
         user: SDataUser,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(address, SDataAction::Read, origin)
@@ -248,7 +248,7 @@ impl SequenceStorage {
         &self,
         address: SDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self
             .get_chunk(address, SDataAction::Read, origin)
@@ -273,7 +273,7 @@ impl SequenceStorage {
         &mut self,
         write_op: SDataWriteOp<SDataPubPermissions>,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let address = write_op.address;
         let result = self.edit_chunk(
@@ -285,14 +285,14 @@ impl SequenceStorage {
                 Ok(sdata)
             },
         );
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, &origin)
     }
 
     fn set_private_permissions(
         &mut self,
         write_op: SDataWriteOp<SDataPrivPermissions>,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let address = write_op.address;
         let result = self.edit_chunk(
@@ -311,7 +311,7 @@ impl SequenceStorage {
         &mut self,
         write_op: SDataWriteOp<SDataOwner>,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let address = write_op.address;
         let result = self.edit_chunk(
@@ -323,14 +323,14 @@ impl SequenceStorage {
                 Ok(sdata)
             },
         );
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, &origin)
     }
 
     fn edit(
         &mut self,
         write_op: SDataWriteOp<SDataEntry>,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let address = write_op.address;
         let result = self.edit_chunk(address, SDataAction::Append, origin, move |mut sdata| {
@@ -344,7 +344,7 @@ impl SequenceStorage {
         &mut self,
         address: SDataAddress,
         action: SDataAction,
-        origin: MsgSender,
+        origin: &MsgSender,
         write_fn: F,
     ) -> NdResult<()>
     where
@@ -363,7 +363,7 @@ impl SequenceStorage {
         &self,
         result: NdResult<T>,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let error = match result {
             Ok(_) => return None,

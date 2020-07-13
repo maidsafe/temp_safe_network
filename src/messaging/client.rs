@@ -13,7 +13,7 @@ use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::{
     Address, Error, HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope,
-    NodePublicId, PublicId, Result, Signature, XorName,
+    NodePublicId, PublicId, Result, Signature, XorName, MsgSender,
 };
 use serde::Serialize;
 use std::{
@@ -95,6 +95,7 @@ impl ClientMessaging {
                 @
                 MsgEnvelope {
                     message: Message::Cmd { .. },
+                    origin: MsgSender::Client { .. },
                     ..
                 },
             ) => Some(msg),
@@ -103,9 +104,11 @@ impl ClientMessaging {
                 @
                 MsgEnvelope {
                     message: Message::Query { .. },
+                    origin: MsgSender::Client { .. },
                     ..
                 },
             ) => Some(msg),
+            _ => None, // Only cmds and queries from client are allowed through here.
         }
     }
 
@@ -186,7 +189,7 @@ impl ClientMessaging {
     //     }
     // }
 
-    pub fn send_to_client(&mut self, msg: MsgEnvelope) -> Result<()> {
+    pub fn send_to_client(&mut self, msg: &MsgEnvelope) -> Result<()> {
         match msg.destination() {
             Address::Client { .. } => (),
             _ => {
@@ -218,7 +221,7 @@ impl ClientMessaging {
                     "{} for message-id {:?}, Unable to find the client to respond to.",
                     self, correlation_id
                 );
-                let _ = self.pending_actions.insert(correlation_id, msg);
+                let _ = self.pending_actions.insert(correlation_id, msg.clone());
                 return Err(Error::NoSuchKey);
             }
         };

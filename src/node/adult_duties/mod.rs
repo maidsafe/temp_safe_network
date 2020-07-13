@@ -46,7 +46,7 @@ impl AdultDuties {
         })
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         self.chunks.receive_msg(msg)
     }
 }

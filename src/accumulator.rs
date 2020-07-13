@@ -29,7 +29,7 @@ impl Accumulator {
         }
     }
 
-    pub(crate) fn accumulate_cmd(&mut self, msg: MsgEnvelope) -> Option<(MsgEnvelope, Signature)> {
+    pub(crate) fn accumulate_cmd(&mut self, msg: &MsgEnvelope) -> Option<(MsgEnvelope, Signature)> {
         let msg_id = msg.id();
         if self.completed.contains(&msg_id) {
             info!("Message already processed.");
@@ -46,7 +46,8 @@ impl Accumulator {
                     | MsgSender::Section {
                         signature: Signature::BlsShare(share),
                         ..
-                    } => *share,
+                    } => share,
+                    _ => return None, // no other variation is valid here (yet)
                 };
                 // If the request comes from a node, the signatures have already
                 // been accumulated at the Adult before the data is requested for duplication.
@@ -55,11 +56,11 @@ impl Accumulator {
                 // } else {
                 match self.messages.entry(msg_id) {
                     Entry::Vacant(entry) => {
-                        let _ = entry.insert((msg, msg.origin, vec![signature]));
+                        let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![signature.clone()]));
                     }
                     Entry::Occupied(mut entry) => {
                         let (_, _, signatures) = entry.get_mut();
-                        signatures.push(signature);
+                        signatures.push(signature.clone());
                     }
                 }
 
@@ -91,18 +92,14 @@ impl Accumulator {
                         let _ = self.completed.insert(msg_id);
                         let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
                         let signature = safe_nd::Signature::Bls(signature);
-                        return Some((msg, signature));
+                        return Some((msg.clone(), signature));
                     } else {
                         error!("Accumulated signature is invalid");
                     }
                 }
                 None
-                //}
             }
-            Message::CmdError { .. } => unimplemented!(),
-            Message::Event { .. } => unimplemented!(),
-            Message::Query { .. } => unimplemented!(),
-            Message::QueryResponse { .. } => unimplemented!(),
+            _ => None, // only client originating cmds are accumulated here
         }
 
         // match msg {

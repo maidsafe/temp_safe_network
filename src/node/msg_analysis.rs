@@ -40,48 +40,48 @@ impl InboundMsgAnalysis {
         Self { routing }
     }
 
-    pub fn is_dst_for(&self, msg: MsgEnvelope) -> bool {
+    pub fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
         self.self_is_handler_for(&msg.destination().xorname())
     }
 
     // todo: , duties: NodeDuties
-    pub fn evaluate(&self, msg: MsgEnvelope) -> InboundMsg {
+    pub fn evaluate(&self, msg: &MsgEnvelope) -> InboundMsg {
         if self.should_accumulate(msg) {
-            InboundMsg::Accumulate(msg)
+            InboundMsg::Accumulate(msg.clone())
         } else if self.should_forward_to_network(msg) {
             // Any type of msg that is not process locally.
-            InboundMsg::ForwardToNetwork(msg)
+            InboundMsg::ForwardToNetwork(msg.clone())
         } else if self.should_push_to_client(msg) {
             // From network to client!
-            InboundMsg::SendToClient(msg)
+            InboundMsg::SendToClient(msg.clone())
         } else if self.should_run_at_gateway(msg) {
             // Client auth operations (Temporarily handled here, will be at app layer (Authenticator)).
             // Gateway Elders should just execute and return the result, for client to accumulate.
-            InboundMsg::RunAtGateway(msg)
+            InboundMsg::RunAtGateway(msg.clone())
         } else if self.should_run_at_data_payment(msg) {
             // Incoming msg from `Gateway`!
-            InboundMsg::RunAtPayment(msg) // Payment Elders should just execute and send onwards.
+            InboundMsg::RunAtPayment(msg.clone()) // Payment Elders should just execute and send onwards.
         } else if self.should_run_at_metadata_write(msg) {
             // Accumulated msg from `Payment`!
-            InboundMsg::RunAtMetadata(msg)
-        } else if self.should_run_at_chunk_write(msg) {
+            InboundMsg::RunAtMetadata(msg.clone())
+        } else if self.should_run_at_adult(msg) {
             // Accumulated msg from `Metadata`!
-            InboundMsg::RunAtAdult(msg)
+            InboundMsg::RunAtAdult(msg.clone())
         } else if self.should_run_at_rewards(msg) {
-            InboundMsg::RunAtRewards(msg)
+            InboundMsg::RunAtRewards(msg.clone())
         } else {
             InboundMsg::Unknown
         }
     }
 
-    fn should_accumulate(&self, msg: MsgEnvelope) -> bool {
+    fn should_accumulate(&self, msg: &MsgEnvelope) -> bool {
         // Incoming msg from `Payment`!
         self.should_accumulate_for_metadata_write(msg) // Metadata Elders accumulate the msgs from Payment Elders.
         // Incoming msg from `Metadata`!
-        || self.should_accumulate_for_chunk_write(msg) // Adults accumulate the msgs from Metadata Elders.
+        || self.should_accumulate_for_adult(msg) // Adults accumulate the msgs from Metadata Elders.
     }
 
-    fn should_forward_to_network(&self, msg: MsgEnvelope) -> bool {
+    fn should_forward_to_network(&self, msg: &MsgEnvelope) -> bool {
         use Address::*;
         let destined_for_network = || match msg.destination() {
             Client(address) => !self.self_is_handler_for(&address),
@@ -104,7 +104,7 @@ impl InboundMsgAnalysis {
     }
 
     // todo: eval all msg types!
-    fn should_run_at_gateway(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_gateway(&self, msg: &MsgEnvelope) -> bool {
         let from_client = || match msg.most_recent_sender() {
             MsgSender::Client { .. } => true,
             _ => false,
@@ -130,7 +130,7 @@ impl InboundMsgAnalysis {
     /// The reason for this is that the payment request is already signed
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
-    fn should_run_at_data_payment(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_data_payment(&self, msg: &MsgEnvelope) -> bool {
         let from_gateway_single_elder = || match msg.most_recent_sender() {
             MsgSender::Node {
                 duty: Duty::Elder(ElderDuty::Gateway),
@@ -155,7 +155,7 @@ impl InboundMsgAnalysis {
 
     /// The individual Payment Elder nodes send their msgs
     /// to Metadata section, where it is accumulated.
-    fn should_accumulate_for_metadata_write(&self, msg: MsgEnvelope) -> bool {
+    fn should_accumulate_for_metadata_write(&self, msg: &MsgEnvelope) -> bool {
         let from_single_payment_elder = || match msg.most_recent_sender() {
             MsgSender::Node {
                 duty: Duty::Elder(ElderDuty::Payment),
@@ -177,7 +177,7 @@ impl InboundMsgAnalysis {
     /// After the data write sent from Payment Elders has been
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
-    fn should_run_at_metadata_write(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_metadata_write(&self, msg: &MsgEnvelope) -> bool {
         let from_payment_section = || match msg.most_recent_sender() {
             MsgSender::Section {
                 duty: Duty::Elder(ElderDuty::Payment),
@@ -197,7 +197,7 @@ impl InboundMsgAnalysis {
     }
 
     /// Adults accumulate the write requests from Elders.
-    fn should_accumulate_for_chunk_write(&self, msg: MsgEnvelope) -> bool {
+    fn should_accumulate_for_adult(&self, msg: &MsgEnvelope) -> bool {
         let from_single_metadata_elder = || match msg.most_recent_sender() {
             MsgSender::Node {
                 duty: Duty::Elder(ElderDuty::Metadata),
@@ -222,7 +222,7 @@ impl InboundMsgAnalysis {
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    fn should_run_at_chunk_write(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_adult(&self, msg: &MsgEnvelope) -> bool {
         let from_metadata_section = || match msg.most_recent_sender() {
             MsgSender::Section {
                 duty: Duty::Elder(ElderDuty::Metadata),
@@ -245,11 +245,11 @@ impl InboundMsgAnalysis {
         is_chunk_cmd() && from_metadata_section() && self.is_dst_for(msg) && self.is_adult()
     }
 
-    fn should_run_at_rewards(&self, msg: MsgEnvelope) -> bool {
+    fn should_run_at_rewards(&self, msg: &MsgEnvelope) -> bool {
         unimplemented!()
     }
 
-    fn should_push_to_client(&self, msg: MsgEnvelope) -> bool {
+    fn should_push_to_client(&self, msg: &MsgEnvelope) -> bool {
         match msg.destination() {
             Address::Client(xorname) => self.self_is_handler_for(&xorname),
             _ => false,
@@ -281,7 +281,6 @@ impl InboundMsgAnalysis {
     }
 
     fn our_duties(&self) -> NodeDuties {
-        let our_name = self.routing.borrow().name();
         if self.routing.borrow().is_elder() {
             NodeDuties::Elder
         } else if self
@@ -290,7 +289,7 @@ impl InboundMsgAnalysis {
             .our_adults()
             .map(|c| c.name())
             .collect::<Vec<_>>()
-            .contains(&our_name)
+            .contains(&self.routing.borrow().name())
         {
             NodeDuties::Adult
         } else {

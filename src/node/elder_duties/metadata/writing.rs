@@ -34,11 +34,11 @@ impl Writing {
     }
 
     fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<OutboundMsg> {
-        register.write(write, self.msg)
+        register.write(write, &self.msg)
     }
 
     fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<OutboundMsg> {
-        storage.write(write, self.msg)
+        storage.write(write, self.msg.id(), &self.msg.origin)
     }
 
     fn sequence(
@@ -46,7 +46,7 @@ impl Writing {
         write: SequenceWrite,
         storage: &mut SequenceStorage,
     ) -> Option<OutboundMsg> {
-        storage.write(write, self.msg.id(), self.msg.origin)
+        storage.write(write, self.msg.id(), &self.msg.origin)
     }
 
     fn account(
@@ -54,6 +54,6 @@ impl Writing {
         write: AccountWrite,
         storage: &mut AccountStorage,
     ) -> Option<OutboundMsg> {
-        storage.write(write, self.msg.id(), self.msg.origin)
+        storage.write(write, self.msg.id(), &self.msg.origin)
     }
 }

@@ -79,23 +79,24 @@ impl Metadata {
         })
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let msg_id = msg.message.id();
-        match msg.message {
+        match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
                 ..
             } => {
-                let mut writing = Writing::new(cmd, msg);
+                let mut writing = Writing::new(cmd.clone(), msg.clone());
                 writing.get_result(&mut self.elder_stores)
             }
             Message::Query {
                 query: Query::Data(query),
                 ..
             } => {
-                let reading = Reading::new(query, msg);
+                let reading = Reading::new(query.clone(), msg.clone());
                 reading.get_result(&self.elder_stores)
             }
+            _ => None, // only Queries and Cmds from client is handled at Metadata
         }
     }
 

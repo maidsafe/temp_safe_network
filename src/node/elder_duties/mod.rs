@@ -66,13 +66,13 @@ impl ElderDuties {
         )?;
 
         // (AT2 Replicas)
-        let replica_manager = Self::replica_manager(routing)?;
+        let replica_manager = Self::replica_manager(routing.clone())?;
 
         // Transfers
         let transfers = Transfers::new(keys.clone(), replica_manager.clone());
 
         // DataPayment
-        let data_payment = DataPayment::new(keys.clone(), replica_manager);
+        let data_payment = DataPayment::new(keys.clone(), replica_manager.clone());
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;

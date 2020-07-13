@@ -24,10 +24,10 @@ impl Writing {
 
     pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<OutboundMsg> {
         use BlobWrite::*;
-        match self.write {
+        match &self.write {
             New(data) => {
                 if self.verify(&self.msg) {
-                    storage.store(&data, self.msg.id(), self.msg.origin)
+                    storage.store(&data, self.msg.id(), &self.msg.origin)
                 } else {
                     error!("Accumulated signature for {:?} is invalid!", &self.msg.id());
                     None
@@ -35,7 +35,7 @@ impl Writing {
             }
             DeletePrivate(address) => {
                 if self.verify(&address) {
-                    storage.delete(address, self.msg.id(), self.msg.origin)
+                    storage.delete(*address, self.msg.id(), &self.msg.origin)
                 } else {
                     error!("Accumulated signature is invalid!");
                     None

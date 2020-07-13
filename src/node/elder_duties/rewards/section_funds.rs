@@ -17,7 +17,7 @@ impl SectionFunds {
     pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<OutboundMsg> {
         match self.actor.transfer(amount, to) {
             Ok(Some(event)) => {
-                self.actor.apply(TransferInitiated(event));
+                self.actor.apply(TransferInitiated(event.clone()));
                 self.decisions.send(Message::NetworkCmd {
                     cmd: NetworkCmd::InitiateRewardPayout(event.signed_transfer),
                     id: MessageId::new(),
@@ -31,7 +31,7 @@ impl SectionFunds {
     pub fn receive(&mut self, validation: TransferValidated) -> Option<OutboundMsg> {
         match self.actor.receive(validation) {
             Ok(Some(event)) => {
-                self.actor.apply(TransferValidationReceived(event));
+                self.actor.apply(TransferValidationReceived(event.clone()));
                 self.decisions.send(Message::NetworkCmd {
                     cmd: NetworkCmd::FinaliseRewardPayout(event.proof?),
                     id: MessageId::new(),

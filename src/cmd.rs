@@ -22,7 +22,7 @@ pub(crate) enum OutboundMsgChain {
 /// Any network node
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum OutboundMsg {
+pub enum OutboundMsg {
     /// Send to a client.
     SendToClient(MsgEnvelope),
     /// Send to a single node.
@@ -43,7 +43,7 @@ pub(crate) enum OutboundMsg {
 /// A GroupDecision is something only
 /// taking place at the network Gateways.
 #[derive(Debug, Clone, Serialize, Deserialize)] // Debug,
-pub(crate) enum GroupDecision {
+pub enum GroupDecision {
     /// When Gateway nodes consider a request
     /// valid, they will vote for it to be forwarded.
     /// As they reach consensus, this is then carried out.

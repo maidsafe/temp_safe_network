@@ -15,13 +15,13 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 
 #[derive(Clone)]
-pub(super) struct ElderMsgDecisions {
-    util: MsgDecisions,
+pub struct ElderMsgDecisions {
+    inner: MsgDecisions,
 }
 
 #[derive(Clone)]
-pub(super) struct AdultMsgDecisions {
-    util: MsgDecisions,
+pub struct AdultMsgDecisions {
+    inner: MsgDecisions,
 }
 
 #[derive(Clone)]
@@ -32,67 +32,67 @@ struct MsgDecisions {
 
 impl AdultMsgDecisions {
     pub fn new(keys: NodeKeys, duty: AdultDuty) -> Self {
-        let util = MsgDecisions::new(keys, Duty::Adult(duty));
-        Self { util }
+        let inner = MsgDecisions::new(keys, Duty::Adult(duty));
+        Self { inner }
     }
 
     pub fn send(&self, message: Message) -> Option<OutboundMsg> {
-        self.util.send(message)
+        self.inner.send(message)
     }
 
     pub fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
-        self.util.send_to_adults(targets, msg)
+        self.inner.send_to_adults(targets, msg)
     }
 
     pub fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
-        self.util.error(error, msg_id, origin)
+        self.inner.error(error, msg_id, &origin)
     }
 }
 
 impl ElderMsgDecisions {
     pub fn new(keys: NodeKeys, duty: ElderDuty) -> Self {
-        let util = MsgDecisions::new(keys, Duty::Elder(duty));
-        Self { util }
+        let inner = MsgDecisions::new(keys, Duty::Elder(duty));
+        Self { inner }
     }
 
-    pub fn vote(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let msg = self.util.set_proxy(&msg);
+    pub fn vote(&self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        let msg = self.inner.set_proxy(msg);
         Some(OutboundMsg::VoteFor(GroupDecision::Forward(msg)))
     }
 
-    pub fn forward(&self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let msg = self.util.set_proxy(&msg);
+    pub fn forward(&self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        let msg = self.inner.set_proxy(&msg);
         Some(OutboundMsg::SendToSection(msg))
     }
 
     pub fn send(&self, message: Message) -> Option<OutboundMsg> {
-        self.util.send(message)
+        self.inner.send(message)
     }
 
     pub fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
-        self.util.send_to_adults(targets, msg)
+        self.inner.send_to_adults(targets, msg)
     }
 
     pub fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
-        self.util.error(error, msg_id, origin)
+        self.inner.error(error, msg_id, &origin)
     }
 }
 
@@ -102,9 +102,10 @@ impl MsgDecisions {
     }
 
     pub fn send(&self, message: Message) -> Option<OutboundMsg> {
+        let origin = self.sign(&message);
         let msg = MsgEnvelope {
             message,
-            origin: self.sign(&message),
+            origin,
             proxies: Default::default(),
         };
         Some(OutboundMsg::SendToSection(msg))
@@ -113,7 +114,7 @@ impl MsgDecisions {
     pub fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
         let msg = self.set_proxy(&msg);
         Some(OutboundMsg::SendToAdults { targets, msg })
@@ -123,7 +124,7 @@ impl MsgDecisions {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         self.send(Message::CmdError {
             id: MessageId::new(),

@@ -14,7 +14,7 @@ use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     BlobRead, BlobWrite, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
-    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
+    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName, MsgSender,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -73,7 +73,7 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn write(&mut self, write: BlobWrite, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub(super) fn write(&mut self, write: BlobWrite, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg),
@@ -81,7 +81,7 @@ impl BlobRegister {
         }
     }
 
-    fn store(&mut self, data: IData, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn store(&mut self, data: IData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -130,7 +130,7 @@ impl BlobRegister {
         self.decisions.send_to_adults(target_holders, msg)
     }
 
-    fn delete(&mut self, address: IDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn delete(&mut self, address: IDataAddress, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -186,7 +186,7 @@ impl BlobRegister {
                     cmd: NetworkCmd::DuplicateChunk {
                         new_holder,
                         address,
-                        fetch_from_holders: current_holders,
+                        fetch_from_holders: current_holders.clone(),
                     },
                     id: message_id,
                 }
@@ -195,14 +195,14 @@ impl BlobRegister {
             .collect()
     }
 
-    pub(super) fn read(&self, read: &BlobRead, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub(super) fn read(&self, read: &BlobRead, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg),
         }
     }
 
-    fn get(&self, address: IDataAddress, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn get(&self, address: IDataAddress, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let query_error = |error: NdError| {
             self.decisions.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),

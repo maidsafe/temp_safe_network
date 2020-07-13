@@ -59,14 +59,14 @@ impl Messaging {
     pub fn send_to_nodes(
         &self,
         targets: BTreeSet<XorName>,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
-        let name = self.routing.borrow().id().name();
+        let name = *self.routing.borrow().id().name();
         for target in targets {
             self.routing
                 .borrow_mut()
                 .send_message(
-                    SrcLocation::Node(*name),
+                    SrcLocation::Node(name),
                     DstLocation::Node(routing::XorName(target.0)),
                     utils::serialise(&msg),
                 )

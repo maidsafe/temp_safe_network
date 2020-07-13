@@ -79,13 +79,13 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub(super) fn handle_request(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        match msg.message {
+    pub(super) fn handle_request(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        match msg.message.clone() {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => self.handle_client_cmd(cmd, msg),
-            Message::NetworkCmd { cmd, .. } => self.handle_network_cmd(cmd, msg.id(), msg.origin),
+            Message::NetworkCmd { cmd, .. } => self.handle_network_cmd(cmd, msg.id(), &msg.origin),
             Message::Query {
                 query: Query::Transfer(query),
                 ..
@@ -98,12 +98,14 @@ impl Transfers {
         &mut self,
         cmd: NetworkCmd,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
+        use NetworkCmd::*;
         match cmd {
-            NetworkCmd::PropagateTransfer(debit_proof) => self.receive_propagated(&debit_proof, msg_id, origin),
-            NetworkCmd::InitiateRewardPayout(signed_transfer) => None, // TODO
-            NetworkCmd::FinaliseRewardPayout(debit_proof) => match self.replica.borrow_mut().register(&debit_proof) {
+            DuplicateChunk { .. } => None, // should not end up here
+            PropagateTransfer(debit_proof) => self.receive_propagated(&debit_proof, msg_id, &origin),
+            InitiateRewardPayout(signed_transfer) => None, // TODO
+            FinaliseRewardPayout(debit_proof) => match self.replica.borrow_mut().register(&debit_proof) {
                     Ok(None) => None,
                     Ok(Some(event)) => {
                         // the transfer is then propagated, and will reach the recipient section
@@ -112,17 +114,17 @@ impl Transfers {
                             id: MessageId::new(),
                         })
                     }
-                    Err(error) => self.decisions.error(CmdError::Transfer(TransferError::TransferRegistration(error)), msg_id, origin),
+                    Err(error) => self.decisions.error(CmdError::Transfer(TransferError::TransferRegistration(error)), msg_id, &origin),
                 }
         }
     }
 
-    fn handle_client_cmd(&mut self, cmd: TransferCmd, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn handle_client_cmd(&mut self, cmd: TransferCmd, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match cmd {
             TransferCmd::ValidateTransfer(signed_transfer) => {
-                self.validate(signed_transfer, msg.id(), msg.origin)
+                self.validate(signed_transfer, msg.id(), &msg.origin)
             }
-            TransferCmd::RegisterTransfer(proof) => self.register(&proof, msg.id(), msg.origin),
+            TransferCmd::RegisterTransfer(proof) => self.register(&proof, msg.id(), &msg.origin),
             #[cfg(feature = "simulated-payouts")]
             TransferCmd::SimulatePayout(transfer) => self
                 .replica
@@ -134,7 +136,7 @@ impl Transfers {
     fn handle_client_query(
         &mut self,
         query: TransferQuery,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
         match query {
             TransferQuery::GetBalance(public_key) => self.balance(public_key, msg),
@@ -144,7 +146,7 @@ impl Transfers {
     }
 
     /// Get the PublicKeySet of our replicas
-    fn get_replica_pks(&self, _public_key: PublicKey, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn get_replica_pks(&self, _public_key: PublicKey, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         // validate signature
         let result = match self.replica.borrow().replicas_pk_set() {
             None => Err(Error::NoSuchKey),
@@ -158,7 +160,7 @@ impl Transfers {
         })
     }
 
-    fn balance(&self, public_key: PublicKey, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn balance(&self, public_key: PublicKey, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         // validate signature
         let result = self
             .replica
@@ -177,7 +179,7 @@ impl Transfers {
         &self,
         public_key: PublicKey,
         _since_version: usize,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
         // validate signature
         let result = match self
@@ -203,7 +205,7 @@ impl Transfers {
         &mut self,
         transfer: SignedTransfer,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
@@ -231,7 +233,7 @@ impl Transfers {
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let message = match self.replica.borrow_mut().register(proof) {
             Ok(None) => return None,
@@ -257,11 +259,11 @@ impl Transfers {
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.borrow_mut().receive_propagated(proof) {
-            Ok(Some(event)) => return None,
+            Ok(_) => return None,
             // self.send(Message {
             //     event: Event::TransferReceived
             // }),

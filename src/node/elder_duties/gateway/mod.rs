@@ -84,7 +84,7 @@ impl Gateway {
             .try_parse_client_msg(peer_addr, bytes, rng)
     }
 
-    pub fn push_to_client(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn push_to_client(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         // TODO: Handle this result
         let _ = self.messaging.send_to_client(msg);
         None
@@ -93,7 +93,7 @@ impl Gateway {
     /// Temporary, while Authenticator is not implemented at app layer.
     /// If a request within OutboundMsg::ForwardClientRequest issued by us in `handle_consensused_cmd`
     /// was made by Gateway and destined to our section, this is where the actual request will end up.
-    pub fn handle_auth_cmd(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn handle_auth_cmd(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         self.auth.finalise(msg)
     }
 
@@ -108,7 +108,7 @@ impl Gateway {
     }
 
     /// Receive client request
-    pub fn handle_client_msg(&mut self, client: PublicId, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn handle_client_msg(&mut self, client: PublicId, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error);
         };
@@ -116,7 +116,7 @@ impl Gateway {
             return Some(error);
         }
 
-        match msg.message {
+        match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(_),
                 id,

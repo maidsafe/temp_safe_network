@@ -34,18 +34,18 @@ impl Reading {
     }
 
     fn blob(&self, read: &BlobRead, register: &BlobRegister) -> Option<OutboundMsg> {
-        register.read(read, self.msg) // since the data is sent on to adults, the entire msg is passed in
+        register.read(read, &self.msg) // since the data is sent on to adults, the entire msg is passed in
     }
 
     fn map(&self, read: &MapRead, storage: &MapStorage) -> Option<OutboundMsg> {
-        storage.read(read, self.msg) // map data currently stay at elders, so the msg is not needed
+        storage.read(read, &self.msg) // map data currently stay at elders, so the msg is not needed
     }
 
     fn sequence(&self, read: &SequenceRead, storage: &SequenceStorage) -> Option<OutboundMsg> {
-        storage.read(read, self.msg.id(), self.msg.origin) // sequence data currently stay at elders, so the msg is not needed
+        storage.read(read, self.msg.id(), &self.msg.origin) // sequence data currently stay at elders, so the msg is not needed
     }
 
     fn account(&self, read: &AccountRead, storage: &AccountStorage) -> Option<OutboundMsg> {
-        storage.read(read, self.msg.id(), self.msg.origin) // account data currently stay at elders, so the msg is not needed
+        storage.read(read, self.msg.id(), &self.msg.origin) // account data currently stay at elders, so the msg is not needed
     }
 }

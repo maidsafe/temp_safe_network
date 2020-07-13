@@ -33,22 +33,21 @@ impl Validation {
         }
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let message = msg.message;
-        match &message {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
                 ..
-            } => self.initiate_write(*cmd, msg),
+            } => self.initiate_write(cmd, msg),
             Message::Query {
                 query: Query::Data(query),
                 ..
-            } => self.initiate_read(*query, msg),
+            } => self.initiate_read(query, msg),
             _ => return None,
         }
     }
 
-    pub fn initiate_write(&mut self, cmd: DataCmd, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, cmd: &DataCmd, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match cmd {
             DataCmd::Blob(_) => self.blobs.initiate_write(msg),
             DataCmd::Map(_) => self.maps.initiate_write(msg),
@@ -57,7 +56,7 @@ impl Validation {
         }
     }
 
-    pub fn initiate_read(&mut self, query: DataQuery, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, query: &DataQuery, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match query {
             DataQuery::Blob(_) => self.blobs.initiate_read(msg),
             DataQuery::Map(_) => self.maps.initiate_read(msg),
@@ -82,13 +81,13 @@ impl Sequences {
     }
 
     // client query
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let _ = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let write = self.extract_write(msg)?;
         use SequenceWrite::*;
         match write {
@@ -101,7 +100,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: SData, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_creation(&mut self, chunk: SData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*msg.origin.id()).is_err() {
@@ -113,7 +112,7 @@ impl Sequences {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
-                msg.origin,
+                &msg.origin,
             );
         }
         self.decisions.vote(msg)
@@ -123,35 +122,35 @@ impl Sequences {
     fn initiate_deletion(
         &mut self,
         address: SDataAddress,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
         if address.is_pub() {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
-                msg.origin,
+                &msg.origin,
             );
         }
         self.decisions.vote(msg)
     }
 
     // on client request
-    fn initiate_edit(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_edit(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         self.decisions.vote(msg)
     }
 
-    fn extract_read(&self, msg: MsgEnvelope) -> Option<SequenceRead> {
-        match msg.message {
+    fn extract_read(&self, msg: &MsgEnvelope) -> Option<SequenceRead> {
+        match &msg.message {
             Message::Query {
                 query: Query::Data(DataQuery::Sequence(query)),
                 ..
-            } => Some(query),
+            } => Some(query.clone()),
             _ => return None,
         }
     }
 
-    fn extract_write(&self, msg: MsgEnvelope) -> Option<SequenceWrite> {
-        match msg.message {
+    fn extract_write(&self, msg: &MsgEnvelope) -> Option<SequenceWrite> {
+        match &msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -159,7 +158,7 @@ impl Sequences {
                         ..
                     },
                 ..
-            } => Some(write),
+            } => Some(write.clone()),
             _ => return None,
         }
     }
@@ -186,7 +185,7 @@ impl Blobs {
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let read = self.extract_read(msg)?;
         self.decisions.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
@@ -199,7 +198,7 @@ impl Blobs {
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let write = self.extract_write(msg)?;
         use BlobWrite::*;
         match write {
@@ -209,7 +208,7 @@ impl Blobs {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: IData, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_creation(&mut self, chunk: IData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         // Assert that if the request was for UnpubIData, that the owner's public key has
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
         // by their Client owners.
@@ -223,7 +222,7 @@ impl Blobs {
                 return self.decisions.error(
                     CmdError::Data(NdError::InvalidOwners),
                     msg.id(),
-                    msg.origin,
+                    &msg.origin,
                 );
             }
         }
@@ -234,7 +233,7 @@ impl Blobs {
     fn initiate_deletion(
         &mut self,
         address: IDataAddress,
-        msg: MsgEnvelope,
+        msg: &MsgEnvelope,
     ) -> Option<OutboundMsg> {
         if address.kind() == IDataKind::Unpub {
             self.decisions.vote(msg)
@@ -242,23 +241,23 @@ impl Blobs {
             self.decisions.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
-                msg.origin,
+                &msg.origin,
             )
         }
     }
 
-    fn extract_read(&self, msg: MsgEnvelope) -> Option<BlobRead> {
-        match msg.message {
+    fn extract_read(&self, msg: &MsgEnvelope) -> Option<BlobRead> {
+        match &msg.message {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(query)),
                 ..
-            } => Some(query),
+            } => Some(query.clone()),
             _ => return None,
         }
     }
 
-    fn extract_write(&self, msg: MsgEnvelope) -> Option<BlobWrite> {
-        match msg.message {
+    fn extract_write(&self, msg: &MsgEnvelope) -> Option<BlobWrite> {
+        match &msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -266,7 +265,7 @@ impl Blobs {
                         ..
                     },
                 ..
-            } => Some(write),
+            } => Some(write.clone()),
             _ => return None,
         }
     }
@@ -293,13 +292,13 @@ impl Maps {
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let read = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use MapWrite::*;
         let write = self.extract_write(msg)?;
         match write {
@@ -311,7 +310,7 @@ impl Maps {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: MData, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_creation(&mut self, chunk: MData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
         if chunk.owner() != *msg.origin.id() {
@@ -323,25 +322,25 @@ impl Maps {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
-                msg.origin,
+                &msg.origin,
             );
         }
 
         self.decisions.vote(msg)
     }
 
-    fn extract_read(&self, msg: MsgEnvelope) -> Option<MapRead> {
-        match msg.message {
+    fn extract_read(&self, msg: &MsgEnvelope) -> Option<MapRead> {
+        match &msg.message {
             Message::Query {
                 query: Query::Data(DataQuery::Map(query)),
                 ..
-            } => Some(query),
+            } => Some(query.clone()),
             _ => return None,
         }
     }
 
-    fn extract_write(&self, msg: MsgEnvelope) -> Option<MapWrite> {
-        match msg.message {
+    fn extract_write(&self, msg: &MsgEnvelope) -> Option<MapWrite> {
+        match &msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -349,7 +348,7 @@ impl Maps {
                         ..
                     },
                 ..
-            } => Some(write),
+            } => Some(write.clone()),
             _ => return None,
         }
     }
@@ -376,7 +375,7 @@ impl Accounts {
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         if self.is_account_read(msg) {
             self.decisions.vote(msg)
         } else {
@@ -385,30 +384,31 @@ impl Accounts {
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let account = self.extract_account_write(msg)?;
         if !account.size_is_valid() {
             return self.decisions.error(
                 CmdError::Data(NdError::ExceededSize),
                 msg.id(),
-                msg.origin,
+                &msg.origin,
             );
         }
         self.decisions.vote(msg)
     }
 
-    fn is_account_read(&self, msg: MsgEnvelope) -> bool {
+    fn is_account_read(&self, msg: &MsgEnvelope) -> bool {
         match msg.message {
             Message::Query {
                 query: Query::Data(DataQuery::Account(_)),
                 ..
             } => true,
+            _ => false,
         }
     }
 
-    fn extract_account_write(&self, msg: MsgEnvelope) -> Option<Account> {
+    fn extract_account_write(&self, msg: &MsgEnvelope) -> Option<Account> {
         use AccountWrite::*;
-        match msg.message {
+        match &msg.message {
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -417,8 +417,8 @@ impl Accounts {
                     },
                 ..
             } => match write {
-                New(account) => Some(account),
-                Update(updated_account) => Some(updated_account),
+                New(account) => Some(account.clone()),
+                Update(updated_account) => Some(updated_account.clone()),
             },
             _ => None,
         }

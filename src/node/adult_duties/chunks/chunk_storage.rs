@@ -52,10 +52,10 @@ impl ChunkStorage {
         &mut self,
         data: &IData,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         if let Err(error) = self.try_store(data) {
-            return self.decisions.error(CmdError::Data(error), msg_id, origin);
+            return self.decisions.error(CmdError::Data(error), msg_id, &origin);
         }
         None
     }
@@ -64,7 +64,7 @@ impl ChunkStorage {
         &mut self,
         data: &IData,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
         accumulated_signature: &Signature,
     ) -> Option<OutboundMsg> {
         let message = match self.try_store(data) {
@@ -107,7 +107,7 @@ impl ChunkStorage {
         &self,
         address: IDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self
             .chunks
@@ -124,7 +124,7 @@ impl ChunkStorage {
     // pub(crate) fn get_for_duplciation(
     //     &self,
     //     address: IDataAddress,
-    //     msg: MsgEnvelope,
+    //     msg: &MsgEnvelope,
     // ) -> Option<OutboundMsg> {
 
     //     match self.chunks.get(&address) {
@@ -148,7 +148,7 @@ impl ChunkStorage {
         &mut self,
         address: IDataAddress,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
@@ -171,7 +171,7 @@ impl ChunkStorage {
         };
          
         if let Err(error) = result {
-            return self.decisions.error(CmdError::Data(error), msg_id, origin);
+            return self.decisions.error(CmdError::Data(error), msg_id, &origin);
         }
         None
     }

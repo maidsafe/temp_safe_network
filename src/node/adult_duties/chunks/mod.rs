@@ -49,19 +49,19 @@ impl Chunks {
         })
     }
 
-    pub fn receive_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,
             msg.id(),
             msg.most_recent_sender().address(),
         );
-        match msg.message {
+        match &msg.message {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(read)),
                 ..
             } => {
-                let reading = Reading::new(read, msg);
+                let reading = Reading::new(read.clone(), msg.clone());
                 reading.get_result(&self.chunk_storage)
             }
             Message::Cmd {
@@ -72,7 +72,7 @@ impl Chunks {
                     },
                 ..
             } => {
-                let writing = Writing::new(write, msg);
+                let writing = Writing::new(write.clone(), msg.clone());
                 writing.get_result(&mut self.chunk_storage)
             }
             _ => None,

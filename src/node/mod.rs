@@ -411,7 +411,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     fn handle_serialized_msg(&mut self, src: SrcLocation, content: Vec<u8>) -> Option<OutboundMsg> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
-            Ok(msg) => self.handle_remote_msg(msg),
+            Ok(msg) => self.handle_remote_msg(&msg),
             Err(e) => {
                 error!(
                     "Error deserializing routing MsgEnvelope into msg type: {:?}",
@@ -422,16 +422,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn handle_remote_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn handle_remote_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use InboundMsg::*;
         match self.msg_analysis.evaluate(msg) {
-            Accumulate(msg) => self.accumulate_msg(msg),
+            Accumulate(msg) => self.accumulate_msg(&msg),
             SendToClient(msg) => Some(OutboundMsg::SendToClient(msg)),
             ForwardToNetwork(msg) => Some(OutboundMsg::SendToSection(msg)),
-            RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(msg),
-            RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(msg),
-            RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(msg),
-            RunAtAdult(msg) => self.adult_duties()?.receive_msg(msg),
+            RunAtGateway(msg) => self.elder_duties()?.gateway().handle_auth_cmd(&msg),
+            RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(&msg),
+            RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(&msg),
+            RunAtAdult(msg) => self.adult_duties()?.receive_msg(&msg),
             RunAtRewards(msg) => unimplemented!(),
             Unknown => {
                 error!("Unknown message destination: {:?}", msg.message.id());
@@ -440,7 +440,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn accumulate_msg(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    fn accumulate_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         let id = self.keys.public_key();
         info!(
             "{}: Accumulating signatures for {:?}",
@@ -463,7 +463,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             };
             // consider msg.pop_proxy() to remove the Node
             // or we just set the last proxy always
-            self.handle_remote_msg(msg.with_proxy(sender))
+            self.handle_remote_msg(&msg.with_proxy(sender))
         } else {
             None
         }
@@ -486,7 +486,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             NewMessage { peer, msg } => {
                 let gateway = elder_duties.gateway();
                 let parsed = gateway.try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
-                return gateway.handle_client_msg(parsed.client.public_id, parsed.msg);
+                return gateway.handle_client_msg(parsed.client.public_id, &parsed.msg);
             }
             SentUserMessage { peer, .. } => {
                 trace!(
@@ -546,15 +546,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         use OutboundMsg::*;
         match outbound {
             SendToClient(msg) => {
-                if self.msg_analysis.is_dst_for(msg) {
-                    self.elder_duties()?.gateway().push_to_client(msg)
+                if self.msg_analysis.is_dst_for(&msg) {
+                    self.elder_duties()?.gateway().push_to_client(&msg)
                 } else {
                     Some(SendToSection(msg))
                 }
             }
             SendToNode(msg) => self.messaging.borrow_mut().send_to_node(msg),
             SendToAdults { targets, msg } => {
-                self.messaging.borrow_mut().send_to_nodes(targets, msg)
+                self.messaging.borrow_mut().send_to_nodes(targets, &msg)
             }
             SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),
             VoteFor(decision) => self.vote_for(decision),

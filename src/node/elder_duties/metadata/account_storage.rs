@@ -50,7 +50,7 @@ impl AccountStorage {
         &self,
         read: &AccountRead,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         use AccountRead::*;
         match read {
@@ -58,7 +58,7 @@ impl AccountStorage {
         }
     }
 
-    fn get(&self, address: &XorName, msg_id: MessageId, origin: MsgSender) -> Option<OutboundMsg> {
+    fn get(&self, address: &XorName, msg_id: MessageId, origin: &MsgSender) -> Option<OutboundMsg> {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);
@@ -74,12 +74,12 @@ impl AccountStorage {
         &mut self,
         write: AccountWrite,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         use AccountWrite::*;
         match write {
-            New(ref account) => self.create(account, msg_id, origin),
-            Update(updated_account) => self.update(&updated_account, msg_id, origin),
+            New(ref account) => self.create(account, msg_id, &origin),
+            Update(updated_account) => self.update(&updated_account, msg_id, &origin),
         }
     }
 
@@ -87,7 +87,7 @@ impl AccountStorage {
         &mut self,
         account: &Account,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
@@ -99,14 +99,14 @@ impl AccountStorage {
                 .put(account)
                 .map_err(|error| error.to_string().into())
         };
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, &origin)
     }
 
     fn update(
         &mut self,
         updated_account: &Account,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         let result = self
             .account(origin.id(), updated_account.address())
@@ -122,7 +122,7 @@ impl AccountStorage {
                         .map_err(|err| err.to_string().into())
                 }
             });
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, &origin)
     }
 
     fn account(&self, requester_pub_key: &PublicKey, address: &XorName) -> NdResult<Account> {
@@ -145,7 +145,7 @@ impl AccountStorage {
         &self,
         result: NdResult<()>,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         if let Err(error) = result {
             return self.decisions.send(Message::CmdError {

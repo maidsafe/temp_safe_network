@@ -12,7 +12,7 @@ use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
-pub(super) struct NodeKeys {
+pub struct NodeKeys {
     keys: Rc<RefCell<Keypair>>,
 }
 

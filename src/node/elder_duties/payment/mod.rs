@@ -10,7 +10,7 @@ use super::transfers::replica_manager::ReplicaManager;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use safe_nd::{Cmd, ElderDuty, Error, Message, MsgEnvelope, CmdError, PublicKey, Result, TransferError};
 use std::{
-    cell::RefCell,
+    cell::{RefCell, RefMut},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -39,9 +39,10 @@ impl DataPayment {
         }
     }
 
-    pub fn pay_for_data(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    // The code in this method is very messy, needs to be cleand up.
+    pub fn pay_for_data(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use TransferError::*;
-        let (cmd, payment) = match msg.message {
+        let (cmd, payment) = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, payment },
                 ..
@@ -52,30 +53,29 @@ impl DataPayment {
         // before executing the debit.
         // (We could also add a method that executes both
         // debit + credit atomically, but this is much simpler).
-        let result = match self.section_account_id() {
+        let recipient_is_not_section = match self.section_account_id() {
             Ok(section) => {
-                if payment.to() != section {
-                    Some(TransferRegistration(Error::NoSuchRecipient))
-                } else {
-                    None
-                }
+                payment.to() != section
             }
-            _ => Some(TransferRegistration(Error::NoSuchRecipient)),
+            _ => true, // this would be strange, is it even possible?
         };
-        if let Some(err) = result {
-            let error = CmdError::Transfer(err);
-            return self.decisions.error(error, msg.id(), msg.origin);
+        
+        if recipient_is_not_section {
+            let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
+            return self.decisions.error(error, msg.id(), &msg.origin);
         }
-        if let Err(err) = self.replica_mut().register(&payment) {
-            let error = CmdError::Transfer(TransferRegistration(err));
-            return self.decisions.error(error, msg.id(), msg.origin);
+        let registration = self.replica_mut().register(&payment);
+        let result = match registration {
+            Ok(_) => match self.replica_mut().receive_propagated(&payment) {
+                Ok(_) => Ok(()),
+                Err(error) => Err(error),
+            }
+            Err(error) => Err(error), // not using TransferPropagation error, since that is for NetworkCmds, so wouldn't be returned to client.
+        };
+        match result {
+            Ok(_) => self.decisions.forward(msg),
+            Err(error) => self.decisions.error(CmdError::Transfer(TransferRegistration(error)), msg.id(), &msg.origin),
         }
-        // Cannot use TransferPropagation error, since it's is not a client error... To be solved.
-        if let Err(err) = self.replica_mut().receive_propagated(&payment) {
-            let error = CmdError::Transfer(TransferRegistration(err));
-            return self.decisions.error(error, msg.id(), msg.origin);
-        }
-        self.decisions.forward(msg)
     }
 
     fn section_account_id(&self) -> Result<PublicKey> {
@@ -85,8 +85,8 @@ impl DataPayment {
         }
     }
 
-    fn replica_mut(&mut self) -> &mut ReplicaManager {
-        &mut self.replica.borrow_mut()
+    fn replica_mut(&mut self) -> RefMut<ReplicaManager> {
+        self.replica.borrow_mut()
     }
 }
 

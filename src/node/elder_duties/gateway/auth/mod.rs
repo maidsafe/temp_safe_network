@@ -34,8 +34,8 @@ impl Auth {
         }
     }
 
-    pub(super) fn initiate(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        let auth_cmd = match msg.message {
+    pub(super) fn initiate(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        let auth_cmd = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(auth_cmd),
                 ..
@@ -62,7 +62,7 @@ impl Auth {
             MsgSender::Client { .. } => (),
             _ => return None,
         };
-        let auth_kind = match msg.message {
+        let auth_kind = match &msg.message {
             Message::Cmd { cmd, .. } => cmd.authorisation_kind(),
             Message::Query { query, .. } => query.authorisation_kind(),
             _ => return None,
@@ -96,14 +96,14 @@ impl Auth {
         if let Err(error) = result {
             return self
                 .decisions
-                .error(CmdError::Auth(error), msg.message.id(), msg.origin);
+                .error(CmdError::Auth(error), msg.message.id(), &msg.origin);
         }
         None
     }
 
     // client query
-    pub fn list_keys_and_version(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
-        match msg.message {
+    pub fn list_keys_and_version(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        match &msg.message {
             Message::Query {
                 query: Query::Auth(ListAuthKeysAndVersion),
                 ..
@@ -122,9 +122,9 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub(super) fn finalise(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         use AuthCmd::*;
-        let auth_cmd = match msg.message {
+        let auth_cmd = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(auth_cmd),
                 ..
@@ -139,19 +139,19 @@ impl Auth {
                 ..
             } => self
                 .auth_keys
-                .insert(msg.origin.id(), key, version, permissions),
-            DelAuthKey { key, version, .. } => self.auth_keys.delete(msg.origin.id(), key, version),
+                .insert(msg.origin.id(), *key, *version, *permissions),
+            DelAuthKey { key, version, .. } => self.auth_keys.delete(msg.origin.id(), *key, *version),
         };
         if let Err(error) = result {
             return self
                 .decisions
-                .error(CmdError::Auth(error), msg.message.id(), msg.origin);
+                .error(CmdError::Auth(error), msg.message.id(), &msg.origin);
         }
         None
     }
 
     // Verify that valid signature is provided if the request requires it.
-    pub fn verify_client_signature(&mut self, msg: MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn verify_client_signature(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
         match msg.authorisation_kind() {
             AuthorisationKind::Data(DataAuthKind::PublicRead) => None,
             _ => {
@@ -161,7 +161,7 @@ impl Auth {
                     self.decisions.error(
                         CmdError::Auth(NdError::AccessDenied),
                         msg.id(),
-                        msg.origin,
+                        &msg.origin,
                     )
                 }
             }
@@ -186,7 +186,7 @@ impl Auth {
     }
 
     fn is_valid_client_signature(&self, msg: &MsgEnvelope) -> bool {
-        let signature = match msg.origin {
+        let signature = match &msg.origin {
             MsgSender::Client { signature, .. } => signature,
             _ => return false,
         };
