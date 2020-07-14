@@ -12,8 +12,8 @@ pub use self::replica_manager::ReplicaManager;
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
 use safe_nd::{
     Cmd, CmdError, DebitAgreementProof, ElderDuty, Error, Event, Message, MessageId, MsgEnvelope,
-    MsgSender, NetworkCmd, NetworkCmdError, PublicKey, Query, QueryResponse, SignedTransfer,
-    TransferCmd, TransferError, TransferQuery,
+    MsgSender, NetworkCmd, NetworkCmdError, NetworkTransferError, PublicKey, Query, QueryResponse,
+    SignedTransfer, TransferCmd, TransferError, TransferQuery,
 };
 use std::{
     cell::RefCell,
@@ -100,7 +100,6 @@ impl Transfers {
     ) -> Option<OutboundMsg> {
         use NetworkCmd::*;
         match cmd {
-            DuplicateChunk { .. } => None, // should not end up here
             PropagateTransfer(debit_proof) => {
                 self.receive_propagated(&debit_proof, msg_id, &origin)
             }
@@ -122,6 +121,7 @@ impl Transfers {
                     ),
                 }
             }
+            _ => None, // others should not end up here (NetworkCmd should preferrably be subdivided more)
         }
     }
 
@@ -267,6 +267,7 @@ impl Transfers {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<OutboundMsg> {
+        use NetworkTransferError::*;
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.borrow_mut().receive_propagated(proof) {
             Ok(_) => return None,
@@ -274,7 +275,7 @@ impl Transfers {
             //     event: Event::TransferReceived
             // }),
             Err(err) => Message::NetworkCmdError {
-                error: NetworkCmdError::TransferPropagation(err),
+                error: NetworkCmdError::Transfers(TransferPropagation(err)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
                 cmd_origin: origin.address(),

@@ -13,16 +13,35 @@ mod validator;
 use self::section_funds::SectionFunds;
 pub use self::{system::FarmingSystem, validator::Validator};
 use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
-use safe_farming::{Accumulation, RewardCounter, StorageRewards};
-use safe_nd::{AccountId, ElderDuty, Money, XorName};
+use safe_farming::{Accumulation, StorageRewards};
+use safe_nd::{
+    AccountId, ElderDuty, Error, Message, MessageId, Money, MsgSender, NetworkCmdError,
+    NetworkEvent, NetworkRewardError, RewardCounter, XorName,
+};
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
 
 pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
-    node_accounts: HashMap<XorName, AccountId>,
+    node_accounts: HashMap<XorName, RewardAccount>,
     section_funds: SectionFunds,
     decisions: ElderMsgDecisions,
+}
+
+struct RewardAccount {
+    pub id: AccountId,
+    pub stage: RewardStage,
+}
+
+#[derive(PartialEq)]
+enum RewardStage {
+    /// From the point of being added, the
+    /// stage of the RewardAccount is `Active`.
+    Active,
+    /// After a node leaves the section
+    /// the RewardAccount transitions into
+    /// stage `AwaitingClaim`.
+    AwaitingClaim,
 }
 
 impl Rewards {
@@ -67,42 +86,65 @@ impl Rewards {
         let factor = 2.0;
         match self.farming.reward(data_hash, num_bytes, factor) {
             Ok(_) => None,
-            Err(_err) => None, // todo: NetworkCmdError
+            Err(_err) => None, // todo: NetworkCmdError. Or not? This is an internal thing..
         }
+    }
+
+    /// When the section becomes aware that a node has left,
+    /// it is flagged for being claimed.
+    pub fn node_left(&mut self, node_id: XorName) -> Option<OutboundMsg> {
+        let account = self.node_accounts.get_mut(&node_id)?;
+        account.stage = RewardStage::AwaitingClaim;
+        None
     }
 
     /// On node relocation, receiving section queries for the
     /// node counter, and asks to claim the node farming account
     /// rewards, and for the old section to send it to the new section.
-    pub fn relocate(
+    pub fn claim_rewards(
         &mut self,
-        _old_node_id: XorName,
-        _new_node_id: XorName,
+        old_node_id: XorName,
+        new_node_id: XorName,
+        msg_id: MessageId,
+        origin: &MsgSender,
     ) -> Option<OutboundMsg> {
-        unimplemented!()
-        // let account_id = self.node_accounts.get(&old_node_id)?;
-        // let counter = match self.claim(account_id) {
-        //     Ok(counter) => counter,
-        //     Err(err) => {
-        //         // todo: NetworkCmdError
-        //         return None;
-        //     }
-        // };
-        // let message = Message::NetworkCmd { cmd: NetworkCmd::ReceiveWorker {
-        //     new_node_id,
-        //     account_id,
-        //     counter,
-        // });
-        // let signature = &utils::sign(self.routing.borrow(), &utils::serialise(&message));
-        // let msg = MsgEnvelope {
-        //     message,
-        //     origin: MsgSender::Node {
-        //         id,
-        //         duty: Duty::Elder(ElderDuty::Rewards),
-        //         signature,
-        //     },
-        //     proxies: Default::default(),
-        // };
-        // Some(OutboundMsg::SendToSection(msg))
+        use NetworkCmdError::*;
+        use NetworkRewardError::*;
+        let account = self.node_accounts.get(&old_node_id)?;
+        if account.stage != RewardStage::AwaitingClaim {
+            // ..means the node has not left, and was not
+            // marked as awaiting claim..
+            let error = Error::NetworkOther("InvalidClaim: Account is still active.".to_string());
+            let error = Rewards(RewardClaiming {
+                error,
+                account_id: account.id,
+            });
+            return self.decisions.network_error(error, msg_id, origin);
+        }
+
+        // Remove the counter.
+        let counter = match self.farming.claim(account.id) {
+            Ok(counter) => counter,
+            Err(error) => {
+                let error = Rewards(RewardClaiming {
+                    error,
+                    account_id: account.id,
+                });
+                return self.decisions.network_error(error, msg_id, origin);
+            }
+        };
+
+        // Send it to the new section.
+        let message = Message::NetworkEvent {
+            event: NetworkEvent::RewardCounterClaimed {
+                new_node_id,
+                account_id: account.id,
+                counter,
+            },
+            id: MessageId::new(),
+            correlation_id: msg_id,
+        };
+
+        self.decisions.send(message)
     }
 }

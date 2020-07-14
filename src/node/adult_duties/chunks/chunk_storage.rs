@@ -11,7 +11,7 @@ use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Conf
 use log::{error, info};
 use safe_nd::{
     AdultDuty, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId, MsgSender,
-    NetworkCmdError, NetworkEvent, QueryResponse, Result as NdResult, Signature,
+    NetworkCmdError, NetworkDataError, NetworkEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
     cell::Cell,
@@ -78,10 +78,10 @@ impl ChunkStorage {
             },
             Err(error) => Message::NetworkCmdError {
                 id: MessageId::new(),
-                error: NetworkCmdError::ChunkDuplication {
+                error: NetworkCmdError::Data(NetworkDataError::ChunkDuplication {
                     address: *data.address(),
                     error,
-                },
+                }),
                 correlation_id: msg_id,
                 cmd_origin: origin.address(),
             },

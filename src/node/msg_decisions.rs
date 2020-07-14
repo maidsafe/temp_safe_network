@@ -12,7 +12,8 @@ use crate::{
     utils,
 };
 use safe_nd::{
-    AdultDuty, CmdError, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender, XorName,
+    AdultDuty, CmdError, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
+    NetworkCmdError, XorName,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -97,6 +98,15 @@ impl ElderMsgDecisions {
     ) -> Option<OutboundMsg> {
         self.inner.error(error, msg_id, &origin)
     }
+
+    pub fn network_error(
+        &self,
+        error: NetworkCmdError,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
+        self.inner.network_error(error, msg_id, &origin)
+    }
 }
 
 impl MsgDecisions {
@@ -130,6 +140,20 @@ impl MsgDecisions {
         origin: &MsgSender,
     ) -> Option<OutboundMsg> {
         self.send(Message::CmdError {
+            id: MessageId::new(),
+            error,
+            correlation_id: msg_id,
+            cmd_origin: origin.address(),
+        })
+    }
+
+    pub fn network_error(
+        &self,
+        error: NetworkCmdError,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<OutboundMsg> {
+        self.send(Message::NetworkCmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,

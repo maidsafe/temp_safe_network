@@ -2128,7 +2128,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-farming"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-farming.git#e458156c28017eb71c8150b7fe2dbc97006d9c84"
+source = "git+https://github.com/oetyng/safe-farming.git#89809ffaa287f358356c34f0f5ec6ee333717ebf"
 dependencies = [
  "bincode",
  "crdts",
@@ -2142,7 +2142,7 @@ dependencies = [
 [[package]]
 name = "safe-nd"
 version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd.git?branch=messaging_refactor#f481215b10fa8c0370b357672b7c5d62aaf000ce"
+source = "git+https://github.com/oetyng/safe-nd.git?branch=messaging_refactor#1d69a5fcb61aa93d381b1e923229e09221e4cbfc"
 dependencies = [
  "bincode",
  "crdts",

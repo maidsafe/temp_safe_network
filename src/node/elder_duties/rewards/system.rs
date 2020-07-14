@@ -1,5 +1,5 @@
-use safe_farming::{Accumulation, AccumulationEvent, RewardAlgo, RewardCounter, Work};
-use safe_nd::{AccountId, Result};
+use safe_farming::{Accumulation, AccumulationEvent, RewardAlgo};
+use safe_nd::{AccountId, Result, RewardCounter, Work};
 use std::collections::HashMap;
 
 pub struct FarmingSystem<A: RewardAlgo> {
