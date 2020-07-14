@@ -366,14 +366,19 @@ impl<R: CryptoRng + Rng> Node<R> {
                 };
                 None
             }
-            RoutingEvent::MemberJoined { .. } => {
+            RoutingEvent::MemberJoined { name, previous_name, .. } => {
                 trace!("New member has joined the section");
                 let elder_count = self.routing.borrow().our_elders().count();
                 let adult_count = self.routing.borrow().our_adults().count();
                 info!("No. of Elders: {}", elder_count);
                 info!("No. of Adults: {}", adult_count);
+                if let Some(cmds) = self.elder_duties()?.relocated_member_joined(XorName(name.0), XorName(previous_name.0)) {
+                    for cmd in cmds {
+                        let result = self.send(cmd);
+                        self.send_while_any(result);
+                    }
+                };
                 None
-                // this here is where we query source section for the reward counter
             }
             RoutingEvent::Connected(_) => self.promote_to_adult().map_or_else(
                 |err| {
@@ -426,7 +431,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             RunAtPayment(msg) => self.elder_duties()?.data_payment().pay_for_data(&msg),
             RunAtMetadata(msg) => self.elder_duties()?.metadata().receive_msg(&msg),
             RunAtAdult(msg) => self.adult_duties()?.receive_msg(&msg),
-            RunAtRewards(_msg) => None, //unimplemented.. //self.elder_duties()?.rewards().receive_msg(&msg),
+            RunAtRewards(_msg) => self.elder_duties()?.receive_reward_msg(&msg),
             RunAtTransfers(msg) => self.elder_duties()?.transfers().receive_msg(&msg),
             Unknown => {
                 error!("Unknown message destination: {:?}", msg.message.id());

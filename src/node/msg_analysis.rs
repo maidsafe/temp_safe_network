@@ -8,7 +8,8 @@
 
 use routing::Node as Routing;
 use safe_nd::{
-    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, Query, XorName,
+    Address, Cmd, DataCmd, Duty, ElderDuty, Message, MsgEnvelope, MsgSender, NetworkCmd, Query,
+    XorName,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -90,6 +91,29 @@ impl InboundMsgAnalysis {
         self.should_accumulate_for_metadata_write(msg) // Metadata Elders accumulate the msgs from Payment Elders.
         // Incoming msg from `Metadata`!
         || self.should_accumulate_for_adult(msg) // Adults accumulate the msgs from Metadata Elders.
+        || self.should_accumulate_for_rewards(msg) // Rewards Elders accumulate the claim counter cmd from other Rewards Elders
+    }
+
+    fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> bool {
+        let from_single_rewards_elder = || match msg.most_recent_sender() {
+            MsgSender::Node {
+                duty: Duty::Elder(ElderDuty::Rewards),
+                ..
+            } => true,
+            _ => false,
+        };
+        let is_accumulating_reward_cmd = || match msg.message {
+            Message::NetworkCmd {
+                cmd: NetworkCmd::ClaimRewardCounter { .. },
+                ..
+            } => true,
+            _ => false,
+        };
+
+        is_accumulating_reward_cmd()
+            && from_single_rewards_elder()
+            && self.is_dst_for(msg)
+            && self.is_elder()
     }
 
     fn should_forward_to_network(&self, msg: &MsgEnvelope) -> bool {
@@ -263,8 +287,31 @@ impl InboundMsgAnalysis {
         is_chunk_cmd() && from_metadata_section() && self.is_dst_for(msg) && self.is_adult()
     }
 
-    fn should_run_at_rewards(&self, _msg: &MsgEnvelope) -> bool {
-        false //unimplemented
+    fn should_run_at_rewards(&self, msg: &MsgEnvelope) -> bool {
+        let from_rewards_section = || match msg.most_recent_sender() {
+            MsgSender::Section {
+                duty: Duty::Elder(ElderDuty::Rewards),
+                ..
+            } => true,
+            _ => false,
+        };
+        let is_reward_cmd = || match msg.message {
+            Message::NetworkCmd {
+                cmd: NetworkCmd::ClaimRewardCounter { .. },
+                ..
+            } => true,
+            // | Message::NetworkCmd {
+            //     cmd: NetworkCmd::InitiateRewardPayout(_),
+            //     ..
+            // }
+            // | Message::NetworkCmd {
+            //     cmd: NetworkCmd::FinaliseRewardPayout(_),
+            //     ..
+            // } => true,
+            _ => false,
+        };
+
+        is_reward_cmd() && from_rewards_section() && self.is_dst_for(msg) && self.is_elder()
     }
 
     fn should_run_at_transfers(&self, msg: &MsgEnvelope) -> bool {

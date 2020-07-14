@@ -24,7 +24,7 @@ use crate::{
     node::section_members::SectionMembers, node::Init, utils, Config, Result,
 };
 use routing::{Node as Routing, RoutingError};
-use safe_nd::XorName;
+use safe_nd::{XorName, MsgEnvelope, NetworkEvent, Message, NetworkCmd};
 use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
@@ -126,10 +126,32 @@ impl ElderDuties {
         &mut self.rewards
     }
 
+    pub fn relocated_member_joined(
+        &mut self,
+        old_node_id: XorName,
+        new_node_id: XorName,
+    ) -> Option<Vec<OutboundMsg>> {
+        // marks the reward account as
+        // awaiting claiming of the counter
+        if let Some(msg) = self.rewards.add_relocated_account(old_node_id, new_node_id) {
+            Some(vec![msg])
+        } else {
+            None
+        }
+        // For now, we skip chunk duplication logic.
+        //self.metadata.trigger_chunk_duplication(XorName(name.0))
+    }
+
     /// Name of the node
     /// Age of the node
-    pub fn member_left(&mut self, _name: XorName, _age: u8) -> Option<Vec<OutboundMsg>> {
-        None
+    pub fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<Vec<OutboundMsg>> {
+        // marks the reward account as
+        // awaiting claiming of the counter
+        if let Some(msg) = self.rewards.node_left(node_id) {
+            Some(vec![msg])
+        } else {
+            None
+        }
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
@@ -147,6 +169,29 @@ impl ElderDuties {
             proof_chain,
         )?;
         None
+    }
+
+    pub fn receive_reward_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+        match &msg.message {
+            Message::NetworkCmd {
+                cmd:
+                    NetworkCmd::ClaimRewardCounter {
+                        old_node_id,
+                        new_node_id,
+                    },
+                id,
+            } => self.rewards.claim_rewards(*old_node_id, *new_node_id, *id, &msg.origin),
+            Message::NetworkEvent {
+                event:
+                    NetworkEvent::RewardCounterClaimed {
+                        new_node_id,
+                        account_id,
+                        counter,
+                    },
+                ..
+            } => self.rewards.receive_claimed_rewards(*account_id, new_node_id, counter),
+            _ => None,
+        }
     }
 }
 
