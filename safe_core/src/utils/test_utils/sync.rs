@@ -12,7 +12,7 @@
 use crate::ConnectionManager;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use safe_nd::{Request, Response};
+use safe_nd::{Request, QueryResponse};
 use std::rc::Rc;
 use std::sync::{Arc, Condvar, Mutex};
 use unwrap::unwrap;
@@ -61,13 +61,13 @@ impl<T: Clone + Rng> Hook<T> {
     }
 
     // Invoke request hook.
-    fn request(&self, _req: &Request) -> Option<Response> {
+    fn request(&self, _req: &Request) -> Option<QueryResponse> {
         self.inner.wait(self.id);
         None
     }
 
     // Invoke response hook.
-    fn response(&self, res: Response) -> Response {
+    fn response(&self, res: QueryResponse) -> QueryResponse {
         self.inner.sleep();
         res
     }

@@ -1,10 +1,10 @@
 use safe_nd::{
-    DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, Response,
-    SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
+    Cmd, TransferCmd, Event, Query,
+    DebitAgreementProof, Message, MessageId, Money, PublicKey, QueryResponse
 };
 use safe_transfers::{ActorEvent, TransferInitiated};
 
-use crate::client::{Client, TransferActor};
+use crate::client::{Client, TransferActor, create_network_message_envelope};
 use crate::errors::CoreError;
 
 use log::{debug, info, trace};
@@ -17,19 +17,18 @@ impl TransferActor {
         self.transfer_actor.lock().await.balance()
     }
 
-    /// Handle a validation request response.
-    pub async fn handle_validation_response(
+    /// Handle a validation event.
+    pub async fn handle_validation_event(
         &mut self,
-        response: Response,
-        _message_id: &MessageId,
+        event: Event
     ) -> Result<Option<DebitAgreementProof>, CoreError> {
-        debug!("Handling validation response: {:?}", response);
-        let validation = match response {
-            Response::TransferValidation(res) => res?,
+        debug!("Handling validation event: {:?}", event);
+        let validation = match event {
+            Event::TransferValidated{client, event} => event,
             _ => {
                 return Err(CoreError::from(format!(
-                    "Unexpected response received at TransferActor, {:?}",
-                    response
+                    "Unexpected event received at TransferActor, {:?}",
+                    event
                 )))
             }
         };
@@ -69,13 +68,17 @@ impl TransferActor {
 
         let public_key = pk.unwrap_or(identity.public_key());
 
-        let request = Self::wrap_money_request(MoneyRequest::GetBalance(public_key));
+        // let request = Self::wrap_money_request(Query::GetBalance(public_key));
 
-        let (message, message_id) = Self::create_network_message(identity.clone(), request)?;
+        let msg_contents = Query::Transfer(
+            TransferQuery::GetBalance(public_key)
+        );
+
+        let (message, message_id) = create_network_message_envelope(identity.clone(), msg_contents)?;
         let _bootstrapped = cm.bootstrap(identity).await;
 
-        match cm.send(&pub_id, &message).await? {
-            Response::GetBalance(balance) => balance.map_err(CoreError::from),
+        match cm.send_query(&pub_id, &message).await? {
+            QueryResponse::GetBalance(balance) => balance.map_err(CoreError::from),
             _ => Err(CoreError::from("Unexpected response when querying balance")),
         }
     }
@@ -109,12 +112,10 @@ impl TransferActor {
             "Signed transfer for send money: {:?}",
             signed_transfer.transfer
         );
-        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer {
-            signed_transfer: signed_transfer.clone(),
-        });
+        let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer( signed_transfer.clone() ) );
 
         let (message, _message_id) =
-            TransferActor::create_network_message(safe_key.clone(), request)?;
+            create_network_message_envelope(safe_key.clone(), msg_contents)?;
 
         self.transfer_actor
             .lock()
@@ -125,21 +126,20 @@ impl TransferActor {
 
         let debit_proof: DebitAgreementProof = self
             .await_validation(
-                message.message_id().ok_or(CoreError::from(
-                    "No message id for created transfer actor request",
-                ))?,
+                message.id(),
                 &safe_key.public_id(),
                 &message,
             )
             .await?;
 
         // Register the transfer on the network.
-        let register_transaction_request =
-            Self::wrap_money_request(MoneyRequest::RegisterTransfer {
-                proof: debit_proof.clone(),
-            });
+        let msg_contents =
+                Cmd::Transfer(
+                    TransferCmd::RegisterTransfer(debit_proof.clone())
+                );
+
         let (message, _message_id) =
-            TransferActor::create_network_message(safe_key.clone(), register_transaction_request)?;
+            create_network_message_envelope(safe_key.clone(), msg_contents)?;
         let safe_key = self.safe_key.clone();
         trace!(
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",

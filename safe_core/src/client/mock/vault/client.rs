@@ -8,7 +8,7 @@
 
 use super::Vault;
 use safe_nd::{
-    AppPermissions, ClientRequest, Error as SndError, PublicId, PublicKey, Response,
+    AppPermissions, ClientRequest, Error as SndError, PublicId, PublicKey, QueryResponse,
     Result as SndResult, XorName,
 };
 use std::collections::BTreeMap;
@@ -22,7 +22,7 @@ impl Vault {
         requester: PublicId,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         match request {
             ClientRequest::ListAuthKeysAndVersion => {
                 let result = {
@@ -32,7 +32,7 @@ impl Vault {
                         Ok(self.list_auth_keys_and_version(&requester.name()))
                     }
                 };
-                Response::ListAuthKeysAndVersion(result)
+                QueryResponse::ListAuthKeysAndVersion(result)
             }
             ClientRequest::InsAuthKey {
                 key,
@@ -44,7 +44,7 @@ impl Vault {
                 } else {
                     self.ins_auth_key(&requester.name(), *key, *permissions, *version)
                 };
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ClientRequest::DelAuthKey { key, version } => {
                 let result = if owner_pk != requester_pk {
@@ -52,7 +52,7 @@ impl Vault {
                 } else {
                     self.del_auth_key(&requester.name(), *key, *version)
                 };
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
         }
     }

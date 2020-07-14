@@ -8,75 +8,95 @@
 
 use futures::channel::mpsc;
 use log::{debug, trace};
-use safe_nd::{MessageId, Response};
+use safe_nd::{MessageId, QueryResponse, MsgEnvelope, Event, CmdError};
 use std::collections::HashMap;
 
 type ResponseRequiredCount = usize;
 type VoteCount = usize;
-type VoteMap = HashMap<Response, VoteCount>;
+type VoteMap = HashMap<QueryResponse, VoteCount>;
 type IsValidationRequest = bool;
 
 pub struct ResponseManager {
     /// MessageId to send_future channel map
-    requests: HashMap<
+    pending_queries: HashMap<
         MessageId,
         (
-            mpsc::UnboundedSender<(Response, MessageId)>,
+            mpsc::UnboundedSender<QueryResponse>,
             VoteMap,
-            ResponseRequiredCount,
-            IsValidationRequest,
+            ResponseRequiredCount
         ),
     >,
+    /// expected events pending
+    // TODO: better naming for this, or just allow binding listeners
+    event_listeners: HashMap<MessageId, mpsc::UnboundedSender<Event>>,
     /// Number of responses to aggregate before returning to a client
     response_threshold: usize,
 }
 
-/// Manage requests and their responses
+/// Manage pending_queries and their responses
 impl ResponseManager {
     pub fn new(response_threshold: ResponseRequiredCount) -> Self {
         Self {
-            requests: Default::default(),
+            pending_queries: Default::default(),
+            event_listeners: Default::default(),
             response_threshold,
+
         }
     }
 
-    pub fn await_responses(
+    pub fn await_query_responses(
         &mut self,
         msg_id: MessageId,
         value: (
-            mpsc::UnboundedSender<(Response, MessageId)>,
-            ResponseRequiredCount,
-            bool,
+            mpsc::UnboundedSender<QueryResponse>,
+            ResponseRequiredCount
         ),
     ) -> Result<(), String> {
-        let (sender, count, is_validation_request) = value;
-        let the_request = (sender, VoteMap::default(), count, is_validation_request);
-        let _ = self.requests.insert(msg_id, the_request);
+        let (sender, count) = value;
+        let the_request = (sender, VoteMap::default(), count);
+        let _ = self.pending_queries.insert(msg_id, the_request);
         Ok(())
     }
 
+    // TODO: rename... it's tried to msgid not really event...
+    pub fn add_event_listener( &mut self, msg_id: MessageId, sender: mpsc::UnboundedSender<Event>) -> Result<(), String> {
+        let _ = self.event_listeners.insert(msg_id, sender);
+        Ok(())
+    }
+    // TODO: rename... it's tried to msgid not really event...
+    pub fn remove_event_listener( &mut self, msg_id: &MessageId) -> Result<(), String> {
+        let _ = self.event_listeners.remove(msg_id);
+        Ok(())
+    }
+
+    /// Send event to registered listeners
+    pub fn handle_event_response( &mut self, correlating_message_id: MessageId, event: Event ) -> Result<(), String> {
+        trace!("Handling event: {:?} correlating to : {:?}", correlating_message_id);
+
+         let _ = self
+            // first remove the response and see how we deal with it (we re-add later if needed)
+            .event_listeners
+            .get(&correlating_message_id)
+            .map(|sender| {
+                sender.unbounded_send(event)
+            });
+        
+            Ok(())
+    }
+
     /// Handle a response from one of the elders.
-    pub fn handle_response(&mut self, msg_id: MessageId, response: Response) -> Result<(), String> {
-        debug!(
-            "Handling response for msg_id: {:?}, resp: {:?}",
-            msg_id, response
+    pub fn handle_query_response(&mut self, correlating_message_id: MessageId, response: QueryResponse) -> Result<(), String> {
+        trace!(
+            "Handling response for sent msg_id: {:?}, query resp: {:?}",
+            correlating_message, response
         );
 
         let _ = self
             // first remove the response and see how we deal with it (we re-add later if needed)
-            .requests
-            .remove(&msg_id)
-            .map(|(sender, mut vote_map, count, is_validation_request)| {
+            .pending_queries
+            .remove(&correlating_message_id)
+            .map(|(sender, mut vote_map, count)| {
                 let vote_response = response.clone();
-
-                // Handle validation requests separately...
-                // TODO: add tests here
-                if is_validation_request {
-                    // here we send _each_ req back to be validated and processed.
-                    // Once a proof has bene found, the sender will be disconnected.
-                    // This error is not important
-                    let _ = sender.unbounded_send((response.clone(), msg_id));
-                }
 
                 // drop the count as we have this new response.
                 let current_count = count - 1;
@@ -120,12 +140,12 @@ impl ResponseManager {
                             }
                         }
 
-                        let _ = sender.unbounded_send((our_most_popular_response.clone(), msg_id));
+                        let _ = sender.unbounded_send(our_most_popular_response.clone());
                         return;
                     }
                 }
 
-                let _ = self.requests.insert(
+                let _ = self.pending_queries.insert(
                     msg_id,
                     (sender, vote_map, current_count, is_validation_request),
                 );
@@ -162,16 +182,16 @@ mod tests {
         // our pseudo data
         let immutable_data = safe_nd::PubImmutableData::new(vec![6]);
 
-        let response = safe_nd::Response::GetIData(Ok(safe_nd::IData::from(immutable_data)));
+        let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::IData::from(immutable_data)));
 
         response_manager
-            .await_responses(message_id, (sender_future, expected_responses, false))
+            .await_query_responses(message_id, (sender_future, expected_responses))
             .unwrap();
         response_manager
-            .handle_response(message_id, response.clone())
+            .handle_query_response(message_id, response.clone())
             .unwrap();
 
-        let (returned_response, _msg_id) = match response_future.next().await {
+        let returned_response = match response_future.next().await {
             Some(res) => Ok(res),
             None => Err("Unexpected error in response handling."),
         }
@@ -199,18 +219,18 @@ mod tests {
         // our nonsense response we receive
         let immutable_data_bad = safe_nd::PubImmutableData::new(vec![7]);
 
-        let response = safe_nd::Response::GetIData(Ok(safe_nd::IData::from(immutable_data)));
+        let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::IData::from(immutable_data)));
         let bad_response =
-            safe_nd::Response::GetIData(Ok(safe_nd::IData::from(immutable_data_bad)));
+            safe_nd::QueryResponse::GetBlob(Ok(safe_nd::IData::from(immutable_data_bad)));
 
         response_manager
-            .await_responses(message_id, (sender_future, expected_responses, false))
+            .await_query_responses(message_id, (sender_future, expected_responses))
             .unwrap();
         response_manager
-            .handle_response(message_id, bad_response)
+            .handle_query_response(message_id, bad_response)
             .unwrap();
 
-        let (returned_response, _msg_id) = match response_future.next().await {
+        let returned_response = match response_future.next().await {
             Some(res) => Ok(res),
             None => Err("Unexpected error in response handling."),
         }
@@ -236,10 +256,10 @@ mod tests {
         // our expected data
         let data = safe_nd::MDataValue::from(vec![6]);
 
-        let response = safe_nd::Response::GetMDataValue(Ok(data));
+        let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
         let error = safe_nd::Error::NoSuchData;
-        let bad_response = safe_nd::Response::GetIData(Err(error));
+        let bad_response = safe_nd::QueryResponse::GetBlob(Err(error));
 
         let mut responses_to_handle = vec![
             response.clone(),
@@ -257,14 +277,14 @@ mod tests {
         responses_to_handle.shuffle(&mut rng);
 
         response_manager
-            .await_responses(message_id, (sender_future, expected_responses, false))
+            .await_query_responses(message_id, (sender_future, expected_responses))
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_response(message_id, resp).unwrap();
+            response_manager.handle_query_response(message_id, resp).unwrap();
         }
 
-        let (returned_response, _msg_id) = match response_future.next().await {
+        let returned_response = match response_future.next().await {
             Some(res) => Ok(res),
             None => Err("Unexpected error in response handling."),
         }
@@ -289,10 +309,10 @@ mod tests {
         // our expected data
         let data = safe_nd::MDataValue::from(vec![6]);
 
-        let response = safe_nd::Response::GetMDataValue(Ok(data));
+        let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
         let error = safe_nd::Error::NoSuchData;
-        let bad_response = safe_nd::Response::GetIData(Err(error));
+        let bad_response = safe_nd::QueryResponse::GetBlob(Err(error));
 
         let mut responses_to_handle = vec![
             response.clone(),
@@ -310,19 +330,19 @@ mod tests {
         responses_to_handle.shuffle(&mut rng);
 
         response_manager
-            .await_responses(message_id, (sender_future, expected_responses, false))
+            .await_query_responses(message_id, (sender_future, expected_responses))
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_response(message_id, resp).unwrap();
+            response_manager.handle_query_response(message_id, resp).unwrap();
         }
 
         // last response should be bad to ensure we dont just default to it
         response_manager
-            .handle_response(message_id, bad_response.clone())
+            .handle_query_response(message_id, bad_response.clone())
             .unwrap();
 
-        let (returned_response, _msg_id) = match response_future.next().await {
+        let returned_response = match response_future.next().await {
             Some(res) => Ok(res),
             None => Err("Unexpected error in response handling."),
         }
@@ -347,10 +367,10 @@ mod tests {
         // our expected data
         let data = safe_nd::MDataValue::from(vec![6]);
 
-        let response = safe_nd::Response::GetMDataValue(Ok(data));
+        let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
-        let bad_response = safe_nd::Response::GetIData(Err(safe_nd::Error::NoSuchData));
-        let another_bad_response = safe_nd::Response::GetIData(Err(safe_nd::Error::NoSuchEntry));
+        let bad_response = safe_nd::QueryResponse::GetBlob(Err(safe_nd::Error::NoSuchData));
+        let another_bad_response = safe_nd::QueryResponse::GetBlob(Err(safe_nd::Error::NoSuchEntry));
 
         let mut responses_to_handle = vec![
             // todo, back to 3 responses
@@ -369,14 +389,14 @@ mod tests {
         responses_to_handle.shuffle(&mut rng);
 
         response_manager
-            .await_responses(message_id, (sender_future, expected_responses, false))
+            .await_query_responses(message_id, (sender_future, expected_responses))
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_response(message_id, resp).unwrap();
+            response_manager.handle_query_response(message_id, resp).unwrap();
         }
 
-        let (returned_response, _msg_id) = match response_future.next().await {
+        let returned_response = match response_future.next().await {
             Some(res) => Ok(res),
             None => Err("Unexpected error in response handling."),
         }
@@ -402,8 +422,8 @@ mod tests {
         let data = safe_nd::MDataValue::from(vec![6]);
         let other_data = safe_nd::MDataValue::from(vec![77]);
 
-        let response = safe_nd::Response::GetMDataValue(Ok(data));
-        let other_response = safe_nd::Response::GetMDataValue(Ok(other_data));
+        let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
+        let other_response = safe_nd::QueryResponse::GetMapValue(Ok(other_data));
 
         let mut responses_to_handle = vec![
             response.clone(),
@@ -421,14 +441,14 @@ mod tests {
         responses_to_handle.shuffle(&mut rng);
 
         response_manager
-            .await_responses(message_id, (sender_future, expected_responses, false))
+            .await_query_responses(message_id, (sender_future, expected_responses))
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_response(message_id, resp).unwrap();
+            response_manager.handle_query_response(message_id, resp).unwrap();
         }
 
-        let (returned_response, _msg_id) = match response_future.next().await {
+        let returned_response = match response_future.next().await {
             Some(res) => Ok(res),
             None => Err("Unexpected error in response handling."),
         }

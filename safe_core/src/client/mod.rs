@@ -49,15 +49,16 @@ use log::{debug, info, trace};
 use lru::LruCache;
 use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
-    AccountRead, AccountWrite, AppPermissions, BlobRead, BlobWrite, ClientAuth, ClientFullId,
-    ClientRequest, DebitAgreementProof, IData, IDataAddress, MData, MDataAddress, MDataEntries,
+    MsgEnvelope, DataQuery,
+     AccountWrite, AppPermissions, BlobRead, BlobWrite, ClientFullId, MsgSender, Cmd, Query,QueryResponse, AuthCmd,
+ DebitAgreementProof, IData, IDataAddress, MData, MDataAddress, MDataEntries, AccountRead, AuthQuery,
     MDataEntryActions, MDataPermissionSet, MDataSeqEntries, MDataSeqEntryActions, MDataSeqValue,
     MDataUnseqEntryActions, MDataValue, MDataValues, MapRead, MapWrite, Message, MessageId, Money,
-    PublicId, PublicKey, Read, Request, RequestType, Response, SData, SDataAction, SDataAddress,
+    PublicId, PublicKey, SData, SDataAction, SDataAddress,
     SDataEntries, SDataEntry, SDataIndex, SDataOwner, SDataPrivPermissions,
     SDataPrivUserPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
-    SDataUserPermissions, SeqMutableData, SequenceRead, SequenceWrite, SystemOp,
-    TransferRegistered, UnseqMutableData, Write, XorName,
+    SDataUserPermissions, SeqMutableData, SequenceRead, SequenceWrite,
+    TransferRegistered, UnseqMutableData, XorName,
 };
 use std::sync::Arc;
 use unwrap::unwrap;
@@ -78,31 +79,44 @@ pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
     Ok(Config::new().quic_p2p.hard_coded_contacts)
 }
 
-async fn send(client: &impl Client, request: Request) -> Result<Response, CoreError> {
+ // Build and sign Cmd Message Envelope
+pub(crate) fn create_cmd_message(
+    safe_key: SafeKey,
+    msg_contents: Cmd,
+) -> Message {
+    trace!("Creating cmd message");
+
+    let id = MessageId::new();
+
+    Message::Cmd{cmd: msg_contents, id}
+}
+
+ // Build and sign Query Message Envelope
+ pub(crate) fn create_query_message(
+    safe_key: SafeKey,
+    msg_contents: Query, 
+) -> Message {
+    trace!("Creating query message");
+
+    let id = MessageId::new();
+    Message::Query{ query : msg_contents, id } 
+}
+
+
+async fn send_query(client: &impl Client, query: Query) -> Result<QueryResponse, CoreError> {
     // `sign` should be false for GETs on published data, true otherwise.
-    let sign = request.get_type() != RequestType::PublicRead;
 
-    println!("-->>Request going out: {:?}", request);
-    //tmp verify our sigs...
-    // let sig =
+    println!("-->>Request going out: {:?}", query);
 
-    let request = client.compose_message(request, sign).await?;
+    let safe_key = client.full_id().await;
+
+    let message = create_query_message(safe_key, query);
     let inner = client.inner();
     let cm = &mut inner.lock().await.connection_manager;
-    cm.send(&client.public_id().await, &request).await
+    cm.send_query(&client.public_id().await, &message).await
 }
 
-// Sends a mutation request to a new routing.
-async fn send_write(client: &impl Client, req: Request) -> Result<(), CoreError> {
-    let response = send(client, req).await?;
-    match response {
-        Response::Write(result) => {
-            trace!("mutation result: {:?}", result);
-            result.map_err(CoreError::from)
-        }
-        _ => Err(CoreError::ReceivedUnexpectedEvent),
-    }
-}
+
 
 /// Trait providing an interface for self-authentication client implementations, so they can
 /// interface all requests from high-level APIs to the actual routing layer and manage all
@@ -157,34 +171,34 @@ pub trait Client: Clone + Send + Sync {
     /// Return the symmetric encryption key.
     async fn secret_symmetric_key(&self) -> shared_secretbox::Key;
 
-    /// Create a `Message` from the given request.
-    /// This function adds the requester signature and message ID.
-    async fn compose_message(&self, request: Request, sign: bool) -> Result<Message, CoreError> {
-        let message_id = MessageId::new();
+    // /// Create a `Message` from the given request.
+    // /// This function adds the requester signature and message ID.
+    // async fn compose_message(&self, request: Request, sign: bool) -> Result<Message, CoreError> {
+    //     let message_id = MessageId::new();
 
-        let signature = if sign {
-            match request.clone() {
-                Request::Client(req) => {
-                    let serialised_req =
-                        bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
-                    Some(self.full_id().await.sign(&serialised_req))
-                }
-                Request::Node(req) => {
-                    let serialised_req =
-                        bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
-                    Some(self.full_id().await.sign(&serialised_req))
-                }
-            }
-        } else {
-            None
-        };
+    //     let signature = if sign {
+    //         match request.clone() {
+    //             Request::Client(req) => {
+    //                 let serialised_req =
+    //                     bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
+    //                 Some(self.full_id().await.sign(&serialised_req))
+    //             }
+    //             // Request::Node(req) => {
+    //             //     let serialised_req =
+    //             //         bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
+    //             //     Some(self.full_id().await.sign(&serialised_req))
+    //             // }
+    //         }
+    //     } else {
+    //         None
+    //     };
 
-        Ok(Message::Request {
-            request,
-            message_id,
-            signature,
-        })
-    }
+    //     Ok(Message::Request {
+    //         request,
+    //         message_id,
+    //         signature,
+    //     })
+    // }
 
     /// Set request timeout.
     async fn set_timeout(&self, duration: Duration) {
@@ -352,13 +366,13 @@ pub trait Client: Clone + Send + Sync {
         }
 
         let inner = Arc::downgrade(&self.inner());
-        let res = send(
+        let res = send_query(
             self,
             Request::Client(ClientRequest::Read(Read::Blob(BlobRead::Get(address)))),
         )
         .await?;
         let data = match res {
-            Response::GetIData(res) => res.map_err(CoreError::from),
+            QueryResponse::GetBlob(res) => res.map_err(CoreError::from),
             _ => return Err(CoreError::ReceivedUnexpectedEvent),
         }?;
 
@@ -424,13 +438,13 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("Fetch Unsequenced Mutable Data");
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::Get(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
-            Response::GetMData(res) => res.map_err(CoreError::from).and_then(|mdata| match mdata {
+            QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|mdata| match mdata {
                 MData::Unseq(data) => Ok(data),
                 MData::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
             }),
@@ -450,7 +464,7 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("Fetch MDataValue for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::GetValue {
                 address: MDataAddress::Seq { name, tag },
@@ -459,7 +473,7 @@ pub trait Client: Clone + Send + Sync {
         )
         .await?
         {
-            Response::GetMDataValue(res) => {
+            QueryResponse::GetMapValue(res) => {
                 res.map_err(CoreError::from).and_then(|value| match value {
                     MDataValue::Seq(val) => Ok(val),
                     MDataValue::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
@@ -481,7 +495,7 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("Fetch MDataValue for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::GetValue {
                 address: MDataAddress::Unseq { name, tag },
@@ -490,7 +504,7 @@ pub trait Client: Clone + Send + Sync {
         )
         .await?
         {
-            Response::GetMDataValue(res) => {
+            QueryResponse::GetMapValue(res) => {
                 res.map_err(CoreError::from).and_then(|value| match value {
                     MDataValue::Unseq(val) => Ok(val),
                     MDataValue::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
@@ -507,13 +521,13 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("Fetch Sequenced Mutable Data");
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::Get(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
-            Response::GetMData(res) => res.map_err(CoreError::from).and_then(|mdata| match mdata {
+            QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|mdata| match mdata {
                 MData::Seq(data) => Ok(data),
                 MData::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
             }),
@@ -578,15 +592,15 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("GetMDataShell for {:?}", name);
+        trace!("GetMapShell for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::GetShell(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
-            Response::GetMDataShell(res) => {
+            QueryResponse::GetMapShell(res) => {
                 res.map_err(CoreError::from).and_then(|mdata| match mdata {
                     MData::Seq(data) => Ok(data),
                     _ => Err(CoreError::ReceivedUnexpectedData),
@@ -605,15 +619,15 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("GetMDataShell for {:?}", name);
+        trace!("GetMapShell for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::GetShell(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
-            Response::GetMDataShell(res) => {
+            QueryResponse::GetMapShell(res) => {
                 res.map_err(CoreError::from).and_then(|mdata| match mdata {
                     MData::Unseq(data) => Ok(data),
                     _ => Err(CoreError::ReceivedUnexpectedData),
@@ -628,10 +642,10 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("GetMDataVersion for {:?}", address);
+        trace!("GetMapVersion for {:?}", address);
 
-        match send(self, wrap_map_read(MapRead::GetVersion(address))).await? {
-            Response::GetMDataVersion(res) => res.map_err(CoreError::from),
+        match send_query(self, wrap_map_read(MapRead::GetVersion(address))).await? {
+            QueryResponse::GetMapVersion(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -647,13 +661,13 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("ListMDataEntries for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::ListEntries(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
-            Response::ListMDataEntries(res) => {
+            QueryResponse::ListMDataEntries(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|entries| match entries {
                         MDataEntries::Unseq(data) => Ok(data),
@@ -675,13 +689,13 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("ListSeqMDataEntries for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::ListEntries(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
-            Response::ListMDataEntries(res) => {
+            QueryResponse::ListMDataEntries(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|entries| match entries {
                         MDataEntries::Seq(data) => Ok(data),
@@ -699,8 +713,8 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("ListMDataKeys for {:?}", address);
 
-        match send(self, wrap_map_read(MapRead::ListKeys(address))).await? {
-            Response::ListMDataKeys(res) => res.map_err(CoreError::from),
+        match send_query(self, wrap_map_read(MapRead::ListKeys(address))).await? {
+            QueryResponse::ListMDataKeys(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -716,13 +730,13 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("List MDataValues for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::ListValues(MDataAddress::Seq { name, tag })),
         )
         .await?
         {
-            Response::ListMDataValues(res) => {
+            QueryResponse::ListMDataValues(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|values| match values {
                         MDataValues::Seq(data) => Ok(data),
@@ -742,15 +756,15 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("GetMDataUserPermissions for {:?}", address);
+        trace!("GetMapUserPermissions for {:?}", address);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::ListUserPermissions { address, user }),
         )
         .await?
         {
-            Response::ListMDataUserPermissions(res) => res.map_err(CoreError::from),
+            QueryResponse::ListMDataUserPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -766,13 +780,13 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("List MDataValues for {:?}", name);
 
-        match send(
+        match send_query(
             self,
             wrap_map_read(MapRead::ListValues(MDataAddress::Unseq { name, tag })),
         )
         .await?
         {
-            Response::ListMDataValues(res) => {
+            QueryResponse::ListMDataValues(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|values| match values {
                         MDataValues::Unseq(data) => Ok(data),
@@ -864,8 +878,8 @@ pub trait Client: Clone + Send + Sync {
 
         trace!("Sequence not found in local CRDT replica");
         // Let's fetch it from the network then
-        let sdata = match send(self, wrap_seq_read(SequenceRead::Get(address))).await? {
-            Response::GetSData(res) => res.map_err(CoreError::from),
+        let sdata = match send_query(self, wrap_seq_read(SequenceRead::Get(address))).await? {
+            QueryResponse::GetSData(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }?;
 
@@ -1171,8 +1185,8 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("List MDataPermissions for {:?}", address);
 
-        match send(self, wrap_map_read(MapRead::ListPermissions(address))).await? {
-            Response::ListMDataPermissions(res) => res.map_err(CoreError::from),
+        match send_query(self, wrap_map_read(MapRead::ListPermissions(address))).await? {
+            QueryResponse::ListMDataPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -1363,8 +1377,10 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("ListAuthKeysAndVersion");
 
-        match send(self, wrap_client_auth(ClientAuth::ListAuthKeysAndVersion)).await? {
-            Response::ListAuthKeysAndVersion(res) => res.map_err(CoreError::from),
+        let client_pk = self.public_key().await;
+
+        match send_query(self, wrap_client_auth_query(AuthQuery::ListAuthKeysAndVersion{ client: client_pk })).await? {
+            QueryResponse::ListAuthKeysAndVersion(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
@@ -1381,14 +1397,10 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("InsAuthKey ({:?})", key);
 
-        send_write(
-            self,
-            wrap_client_auth(ClientAuth::InsAuthKey {
-                key,
-                permissions,
-                version,
-            }),
-        )
+        self.transfer_actor()
+        .await
+        .ok_or(CoreError::from("No TransferActor found for client."))?
+        .insert_auth_key(key, permissions, version)
         .await
     }
 
@@ -1399,11 +1411,12 @@ pub trait AuthActions: Client + Clone + 'static {
     {
         trace!("DelAuthKey ({:?})", key);
 
-        send_write(
-            self,
-            wrap_client_auth(ClientAuth::DelAuthKey { key, version }),
-        )
+        self.transfer_actor()
         .await
+        .ok_or(CoreError::from("No TransferActor found for client."))?
+        .del_auth_key(key, version)
+        .await
+
     }
 
     /// Delete MData from network
@@ -1463,24 +1476,24 @@ impl Inner {
 
 /// Send a request and wait for a response.
 /// This function is blocking.
-pub async fn req(
-    cm: &mut ConnectionManager,
-    request: Request,
-    full_id_new: &SafeKey,
-) -> Result<Response, CoreError> {
-    let message_id = MessageId::new();
-    let signature = full_id_new.sign(&unwrap!(bincode::serialize(&(&request, message_id))));
+// pub async fn req(
+//     cm: &mut ConnectionManager,
+//     request: Request,
+//     full_id_new: &SafeKey,
+// ) -> Result<Response, CoreError> {
+//     let message_id = MessageId::new();
+//     let signature = full_id_new.sign(&unwrap!(bincode::serialize(&(&request, message_id))));
 
-    cm.send(
-        &full_id_new.public_id(),
-        &Message::Request {
-            request,
-            message_id,
-            signature: Some(signature),
-        },
-    )
-    .await
-}
+//     cm.send_query(
+//         &full_id_new.public_id(),
+//         &Message::Request {
+//             request,
+//             message_id,
+//             signature: Some(signature),
+//         },
+//     )
+//     .await
+// }
 
 /// Utility function that bootstraps a client to the network. If there is a failure then it retries.
 /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
@@ -2671,25 +2684,39 @@ mod tests {
     }
 }
 
-fn wrap_blob_read(read: BlobRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Blob(read)))
+fn wrap_blob_read(read: BlobRead) -> Query {
+    Query::Data(
+        DataQuery::Blob(read)
+    )
 }
 
-fn wrap_map_read(read: MapRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Map(read)))
+fn wrap_map_read(read: MapRead) -> Query {
+    Query::Data(
+        DataQuery::Map(read)
+    )
 }
 
-fn wrap_seq_read(read: SequenceRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Sequence(read)))
+fn wrap_seq_read(read: SequenceRead) -> Query {
+    Query::Data(
+        DataQuery::Sequence(read)
+    )
 }
 
-fn wrap_account_read(read: AccountRead) -> Request {
-    Request::Client(ClientRequest::Read(Read::Account(read)))
+fn wrap_account_read(read: AccountRead) -> Query {
+    Query::Data(
+        DataQuery::Account(read)
+    )
 }
 
-fn wrap_client_auth(op: ClientAuth) -> Request {
-    Request::Client(ClientRequest::System(SystemOp::ClientAuth(op)))
+fn wrap_client_auth_cmd(auth_cmd: AuthCmd) -> Cmd {
+    Cmd::Auth(auth_cmd)
 }
+
+
+fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {
+    Query::Auth(auth_query)
+}
+
 
 // 1. Store different variants of unpublished data on the network.
 // 2. Get the balance of the client.
@@ -2746,7 +2773,7 @@ fn wrap_client_auth(op: ClientAuth) -> Request {
 
 //     match response {
 //         Ok(res) => match res {
-//             Response::TransferRegistration(result) => match result {
+//             QueryResponse::TransferRegistration(result) => match result {
 //                 Ok(transfer) => Ok(transfer),
 //                 Err(error) => Err(CoreError::from(error)),
 //             },

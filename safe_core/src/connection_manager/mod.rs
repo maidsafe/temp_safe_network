@@ -18,7 +18,7 @@ use connection_group::ConnectionGroup;
 use futures::lock::Mutex;
 use log::{error, trace};
 use quic_p2p::Config as QuicP2pConfig;
-use safe_nd::{DebitAgreementProof, Message, PublicId, Response};
+use safe_nd::{DebitAgreementProof, Message,MsgEnvelope, PublicId, QueryResponse};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
@@ -56,8 +56,8 @@ impl ConnectionManager {
     }
 
     /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`.
-    pub async fn send(&mut self, pub_id: &PublicId, msg: &Message) -> Result<Response, CoreError> {
-        self.inner.lock().await.send(pub_id, msg).await
+    pub async fn send_query(&mut self, pub_id: &PublicId, msg: &Message) -> Result<QueryResponse, CoreError> {
+        self.inner.lock().await.send_query(pub_id, msg).await
     }
 
     /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`, does not expect response
@@ -65,7 +65,7 @@ impl ConnectionManager {
         self.inner.lock().await.send_cmd(pub_id, msg).await
     }
 
-    /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`.
+    /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`. Wait for DebitAgreementProof generation before replying
     pub async fn send_for_validation(
         &mut self,
         pub_id: &PublicId,
@@ -131,12 +131,8 @@ impl Inner {
         }
     }
 
-    async fn send(&mut self, pub_id: &PublicId, msg: &Message) -> Result<Response, CoreError> {
-        let msg_id = if let Message::Request { message_id, .. } = msg {
-            *message_id
-        } else {
-            return Err(CoreError::Unexpected("Not a Request".to_string()));
-        };
+    async fn send_query(&mut self, pub_id: &PublicId, msg: &Message) -> Result<QueryResponse, CoreError> {
+        let msg_id = msg.id();
 
         let conn_group = self.groups.get_mut(&pub_id).ok_or_else(|| {
             CoreError::Unexpected(
@@ -144,15 +140,11 @@ impl Inner {
             )
         })?;
 
-        conn_group.send(msg_id, msg).await
+        conn_group.send_query(msg_id, msg).await
     }
 
     async fn send_cmd(&mut self, pub_id: &PublicId, msg: &Message) -> Result<(), CoreError> {
-        let msg_id = if let Message::Request { message_id, .. } = msg {
-            *message_id
-        } else {
-            return Err(CoreError::Unexpected("Not a Request".to_string()));
-        };
+        let msg_id = msg.id();
 
         let conn_group = self.groups.get_mut(&pub_id).ok_or_else(|| {
             CoreError::Unexpected(
@@ -169,11 +161,7 @@ impl Inner {
         msg: &Message,
         transfer_actor: &mut TransferActor,
     ) -> Result<DebitAgreementProof, CoreError> {
-        let msg_id = if let Message::Request { message_id, .. } = msg {
-            *message_id
-        } else {
-            return Err(CoreError::Unexpected("Not a Request".to_string()));
-        };
+        let msg_id = msg.id();
 
         let conn_group = self.groups.get_mut(&pub_id).ok_or_else(|| {
             CoreError::Unexpected(

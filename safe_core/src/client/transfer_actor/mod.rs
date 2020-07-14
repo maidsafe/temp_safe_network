@@ -1,6 +1,6 @@
 use safe_nd::{
-    ClientRequest, DebitAgreementProof, Message, MessageId, PublicId, PublicKey, Request, Response,
-    SystemOp, Transfers as MoneyRequest, Write,
+    DebitAgreementProof, Message, MessageId, PublicId, PublicKey, QueryResponse,MsgEnvelope,
+    Cmd, Data, Query, TransferCmd, MsgSender
 };
 
 use safe_transfers::{
@@ -8,7 +8,7 @@ use safe_transfers::{
 };
 
 use crate::client::ConnectionManager;
-use crate::client::{Client, SafeKey, COST_OF_PUT};
+use crate::client::{Client, SafeKey, COST_OF_PUT, create_network_message_envelope};
 use crate::errors::CoreError;
 use crdts::Dot;
 use futures::lock::Mutex;
@@ -48,9 +48,9 @@ impl ReplicaValidator for ClientTransferValidator {
 }
 
 impl TransferActor {
-    fn wrap_money_request(req: MoneyRequest) -> ClientRequest {
-        ClientRequest::System(SystemOp::Transfers(req))
-    }
+    // fn wrap_money_request(req: MoneyRequest) -> ClientRequest {
+    //     ClientRequest::System(SystemOp::Transfers(req))
+    // }
 
     /// Get a payment proof
     pub async fn get_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
@@ -72,21 +72,23 @@ impl TransferActor {
         let public_key = self.safe_key.public_key();
         info!("Getting SafeTransfers history for pk: {:?}", public_key);
 
-        let request = Self::wrap_money_request(MoneyRequest::GetHistory {
-            at: public_key,
-            since_version: 0,
-        });
-
+        let msg_contents = Query::Transfer(
+            TransferQuery::GetHistory {
+                at: public_key,
+                since_version: 0,
+            }
+        );
+        
         let (message, _messafe_id) =
-            TransferActor::create_network_message(self.safe_key.clone(), request)?;
+            create_network_message_envelope(self.safe_key.clone(), msg_contents)?;
 
         let _bootstrapped = cm.bootstrap(self.safe_key.clone()).await;
 
         // This is a normal response manager request. We want quorum on this for now...
-        let res = cm.send(&self.safe_key.public_id(), &message).await?;
+        let res = cm.send_query(&self.safe_key.public_id(), &message).await?;
 
         let history = match res {
-            Response::GetHistory(history) => history.map_err(CoreError::from),
+            QueryResponse::GetHistory(history) => history.map_err(CoreError::from),
             _ => Err(CoreError::from(format!(
                 "Unexpected response when retrieving account history {:?}",
                 res
@@ -114,31 +116,6 @@ impl TransferActor {
         Ok(())
     }
 
-    // build, sign and send a validation type message, await appropriate response
-    // TODO: remove old client sign req
-    pub(crate) fn create_network_message(
-        safe_key: SafeKey,
-        request: ClientRequest,
-    ) -> Result<(Message, MessageId), CoreError> {
-        trace!("Creating signed network message");
-
-        let message_id = MessageId::new();
-
-        let signature = Some(safe_key.sign(&unwrap::unwrap!(bincode::serialize(&(
-            &request, message_id
-        )))));
-
-        let request = Request::Client(request);
-
-        let message = Message::Request {
-            request,
-            message_id: message_id.clone(),
-            signature,
-        };
-
-        Ok((message, message_id))
-    }
-
     /// Validates a tranction for paying store_cost
     async fn create_write_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
         info!("Sending requests for payment for write operation");
@@ -160,14 +137,14 @@ impl TransferActor {
             .transfer(COST_OF_PUT, section_key)?
             .signed_transfer;
 
-        let request = Self::wrap_money_request(MoneyRequest::ValidateTransfer {
-            signed_transfer: signed_transfer.clone(),
-        });
+        let command = TransferCmd::ValidateTransfer(
+            signed_transfer.clone()
+        );
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
         let (transfer_message, message_id) =
-            TransferActor::create_network_message(safe_key.clone(), request)?;
+            create_network_message_envelope(safe_key.clone(), command)?;
 
         self.transfer_actor
             .lock()
@@ -192,7 +169,7 @@ impl TransferActor {
         &mut self,
         _message_id: MessageId,
         pub_id: &PublicId,
-        message: &Message,
+        message: &MsgEnvelope,
     ) -> Result<DebitAgreementProof, CoreError> {
         trace!("Awaiting transfer validation");
         let mut cm = self.connection_manager();

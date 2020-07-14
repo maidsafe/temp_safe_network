@@ -34,7 +34,7 @@ impl<C: Send + Sync + Client + 'static> Storage for SelfEncryptionStorage<C> {
     type Error = SEStorageError;
 
     async fn get(&self, name: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        trace!("Self encrypt invoked GetIData.");
+        trace!("Self encrypt invoked GetBlob.");
 
         if name.len() != XOR_NAME_LEN {
             let err = CoreError::Unexpected("Requested `name` is incorrect size.".to_owned());
@@ -127,7 +127,7 @@ impl<C: Send + Sync + Client + 'static> Storage for SelfEncryptionStorageDryRun<
     type Error = SEStorageError;
 
     async fn get(&self, _name: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        trace!("Self encrypt invoked GetIData dry run.");
+        trace!("Self encrypt invoked GetBlob dry run.");
         Err(SEStorageError::from(CoreError::Unexpected(
             "Cannot get from storage since it's a dry run.".to_owned(),
         )))

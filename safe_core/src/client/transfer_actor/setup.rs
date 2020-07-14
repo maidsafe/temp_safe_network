@@ -1,5 +1,6 @@
 use safe_nd::{
-    DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, Response,
+    Query, TransferQuery, Cmd, TransferCmd,
+    DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, QueryResponse,
     SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
 use safe_transfers::{ActorEvent, TransferActor as SafeTransferActor, TransfersSynched};
@@ -26,16 +27,16 @@ impl TransferActor {
     ) -> Result<PublicKeySet, CoreError> {
         trace!("Getting replica keys for {:?}", safe_key);
 
-        let request = Self::wrap_money_request(MoneyRequest::GetReplicaKeys(safe_key.public_key()));
+        let keys_query_msg = Query::Transfer( TransferQuery::GetReplicaKeys(safe_key.public_key()));
 
         let (message, message_id) =
-            TransferActor::create_network_message(safe_key.clone(), request)?;
+            create_network_message_envelope(safe_key.clone(), keys_query_msg)?;
 
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
-        let res = cm.send(&safe_key.public_id(), &message).await?;
+        let res = cm.send_query(&safe_key.public_id(), &message).await?;
 
         let r = match res {
-            Response::GetReplicaKeys(pk_set) => Ok(pk_set?),
+            QueryResponse::GetReplicaKeys(pk_set) => Ok(pk_set?),
             _ => Err(CoreError::from(format!(
                 "Unexpected response when retrieving account replica keys for {:?}",
                 safe_key.public_key()

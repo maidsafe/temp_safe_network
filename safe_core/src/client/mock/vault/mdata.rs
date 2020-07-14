@@ -9,7 +9,7 @@
 use super::{DataId, Vault};
 use safe_nd::{
     Data, Error as SndError, MData, MDataAction, MDataAddress, MDataKind, MapRead, MapWrite,
-    PublicId, PublicKey, Response, Result as SndResult,
+    PublicId, PublicKey, QueryResponse, Result as SndResult,
 };
 
 impl Vault {
@@ -20,7 +20,7 @@ impl Vault {
         requester: PublicId,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         match request {
             MDataRequest::Get(address) => {
                 let result = self
@@ -32,7 +32,7 @@ impl Vault {
 
                         Ok(data)
                     });
-                Response::GetMData(result)
+                QueryResponse::GetMap(result)
             }
             MDataRequest::Put(data) => {
                 let address = *data.address();
@@ -46,7 +46,7 @@ impl Vault {
                         requester,
                     )
                 };
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             MDataRequest::GetValue { address, ref key } => {
                 let data = self.get_mdata(*address, requester_pk, &request);
@@ -57,17 +57,17 @@ impl Vault {
                             .get(&key)
                             .map(|value| value.clone().into())
                             .ok_or(SndError::NoSuchEntry);
-                        Response::GetMDataValue(result)
+                        QueryResponse::GetMapValue(result)
                     }
                     (MDataKind::Unseq, Ok(MData::Unseq(mdata))) => {
                         let result = mdata
                             .get(&key)
                             .map(|value| value.clone().into())
                             .ok_or(SndError::NoSuchEntry);
-                        Response::GetMDataValue(result)
+                        QueryResponse::GetMapValue(result)
                     }
-                    (_, Err(err)) => Response::GetMDataValue(Err(err)),
-                    (_, Ok(_)) => Response::GetMDataValue(Err(SndError::NoSuchData)),
+                    (_, Err(err)) => QueryResponse::GetMapValue(Err(err)),
+                    (_, Ok(_)) => QueryResponse::GetMapValue(Err(SndError::NoSuchData)),
                 }
             }
             MDataRequest::GetShell(address) => {
@@ -80,7 +80,7 @@ impl Vault {
 
                         Ok(data.shell())
                     });
-                Response::GetMDataShell(result)
+                QueryResponse::GetMapShell(result)
             }
             MDataRequest::GetVersion(address) => {
                 let result = self
@@ -92,20 +92,20 @@ impl Vault {
 
                         Ok(data.version())
                     });
-                Response::GetMDataVersion(result)
+                QueryResponse::GetMapVersion(result)
             }
             MDataRequest::ListEntries(address) => {
                 let data = self.get_mdata(*address, requester_pk, &request);
 
                 match (address.kind(), data) {
                     (MDataKind::Seq, Ok(MData::Seq(mdata))) => {
-                        Response::ListMDataEntries(Ok(mdata.entries().clone().into()))
+                        QueryResponse::ListMDataEntries(Ok(mdata.entries().clone().into()))
                     }
                     (MDataKind::Unseq, Ok(MData::Unseq(mdata))) => {
-                        Response::ListMDataEntries(Ok(mdata.entries().clone().into()))
+                        QueryResponse::ListMDataEntries(Ok(mdata.entries().clone().into()))
                     }
-                    (_, Err(err)) => Response::ListMDataEntries(Err(err)),
-                    (_, Ok(_)) => Response::ListMDataEntries(Err(SndError::NoSuchData)),
+                    (_, Err(err)) => QueryResponse::ListMDataEntries(Err(err)),
+                    (_, Ok(_)) => QueryResponse::ListMDataEntries(Err(SndError::NoSuchData)),
                 }
             }
             MDataRequest::ListKeys(address) => {
@@ -118,20 +118,20 @@ impl Vault {
 
                         Ok(data.keys())
                     });
-                Response::ListMDataKeys(result)
+                QueryResponse::ListMDataKeys(result)
             }
             MDataRequest::ListValues(address) => {
                 let data = self.get_mdata(*address, requester_pk, &request);
 
                 match (address.kind(), data) {
                     (MDataKind::Seq, Ok(MData::Seq(mdata))) => {
-                        Response::ListMDataValues(Ok(mdata.values().into()))
+                        QueryResponse::ListMDataValues(Ok(mdata.values().into()))
                     }
                     (MDataKind::Unseq, Ok(MData::Unseq(mdata))) => {
-                        Response::ListMDataValues(Ok(mdata.values().into()))
+                        QueryResponse::ListMDataValues(Ok(mdata.values().into()))
                     }
-                    (_, Err(err)) => Response::ListMDataValues(Err(err)),
-                    (_, Ok(_)) => Response::ListMDataValues(Err(SndError::NoSuchData)),
+                    (_, Err(err)) => QueryResponse::ListMDataValues(Err(err)),
+                    (_, Ok(_)) => QueryResponse::ListMDataValues(Err(SndError::NoSuchData)),
                 }
             }
             MDataRequest::Delete(address) => {
@@ -153,7 +153,7 @@ impl Vault {
                             Err(SndError::AccessDenied)
                         }
                     });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             MDataRequest::SetUserPermissions {
                 address,
@@ -178,7 +178,7 @@ impl Vault {
 
                             Ok(())
                         });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             MDataRequest::DelUserPermissions {
                 address,
@@ -201,7 +201,7 @@ impl Vault {
 
                             Ok(())
                         });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             MDataRequest::ListUserPermissions { address, ref user } => {
                 let user = *user;
@@ -215,7 +215,7 @@ impl Vault {
 
                         data.user_permissions(user).map(|perm| perm.clone())
                     });
-                Response::ListMDataUserPermissions(result)
+                QueryResponse::ListMDataUserPermissions(result)
             }
             MDataRequest::ListPermissions(address) => {
                 let result = self
@@ -227,7 +227,7 @@ impl Vault {
 
                         Ok(data.permissions())
                     });
-                Response::ListMDataPermissions(result)
+                QueryResponse::ListMDataPermissions(result)
             }
             MDataRequest::MutateEntries {
                 address,
@@ -247,7 +247,7 @@ impl Vault {
 
                             Ok(())
                         });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
         }
     }

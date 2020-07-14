@@ -430,7 +430,7 @@ impl Vault {
             Ok(s) => s,
             Err(err) => {
                 let response = request.error_response(err);
-                return Ok(Message::Response {
+                return Ok(Message::QueryResponse {
                     response,
                     message_id,
                 });
@@ -446,7 +446,7 @@ impl Vault {
             Request::Account(req) => self.process_login_packet_req(req, requester_pk, owner_pk),
         };
 
-        Ok(Message::Response {
+        Ok(Message::QueryResponse {
             response,
             message_id,
         })

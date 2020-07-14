@@ -10,7 +10,7 @@ use super::{Operation, Vault};
 use crate::client::COST_OF_PUT;
 use rand::Rng;
 use safe_nd::{
-    ClientFullId, DebitAgreementProof, Error as SndError, Money, MoneyRequest, PublicKey, Response,
+    ClientFullId, DebitAgreementProof, Error as SndError, Money, MoneyRequest, PublicKey, QueryResponse,
     SafeKey, SignedTransfer, Transfer, TransferRegistered, XorName,
 };
 use std::str::FromStr;
@@ -24,7 +24,7 @@ impl Vault {
         request: &MoneyRequest,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         // let mut rng = rand::Rng::thread_rng();
         let mut rng = rand::thread_rng();
         let client_safe_key = SafeKey::client(ClientFullId::new_ed25519(&mut rng));
@@ -58,7 +58,7 @@ impl Vault {
                     Err(e) => Err(e),
                 };
 
-                Response::TransferRegistration(final_result)
+                QueryResponse::TransferRegistration(final_result)
             }
             MoneyRequest::ValidateTransfer { signed_transfer } => {
                 let source = owner_pk.into();
@@ -89,10 +89,10 @@ impl Vault {
                     Err(e) => Err(e),
                 };
 
-                Response::TransferRegistration(final_result)
+                QueryResponse::TransferRegistration(final_result)
             }
             MoneyRequest::RegisterTransfer { .. } => {
-                Response::TransferRegistration(Err(SndError::from(
+                QueryResponse::TransferRegistration(Err(SndError::from(
                     "Register Transfer Unimplemented for mock",
                 )))
 
@@ -100,7 +100,7 @@ impl Vault {
             }
             MoneyRequest::PropagateTransfer { .. } => {
                 panic!("SCL Mock vault should not receive this request.");
-                Response::TransferRegistration(Err(SndError::from(
+                QueryResponse::TransferRegistration(Err(SndError::from(
                     "PropagateTransfer Unimplemented for mock",
                 )))
             }
@@ -114,14 +114,14 @@ impl Vault {
                         Ok(vec![])
                     });
 
-                Response::GetHistory(result)
+                QueryResponse::GetHistory(result)
                 // do this
             }
             MoneyRequest::GetBalance(public_key) => {
                 let result = self
                     .authorise_operations(&[Operation::GetBalance], *public_key, requester_pk)
                     .and_then(move |_| self.get_balance(&public_key));
-                Response::GetBalance(result)
+                QueryResponse::GetBalance(result)
             }
         }
     }

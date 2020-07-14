@@ -24,8 +24,9 @@ use quic_p2p::{
 };
 use rand::Rng;
 use safe_nd::{
+    Event as EventMsg,
     DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId,
-    PublicId, Request, RequestType, Response,
+    PublicId, QueryResponse, MsgEnvelope
 };
 
 use futures_util::stream::StreamExt;
@@ -103,12 +104,12 @@ impl ConnectionGroup {
         Ok(Self { inner })
     }
 
-    pub async fn send(&mut self, msg_id: MessageId, msg: &Message) -> Result<Response, CoreError> {
+    pub async fn send_query(&mut self, msg: &Message) -> Result<QueryResponse, CoreError> {
         // user block here to drop lock asap
-        let mut receiver_future = { self.inner.lock().await.send(msg_id, msg).await? };
+        let mut receiver_future = { self.inner.lock().await.send_query( msg).await? };
 
         let mut response = Err(CoreError::from("No response received."));
-        while let Some((res, _message_id)) = receiver_future.next().await {
+        while let Some(QueryResponse) = receiver_future.next().await {
             response = Ok(res);
             receiver_future.close();
         }
@@ -143,13 +144,14 @@ impl ConnectionGroup {
             // Let the actor handle receipt of each response from elders
 
             match transfer_actor
-                .handle_validation_response(res, &message_id)
+                .handle_validation_event(event)
                 .await
             {
                 Ok(proof) => {
                     if let Some(debit_agreement_proof) = proof {
                         receiver_future.close();
-                        response = Ok(debit_agreement_proof)
+                        response = Ok(debit_agreement_proof);
+                        self.response_manager.remove_event_listener(&message_id)?;
                     };
                 }
                 Err(error) => response = Err(error),
@@ -333,6 +335,7 @@ impl Joining {
 struct Connected {
     elders: HashMap<SocketAddr, Elder>,
     response_manager: ResponseManager,
+    full_id: SafeKey,
 }
 
 impl Connected {
@@ -349,6 +352,18 @@ impl Connected {
                 .into_iter()
                 .map(|(k, v)| (k, v.elder))
                 .collect(),
+            full_id: old_state.full_id
+        }
+    }
+
+    fn get_envelope_for_message( &self, message: Message ) -> MsgEnvelope {
+        let signature = self.full_id.sign(&unwrap::unwrap!(bincode::serialize( &message )));
+        let origin =  MsgSender::Client{ id: self.full_id.public_key(), signature };
+    
+        MsgEnvelope {
+            message,
+            origin,
+            proxies: Default::default()
         }
     }
 
@@ -358,33 +373,27 @@ impl Connected {
         }
     }
 
-    async fn send(
+    async fn send_query(
         &mut self,
         quic_p2p: &mut QuicP2p,
-        msg_id: MessageId,
         msg: &Message,
-    ) -> Result<mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
-        trace!("Sending message {:?}", msg_id);
+    ) -> Result<Option<mpsc::UnboundedReceiver<QueryResponse>, CoreError>> {
+        trace!("Sending message {:?}", msg.id());
 
+        let envelope = self.get_envelope_for_message(&msg);
+        
+        let expected_responses = self.elders.len() / 2 + 1;
         let (sender_future, response_future) = mpsc::unbounded();
-        let expected_responses = if is_read(&msg) {
-            self.elders.len()
-        } else {
-            self.elders.len() / 2 + 1
-        };
-
-        let is_this_validation_request = false;
-
-        let _ = self.response_manager.await_responses(
-            msg_id,
+        // send and await response
+        let _ = self.response_manager.await_query_responses(
+            msg.id(),
             (
                 sender_future,
-                expected_responses,
-                is_this_validation_request,
+                expected_responses
             ),
         );
 
-        let bytes = Bytes::from(unwrap!(serialize(msg)));
+        let bytes = Bytes::from(unwrap!(serialize(&envelope)));
         {
             for peer in self.elders.values().map(Elder::peer) {
                 let token = rand::random();
@@ -419,25 +428,17 @@ impl Connected {
         quic_p2p: &mut QuicP2p,
         msg_id: MessageId,
         msg: &Message,
-    ) -> Result<mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
+    ) -> Result<mpsc::UnboundedReceiver<EventMsg>, CoreError> {
         trace!("Sending message {:?}", msg_id);
-        //let mut rng = rand::thread_rng();
 
         let (sender_future, response_future) = mpsc::unbounded();
-
         let expected_responses = 7;
-        // let expected_responses =  self.elders.len() / 2 + 1;
-
         let is_this_validation_request = true;
 
         // is validator to be added to response manager
-        let _ = self.response_manager.await_responses(
+        let _ = self.response_manager.add_event_listener(
             msg_id,
-            (
-                sender_future,
-                expected_responses,
-                is_this_validation_request,
-            ),
+            sender_future
         );
 
         // send the message to our elders list
@@ -461,21 +462,62 @@ impl Connected {
         trace!("{}: Message: {}.", peer_addr, utils::bin_data_format(&msg),);
 
         match deserialize(&msg) {
-            Ok(Message::Response {
-                response,
-                message_id,
-            }) => {
-                trace!(
-                    "Response from: {:?}, msg_id: {:?}, resp: {:?}",
-                    peer_addr,
-                    message_id,
-                    response
-                );
-                let _ = self.response_manager.handle_response(message_id, response);
+            Ok(MsgEnvelope{ message, ..}) => {
+
+                match message {
+                    Message::QueryResponse{
+                        response, 
+                        correlation_id,
+                        query_origin,
+                        id
+                    } => {
+                        trace!(
+                            "QueryResponse: query came from: {:?}, correlation_id: {:?}, resp: {:?}, msg_id: {:?}",
+                            query_origin,
+                            correlation_id,
+                            response,
+                            id
+                        );
+
+                        let _ = self.response_manager.handle_query_response(correlation_id, response);
+                    },
+                    Message::Event{
+                        event, 
+                        correlation_id,
+                        id
+                    } => {
+                        trace!(
+                            "Event: {:?}, correlation_id: {:?}, msg_id: {:?}",
+                            event,
+                            correlation_id,
+                            id
+                        );
+                        let _ = self.response_manager.handle_event_response(correlation_id, event);
+                    },
+                    Message::CmdError{
+                        error, 
+                        correlation_id,
+                        cmd_origin,
+                        id
+                    } => {
+                        trace!(
+                            "CmdError: from: {:?}, correlation_id: {:?}, error: {:?}, msg_id: {:?}",
+                            cmd_origin,
+                            correlation_id,
+                            &error,
+                            id
+                        );
+                        warn!("CmdError received: {:?}", &error);
+                        // let _ = self.response_manager.handle_query_response(correlation_id, response);
+                    },
+                    _ => {
+                        warn!("Error: Unexpected message received: {:?}", &message);
+                    }
+                }
             }
-            Ok(Message::TransferNotification { payload }) => {
-                trace!("Got transfer_id notification: {:?}", payload);
-            }
+            // Ok(Message::TransferNotification { payload }) => {
+            //     trace!("Got transfer_id notification: {:?}", payload);
+            // }
             Ok(_msg) => error!("Unexpected message type, expected response."),
             Err(e) => {
                 error!("Unexpected error: {:?}", e);
@@ -487,16 +529,16 @@ impl Connected {
 }
 
 // Returns true when a message is a request to read.
-fn is_read(msg: &Message) -> bool {
-    if let Message::Request { request, .. } = msg {
-        match request.get_type() {
-            RequestType::PublicRead | RequestType::PrivateRead => true,
-            _ => false,
-        }
-    } else {
-        false
-    }
-}
+// fn is_read(msg: &Message) -> bool {
+//     if let Message::Request { request, .. } = msg {
+//         match request.get_type() {
+//             RequestType::PublicRead | RequestType::PrivateRead => true,
+//             _ => false,
+//         }
+//     } else {
+//         false
+//     }
+// }
 
 /// Represents the connection state of a certain connection group.
 enum State {
@@ -546,14 +588,13 @@ impl State {
         State::Terminated
     }
 
-    async fn send(
+    async fn send_query(
         &mut self,
         quic_p2p: &mut QuicP2p,
-        msg_id: MessageId,
         msg: &Message,
-    ) -> Result<channel::mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
+    ) -> Result<channel::mpsc::UnboundedReceiver<QueryResponse>, CoreError> {
         match self {
-            State::Connected(state) => state.send(quic_p2p, msg_id, msg).await,
+            State::Connected(state) => state.send_query(quic_p2p, msg.id(), msg).await,
             // This message is not expected for the rest of states
             _state => Err(CoreError::OperationForbidden),
         }
@@ -577,7 +618,7 @@ impl State {
         quic_p2p: &mut QuicP2p,
         msg_id: MessageId,
         msg: &Message,
-    ) -> Result<channel::mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
+    ) -> Result<channel::mpsc::UnboundedReceiver<EventMsg>, CoreError> {
         match self {
             State::Connected(state) => state.send_for_validation(quic_p2p, msg_id, msg).await,
             // This message is not expected for the rest of states
@@ -641,12 +682,11 @@ impl Inner {
         let _ = old_state.apply_transition(&mut self.quic_p2p, Transition::Terminate);
     }
 
-    async fn send(
+    async fn send_query(
         &mut self,
-        msg_id: MessageId,
         msg: &Message,
-    ) -> Result<channel::mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
-        self.state.send(&mut self.quic_p2p, msg_id, msg).await
+    ) -> Result<channel::mpsc::UnboundedReceiver<QueryResponse>, CoreError> {
+        self.state.send_query(&mut self.quic_p2p, msg).await
     }
 
     async fn send_cmd(&mut self, msg_id: MessageId, msg: &Message) -> Result<(), CoreError> {
@@ -663,7 +703,7 @@ impl Inner {
         &mut self,
         msg_id: MessageId,
         msg: &Message,
-    ) -> Result<channel::mpsc::UnboundedReceiver<(Response, MessageId)>, CoreError> {
+    ) -> Result<channel::mpsc::UnboundedReceiver<EventMsg>, CoreError> {
         self.state
             .send_for_validation(&mut self.quic_p2p, msg_id, msg)
             .await
@@ -682,7 +722,7 @@ impl Inner {
     fn handle_quic_p2p_event(&mut self, event: Event) {
         use Event::*;
         // should handle new messages sent by vault (assuming it's only the `Challenge::Request` for now)
-        // if the message is found to be related to a certain `ConnectionGroup`, `connection_group.response_manager.handle_response(message_id, response)` should be called.
+        // if the message is found to be related to a certain `ConnectionGroup`, `connection_group.response_manager.handle_query_response(message_id, response)` should be called.
         match event {
             BootstrapFailure => self.handle_bootstrap_failure(),
             BootstrappedTo { node } => self.state.handle_bootstrapped_to(&mut self.quic_p2p, node),
@@ -735,20 +775,19 @@ impl Inner {
         // TODO: check if we have handled the challenge?
 
         match deserialize(msg) {
-            Ok(Message::Request {
-                request,
-                message_id,
-                ..
-            }) => self.handle_unsent_request(peer_addr, request, message_id, token),
+            Ok(MsgEnvelope{ message, ..}) => {
+                warn!("unimplemented: Handling of unsent message. Message not sent: {:?}", message );
+                // self.handle_unsent_message(peer_addr, request, message_id, token)
+            },
             Ok(_) => println!("Unexpected message type"),
             Err(e) => println!("Unexpected error {:?}", e),
         }
     }
 
-    fn handle_unsent_request(
+    fn handle_unsent_message(
         &mut self,
         _peer_addr: SocketAddr,
-        _request: Request,
+        _msg: Message,
         _message_id: MessageId,
         _token: Token,
     ) {

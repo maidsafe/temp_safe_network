@@ -9,7 +9,7 @@
 use super::{DataId, Vault};
 use safe_nd::{
     AData, ADataAction, ADataAddress, ADataIndex, ADataRequest, AppendOnlyData, Data,
-    Error as SndError, PublicId, PublicKey, Response, Result as SndResult, SeqAppendOnly,
+    Error as SndError, PublicId, PublicKey, QueryResponse, Result as SndResult, SeqAppendOnly,
     UnseqAppendOnly,
 };
 
@@ -21,7 +21,7 @@ impl Vault {
         requester: PublicId,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         match request {
             ADataRequest::Put(adata) => {
                 let owner_index = adata.owners_index();
@@ -41,11 +41,11 @@ impl Vault {
                     }
                     None => Err(SndError::NoSuchEntry),
                 };
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::Get(address) => {
                 let result = self.get_adata(*address, requester_pk, &request);
-                Response::GetAData(result)
+                QueryResponse::GetAData(result)
             }
             ADataRequest::Delete(address) => {
                 let id = DataId::AppendOnly(*address);
@@ -59,7 +59,7 @@ impl Vault {
                         }
                     },
                 );
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::GetShell {
                 address,
@@ -74,7 +74,7 @@ impl Vault {
                             };
                             data.shell(index)
                         });
-                Response::GetADataShell(result)
+                QueryResponse::GetADataShell(result)
             }
             ADataRequest::GetRange { address, range } => {
                 let result =
@@ -82,25 +82,25 @@ impl Vault {
                         .and_then(move |data| {
                             data.in_range(range.0, range.1).ok_or(SndError::NoSuchEntry)
                         });
-                Response::GetADataRange(result)
+                QueryResponse::GetADataRange(result)
             }
             ADataRequest::GetValue { address, ref key } => {
                 let result = self
                     .get_adata(*address, requester_pk, &request)
                     .and_then(move |data| data.get(key).cloned().ok_or(SndError::NoSuchEntry));
-                Response::GetADataValue(result)
+                QueryResponse::GetADataValue(result)
             }
             ADataRequest::GetIndices(address) => {
                 let result = self
                     .get_adata(*address, requester_pk, &request)
                     .and_then(move |data| data.indices());
-                Response::GetADataIndices(result)
+                QueryResponse::GetADataIndices(result)
             }
             ADataRequest::GetLastEntry(address) => {
                 let result = self
                     .get_adata(*address, requester_pk, &request)
                     .and_then(move |data| data.last_entry().cloned().ok_or(SndError::NoSuchEntry));
-                Response::GetADataLastEntry(result)
+                QueryResponse::GetADataLastEntry(result)
             }
             ADataRequest::GetPermissions {
                 address,
@@ -110,19 +110,19 @@ impl Vault {
 
                 match (address.kind(), data) {
                     (kind, Ok(ref data)) if kind.is_pub() && data.is_pub() => {
-                        Response::GetADataPermissions(
+                        QueryResponse::GetADataPermissions(
                             data.pub_permissions(*permissions_index)
                                 .map(|perm| perm.clone().into()),
                         )
                     }
                     (kind, Ok(ref data)) if kind.is_unpub() && data.is_unpub() => {
-                        Response::GetADataPermissions(
+                        QueryResponse::GetADataPermissions(
                             data.unpub_permissions(*permissions_index)
                                 .map(|perm| perm.clone().into()),
                         )
                     }
-                    (_, Err(err)) => Response::GetADataPermissions(Err(err)),
-                    (_, Ok(_)) => Response::GetADataPermissions(Err(SndError::NoSuchData)),
+                    (_, Err(err)) => QueryResponse::GetADataPermissions(Err(err)),
+                    (_, Ok(_)) => QueryResponse::GetADataPermissions(Err(SndError::NoSuchData)),
                 }
             }
             ADataRequest::GetPubUserPermissions {
@@ -133,7 +133,7 @@ impl Vault {
                 let result = self
                     .get_adata(*address, requester_pk, &request)
                     .and_then(move |data| data.pub_user_permissions(*user, *permissions_index));
-                Response::GetPubADataUserPermissions(result)
+                QueryResponse::GetPubADataUserPermissions(result)
             }
             ADataRequest::GetUnpubUserPermissions {
                 address,
@@ -145,7 +145,7 @@ impl Vault {
                         .and_then(move |data| {
                             data.unpub_user_permissions(*public_key, *permissions_index)
                         });
-                Response::GetUnpubADataUserPermissions(result)
+                QueryResponse::GetUnpubADataUserPermissions(result)
             }
             ADataRequest::AppendSeq { append, index } => {
                 let id = DataId::AppendOnly(append.address);
@@ -166,7 +166,7 @@ impl Vault {
                         }
                         _ => Err(SndError::NoSuchData),
                     });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::AppendUnseq(append) => {
                 let id = DataId::AppendOnly(append.address);
@@ -187,7 +187,7 @@ impl Vault {
                         }
                         _ => Err(SndError::NoSuchData),
                     });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::AddPubPermissions {
                 address,
@@ -224,7 +224,7 @@ impl Vault {
                             },
                             _ => Err(SndError::AccessDenied),
                         });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::AddUnpubPermissions {
                 address,
@@ -257,7 +257,7 @@ impl Vault {
                         },
                         _ => Err(SndError::AccessDenied),
                     });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::SetOwner {
                 address,
@@ -308,7 +308,7 @@ impl Vault {
                                 _ => Err(SndError::NoSuchData),
                             },
                         });
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             ADataRequest::GetOwners {
                 address,
@@ -326,7 +326,7 @@ impl Vault {
                                 None => Err(SndError::NoSuchEntry),
                             }
                         });
-                Response::GetADataOwners(result)
+                QueryResponse::GetADataOwners(result)
             }
         }
     }

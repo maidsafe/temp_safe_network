@@ -8,7 +8,7 @@
 
 use super::{DataId, Vault};
 use safe_nd::{
-    Data, Error as SndError, IData, IDataAddress, IDataRequest, PublicId, PublicKey, Response,
+    Data, Error as SndError, IData, IDataAddress, IDataRequest, PublicId, PublicKey, QueryResponse,
     Result as SndResult,
 };
 
@@ -20,7 +20,7 @@ impl Vault {
         requester: PublicId,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         match request {
             IDataRequest::Get(address) => {
                 let result = self.get_idata(*address).and_then(|idata| match idata {
@@ -34,7 +34,7 @@ impl Vault {
                     }
                     IData::Pub(_) => Ok(idata),
                 });
-                Response::GetIData(result)
+                QueryResponse::GetBlob(result)
             }
             IDataRequest::Put(idata) => {
                 let mut errored = false;
@@ -54,11 +54,11 @@ impl Vault {
                     )
                 };
 
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             IDataRequest::DeleteUnpub(address) => {
                 let result = self.delete_idata(*address, requester_pk);
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
         }
     }

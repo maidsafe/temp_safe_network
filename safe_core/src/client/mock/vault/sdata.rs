@@ -8,7 +8,7 @@
 
 use super::{DataId, Vault};
 use safe_nd::{
-    Data, Error as SndError, PublicId, PublicKey, Response, Result as SndResult, SData,
+    Data, Error as SndError, PublicId, PublicKey, QueryResponse, Result as SndResult, SData,
     SDataAction, SDataAddress, SequenceRead, SequenceWrite,
 };
 
@@ -20,7 +20,7 @@ impl Vault {
         requester: PublicId,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         match request {
             SDataRequest::Store(sdata) => {
                 let owner_index = sdata.owners_index();
@@ -40,11 +40,11 @@ impl Vault {
                     }
                     None => Err(SndError::NoSuchEntry),
                 };
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             SDataRequest::Get(address) => {
                 let result = self.get_sdata(*address, requester_pk, &request);
-                Response::GetSData(result)
+                QueryResponse::GetSData(result)
             }
             SDataRequest::Delete(address) => {
                 let id = DataId::Sequence(*address);
@@ -58,7 +58,7 @@ impl Vault {
                         }
                     },
                 );
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             SDataRequest::GetRange { address, range } => {
                 let result =
@@ -66,7 +66,7 @@ impl Vault {
                         .and_then(move |data| {
                             data.in_range(range.0, range.1).ok_or(SndError::NoSuchEntry)
                         });
-                Response::GetSDataRange(result)
+                QueryResponse::GetSDataRange(result)
             }
             SDataRequest::GetLastEntry(address) => {
                 let result =
@@ -75,33 +75,33 @@ impl Vault {
                             let entry = data.last_entry().cloned().ok_or(SndError::NoSuchEntry)?;
                             Ok((data.entries_index() - 1, entry))
                         });
-                Response::GetSDataLastEntry(result)
+                QueryResponse::GetSDataLastEntry(result)
             }
             SDataRequest::GetPermissions(address) => {
                 let data = self.get_sdata(*address, requester_pk, &request);
 
                 match (address.kind(), data) {
                     (kind, Ok(ref data)) if kind.is_pub() && data.is_pub() => {
-                        Response::GetSDataPermissions(
+                        QueryResponse::GetSDataPermissions(
                             data.pub_permissions(data.permissions_index())
                                 .map(|perm| perm.clone().into()),
                         )
                     }
                     (kind, Ok(ref data)) if kind.is_priv() && data.is_priv() => {
-                        Response::GetSDataPermissions(
+                        QueryResponse::GetSDataPermissions(
                             data.priv_permissions(data.permissions_index())
                                 .map(|perm| perm.clone().into()),
                         )
                     }
-                    (_, Err(err)) => Response::GetSDataPermissions(Err(err)),
-                    (_, Ok(_)) => Response::GetSDataPermissions(Err(SndError::NoSuchData)),
+                    (_, Err(err)) => QueryResponse::GetSDataPermissions(Err(err)),
+                    (_, Ok(_)) => QueryResponse::GetSDataPermissions(Err(SndError::NoSuchData)),
                 }
             }
             SDataRequest::GetUserPermissions { address, user } => {
                 let result = self
                     .get_sdata(*address, requester_pk, &request)
                     .and_then(move |data| data.user_permissions(*user, data.permissions_index()));
-                Response::GetSDataUserPermissions(result)
+                QueryResponse::GetSDataUserPermissions(result)
             }
             SDataRequest::Edit(op) => {
                 let id = DataId::Sequence(op.address);
@@ -113,7 +113,7 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             SDataRequest::SetPubPermissions(op) => {
                 let id = DataId::Sequence(op.address);
@@ -125,7 +125,7 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             SDataRequest::SetPrivPermissions(op) => {
                 let id = DataId::Sequence(op.address);
@@ -137,7 +137,7 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             SDataRequest::SetOwner(op) => {
                 let id = DataId::Sequence(op.address);
@@ -149,7 +149,7 @@ impl Vault {
                         Ok(())
                     },
                 );
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
             SDataRequest::GetOwner(address) => {
                 let result =
@@ -158,7 +158,7 @@ impl Vault {
                             Some(owner) => Ok(*owner),
                             None => Err(SndError::NoSuchEntry),
                         });
-                Response::GetSDataOwner(result)
+                QueryResponse::GetSDataOwner(result)
             }
         }
     }

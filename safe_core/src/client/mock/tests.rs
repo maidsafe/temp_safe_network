@@ -197,7 +197,7 @@ async fn mutable_data_basics() {
         Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(data2_address)))),
     )
     .await;
-    assert_eq!(response, Response::GetMDataVersion(Ok(0)));
+    assert_eq!(response, Response::GetMapVersion(Ok(0)));
 
     // MData(MDataRequest::Get should return the entire MutableData objec)t
     send_req_expect_ok!(
@@ -469,7 +469,7 @@ async fn mutable_data_reclaim() {
         Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(address)))),
     )
     .await;
-    assert_eq!(response, Response::GetMDataVersion(Ok(0)));
+    assert_eq!(response, Response::GetMapVersion(Ok(0)));
 
     // Try deleting the entry with an invalid entry_version and make sure it fails
     let actions: MDataSeqEntryActions = btree_map![
@@ -767,7 +767,7 @@ async fn mutable_data_permissions() {
         Request::Client(ClientRequest::Read(Read::Map(MapRead::GetVersion(address)))),
     )
     .await;
-    assert_eq!(response, Response::GetMDataVersion(Ok(1)));
+    assert_eq!(response, Response::GetMapVersion(Ok(1)));
 
     // App can't insert entries.
     let key1 = b"key1";

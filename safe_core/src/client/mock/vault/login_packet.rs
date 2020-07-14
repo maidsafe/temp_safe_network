@@ -10,7 +10,7 @@ use super::{Operation, Vault};
 use crate::client::COST_OF_PUT;
 use safe_nd::{
     AccountRead, AccountWrite, ClientFullId, DebitAgreementProof, Error as SndError, Money,
-    PublicKey, Response, SafeKey, SignedTransfer, Transfer, TransferRegistered,
+    PublicKey, QueryResponse, SafeKey, SignedTransfer, Transfer, TransferRegistered,
 };
 use std::str::FromStr;
 use unwrap::unwrap;
@@ -22,7 +22,7 @@ impl Vault {
         request: &AccountRequest,
         requester_pk: PublicKey,
         owner_pk: PublicKey,
-    ) -> Response {
+    ) -> QueryResponse {
         let mut rng = rand::thread_rng();
         let client_safe_key = SafeKey::client(ClientFullId::new_ed25519(&mut rng));
         let fake_signature = client_safe_key.sign(b"mock-key");
@@ -94,7 +94,7 @@ impl Vault {
                             }
                         })
                 };
-                Response::TransferRegistration(result)
+                QueryResponse::TransferRegistration(result)
             }
             AccountRequest::Create(account_data) => {
                 let source = owner_pk.into();
@@ -102,9 +102,9 @@ impl Vault {
                 if let Err(e) =
                     self.authorise_operations(&[Operation::Mutation], source, requester_pk)
                 {
-                    Response::Write(Err(e))
+                    QueryResponse::Write(Err(e))
                 } else if self.get_login_packet(account_data.destination()).is_some() {
-                    Response::Write(Err(SndError::LoginPacketExists))
+                    QueryResponse::Write(Err(SndError::LoginPacketExists))
                 } else {
                     let result = self
                         .get_balance(&source)
@@ -116,7 +116,7 @@ impl Vault {
                             Ok(())
                         })
                         .map(|_| self.insert_login_packet(account_data.clone()));
-                    Response::Write(result)
+                    QueryResponse::Write(result)
                 }
             }
             AccountRequest::Get(location) => {
@@ -133,7 +133,7 @@ impl Vault {
                         }
                     }
                 };
-                Response::GetAccount(result)
+                QueryResponse::GetAccount(result)
             }
             AccountRequest::Update(new_packet) => {
                 let result = {
@@ -149,7 +149,7 @@ impl Vault {
                         None => Err(SndError::NoSuchLoginPacket),
                     }
                 };
-                Response::Write(result)
+                QueryResponse::Write(result)
             }
         }
     }
