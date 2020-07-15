@@ -2045,8 +2045,9 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.10.0"
-source = "git+https://github.com/maidsafe/safe-nd.git#c7a5a3e60c6a1a0f31a57f953dd8fd4709c87d24"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a10abe5f4ff7e446e924fd472cc839e4297f1c08d1bb0148945ba4a58be45e3"
 dependencies = [
  "bincode",
  "crdts",
@@ -2063,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.16.3"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2091,7 +2092,7 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator"
-version = "0.16.3"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2114,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator_ffi"
-version = "0.16.3"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2155,7 +2156,7 @@ dependencies = [
 
 [[package]]
 name = "safe_core"
-version = "0.41.3"
+version = "0.42.0"
 dependencies = [
  "async-trait",
  "bincode",

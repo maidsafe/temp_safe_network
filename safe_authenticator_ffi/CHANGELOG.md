@@ -1,5 +1,9 @@
 # SAFE Authenticator - Change Log
 
+## [0.17.0]
+- Update internal crates
+- Standardize cargo dependency versioning
+
 ## [0.16.3]
 - Fix CI deploy
 

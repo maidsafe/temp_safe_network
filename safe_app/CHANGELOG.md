@@ -1,5 +1,10 @@
 # SAFE App
 
+## [0.17.0]
+- Added of SequenceData APIs
+- Removed of AppendOnlyData APIs
+- Standardize cargo dependency versioning
+
 ## [0.16.3]
 - Fix CI deploy
 
