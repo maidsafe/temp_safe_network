@@ -11,31 +11,23 @@ mod msg_analysis;
 mod accumulation;
 mod messaging;
 
+use network_events::NetworkEvents;
+use msg_analysis::{NodeOperation, NetworkMsgAnalysis};
+use accumulation::Accumulation;
+use messaging::{Messaging, Receiver, Received};
 use crate::{
-    accumulator::Accumulator,
+    accumulation::Accumulation,
     cmd::{GroupDecision, MessagingDuty},
-    messaging::{ClientMessaging, Messaging, Receiver, Received},
     node::{
-        node_duties::{NodeDuties, NetworkEvents, Accumulation, msg_analysis::{NodeOperation, NetworkMsgAnalysis}},
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
         keys::NodeKeys,
     },
-    utils, Config, Result,
+    Config, Result,
 };
-use crossbeam_channel::{Receiver, Select};
-use hex_fmt::HexFmt;
-use log::{debug, error, info, trace, warn};
-use rand::{CryptoRng, Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
-use routing::{event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent};
-use safe_nd::{MsgEnvelope, MsgSender, NodeFullId, XorName};
+use routing::Node as Routing;
 use std::{
     cell::{Cell, RefCell},
-    fmt::{self, Display, Formatter},
-    fs,
-    net::SocketAddr,
-    path::PathBuf,
     rc::Rc,
 };
 
@@ -50,7 +42,8 @@ struct NodeDuties {
     keys: NodeKeys
     age_based: AgeBasedDuties,
     network_events: NetworkEvents,
-    accumulator: Accumulator,
+    accumulation: Accumulation,
+    messaging: Messaging,
     routing: RefCell<Rc<Routing>>,
     config: Config,
 }
@@ -59,13 +52,15 @@ impl NodeDuties {
     
     pub fn new(keys: NodeKeys, age_based: AgeBasedDuties,
         routing: RefCell<Rc<Routing>>, config: Config) -> Self {
-        let accumulator = Accumulator::new(routing.clone());
+        let accumulation = Accumulation::new(routing.clone());
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
+        let messaging = Messaging::new(routing.clone());
         Self {
             config,
             age_based,
             network_events,
             accumulator,
+            messaging
             routing,
         }
     }
@@ -73,10 +68,11 @@ impl NodeDuties {
     pub fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
         match duty {
-            BecomeAdult => self.become_adult(config: Config),
-            BecomeElder => self.become_elder(config: Config, routing: RefCell<Rc<Routing>>),
-            ProcessNetworkEvent(event) => self.network_events.process(event),
+            BecomeAdult => self.become_adult(),
+            BecomeElder => self.become_elder(),
+            Accumulate(msg) => self.accumulation.process(&msg),
             ProcessMessaging(duty) => self.messaging.process(duty),
+            ProcessNetworkEvent(event) => self.network_events.process(event),
         }
     }
 
@@ -85,7 +81,7 @@ impl NodeDuties {
         // let mut config = Config::default();
         // config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
-        self.age_based = Adult(AdultDuties::new(self.keys.clone(), &self.config), &total_used_space, Init::New)?);
+        self.age_based = Adult(AdultDuties::new(self.keys.clone(), &self.config, &total_used_space, Init::New)?);
         Ok(())
     }
 
@@ -94,6 +90,11 @@ impl NodeDuties {
         // let mut config = Config::default();
         // config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
+
+        input_parsing: InputParsing,
+        section: SectionQuerying,
+        client_msg_tracking: ClientMsgTracking,
+
         let duties = ElderDuties::new(
             self.keys.clone(),
             &self.config,
@@ -102,9 +103,7 @@ impl NodeDuties {
             routing.clone(),
             ClientMessaging::new(self.id.public_id().clone(), routing),
         )?;
-        self.age_based = Elder(duties)
-            accumulator: Accumulator::new(self.routing.clone()),
-        };
+        self.age_based = Elder(duties);
         Ok(())
     }
 }

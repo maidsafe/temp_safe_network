@@ -6,13 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use routing::Node as Routing;
 use safe_nd::{
-    Address, Cmd, DataCmd, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NetworkCmd, Query,
-    XorName, PublicKey,
+    MsgEnvelope, XorName, PublicKey,
 };
-use std::{cell::RefCell, rc::Rc};
-use crate::internal_msgs::*;
 use super::msg_analysis::NetworkMsgAnalysis;
 
 pub struct NetworkEvents {

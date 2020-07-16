@@ -57,27 +57,44 @@ impl Rewards {
         }
     }
 
-    pub fn process(&mut self, duty: RewardDuty) -> Option<MessagingDuty> {
-        match duty {
-            RewardDuty::ClaimRewardCounter {
+    pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
+        use RewardDuty::*;
+        let result = match duty {
+            AccumulateReward {
+                data,
+            } => self.accumulate_reward(data),
+            AddNewAccount {
+                id, 
+                node_id,
+            } => self.add_account(id, node_id),
+            AddRelocatedAccount {
+                old_node_id,
+                new_node_id,
+            } => self.add_relocated_account(old_node_id, new_node_id),
+            ClaimRewardCounter {
                 old_node_id, new_node_id, msg_id, origin,
             } => self.claim_rewards(old_node_id, new_node_id, msg_id, origin),
-            RewardDuty::InitiateRewardPayout {
-
-            }
-        }
-        None,
+            ReceiveClaimedRewards {
+                id,
+                node_id,
+                counter,
+            } => self.receive_claimed_rewards(id, node_id, counter),
+        };
+        use NodeDuty::*;
+        use NodeOperation::*;
+        
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
     /// 0. A brand new node has joined our section.
-    pub fn add_account(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
+    fn add_account(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
         let _ = self.node_accounts.insert(node_id, RewardAccount::Active(id));
         None
     }
 
     /// 1. When a node is relocated to our section, we add the account
     /// and send a cmd to old section, for claiming the rewards.
-    pub fn add_relocated_account(
+    fn add_relocated_account(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
@@ -99,7 +116,7 @@ impl Rewards {
     /// Work is the total work associated with this account id.
     /// It is a strictly incrementing value during the lifetime of
     /// the owner on the network.
-    pub fn receive_claimed_rewards(
+    fn receive_claimed_rewards(
         &mut self,
         id: AccountId,
         node_id: &XorName,
@@ -158,7 +175,7 @@ impl Rewards {
 
     /// 3. Every time the section receives
     /// a write request, the accounts accumulate reward.
-    pub fn accumulate_reward(&mut self, data: Vec<u8>) -> Option<MessagingDuty> {
+    fn accumulate_reward(&mut self, data: Vec<u8>) -> Option<MessagingDuty> {
         let num_bytes = data.len() as u64;
         let data_hash = data;
         let factor = 2.0;

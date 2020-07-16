@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    accumulator::Accumulator,
     cmd::{GroupDecision, MessagingDuty},
     messaging::{ClientMessaging, Messaging},
     node::{

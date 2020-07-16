@@ -21,9 +21,10 @@ use crate::{
     node::Init,
     Config, Result,
 };
+use routing::TransportEvent as ClientEvent;
 use bytes::Bytes;
 use log::trace;
-use rand::{CryptoRng, Rng};
+use rand::CryptoRng;
 use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
 use std::{
     fmt::{self, Display, Formatter},
@@ -41,13 +42,11 @@ pub(crate) struct Gateway {
 
 impl Gateway {
     pub fn new(
+        id: NodePublicId,
         keys: NodeKeys,
         config: &Config,
         init_mode: Init,
-        onboarding: Onboarding,
-        input_parsing: InputParsing,
         section: SectionQuerying,
-        client_msg_tracking: ClientMsgTracking,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
@@ -56,6 +55,10 @@ impl Gateway {
         let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Gateway);
         let auth = Auth::new(keys.clone(), auth_keys_db, decisions.clone());
         let data = Validation::new(decisions);
+
+        let onboarding = Onboarding::new(id.clone());
+        let input_parsing = InputParsing::new();
+        let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {
             keys,
@@ -70,13 +73,16 @@ impl Gateway {
         Ok(gateway)
     }
 
-    pub fn process(&mut self, cmd: &GatewayCmd) -> Option<MessagingDuty> {
-        use GatewayCmd::*;
-        match cmd {
+    pub fn process(&mut self, cmd: &GatewayDuty) -> Option<NodeOperation> {
+        use NodeDuty::*;
+        use GatewayDuty::*;
+        use NodeOperation::*;
+        let result = match cmd {
             ProcessMsg(msg) => self.process_msg(msg),
             ProcessClientEvent(event) => self.process_client_event(event),
             ProcessGroupDecision(decision) => self.process_group_decision(decision),
-        }
+        };
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
     fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
@@ -125,6 +131,18 @@ impl Gateway {
             }
             NewMessage { peer, msg } => {
                 let parsed = self.input_parsing.try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
+                match parsed {
+                    ClientInput::Msgs(msg) => {
+                        let result = self.client_msg_tracking.track_incoming(msg.id, peer.peer_addr());
+                        if result.is_some() {
+                            return result;
+                        }
+                    }
+                    ClientInput::Handshake(hs) => {
+                        self.onboarding.process(hs, peer.peer_addr(), &mut rng)
+                    }
+                }
+                
                 return self.process_client_msg(parsed.client.public_id, &parsed.msg);
             }
             SentUserMessage { peer, .. } => {

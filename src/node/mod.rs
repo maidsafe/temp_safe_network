@@ -12,32 +12,28 @@ mod node_duties;
 mod keys;
 mod msg_wrapping;
 mod section_querying;
+mod node_ops;
 
 use crate::{
     cmd::{GroupDecision, MessagingDuty},
     messaging::{ClientMessaging, Messaging, Receiver, Received},
     node::{
-        node_duties::{NodeDuties, NetworkEvents},
+        node_duties::{msg_analysis::NodeOperation, messaging::Receiver},
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
         keys::NodeKeys,
-        msg_analysis::{NodeOperation, InboundMsgAnalysis},
     },
     utils, Config, Result,
 };
-use crossbeam_channel::{Receiver, Select};
-use hex_fmt::HexFmt;
-use log::{debug, error, info, trace, warn};
-use rand::{CryptoRng, Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
-use routing::{event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent};
-use safe_nd::{MsgEnvelope, MsgSender, NodeFullId, XorName};
+use log::{error, info, warn};
+use rand::{CryptoRng, Rng};
+use routing::Node as Routing;
+use safe_nd::{MsgEnvelope, MsgSender, NodeFullId};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     fs,
     net::SocketAddr,
-    path::PathBuf,
     rc::Rc,
 };
 
@@ -156,16 +152,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         use NodeDuty::*;
         loop {
             let result = match self.receiver.next() {
-                Received::Client(event) => Some(RunAsGateway(ProcessClientEvent(event))),
-                Received::Network(event) => Some(RunAsNode(ProcessNetworkEvent(event)))),
+                Received::Client(event) => RunAsGateway(ProcessClientEvent(event)),
+                Received::Network(event) => RunAsNode(ProcessNetworkEvent(event)),
                 Received::Unknown(channel) => {
                     if let Err(err) = self.routing.borrow_mut().handle_selected_operation(channel.index) {
                         warn!("Could not process operation: {}", err);
                     }
-                    None
+                    continue;
                 }
             };
-            self.process_while_any(result);
+            self.process_while_any(Some(result));
         }
     }
 
@@ -198,19 +194,19 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn accumulator(&mut self) -> Option<&mut Accumulator> {
-        match &mut self.state {
-            State::Infant => None,
-            State::Elder {
-                ref mut accumulator,
-                ..
-            } => Some(accumulator),
-            State::Adult {
-                ref mut accumulator,
-                ..
-            } => Some(accumulator),
-        }
-    }
+    // fn accumulator(&mut self) -> Option<&mut Accumulator> {
+    //     match &mut self.state {
+    //         State::Infant => None,
+    //         State::Elder {
+    //             ref mut accumulator,
+    //             ..
+    //         } => Some(accumulator),
+    //         State::Adult {
+    //             ref mut accumulator,
+    //             ..
+    //         } => Some(accumulator),
+    //     }
+    // }
 
     ///
     pub fn process_while_any(&mut self, op: Option<NodeOperation>) {
@@ -219,17 +215,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut next_op = op;
         while let Some(op) = next_op {
             next_op = match op {
-                Accumulate(msg) => self.node_duties().accumulation().process(&msg),
-                RunAsMessaging(duty) => self.node_duties().process(NodeDuty::ProcessMessaging(&duty)),
+                //RunAsMessaging(duty) => self.node_duties().process(NodeDuty::ProcessMessaging(&duty)),
                 RunAsGateway(duty) => self
                     .elder_duties()?
                     .gateway()
                     .process(&duty),
-                RunAsPayment(duty) => self.elder_duties()?.data_payment().pay_for_data(&duty),
-                RunAsMetadata(duty) => self.elder_duties()?.metadata().receive_msg(&duty),
-                RunAsChunks(duty) => self.adult_duties()?.receive_msg(&duty),
-                RunAsRewards(duty) => self.elder_duties()?.receive_reward_msg(&duty),
-                RunAsTransfers(duty) => self.elder_duties()?.transfers().receive_msg(&duty),
+                RunAsPayment(duty) => self.elder_duties()?.data_payment().process(&duty),
+                RunAsTransfers(duty) => self.elder_duties()?.transfers().process(&duty),
+                RunAsMetadata(duty) => self.elder_duties()?.metadata().process(&duty),
+                RunAsRewards(duty) => self.elder_duties()?.rewards().process(&duty),
+                RunAsAdult(duty) => self.adult_duties()?.process(&duty),
                 RunAsElder(duty) => self.elder_duties()?.process(duty),
                 RunAsNode(duty) => self.node_duties().process(duty),
                 Unknown => {

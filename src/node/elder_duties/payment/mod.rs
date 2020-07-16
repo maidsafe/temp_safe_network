@@ -42,7 +42,7 @@ impl DataPayment {
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
-    pub fn process(&mut self, duty: &PaymentDuty) -> Option<MessagingDuty> {
+    pub fn process(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
         let PaymentDuty::ProcessPayment(msg) = duty;
         let payment = match &msg.message {
             Message::Cmd {
@@ -73,14 +73,18 @@ impl DataPayment {
             },
             Err(error) => Err(error), // not using TransferPropagation error, since that is for NetworkCmds, so wouldn't be returned to client.
         };
-        match result {
+        let result = match result {
             Ok(_) => self.decisions.forward(msg),
             Err(error) => self.decisions.error(
                 CmdError::Transfer(TransferRegistration(error)),
                 msg.id(),
                 &msg.origin,
             ),
-        }
+        };
+        use NodeDuty::*;
+        use NodeOperation::*;
+        
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
     fn section_account_id(&self) -> Result<PublicKey> {

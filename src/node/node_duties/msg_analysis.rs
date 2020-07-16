@@ -6,20 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node_ops::RewardDuty;
+
 use routing::Node as Routing;
 use safe_nd::{
     Address, Cmd, DataCmd, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NetworkCmd, Query,
-    XorName,
+    XorName, NetworkEvent,
 };
 use std::{cell::RefCell, rc::Rc};
-use crate::internal_msgs::*;
-
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum NodeDuties {
-    Infant,
-    Adult,
-    Elder,
-}
 
 /// Currently, this is only evaluating
 /// remote msgs from the network, i.e.
@@ -43,33 +37,35 @@ impl NetworkMsgAnalysis {
     /// it is not evaluating msgs sent
     /// directly from the client.
     pub fn evaluate(&self, msg: &MsgEnvelope) -> NodeOperation {
+        NodeOperation::*;
+        NodeDuty::*;
         if self.should_accumulate(msg) {
-            NodeOperation::Accumulate(msg.clone())
+            RunAsNode(Accumulate(msg.clone()))
         } else if let Some(duty) = self.try_messaging(msg) {
             // Identified as an outbound msg, to be sent on the wire.
-            NodeOperation::RunAsMessaging(duty)
+            RunAsNode(RunAsMessaging(duty))
         } else if let Some(duty) = self.try_gateway(msg) {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
-            NodeOperation::RunAsGateway(duty)
+            RunAsGateway(duty)
         } else if let Some(duty) = self.try_data_payment(msg) {
             // Incoming msg from `Gateway`!
-            NodeOperation::RunAsPayment(duty) // Payment Elders should just execute and send onwards.
+            RunAsPayment(duty) // Payment Elders should just execute and send onwards.
         } else if let Some(duty) = self.try_metadata(msg) {
             // Accumulated msg from `Payment`!
-            NodeOperation::RunAsMetadata(duty)
+            RunAsMetadata(duty)
         } else if let Some(duty) = self.try_adult(msg) {
             // Accumulated msg from `Metadata`!
-            NodeOperation::RunAsChunks(duty)
+            RunAsChunks(duty)
         } else if let Some(duty) = self.try_rewards(msg) {
             // Identified as a Rewards msg
-            NodeOperation::RunAsRewards(duty)
+            RunAsRewards(duty)
         } else if let Some(duty) = self.try_transfers(msg) {
             // Identified as a Transfers msg
-            NodeOperation::RunAsTransfers(duty)
+            RunAsTransfers(duty)
         } else {
-            NodeOperation::Unknown
+            Unknown
         }
     }
 
@@ -140,7 +136,7 @@ impl NetworkMsgAnalysis {
         };
         let is_accumulating_reward_cmd = || match msg.message {
             Message::NetworkCmd {
-                cmd: NetworkCmd::ClaimRewardCounter { .. },
+                cmd: NetworkCmd::Rewards(NetworkRewardsCmd::ClaimRewardCounter { .. }),
                 ..
             } => true,
             _ => false,
@@ -292,7 +288,7 @@ impl NetworkMsgAnalysis {
         // Is it a data query?
         let is_data_query = || match msg.message {
             Message::Query {
-                cmd: Cmd::Query(_),
+                query: Query::Data(_),
                 ..
             } => true,
             _ => false,
@@ -330,10 +326,7 @@ impl NetworkMsgAnalysis {
         let is_chunk_query = || match msg.message {
             Message::Query {
                 query:
-                    Query::Data {
-                        query: DataQuery::Blob(_),
-                        ..
-                    },
+                    Query::Data(DataQuery::Blob(_)),
                 ..
             } => true,
             _ => false,
@@ -371,19 +364,32 @@ impl NetworkMsgAnalysis {
         };
 
         if from_rewards_section() && self.is_dst_for(msg) && self.is_elder() {
+            use NetworkRewardCmd::*;
             return match msg.message {
                 Message::NetworkCmd {
-                    cmd: NetworkCmd::ClaimRewardCounter { .. },
+                    cmd: NetworkCmd::Rewards(ClaimRewardCounter {
+                        old_node_id,
+                        new_node_id,
+                    }),
+                    id,
+                } => RewardDuty::ClaimRewardCounter {
+                    old_node_id,
+                    new_node_id,
+                    msg_id: id, 
+                    origin: msg.origin.address(), 
+                },
+                Message::NetworkEvent {
+                    event: NetworkEvent::RewardCounterClaimed {
+                        id,
+                        node_id,
+                        counter,
+                    },
                     ..
-                } => RewardDuty::ClaimRewardCounter(msg),
-                Message::NetworkCmd {
-                    cmd: NetworkCmd::InitiateRewardPayout(_),
-                    ..
-                } => RewardDuty::InitiateRewardPayout(msg),
-                Message::NetworkCmd {
-                    cmd: NetworkCmd::FinaliseRewardPayout(_),
-                    ..
-                } => RewardDuty::FinaliseRewardPayout(msg),
+                } => RewardDuty::ReceiveClaimedRewards {
+                    id,
+                    node_id,
+                    &counter,
+                }
                 _ => None,
             };
         }
@@ -412,7 +418,14 @@ impl NetworkMsgAnalysis {
             } => true,
             _ => false,
         };
-
+        // Message::NetworkCmd {
+        //     cmd: NetworkCmd::Rewards(InitiateRewardPayout(_),
+        //     ..
+        // } => RewardDuty::InitiateRewardPayout(msg),
+        // Message::NetworkCmd {
+        //     cmd: NetworkCmd::FinaliseRewardPayout(_),
+        //     ..
+        // } => RewardDuty::FinaliseRewardPayout(msg),
         if from_single_gateway_elder() && self.is_dst_for(msg) && self.is_elder() {
             if is_transfer_cmd() {
                 return TransferDuty::ProcessTransfer(msg);
@@ -432,7 +445,7 @@ impl NetworkMsgAnalysis {
     }
 
     fn is_elder(&self) -> bool {
-        if let NodeDuties::Elder = self.our_duties() {
+        if let AgeGroup::Elder = self.our_duties() {
             true
         } else {
             false
@@ -440,16 +453,16 @@ impl NetworkMsgAnalysis {
     }
 
     fn is_adult(&self) -> bool {
-        if let NodeDuties::Adult = self.our_duties() {
+        if let AgeGroup::Adult = self.our_duties() {
             true
         } else {
             false
         }
     }
 
-    fn our_duties(&self) -> NodeDuties {
+    fn our_duties(&self) -> AgeGroup {
         if self.routing.borrow().is_elder() {
-            NodeDuties::Elder
+            AgeGroup::Elder
         } else if self
             .routing
             .borrow()
@@ -457,9 +470,15 @@ impl NetworkMsgAnalysis {
             .map(|c| c.name())
             .any(|x| x == self.routing.borrow().name())
         {
-            NodeDuties::Adult
+            AgeGroup::Adult
         } else {
-            NodeDuties::Infant
+            AgeGroup::Infant
         }
     }
+}
+
+enum AgeGroup {
+    Infant,
+    Adult,
+    Elder,
 }

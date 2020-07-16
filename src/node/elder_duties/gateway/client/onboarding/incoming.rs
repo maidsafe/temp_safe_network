@@ -86,7 +86,7 @@ impl Onboarding {
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         rng: &mut R,
-    ) -> Option<OnboardingDecision> {
+    ) -> Option<MessagingDuty> {
         match handshake {
             HandshakeRequest::Bootstrap(client_id) => self.try_bootstrap(peer_addr, &client_id),
             HandshakeRequest::Join(client_id) => self.try_join(peer_addr, client_id, rng),
@@ -94,7 +94,7 @@ impl Onboarding {
         }
     }
 
-    fn try_bootstrap(&self, peer_addr: SocketAddr, client_id: &PublicId) -> Option<OnboardingDecision> {
+    fn try_bootstrap(&self, peer_addr: SocketAddr, client_id: &PublicId) -> Option<MessagingDuty> {
         let elders = if self
             .section
             .matches_our_prefix(client_id.name())
@@ -126,12 +126,11 @@ impl Onboarding {
             } else {
                 elders
             }
-        }
-
-        Some(OnboardingDecision::Continue(OnboardingStep {
-            peer_addr, 
-            response: HandshakeResponse::Join(elders),
-        }))
+        };
+        Some(MessagingDuty::SendHandshake { 
+            address: peer_addr, 
+            response: HandshakeResponse::Join(elders)
+        })
     }
     
     /// Handles a received join request from a client.
@@ -140,25 +139,23 @@ impl Onboarding {
         peer_addr: SocketAddr,
         client_id: PublicId,
         rng: &mut R,
-    ) -> Option<OnboardingDecision> {
+    ) -> Option<MessagingDuty> {
         if self.section.matches_our_prefix(client_id.name())
         {
             let challenge = utils::random_vec(rng, 8);
             let _ = self
                 .client_candidates
                 .insert(peer_addr, (challenge.clone(), client_id));
-
-            Some(OnboardingDecision::Continue(OnboardingStep {
-                peer_addr, 
-                response: HandshakeResponse::Challenge(PublicId::Node(self.id.clone()), challenge),
-            }))
+            Some(MessagingDuty::SendHandshake { 
+                address: peer_addr, 
+                response: HandshakeResponse::Challenge(PublicId::Node(self.id.clone()), challenge)
+            })
         } else {
             debug!(
                 "Client {} ({}) wants to join us but we are not its client handler",
                 client_id, peer_addr
             );
-            //let _ = self.routing.borrow_mut().disconnect_from_client(peer_addr);
-            Some(OnboardingDecision::Disconnect(peer_addr))
+            Some(MessagingDuty::DisconnectClient(peer_addr))
         }
     }
 
@@ -175,27 +172,21 @@ impl Onboarding {
                         "{}: Client on {} identifies as a node: {}, hence disconnect from it.",
                         self, peer_addr, public_id
                     );
-                    return Some(OnboardingDecision::Disconnect(peer_addr));
-                    // if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
-                    //     warn!("{}: Could not disconnect client: {:?}", self, err);
-                    // }
-                    // return;
+                    return Some(MessagingDuty::DisconnectClient(peer_addr));
                 }
             };
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
                     info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
                     let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
+                    None
                 }
                 Err(err) => {
                     info!(
                         "{}: Challenge failed for {} on {}: {}",
                         self, public_id, peer_addr, err
                     );
-                    return Some(OnboardingDecision::Disconnect(peer_addr));
-                    // if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
-                    //     warn!("{}: Could not disconnect client: {:?}", self, err);
-                    // }
+                    Some(MessagingDuty::DisconnectClient(peer_addr))
                 }
             }
         } else {
@@ -203,35 +194,34 @@ impl Onboarding {
                 "{}: {} supplied challenge response without us providing it.",
                 self, peer_addr
             );
-            return Some(OnboardingDecision::Disconnect(peer_addr));
+            Some(MessagingDuty::DisconnectClient(peer_addr))
             // if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
             //     warn!("{}: Could not disconnect client: {:?}", self, err);
             // }
         }
     }
 
-    // #[allow(unused)]
+    // fn send<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) {
+    //     let msg = utils::serialise(msg);
+    //     let msg = Bytes::from(msg);
+
+    //     if let Err(e) = self
+    //         .routing
+    //         .borrow_mut()
+    //         .send_message_to_client(recipient, msg, 0)
+    //     {
+    //         warn!(
+    //             "{}: Could not send message to client {}: {:?}",
+    //             self, recipient, e
+    //         );
+    //     }
+    // }
+
     // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
     //     for client_id in self.lookup_client_and_its_apps(client) {
     //         self.send_notification_to_client(&client_id, &TransferNotification(receipt.clone()));
     //     }
     // }
-
-    fn send<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) {
-        let msg = utils::serialise(msg);
-        let msg = Bytes::from(msg);
-
-        if let Err(e) = self
-            .routing
-            .borrow_mut()
-            .send_message_to_client(recipient, msg, 0)
-        {
-            warn!(
-                "{}: Could not send message to client {}: {:?}",
-                self, recipient, e
-            );
-        }
-    }
 
     // pub(crate) fn send_notification_to_client(
     //     &mut self,
@@ -271,7 +261,7 @@ impl Onboarding {
             .collect()
     }
 
-    pub(crate) fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
+    fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
         self.clients
             .values()
             .filter_map(|client| {

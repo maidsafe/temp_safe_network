@@ -77,8 +77,8 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        match msg.message.clone() {
+    pub fn process(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        let result = match msg.message.clone() {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
@@ -89,7 +89,11 @@ impl Transfers {
                 ..
             } => self.handle_client_query(query, msg),
             _ => None,
-        }
+        };
+        use NodeDuty::*;
+        use NodeOperation::*;
+        
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
     fn handle_network_cmd(

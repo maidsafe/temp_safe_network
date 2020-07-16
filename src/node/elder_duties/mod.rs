@@ -24,7 +24,7 @@ use crate::{
     node::section_querying::SectionQuerying, node::Init, utils, Config, Result,
 };
 use routing::{Node as Routing, RoutingError};
-use safe_nd::{XorName, MsgEnvelope, NetworkEvent, Message, NetworkCmd};
+use safe_nd::XorName;
 use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
@@ -90,22 +90,6 @@ impl ElderDuties {
         })
     }
 
-    fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
-        let node = routing.borrow();
-        let public_key_set = node.public_key_set()?;
-        let secret_key_share = node.secret_key_share()?;
-        let key_index = node.our_index()?;
-        let proof_chain = node.our_history().ok_or(RoutingError::InvalidState)?;
-        let replica_manager = ReplicaManager::new(
-            secret_key_share,
-            key_index,
-            public_key_set,
-            vec![],
-            proof_chain.clone(),
-        )?;
-        Ok(Rc::new(RefCell::new(replica_manager)))
-    }
-
     pub fn gateway(&mut self) -> &mut Gateway {
         &mut self.gateway
     }
@@ -126,38 +110,49 @@ impl ElderDuties {
         &mut self.rewards
     }
 
-    pub fn relocated_member_joined(
+    pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
+        use ElderDuty::*;
+        let result = match duty {
+            ProcessLostMember { 
+                name,
+                age,
+            } => self.member_left(name, age),
+            ProcessJoinedMember {
+                old_node_id,
+                new_node_id,        
+            } => self.relocated_member_joined(old_node_id, new_node_id),
+            ProcessElderChange { .. } => self.elders_changed(),
+        };
+        use NodeDuty::*;
+        use NodeOperation::*;
+        
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
+    }
+
+    fn relocated_member_joined(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
-    ) -> Option<Vec<MessagingDuty>> {
+    ) -> Option<MessagingDuty> {
         // marks the reward account as
         // awaiting claiming of the counter
-        if let Some(msg) = self.rewards.add_relocated_account(old_node_id, new_node_id) {
-            Some(vec![msg])
-        } else {
-            None
-        }
+        self.rewards.add_relocated_account(old_node_id, new_node_id)
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
 
     /// Name of the node
     /// Age of the node
-    pub fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<Vec<MessagingDuty>> {
+    fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<MessagingDuty> {
         // marks the reward account as
         // awaiting claiming of the counter
-        if let Some(msg) = self.rewards.node_left(node_id) {
-            Some(vec![msg])
-        } else {
-            None
-        }
+        self.rewards.node_left(node_id)
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self) -> Option<MessagingDuty> {
+    fn elders_changed(&mut self) -> Option<MessagingDuty> {
         let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();
@@ -170,28 +165,21 @@ impl ElderDuties {
         )?;
         None
     }
-
-    pub fn receive_reward_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        match &msg.message {
-            Message::NetworkCmd {
-                cmd:
-                    NetworkCmd::ClaimRewardCounter {
-                        old_node_id,
-                        new_node_id,
-                    },
-                id,
-            } => self.rewards.claim_rewards(*old_node_id, *new_node_id, *id, &msg.origin),
-            Message::NetworkEvent {
-                event:
-                    NetworkEvent::RewardCounterClaimed {
-                        new_node_id,
-                        account_id,
-                        counter,
-                    },
-                ..
-            } => self.rewards.receive_claimed_rewards(*account_id, new_node_id, counter),
-            _ => None,
-        }
+    
+    fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
+        let node = routing.borrow();
+        let public_key_set = node.public_key_set()?;
+        let secret_key_share = node.secret_key_share()?;
+        let key_index = node.our_index()?;
+        let proof_chain = node.our_history().ok_or(RoutingError::InvalidState)?;
+        let replica_manager = ReplicaManager::new(
+            secret_key_share,
+            key_index,
+            public_key_set,
+            vec![],
+            proof_chain.clone(),
+        )?;
+        Ok(Rc::new(RefCell::new(replica_manager)))
     }
 }
 

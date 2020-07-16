@@ -29,12 +29,9 @@
 // For quick_error
 #![recursion_limit = "128"]
 
-mod accumulator;
 mod chunk_store;
-mod internal_msgs;
 mod config_handler;
 mod error;
-mod messaging;
 mod node;
 mod to_db_key;
 mod utils;

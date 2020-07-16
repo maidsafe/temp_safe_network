@@ -35,6 +35,12 @@ struct InputParsing {
 
 impl InputParsing {
     
+    pub fn new() -> Self {
+        Self {
+        
+        }
+    }
+
     pub fn try_parse_client_input<R: CryptoRng + Rng>(
         &mut self,
         peer_addr: SocketAddr,
@@ -96,8 +102,6 @@ impl InputParsing {
                 return None;
             }
         };
-
         Some(ClientInput::Handshake(hs))
     }
-
 }

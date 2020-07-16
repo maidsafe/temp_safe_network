@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{MsgEnvelope, XorName, Address, MessageId, SignedTransfer, Transfer, DebitAgreementProof};
+use safe_nd::{HandshakeResponse, MsgEnvelope, XorName, Address, MessageId, SignedTransfer, Transfer, DebitAgreementProof};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
@@ -40,14 +40,12 @@ use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 // }
 
 pub enum NodeOperation {
-    Accumulate(MsgEnvelope),
     RunAsGateway(GatewayDuty),
     RunAsPayment(PaymentDuty),
     RunAsMetadata(MetadataDuty),
-    RunAsChunks(ChunkDuty),
     RunAsRewards(RewardDuty),
     RunAsTransfers(TransferDuty),
-    RunAsMessaging(MessagingDuty),
+    RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
     RunAsNode(NodeDuty),
     Unknown,
@@ -86,13 +84,16 @@ pub enum MessagingDuty {
     /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
     VoteFor(GroupDecision),
+    /// 
+    SendHandshake { address: SocketAddr, response: HandshakeResponse },
+    ///
+    DisconnectClient(SocketAddr),
 }
 
 pub enum NodeDuty {
     BecomeAdult,
     BecomeElder,
-    // RunAsElder(ElderDuty),
-    // RunAsAdult(AdultDuty),
+    Accumulate(MsgEnvelope),
     ProcessMessaging(MessagingDuty),
     ProcessNetworkEvent(NetworkEvent),
 }
@@ -106,9 +107,13 @@ pub enum ElderDuty {
         /// The prefix of our section.
         prefix: Prefix,
         /// The BLS public key of our section.
-        key: bls::PublicKey,
+        key: PublicKey,
         /// The set of elders of our section.
         elders: BTreeSet<XorName>,
+    },
+    ProcessJoinedMember {
+        old_node_id: XorName,
+        new_node_id: XorName,
     },
     // RunAsGateway(GatewayDuty),
     // RunAsPayment(PaymentDuty),
@@ -117,9 +122,9 @@ pub enum ElderDuty {
     // RunAsTransfers(TransferDuty),
 }
 
-// pub enum AdultDuty {
-//     RunAsChunks(ChunkDuty),
-// }
+pub enum AdultDuty {
+    RunAsChunks(ChunkDuty),
+}
 
 // -- All duties below solely process and produce internal msgs
 // -- for further handling locally - of which MessagingDuty is the
@@ -171,6 +176,18 @@ pub enum ChunkDuty {
 ///
 pub enum RewardDuty {
     ///
+    AccumulateReward {
+        ///
+        data: Vec<u8>
+    }
+    ///
+    AddNewAccount {
+        ///
+        id: AccountId, 
+        ///
+        node_id: XorName
+    }
+    ///
     AddRelocatedAccount {
         ///
         old_node_id: XorName,
@@ -188,6 +205,15 @@ pub enum RewardDuty {
         ///
         origin: Address,
     },
+    ///
+    ReceiveClaimedRewards {
+        ///
+        id: AccountId,
+        ///
+        node_id: &XorName,
+        ///
+        counter: &RewardCounter,
+    }
 }
 
 // --------------- Transfers ---------------

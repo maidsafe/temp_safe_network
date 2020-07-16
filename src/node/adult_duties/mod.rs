@@ -33,8 +33,12 @@ impl AdultDuties {
         Ok(Self { keys, chunks })
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        self.chunks.receive_msg(msg)
+    pub fn process(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        use NodeDuty::*;
+        use NodeOperation::*;
+
+        let result = self.chunks.receive_msg(msg);
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 }
 

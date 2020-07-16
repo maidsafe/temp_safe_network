@@ -79,8 +79,11 @@ impl Metadata {
         })
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        match &msg.message {
+    pub fn process(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        use NodeDuty::*;
+        use NodeOperation::*;
+
+        let result = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
                 ..
@@ -96,7 +99,9 @@ impl Metadata {
                 reading.get_result(&self.elder_stores)
             }
             _ => None, // only Queries and Cmds from client is handled at Metadata
-        }
+        };
+
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
     // This should be called whenever a node leaves the section. It fetches the list of data that was

@@ -52,7 +52,7 @@ impl SectionQuerying {
             .collect::<Vec<_>>()
     }
     
-    pub fn our_elders(&self) {
+    pub fn our_elders(&self) -> Vec<XorName> {
         self
             .routing
             .borrow_mut()

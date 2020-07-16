@@ -112,7 +112,7 @@ impl ClientMsgTracking {
                     "{} for message-id {:?}, Unable to find the client to respond to.",
                     self, correlation_id
                 );
-                let _ = self.pending_actions.insert(correlation_id, msg.clone());
+                let _ = self.tracked_outgoing.insert(correlation_id, msg.clone());
                 return None;
                 //return Err(Error::NoSuchKey);
             }
@@ -167,7 +167,7 @@ impl ClientMsgTracking {
             .collect()
     }
 
-    pub(crate) fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
+    fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
         self.clients
             .values()
             .filter_map(|client| {
