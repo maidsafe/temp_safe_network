@@ -169,7 +169,7 @@ impl TransferActor {
         &mut self,
         _message_id: MessageId,
         pub_id: &PublicId,
-        message: &MsgEnvelope,
+        message: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
         trace!("Awaiting transfer validation");
         let mut cm = self.connection_manager();

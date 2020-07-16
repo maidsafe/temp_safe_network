@@ -1414,7 +1414,7 @@ pub trait AuthActions: Client + Clone + 'static {
         self.transfer_actor()
         .await
         .ok_or(CoreError::from("No TransferActor found for client."))?
-        .del_auth_key(key, version)
+        .delete_auth_key(key, version)
         .await
 
     }

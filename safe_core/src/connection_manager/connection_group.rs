@@ -130,35 +130,11 @@ impl ConnectionGroup {
     ) -> Result<DebitAgreementProof, CoreError> {
         trace!("Sending transfer req for validation");
 
-        let mut receiver_future = {
-            self.inner
-                .lock()
-                .await
-                .send_for_validation(*msg_id, msg)
-                .await?
-        };
-
-        let mut response = Err(CoreError::from("No debit agreement proof received"));
-
-        while let Some((res, message_id)) = receiver_future.next().await {
-            // Let the actor handle receipt of each response from elders
-
-            match transfer_actor
-                .handle_validation_event(event)
-                .await
-            {
-                Ok(proof) => {
-                    if let Some(debit_agreement_proof) = proof {
-                        receiver_future.close();
-                        response = Ok(debit_agreement_proof);
-                        self.response_manager.remove_event_listener(&message_id)?;
-                    };
-                }
-                Err(error) => response = Err(error),
-            }
-        }
-
-        response
+        self.inner
+            .lock()
+            .await
+            .send_for_validation(*msg_id, msg)
+            .await
     }
 
     /// Terminate the QUIC connections gracefully.
@@ -377,10 +353,10 @@ impl Connected {
         &mut self,
         quic_p2p: &mut QuicP2p,
         msg: &Message,
-    ) -> Result<Option<mpsc::UnboundedReceiver<QueryResponse>, CoreError>> {
+    ) -> Result<mpsc::UnboundedReceiver<QueryResponse>, CoreError> {
         trace!("Sending message {:?}", msg.id());
 
-        let envelope = self.get_envelope_for_message(&msg);
+        let envelope = self.get_envelope_for_message(msg.clone());
         
         let expected_responses = self.elders.len() / 2 + 1;
         let (sender_future, response_future) = mpsc::unbounded();
@@ -428,14 +404,12 @@ impl Connected {
         quic_p2p: &mut QuicP2p,
         msg_id: MessageId,
         msg: &Message,
-    ) -> Result<mpsc::UnboundedReceiver<EventMsg>, CoreError> {
+    ) -> Result<DebitAgreementProof, CoreError> {
         trace!("Sending message {:?}", msg_id);
 
+        // set up channel
         let (sender_future, response_future) = mpsc::unbounded();
-        let expected_responses = 7;
-        let is_this_validation_request = true;
 
-        // is validator to be added to response manager
         let _ = self.response_manager.add_event_listener(
             msg_id,
             sender_future
@@ -450,7 +424,28 @@ impl Connected {
             }
         }
 
-        Ok(response_future)
+        // await response
+        let mut response = Err(CoreError::from("No debit agreement proof received"));
+
+        while let Some((res, message_id)) = receiver_future.next().await {
+            // Let the actor handle receipt of each response from elders
+            match transfer_actor
+                .handle_validation_event(event)
+                .await
+            {
+                Ok(proof) => {
+                    if let Some(debit_agreement_proof) = proof {
+                        receiver_future.close();
+                        response = Ok(debit_agreement_proof);
+                    };
+                }
+                Err(error) => response = Err(error),
+            }
+        }
+
+        self.response_manager.remove_event_listener(&message_id)?;
+
+        response
     }
 
     fn handle_new_message(
@@ -528,18 +523,6 @@ impl Connected {
     }
 }
 
-// Returns true when a message is a request to read.
-// fn is_read(msg: &Message) -> bool {
-//     if let Message::Request { request, .. } = msg {
-//         match request.get_type() {
-//             RequestType::PublicRead | RequestType::PrivateRead => true,
-//             _ => false,
-//         }
-//     } else {
-//         false
-//     }
-// }
-
 /// Represents the connection state of a certain connection group.
 enum State {
     Bootstrapping(Bootstrapping),
@@ -594,7 +577,7 @@ impl State {
         msg: &Message,
     ) -> Result<channel::mpsc::UnboundedReceiver<QueryResponse>, CoreError> {
         match self {
-            State::Connected(state) => state.send_query(quic_p2p, msg.id(), msg).await,
+            State::Connected(state) => state.send_query(quic_p2p, msg).await,
             // This message is not expected for the rest of states
             _state => Err(CoreError::OperationForbidden),
         }
@@ -618,7 +601,7 @@ impl State {
         quic_p2p: &mut QuicP2p,
         msg_id: MessageId,
         msg: &Message,
-    ) -> Result<channel::mpsc::UnboundedReceiver<EventMsg>, CoreError> {
+    ) -> Result<DebitAgreementProof, CoreError> {
         match self {
             State::Connected(state) => state.send_for_validation(quic_p2p, msg_id, msg).await,
             // This message is not expected for the rest of states
@@ -703,7 +686,7 @@ impl Inner {
         &mut self,
         msg_id: MessageId,
         msg: &Message,
-    ) -> Result<channel::mpsc::UnboundedReceiver<EventMsg>, CoreError> {
+    ) -> Result<DebitAgreementProof, CoreError> {
         self.state
             .send_for_validation(&mut self.quic_p2p, msg_id, msg)
             .await
