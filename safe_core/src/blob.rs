@@ -18,7 +18,7 @@ use bincode::{deserialize, serialize};
 
 use log::trace;
 
-use safe_nd::{IData, IDataAddress, PubImmutableData, UnpubImmutableData};
+use safe_nd::{Blob, BlobAddress, PublicBlob, PrivateBlob};
 use self_encryption::{DataMap, SelfEncryptor, Storage};
 use serde::{Deserialize, Serialize};
 
@@ -35,8 +35,8 @@ pub async fn create(
     value: &[u8],
     published: bool,
     encryption_key: Option<shared_secretbox::Key>,
-) -> Result<IData, CoreError> {
-    trace!("Creating conformant ImmutableData.");
+) -> Result<Blob, CoreError> {
+    trace!("Creating conformant Blob.");
     let se_storage = SelfEncryptionStorage::new(client.clone(), published);
     write_with_self_encryptor(se_storage, client, value, published, encryption_key).await
 }
@@ -49,16 +49,16 @@ pub async fn gen_data_map(
     value: &[u8],
     published: bool,
     encryption_key: Option<shared_secretbox::Key>,
-) -> Result<IData, CoreError> {
-    trace!("Creating conformant ImmutableData data map.");
+) -> Result<Blob, CoreError> {
+    trace!("Creating conformant Blob data map.");
     let se_storage = SelfEncryptionStorageDryRun::new(client.clone(), published);
     write_with_self_encryptor(se_storage, client, value, published, encryption_key).await
 }
 
-/// Get the raw bytes from `ImmutableData` created via the `create` function in this module.
+/// Get the raw bytes from `Blob` created via the `create` function in this module.
 pub async fn extract_value(
     client: &(impl Client + 'static),
-    data: IData,
+    data: Blob,
     position: Option<u64>,
     len: Option<u64>,
     decryption_key: Option<shared_secretbox::Key>,
@@ -93,17 +93,17 @@ pub async fn extract_value(
 }
 
 /// Get immutable data from the network and extract its value, decrypting it in the process (if keys
-/// provided). This combines `get_idata` in `Client` and `extract_value` in this module into one
+/// provided). This combines `get_blob` in `Client` and `extract_value` in this module into one
 /// function.
 pub async fn get_value(
     client: &(impl Client + 'static),
-    address: IDataAddress,
+    address: BlobAddress,
     position: Option<u64>,
     len: Option<u64>,
     decryption_key: Option<shared_secretbox::Key>,
 ) -> Result<Vec<u8>, CoreError> {
     let client2 = client.clone();
-    let data = client.get_idata(address).await?;
+    let data = client.get_blob(address).await?;
     extract_value(&client2, data, position, len, decryption_key).await
 }
 
@@ -113,7 +113,7 @@ async fn write_with_self_encryptor<S>(
     value: &[u8],
     published: bool,
     encryption_key: Option<shared_secretbox::Key>,
-) -> Result<IData, CoreError>
+) -> Result<Blob, CoreError>
 where
     S: Storage<Error = SEStorageError> + Clone + Send + Sync + 'static,
 {
@@ -139,15 +139,15 @@ async fn pack<S>(
     client: &(impl Client + 'static),
     mut value: Vec<u8>,
     published: bool,
-) -> Result<IData, CoreError>
+) -> Result<Blob, CoreError>
 where
     S: Storage<Error = SEStorageError> + Clone + 'static + Sync + Send,
 {
     loop {
-        let data: IData = if published {
-            PubImmutableData::new(value).into()
+        let data: Blob = if published {
+            PublicBlob::new(value).into()
         } else {
-            UnpubImmutableData::new(value, client.public_key().await).into()
+            PrivateBlob::new(value, client.public_key().await).into()
         };
 
         let serialised_data = serialize(&data)?;
@@ -167,7 +167,7 @@ where
     }
 }
 
-async fn unpack<S>(se_storage: S, mut data: IData) -> Result<Vec<u8>, CoreError>
+async fn unpack<S>(se_storage: S, mut data: Blob) -> Result<Vec<u8>, CoreError>
 where
     S: Storage<Error = SEStorageError> + Clone + 'static + Send + Sync,
 {
@@ -193,7 +193,7 @@ mod tests {
     use safe_nd::Error as SndError;
     use utils::{self, test_utils::random_client};
 
-    // Test creating and retrieving a 1kb idata.
+    // Test creating and retrieving a 1kb blob.
     #[tokio::test]
     async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<(), CoreError> {
         let size = 1024;
@@ -244,7 +244,7 @@ mod tests {
 
         let data = create(&client, &value, true, None).await?;
         let address = *data.address();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
         let res = get_value(&client3, address, None, None, Some(key)).await;
         assert!(res.is_err());
@@ -266,7 +266,7 @@ mod tests {
 
         let data = create(&client, &value, true, Some(key)).await?;
         let address = *data.address();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
         let res = get_value(&client3, address, None, None, None).await;
         assert!(res.is_err());
@@ -286,9 +286,9 @@ mod tests {
 
         let data = create(&client, &value, true, None).await?;
         let data_name = *data.name();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
-        let address = IDataAddress::Unpub(data_name);
+        let address = BlobAddress::Unpub(data_name);
         let res = get_value(&client3, address, None, None, None).await;
         assert!(res.is_err());
 
@@ -308,9 +308,9 @@ mod tests {
 
         let data = create(&client, &value, false, None).await?;
         let data_name = *data.name();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
-        let address = IDataAddress::Pub(data_name);
+        let address = BlobAddress::Pub(data_name);
         let res = get_value(&client3, address, None, None, None).await;
         assert!(res.is_err());
 
@@ -321,7 +321,7 @@ mod tests {
     // 10mb (ie. more than 1 chunk)
     // ----------------------------------------------------------------
 
-    // Test creating and retrieving a 1kb idata.
+    // Test creating and retrieving a 1kb blob.
     #[tokio::test]
     async fn create_and_retrieve_10mb_pub_unencrypted() -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
@@ -372,7 +372,7 @@ mod tests {
 
         let data = create(&client, &value, true, None).await?;
         let address = *data.address();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
         let res = get_value(&client3, address, None, None, Some(key)).await;
         assert!(res.is_err());
@@ -394,7 +394,7 @@ mod tests {
 
         let data = create(&client, &value, true, Some(key)).await?;
         let address = *data.address();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
         let res = get_value(&client3, address, None, None, None).await;
         assert!(res.is_err());
@@ -414,9 +414,9 @@ mod tests {
 
         let data = create(&client, &value, true, None).await?;
         let data_name = *data.name();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
-        let address = IDataAddress::Unpub(data_name);
+        let address = BlobAddress::Unpub(data_name);
         let res = get_value(&client3, address, None, None, None).await;
         assert!(res.is_err());
 
@@ -436,9 +436,9 @@ mod tests {
 
         let data = create(&client, &value, false, None).await?;
         let data_name = *data.name();
-        client2.put_idata(data).await?;
+        client2.put_blob(data).await?;
 
-        let address = IDataAddress::Pub(data_name);
+        let address = BlobAddress::Pub(data_name);
         let res = get_value(&client3, address, None, None, None).await;
         assert!(res.is_err());
 
@@ -459,7 +459,7 @@ mod tests {
 
             let data = create(&client, &value, true, None).await?;
             let address = *data.address();
-            client2.put_idata(data).await?;
+            client2.put_blob(data).await?;
 
             let fetched_value =
                 get_value(&client3, address, None, Some(size as u64 / 2), None).await?;
@@ -476,7 +476,7 @@ mod tests {
 
             let data = create(&client, &value2, true, None).await?;
             let address = *data.address();
-            client2.put_idata(data).await?;
+            client2.put_blob(data).await?;
 
             let fetched_value = get_value(
                 &client3,
@@ -523,10 +523,10 @@ mod tests {
                 create(&client3, &value_before2.clone(), published, key3).await?
             }
             Ok(_) => panic!(
-                "ImmutableData unexpectedly retrieved using address generated by gen_data_map"
+                "Blob unexpectedly retrieved using address generated by gen_data_map"
             ),
             Err(_) => panic!(
-                "Unexpected error when ImmutableData retrieved using address generated by gen_data_map"
+                "Unexpected error when Blob retrieved using address generated by gen_data_map"
             ),
         };
 
@@ -540,7 +540,7 @@ mod tests {
             // which changes the address of the chunks
             assert_ne!(address_after, address_before);
         }
-        client4.put_idata(data_map_before).await?;
+        client4.put_blob(data_map_before).await?;
 
         let address = address_after;
 

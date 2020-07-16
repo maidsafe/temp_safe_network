@@ -70,8 +70,8 @@ pub mod core_structs;
 pub mod crypto;
 /// FFI.
 pub mod ffi;
-/// Utilities for handling `ImmutableData`.
-pub mod immutable_data;
+/// Utilities for handling `Blob`.
+pub mod blob;
 /// Inter-Process Communication utilities.
 pub mod ipc;
 /// NFS utilities.

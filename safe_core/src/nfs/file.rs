@@ -10,7 +10,7 @@ use crate::ffi::nfs::File as FfiFile;
 use crate::nfs::errors::NfsError;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use ffi_utils::{vec_clone_from_raw_parts, vec_into_raw_parts, ReprC};
-use safe_nd::{IDataAddress, IDataKind, XorName};
+use safe_nd::{BlobAddress, BlobKind, XorName};
 use serde::{Deserialize, Serialize};
 
 /// Representation of a File to be put into the network. Could be any kind of
@@ -88,9 +88,9 @@ impl File {
     }
 
     /// Get the Immutable Data address of the file
-    pub fn data_address(&self) -> IDataAddress {
-        let kind = IDataKind::from_flag(self.published());
-        IDataAddress::from_kind(kind, *self.data_map_name())
+    pub fn data_address(&self) -> BlobAddress {
+        let kind = BlobKind::from_flag(self.published());
+        BlobAddress::from_kind(kind, *self.data_map_name())
     }
 
     /// Set the data-map name of the File

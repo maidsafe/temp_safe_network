@@ -127,7 +127,7 @@ async fn file_fetch_public_md() -> Result<(), NfsError> {
 // Other clients should not be able to fetch the file.
 // After deletion the file should not be accessible anymore.
 #[tokio::test]
-async fn files_stored_in_unpublished_idata() -> Result<(), NfsError> {
+async fn files_stored_in_unpublished_blob() -> Result<(), NfsError> {
     let (mut client1_tx, mut client1_rx) = mpsc::channel(1);
     let (mut client2_tx, mut client2_rx) = mpsc::channel(1);
     let (mut finish_tx, mut finish_rx) = mpsc::channel(1);

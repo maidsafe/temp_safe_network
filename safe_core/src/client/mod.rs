@@ -51,7 +51,7 @@ use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
     MsgEnvelope, DataQuery,
      AccountWrite, AppPermissions, BlobRead, BlobWrite, ClientFullId, MsgSender, Cmd, Query,QueryResponse, AuthCmd,
- DebitAgreementProof, IData, IDataAddress, Map, MapAddress, MapEntries, AccountRead, AuthQuery,
+ DebitAgreementProof, Blob, BlobAddress, Map, MapAddress, MapEntries, AccountRead, AuthQuery,
     MapEntryActions, MapPermissionSet, MapSeqEntries, MapSeqEntryActions, MapSeqValue,
     MapUnseqEntryActions, MapValue, MapValues, MapRead, MapWrite, Message, MessageId, Money,
     PublicId, PublicKey, SData, SDataAction, SDataAddress,
@@ -336,32 +336,32 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Put immutable data to the network.
-    async fn put_idata<D: Into<IData> + Send>(&self, data: D) -> Result<(), CoreError>
+    async fn put_blob<D: Into<Blob> + Send>(&self, data: D) -> Result<(), CoreError>
     where
         Self: Sized + Send,
     {
-        let idata: IData = data.into();
-        trace!("Put IData at {:?}", idata.name());
+        let blob: Blob = data.into();
+        trace!("Put Blob at {:?}", blob.name());
 
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.new_blob(idata).await
+        actor.new_blob(blob).await
     }
 
     /// Get immutable data from the network. If the data exists locally in the cache then it will be
     /// immediately returned without making an actual network request.
-    async fn get_idata(&self, address: IDataAddress) -> Result<IData, CoreError>
+    async fn get_blob(&self, address: BlobAddress) -> Result<Blob, CoreError>
     where
         Self: Sized,
     {
         trace!("Fetch Immutable Data");
 
         let inner = self.inner();
-        if let Some(data) = inner.lock().await.idata_cache.get_mut(&address) {
-            trace!("ImmutableData found in cache.");
+        if let Some(data) = inner.lock().await.blob_cache.get_mut(&address) {
+            trace!("Blob found in cache.");
             return Ok(data.clone());
         }
 
@@ -381,14 +381,14 @@ pub trait Client: Clone + Send + Sync {
             let _ = inner
                 .lock()
                 .await
-                .idata_cache
+                .blob_cache
                 .put(*data.address(), data.clone());
         };
         Ok(data)
     }
 
     /// Delete unpublished immutable data from the network.
-    async fn del_unpub_idata(&self, name: XorName) -> Result<(), CoreError>
+    async fn del_unpub_blob(&self, name: XorName) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -396,24 +396,24 @@ pub trait Client: Clone + Send + Sync {
         if inner
             .lock()
             .await
-            .idata_cache
-            .pop(&IDataAddress::Unpub(name))
+            .blob_cache
+            .pop(&BlobAddress::Unpub(name))
             .is_some()
         {
-            trace!("Deleted UnpubImmutableData from cache.");
+            trace!("Deleted PrivateBlob from cache.");
         }
 
         let inner = self.inner().clone();
 
         let _ = Arc::downgrade(&inner);
-        trace!("Delete Unpublished IData at {:?}", name);
+        trace!("Delete Unpublished Blob at {:?}", name);
 
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.delete_blob(IDataAddress::Unpub(name)).await
+        actor.delete_blob(BlobAddress::Unpub(name)).await
     }
 
     /// Put sequenced mutable data to the network
@@ -1442,7 +1442,7 @@ pub trait AuthActions: Client + Clone + 'static {
 #[allow(unused)] // FIXME
 pub struct Inner {
     connection_manager: ConnectionManager,
-    idata_cache: LruCache<IDataAddress, IData>,
+    blob_cache: LruCache<BlobAddress, Blob>,
     /// Sequence CRDT replica
     sdata_cache: LruCache<SDataAddress, SData>,
     timeout: Duration,
@@ -1458,7 +1458,7 @@ impl Inner {
     {
         Self {
             connection_manager,
-            idata_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+            blob_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             sdata_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
             timeout,
             net_tx,
@@ -1529,36 +1529,36 @@ mod tests {
         test_utils::{calculate_new_balance, gen_bls_keypair, random_client},
     };
     use safe_nd::{
-        Error as SndError, MapAction, MapKind, Money, PubImmutableData,
-        SDataPrivUserPermissions, UnpubImmutableData, XorName,
+        Error as SndError, MapAction, MapKind, Money, PublicBlob,
+        SDataPrivUserPermissions, PrivateBlob, XorName,
     };
     use std::str::FromStr;
 
-    // Test putting and getting pub idata.
+    // Test putting and getting pub blob.
     #[tokio::test]
-    async fn pub_idata_test() -> Result<(), CoreError> {
+    async fn pub_blob_test() -> Result<(), CoreError> {
         let client = random_client()?;
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
 
         let value = unwrap!(generate_random_vector::<u8>(10));
-        let data = PubImmutableData::new(value.clone());
+        let data = PublicBlob::new(value.clone());
         let address = *data.address();
         let pk = gen_bls_keypair().public_key();
 
-        let test_data = UnpubImmutableData::new(value, pk);
+        let test_data = PrivateBlob::new(value, pk);
         let res = client
-            // Get inexistent idata
-            .get_idata(address)
+            // Get inexistent blob
+            .get_blob(address)
             .await;
         match res {
-            Ok(data) => panic!("Pub idata should not exist yet: {:?}", data),
+            Ok(data) => panic!("Pub blob should not exist yet: {:?}", data),
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
             Err(e) => panic!("Unexpected: {:?}", e),
         }
-        // Put idata
-        client.put_idata(data.clone()).await?;
-        let res = client.put_idata(test_data.clone()).await;
+        // Put blob
+        client.put_blob(data.clone()).await?;
+        let res = client.put_blob(test_data.clone()).await;
         match res {
             Ok(_) => panic!("Unexpected Success: Validating owners should fail"),
             Err(CoreError::DataError(SndError::InvalidOwners)) => (),
@@ -1568,15 +1568,15 @@ mod tests {
         let balance = client.get_balance(None).await?;
         let expected_bal = calculate_new_balance(start_bal, Some(2), None);
         assert_eq!(balance, expected_bal);
-        // Fetch idata
-        let fetched_data = client.get_idata(address).await?;
+        // Fetch blob
+        let fetched_data = client.get_blob(address).await?;
         assert_eq!(*fetched_data.address(), address);
         Ok(())
     }
 
-    // Test putting, getting, and deleting unpub idata.
+    // Test putting, getting, and deleting unpub blob.
     #[tokio::test]
-    async fn unpub_idata_test() -> Result<(), CoreError> {
+    async fn unpub_blob_test() -> Result<(), CoreError> {
         crate::utils::test_utils::init_log();
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
@@ -1585,29 +1585,29 @@ mod tests {
         let client9 = client.clone();
 
         let value = unwrap!(generate_random_vector::<u8>(10));
-        let data = UnpubImmutableData::new(value.clone(), client.public_key().await);
+        let data = PrivateBlob::new(value.clone(), client.public_key().await);
         let data2 = data.clone();
         let data3 = data.clone();
         let address = *data.address();
         assert_eq!(address, *data2.address());
 
-        let pub_data = PubImmutableData::new(value);
+        let pub_data = PublicBlob::new(value);
 
         let res = client
-            // Get inexistent idata
-            .get_idata(address)
+            // Get inexistent blob
+            .get_blob(address)
             .await;
         match res {
-            Ok(_) => panic!("Unpub idata should not exist yet"),
+            Ok(_) => panic!("Unpub blob should not exist yet"),
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
             Err(e) => panic!("Unexpected: {:?}", e),
         }
 
-        // Put idata
-        client.put_idata(data.clone()).await?;
-        // Test putting unpub idata with the same value.
+        // Put blob
+        client.put_blob(data.clone()).await?;
+        // Test putting unpub blob with the same value.
         // Should conflict because duplication does .await?;not apply to unpublished data.
-        let res = client.put_idata(data2.clone()).await;
+        let res = client.put_blob(data2.clone()).await;
         match res {
             Err(CoreError::DataError(SndError::DataExists)) => (),
             res => panic!("Unexpected: {:?}", res),
@@ -1617,24 +1617,24 @@ mod tests {
         let expected_bal = calculate_new_balance(start_bal, Some(3), None);
         assert_eq!(balance, expected_bal);
 
-        // Test putting published idata with the same value. Should not conflict.
-        client.put_idata(pub_data).await?;
-        // Fetch idata
-        let fetched_data = client.get_idata(address).await?;
+        // Test putting published blob with the same value. Should not conflict.
+        client.put_blob(pub_data).await?;
+        // Fetch blob
+        let fetched_data = client.get_blob(address).await?;
 
         assert_eq!(*fetched_data.address(), address);
 
-        // Delete idata
-        client.del_unpub_idata(*address.name()).await?;
-        // Make sure idata was deleted
-        let res = client.get_idata(address).await;
+        // Delete blob
+        client.del_unpub_blob(*address.name()).await?;
+        // Make sure blob was deleted
+        let res = client.get_blob(address).await;
         match res {
-            Ok(_) => panic!("Unpub idata still exists after deletion"),
+            Ok(_) => panic!("Unpub blob still exists after deletion"),
             Err(error) => assert!(error.to_string().contains("Chunk not found")),
         }
 
-        // Test putting unpub idata with the same value again. Should not conflict.
-        client9.put_idata(data3.clone()).await?;
+        // Test putting unpub blob with the same value again. Should not conflict.
+        client9.put_blob(data3.clone()).await?;
         Ok(())
     }
 
@@ -1967,8 +1967,8 @@ mod tests {
             )
             .await
             .unwrap();
-        let data = PubImmutableData::new(unwrap!(generate_random_vector::<u8>(10)));
-        let res = client.put_idata(data).await;
+        let data = PublicBlob::new(unwrap!(generate_random_vector::<u8>(10)));
+        let res = client.put_blob(data).await;
         match res {
             Err(CoreError::DataError(SndError::InsufficientBalance)) => (),
             res => panic!(
@@ -2291,18 +2291,18 @@ mod tests {
     // }
 
     #[tokio::test]
-    pub async fn idata_deletions_should_cost_put_price() -> Result<(), CoreError> {
+    pub async fn blob_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let client = random_client()?;
 
-        let idata = UnpubImmutableData::new(
+        let blob = PrivateBlob::new(
             unwrap!(generate_random_vector::<u8>(10)),
             client.public_key().await,
         );
-        let idata_address = *idata.name();
-        client.put_idata(idata).await?;
+        let blob_address = *blob.name();
+        client.put_blob(blob).await?;
 
         let balance_before_delete = client.get_balance(None).await?;
-        client.del_unpub_idata(idata_address).await?;
+        client.del_unpub_blob(blob_address).await?;
         let new_balance = client.get_balance(None).await?;
 
         // make sure we have _some_ balance
@@ -2728,12 +2728,12 @@ fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {
 //     let tag = 10;
 //     let client = random_client()?;
 
-//     let idata = UnpubImmutableData::new(
+//     let blob = PrivateBlob::new(
 //         unwrap!(generate_random_vector::<u8>(10)),
 //         client.public_key().await,
 //     );
-//     let address = *idata.name();
-//     client.put_idata(idata).await?;
+//     let address = *blob.name();
+//     client.put_blob(blob).await?;
 //     let mut adata = UnpubSeqAppendOnlyData::new(name, tag);
 //     let owner = ADataOwner {
 //         public_key: client.public_key().await,

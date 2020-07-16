@@ -9,7 +9,7 @@
 use super::{Client, CoreError};
 use async_trait::async_trait;
 use log::trace;
-use safe_nd::{IData, IDataAddress, PubImmutableData, UnpubImmutableData, XorName, XOR_NAME_LEN};
+use safe_nd::{Blob, BlobAddress, PublicBlob, PrivateBlob, XorName, XOR_NAME_LEN};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -49,37 +49,37 @@ impl<C: Send + Sync + Client + 'static> Storage for SelfEncryptionStorage<C> {
         };
 
         let address = if self.published {
-            IDataAddress::Pub(name)
+            BlobAddress::Pub(name)
         } else {
-            IDataAddress::Unpub(name)
+            BlobAddress::Unpub(name)
         };
 
-        match self.client.get_idata(address).await {
+        match self.client.get_blob(address).await {
             Ok(data) => Ok(data.value().clone()),
             Err(error) => Err(SEStorageError::from(error)),
         }
     }
 
     async fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), Self::Error> {
-        trace!("Self encrypt invoked PutIData.");
-        let immutable_data: IData = if self.published {
-            PubImmutableData::new(data).into()
+        trace!("Self encrypt invoked PutBlob.");
+        let blob: Blob = if self.published {
+            PublicBlob::new(data).into()
         } else {
-            UnpubImmutableData::new(data, self.client.public_key().await).into()
+            PrivateBlob::new(data, self.client.public_key().await).into()
         };
-        match self.client.put_idata(immutable_data).await {
+        match self.client.put_blob(blob).await {
             Ok(_r) => Ok(()),
             Err(error) => Err(SEStorageError::from(error)),
         }
     }
 
     async fn generate_address(&self, data: &[u8]) -> Vec<u8> {
-        let immutable_data: IData = if self.published {
-            PubImmutableData::new(data.to_vec()).into()
+        let blob: Blob = if self.published {
+            PublicBlob::new(data.to_vec()).into()
         } else {
-            UnpubImmutableData::new(data.to_vec(), self.client.public_key().await).into()
+            PrivateBlob::new(data.to_vec(), self.client.public_key().await).into()
         };
-        immutable_data.name().0.to_vec()
+        blob.name().0.to_vec()
     }
 }
 
@@ -134,18 +134,18 @@ impl<C: Send + Sync + Client + 'static> Storage for SelfEncryptionStorageDryRun<
     }
 
     async fn put(&mut self, _: Vec<u8>, _data: Vec<u8>) -> Result<(), Self::Error> {
-        trace!("Self encrypt invoked PutIData dry run.");
+        trace!("Self encrypt invoked PutBlob dry run.");
         // We do nothing here just return ok so self-encrpytion can finish
         // and generate chunk addresses and datamap if required
         Ok(())
     }
 
     async fn generate_address(&self, data: &[u8]) -> Vec<u8> {
-        let immutable_data: IData = if self.published {
-            PubImmutableData::new(data.to_vec()).into()
+        let blob: Blob = if self.published {
+            PublicBlob::new(data.to_vec()).into()
         } else {
-            UnpubImmutableData::new(data.to_vec(), self.client.public_key().await).into()
+            PrivateBlob::new(data.to_vec(), self.client.public_key().await).into()
         };
-        immutable_data.name().0.to_vec()
+        blob.name().0.to_vec()
     }
 }

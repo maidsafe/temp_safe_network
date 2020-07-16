@@ -25,7 +25,7 @@ pub struct File {
     pub user_metadata: *const u8,
     /// Size of the user metadata.
     pub user_metadata_len: usize,
-    /// Name of the `ImmutableData` containing the content of this file.
+    /// Name of the `Blob` containing the content of this file.
     pub data_map_name: XorNameArray,
     /// Published status of the file
     pub published: bool,

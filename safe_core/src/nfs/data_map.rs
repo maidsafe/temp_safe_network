@@ -10,20 +10,20 @@
 
 use crate::client::Client;
 use crate::crypto::shared_secretbox;
-use crate::immutable_data;
+use crate::blob;
 use crate::nfs::NfsError;
 use bincode::{deserialize, serialize};
-use safe_nd::{IDataAddress, XorName};
+use safe_nd::{BlobAddress, XorName};
 use self_encryption::DataMap;
 
 // Get `DataMap` from the network.
 // If the `DataMap` is encrypted, an `encryption_key` must be passed in to decrypt it.
 pub async fn get(
     client: &(impl Client + 'static),
-    address: IDataAddress,
+    address: BlobAddress,
     encryption_key: Option<shared_secretbox::Key>,
 ) -> Result<DataMap, NfsError> {
-    let content = immutable_data::get_value(client, address, None, None, encryption_key).await?;
+    let content = blob::get_value(client, address, None, None, encryption_key).await?;
 
     deserialize(&content).map_err(From::from)
 }
@@ -41,10 +41,10 @@ pub async fn put(
 
     let encoded = serialize(&data_map)?;
 
-    let data = immutable_data::create(&client, &encoded, published, encryption_key).await?;
+    let data = blob::create(&client, &encoded, published, encryption_key).await?;
 
     let name = *data.name();
-    client2.put_idata(data).await?;
+    client2.put_blob(data).await?;
 
     Ok(name)
 }

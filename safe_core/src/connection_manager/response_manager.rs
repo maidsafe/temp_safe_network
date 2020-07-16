@@ -177,12 +177,12 @@ mod tests {
         let message_id = safe_nd::MessageId::new();
 
         let (sender_future, mut response_future) = mpsc::unbounded();
-        let expected_responses = 1; // for IData
+        let expected_responses = 1; // for Blob
 
         // our pseudo data
-        let immutable_data = safe_nd::PubImmutableData::new(vec![6]);
+        let blob = safe_nd::PublicBlob::new(vec![6]);
 
-        let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::IData::from(immutable_data)));
+        let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::Blob::from(blob)));
 
         response_manager
             .await_query_responses(message_id, (sender_future, expected_responses))
@@ -211,17 +211,17 @@ mod tests {
         let message_id = safe_nd::MessageId::new();
 
         let (sender_future, mut response_future) = mpsc::unbounded();
-        let expected_responses = 1; // for IData
+        let expected_responses = 1; // for Blob
 
         // our expected data
-        let immutable_data = safe_nd::PubImmutableData::new(vec![6]);
+        let blob = safe_nd::PublicBlob::new(vec![6]);
 
         // our nonsense response we receive
-        let immutable_data_bad = safe_nd::PubImmutableData::new(vec![7]);
+        let blob_bad = safe_nd::PublicBlob::new(vec![7]);
 
-        let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::IData::from(immutable_data)));
+        let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::Blob::from(blob)));
         let bad_response =
-            safe_nd::QueryResponse::GetBlob(Ok(safe_nd::IData::from(immutable_data_bad)));
+            safe_nd::QueryResponse::GetBlob(Ok(safe_nd::Blob::from(blob_bad)));
 
         response_manager
             .await_query_responses(message_id, (sender_future, expected_responses))

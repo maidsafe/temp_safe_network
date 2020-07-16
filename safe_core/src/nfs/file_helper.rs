@@ -128,7 +128,7 @@ where
     // version_fut
     if !published {
         let (_, file) = fetch(client, parent2, name2).await?;
-        client2.del_unpub_idata(*file.data_map_name()).await?;
+        client2.del_unpub_blob(*file.data_map_name()).await?;
     }
     client3
         .mutate_seq_map_entries(

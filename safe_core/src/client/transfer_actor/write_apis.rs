@@ -1,7 +1,7 @@
 use safe_nd::{
     AuthCmd,
     Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, AppPermissions,
-    IData, IDataAddress, Map, MapAddress, MapEntryActions, MapPermissionSet, MapRead,
+    Blob, BlobAddress, Map, MapAddress, MapEntryActions, MapPermissionSet, MapRead,
     MapWrite, PublicKey, QueryResponse, SData, SDataAddress, SDataOwner,
     SDataPrivPermissions, SDataPubPermissions, SDataWriteOp, SequenceRead, SequenceWrite, Write, DataCmd, Cmd
 };
@@ -14,7 +14,7 @@ use log::info;
 /// Handle Write API msg_contents for a given TransferActor.
 impl TransferActor {
     /// Delete mutable data user permission
-    pub async fn delete_blob(&mut self, address: IDataAddress) -> Result<(), CoreError> {
+    pub async fn delete_blob(&mut self, address: BlobAddress) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -296,7 +296,7 @@ impl TransferActor {
 
     /// Store a new immutabledata object
     /// Wraps msg_contents for payment validation and mutation
-    pub async fn new_blob(&mut self, data: IData) -> Result<(), CoreError> {
+    pub async fn new_blob(&mut self, data: Blob) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
