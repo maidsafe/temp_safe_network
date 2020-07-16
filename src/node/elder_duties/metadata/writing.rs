@@ -10,7 +10,7 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::cmd::OutboundMsg;
+use crate::cmd::MessagingDuty;
 use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite};
 
 pub(super) struct Writing {
@@ -23,7 +23,7 @@ impl Writing {
         Self { cmd, msg }
     }
 
-    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<OutboundMsg> {
+    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<MessagingDuty> {
         use DataCmd::*;
         match self.cmd.clone() {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
@@ -33,11 +33,11 @@ impl Writing {
         }
     }
 
-    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<OutboundMsg> {
+    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<MessagingDuty> {
         register.write(write, &self.msg)
     }
 
-    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<OutboundMsg> {
+    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<MessagingDuty> {
         storage.write(write, self.msg.id(), &self.msg.origin)
     }
 
@@ -45,7 +45,7 @@ impl Writing {
         &mut self,
         write: SequenceWrite,
         storage: &mut SequenceStorage,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         storage.write(write, self.msg.id(), &self.msg.origin)
     }
 
@@ -53,7 +53,7 @@ impl Writing {
         &mut self,
         write: AccountWrite,
         storage: &mut AccountStorage,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         storage.write(write, self.msg.id(), &self.msg.origin)
     }
 }

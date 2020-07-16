@@ -9,7 +9,7 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::Init, Config, Result};
+use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::Init, Config, Result};
 use safe_nd::MsgEnvelope;
 use std::{
     cell::Cell,
@@ -33,7 +33,7 @@ impl AdultDuties {
         Ok(Self { keys, chunks })
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         self.chunks.receive_msg(msg)
     }
 }

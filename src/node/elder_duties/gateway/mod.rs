@@ -14,17 +14,17 @@ use self::{
     validation::Validation,
 };
 use crate::{
-    cmd::{GroupDecision, OutboundMsg},
-    messaging::{ClientMessaging, ClientMsg},
+    cmd::{GroupDecision, MessagingDuty},
+    messaging::{ClientMessaging, ClientMsg, Onboarding, InputParsing},
     node::keys::NodeKeys,
-    node::msg_decisions::ElderMsgDecisions,
+    node::msg_wrapping::ElderMsgWrapping,
     node::Init,
     Config, Result,
 };
 use bytes::Bytes;
 use log::trace;
 use rand::{CryptoRng, Rng};
-use safe_nd::{Cmd, ElderDuty, Message, MsgEnvelope, PublicId, Query};
+use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -34,7 +34,9 @@ pub(crate) struct Gateway {
     keys: NodeKeys,
     auth: Auth,
     data: Validation,
-    messaging: ClientMessaging,
+    section: SectionQuerying,
+    onboarding: Onboarding,
+    input_parsing: InputParsing,
 }
 
 impl Gateway {
@@ -42,13 +44,16 @@ impl Gateway {
         keys: NodeKeys,
         config: &Config,
         init_mode: Init,
-        messaging: ClientMessaging,
+        onboarding: Onboarding,
+        input_parsing: InputParsing,
+        section: SectionQuerying,
+        client_msg_tracking: ClientMsgTracking,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
 
-        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Gateway);
+        let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Gateway);
         let auth = Auth::new(keys.clone(), auth_keys_db, decisions.clone());
         let data = Validation::new(decisions);
 
@@ -56,60 +61,98 @@ impl Gateway {
             keys,
             auth,
             data,
-            messaging,
+            section,
+            onboarding,
+            input_parsing,
+            client_msg_tracking,
         };
 
         Ok(gateway)
     }
 
-    /// New connection
-    pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
-        self.messaging.handle_new_connection(peer_addr)
+    pub fn process(&mut self, cmd: &GatewayCmd) -> Option<MessagingDuty> {
+        use GatewayCmd::*;
+        match cmd {
+            ProcessMsg(msg) => self.process_msg(msg),
+            ProcessClientEvent(event) => self.process_client_event(event),
+            ProcessGroupDecision(decision) => self.process_group_decision(decision),
+        }
     }
 
-    /// Conection failure
-    pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
-        self.messaging.handle_connection_failure(peer_addr)
-    }
-
-    pub fn try_parse_client_msg<R: CryptoRng + Rng>(
-        &mut self,
-        peer_addr: SocketAddr,
-        bytes: &Bytes,
-        rng: &mut R,
-    ) -> Option<ClientMsg> {
-        self.messaging.try_parse_client_msg(peer_addr, bytes, rng)
-    }
-
-    pub fn push_to_client(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        // TODO: Handle this result
-        let _ = self.messaging.send_to_client(msg);
-        None
+    fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+        use AuthCmd::*;
+        if let Address::Client(xorname) = &msg.destination() {
+            if self.section.handles(&xorname) {
+                self.client_msg_tracking.match_outgoing(msg)
+            }
+            None
+        } else if let Message::Cmd {
+            cmd: Cmd::Auth(auth_cmd),
+            ..
+        } = &msg.message {
+             /// Temporary, while Authenticator is not implemented at app layer.
+            /// If a request within MessagingDuty::ForwardClientRequest issued by us in `handle_group_decision`
+            /// was made by Gateway and destined to our section, this is where the actual request will end up.
+            return self.auth.finalise(auth_cmd, msg.id(), &msg.origin),
+        } else {
+            // so, it wasn't really for Gateway after all
+            None
+        }
     }
 
     /// Basically.. when Gateway nodes have agreed,
     /// they'll forward the request into the network.
-    pub fn handle_group_decision(&mut self, cmd: GroupDecision) -> Option<OutboundMsg> {
+    fn process_group_decision(&mut self, decision: GroupDecision) -> Option<MessagingDuty> {
         use GroupDecision::*;
         trace!("{}: Group decided on {:?}", self, cmd);
-        match cmd {
-            Forward(msg) => Some(OutboundMsg::SendToSection(msg)),
+        match decision {
+            Forward(msg) => Some(MessagingDuty::SendToSection(msg)),
         }
     }
 
-    /// Temporary, while Authenticator is not implemented at app layer.
-    /// If a request within OutboundMsg::ForwardClientRequest issued by us in `handle_group_decision`
-    /// was made by Gateway and destined to our section, this is where the actual request will end up.
-    pub fn finalise_agreed_auth_cmd(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        self.auth.finalise(msg)
+    /// Will only act on this (i.e. return an action) if node is currently an Elder.
+    fn process_client_event(&mut self, event: ClientEvent) -> Option<MessagingDuty> {
+        use ClientEvent::*;
+        let mut rng = ChaChaRng::from_seed(self.rng.gen());
+        match event {
+            ConnectedTo { peer } => {
+                if !self.onboarding.contains(peer.peer_addr()) {
+                    info!("{}: Connected to new client on {}", self, peer_addr);
+                }
+            }
+            ConnectionFailure { peer, .. } => {
+                self.onboarding.remove_client(peer.peer_addr());
+            }
+            NewMessage { peer, msg } => {
+                let parsed = self.input_parsing.try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
+                return self.process_client_msg(parsed.client.public_id, &parsed.msg);
+            }
+            SentUserMessage { peer, .. } => {
+                trace!(
+                    "{}: Succesfully sent Message to: {}",
+                    self,
+                    peer.peer_addr()
+                );
+            }
+            UnsentUserMessage { peer, .. } => {
+                info!("{}: Not sent Message to: {}", self, peer.peer_addr());
+            }
+            BootstrapFailure | BootstrappedTo { .. } => {
+                error!("Unexpected bootstrapping client event")
+            }
+            Finish => {
+                info!("{}: Received Finish event", self);
+            }
+        }
+        None
     }
 
-    /// Receive client request
-    pub fn handle_client_msg(
+    /// Process a msg from a client.
+    fn process_client_msg(
         &mut self,
         client: PublicId,
         msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error);
         };
@@ -136,6 +179,13 @@ impl Gateway {
             _ => None, // error..!
         }
     }
+
+        // pub fn push_to_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    //     // TODO: Handle this result
+    //     let _ = self.messaging.send_to_client(msg);
+    //     None
+    // }
+
 }
 
 impl Display for Gateway {

@@ -7,40 +7,40 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    cmd::{GroupDecision, OutboundMsg},
+    cmd::{GroupDecision, MessagingDuty},
     node::keys::NodeKeys,
     utils,
 };
 use safe_nd::{
-    AdultDuty, CmdError, Duty, ElderDuty, Message, MessageId, MsgEnvelope, MsgSender,
+    AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
     NetworkCmdError, XorName,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;
 
 #[derive(Clone)]
-pub struct ElderMsgDecisions {
-    inner: MsgDecisions,
+pub struct ElderMsgWrapping {
+    inner: MsgWrapping,
 }
 
 #[derive(Clone)]
-pub struct AdultMsgDecisions {
-    inner: MsgDecisions,
+pub struct AdultMsgWrapping {
+    inner: MsgWrapping,
 }
 
 #[derive(Clone)]
-struct MsgDecisions {
+struct MsgWrapping {
     keys: NodeKeys,
     duty: Duty,
 }
 
-impl AdultMsgDecisions {
-    pub fn new(keys: NodeKeys, duty: AdultDuty) -> Self {
-        let inner = MsgDecisions::new(keys, Duty::Adult(duty));
+impl AdultMsgWrapping {
+    pub fn new(keys: NodeKeys, duty: AdultDuties) -> Self {
+        let inner = MsgWrapping::new(keys, Duty::Adult(duty));
         Self { inner }
     }
 
-    pub fn send(&self, message: Message) -> Option<OutboundMsg> {
+    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
         self.inner.send(message)
     }
 
@@ -48,7 +48,7 @@ impl AdultMsgDecisions {
     //     &self,
     //     targets: BTreeSet<XorName>,
     //     msg: &MsgEnvelope,
-    // ) -> Option<OutboundMsg> {
+    // ) -> Option<MessagingDuty> {
     //     self.inner.send_to_adults(targets, msg)
     // }
 
@@ -57,28 +57,28 @@ impl AdultMsgDecisions {
         error: CmdError,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         self.inner.error(error, msg_id, &origin)
     }
 }
 
-impl ElderMsgDecisions {
-    pub fn new(keys: NodeKeys, duty: ElderDuty) -> Self {
-        let inner = MsgDecisions::new(keys, Duty::Elder(duty));
+impl ElderMsgWrapping {
+    pub fn new(keys: NodeKeys, duty: ElderDuties) -> Self {
+        let inner = MsgWrapping::new(keys, Duty::Elder(duty));
         Self { inner }
     }
 
-    pub fn vote(&self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn vote(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let msg = self.inner.set_proxy(msg);
-        Some(OutboundMsg::VoteFor(GroupDecision::Forward(msg)))
+        Some(MessagingDuty::VoteFor(GroupDecision::Forward(msg)))
     }
 
-    pub fn forward(&self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn forward(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let msg = self.inner.set_proxy(&msg);
-        Some(OutboundMsg::SendToSection(msg))
+        Some(MessagingDuty::SendToSection(msg))
     }
 
-    pub fn send(&self, message: Message) -> Option<OutboundMsg> {
+    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
         self.inner.send(message)
     }
 
@@ -86,7 +86,7 @@ impl ElderMsgDecisions {
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         self.inner.send_to_adults(targets, msg)
     }
 
@@ -95,7 +95,7 @@ impl ElderMsgDecisions {
         error: CmdError,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         self.inner.error(error, msg_id, &origin)
     }
 
@@ -104,33 +104,33 @@ impl ElderMsgDecisions {
         error: NetworkCmdError,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         self.inner.network_error(error, msg_id, &origin)
     }
 }
 
-impl MsgDecisions {
+impl MsgWrapping {
     pub fn new(keys: NodeKeys, duty: Duty) -> Self {
         Self { keys, duty }
     }
 
-    pub fn send(&self, message: Message) -> Option<OutboundMsg> {
+    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
         let origin = self.sign(&message);
         let msg = MsgEnvelope {
             message,
             origin,
             proxies: Default::default(),
         };
-        Some(OutboundMsg::SendToSection(msg))
+        Some(MessagingDuty::SendToSection(msg))
     }
 
     pub fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let msg = self.set_proxy(&msg);
-        Some(OutboundMsg::SendToAdults { targets, msg })
+        Some(MessagingDuty::SendToAdults { targets, msg })
     }
 
     pub fn error(
@@ -138,7 +138,7 @@ impl MsgDecisions {
         error: CmdError,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         self.send(Message::CmdError {
             id: MessageId::new(),
             error,
@@ -152,7 +152,7 @@ impl MsgDecisions {
         error: NetworkCmdError,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         self.send(Message::NetworkCmdError {
             id: MessageId::new(),
             error,

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::OutboundMsg, utils};
+use crate::{cmd::MessagingDuty, utils};
 use log::error;
 use safe_nd::{BlobWrite, MsgEnvelope, MsgSender};
 use serde::Serialize;
@@ -22,7 +22,7 @@ impl Writing {
         Self { write, msg }
     }
 
-    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<OutboundMsg> {
+    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<MessagingDuty> {
         use BlobWrite::*;
         match &self.write {
             New(data) => {

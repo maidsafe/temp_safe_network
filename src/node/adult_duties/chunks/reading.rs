@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::OutboundMsg, utils};
+use crate::{cmd::MessagingDuty, utils};
 use log::error;
 use safe_nd::{Address, BlobRead, MsgEnvelope, MsgSender};
 use serde::Serialize;
@@ -22,7 +22,7 @@ impl Reading {
         Self { read, msg }
     }
 
-    pub fn get_result(&self, storage: &ChunkStorage) -> Option<OutboundMsg> {
+    pub fn get_result(&self, storage: &ChunkStorage) -> Option<MessagingDuty> {
         let BlobRead::Get(address) = self.read;
         if let Address::Section(_) = self.msg.most_recent_sender().address() {
             if self.verify(&self.msg.message) {

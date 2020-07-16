@@ -31,7 +31,7 @@
 
 mod accumulator;
 mod chunk_store;
-mod cmd;
+mod internal_msgs;
 mod config_handler;
 mod error;
 mod messaging;

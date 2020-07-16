@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions};
+use crate::{cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
 use log::trace;
 use safe_nd::{
     Account, AccountWrite, BlobRead, BlobWrite, Cmd, CmdError, DataCmd, DataQuery,
@@ -24,7 +24,7 @@ pub(crate) struct Validation {
 }
 
 impl Validation {
-    pub fn new(decisions: ElderMsgDecisions) -> Self {
+    pub fn new(decisions: ElderMsgWrapping) -> Self {
         Self {
             blobs: Blobs::new(decisions.clone()),
             maps: Maps::new(decisions.clone()),
@@ -33,7 +33,7 @@ impl Validation {
         }
     }
 
-    // pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    // pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
     //     match &msg.message {
     //         Message::Cmd {
     //             cmd: Cmd::Data { cmd, .. },
@@ -48,7 +48,7 @@ impl Validation {
     // }
 
     // Called directly from
-    pub fn initiate_write(&mut self, cmd: &DataCmd, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, cmd: &DataCmd, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match cmd {
             DataCmd::Blob(_) => self.blobs.initiate_write(msg),
             DataCmd::Map(_) => self.maps.initiate_write(msg),
@@ -57,7 +57,7 @@ impl Validation {
         }
     }
 
-    pub fn initiate_read(&mut self, query: &DataQuery, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, query: &DataQuery, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match query {
             DataQuery::Blob(_) => self.blobs.initiate_read(msg),
             DataQuery::Map(_) => self.maps.initiate_read(msg),
@@ -73,22 +73,22 @@ impl Validation {
 
 #[derive(Clone)]
 pub(crate) struct Sequences {
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl Sequences {
-    pub fn new(decisions: ElderMsgDecisions) -> Self {
+    pub fn new(decisions: ElderMsgWrapping) -> Self {
         Self { decisions }
     }
 
     // client query
-    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let _ = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let write = self.extract_write(msg)?;
         use SequenceWrite::*;
         match write {
@@ -101,7 +101,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: SData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_creation(&mut self, chunk: SData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*msg.origin.id()).is_err() {
@@ -124,7 +124,7 @@ impl Sequences {
         &mut self,
         address: SDataAddress,
         msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if address.is_pub() {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOperation),
@@ -136,7 +136,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_edit(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_edit(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         self.decisions.vote(msg)
     }
 
@@ -177,16 +177,16 @@ impl Display for Sequences {
 
 #[derive(Clone)]
 pub(crate) struct Blobs {
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl Blobs {
-    pub fn new(decisions: ElderMsgDecisions) -> Self {
+    pub fn new(decisions: ElderMsgWrapping) -> Self {
         Self { decisions }
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let _read = self.extract_read(msg)?;
         self.decisions.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
@@ -199,7 +199,7 @@ impl Blobs {
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let write = self.extract_write(msg)?;
         use BlobWrite::*;
         match write {
@@ -209,7 +209,7 @@ impl Blobs {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: IData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_creation(&mut self, chunk: IData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // Assert that if the request was for UnpubIData, that the owner's public key has
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
         // by their Client owners.
@@ -235,7 +235,7 @@ impl Blobs {
         &mut self,
         address: IDataAddress,
         msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if address.kind() == IDataKind::Unpub {
             self.decisions.vote(msg)
         } else {
@@ -284,22 +284,22 @@ impl Display for Blobs {
 
 #[derive(Clone)]
 pub(crate) struct Maps {
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl Maps {
-    pub fn new(decisions: ElderMsgDecisions) -> Self {
+    pub fn new(decisions: ElderMsgWrapping) -> Self {
         Self { decisions }
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let _read = self.extract_read(msg)?;
         self.decisions.forward(msg)
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         use MapWrite::*;
         let write = self.extract_write(msg)?;
         match write {
@@ -311,7 +311,7 @@ impl Maps {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: MData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn initiate_creation(&mut self, chunk: MData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
         if chunk.owner() != *msg.origin.id() {
@@ -367,16 +367,16 @@ impl Display for Maps {
 
 #[derive(Clone)]
 pub(super) struct Accounts {
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl Accounts {
-    pub fn new(decisions: ElderMsgDecisions) -> Self {
+    pub fn new(decisions: ElderMsgWrapping) -> Self {
         Self { decisions }
     }
 
     // on client request
-    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if self.is_account_read(msg) {
             self.decisions.vote(msg)
         } else {
@@ -385,7 +385,7 @@ impl Accounts {
     }
 
     // on client request
-    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let account = self.extract_account_write(msg)?;
         if !account.size_is_valid() {
             return self.decisions.error(

@@ -10,7 +10,7 @@ mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
 use crate::{
-    cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions, utils,
+    cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping, utils,
 };
 use log::warn;
 use safe_nd::{
@@ -23,11 +23,11 @@ use std::fmt::{self, Display, Formatter};
 pub(super) struct Auth {
     keys: NodeKeys,
     auth_keys: AuthKeysDb,
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl Auth {
-    pub fn new(keys: NodeKeys, auth_keys: AuthKeysDb, decisions: ElderMsgDecisions) -> Self {
+    pub fn new(keys: NodeKeys, auth_keys: AuthKeysDb, decisions: ElderMsgWrapping) -> Self {
         Self {
             keys,
             auth_keys,
@@ -35,7 +35,7 @@ impl Auth {
         }
     }
 
-    pub(super) fn initiate(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub(super) fn initiate(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let auth_cmd = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(auth_cmd),
@@ -54,7 +54,7 @@ impl Auth {
         &mut self,
         public_id: &PublicId,
         msg: &MsgEnvelope,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
             _ => return None,
@@ -103,7 +103,7 @@ impl Auth {
     }
 
     // client query
-    pub fn list_keys_and_version(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn list_keys_and_version(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match &msg.message {
             Message::Query {
                 query: Query::Auth(AuthQuery::ListAuthKeysAndVersion { .. }),
@@ -123,15 +123,7 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        use AuthCmd::*;
-        let auth_cmd = match &msg.message {
-            Message::Cmd {
-                cmd: Cmd::Auth(auth_cmd),
-                ..
-            } => auth_cmd,
-            _ => return None,
-        };
+    pub(super) fn finalise(&mut self, auth_cmd: AuthCmd, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
         let result = match auth_cmd {
             InsAuthKey {
                 key,
@@ -140,21 +132,21 @@ impl Auth {
                 ..
             } => self
                 .auth_keys
-                .insert(msg.origin.id(), *key, *version, *permissions),
+                .insert(origin.id(), *key, *version, *permissions),
             DelAuthKey { key, version, .. } => {
-                self.auth_keys.delete(msg.origin.id(), *key, *version)
+                self.auth_keys.delete(origin.id(), *key, *version)
             }
         };
         if let Err(error) = result {
             return self
                 .decisions
-                .error(CmdError::Auth(error), msg.message.id(), &msg.origin);
+                .error(CmdError::Auth(error), msg_id, origin);
         }
         None
     }
 
     // Verify that valid signature is provided if the request requires it.
-    pub fn verify_client_signature(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn verify_client_signature(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match msg.authorisation_kind() {
             AuthorisationKind::Data(DataAuthKind::PublicRead) => None,
             _ => {

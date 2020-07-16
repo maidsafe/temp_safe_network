@@ -12,10 +12,10 @@ mod validator;
 
 use self::section_funds::SectionFunds;
 pub use self::{system::FarmingSystem, validator::Validator};
-use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
+use crate::{internal_msgs::{MessagingDuty, RewardDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_farming::{Accumulation, StorageRewards};
 use safe_nd::{
-    AccountId, ElderDuty, Error, Message, MessageId, Money, MsgSender, NetworkCmd, NetworkCmdError,
+    AccountId, ElderDuties, Error, Message, MessageId, Money, MsgSender, NetworkCmd, NetworkCmdError,
     NetworkEvent, NetworkRewardError, RewardCounter, XorName,
 };
 use safe_transfers::TransferActor;
@@ -25,7 +25,7 @@ pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
     node_accounts: HashMap<XorName, RewardAccount>,
     section_funds: SectionFunds,
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 #[derive(PartialEq)]
@@ -43,7 +43,7 @@ pub enum RewardAccount {
 
 impl Rewards {
     pub fn new(keys: NodeKeys, actor: TransferActor<Validator>) -> Self {
-        let decisions = ElderMsgDecisions::new(keys, ElderDuty::Rewards);
+        let decisions = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
         let acc = Accumulation::new(Default::default(), Default::default());
         let base_cost = Money::from_nano(1);
         let algo = StorageRewards::new(base_cost);
@@ -57,8 +57,20 @@ impl Rewards {
         }
     }
 
+    pub fn process(&mut self, duty: RewardDuty) -> Option<MessagingDuty> {
+        match duty {
+            RewardDuty::ClaimRewardCounter {
+                old_node_id, new_node_id, msg_id, origin,
+            } => self.claim_rewards(old_node_id, new_node_id, msg_id, origin),
+            RewardDuty::InitiateRewardPayout {
+
+            }
+        }
+        None,
+    }
+
     /// 0. A brand new node has joined our section.
-    pub fn add_account(&mut self, id: AccountId, node_id: XorName) -> Option<OutboundMsg> {
+    pub fn add_account(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
         let _ = self.node_accounts.insert(node_id, RewardAccount::Active(id));
         None
     }
@@ -69,7 +81,7 @@ impl Rewards {
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let _ = self
             .node_accounts
             .insert(new_node_id, RewardAccount::AwaitingStart);
@@ -92,7 +104,7 @@ impl Rewards {
         id: AccountId,
         node_id: &XorName,
         counter: &RewardCounter,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         // TODO: Consider this validation code here, and the flow..
         // .. because we are receiving an event triggered by our cmd, something is very odd
         // most likely a bug, if we ever hit these errors.
@@ -146,7 +158,7 @@ impl Rewards {
 
     /// 3. Every time the section receives
     /// a write request, the accounts accumulate reward.
-    pub fn accumulate_reward(&mut self, data: Vec<u8>) -> Option<OutboundMsg> {
+    pub fn accumulate_reward(&mut self, data: Vec<u8>) -> Option<MessagingDuty> {
         let num_bytes = data.len() as u64;
         let data_hash = data;
         let factor = 2.0;
@@ -158,7 +170,7 @@ impl Rewards {
 
     /// 4. When the section becomes aware that a node has left,
     /// it is flagged for being awaiting move.
-    pub fn node_left(&mut self, node_id: XorName) -> Option<OutboundMsg> {
+    pub fn node_left(&mut self, node_id: XorName) -> Option<MessagingDuty> {
         let id = match self.node_accounts.get(&node_id) {
             Some(RewardAccount::Active(id)) => *id,
             Some(RewardAccount::AwaitingStart) // hmm.. left when AwaitingStart is a tricky case..
@@ -180,8 +192,8 @@ impl Rewards {
         old_node_id: XorName,
         new_node_id: XorName,
         msg_id: MessageId,
-        origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+        origin: &Address,
+    ) -> Option<MessagingDuty> {
         use NetworkCmdError::*;
         use NetworkRewardError::*;
 

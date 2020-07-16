@@ -1,20 +1,20 @@
 use super::validator::Validator;
-use crate::{cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions};
+use crate::{cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
 use safe_nd::{AccountId, Message, MessageId, Money, NetworkCmd, TransferValidated};
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
 
 pub(super) struct SectionFunds {
     actor: TransferActor<Validator>,
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl SectionFunds {
-    pub fn new(actor: TransferActor<Validator>, decisions: ElderMsgDecisions) -> Self {
+    pub fn new(actor: TransferActor<Validator>, decisions: ElderMsgWrapping) -> Self {
         Self { actor, decisions }
     }
 
-    pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<OutboundMsg> {
+    pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<MessagingDuty> {
         match self.actor.transfer(amount, to) {
             Ok(Some(event)) => {
                 let applied = self.actor.apply(TransferInitiated(event.clone()));
@@ -34,7 +34,7 @@ impl SectionFunds {
         }
     }
 
-    pub fn receive(&mut self, validation: TransferValidated) -> Option<OutboundMsg> {
+    pub fn receive(&mut self, validation: TransferValidated) -> Option<MessagingDuty> {
         match self.actor.receive(validation) {
             Ok(Some(event)) => {
                 let applied = self.actor.apply(TransferValidationReceived(event.clone()));

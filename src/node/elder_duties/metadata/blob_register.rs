@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    cmd::OutboundMsg, node::msg_decisions::ElderMsgDecisions,
-    node::section_members::SectionMembers, node::Init, utils, Config, Result, ToDbKey,
+    cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping,
+    node::section_querying::SectionQuerying, node::Init, utils, Config, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
@@ -46,16 +46,16 @@ pub(super) struct BlobRegister {
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    decisions: ElderMsgDecisions,
-    section_members: SectionMembers,
+    decisions: ElderMsgWrapping,
+    section_querying: SectionQuerying,
 }
 
 impl BlobRegister {
     pub(super) fn new(
         config: &Config,
         init_mode: Init,
-        decisions: ElderMsgDecisions,
-        section_members: SectionMembers,
+        decisions: ElderMsgWrapping,
+        section_querying: SectionQuerying,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
@@ -66,12 +66,12 @@ impl BlobRegister {
             metadata,
             holders,
             full_adults,
-            section_members,
+            section_querying,
             decisions,
         })
     }
 
-    pub(super) fn write(&mut self, write: BlobWrite, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub(super) fn write(&mut self, write: BlobWrite, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg),
@@ -79,7 +79,7 @@ impl BlobRegister {
         }
     }
 
-    fn store(&mut self, data: IData, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn store(&mut self, data: IData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -128,7 +128,7 @@ impl BlobRegister {
         self.decisions.send_to_adults(target_holders, msg)
     }
 
-    fn delete(&mut self, address: IDataAddress, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn delete(&mut self, address: IDataAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -152,7 +152,7 @@ impl BlobRegister {
         self.decisions.send_to_adults(metadata.holders, msg)
     }
 
-    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<OutboundMsg>> {
+    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<MessagingDuty>> {
         trace!("Duplicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
@@ -172,7 +172,7 @@ impl BlobRegister {
         &self,
         address: IDataAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> Vec<OutboundMsg> {
+    ) -> Vec<MessagingDuty> {
         self.get_new_holders_for_chunk(&address)
             .into_iter()
             .map(|new_holder| {
@@ -193,14 +193,14 @@ impl BlobRegister {
             .collect()
     }
 
-    pub(super) fn read(&self, read: &BlobRead, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub(super) fn read(&self, read: &BlobRead, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg),
         }
     }
 
-    fn get(&self, address: IDataAddress, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    fn get(&self, address: IDataAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let query_error = |error: NdError| {
             self.decisions.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
@@ -230,7 +230,7 @@ impl BlobRegister {
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if result.is_ok() {
             let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
             if !chunk_metadata.holders.insert(sender) {
@@ -269,7 +269,7 @@ impl BlobRegister {
     //     result: NdResult<()>,
     //     message_id: MessageId,
     //     request: Request,
-    // ) -> Option<OutboundMsg> {
+    // ) -> Option<MessagingDuty> {
     //     match &request {
     //         Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
     //             self.handle_store_result(*data.address(), sender, &result, message_id, requester)
@@ -288,7 +288,7 @@ impl BlobRegister {
     //     _result: &NdResult<()>,
     //     message_id: MessageId,
     //     requester: PublicId,
-    // ) -> Option<OutboundMsg> {
+    // ) -> Option<MessagingDuty> {
     //     // TODO -
     //     // - if Ok, and this is the final of the three responses send success back to client handlers and
     //     //   then on to the client.  Note: there's no functionality in place yet to know whether
@@ -359,7 +359,7 @@ impl BlobRegister {
     //     result: NdResult<()>,
     //     message_id: MessageId,
     //     requester: PublicId,
-    // ) -> Option<OutboundMsg> {
+    // ) -> Option<MessagingDuty> {
     //     if let Err(err) = &result {
     //         warn!("{}: Node reports error deleting: {}", self, err);
     //     } else {
@@ -431,7 +431,7 @@ impl BlobRegister {
     //     message_id: MessageId,
     //     requester: PublicId,
     //     proof: (Request, Signature),
-    // ) -> Option<OutboundMsg> {
+    // ) -> Option<MessagingDuty> {
     //     let response = Response::GetIData(result);
     //     wrap(MetadataCmd::RespondToGateway {
     //         sender: *self.id.name(),
@@ -523,12 +523,12 @@ impl BlobRegister {
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = IMMUTABLE_DATA_ADULT_COPY_COUNT;
         let mut closest_adults = self
-            .section_members
+            .section_querying
             .our_adults_sorted_by_distance_to(&target, take);
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
             let take = IMMUTABLE_DATA_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
-                .section_members
+                .section_querying
                 .our_elders_sorted_by_distance_to(&target, take);
             closest_adults.append(&mut closest_elders);
             closest_adults

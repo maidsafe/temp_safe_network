@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::OutboundMsg, node::keys::NodeKeys, node::msg_decisions::ElderMsgDecisions};
+use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_nd::{
-    Cmd, CmdError, ElderDuty, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
+    Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
 use std::{
     cell::{RefCell, RefMut},
@@ -20,7 +20,7 @@ use std::{
 pub(crate) struct DataPayment {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 /// An Elder in S(R) is responsible for
@@ -33,7 +33,7 @@ pub(crate) struct DataPayment {
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl DataPayment {
     pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
-        let decisions = ElderMsgDecisions::new(keys.clone(), ElderDuty::Payment);
+        let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
         Self {
             keys,
             replica,
@@ -41,9 +41,9 @@ impl DataPayment {
         }
     }
 
-    // The code in this method is very messy, needs to be cleand up.
-    pub fn pay_for_data(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
-        use TransferError::*;
+    // The code in this method is a bit messy, needs to be cleaned up.
+    pub fn process(&mut self, duty: &PaymentDuty) -> Option<MessagingDuty> {
+        let PaymentDuty::ProcessPayment(msg) = duty;
         let payment = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { payment, .. },
@@ -60,6 +60,7 @@ impl DataPayment {
             _ => true, // this would be strange, is it even possible?
         };
 
+        use TransferError::*;
         if recipient_is_not_section {
             let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
             return self.decisions.error(error, msg.id(), &msg.origin);

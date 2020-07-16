@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{keys::NodeKeys, msg_decisions::AdultMsgDecisions};
-use crate::{chunk_store::ImmutableChunkStore, cmd::OutboundMsg, node::Init, Config, Result};
+use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping};
+use crate::{chunk_store::ImmutableChunkStore, cmd::MessagingDuty, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
-    AdultDuty, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId, MsgSender,
+    AdultDuties, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId, MsgSender,
     NetworkCmdError, NetworkDataError, NetworkEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
@@ -22,7 +22,7 @@ use std::{
 pub(crate) struct ChunkStorage {
     keys: NodeKeys,
     chunks: ImmutableChunkStore,
-    decisions: AdultMsgDecisions,
+    decisions: AdultMsgWrapping,
 }
 
 impl ChunkStorage {
@@ -40,7 +40,7 @@ impl ChunkStorage {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        let decisions = AdultMsgDecisions::new(keys.clone(), AdultDuty::ChunkStorage);
+        let decisions = AdultMsgWrapping::new(keys.clone(), AdultDuties::ChunkStorage);
         Ok(Self {
             keys,
             chunks,
@@ -53,7 +53,7 @@ impl ChunkStorage {
         data: &IData,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if let Err(error) = self.try_store(data) {
             return self.decisions.error(CmdError::Data(error), msg_id, &origin);
         }
@@ -66,7 +66,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: &MsgSender,
         accumulated_signature: &Signature,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let message = match self.try_store(data) {
             Ok(()) => Message::NetworkEvent {
                 event: NetworkEvent::DuplicationComplete {
@@ -108,7 +108,7 @@ impl ChunkStorage {
         address: IDataAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let result = self
             .chunks
             .get(&address)
@@ -125,7 +125,7 @@ impl ChunkStorage {
     //     &self,
     //     address: IDataAddress,
     //     msg: &MsgEnvelope,
-    // ) -> Option<OutboundMsg> {
+    // ) -> Option<MessagingDuty> {
 
     //     match self.chunks.get(&address) {
 
@@ -133,7 +133,7 @@ impl ChunkStorage {
 
     //     let mut targets: BTreeSet<XorName> = Default::default();
     //     let _ = targets.insert(XorName(xorname.0));
-    //     Some(OutboundMsg::SendToNode {
+    //     Some(MessagingDuty::SendToNode {
     //         targets,
     //         msg: Message::QueryResponse {
     //             requester: requester.clone(),
@@ -149,7 +149,7 @@ impl ChunkStorage {
         address: IDataAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
             return None;

@@ -8,8 +8,8 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
-    cmd::OutboundMsg,
-    node::msg_decisions::ElderMsgDecisions,
+    cmd::MessagingDuty,
+    node::msg_wrapping::ElderMsgWrapping,
     node::Init,
     Config, Result,
 };
@@ -25,7 +25,7 @@ use std::{
 
 pub(super) struct AccountStorage {
     chunks: AccountChunkStore,
-    decisions: ElderMsgDecisions,
+    decisions: ElderMsgWrapping,
 }
 
 impl AccountStorage {
@@ -33,7 +33,7 @@ impl AccountStorage {
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
-        decisions: ElderMsgDecisions,
+        decisions: ElderMsgWrapping,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
@@ -51,14 +51,14 @@ impl AccountStorage {
         read: &AccountRead,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         use AccountRead::*;
         match read {
             Get(ref address) => self.get(address, msg_id, origin),
         }
     }
 
-    fn get(&self, address: &XorName, msg_id: MessageId, origin: &MsgSender) -> Option<OutboundMsg> {
+    fn get(&self, address: &XorName, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);
@@ -75,7 +75,7 @@ impl AccountStorage {
         write: AccountWrite,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         use AccountWrite::*;
         match write {
             New(ref account) => self.create(account, msg_id, &origin),
@@ -88,7 +88,7 @@ impl AccountStorage {
         account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
         } else if account.owner() != origin.id() {
@@ -107,7 +107,7 @@ impl AccountStorage {
         updated_account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         let result = self
             .account(origin.id(), updated_account.address())
             .and_then(|existing_account| {
@@ -146,7 +146,7 @@ impl AccountStorage {
         result: NdResult<()>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<OutboundMsg> {
+    ) -> Option<MessagingDuty> {
         if let Err(error) = result {
             return self.decisions.send(Message::CmdError {
                 id: MessageId::new(),

@@ -20,8 +20,8 @@ use self::{
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    cmd::OutboundMsg, messaging::ClientMessaging, node::keys::NodeKeys,
-    node::section_members::SectionMembers, node::Init, utils, Config, Result,
+    cmd::MessagingDuty, messaging::ClientMessaging, node::keys::NodeKeys,
+    node::section_querying::SectionQuerying, node::Init, utils, Config, Result,
 };
 use routing::{Node as Routing, RoutingError};
 use safe_nd::{XorName, MsgEnvelope, NetworkEvent, Message, NetworkCmd};
@@ -54,14 +54,14 @@ impl ElderDuties {
         // Gateway
         let gateway = Gateway::new(keys.clone(), &config, init_mode, messaging)?;
 
-        let section_members = SectionMembers::new(routing.clone());
+        let section_querying = SectionQuerying::new(routing.clone());
         // Metadata
         let metadata = Metadata::new(
             keys.clone(),
             &config,
             &total_used_space,
             init_mode,
-            section_members,
+            section_querying,
         )?;
 
         // (AT2 Replicas)
@@ -130,7 +130,7 @@ impl ElderDuties {
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
-    ) -> Option<Vec<OutboundMsg>> {
+    ) -> Option<Vec<MessagingDuty>> {
         // marks the reward account as
         // awaiting claiming of the counter
         if let Some(msg) = self.rewards.add_relocated_account(old_node_id, new_node_id) {
@@ -144,7 +144,7 @@ impl ElderDuties {
 
     /// Name of the node
     /// Age of the node
-    pub fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<Vec<OutboundMsg>> {
+    pub fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<Vec<MessagingDuty>> {
         // marks the reward account as
         // awaiting claiming of the counter
         if let Some(msg) = self.rewards.node_left(node_id) {
@@ -157,7 +157,7 @@ impl ElderDuties {
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self) -> Option<OutboundMsg> {
+    pub fn elders_changed(&mut self) -> Option<MessagingDuty> {
         let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();
@@ -171,7 +171,7 @@ impl ElderDuties {
         None
     }
 
-    pub fn receive_reward_msg(&mut self, msg: &MsgEnvelope) -> Option<OutboundMsg> {
+    pub fn receive_reward_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match &msg.message {
             Message::NetworkCmd {
                 cmd:

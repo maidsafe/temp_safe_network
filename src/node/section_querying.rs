@@ -11,13 +11,25 @@ use safe_nd::XorName;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
-pub(crate) struct SectionMembers {
+pub(crate) struct SectionQuerying {
     routing: Rc<RefCell<Routing>>,
 }
 
-impl SectionMembers {
+/// Querying of our section's member composition.
+impl SectionQuerying {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
         Self { routing }
+    }
+
+    /// This can be asked for anything that has an XorName.
+    /// What we ask is if our section should handle it, whether
+    /// it be a piece of data, or a client address.
+    pub fn handles(&self, address: &XorName) -> bool {
+        let xorname = routing::XorName(address.0);
+        match self.routing.borrow().matches_our_prefix(&xorname) {
+            Ok(result) => result,
+            _ => false,
+        }
     }
 
     pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
@@ -39,4 +51,23 @@ impl SectionMembers {
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
     }
+    
+    pub fn our_elders(&self) {
+        self
+            .routing
+            .borrow_mut()
+            .our_elders()
+            .into_iter()
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn matches_our_prefix(&self, name: XorName) -> bool {
+        self
+            .routing
+            .borrow()
+            .matches_our_prefix(&routing::XorName(name.0))
+            .unwrap_or(false)
+    }
+    
 }

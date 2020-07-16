@@ -12,14 +12,14 @@ use std::rc::Rc;
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);
 type DuplicationInfo = (IDataAddress, BTreeSet<XorName>, Vec<SignatureShare>);
 
-pub struct Accumulator {
+pub struct Accumulation {
     routing_node: Rc<RefCell<Node>>,
     messages: HashMap<MessageId, RequestInfo>,
     duplications: HashMap<MessageId, DuplicationInfo>,
     completed: HashSet<MessageId>,
 }
 
-impl Accumulator {
+impl Accumulation {
     pub fn new(routing_node: Rc<RefCell<Node>>) -> Self {
         Self {
             routing_node,
