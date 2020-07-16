@@ -60,6 +60,8 @@ pub use self::self_encryption_storage::{
 pub use self::utils::logging;
 pub use quic_p2p::Config as QuicP2pConfig;
 
+/// Utilities for handling `Blob`.
+pub mod blob;
 /// Client trait and related constants.
 pub mod client;
 /// Config file handling.
@@ -70,8 +72,6 @@ pub mod core_structs;
 pub mod crypto;
 /// FFI.
 pub mod ffi;
-/// Utilities for handling `Blob`.
-pub mod blob;
 /// Inter-Process Communication utilities.
 pub mod ipc;
 /// NFS utilities.
@@ -88,7 +88,7 @@ mod network_event;
 
 /// All Maidsafe tagging should positive-offset from this.
 pub const MAIDSAFE_TAG: u64 = 5_483_000;
-/// `MutableData` type tag for a directory.
+/// `Map` type tag for a directory.
 pub const DIR_TAG: u64 = 15_000;
 
 /// Gets name of the dedicated container of the given app.

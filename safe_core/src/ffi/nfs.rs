@@ -27,7 +27,7 @@ pub struct File {
     pub user_metadata_len: usize,
     /// Name of the `Blob` containing the content of this file.
     pub data_map_name: XorNameArray,
-    /// Published status of the file
+    /// Public status of the file
     pub published: bool,
 }
 

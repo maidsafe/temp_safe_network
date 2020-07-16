@@ -1,10 +1,10 @@
 use safe_nd::{
-    Cmd, TransferCmd, Event, Query,
-    DebitAgreementProof, Message, MessageId, Money, PublicKey, QueryResponse
+    Cmd, DebitAgreementProof, Event, Message, MessageId, Money, PublicKey, Query, QueryResponse,
+    TransferCmd,
 };
 use safe_transfers::{ActorEvent, TransferInitiated};
 
-use crate::client::{Client, TransferActor, create_network_message_envelope};
+use crate::client::{create_network_message_envelope, Client, TransferActor};
 use crate::errors::CoreError;
 
 use log::{debug, info, trace};
@@ -20,11 +20,11 @@ impl TransferActor {
     /// Handle a validation event.
     pub async fn handle_validation_event(
         &mut self,
-        event: Event
+        event: Event,
     ) -> Result<Option<DebitAgreementProof>, CoreError> {
         debug!("Handling validation event: {:?}", event);
         let validation = match event {
-            Event::TransferValidated{client, event} => event,
+            Event::TransferValidated { client, event } => event,
             _ => {
                 return Err(CoreError::from(format!(
                     "Unexpected event received at TransferActor, {:?}",
@@ -70,11 +70,10 @@ impl TransferActor {
 
         // let request = Self::wrap_money_request(Query::GetBalance(public_key));
 
-        let msg_contents = Query::Transfer(
-            TransferQuery::GetBalance(public_key)
-        );
+        let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let (message, message_id) = create_network_message_envelope(identity.clone(), msg_contents)?;
+        let (message, message_id) =
+            create_network_message_envelope(identity.clone(), msg_contents)?;
         let _bootstrapped = cm.bootstrap(identity).await;
 
         match cm.send_query(&pub_id, &message).await? {
@@ -112,7 +111,7 @@ impl TransferActor {
             "Signed transfer for send money: {:?}",
             signed_transfer.transfer
         );
-        let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer( signed_transfer.clone() ) );
+        let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
         let (message, _message_id) =
             create_network_message_envelope(safe_key.clone(), msg_contents)?;
@@ -125,18 +124,11 @@ impl TransferActor {
             }));
 
         let debit_proof: DebitAgreementProof = self
-            .await_validation(
-                message.id(),
-                &safe_key.public_id(),
-                &message,
-            )
+            .await_validation(message.id(), &safe_key.public_id(), &message)
             .await?;
 
         // Register the transfer on the network.
-        let msg_contents =
-                Cmd::Transfer(
-                    TransferCmd::RegisterTransfer(debit_proof.clone())
-                );
+        let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(debit_proof.clone()));
 
         let (message, _message_id) =
             create_network_message_envelope(safe_key.clone(), msg_contents)?;

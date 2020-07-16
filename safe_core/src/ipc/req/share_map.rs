@@ -23,7 +23,7 @@ pub struct ShareMapReq {
     pub map: Vec<ShareMap>,
 }
 
-/// For use in `ShareMapReq`. Represents a specific `MutableData` that is being shared.
+/// For use in `ShareMapReq`. Represents a specific `Map` that is being shared.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ShareMap {
     /// The mutable data type.
@@ -62,8 +62,7 @@ impl ReprC for ShareMapReq {
             app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
             map: {
                 let map = slice::from_raw_parts((*repr_c).map, (*repr_c).map_len);
-                map
-                    .iter()
+                map.iter()
                     .map(|c| ShareMap::clone_from_repr_c(c))
                     .collect::<Result<_, _>>()?
             },

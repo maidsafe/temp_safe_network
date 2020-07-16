@@ -146,13 +146,13 @@
 - Add new testing features to mock-routing (allowing to override certain requests with predefined responses)
 - Improve the NFS test coverage
 - Update to use Rust Stable 1.19.0 / Nightly 2017-07-20, clippy 0.0.144, and rustfmt 0.9.0
-- Update `routing` to 0.32.0 to include more descriptive MutableData errors
+- Update `routing` to 0.32.0 to include more descriptive Map errors
 - Update other dependencies
 
 ## [0.24.0]
 - Use asynchronous I/O and futures for interfacing with Routing
 - Deprecate and remove StructuredData and AppendableData types
-- Introduce a new data type instead: MutableData
+- Introduce a new data type instead: Map
 - Implement URI-based IPC interaction between apps required for supporting mobile devices
 - Integrate with routing 0.31.0
 - Move all FFI functions to their own separate crates

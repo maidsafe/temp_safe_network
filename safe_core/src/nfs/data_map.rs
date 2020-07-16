@@ -8,9 +8,9 @@
 
 //! `DataMap` utilities
 
+use crate::blob;
 use crate::client::Client;
 use crate::crypto::shared_secretbox;
-use crate::blob;
 use crate::nfs::NfsError;
 use bincode::{deserialize, serialize};
 use safe_nd::{BlobAddress, XorName};

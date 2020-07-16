@@ -20,24 +20,14 @@ pub mod transfer_actor;
 
 use async_trait::async_trait;
 
-#[cfg(feature = "mock-network")]
-mod mock;
-
 // safe-transfers wrapper
 pub use self::transfer_actor::{ClientTransferValidator, TransferActor};
 
 pub use self::account::ClientKeys;
 pub use self::map_info::MapInfo;
-#[cfg(feature = "mock-network")]
-pub use self::mock::vault::mock_vault_path;
-#[cfg(feature = "mock-network")]
-pub use self::mock::ConnectionManager as MockConnectionManager;
 pub use safe_nd::SafeKey;
 
-#[cfg(feature = "mock-network")]
-use self::mock::ConnectionManager;
 use crate::config_handler::Config;
-#[cfg(not(feature = "mock-network"))]
 use crate::connection_manager::ConnectionManager;
 use crate::crypto::{shared_box, shared_secretbox};
 use crate::errors::CoreError;
@@ -49,16 +39,15 @@ use log::{debug, info, trace};
 use lru::LruCache;
 use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
-    MsgEnvelope, DataQuery,
-     AccountWrite, AppPermissions, BlobRead, BlobWrite, ClientFullId, MsgSender, Cmd, Query,QueryResponse, AuthCmd,
- DebitAgreementProof, Blob, BlobAddress, Map, MapAddress, MapEntries, AccountRead, AuthQuery,
-    MapEntryActions, MapPermissionSet, MapSeqEntries, MapSeqEntryActions, MapSeqValue,
-    MapUnseqEntryActions, MapValue, MapValues, MapRead, MapWrite, Message, MessageId, Money,
-    PublicId, PublicKey, SData, SDataAction, SDataAddress,
-    SDataEntries, SDataEntry, SDataIndex, SDataOwner, SDataPrivPermissions,
-    SDataPrivUserPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
-    SDataUserPermissions, SeqMutableData, SequenceRead, SequenceWrite,
-    TransferRegistered, UnseqMutableData, XorName,
+    AccountRead, AccountWrite, AppPermissions, AuthCmd, AuthQuery, Blob, BlobAddress, BlobRead,
+    BlobWrite, ClientFullId, Cmd, DataQuery, DebitAgreementProof, Map, MapAddress, MapEntries,
+    MapEntryActions, MapPermissionSet, MapRead, MapSeqEntries, MapSeqEntryActions, MapSeqValue,
+    MapUnseqEntryActions, MapValue, MapValues, MapWrite, Message, MessageId, Money, MsgEnvelope,
+    MsgSender, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence, SequenceAction,
+    SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex, SequenceOwner,
+    SequencePrivUserPermissions, SequencePrivatePermissions, SequencePubUserPermissions,
+    SequencePublicPermissions, SequenceRead, SequenceUser, SequenceUserPermissions, SequenceWrite,
+    TransferRegistered, UnseqMap, XorName,
 };
 use std::sync::Arc;
 use unwrap::unwrap;
@@ -79,29 +68,28 @@ pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
     Ok(Config::new().quic_p2p.hard_coded_contacts)
 }
 
- // Build and sign Cmd Message Envelope
-pub(crate) fn create_cmd_message(
-    safe_key: SafeKey,
-    msg_contents: Cmd,
-) -> Message {
+// Build and sign Cmd Message Envelope
+pub(crate) fn create_cmd_message(safe_key: SafeKey, msg_contents: Cmd) -> Message {
     trace!("Creating cmd message");
 
     let id = MessageId::new();
 
-    Message::Cmd{cmd: msg_contents, id}
+    Message::Cmd {
+        cmd: msg_contents,
+        id,
+    }
 }
 
- // Build and sign Query Message Envelope
- pub(crate) fn create_query_message(
-    safe_key: SafeKey,
-    msg_contents: Query, 
-) -> Message {
+// Build and sign Query Message Envelope
+pub(crate) fn create_query_message(safe_key: SafeKey, msg_contents: Query) -> Message {
     trace!("Creating query message");
 
     let id = MessageId::new();
-    Message::Query{ query : msg_contents, id } 
+    Message::Query {
+        query: msg_contents,
+        id,
+    }
 }
-
 
 async fn send_query(client: &impl Client, query: Query) -> Result<QueryResponse, CoreError> {
     // `sign` should be false for GETs on published data, true otherwise.
@@ -115,8 +103,6 @@ async fn send_query(client: &impl Client, query: Query) -> Result<QueryResponse,
     let cm = &mut inner.lock().await.connection_manager;
     cm.send_query(&client.public_id().await, &message).await
 }
-
-
 
 /// Trait providing an interface for self-authentication client implementations, so they can
 /// interface all requests from high-level APIs to the actual routing layer and manage all
@@ -224,7 +210,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Put unsequenced mutable data to the network
-    async fn put_unseq_mutable_data(&self, data: UnseqMutableData) -> Result<(), CoreError>
+    async fn put_unseq_mutable_data(&self, data: UnseqMap) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -357,7 +343,7 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("Fetch Immutable Data");
+        trace!("Fetch Blob");
 
         let inner = self.inner();
         if let Some(data) = inner.lock().await.blob_cache.get_mut(&address) {
@@ -397,7 +383,7 @@ pub trait Client: Clone + Send + Sync {
             .lock()
             .await
             .blob_cache
-            .pop(&BlobAddress::Unpub(name))
+            .pop(&BlobAddress::Private(name))
             .is_some()
         {
             trace!("Deleted PrivateBlob from cache.");
@@ -406,18 +392,18 @@ pub trait Client: Clone + Send + Sync {
         let inner = self.inner().clone();
 
         let _ = Arc::downgrade(&inner);
-        trace!("Delete Unpublished Blob at {:?}", name);
+        trace!("Delete Private Blob at {:?}", name);
 
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.delete_blob(BlobAddress::Unpub(name)).await
+        actor.delete_blob(BlobAddress::Private(name)).await
     }
 
     /// Put sequenced mutable data to the network
-    async fn put_seq_mutable_data(&self, data: SeqMutableData) -> Result<(), CoreError>
+    async fn put_seq_mutable_data(&self, data: SeqMap) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -432,7 +418,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Fetch unpublished mutable data from the network
-    async fn get_unseq_map(&self, name: XorName, tag: u64) -> Result<UnseqMutableData, CoreError>
+    async fn get_unseq_map(&self, name: XorName, tag: u64) -> Result<UnseqMap, CoreError>
     where
         Self: Sized,
     {
@@ -515,7 +501,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Fetch sequenced mutable data from the network
-    async fn get_seq_map(&self, name: XorName, tag: u64) -> Result<SeqMutableData, CoreError>
+    async fn get_seq_map(&self, name: XorName, tag: u64) -> Result<SeqMap, CoreError>
     where
         Self: Sized,
     {
@@ -535,7 +521,7 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Mutates sequenced `MutableData` entries in bulk
+    /// Mutates sequenced `Map` entries in bulk
     async fn mutate_seq_map_entries(
         &self,
         name: XorName,
@@ -559,7 +545,7 @@ pub trait Client: Clone + Send + Sync {
         actor.edit_map_entries(address, map_actions).await
     }
 
-    /// Mutates unsequenced `MutableData` entries in bulk
+    /// Mutates unsequenced `Map` entries in bulk
     async fn mutate_unseq_map_entries(
         &self,
         name: XorName,
@@ -583,12 +569,8 @@ pub trait Client: Clone + Send + Sync {
         actor.edit_map_entries(address, map_actions).await
     }
 
-    /// Get a shell (bare bones) version of `MutableData` from the network.
-    async fn get_seq_map_shell(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<SeqMutableData, CoreError>
+    /// Get a shell (bare bones) version of `Map` from the network.
+    async fn get_seq_map_shell(&self, name: XorName, tag: u64) -> Result<SeqMap, CoreError>
     where
         Self: Sized,
     {
@@ -610,12 +592,12 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Get a shell (bare bones) version of `MutableData` from the network.
+    /// Get a shell (bare bones) version of `Map` from the network.
     async fn get_unseq_map_shell(
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<UnseqMutableData, CoreError>
+    ) -> Result<UnseqMap, CoreError>
     where
         Self: Sized,
     {
@@ -637,7 +619,7 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Get a current version of `MutableData` from the network.
+    /// Get a current version of `Map` from the network.
     async fn get_map_version(&self, address: MapAddress) -> Result<u64, CoreError>
     where
         Self: Sized,
@@ -650,7 +632,7 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Return a complete list of entries in `MutableData`.
+    /// Return a complete list of entries in `Map`.
     async fn list_unseq_map_entries(
         &self,
         name: XorName,
@@ -678,7 +660,7 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Return a complete list of entries in `MutableData`.
+    /// Return a complete list of entries in `Map`.
     async fn list_seq_map_entries(
         &self,
         name: XorName,
@@ -706,7 +688,7 @@ pub trait Client: Clone + Send + Sync {
         }
     }
 
-    /// Return a list of keys in `MutableData` stored on the network.
+    /// Return a list of keys in `Map` stored on the network.
     async fn list_map_keys(&self, address: MapAddress) -> Result<BTreeSet<Vec<u8>>, CoreError>
     where
         Self: Sized,
@@ -800,17 +782,17 @@ pub trait Client: Clone + Send + Sync {
     // ======= Sequence Data =======
     //
     /// Store Private Sequence Data into the Network
-    async fn store_priv_sdata(
+    async fn store_private_sequence(
         &self,
         name: XorName,
         tag: u64,
         owner: PublicKey,
-        permissions: BTreeMap<PublicKey, SDataPrivUserPermissions>,
-    ) -> Result<SDataAddress, CoreError> {
+        permissions: BTreeMap<PublicKey, SequencePrivUserPermissions>,
+    ) -> Result<SequenceAddress, CoreError> {
         trace!("Store Private Sequence Data {:?}", name);
-        let mut data = SData::new_priv(self.public_key().await, name, tag);
+        let mut data = Sequence::new_private(self.public_key().await, name, tag);
         let address = *data.address();
-        let _ = data.set_priv_permissions(permissions)?;
+        let _ = data.set_private_permissions(permissions)?;
         let _ = data.set_owner(owner);
 
         let mut actor = self
@@ -825,22 +807,22 @@ pub trait Client: Clone + Send + Sync {
             .inner()
             .lock()
             .await
-            .sdata_cache
+            .sequence_cache
             .put(*data.address(), data);
 
         Ok(address)
     }
 
     /// Store Public Sequence Data into the Network
-    async fn store_pub_sdata(
+    async fn store_pub_sequence(
         &self,
         name: XorName,
         tag: u64,
         owner: PublicKey,
-        permissions: BTreeMap<SDataUser, SDataPubUserPermissions>,
-    ) -> Result<SDataAddress, CoreError> {
+        permissions: BTreeMap<SequenceUser, SequencePubUserPermissions>,
+    ) -> Result<SequenceAddress, CoreError> {
         trace!("Store Public Sequence Data {:?}", name);
-        let mut data = SData::new_pub(self.public_key().await, name, tag);
+        let mut data = Sequence::new_pub(self.public_key().await, name, tag);
         let address = *data.address();
         let _ = data.set_pub_permissions(permissions)?;
         let _ = data.set_owner(owner);
@@ -858,28 +840,28 @@ pub trait Client: Clone + Send + Sync {
             .inner()
             .lock()
             .await
-            .sdata_cache
+            .sequence_cache
             .put(*data.address(), data);
 
         Ok(address)
     }
 
     /// Get Sequence Data from the Network
-    async fn get_sdata(&self, address: SDataAddress) -> Result<SData, CoreError> {
+    async fn get_sequence(&self, address: SequenceAddress) -> Result<Sequence, CoreError> {
         trace!("Get Sequence Data at {:?}", address.name());
         // First try to fetch it from local CRDT replica
         // TODO: implement some logic to refresh data from the network if local replica
         // is too old, to mitigate the risk of successfully apply mutations locally but which
         // can fail on other replicas, e.g. due to being out of sync with permissions/owner
-        if let Some(sdata) = self.inner().lock().await.sdata_cache.get(&address) {
+        if let Some(sequence) = self.inner().lock().await.sequence_cache.get(&address) {
             trace!("Sequence found in local CRDT replica");
-            return Ok(sdata.clone());
+            return Ok(sequence.clone());
         }
 
         trace!("Sequence not found in local CRDT replica");
         // Let's fetch it from the network then
-        let sdata = match send_query(self, wrap_seq_read(SequenceRead::Get(address))).await? {
-            QueryResponse::GetSData(res) => res.map_err(CoreError::from),
+        let sequence = match send_query(self, wrap_seq_read(SequenceRead::Get(address))).await? {
+            QueryResponse::GetSequence(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }?;
 
@@ -889,71 +871,71 @@ pub trait Client: Clone + Send + Sync {
             .inner()
             .lock()
             .await
-            .sdata_cache
-            .put(*sdata.address(), sdata.clone());
+            .sequence_cache
+            .put(*sequence.address(), sequence.clone());
 
-        Ok(sdata)
+        Ok(sequence)
     }
 
     /// Get the last data entry from a Sequence Data.
-    async fn get_sdata_last_entry(
+    async fn get_sequence_last_entry(
         &self,
-        address: SDataAddress,
-    ) -> Result<(u64, SDataEntry), CoreError> {
+        address: SequenceAddress,
+    ) -> Result<(u64, SequenceEntry), CoreError> {
         trace!(
             "Get latest entry from Sequence Data at {:?}",
             address.name()
         );
 
-        let sdata = self.get_sdata(address).await?;
-        match sdata.last_entry() {
-            Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
+        let sequence = self.get_sequence(address).await?;
+        match sequence.last_entry() {
+            Some(entry) => Ok((sequence.entries_index() - 1, entry.to_vec())),
             None => Err(CoreError::from(safe_nd::Error::NoSuchEntry)),
         }
     }
 
     /// Get a set of Entries for the requested range from a Sequence.
-    async fn get_sdata_range(
+    async fn get_sequence_range(
         &self,
-        address: SDataAddress,
-        range: (SDataIndex, SDataIndex),
-    ) -> Result<SDataEntries, CoreError> {
+        address: SequenceAddress,
+        range: (SequenceIndex, SequenceIndex),
+    ) -> Result<SequenceEntries, CoreError> {
         trace!(
             "Get range of entries from Sequence Data at {:?}",
             address.name()
         );
 
-        let sdata = self.get_sdata(address).await?;
-        sdata
+        let sequence = self.get_sequence(address).await?;
+        sequence
             .in_range(range.0, range.1)
             .ok_or_else(|| CoreError::from(safe_nd::Error::NoSuchEntry))
     }
 
     /// Append to Sequence Data
-    async fn sdata_append(
+    async fn sequence_append(
         &self,
-        address: SDataAddress,
-        entry: SDataEntry,
+        address: SequenceAddress,
+        entry: SequenceEntry,
     ) -> Result<(), CoreError> {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
-        let mut sdata = self.get_sdata(address).await?;
+        let mut sequence = self.get_sequence(address).await?;
 
         // We do a permissions check just to make sure it won't fail when the operation
         // is broadcasted to the network, assuming our replica is in sync and up to date
         // with the permissions and ownership information compared with the replicas on the network.
-        sdata.check_permission(SDataAction::Append, self.public_id().await.public_key())?;
+        sequence.check_permission(SequenceAction::Append, self.public_id().await.public_key())?;
 
         // We can now append the entry to the Sequence
-        let op = sdata.append(entry);
+        let op = sequence.append(entry);
 
         // Update the local Sequence CRDT replica
         let _ = self
             .inner()
             .lock()
             .await
-            .sdata_cache
-            .put(*sdata.address(), sdata.clone());
+            .sequence_cache
+            .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas
         let _cm = self.inner().lock().await.connection_manager.clone();
@@ -967,49 +949,49 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Get the set of Permissions of a Public Sequence.
-    async fn get_sdata_pub_permissions(
+    async fn get_sequence_pub_permissions(
         &self,
-        address: SDataAddress,
-    ) -> Result<SDataPubPermissions, CoreError> {
+        address: SequenceAddress,
+    ) -> Result<SequencePublicPermissions, CoreError> {
         trace!(
             "Get permissions from Public Sequence Data at {:?}",
             address.name()
         );
 
         // TODO: perhaps we want to grab it directly from the network and update local replica
-        let sdata = self.get_sdata(address).await?;
-        let perms = sdata
-            .pub_permissions(sdata.permissions_index() - 1)
+        let sequence = self.get_sequence(address).await?;
+        let perms = sequence
+            .pub_permissions(sequence.permissions_index() - 1)
             .map_err(CoreError::from)?;
 
         Ok(perms.clone())
     }
 
     /// Get the set of Permissions of a Private Sequence.
-    async fn get_sdata_priv_permissions(
+    async fn get_sequence_private_permissions(
         &self,
-        address: SDataAddress,
-    ) -> Result<SDataPrivPermissions, CoreError> {
+        address: SequenceAddress,
+    ) -> Result<SequencePrivatePermissions, CoreError> {
         trace!(
             "Get permissions from Private Sequence Data at {:?}",
             address.name()
         );
 
         // TODO: perhaps we want to grab it directly from the network and update local replica
-        let sdata = self.get_sdata(address).await?;
-        let perms = sdata
-            .priv_permissions(sdata.permissions_index() - 1)
+        let sequence = self.get_sequence(address).await?;
+        let perms = sequence
+            .private_permissions(sequence.permissions_index() - 1)
             .map_err(CoreError::from)?;
 
         Ok(perms.clone())
     }
 
     /// Get the set of Permissions for a specific user in a Sequence.
-    async fn get_sdata_user_permissions(
+    async fn get_sequence_user_permissions(
         &self,
-        address: SDataAddress,
-        user: SDataUser,
-    ) -> Result<SDataUserPermissions, CoreError> {
+        address: SequenceAddress,
+        user: SequenceUser,
+    ) -> Result<SequenceUserPermissions, CoreError> {
         trace!(
             "Get permissions for user {:?} from Sequence Data at {:?}",
             user,
@@ -1017,41 +999,41 @@ pub trait Client: Clone + Send + Sync {
         );
 
         // TODO: perhaps we want to grab it directly from the network and update local replica
-        let sdata = self.get_sdata(address).await?;
-        let perms = sdata
-            .user_permissions(user, sdata.permissions_index() - 1)
+        let sequence = self.get_sequence(address).await?;
+        let perms = sequence
+            .user_permissions(user, sequence.permissions_index() - 1)
             .map_err(CoreError::from)?;
 
         Ok(perms)
     }
 
     /// Set permissions to Public Sequence Data
-    async fn sdata_set_pub_permissions(
+    async fn sequence_set_pub_permissions(
         &self,
-        address: SDataAddress,
-        permissions: BTreeMap<SDataUser, SDataPubUserPermissions>,
+        address: SequenceAddress,
+        permissions: BTreeMap<SequenceUser, SequencePubUserPermissions>,
     ) -> Result<(), CoreError> {
         // First we fetch it either from local CRDT replica or from the network if not found
-        let mut sdata = self.get_sdata(address).await?;
+        let mut sequence = self.get_sequence(address).await?;
 
         // We do a permissions check just to make sure it won't fail when the operation
         // is broadcasted to the network, assuming our replica is in sync and up to date
         // with the permissions information compared with the replicas on the network.
-        sdata.check_permission(
-            SDataAction::ManagePermissions,
+        sequence.check_permission(
+            SequenceAction::ManagePermissions,
             self.public_id().await.public_key(),
         )?;
 
         // We can now set the new permissions to the Sequence
-        let op = sdata.set_pub_permissions(permissions)?;
+        let op = sequence.set_pub_permissions(permissions)?;
 
         // Update the local Sequence CRDT replica
         let _ = self
             .inner()
             .lock()
             .await
-            .sdata_cache
-            .put(*sdata.address(), sdata.clone());
+            .sequence_cache
+            .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas
         let _cm = self.inner().lock().await.connection_manager.clone();
@@ -1065,33 +1047,33 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Set permissions to Private Sequence Data
-    async fn sdata_set_priv_permissions(
+    async fn sequence_set_private_permissions(
         &self,
-        address: SDataAddress,
-        permissions: BTreeMap<PublicKey, SDataPrivUserPermissions>,
+        address: SequenceAddress,
+        permissions: BTreeMap<PublicKey, SequencePrivUserPermissions>,
     ) -> Result<(), CoreError> {
         // First we fetch it either from local CRDT replica or from the network if not found
-        let mut sdata = self.get_sdata(address).await?;
+        let mut sequence = self.get_sequence(address).await?;
 
         // We do a permissions check just to make sure it won't fail when the operation
         // is broadcasted to the network, assuming our replica is in sync and up to date
         // with the permissions information compared with the replicas on the network.
         // TODO: if it fails, try to sync-up perms with rmeote replicas and try once more
-        sdata.check_permission(
-            SDataAction::ManagePermissions,
+        sequence.check_permission(
+            SequenceAction::ManagePermissions,
             self.public_id().await.public_key(),
         )?;
 
         // We can now set the new permissions to the Sequence
-        let op = sdata.set_priv_permissions(permissions)?;
+        let op = sequence.set_private_permissions(permissions)?;
 
         // Update the local Sequence CRDT replica
         let _ = self
             .inner()
             .lock()
             .await
-            .sdata_cache
-            .put(*sdata.address(), sdata.clone());
+            .sequence_cache
+            .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas
         let _cm = self.inner().lock().await.connection_manager.clone();
@@ -1105,12 +1087,15 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Get the owner of a Sequence.
-    async fn get_sdata_owner(&self, address: SDataAddress) -> Result<SDataOwner, CoreError> {
+    async fn get_sequence_owner(
+        &self,
+        address: SequenceAddress,
+    ) -> Result<SequenceOwner, CoreError> {
         trace!("Get owner of the Sequence Data at {:?}", address.name());
 
         // TODO: perhaps we want to grab it directly from the network and update local replica
-        let sdata = self.get_sdata(address).await?;
-        let owner = sdata.owner(sdata.owners_index() - 1).ok_or_else(|| {
+        let sequence = self.get_sequence(address).await?;
+        let owner = sequence.owner(sequence.owners_index() - 1).ok_or_else(|| {
             CoreError::from("Unexpectedly failed to obtain current owner of Sequence")
         })?;
 
@@ -1118,32 +1103,32 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Set the new owner of a Sequence Data
-    async fn sdata_set_owner(
+    async fn sequence_set_owner(
         &self,
-        address: SDataAddress,
+        address: SequenceAddress,
         owner: PublicKey,
     ) -> Result<(), CoreError> {
         // First we fetch it either from local CRDT replica or from the network if not found
-        let mut sdata = self.get_sdata(address).await?;
+        let mut sequence = self.get_sequence(address).await?;
 
         // We do a permissions check just to make sure it won't fail when the operation
         // is broadcasted to the network, assuming our replica is in sync and up to date
         // with the ownership information compared with the replicas on the network.
-        sdata.check_permission(
-            SDataAction::ManagePermissions,
+        sequence.check_permission(
+            SequenceAction::ManagePermissions,
             self.public_id().await.public_key(),
         )?;
 
         // We can now set the new owner to the Sequence
-        let op = sdata.set_owner(owner);
+        let op = sequence.set_owner(owner);
 
         // Update the local Sequence CRDT replica
         let _ = self
             .inner()
             .lock()
             .await
-            .sdata_cache
-            .put(*sdata.address(), sdata.clone());
+            .sequence_cache
+            .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas
         let _cm = self.inner().lock().await.connection_manager.clone();
@@ -1157,11 +1142,11 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Delete Private Sequence Data from the Network
-    async fn delete_sdata(&self, address: SDataAddress) -> Result<(), CoreError> {
+    async fn delete_sequence(&self, address: SequenceAddress) -> Result<(), CoreError> {
         trace!("Delete Private Sequence Data {:?}", address.name());
 
         // Delete it from local Sequence CRDT replica
-        let _ = self.inner().lock().await.sdata_cache.pop(&address);
+        let _ = self.inner().lock().await.sequence_cache.pop(&address);
 
         trace!("Deleted local Private Sequence {:?}", address.name());
 
@@ -1175,7 +1160,7 @@ pub trait Client: Clone + Send + Sync {
 
     // ========== END of Sequence Data functions =========
 
-    /// Return a list of permissions in `MutableData` stored on the network.
+    /// Return a list of permissions in `Map` stored on the network.
     async fn list_map_permissions(
         &self,
         address: MapAddress,
@@ -1244,49 +1229,6 @@ pub trait Client: Clone + Send + Sync {
         version: u64,
     ) -> Result<(), CoreError> {
         unimplemented!();
-    }
-
-    #[cfg(any(
-        all(test, feature = "mock-network"),
-        all(feature = "testing", feature = "mock-network")
-    ))]
-    #[doc(hidden)]
-    async fn set_network_limits(&self, max_ops_count: Option<u64>) {
-        let inner = self.inner();
-        inner
-            .lock()
-            .await
-            .connection_manager
-            .set_network_limits(max_ops_count);
-    }
-
-    #[cfg(any(
-        all(test, feature = "mock-network"),
-        all(feature = "testing", feature = "mock-network")
-    ))]
-    #[doc(hidden)]
-    async fn simulate_network_disconnect(&self) {
-        let inner = self.inner();
-        inner
-            .lock()
-            .await
-            .connection_manager
-            .simulate_disconnect()
-            .await;
-    }
-
-    #[cfg(any(
-        all(test, feature = "mock-network"),
-        all(feature = "testing", feature = "mock-network")
-    ))]
-    #[doc(hidden)]
-    async fn set_simulate_timeout(&self, enabled: bool) {
-        let inner = self.inner();
-        inner
-            .lock()
-            .await
-            .connection_manager
-            .set_simulate_timeout(enabled);
     }
 
     /// Set the coin balance to a specific value for testing
@@ -1379,7 +1321,12 @@ pub trait AuthActions: Client + Clone + 'static {
 
         let client_pk = self.public_key().await;
 
-        match send_query(self, wrap_client_auth_query(AuthQuery::ListAuthKeysAndVersion{ client: client_pk })).await? {
+        match send_query(
+            self,
+            wrap_client_auth_query(AuthQuery::ListAuthKeysAndVersion { client: client_pk }),
+        )
+        .await?
+        {
             QueryResponse::ListAuthKeysAndVersion(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -1398,10 +1345,10 @@ pub trait AuthActions: Client + Clone + 'static {
         trace!("InsAuthKey ({:?})", key);
 
         self.transfer_actor()
-        .await
-        .ok_or(CoreError::from("No TransferActor found for client."))?
-        .insert_auth_key(key, permissions, version)
-        .await
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?
+            .insert_auth_key(key, permissions, version)
+            .await
     }
 
     /// Removes an authorised key.
@@ -1412,11 +1359,10 @@ pub trait AuthActions: Client + Clone + 'static {
         trace!("DelAuthKey ({:?})", key);
 
         self.transfer_actor()
-        .await
-        .ok_or(CoreError::from("No TransferActor found for client."))?
-        .delete_auth_key(key, version)
-        .await
-
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?
+            .delete_auth_key(key, version)
+            .await
     }
 
     /// Delete Map from network
@@ -1444,7 +1390,7 @@ pub struct Inner {
     connection_manager: ConnectionManager,
     blob_cache: LruCache<BlobAddress, Blob>,
     /// Sequence CRDT replica
-    sdata_cache: LruCache<SDataAddress, SData>,
+    sequence_cache: LruCache<SequenceAddress, Sequence>,
     timeout: Duration,
     net_tx: NetworkTx,
 }
@@ -1459,7 +1405,7 @@ impl Inner {
         Self {
             connection_manager,
             blob_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            sdata_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
+            sequence_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
             timeout,
             net_tx,
         }
@@ -1529,8 +1475,8 @@ mod tests {
         test_utils::{calculate_new_balance, gen_bls_keypair, random_client},
     };
     use safe_nd::{
-        Error as SndError, MapAction, MapKind, Money, PublicBlob,
-        SDataPrivUserPermissions, PrivateBlob, XorName,
+        Error as SndError, MapAction, MapKind, Money, PrivateBlob, PublicBlob,
+        SequencePrivUserPermissions, XorName,
     };
     use std::str::FromStr;
 
@@ -1598,7 +1544,7 @@ mod tests {
             .get_blob(address)
             .await;
         match res {
-            Ok(_) => panic!("Unpub blob should not exist yet"),
+            Ok(_) => panic!("Private blob should not exist yet"),
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
             Err(e) => panic!("Unexpected: {:?}", e),
         }
@@ -1629,7 +1575,7 @@ mod tests {
         // Make sure blob was deleted
         let res = client.get_blob(address).await;
         match res {
-            Ok(_) => panic!("Unpub blob still exists after deletion"),
+            Ok(_) => panic!("Private blob still exists after deletion"),
             Err(error) => assert!(error.to_string().contains("Chunk not found")),
         }
 
@@ -1655,7 +1601,7 @@ mod tests {
         let entries_keys = entries.keys().cloned().collect();
         let entries_values: Vec<Vec<u8>> = entries.values().cloned().collect();
 
-        let data = UnseqMutableData::new_with_data(
+        let data = UnseqMap::new_with_data(
             name,
             tag,
             entries.clone(),
@@ -1705,7 +1651,7 @@ mod tests {
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new().allow(MapAction::Read);
         let _ = permissions.insert(client.public_key().await, permission_set);
-        let data = SeqMutableData::new_with_data(
+        let data = SeqMap::new_with_data(
             name,
             tag,
             entries.clone(),
@@ -1722,9 +1668,7 @@ mod tests {
         assert_eq!(*map_shell.name(), name);
         assert_eq!(map_shell.tag(), tag);
         assert_eq!(map_shell.entries().len(), 0);
-        let keys = client
-            .list_map_keys(MapAddress::Seq { name, tag })
-            .await?;
+        let keys = client.list_map_keys(MapAddress::Seq { name, tag }).await?;
         assert_eq!(keys, entries_keys);
         let values = client.list_seq_map_values(name, tag).await?;
         assert_eq!(values, entries_values);
@@ -1743,7 +1687,7 @@ mod tests {
         let name = XorName(rand::random());
         let tag = 15001;
         let mapref = MapAddress::Seq { name, tag };
-        let data = SeqMutableData::new_with_data(
+        let data = SeqMap::new_with_data(
             name,
             tag,
             Default::default(),
@@ -1769,7 +1713,7 @@ mod tests {
         let name = XorName(rand::random());
         let tag = 15001;
         let mapref = MapAddress::Unseq { name, tag };
-        let data = UnseqMutableData::new_with_data(
+        let data = UnseqMap::new_with_data(
             name,
             tag,
             Default::default(),
@@ -1987,7 +1931,7 @@ mod tests {
         let mapref = MapAddress::Unseq { name, tag };
 
         let client = random_client()?;
-        let data = UnseqMutableData::new_with_data(
+        let data = UnseqMap::new_with_data(
             name,
             tag,
             Default::default(),
@@ -2007,9 +1951,9 @@ mod tests {
         Ok(())
     }
 
-
     #[tokio::test]
-    pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<(), CoreError> {
+    pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client(
+    ) -> Result<(), CoreError> {
         let client = random_client()?;
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
@@ -2026,7 +1970,7 @@ mod tests {
         let _ = permissions.insert(random_user, permission_set);
 
         let test_data_name = XorName(rand::random());
-        let test_data_with_different_owner_than_client = SeqMutableData::new_with_data(
+        let test_data_with_different_owner_than_client = SeqMap::new_with_data(
             test_data_name.clone(),
             15000,
             Default::default(),
@@ -2034,7 +1978,9 @@ mod tests {
             random_pk,
         );
 
-        client.put_seq_mutable_data(test_data_with_different_owner_than_client.clone()).await?;
+        client
+            .put_seq_mutable_data(test_data_with_different_owner_than_client.clone())
+            .await?;
         let res = client.get_seq_map_shell(test_data_name, 1500).await;
         match res {
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
@@ -2050,7 +1996,6 @@ mod tests {
         // assert_eq!(balance, expected_bal);
 
         Ok(())
-
     }
 
     // 1. Create a mutable data with some permissions and store it on the network.
@@ -2073,7 +2018,7 @@ mod tests {
         let _ = permissions.insert(user, permission_set.clone());
         let _ = permissions.insert(random_user, permission_set);
 
-        let data = SeqMutableData::new_with_data(
+        let data = SeqMap::new_with_data(
             name,
             tag,
             Default::default(),
@@ -2145,7 +2090,7 @@ mod tests {
                 version: 0,
             },
         );
-        let data = SeqMutableData::new_with_data(
+        let data = SeqMap::new_with_data(
             name,
             tag,
             entries.clone(),
@@ -2220,7 +2165,7 @@ mod tests {
         let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = Default::default();
         let _ = entries.insert(b"key1".to_vec(), b"value".to_vec());
         let _ = entries.insert(b"key2".to_vec(), b"value".to_vec());
-        let data = UnseqMutableData::new_with_data(
+        let data = UnseqMap::new_with_data(
             name,
             tag,
             entries.clone(),
@@ -2318,7 +2263,7 @@ mod tests {
         let tag = 10;
         let client = random_client()?;
 
-        let map = UnseqMutableData::new(name, tag, client.public_key().await);
+        let map = UnseqMap::new(name, tag, client.public_key().await);
         client.put_unseq_mutable_data(map).await?;
 
         let map_address = MapAddress::from_kind(MapKind::Unseq, name, tag);
@@ -2335,16 +2280,18 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sdata_deletions_should_cost_put_price() -> Result<(), CoreError> {
+    pub async fn sequence_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = random_client()?;
         let owner = client.public_key().await;
-        let perms = BTreeMap::<PublicKey, SDataPrivUserPermissions>::new();
-        let sdata_address = client.store_priv_sdata(name, tag, owner, perms).await?;
+        let perms = BTreeMap::<PublicKey, SequencePrivUserPermissions>::new();
+        let sequence_address = client
+            .store_private_sequence(name, tag, owner, perms)
+            .await?;
 
         let balance_before_delete = client.get_balance(None).await?;
-        client.delete_sdata(sdata_address).await?;
+        client.delete_sequence(sequence_address).await?;
         let new_balance = client.get_balance(None).await?;
 
         // make sure we have _some_ balance
@@ -2357,7 +2304,7 @@ mod tests {
     /// Sequence data tests ///
 
     #[tokio::test]
-    pub async fn sdata_basics_test() -> Result<(), CoreError> {
+    pub async fn sequence_basics_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
@@ -2365,67 +2312,74 @@ mod tests {
         let owner = client.public_key().await;
 
         // store a Private Sequence
-        let mut perms = BTreeMap::<PublicKey, SDataPrivUserPermissions>::new();
-        let _ = perms.insert(owner, SDataPrivUserPermissions::new(true, true, true));
-        let address = client.store_priv_sdata(name, tag, owner, perms).await?;
-        let sdata = client.get_sdata(address).await?;
-        assert!(sdata.is_priv());
-        assert_eq!(*sdata.name(), name);
-        assert_eq!(sdata.tag(), tag);
-        assert_eq!(sdata.permissions_index(), 1);
-        assert_eq!(sdata.owners_index(), 1);
-        assert_eq!(sdata.entries_index(), 0);
+        let mut perms = BTreeMap::<PublicKey, SequencePrivUserPermissions>::new();
+        let _ = perms.insert(owner, SequencePrivUserPermissions::new(true, true, true));
+        let address = client
+            .store_private_sequence(name, tag, owner, perms)
+            .await?;
+        let sequence = client.get_sequence(address).await?;
+        assert!(sequence.is_private());
+        assert_eq!(*sequence.name(), name);
+        assert_eq!(sequence.tag(), tag);
+        assert_eq!(sequence.permissions_index(), 1);
+        assert_eq!(sequence.owners_index(), 1);
+        assert_eq!(sequence.entries_index(), 0);
 
         // store a Public Sequence
-        let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
-        let _ = perms.insert(SDataUser::Anyone, SDataPubUserPermissions::new(true, true));
-        let address = client.store_pub_sdata(name, tag, owner, perms).await?;
-        let sdata = client.get_sdata(address).await?;
-        assert!(sdata.is_pub());
-        assert_eq!(*sdata.name(), name);
-        assert_eq!(sdata.tag(), tag);
-        assert_eq!(sdata.permissions_index(), 1);
-        assert_eq!(sdata.owners_index(), 1);
-        assert_eq!(sdata.entries_index(), 0);
+        let mut perms = BTreeMap::<SequenceUser, SequencePubUserPermissions>::new();
+        let _ = perms.insert(
+            SequenceUser::Anyone,
+            SequencePubUserPermissions::new(true, true),
+        );
+        let address = client.store_pub_sequence(name, tag, owner, perms).await?;
+        let sequence = client.get_sequence(address).await?;
+        assert!(sequence.is_pub());
+        assert_eq!(*sequence.name(), name);
+        assert_eq!(sequence.tag(), tag);
+        assert_eq!(sequence.permissions_index(), 1);
+        assert_eq!(sequence.owners_index(), 1);
+        assert_eq!(sequence.entries_index(), 0);
 
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn sdata_priv_permissions_test() -> Result<(), CoreError> {
+    pub async fn sequence_private_permissions_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key().await;
-        let mut perms = BTreeMap::<PublicKey, SDataPrivUserPermissions>::new();
-        let _ = perms.insert(owner, SDataPrivUserPermissions::new(true, true, true));
-        let address = client.store_priv_sdata(name, tag, owner, perms).await?;
+        let mut perms = BTreeMap::<PublicKey, SequencePrivUserPermissions>::new();
+        let _ = perms.insert(owner, SequencePrivUserPermissions::new(true, true, true));
+        let address = client
+            .store_private_sequence(name, tag, owner, perms)
+            .await?;
 
-        let data = client.get_sdata(address).await?;
+        let data = client.get_sequence(address).await?;
         assert_eq!(data.entries_index(), 0);
         assert_eq!(data.owners_index(), 1);
         assert_eq!(data.permissions_index(), 1);
 
-        let priv_permissions = client.get_sdata_priv_permissions(address).await?;
-        let user_perms = priv_permissions
+        let private_permissions = client.get_sequence_private_permissions(address).await?;
+        let user_perms = private_permissions
             .permissions
             .get(&owner)
             .ok_or_else(|| CoreError::from("Unexpectedly failed to get user permissions"))?;
-        assert!(user_perms.is_allowed(SDataAction::Read));
-        assert!(user_perms.is_allowed(SDataAction::Append));
-        assert!(user_perms.is_allowed(SDataAction::ManagePermissions));
+        assert!(user_perms.is_allowed(SequenceAction::Read));
+        assert!(user_perms.is_allowed(SequenceAction::Append));
+        assert!(user_perms.is_allowed(SequenceAction::ManagePermissions));
 
         match client
-            .get_sdata_user_permissions(address, SDataUser::Key(owner))
+            .get_sequence_user_permissions(address, SequenceUser::Key(owner))
             .await?
         {
-            SDataUserPermissions::Priv(user_perms) => {
-                assert!(user_perms.is_allowed(SDataAction::Read));
-                assert!(user_perms.is_allowed(SDataAction::Append));
-                assert!(user_perms.is_allowed(SDataAction::ManagePermissions));
+            SequenceUserPermissions::Priv(user_perms) => {
+                assert!(user_perms.is_allowed(SequenceAction::Read));
+                assert!(user_perms.is_allowed(SequenceAction::Append));
+                assert!(user_perms.is_allowed(SequenceAction::ManagePermissions));
             }
-            SDataUserPermissions::Pub(_) => {
+            SequenceUserPermissions::Public(_) => {
                 return Err(CoreError::from(
                     "Unexpectedly obtained incorrect user permissions",
                 ))
@@ -2433,82 +2387,84 @@ mod tests {
         }
 
         let sim_client = gen_bls_keypair().public_key();
-        let mut perms2 = BTreeMap::<PublicKey, SDataPrivUserPermissions>::new();
+        let mut perms2 = BTreeMap::<PublicKey, SequencePrivUserPermissions>::new();
         let _ = perms2.insert(
             sim_client,
-            SDataPrivUserPermissions::new(false, true, false),
+            SequencePrivUserPermissions::new(false, true, false),
         );
-        client.sdata_set_priv_permissions(address, perms2).await?;
+        client
+            .sequence_set_private_permissions(address, perms2)
+            .await?;
 
-        let priv_permissions = client.get_sdata_priv_permissions(address).await?;
-        let user_perms = priv_permissions
+        let private_permissions = client.get_sequence_private_permissions(address).await?;
+        let user_perms = private_permissions
             .permissions
             .get(&sim_client)
             .ok_or_else(|| CoreError::from("Unexpectedly failed to get user permissions"))?;
-        assert!(!user_perms.is_allowed(SDataAction::Read));
-        assert!(user_perms.is_allowed(SDataAction::Append));
-        assert!(!user_perms.is_allowed(SDataAction::ManagePermissions));
+        assert!(!user_perms.is_allowed(SequenceAction::Read));
+        assert!(user_perms.is_allowed(SequenceAction::Append));
+        assert!(!user_perms.is_allowed(SequenceAction::ManagePermissions));
 
         match client
-            .get_sdata_user_permissions(address, SDataUser::Key(sim_client))
+            .get_sequence_user_permissions(address, SequenceUser::Key(sim_client))
             .await?
         {
-            SDataUserPermissions::Priv(user_perms) => {
-                assert!(!user_perms.is_allowed(SDataAction::Read));
-                assert!(user_perms.is_allowed(SDataAction::Append));
-                assert!(!user_perms.is_allowed(SDataAction::ManagePermissions));
+            SequenceUserPermissions::Priv(user_perms) => {
+                assert!(!user_perms.is_allowed(SequenceAction::Read));
+                assert!(user_perms.is_allowed(SequenceAction::Append));
+                assert!(!user_perms.is_allowed(SequenceAction::ManagePermissions));
                 Ok(())
             }
-            SDataUserPermissions::Pub(_) => Err(CoreError::from(
+            SequenceUserPermissions::Public(_) => Err(CoreError::from(
                 "Unexpectedly obtained incorrect user permissions",
             )),
         }
     }
 
     #[tokio::test]
-    pub async fn sdata_pub_permissions_test() -> Result<(), CoreError> {
+    pub async fn sequence_pub_permissions_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key().await;
-        let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
+        let mut perms = BTreeMap::<SequenceUser, SequencePubUserPermissions>::new();
         let _ = perms.insert(
-            SDataUser::Key(owner),
-            SDataPubUserPermissions::new(None, true),
+            SequenceUser::Key(owner),
+            SequencePubUserPermissions::new(None, true),
         );
-        let address = client.store_pub_sdata(name, tag, owner, perms).await?;
+        let address = client.store_pub_sequence(name, tag, owner, perms).await?;
 
-        let data = client.get_sdata(address).await?;
+        let data = client.get_sequence(address).await?;
         assert_eq!(data.entries_index(), 0);
         assert_eq!(data.owners_index(), 1);
         assert_eq!(data.permissions_index(), 1);
 
-        let pub_permissions = client.get_sdata_pub_permissions(address).await?;
+        let pub_permissions = client.get_sequence_pub_permissions(address).await?;
         let user_perms = pub_permissions
             .permissions
-            .get(&SDataUser::Key(owner))
+            .get(&SequenceUser::Key(owner))
             .ok_or_else(|| CoreError::from("Unexpectedly failed to get user permissions"))?;
-        assert_eq!(Some(true), user_perms.is_allowed(SDataAction::Read));
-        assert_eq!(None, user_perms.is_allowed(SDataAction::Append));
+        assert_eq!(Some(true), user_perms.is_allowed(SequenceAction::Read));
+        assert_eq!(None, user_perms.is_allowed(SequenceAction::Append));
         assert_eq!(
             Some(true),
-            user_perms.is_allowed(SDataAction::ManagePermissions)
+            user_perms.is_allowed(SequenceAction::ManagePermissions)
         );
 
         match client
-            .get_sdata_user_permissions(address, SDataUser::Key(owner))
+            .get_sequence_user_permissions(address, SequenceUser::Key(owner))
             .await?
         {
-            SDataUserPermissions::Pub(user_perms) => {
-                assert_eq!(Some(true), user_perms.is_allowed(SDataAction::Read));
-                assert_eq!(None, user_perms.is_allowed(SDataAction::Append));
+            SequenceUserPermissions::Public(user_perms) => {
+                assert_eq!(Some(true), user_perms.is_allowed(SequenceAction::Read));
+                assert_eq!(None, user_perms.is_allowed(SequenceAction::Append));
                 assert_eq!(
                     Some(true),
-                    user_perms.is_allowed(SDataAction::ManagePermissions)
+                    user_perms.is_allowed(SequenceAction::ManagePermissions)
                 );
             }
-            SDataUserPermissions::Priv(_) => {
+            SequenceUserPermissions::Priv(_) => {
                 return Err(CoreError::from(
                     "Unexpectedly obtained incorrect user permissions",
                 ))
@@ -2516,72 +2472,75 @@ mod tests {
         }
 
         let sim_client = gen_bls_keypair().public_key();
-        let mut perms2 = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
+        let mut perms2 = BTreeMap::<SequenceUser, SequencePubUserPermissions>::new();
         let _ = perms2.insert(
-            SDataUser::Key(sim_client),
-            SDataPubUserPermissions::new(false, false),
+            SequenceUser::Key(sim_client),
+            SequencePubUserPermissions::new(false, false),
         );
-        client.sdata_set_pub_permissions(address, perms2).await?;
+        client.sequence_set_pub_permissions(address, perms2).await?;
 
-        let pub_permissions = client.get_sdata_pub_permissions(address).await?;
+        let pub_permissions = client.get_sequence_pub_permissions(address).await?;
         let user_perms = pub_permissions
             .permissions
-            .get(&SDataUser::Key(sim_client))
+            .get(&SequenceUser::Key(sim_client))
             .ok_or_else(|| CoreError::from("Unexpectedly failed to get user permissions"))?;
-        assert_eq!(Some(true), user_perms.is_allowed(SDataAction::Read));
-        assert_eq!(Some(false), user_perms.is_allowed(SDataAction::Append));
+        assert_eq!(Some(true), user_perms.is_allowed(SequenceAction::Read));
+        assert_eq!(Some(false), user_perms.is_allowed(SequenceAction::Append));
         assert_eq!(
             Some(false),
-            user_perms.is_allowed(SDataAction::ManagePermissions)
+            user_perms.is_allowed(SequenceAction::ManagePermissions)
         );
 
         match client
-            .get_sdata_user_permissions(address, SDataUser::Key(sim_client))
+            .get_sequence_user_permissions(address, SequenceUser::Key(sim_client))
             .await?
         {
-            SDataUserPermissions::Pub(user_perms) => {
-                assert_eq!(Some(true), user_perms.is_allowed(SDataAction::Read));
-                assert_eq!(Some(false), user_perms.is_allowed(SDataAction::Append));
+            SequenceUserPermissions::Public(user_perms) => {
+                assert_eq!(Some(true), user_perms.is_allowed(SequenceAction::Read));
+                assert_eq!(Some(false), user_perms.is_allowed(SequenceAction::Append));
                 assert_eq!(
                     Some(false),
-                    user_perms.is_allowed(SDataAction::ManagePermissions)
+                    user_perms.is_allowed(SequenceAction::ManagePermissions)
                 );
                 Ok(())
             }
-            SDataUserPermissions::Priv(_) => Err(CoreError::from(
+            SequenceUserPermissions::Priv(_) => Err(CoreError::from(
                 "Unexpectedly obtained incorrect user permissions",
             )),
         }
     }
 
     #[tokio::test]
-    pub async fn sdata_append_test() -> Result<(), CoreError> {
+    pub async fn sequence_append_test() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = random_client()?;
 
         let owner = client.public_key().await;
-        let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
+        let mut perms = BTreeMap::<SequenceUser, SequencePubUserPermissions>::new();
         let _ = perms.insert(
-            SDataUser::Key(owner),
-            SDataPubUserPermissions::new(true, true),
+            SequenceUser::Key(owner),
+            SequencePubUserPermissions::new(true, true),
         );
-        let address = client.store_pub_sdata(name, tag, owner, perms).await?;
+        let address = client.store_pub_sequence(name, tag, owner, perms).await?;
 
-        client.sdata_append(address, b"VALUE1".to_vec()).await?;
+        client.sequence_append(address, b"VALUE1".to_vec()).await?;
 
-        let (index, data) = client.get_sdata_last_entry(address).await?;
+        let (index, data) = client.get_sequence_last_entry(address).await?;
         assert_eq!(0, index);
         assert_eq!(unwrap!(std::str::from_utf8(&data)), "VALUE1");
 
-        client.sdata_append(address, b"VALUE2".to_vec()).await?;
+        client.sequence_append(address, b"VALUE2".to_vec()).await?;
 
-        let (index, data) = client.get_sdata_last_entry(address).await?;
+        let (index, data) = client.get_sequence_last_entry(address).await?;
         assert_eq!(1, index);
         assert_eq!(unwrap!(std::str::from_utf8(&data)), "VALUE2");
 
         let data = client
-            .get_sdata_range(address, (SDataIndex::FromStart(0), SDataIndex::FromEnd(0)))
+            .get_sequence_range(
+                address,
+                (SequenceIndex::FromStart(0), SequenceIndex::FromEnd(0)),
+            )
             .await?;
         assert_eq!(unwrap!(std::str::from_utf8(&data[0])), "VALUE1");
         assert_eq!(unwrap!(std::str::from_utf8(&data[1])), "VALUE2");
@@ -2590,38 +2549,40 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sdata_owner_test() -> Result<(), CoreError> {
+    pub async fn sequence_owner_test() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = random_client()?;
 
         let owner = client.public_key().await;
-        let mut perms = BTreeMap::<PublicKey, SDataPrivUserPermissions>::new();
-        let _ = perms.insert(owner, SDataPrivUserPermissions::new(true, true, true));
-        let address = client.store_priv_sdata(name, tag, owner, perms).await?;
+        let mut perms = BTreeMap::<PublicKey, SequencePrivUserPermissions>::new();
+        let _ = perms.insert(owner, SequencePrivUserPermissions::new(true, true, true));
+        let address = client
+            .store_private_sequence(name, tag, owner, perms)
+            .await?;
 
-        client.sdata_append(address, b"VALUE1".to_vec()).await?;
-        client.sdata_append(address, b"VALUE2".to_vec()).await?;
+        client.sequence_append(address, b"VALUE1".to_vec()).await?;
+        client.sequence_append(address, b"VALUE2".to_vec()).await?;
 
-        let data = client.get_sdata(address).await?;
+        let data = client.get_sequence(address).await?;
         assert_eq!(data.entries_index(), 2);
         assert_eq!(data.owners_index(), 1);
         assert_eq!(data.permissions_index(), 1);
 
-        let current_owner = client.get_sdata_owner(address).await?;
+        let current_owner = client.get_sequence_owner(address).await?;
         assert_eq!(owner, current_owner.public_key);
 
         let sim_client = gen_bls_keypair().public_key();
-        client.sdata_set_owner(address, sim_client).await?;
+        client.sequence_set_owner(address, sim_client).await?;
 
-        let current_owner = client.get_sdata_owner(address).await?;
+        let current_owner = client.get_sequence_owner(address).await?;
         assert_eq!(sim_client, current_owner.public_key);
 
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn sdata_can_delete_private_test() -> Result<(), CoreError> {
+    pub async fn sequence_can_delete_private_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
@@ -2629,15 +2590,17 @@ mod tests {
         let owner = client.public_key().await;
 
         // store a Private Sequence
-        let mut perms = BTreeMap::<PublicKey, SDataPrivUserPermissions>::new();
-        let _ = perms.insert(owner, SDataPrivUserPermissions::new(true, true, true));
-        let address = client.store_priv_sdata(name, tag, owner, perms).await?;
-        let sdata = client.get_sdata(address).await?;
-        assert!(sdata.is_priv());
+        let mut perms = BTreeMap::<PublicKey, SequencePrivUserPermissions>::new();
+        let _ = perms.insert(owner, SequencePrivUserPermissions::new(true, true, true));
+        let address = client
+            .store_private_sequence(name, tag, owner, perms)
+            .await?;
+        let sequence = client.get_sequence(address).await?;
+        assert!(sequence.is_private());
 
-        client.delete_sdata(address).await?;
+        client.delete_sequence(address).await?;
 
-        match client.get_sdata(address).await {
+        match client.get_sequence(address).await {
             Err(CoreError::DataError(SndError::NoSuchData)) => Ok(()),
             Err(err) => {
                 return Err(CoreError::from(format!(
@@ -2654,7 +2617,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn sdata_cannot_delete_public_test() -> Result<(), CoreError> {
+    pub async fn sequence_cannot_delete_public_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
@@ -2662,16 +2625,19 @@ mod tests {
         let owner = client.public_key().await;
 
         // store a Public Sequence
-        let mut perms = BTreeMap::<SDataUser, SDataPubUserPermissions>::new();
-        let _ = perms.insert(SDataUser::Anyone, SDataPubUserPermissions::new(true, true));
-        let address = client.store_pub_sdata(name, tag, owner, perms).await?;
-        let sdata = client.get_sdata(address).await?;
-        assert!(sdata.is_pub());
+        let mut perms = BTreeMap::<SequenceUser, SequencePubUserPermissions>::new();
+        let _ = perms.insert(
+            SequenceUser::Anyone,
+            SequencePubUserPermissions::new(true, true),
+        );
+        let address = client.store_pub_sequence(name, tag, owner, perms).await?;
+        let sequence = client.get_sequence(address).await?;
+        assert!(sequence.is_pub());
 
-        client.delete_sdata(address).await?;
+        client.delete_sequence(address).await?;
 
         // Check that our data still exists.
-        match client.get_sdata(address).await {
+        match client.get_sequence(address).await {
             Err(CoreError::DataError(SndError::InvalidOperation)) => Ok(()),
             Err(err) => {
                 return Err(CoreError::from(format!(
@@ -2685,38 +2651,28 @@ mod tests {
 }
 
 fn wrap_blob_read(read: BlobRead) -> Query {
-    Query::Data(
-        DataQuery::Blob(read)
-    )
+    Query::Data(DataQuery::Blob(read))
 }
 
 fn wrap_map_read(read: MapRead) -> Query {
-    Query::Data(
-        DataQuery::Map(read)
-    )
+    Query::Data(DataQuery::Map(read))
 }
 
 fn wrap_seq_read(read: SequenceRead) -> Query {
-    Query::Data(
-        DataQuery::Sequence(read)
-    )
+    Query::Data(DataQuery::Sequence(read))
 }
 
 fn wrap_account_read(read: AccountRead) -> Query {
-    Query::Data(
-        DataQuery::Account(read)
-    )
+    Query::Data(DataQuery::Account(read))
 }
 
 fn wrap_client_auth_cmd(auth_cmd: AuthCmd) -> Cmd {
     Cmd::Auth(auth_cmd)
 }
 
-
 fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {
     Query::Auth(auth_query)
 }
-
 
 // 1. Store different variants of unpublished data on the network.
 // 2. Get the balance of the client.
@@ -2734,7 +2690,7 @@ fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {
 //     );
 //     let address = *blob.name();
 //     client.put_blob(blob).await?;
-//     let mut adata = UnpubSeqAppendOnlyData::new(name, tag);
+//     let mut adata = PrivateSeqAppendOnlyData::new(name, tag);
 //     let owner = ADataOwner {
 //         public_key: client.public_key().await,
 //         entries_index: 0,
@@ -2742,7 +2698,7 @@ fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {
 //     };
 //     unwrap!(adata.append_owner(owner, 0));
 //     client.put_adata(adata.into()).await?;
-//     let map = UnseqMutableData::new(name, tag, client.public_key().await);
+//     let map = UnseqMap::new(name, tag, client.public_key().await);
 //     client.put_unseq_mutable_data(map).await?;
 
 // /// Insert a given login packet at the specified destination

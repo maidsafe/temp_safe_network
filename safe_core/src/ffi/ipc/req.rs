@@ -158,7 +158,7 @@ impl Drop for ContainersReq {
 }
 
 #[repr(C)]
-/// For use in `ShareMapReq`. Represents a specific `MutableData` that is being shared.
+/// For use in `ShareMapReq`. Represents a specific `Map` that is being shared.
 pub struct ShareMap {
     /// The mutable data type.
     pub type_tag: u64,

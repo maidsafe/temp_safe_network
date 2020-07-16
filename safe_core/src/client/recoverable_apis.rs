@@ -11,8 +11,7 @@ use crate::client::AuthActions;
 use crate::errors::CoreError;
 use safe_nd::{
     AppPermissions, EntryError, Error as SndError, MapAction, MapAddress, MapPermissionSet,
-    MapSeqEntries, MapSeqEntryAction, MapSeqEntryActions, MapSeqValue, PublicKey,
-    SeqMutableData,
+    MapSeqEntries, MapSeqEntryAction, MapSeqEntryActions, MapSeqValue, PublicKey, SeqMap,
 };
 
 use std::collections::BTreeMap;
@@ -28,7 +27,7 @@ const MAX_ATTEMPTS: usize = 10;
 /// entries or remove existing permissions.
 pub async fn put_map(
     client: (impl Client + Sync + Send),
-    data: SeqMutableData,
+    data: SeqMap,
 ) -> Result<(), CoreError> {
     let client = client.clone();
 
@@ -170,7 +169,7 @@ pub async fn del_map_user_permissions(
 
 async fn update_map(
     client: (impl Client + Sync + Send),
-    data: SeqMutableData,
+    data: SeqMap,
 ) -> Result<(), CoreError> {
     let client = client.clone();
 
@@ -248,8 +247,7 @@ async fn update_map_permissions(
 
     while !success {
         if let Some((user, set)) = permissions.pop() {
-            match set_map_user_permissions(client.clone(), address, user, set, version_to_try)
-                .await
+            match set_map_user_permissions(client.clone(), address, user, set, version_to_try).await
             {
                 Ok(()) => {
                     success = true;
@@ -284,10 +282,7 @@ fn fix_entry_actions(
         })
 }
 
-fn fix_entry_action(
-    action: &MapSeqEntryAction,
-    error: &EntryError,
-) -> Option<MapSeqEntryAction> {
+fn fix_entry_action(action: &MapSeqEntryAction, error: &EntryError) -> Option<MapSeqEntryAction> {
     match (action, error) {
         (MapSeqEntryAction::Ins(value), EntryError::EntryExists(current_version))
         | (MapSeqEntryAction::Update(value), EntryError::InvalidSuccessor(current_version)) => {
@@ -519,7 +514,7 @@ mod tests_with_mock_routing {
         let permissions = btree_map![
             user => MapPermissionSet::new().allow(MapAction::Insert)
         ];
-        let data0 = SeqMutableData::new_with_data(name, tag, entries, permissions, owners);
+        let data0 = SeqMap::new_with_data(name, tag, entries, permissions, owners);
 
         let entries1 = btree_map![
             vec![0] => MapSeqValue {
@@ -543,7 +538,7 @@ mod tests_with_mock_routing {
            user => MapPermissionSet::new().allow(MapAction::Delete)
         ];
 
-        let data1 = SeqMutableData::new_with_data(name, tag, entries1, permissions, owners);
+        let data1 = SeqMap::new_with_data(name, tag, entries1, permissions, owners);
 
         client.put_seq_mutable_data(data0).await?;
         put_map(client.clone(), data1).await?;
@@ -606,7 +601,7 @@ mod tests_with_mock_routing {
             }
         ];
         let owners = client.public_key().await;
-        let data = SeqMutableData::new_with_data(name, tag, entries, Default::default(), owners);
+        let data = SeqMap::new_with_data(name, tag, entries, Default::default(), owners);
 
         client.put_seq_mutable_data(data).await?;
 
@@ -674,7 +669,7 @@ mod tests_with_mock_routing {
         let name: XorName = rand::random();
         let tag = 10_000;
         let owners = client.public_key().await;
-        let data = SeqMutableData::new_with_data(
+        let data = SeqMap::new_with_data(
             name,
             tag,
             Default::default(),

@@ -123,7 +123,7 @@ async fn file_fetch_public_md() -> Result<(), NfsError> {
 }
 
 // Test inserting files to, and fetching from, a public map.
-// Insert a file as Unpublished Immutable data and verify that it can be fetched.
+// Insert a file as Private Immutable data and verify that it can be fetched.
 // Other clients should not be able to fetch the file.
 // After deletion the file should not be accessible anymore.
 #[tokio::test]

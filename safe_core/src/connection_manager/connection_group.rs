@@ -24,9 +24,8 @@ use quic_p2p::{
 };
 use rand::Rng;
 use safe_nd::{
-    Event as EventMsg,
-    DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId,
-    PublicId, QueryResponse, MsgEnvelope
+    DebitAgreementProof, Event as EventMsg, HandshakeRequest, HandshakeResponse, Message,
+    MessageId, MsgEnvelope, NodePublicId, PublicId, QueryResponse,
 };
 
 use futures_util::stream::StreamExt;
@@ -106,7 +105,7 @@ impl ConnectionGroup {
 
     pub async fn send_query(&mut self, msg: &Message) -> Result<QueryResponse, CoreError> {
         // user block here to drop lock asap
-        let mut receiver_future = { self.inner.lock().await.send_query( msg).await? };
+        let mut receiver_future = { self.inner.lock().await.send_query(msg).await? };
 
         let mut response = Err(CoreError::from("No response received."));
         while let Some(QueryResponse) = receiver_future.next().await {
@@ -328,18 +327,23 @@ impl Connected {
                 .into_iter()
                 .map(|(k, v)| (k, v.elder))
                 .collect(),
-            full_id: old_state.full_id
+            full_id: old_state.full_id,
         }
     }
 
-    fn get_envelope_for_message( &self, message: Message ) -> MsgEnvelope {
-        let signature = self.full_id.sign(&unwrap::unwrap!(bincode::serialize( &message )));
-        let origin =  MsgSender::Client{ id: self.full_id.public_key(), signature };
-    
+    fn get_envelope_for_message(&self, message: Message) -> MsgEnvelope {
+        let signature = self
+            .full_id
+            .sign(&unwrap::unwrap!(bincode::serialize(&message)));
+        let origin = MsgSender::Client {
+            id: self.full_id.public_key(),
+            signature,
+        };
+
         MsgEnvelope {
             message,
             origin,
-            proxies: Default::default()
+            proxies: Default::default(),
         }
     }
 
@@ -357,17 +361,13 @@ impl Connected {
         trace!("Sending message {:?}", msg.id());
 
         let envelope = self.get_envelope_for_message(msg.clone());
-        
+
         let expected_responses = self.elders.len() / 2 + 1;
         let (sender_future, response_future) = mpsc::unbounded();
         // send and await response
-        let _ = self.response_manager.await_query_responses(
-            msg.id(),
-            (
-                sender_future,
-                expected_responses
-            ),
-        );
+        let _ = self
+            .response_manager
+            .await_query_responses(msg.id(), (sender_future, expected_responses));
 
         let bytes = Bytes::from(unwrap!(serialize(&envelope)));
         {
@@ -410,10 +410,9 @@ impl Connected {
         // set up channel
         let (sender_future, response_future) = mpsc::unbounded();
 
-        let _ = self.response_manager.add_event_listener(
-            msg_id,
-            sender_future
-        );
+        let _ = self
+            .response_manager
+            .add_event_listener(msg_id, sender_future);
 
         // send the message to our elders list
         let bytes = Bytes::from(unwrap!(serialize(msg)));
@@ -429,10 +428,7 @@ impl Connected {
 
         while let Some((res, message_id)) = receiver_future.next().await {
             // Let the actor handle receipt of each response from elders
-            match transfer_actor
-                .handle_validation_event(event)
-                .await
-            {
+            match transfer_actor.handle_validation_event(event).await {
                 Ok(proof) => {
                     if let Some(debit_agreement_proof) = proof {
                         receiver_future.close();
@@ -457,14 +453,13 @@ impl Connected {
         trace!("{}: Message: {}.", peer_addr, utils::bin_data_format(&msg),);
 
         match deserialize(&msg) {
-            Ok(MsgEnvelope{ message, ..}) => {
-
+            Ok(MsgEnvelope { message, .. }) => {
                 match message {
-                    Message::QueryResponse{
-                        response, 
+                    Message::QueryResponse {
+                        response,
                         correlation_id,
                         query_origin,
-                        id
+                        id,
                     } => {
                         trace!(
                             "QueryResponse: query came from: {:?}, correlation_id: {:?}, resp: {:?}, msg_id: {:?}",
@@ -474,12 +469,14 @@ impl Connected {
                             id
                         );
 
-                        let _ = self.response_manager.handle_query_response(correlation_id, response);
-                    },
-                    Message::Event{
-                        event, 
+                        let _ = self
+                            .response_manager
+                            .handle_query_response(correlation_id, response);
+                    }
+                    Message::Event {
+                        event,
                         correlation_id,
-                        id
+                        id,
                     } => {
                         trace!(
                             "Event: {:?}, correlation_id: {:?}, msg_id: {:?}",
@@ -487,13 +484,15 @@ impl Connected {
                             correlation_id,
                             id
                         );
-                        let _ = self.response_manager.handle_event_response(correlation_id, event);
-                    },
-                    Message::CmdError{
-                        error, 
+                        let _ = self
+                            .response_manager
+                            .handle_event_response(correlation_id, event);
+                    }
+                    Message::CmdError {
+                        error,
                         correlation_id,
                         cmd_origin,
-                        id
+                        id,
                     } => {
                         trace!(
                             "CmdError: from: {:?}, correlation_id: {:?}, error: {:?}, msg_id: {:?}",
@@ -504,7 +503,7 @@ impl Connected {
                         );
                         warn!("CmdError received: {:?}", &error);
                         // let _ = self.response_manager.handle_query_response(correlation_id, response);
-                    },
+                    }
                     _ => {
                         warn!("Error: Unexpected message received: {:?}", &message);
                     }
@@ -758,10 +757,13 @@ impl Inner {
         // TODO: check if we have handled the challenge?
 
         match deserialize(msg) {
-            Ok(MsgEnvelope{ message, ..}) => {
-                warn!("unimplemented: Handling of unsent message. Message not sent: {:?}", message );
+            Ok(MsgEnvelope { message, .. }) => {
+                warn!(
+                    "unimplemented: Handling of unsent message. Message not sent: {:?}",
+                    message
+                );
                 // self.handle_unsent_message(peer_addr, request, message_id, token)
-            },
+            }
             Ok(_) => println!("Unexpected message type"),
             Err(e) => println!("Unexpected error {:?}", e),
         }

@@ -15,9 +15,7 @@ use crate::utils::{
     self, symmetric_decrypt, symmetric_encrypt, SymEncKey, SymEncNonce, SYM_ENC_NONCE_LEN,
 };
 use ffi_utils::ReprC;
-use safe_nd::{
-    MapAddress, MapKind, MapSeqEntries, MapSeqEntryAction, MapSeqValue, XorName,
-};
+use safe_nd::{MapAddress, MapKind, MapSeqEntries, MapSeqEntryAction, MapSeqValue, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto;

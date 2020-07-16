@@ -10,7 +10,7 @@ use crate::client::{Client, MapInfo};
 use crate::errors::CoreError;
 use crate::nfs::NfsError;
 use log::trace;
-use safe_nd::{Error as SndError, MapPermissionSet, MapSeqEntries, PublicKey, SeqMutableData};
+use safe_nd::{Error as SndError, MapPermissionSet, MapSeqEntries, PublicKey, SeqMap};
 use std::collections::BTreeMap;
 
 /// Create a new directory based on the provided `MapInfo`.
@@ -23,7 +23,7 @@ pub async fn create_directory(
     let pub_key = client.owner_key().await;
 
     let dir_md =
-        SeqMutableData::new_with_data(dir.name(), dir.type_tag(), contents, perms, pub_key);
+        SeqMap::new_with_data(dir.name(), dir.type_tag(), contents, perms, pub_key);
 
     trace!("Creating new directory: {:?}", dir);
     client

@@ -1,7 +1,7 @@
 use safe_nd::{
-    Query, TransferQuery, Cmd, TransferCmd,
-    DebitAgreementProof, Message, MessageId, Money, PublicKey, ReplicaEvent, Request, QueryResponse,
-    SignatureShare, SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
+    Cmd, DebitAgreementProof, Message, MessageId, Money, PublicKey, Query, QueryResponse,
+    ReplicaEvent, Request, SignatureShare, SignedTransfer, Transfer, TransferCmd,
+    TransferPropagated, TransferQuery, Transfers as MoneyRequest,
 };
 use safe_transfers::{ActorEvent, TransferActor as SafeTransferActor, TransfersSynched};
 
@@ -27,7 +27,7 @@ impl TransferActor {
     ) -> Result<PublicKeySet, CoreError> {
         trace!("Getting replica keys for {:?}", safe_key);
 
-        let keys_query_msg = Query::Transfer( TransferQuery::GetReplicaKeys(safe_key.public_key()));
+        let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(safe_key.public_key()));
 
         let (message, message_id) =
             create_network_message_envelope(safe_key.clone(), keys_query_msg)?;

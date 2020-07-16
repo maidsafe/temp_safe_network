@@ -18,7 +18,7 @@ use connection_group::ConnectionGroup;
 use futures::lock::Mutex;
 use log::{error, trace};
 use quic_p2p::Config as QuicP2pConfig;
-use safe_nd::{DebitAgreementProof, Message,MsgEnvelope, PublicId, QueryResponse};
+use safe_nd::{DebitAgreementProof, Message, MsgEnvelope, PublicId, QueryResponse};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
@@ -56,7 +56,11 @@ impl ConnectionManager {
     }
 
     /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`.
-    pub async fn send_query(&mut self, pub_id: &PublicId, msg: &Message) -> Result<QueryResponse, CoreError> {
+    pub async fn send_query(
+        &mut self,
+        pub_id: &PublicId,
+        msg: &Message,
+    ) -> Result<QueryResponse, CoreError> {
         self.inner.lock().await.send_query(pub_id, msg).await
     }
 
@@ -131,7 +135,11 @@ impl Inner {
         }
     }
 
-    async fn send_query(&mut self, pub_id: &PublicId, msg: &Message) -> Result<QueryResponse, CoreError> {
+    async fn send_query(
+        &mut self,
+        pub_id: &PublicId,
+        msg: &Message,
+    ) -> Result<QueryResponse, CoreError> {
         let msg_id = msg.id();
 
         let conn_group = self.groups.get_mut(&pub_id).ok_or_else(|| {

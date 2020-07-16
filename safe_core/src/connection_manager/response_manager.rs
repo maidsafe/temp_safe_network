@@ -8,7 +8,7 @@
 
 use futures::channel::mpsc;
 use log::{debug, trace};
-use safe_nd::{MessageId, QueryResponse, MsgEnvelope, Event, CmdError};
+use safe_nd::{CmdError, Event, MessageId, MsgEnvelope, QueryResponse};
 use std::collections::HashMap;
 
 type ResponseRequiredCount = usize;
@@ -23,7 +23,7 @@ pub struct ResponseManager {
         (
             mpsc::UnboundedSender<QueryResponse>,
             VoteMap,
-            ResponseRequiredCount
+            ResponseRequiredCount,
         ),
     >,
     /// expected events pending
@@ -40,17 +40,13 @@ impl ResponseManager {
             pending_queries: Default::default(),
             event_listeners: Default::default(),
             response_threshold,
-
         }
     }
 
     pub fn await_query_responses(
         &mut self,
         msg_id: MessageId,
-        value: (
-            mpsc::UnboundedSender<QueryResponse>,
-            ResponseRequiredCount
-        ),
+        value: (mpsc::UnboundedSender<QueryResponse>, ResponseRequiredCount),
     ) -> Result<(), String> {
         let (sender, count) = value;
         let the_request = (sender, VoteMap::default(), count);
@@ -59,36 +55,50 @@ impl ResponseManager {
     }
 
     // TODO: rename... it's tried to msgid not really event...
-    pub fn add_event_listener( &mut self, msg_id: MessageId, sender: mpsc::UnboundedSender<Event>) -> Result<(), String> {
+    pub fn add_event_listener(
+        &mut self,
+        msg_id: MessageId,
+        sender: mpsc::UnboundedSender<Event>,
+    ) -> Result<(), String> {
         let _ = self.event_listeners.insert(msg_id, sender);
         Ok(())
     }
     // TODO: rename... it's tried to msgid not really event...
-    pub fn remove_event_listener( &mut self, msg_id: &MessageId) -> Result<(), String> {
+    pub fn remove_event_listener(&mut self, msg_id: &MessageId) -> Result<(), String> {
         let _ = self.event_listeners.remove(msg_id);
         Ok(())
     }
 
     /// Send event to registered listeners
-    pub fn handle_event_response( &mut self, correlating_message_id: MessageId, event: Event ) -> Result<(), String> {
-        trace!("Handling event: {:?} correlating to : {:?}", correlating_message_id);
+    pub fn handle_event_response(
+        &mut self,
+        correlating_message_id: MessageId,
+        event: Event,
+    ) -> Result<(), String> {
+        trace!(
+            "Handling event: {:?} correlating to : {:?}",
+            correlating_message_id
+        );
 
-         let _ = self
+        let _ = self
             // first remove the response and see how we deal with it (we re-add later if needed)
             .event_listeners
             .get(&correlating_message_id)
-            .map(|sender| {
-                sender.unbounded_send(event)
-            });
-        
-            Ok(())
+            .map(|sender| sender.unbounded_send(event));
+
+        Ok(())
     }
 
     /// Handle a response from one of the elders.
-    pub fn handle_query_response(&mut self, correlating_message_id: MessageId, response: QueryResponse) -> Result<(), String> {
+    pub fn handle_query_response(
+        &mut self,
+        correlating_message_id: MessageId,
+        response: QueryResponse,
+    ) -> Result<(), String> {
         trace!(
             "Handling response for sent msg_id: {:?}, query resp: {:?}",
-            correlating_message, response
+            correlating_message,
+            response
         );
 
         let _ = self
@@ -220,8 +230,7 @@ mod tests {
         let blob_bad = safe_nd::PublicBlob::new(vec![7]);
 
         let response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::Blob::from(blob)));
-        let bad_response =
-            safe_nd::QueryResponse::GetBlob(Ok(safe_nd::Blob::from(blob_bad)));
+        let bad_response = safe_nd::QueryResponse::GetBlob(Ok(safe_nd::Blob::from(blob_bad)));
 
         response_manager
             .await_query_responses(message_id, (sender_future, expected_responses))
@@ -281,7 +290,9 @@ mod tests {
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_query_response(message_id, resp).unwrap();
+            response_manager
+                .handle_query_response(message_id, resp)
+                .unwrap();
         }
 
         let returned_response = match response_future.next().await {
@@ -334,7 +345,9 @@ mod tests {
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_query_response(message_id, resp).unwrap();
+            response_manager
+                .handle_query_response(message_id, resp)
+                .unwrap();
         }
 
         // last response should be bad to ensure we dont just default to it
@@ -370,7 +383,8 @@ mod tests {
         let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
         let bad_response = safe_nd::QueryResponse::GetBlob(Err(safe_nd::Error::NoSuchData));
-        let another_bad_response = safe_nd::QueryResponse::GetBlob(Err(safe_nd::Error::NoSuchEntry));
+        let another_bad_response =
+            safe_nd::QueryResponse::GetBlob(Err(safe_nd::Error::NoSuchEntry));
 
         let mut responses_to_handle = vec![
             // todo, back to 3 responses
@@ -393,7 +407,9 @@ mod tests {
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_query_response(message_id, resp).unwrap();
+            response_manager
+                .handle_query_response(message_id, resp)
+                .unwrap();
         }
 
         let returned_response = match response_future.next().await {
@@ -445,7 +461,9 @@ mod tests {
             .unwrap();
 
         for resp in responses_to_handle {
-            response_manager.handle_query_response(message_id, resp).unwrap();
+            response_manager
+                .handle_query_response(message_id, resp)
+                .unwrap();
         }
 
         let returned_response = match response_future.next().await {

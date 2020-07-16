@@ -333,7 +333,7 @@ impl ReprC for AppAccess {
     }
 }
 
-/// Metadata for `MutableData`.
+/// Metadata for `Map`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UserMetadata {
     /// Name or purpose of this mutable data.

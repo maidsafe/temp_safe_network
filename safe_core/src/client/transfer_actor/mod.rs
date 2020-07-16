@@ -1,6 +1,6 @@
 use safe_nd::{
-    DebitAgreementProof, Message, MessageId, PublicId, PublicKey, QueryResponse,MsgEnvelope,
-    Cmd, Data, Query, TransferCmd, MsgSender
+    Cmd, Data, DebitAgreementProof, Message, MessageId, MsgEnvelope, MsgSender, PublicId,
+    PublicKey, Query, QueryResponse, TransferCmd,
 };
 
 use safe_transfers::{
@@ -8,7 +8,7 @@ use safe_transfers::{
 };
 
 use crate::client::ConnectionManager;
-use crate::client::{Client, SafeKey, COST_OF_PUT, create_network_message_envelope};
+use crate::client::{create_network_message_envelope, Client, SafeKey, COST_OF_PUT};
 use crate::errors::CoreError;
 use crdts::Dot;
 use futures::lock::Mutex;
@@ -72,13 +72,11 @@ impl TransferActor {
         let public_key = self.safe_key.public_key();
         info!("Getting SafeTransfers history for pk: {:?}", public_key);
 
-        let msg_contents = Query::Transfer(
-            TransferQuery::GetHistory {
-                at: public_key,
-                since_version: 0,
-            }
-        );
-        
+        let msg_contents = Query::Transfer(TransferQuery::GetHistory {
+            at: public_key,
+            since_version: 0,
+        });
+
         let (message, _messafe_id) =
             create_network_message_envelope(self.safe_key.clone(), msg_contents)?;
 
@@ -137,9 +135,7 @@ impl TransferActor {
             .transfer(COST_OF_PUT, section_key)?
             .signed_transfer;
 
-        let command = TransferCmd::ValidateTransfer(
-            signed_transfer.clone()
-        );
+        let command = TransferCmd::ValidateTransfer(signed_transfer.clone());
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 

@@ -87,7 +87,7 @@ impl File {
         self.published
     }
 
-    /// Get the Immutable Data address of the file
+    /// Get the Blob address of the file
     pub fn data_address(&self) -> BlobAddress {
         let kind = BlobKind::from_flag(self.published());
         BlobAddress::from_kind(kind, *self.data_map_name())

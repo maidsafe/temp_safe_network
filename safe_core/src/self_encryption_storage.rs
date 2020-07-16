@@ -9,7 +9,7 @@
 use super::{Client, CoreError};
 use async_trait::async_trait;
 use log::trace;
-use safe_nd::{Blob, BlobAddress, PublicBlob, PrivateBlob, XorName, XOR_NAME_LEN};
+use safe_nd::{Blob, BlobAddress, PrivateBlob, PublicBlob, XorName, XOR_NAME_LEN};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -49,9 +49,9 @@ impl<C: Send + Sync + Client + 'static> Storage for SelfEncryptionStorage<C> {
         };
 
         let address = if self.published {
-            BlobAddress::Pub(name)
+            BlobAddress::Public(name)
         } else {
-            BlobAddress::Unpub(name)
+            BlobAddress::Private(name)
         };
 
         match self.client.get_blob(address).await {

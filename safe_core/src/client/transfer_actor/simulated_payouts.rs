@@ -1,10 +1,10 @@
 use safe_nd::{
-    DebitAgreementProof, Money, PublicKey, ReplicaEvent, Request, QueryResponse, SignatureShare,
+    DebitAgreementProof, Money, PublicKey, QueryResponse, ReplicaEvent, Request, SignatureShare,
     SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
 };
 use safe_transfers::{ActorEvent, TransfersSynched};
 
-use crate::client::{Client, TransferActor, create_network_message_envelope};
+use crate::client::{create_network_message_envelope, Client, TransferActor};
 use crate::errors::CoreError;
 
 use std::str::FromStr;
@@ -50,7 +50,7 @@ impl TransferActor {
             id: self.simulated_farming_payout_dot,
         };
 
-        let simluated_farming_msg =  Cmd::Transfer::SimulatePayout(        simulated_transfer.clone() );
+        let simluated_farming_msg = Cmd::Transfer::SimulatePayout(simulated_transfer.clone());
 
         let (message, _message_id) =
             create_network_message_envelope(safe_key.clone(), simluated_farming_msg)?;
