@@ -28,7 +28,7 @@ use crate::{
 use log::{error, info, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{MsgEnvelope, MsgSender, NodeFullId};
+use safe_nd::NodeFullId;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -73,18 +73,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         let keypair = Rc::new(RefCell::new(utils::key_pair(routing.clone())?));
         let keys = NodeKeys::new(keypair);
 
-        let messaging = Messaging::new(routing.clone());
-        let messaging = Rc::new(RefCell::new(messaging));
-
         let age_based_duties = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
             let duties = ElderDuties::new(
+                id.public_id().clone(),
                 keys.clone(),
                 &config,
                 &total_used_space,
                 init_mode,
                 routing.clone(),
-                ClientMessaging::new(id.public_id().clone(), routing.clone()),
             )?;
             AgeBasedDuties::Elder(duties)
         } else {
@@ -165,49 +162,6 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    fn accumulate_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        let id = self.keys.public_key();
-        info!(
-            "{}: Accumulating signatures for {:?}",
-            &id,
-            msg.message.id()
-        );
-        if let Some((accumulated_msg, signature)) = self.accumulator()?.accumulate_cmd(msg) {
-            info!(
-                "Got enough signatures for {:?}",
-                accumulated_msg.message.id()
-            );
-            // upgrade sender to Section, since it accumulated
-            let sender = match msg.most_recent_sender() {
-                MsgSender::Node { duty, .. } => MsgSender::Section {
-                    id,
-                    duty: *duty,
-                    signature,
-                },
-                _ => return None, // invalid use case, we only accumulate from Nodes
-            };
-            // consider msg.pop_proxy() to remove the Node
-            // or we just set the last proxy always
-            self.handle_remote_msg(&msg.with_proxy(sender))
-        } else {
-            None
-        }
-    }
-
-    // fn accumulator(&mut self) -> Option<&mut Accumulator> {
-    //     match &mut self.state {
-    //         State::Infant => None,
-    //         State::Elder {
-    //             ref mut accumulator,
-    //             ..
-    //         } => Some(accumulator),
-    //         State::Adult {
-    //             ref mut accumulator,
-    //             ..
-    //         } => Some(accumulator),
-    //     }
-    // }
-
     ///
     pub fn process_while_any(&mut self, op: Option<NodeOperation>) {
         use NodeOperation::*;
@@ -215,24 +169,51 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut next_op = op;
         while let Some(op) = next_op {
             next_op = match op {
-                //RunAsMessaging(duty) => self.node_duties().process(NodeDuty::ProcessMessaging(&duty)),
-                RunAsGateway(duty) => self
-                    .elder_duties()?
-                    .gateway()
-                    .process(&duty),
-                RunAsPayment(duty) => self.elder_duties()?.data_payment().process(&duty),
-                RunAsTransfers(duty) => self.elder_duties()?.transfers().process(&duty),
-                RunAsMetadata(duty) => self.elder_duties()?.metadata().process(&duty),
-                RunAsRewards(duty) => self.elder_duties()?.rewards().process(&duty),
-                RunAsAdult(duty) => self.adult_duties()?.process(&duty),
-                RunAsElder(duty) => self.elder_duties()?.process(duty),
+                RunAsGateway(duty) => self.run_as_gateway(duty),
+                RunAsPayment(duty) => self.run_as_payment(duty),
+                RunAsTransfers(duty) => self.run_as_transfers(duty),
+                RunAsMetadata(duty) => self.run_as_metadata(duty),
+                RunAsRewards(duty) => self.run_as_rewards(duty),
+                RunAsAdult(duty) => self.run_as_adult(duty),
+                RunAsElder(duty) => self.run_as_elder(duty),
                 RunAsNode(duty) => self.node_duties().process(duty),
-                Unknown => {
-                    error!("Unknown message destination: {:?}", msg.message.id());
-                    None
-                }
+                Unknown => None,
             }
         }
+    }
+
+    fn run_as_adult(&mut self, duty: node_ops::AdultDuty) -> Option<NodeOperation> {
+        // if let Some(duties) = self.adult_duties() {
+        //     duties.process(&duty)
+        // } else {
+        //     error!("Invalid message assignment: {:?}", duty);
+        //     None
+        // }
+        self.adult_duties()?.process(&duty)
+    }
+
+    fn run_as_elder(&mut self, duty: node_ops::ElderDuty) -> Option<NodeOperation> {
+        self.elder_duties()?.process(&duty)
+    }
+
+    fn run_as_gateway(&mut self, duty: node_ops::GatewayDuty) -> Option<NodeOperation> {
+        self.elder_duties()?.gateway().process(&duty)
+    }
+
+    fn run_as_payment(&mut self, duty: node_ops::PaymentDuty) -> Option<NodeOperation> {
+        self.elder_duties()?.data_payment().process(&duty)
+    }
+
+    fn run_as_transfers(&mut self, duty: node_ops::TransferDuty) -> Option<NodeOperation> {
+        self.elder_duties()?.transfers().process(&duty)
+    }
+    
+    fn run_as_metadata(&mut self, duty: node_ops::MetadataDuty) -> Option<NodeOperation> {
+        self.elder_duties()?.metadata().process(&duty)
+    }
+
+    fn run_as_rewards(&mut self, duty: node_ops::RewardDuty) -> Option<NodeOperation> {
+        self.elder_duties()?.rewards().process(&duty)
     }
 
     ///
@@ -271,7 +252,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     fn dump_state(&self) -> Result<()> {
         let path = self.root_dir.join(STATE_FILENAME);
-        let is_elder = matches!(self.state, State::Elder { .. });
+        let is_elder = matches!(self.duties, AgeBasedDuties::Elder { .. });
         Ok(fs::write(path, utils::serialise(&(is_elder, &self.id)))?)
     }
 

@@ -10,8 +10,8 @@ use crate::{cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
 use log::trace;
 use safe_nd::{
     Account, AccountWrite, BlobRead, BlobWrite, Cmd, CmdError, DataCmd, DataQuery,
-    Error as NdError, IData, IDataAddress, IDataKind, MData, MapRead, MapWrite, Message,
-    MsgEnvelope, Query, SData, SDataAddress, SequenceRead, SequenceWrite,
+    Error as NdError, Blob, BlobAddress, BlobKind, Map, MapRead, MapWrite, Message,
+    MsgEnvelope, Query, Sequence, SequenceAddress, SequenceRead, SequenceWrite,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -101,7 +101,7 @@ impl Sequences {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: SData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn initiate_creation(&mut self, chunk: Sequence, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*msg.origin.id()).is_err() {
@@ -122,7 +122,7 @@ impl Sequences {
     // on client request
     fn initiate_deletion(
         &mut self,
-        address: SDataAddress,
+        address: SequenceAddress,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
         if address.is_pub() {
@@ -209,14 +209,14 @@ impl Blobs {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: IData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        // Assert that if the request was for UnpubIData, that the owner's public key has
+    fn initiate_creation(&mut self, chunk: Blob, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+        // Assert that if the request was for UnpubBlob, that the owner's public key has
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
         // by their Client owners.
-        if let IData::Unpub(ref unpub_chunk) = &chunk {
+        if let Blob::Private(ref unpub_chunk) = &chunk {
             if unpub_chunk.owner() != msg.origin.id() {
                 trace!(
-                    "{}: {} attempted Put UnpubIData with invalid owners field.",
+                    "{}: {} attempted Put UnpubBlob with invalid owners field.",
                     self,
                     msg.origin.id()
                 );
@@ -233,10 +233,10 @@ impl Blobs {
     // on client request
     fn initiate_deletion(
         &mut self,
-        address: IDataAddress,
+        address: BlobAddress,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
-        if address.kind() == IDataKind::Unpub {
+        if address.kind() == BlobKind::Private {
             self.decisions.vote(msg)
         } else {
             self.decisions.error(
@@ -311,7 +311,7 @@ impl Maps {
     }
 
     // on client request
-    fn initiate_creation(&mut self, chunk: MData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn initiate_creation(&mut self, chunk: Map, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
         if chunk.owner() != *msg.origin.id() {

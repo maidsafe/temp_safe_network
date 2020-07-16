@@ -154,7 +154,7 @@ impl Metadata {
     //                 message_id,
     //                 request,
     //             ),
-    //             GetIData(result) => self.elder_stores.blob_register().handle_get_result(
+    //             GetBlob(result) => self.elder_stores.blob_register().handle_get_result(
     //                 result,
     //                 message_id,
     //                 requester,
@@ -179,13 +179,13 @@ impl Metadata {
 
     // fn initiate_duplication(
     //     &mut self,
-    //     address: IDataAddress,
+    //     address: BlobAddress,
     //     holders: BTreeSet<XorName>,
     //     message_id: MessageId,
     //     accumulated_signature: Option<Signature>,
     // ) -> Option<MessagingDuty> {
     //     trace!(
-    //         "Sending GetIData request for address: ({:?}) to {:?}",
+    //         "Sending GetBlob request for address: ({:?}) to {:?}",
     //         address,
     //         holders,
     //     );
@@ -206,7 +206,7 @@ impl Metadata {
     //     sender: SrcLocation,
     //     response: Response,
     //     message_id: MessageId,
-    //     idata_address: IDataAddress,
+    //     Blob_address: BlobAddress,
     //     signature: Signature,
     // ) -> Option<MessagingDuty> {
     //     use Response::*;
@@ -216,11 +216,11 @@ impl Metadata {
     //         .public_key_set()
     //         .ok()?
     //         .public_key()
-    //         .verify(&signature, &utils::serialise(&idata_address))
+    //         .verify(&signature, &utils::serialise(&Blob_address))
     //     {
     //         match response {
     //             Write(result) => self.elder_stores.blob_register_mut().update_holders(
-    //                 idata_address,
+    //                 Blob_address,
     //                 utils::get_source_name(sender),
     //                 result,
     //                 message_id,

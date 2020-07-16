@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{SData, SDataAddress};
+use safe_nd::{Sequence, SequenceAddress};
 
-impl Chunk for SData {
-    type Id = SDataAddress;
+impl Chunk for Sequence {
+    type Id = SequenceAddress;
     fn id(&self) -> &Self::Id {
         self.address()
     }
 }
 
-impl ChunkId for SDataAddress {}
+impl ChunkId for SequenceAddress {}

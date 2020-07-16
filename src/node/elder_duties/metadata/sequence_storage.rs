@@ -16,8 +16,8 @@ use crate::{
 };
 use safe_nd::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
-    SData, SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions,
-    SDataPrivPermissions, SDataPubPermissions, SDataUser, SDataWriteOp, SequenceRead,
+    Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex, SequenceOwner, SequencePermissions,
+    SequencePrivPermissions, SequencePubPermissions, SequenceUser, SequenceWriteOp, SequenceRead,
     SequenceWrite,
 };
 use std::{
@@ -95,7 +95,7 @@ impl SequenceStorage {
 
     fn store(
         &mut self,
-        data: &SData,
+        data: &Sequence,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -111,11 +111,11 @@ impl SequenceStorage {
 
     fn get(
         &self,
-        address: SDataAddress,
+        address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result = self.get_chunk(address, SDataAction::Read, origin);
+        let result = self.get_chunk(address, SequenceAction::Read, origin);
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetSequence(result),
             id: MessageId::new(),
@@ -126,10 +126,10 @@ impl SequenceStorage {
 
     fn get_chunk(
         &self,
-        address: SDataAddress,
-        action: SDataAction,
+        address: SequenceAddress,
+        action: SequenceAction,
         origin: &MsgSender,
-    ) -> Result<SData, NdError> {
+    ) -> Result<Sequence, NdError> {
         //let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
         let data = self.chunks.get(&address).map_err(|error| match error {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
@@ -141,7 +141,7 @@ impl SequenceStorage {
 
     fn delete(
         &mut self,
-        address: SDataAddress,
+        address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -153,12 +153,12 @@ impl SequenceStorage {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                 error => error.to_string().into(),
             })
-            .and_then(|sdata| {
-                // TODO - SData::check_permission() doesn't support Delete yet in safe-nd
-                if sdata.address().is_pub() {
+            .and_then(|sequence| {
+                // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
+                if sequence.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    sdata.check_is_last_owner(*origin.id())
+                    sequence.check_is_last_owner(*origin.id())
                 }
             })
             .and_then(|_| {
@@ -172,14 +172,14 @@ impl SequenceStorage {
 
     fn get_range(
         &self,
-        address: SDataAddress,
-        range: (SDataIndex, SDataIndex),
+        address: SequenceAddress,
+        range: (SequenceIndex, SequenceIndex),
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SDataAction::Read, origin)
-            .and_then(|sdata| sdata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
+            .get_chunk(address, SequenceAction::Read, origin)
+            .and_then(|sequence| sequence.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceRange(result),
             id: MessageId::new(),
@@ -190,14 +190,14 @@ impl SequenceStorage {
 
     fn get_last_entry(
         &self,
-        address: SDataAddress,
+        address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result =
-            self.get_chunk(address, SDataAction::Read, origin)
-                .and_then(|sdata| match sdata.last_entry() {
-                    Some(entry) => Ok((sdata.entries_index() - 1, entry.to_vec())),
+            self.get_chunk(address, SequenceAction::Read, origin)
+                .and_then(|sequence| match sequence.last_entry() {
+                    Some(entry) => Ok((sequence.entries_index() - 1, entry.to_vec())),
                     None => Err(NdError::NoSuchEntry),
                 });
         self.decisions.send(Message::QueryResponse {
@@ -210,15 +210,15 @@ impl SequenceStorage {
 
     fn get_owner(
         &self,
-        address: SDataAddress,
+        address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SDataAction::Read, origin)
-            .and_then(|sdata| {
-                let index = sdata.owners_index() - 1;
-                sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
+            .get_chunk(address, SequenceAction::Read, origin)
+            .and_then(|sequence| {
+                let index = sequence.owners_index() - 1;
+                sequence.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceOwner(result),
@@ -230,16 +230,16 @@ impl SequenceStorage {
 
     fn get_user_permissions(
         &self,
-        address: SDataAddress,
-        user: SDataUser,
+        address: SequenceAddress,
+        user: SequenceUser,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SDataAction::Read, origin)
-            .and_then(|sdata| {
-                let index = sdata.permissions_index() - 1;
-                sdata.user_permissions(user, index)
+            .get_chunk(address, SequenceAction::Read, origin)
+            .and_then(|sequence| {
+                let index = sequence.permissions_index() - 1;
+                sequence.user_permissions(user, index)
             });
         self.decisions.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceUserPermissions(result),
@@ -251,18 +251,18 @@ impl SequenceStorage {
 
     fn get_permissions(
         &self,
-        address: SDataAddress,
+        address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SDataAction::Read, origin)
-            .and_then(|sdata| {
-                let index = sdata.permissions_index() - 1;
-                let res = if sdata.is_pub() {
-                    SDataPermissions::from(sdata.pub_permissions(index)?.clone())
+            .get_chunk(address, SequenceAction::Read, origin)
+            .and_then(|sequence| {
+                let index = sequence.permissions_index() - 1;
+                let res = if sequence.is_pub() {
+                    SequencePermissions::from(sequence.pub_permissions(index)?.clone())
                 } else {
-                    SDataPermissions::from(sdata.priv_permissions(index)?.clone())
+                    SequencePermissions::from(sequence.private_permissions(index)?.clone())
                 };
                 Ok(res)
             });
@@ -276,18 +276,18 @@ impl SequenceStorage {
 
     fn set_public_permissions(
         &mut self,
-        write_op: SDataWriteOp<SDataPubPermissions>,
+        write_op: SequenceWriteOp<SequencePubPermissions>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
         let result = self.edit_chunk(
             address,
-            SDataAction::ManagePermissions,
+            SequenceAction::ManagePermissions,
             origin,
-            move |mut sdata| {
-                sdata.apply_crdt_pub_perms_op(write_op.crdt_op)?;
-                Ok(sdata)
+            move |mut sequence| {
+                sequence.apply_crdt_pub_perms_op(write_op.crdt_op)?;
+                Ok(sequence)
             },
         );
         self.ok_or_error(result, msg_id, &origin)
@@ -295,18 +295,18 @@ impl SequenceStorage {
 
     fn set_private_permissions(
         &mut self,
-        write_op: SDataWriteOp<SDataPrivPermissions>,
+        write_op: SequenceWriteOp<SequencePrivPermissions>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
         let result = self.edit_chunk(
             address,
-            SDataAction::ManagePermissions,
+            SequenceAction::ManagePermissions,
             origin,
-            move |mut sdata| {
-                sdata.apply_crdt_priv_perms_op(write_op.crdt_op)?;
-                Ok(sdata)
+            move |mut sequence| {
+                sequence.apply_crdt_private_perms_op(write_op.crdt_op)?;
+                Ok(sequence)
             },
         );
         self.ok_or_error(result, msg_id, origin)
@@ -314,18 +314,18 @@ impl SequenceStorage {
 
     fn set_owner(
         &mut self,
-        write_op: SDataWriteOp<SDataOwner>,
+        write_op: SequenceWriteOp<SequenceOwner>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
         let result = self.edit_chunk(
             address,
-            SDataAction::ManagePermissions,
+            SequenceAction::ManagePermissions,
             origin,
-            move |mut sdata| {
-                sdata.apply_crdt_owner_op(write_op.crdt_op);
-                Ok(sdata)
+            move |mut sequence| {
+                sequence.apply_crdt_owner_op(write_op.crdt_op);
+                Ok(sequence)
             },
         );
         self.ok_or_error(result, msg_id, &origin)
@@ -333,33 +333,33 @@ impl SequenceStorage {
 
     fn edit(
         &mut self,
-        write_op: SDataWriteOp<SDataEntry>,
+        write_op: SequenceWriteOp<SequenceEntry>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
-        let result = self.edit_chunk(address, SDataAction::Append, origin, move |mut sdata| {
-            sdata.apply_crdt_op(write_op.crdt_op);
-            Ok(sdata)
+        let result = self.edit_chunk(address, SequenceAction::Append, origin, move |mut sequence| {
+            sequence.apply_crdt_op(write_op.crdt_op);
+            Ok(sequence)
         });
         self.ok_or_error(result, msg_id, origin)
     }
 
     fn edit_chunk<F>(
         &mut self,
-        address: SDataAddress,
-        action: SDataAction,
+        address: SequenceAddress,
+        action: SequenceAction,
         origin: &MsgSender,
         write_fn: F,
     ) -> NdResult<()>
     where
-        F: FnOnce(SData) -> NdResult<SData>,
+        F: FnOnce(Sequence) -> NdResult<Sequence>,
     {
         self.get_chunk(address, action, origin)
             .and_then(write_fn)
-            .and_then(move |sdata| {
+            .and_then(move |sequence| {
                 self.chunks
-                    .put(&sdata)
+                    .put(&sequence)
                     .map_err(|error| error.to_string().into())
             })
     }

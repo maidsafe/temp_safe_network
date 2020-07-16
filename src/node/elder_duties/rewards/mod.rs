@@ -16,7 +16,7 @@ use crate::{internal_msgs::{MessagingDuty, RewardDuty}, node::keys::NodeKeys, no
 use safe_farming::{Accumulation, StorageRewards};
 use safe_nd::{
     AccountId, ElderDuties, Error, Message, MessageId, Money, MsgSender, NetworkCmd, NetworkCmdError,
-    NetworkEvent, NetworkRewardError, RewardCounter, XorName,
+    NetworkEvent, NetworkRewardError, RewardCounter, XorName, NetworkRewardCmd,
 };
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
@@ -99,15 +99,18 @@ impl Rewards {
         old_node_id: XorName,
         new_node_id: XorName,
     ) -> Option<MessagingDuty> {
+        use NetworkCmd::*;
+        use NetworkRewardCmd::*;
+
         let _ = self
             .node_accounts
             .insert(new_node_id, RewardAccount::AwaitingStart);
 
         self.decisions.send(Message::NetworkCmd {
-            cmd: NetworkCmd::ClaimRewardCounter {
+            cmd: Rewards(ClaimRewardCounter {
                 old_node_id,
                 new_node_id,
-            },
+            }),
             id: MessageId::new(),
         })
     }

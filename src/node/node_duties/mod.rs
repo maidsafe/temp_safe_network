@@ -16,7 +16,6 @@ use msg_analysis::{NodeOperation, NetworkMsgAnalysis};
 use accumulation::Accumulation;
 use messaging::{Messaging, Receiver, Received};
 use crate::{
-    accumulation::Accumulation,
     cmd::{GroupDecision, MessagingDuty},
     node::{
         adult_duties::AdultDuties,
@@ -38,31 +37,29 @@ enum AgeBasedDuties {
     Elder(ElderDuties),
 }
 
-struct NodeDuties {
+pub struct NodeDuties {
     keys: NodeKeys
     age_based: AgeBasedDuties,
     network_events: NetworkEvents,
-    accumulation: Accumulation,
     messaging: Messaging,
-    routing: RefCell<Rc<Routing>>,
+    routing: Rc<RefCell<Routing>>,
     config: Config,
 }
 
 impl NodeDuties {
     
     pub fn new(keys: NodeKeys, age_based: AgeBasedDuties,
-        routing: RefCell<Rc<Routing>>, config: Config) -> Self {
-        let accumulation = Accumulation::new(routing.clone());
-        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
-        let messaging = Messaging::new(routing.clone());
-        Self {
-            config,
-            age_based,
-            network_events,
-            accumulator,
-            messaging
-            routing,
-        }
+        routing: Rc<RefCell<Routing>>, config: Config) -> Self {
+            let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
+            let messaging = Messaging::new(routing.clone());
+            Self {
+                keys,
+                age_based,
+                network_events,
+                messaging,
+                routing,
+                config,
+            }
     }
 
     pub fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
@@ -70,7 +67,6 @@ impl NodeDuties {
         match duty {
             BecomeAdult => self.become_adult(),
             BecomeElder => self.become_elder(),
-            Accumulate(msg) => self.accumulation.process(&msg),
             ProcessMessaging(duty) => self.messaging.process(duty),
             ProcessNetworkEvent(event) => self.network_events.process(event),
         }

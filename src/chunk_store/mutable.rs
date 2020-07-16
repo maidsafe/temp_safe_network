@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{MData, MDataAddress};
+use safe_nd::{Map, MapAddress};
 
-impl Chunk for MData {
-    type Id = MDataAddress;
+impl Chunk for Map {
+    type Id = MapAddress;
     fn id(&self) -> &Self::Id {
         match self {
-            MData::Seq(ref chunk) => chunk.address(),
-            MData::Unseq(ref chunk) => chunk.address(),
+            Map::Seq(ref chunk) => chunk.address(),
+            Map::Unseq(ref chunk) => chunk.address(),
         }
     }
 }
 
-impl ChunkId for MDataAddress {}
+impl ChunkId for MapAddress {}

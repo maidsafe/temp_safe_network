@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{HandshakeResponse, MsgEnvelope, XorName, Address, MessageId, SignedTransfer, Transfer, DebitAgreementProof};
+use safe_nd::{HandshakeResponse, MsgEnvelope, XorName, Address, MessageId, SignedTransfer, DebitAgreementProof};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
@@ -67,7 +67,7 @@ pub enum GroupDecision {
 /// This duty is at the border of infrastructural
 /// and domain duties. Messaging is such a fundamental
 /// part of the system, that it can be considered domain.
-#[derive(Debug)]
+//#[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessagingDuty {
     /// Send to a client.
@@ -93,7 +93,6 @@ pub enum MessagingDuty {
 pub enum NodeDuty {
     BecomeAdult,
     BecomeElder,
-    Accumulate(MsgEnvelope),
     ProcessMessaging(MessagingDuty),
     ProcessNetworkEvent(NetworkEvent),
 }
@@ -210,9 +209,9 @@ pub enum RewardDuty {
         ///
         id: AccountId,
         ///
-        node_id: &XorName,
+        node_id: XorName,
         ///
-        counter: &RewardCounter,
+        counter: RewardCounter,
     }
 }
 

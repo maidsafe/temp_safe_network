@@ -38,6 +38,7 @@ pub(crate) struct Gateway {
     section: SectionQuerying,
     onboarding: Onboarding,
     input_parsing: InputParsing,
+    client_msg_tracking: ClientMsgTracking,
 }
 
 impl Gateway {

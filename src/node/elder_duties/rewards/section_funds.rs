@@ -1,6 +1,6 @@
 use super::validator::Validator;
 use crate::{cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
-use safe_nd::{AccountId, Message, MessageId, Money, NetworkCmd, TransferValidated};
+use safe_nd::{AccountId, Message, MessageId, Money, NetworkCmd, NetworkTransferCmd, TransferValidated};
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
 
@@ -15,6 +15,8 @@ impl SectionFunds {
     }
 
     pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<MessagingDuty> {
+        use NetworkCmd::*;
+        use NetworkTransferCmd::*;
         match self.actor.transfer(amount, to) {
             Ok(Some(event)) => {
                 let applied = self.actor.apply(TransferInitiated(event.clone()));
@@ -24,7 +26,7 @@ impl SectionFunds {
                     None
                 } else {
                     self.decisions.send(Message::NetworkCmd {
-                        cmd: NetworkCmd::InitiateRewardPayout(event.signed_transfer),
+                        cmd: Transfer(InitiateRewardPayout(event.signed_transfer)),
                         id: MessageId::new(),
                     })
                 }
@@ -35,6 +37,8 @@ impl SectionFunds {
     }
 
     pub fn receive(&mut self, validation: TransferValidated) -> Option<MessagingDuty> {
+        use NetworkCmd::*;
+        use NetworkTransferCmd::*;
         match self.actor.receive(validation) {
             Ok(Some(event)) => {
                 let applied = self.actor.apply(TransferValidationReceived(event.clone()));
@@ -44,7 +48,7 @@ impl SectionFunds {
                     None
                 } else {
                     self.decisions.send(Message::NetworkCmd {
-                        cmd: NetworkCmd::FinaliseRewardPayout(event.proof?),
+                        cmd: Transfer(FinaliseRewardPayout(event.proof?)),
                         id: MessageId::new(),
                     })
                 }

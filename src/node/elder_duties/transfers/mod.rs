@@ -13,7 +13,7 @@ use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderM
 use safe_nd::{
     Cmd, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, MsgEnvelope,
     MsgSender, NetworkCmd, NetworkCmdError, NetworkTransferError, PublicKey, Query, QueryResponse,
-    SignedTransfer, TransferCmd, TransferError, TransferQuery,
+    SignedTransfer, TransferCmd, TransferError, TransferQuery, NetworkTransferCmd,
 };
 use std::{
     cell::RefCell,
@@ -245,10 +245,13 @@ impl Transfers {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
+        use NetworkCmd::*;
+        use NetworkTransferCmd::*;
+        
         let message = match self.replica.borrow_mut().register(proof) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NetworkCmd {
-                cmd: NetworkCmd::PropagateTransfer(event.debit_proof),
+                cmd: Transfers(PropagateTransfer(event.debit_proof)),
                 id: MessageId::new(),
             },
             Err(error) => Message::CmdError {

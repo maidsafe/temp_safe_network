@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node_ops::RewardDuty;
+use crate::accumulation::Accumulation;
 
 use routing::Node as Routing;
 use safe_nd::{
@@ -19,13 +20,17 @@ use std::{cell::RefCell, rc::Rc};
 /// remote msgs from the network, i.e.
 /// it is not evaluating msgs sent
 /// directly from the client.
-pub(crate) struct NetworkMsgAnalysis {
+pub struct NetworkMsgAnalysis {
+    accumulation: Accumulation,
     routing: Rc<RefCell<Routing>>,
 }
 
 impl NetworkMsgAnalysis {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
-        Self { routing }
+        Self { 
+            accumulation: Accumulation::new(routing.clone()),
+            routing,
+        }
     }
 
     pub fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
@@ -36,11 +41,11 @@ impl NetworkMsgAnalysis {
     /// remote msgs from the network, i.e.
     /// it is not evaluating msgs sent
     /// directly from the client.
-    pub fn evaluate(&self, msg: &MsgEnvelope) -> NodeOperation {
-        NodeOperation::*;
-        NodeDuty::*;
-        if self.should_accumulate(msg) {
-            RunAsNode(Accumulate(msg.clone()))
+    pub fn evaluate(&self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        use NodeDuty::*;
+        use NodeOperation::*;
+        let result = if self.should_accumulate(msg) {
+            self.evaluate(self.accumulation.process(msg)?) // recursive call at most 1 level deep if process is some
         } else if let Some(duty) = self.try_messaging(msg) {
             // Identified as an outbound msg, to be sent on the wire.
             RunAsNode(RunAsMessaging(duty))
@@ -57,7 +62,7 @@ impl NetworkMsgAnalysis {
             RunAsMetadata(duty)
         } else if let Some(duty) = self.try_adult(msg) {
             // Accumulated msg from `Metadata`!
-            RunAsChunks(duty)
+            RunAsAdult(duty)
         } else if let Some(duty) = self.try_rewards(msg) {
             // Identified as a Rewards msg
             RunAsRewards(duty)
@@ -65,8 +70,10 @@ impl NetworkMsgAnalysis {
             // Identified as a Transfers msg
             RunAsTransfers(duty)
         } else {
+            error!("Unknown message destination: {:?}", msg.id());
             Unknown
-        }
+        };
+        Some(result)
     }
 
     fn try_messaging(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
@@ -314,7 +321,7 @@ impl NetworkMsgAnalysis {
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    fn try_adult(&self, msg: &MsgEnvelope) -> Option<AdultDuties> {
+    fn try_adult(&self, msg: &MsgEnvelope) -> Option<AdultDuty> {
         let from_metadata_section = || match msg.most_recent_sender() {
             MsgSender::Section {
                 duty: Duty::Elder(ElderDuties::Metadata),
@@ -346,9 +353,9 @@ impl NetworkMsgAnalysis {
 
         if from_metadata_section() && self.is_dst_for(msg) && self.is_adult() {
             if is_chunk_cmd() {
-                return AdultDuties::WriteChunk(msg);
+                return AdultDuty::RunAsChunks(ChunkDuty::WriteChunk(msg));
             } else if is_chunk_query() {
-                return AdultDuties::ReadChunk(msg);
+                return AdultDuty::RunAsChunks(ChunkDuty::ReadChunk(msg));
             }
         }
         None

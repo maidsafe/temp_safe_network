@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping};
-use crate::{chunk_store::ImmutableChunkStore, cmd::MessagingDuty, node::Init, Config, Result};
+use crate::{chunk_store::BlobChunkStor, cmd::MessagingDuty, node::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
-    AdultDuties, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId, MsgSender,
+    AdultDuties, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId, MsgSender,
     NetworkCmdError, NetworkDataError, NetworkEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
@@ -21,7 +21,7 @@ use std::{
 
 pub(crate) struct ChunkStorage {
     keys: NodeKeys,
-    chunks: ImmutableChunkStore,
+    chunks: BlobChunkStor,
     decisions: AdultMsgWrapping,
 }
 
@@ -34,7 +34,7 @@ impl ChunkStorage {
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
-        let chunks = ImmutableChunkStore::new(
+        let chunks = BlobChunkStor::new(
             &root_dir,
             max_capacity,
             Rc::clone(total_used_space),
@@ -50,7 +50,7 @@ impl ChunkStorage {
 
     pub(crate) fn store(
         &mut self,
-        data: &IData,
+        data: &Blob,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -62,7 +62,7 @@ impl ChunkStorage {
 
     pub(crate) fn take_duplicate(
         &mut self,
-        data: &IData,
+        data: &Blob,
         msg_id: MessageId,
         origin: &MsgSender,
         accumulated_signature: &Signature,
@@ -89,7 +89,7 @@ impl ChunkStorage {
         self.decisions.send(message)
     }
 
-    fn try_store(&mut self, data: &IData) -> NdResult<()> {
+    fn try_store(&mut self, data: &Blob) -> NdResult<()> {
         if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -105,7 +105,7 @@ impl ChunkStorage {
 
     pub(crate) fn get(
         &self,
-        address: IDataAddress,
+        address: BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -123,7 +123,7 @@ impl ChunkStorage {
 
     // pub(crate) fn get_for_duplciation(
     //     &self,
-    //     address: IDataAddress,
+    //     address: BlobAddress,
     //     msg: &MsgEnvelope,
     // ) -> Option<MessagingDuty> {
 
@@ -137,7 +137,7 @@ impl ChunkStorage {
     //         targets,
     //         msg: Message::QueryResponse {
     //             requester: requester.clone(),
-    //             response: Response::GetIData(result),
+    //             response: Response::GetBlob(result),
     //             message_id,
     //             proof: Some((request, (accumulated_signature?).clone())),
     //         },
@@ -146,7 +146,7 @@ impl ChunkStorage {
 
     pub(crate) fn delete(
         &mut self,
-        address: IDataAddress,
+        address: BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -156,13 +156,13 @@ impl ChunkStorage {
         }
 
         let result = match self.chunks.get(&address) {
-            Ok(IData::Unpub(_)) => self
+            Ok(Blob::Private(_)) => self
                 .chunks
                 .delete(&address)
                 .map_err(|error| error.to_string().into()),
             Ok(_) => {
                 error!(
-                    "{}: Invalid DeletePrivate(IData::Public) encountered: {:?}",
+                    "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
                     self, msg_id
                 );
                 Err(NdError::InvalidOperation)

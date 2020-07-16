@@ -100,12 +100,12 @@ impl Chunks {
     //             return None;
     //         }
     //         match response {
-    //             GetIData(result) => {
+    //             GetBlob(result) => {
     //                 if matches!(requester, PublicId::Node(_)) {
     //                     debug!("got the duplication copy");
     //                     if let Ok(data) = result {
     //                         trace!(
-    //                             "Got GetIData copy response for address: ({:?})",
+    //                             "Got GetBlob copy response for address: ({:?})",
     //                             data.address(),
     //                         );
     //                         self.chunk_storage.store(

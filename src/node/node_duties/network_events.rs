@@ -85,7 +85,7 @@ impl NetworkEvents {
 
     fn evaluate_msg(&mut self, content: Vec<u8>) -> Option<NodeOperation> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
-            Ok(msg) => Some(self.analysis.evaluate(&msg)),
+            Ok(msg) => self.analysis.evaluate(&msg),
             Err(e) => {
                 error!(
                     "Error deserializing received network message into MsgEnvelope type: {:?}",

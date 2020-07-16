@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{IData, IDataAddress};
+use safe_nd::{Blob, BlobAddress};
 
-impl Chunk for IData {
-    type Id = IDataAddress;
+impl Chunk for Blob {
+    type Id = BlobAddress;
     fn id(&self) -> &Self::Id {
         match self {
-            IData::Pub(ref chunk) => chunk.address(),
-            IData::Unpub(ref chunk) => chunk.address(),
+            Blob::Public(ref chunk) => chunk.address(),
+            Blob::Private(ref chunk) => chunk.address(),
         }
     }
 }
 
-impl ChunkId for IDataAddress {}
+impl ChunkId for BlobAddress {}

@@ -20,11 +20,11 @@ use self::{
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    cmd::MessagingDuty, messaging::ClientMessaging, node::keys::NodeKeys,
+    node_ops::{RewardDuty, MessagingDuty}, node::keys::NodeKeys,
     node::section_querying::SectionQuerying, node::Init, utils, Config, Result,
 };
 use routing::{Node as Routing, RoutingError};
-use safe_nd::XorName;
+use safe_nd::{NodePublicId, XorName};
 use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
@@ -44,17 +44,19 @@ pub(crate) struct ElderDuties {
 
 impl ElderDuties {
     pub fn new(
+        id: NodePublicId,
         keys: NodeKeys,
         config: &Config,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing: Rc<RefCell<Routing>>,
-        messaging: ClientMessaging,
     ) -> Result<Self> {
-        // Gateway
-        let gateway = Gateway::new(keys.clone(), &config, init_mode, messaging)?;
 
         let section_querying = SectionQuerying::new(routing.clone());
+
+        // Gateway
+        let gateway = Gateway::new(id, keys.clone(), &config, init_mode, section_querying.clone())?;
+        
         // Metadata
         let metadata = Metadata::new(
             keys.clone(),
@@ -136,7 +138,7 @@ impl ElderDuties {
     ) -> Option<MessagingDuty> {
         // marks the reward account as
         // awaiting claiming of the counter
-        self.rewards.add_relocated_account(old_node_id, new_node_id)
+        self.rewards.process(RewardDuty::AddRelocatedAccount {old_node_id, new_node_id})
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }

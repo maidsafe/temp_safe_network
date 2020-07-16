@@ -13,8 +13,8 @@ use crate::{
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    BlobRead, BlobWrite, CmdError, Error as NdError, IData, IDataAddress, Message, MessageId,
-    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
+    BlobRead, BlobWrite, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId,
+    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName, NetworkDataCmd,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -38,7 +38,7 @@ struct ChunkMetadata {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct HolderMetadata {
-    chunks: BTreeSet<IDataAddress>,
+    chunks: BTreeSet<BlobAddress>,
 }
 
 pub(super) struct BlobRegister {
@@ -79,7 +79,7 @@ impl BlobRegister {
         }
     }
 
-    fn store(&mut self, data: IData, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn store(&mut self, data: Blob, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -128,7 +128,7 @@ impl BlobRegister {
         self.decisions.send_to_adults(target_holders, msg)
     }
 
-    fn delete(&mut self, address: IDataAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn delete(&mut self, address: BlobAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.decisions.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -170,9 +170,12 @@ impl BlobRegister {
 
     fn get_duplication_msgs(
         &self,
-        address: IDataAddress,
+        address: BlobAddress,
         current_holders: BTreeSet<XorName>,
     ) -> Vec<MessagingDuty> {
+        use NetworkCmd::*;
+        use NetworkDataCmd::*;
+        
         self.get_new_holders_for_chunk(&address)
             .into_iter()
             .map(|new_holder| {
@@ -181,11 +184,11 @@ impl BlobRegister {
                 hash_bytes.extend_from_slice(&new_holder.0);
                 let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
                 Message::NetworkCmd {
-                    cmd: NetworkCmd::DuplicateChunk {
+                    cmd: Data(DuplicateChunk {
                         new_holder,
                         address,
                         fetch_from_holders: current_holders.clone(),
-                    },
+                    }),
                     id: message_id,
                 }
             })
@@ -200,7 +203,7 @@ impl BlobRegister {
         }
     }
 
-    fn get(&self, address: IDataAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn get(&self, address: BlobAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let query_error = |error: NdError| {
             self.decisions.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
@@ -226,7 +229,7 @@ impl BlobRegister {
 
     pub(super) fn update_holders(
         &mut self,
-        address: IDataAddress,
+        address: BlobAddress,
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
@@ -283,7 +286,7 @@ impl BlobRegister {
 
     // pub(super) fn handle_store_result(
     //     &mut self,
-    //     idata_address: IDataAddress,
+    //     Blob_address: BlobAddress,
     //     sender: XorName,
     //     _result: &NdResult<()>,
     //     message_id: MessageId,
@@ -301,16 +304,16 @@ impl BlobRegister {
     //     // For phase 1, we can leave many of these unanswered.
 
     //     // TODO - we'll assume `result` is success for phase 1.
-    //     let db_key = idata_address.to_db_key();
-    //     let mut metadata = self.get_metadata_for(idata_address).unwrap_or_default();
-    //     if idata_address.is_unpub() {
+    //     let db_key = Blob_address.to_db_key();
+    //     let mut metadata = self.get_metadata_for(Blob_address).unwrap_or_default();
+    //     if Blob_address.is_unpub() {
     //         metadata.owner = Some(*utils::own_key(&requester)?);
     //     }
 
     //     if !metadata.holders.insert(sender) {
     //         warn!(
     //             "{}: {} already registered as a holder for {:?}",
-    //             self, sender, &idata_address
+    //             self, sender, &Blob_address
     //         );
     //     }
 
@@ -322,17 +325,17 @@ impl BlobRegister {
     //     debug!(
     //         "{:?}, Entry {:?} has {:?} holders",
     //         self.id,
-    //         idata_address,
+    //         Blob_address,
     //         metadata.holders.len()
     //     );
 
     //     // We're acting as data handler, received request from client handlers
     //     let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
 
-    //     if !holders_metadata.chunks.insert(idata_address) {
+    //     if !holders_metadata.chunks.insert(Blob_address) {
     //         warn!(
     //             "{}: {} already registered as a holder for {:?}",
-    //             self, sender, &idata_address
+    //             self, sender, &Blob_address
     //         );
     //     }
 
@@ -342,7 +345,7 @@ impl BlobRegister {
 
     //     // Should we wait for multiple responses
     //     wrap(MetadataCmd::RespondToGateway {
-    //         sender: *idata_address.name(),
+    //         sender: *Blob_address.name(),
     //         msg: Message::Response {
     //             requester,
     //             response: Response::Write(Ok(())),
@@ -354,7 +357,7 @@ impl BlobRegister {
 
     // pub(super) fn handle_delete_result(
     //     &mut self,
-    //     idata_address: IDataAddress,
+    //     Blob_address: BlobAddress,
     //     sender: XorName,
     //     result: NdResult<()>,
     //     message_id: MessageId,
@@ -363,15 +366,15 @@ impl BlobRegister {
     //     if let Err(err) = &result {
     //         warn!("{}: Node reports error deleting: {}", self, err);
     //     } else {
-    //         let db_key = idata_address.to_db_key();
-    //         let metadata = self.get_metadata_for(idata_address);
+    //         let db_key = Blob_address.to_db_key();
+    //         let metadata = self.get_metadata_for(Blob_address);
 
     //         if let Ok(mut metadata) = metadata {
     //             let holder = self.get_holder(sender);
 
     //             // Remove the chunk from the holder metadata
     //             if let Ok(mut holder) = holder {
-    //                 let _ = holder.chunks.remove(&idata_address);
+    //                 let _ = holder.chunks.remove(&Blob_address);
 
     //                 if holder.chunks.is_empty() {
     //                     if let Err(error) = self.holders.rem(&sender.to_db_key()) {
@@ -392,7 +395,7 @@ impl BlobRegister {
     //             if !metadata.holders.remove(&sender) {
     //                 warn!(
     //                     "{}: {} is not registered as a holder for {:?}",
-    //                     self, sender, &idata_address
+    //                     self, sender, &Blob_address
     //                 );
     //             }
     //             if metadata.holders.is_empty() {
@@ -415,7 +418,7 @@ impl BlobRegister {
 
     //     // TODO: Different responses from adults?
     //     wrap(MetadataCmd::RespondToGateway {
-    //         sender: *idata_address.name(),
+    //         sender: *Blob_address.name(),
     //         msg: Message::Response {
     //             requester,
     //             response: Response::Write(result),
@@ -427,12 +430,12 @@ impl BlobRegister {
 
     // pub(super) fn handle_get_result(
     //     &self,
-    //     result: NdResult<IData>,
+    //     result: NdResult<Blob>,
     //     message_id: MessageId,
     //     requester: PublicId,
     //     proof: (Request, Signature),
     // ) -> Option<MessagingDuty> {
-    //     let response = Response::GetIData(result);
+    //     let response = Response::GetBlob(result);
     //     wrap(MetadataCmd::RespondToGateway {
     //         sender: *self.id.name(),
     //         msg: Message::Response {
@@ -449,8 +452,8 @@ impl BlobRegister {
     pub fn remove_holder(
         &mut self,
         node: XorName,
-    ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
-        let mut idata_addresses: BTreeMap<IDataAddress, BTreeSet<XorName>> = BTreeMap::new();
+    ) -> NdResult<BTreeMap<BlobAddress, BTreeSet<XorName>>> {
+        let mut Blob_addresses: BTreeMap<BlobAddress, BTreeSet<XorName>> = BTreeMap::new();
         let chunk_holder = self.get_holder(node);
 
         if let Ok(holder) = chunk_holder {
@@ -463,7 +466,7 @@ impl BlobRegister {
                         warn!("doesn't contain the holder",);
                     }
 
-                    let _ = idata_addresses.insert(chunk_address, metadata.holders.clone());
+                    let _ = Blob_addresses.insert(chunk_address, metadata.holders.clone());
 
                     if metadata.holders.is_empty() {
                         if let Err(error) = self.metadata.rem(&db_key) {
@@ -481,7 +484,7 @@ impl BlobRegister {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
 
-        Ok(idata_addresses)
+        Ok(Blob_addresses)
     }
 
     fn get_holder(&self, holder: XorName) -> NdResult<HolderMetadata> {
@@ -501,7 +504,7 @@ impl BlobRegister {
         }
     }
 
-    fn get_metadata_for(&self, address: IDataAddress) -> NdResult<ChunkMetadata> {
+    fn get_metadata_for(&self, address: BlobAddress) -> NdResult<ChunkMetadata> {
         match self.metadata.get::<ChunkMetadata>(&address.to_db_key()) {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
@@ -518,7 +521,7 @@ impl BlobRegister {
         }
     }
 
-    // Returns `XorName`s of the target holders for an idata chunk.
+    // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = IMMUTABLE_DATA_ADULT_COPY_COUNT;
@@ -537,9 +540,9 @@ impl BlobRegister {
         }
     }
 
-    // Returns `XorName`s of the new target holders for an idata chunk.
+    // Returns `XorName`s of the new target holders for an Blob chunk.
     // Used to fetch the additional list of holders for existing chunks.
-    fn get_new_holders_for_chunk(&self, target: &IDataAddress) -> BTreeSet<XorName> {
+    fn get_new_holders_for_chunk(&self, target: &BlobAddress) -> BTreeSet<XorName> {
         let closest_holders = self
             .get_holders_for_chunk(target.name())
             .iter()
