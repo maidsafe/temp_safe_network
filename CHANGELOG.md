@@ -2,7 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### 0.13.1 (2020-06-11)
+### 0.15.0 (2020-07-16)
+
+### Features
+
+* ***api*** implements support for storing, retrieving and resolving symlinks ([01c62df](https://github.com/maidsafe/safe-api/commit/01c62dfc1f8d55ad005a67de0aff14eb54516369))
+
+* ***api & cli*** first draft implementation of a Sequence API and CLI commands ([e287d28](https://github.com/maidsafe/safe-api/commit/e287d2838e8a0c11c700b342989afa6e4b829cd3))
+
+* ***api*** migrate public FilesContainers and NRSContainers to use PublicSequence as its native data type ([3d00203](https://github.com/maidsafe/safe-api/commit/3d00203bd4fe073efed8f3f8921f2dd85c98954f)
+
+* ***api & cli*** allow to store, append and retrieve Private Sequence with API and CLI ([9c1a80b](https://github.com/maidsafe/safe-api/commit/9c1a80b1eb57948e08f5c548f318b4cbc36ea365))
+
+* ***cli*** show the native data XOR-URL in the dog output ([9abbecb](https://github.com/maidsafe/safe-api/commit/9abbecb5a909d3e38e471bd758ec6dd1a648151b))
+
+* ***ffi*** expose sequence data APIs from the ffi ([dfc3ca7](https://github.com/maidsafe/safe-api/commit/dfc3ca7aedd892d1497d4c9cc355ad7e08f8e572))
+
+### Bug Fixes
+
+* ***cli*** XOR-URL of a resolved NRS Container was displaying subnames as part of the output of the dog cmd ([bb9b15c](https://github.com/maidsafe/safe-api/commit/bb9b15cbd252ebd23b34253317535315d3d81f74))
+
+* ***api*** return an error when resolving a URL which contains subnames but targetting content non supporting subnames ([f1a9c60](https://github.com/maidsafe/safe-api/commit/f1a9c600ff05fca1481f13fe51358afe18819d01))
+
+
+### 0.14.0 (2020-06-11)
 
 ### Features
 
