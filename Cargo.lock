@@ -772,9 +772,9 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
 name = "ffi_utils"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "429a449983b4ef2cae75c920146cd9f86566b9dd1a310c012907fed222d0f6a9"
+checksum = "245e34abfc6aedb678ae03b18bce30983f6c6b68dc6813a29d8f39d7e8a218ee"
 dependencies = [
  "base64 0.9.3",
  "log 0.4.8",
@@ -2064,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2092,7 +2092,7 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator_ffi"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2156,7 +2156,7 @@ dependencies = [
 
 [[package]]
 name = "safe_core"
-version = "0.42.0"
+version = "0.42.1"
 dependencies = [
  "async-trait",
  "bincode",

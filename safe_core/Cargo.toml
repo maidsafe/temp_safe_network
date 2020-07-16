@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_core"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_client_libs"
-version = "0.42.0"
+version = "0.42.1"
 
 [dependencies]
 async-trait = "~0.1.30"
@@ -18,7 +18,7 @@ chrono = { version = "~0.4.0", features = ["serde"] }
 crossbeam-channel = "~0.4.2"
 data-encoding = "2.1.1"
 directories = "2.0.2"
-ffi_utils = "~0.16.0"
+ffi_utils = "~0.17.0"
 fs2 = "~0.4.3"
 futures = "~0.3.5"
 futures-util = "~0.3.4"
