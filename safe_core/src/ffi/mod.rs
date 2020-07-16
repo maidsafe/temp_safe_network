@@ -17,12 +17,12 @@ pub mod ipc;
 /// NFS API.
 pub mod nfs;
 use self::arrays::*;
-use safe_nd::MDataKind as NativeMDataKind;
+use safe_nd::MapKind as NativeMapKind;
 
-/// FFI wrapper for `MDataInfo`.
+/// FFI wrapper for `MapInfo`.
 #[repr(C)]
 #[derive(Clone)]
-pub struct MDataInfo {
+pub struct MapInfo {
     // NOTE: `repr[C]` enums don't seem to be supported by JNI right now, so we use a bool.
     /// The kind of the mutable data.
     pub seq: bool,
@@ -48,22 +48,22 @@ pub struct MDataInfo {
     pub new_enc_nonce: SymNonce,
 }
 
-// TODO: Implement `into_repr_c` for MDataKind once we move FfiMDataKind to safe-nd.
-/// Convert from native to FFI representation for `MDataKind`.
-pub fn md_kind_into_repr_c(kind: NativeMDataKind) -> bool {
+// TODO: Implement `into_repr_c` for MapKind once we move FfiMapKind to safe-nd.
+/// Convert from native to FFI representation for `MapKind`.
+pub fn md_kind_into_repr_c(kind: NativeMapKind) -> bool {
     match kind {
-        NativeMDataKind::Seq => true,
-        NativeMDataKind::Unseq => false,
+        NativeMapKind::Seq => true,
+        NativeMapKind::Unseq => false,
     }
 }
 
-// TODO: Implement `clone_from_repr_c` for `MDataKind` once we move
-// `FfiMDataKind` to safe-nd.
-/// Convert from FFI to native representation for `MDataKind`.
-pub fn md_kind_clone_from_repr_c(kind: bool) -> NativeMDataKind {
+// TODO: Implement `clone_from_repr_c` for `MapKind` once we move
+// `FfiMapKind` to safe-nd.
+/// Convert from FFI to native representation for `MapKind`.
+pub fn md_kind_clone_from_repr_c(kind: bool) -> NativeMapKind {
     if kind {
-        NativeMDataKind::Seq
+        NativeMapKind::Seq
     } else {
-        NativeMDataKind::Unseq
+        NativeMapKind::Unseq
     }
 }

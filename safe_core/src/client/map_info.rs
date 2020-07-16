@@ -9,14 +9,14 @@
 use crate::crypto::shared_secretbox;
 use crate::errors::CoreError;
 use crate::ffi::arrays::{SymNonce, SymSecretKey};
-use crate::ffi::{md_kind_clone_from_repr_c, md_kind_into_repr_c, MDataInfo as FfiMDataInfo};
+use crate::ffi::{md_kind_clone_from_repr_c, md_kind_into_repr_c, MapInfo as FfiMapInfo};
 use crate::ipc::IpcError;
 use crate::utils::{
     self, symmetric_decrypt, symmetric_encrypt, SymEncKey, SymEncNonce, SYM_ENC_NONCE_LEN,
 };
 use ffi_utils::ReprC;
 use safe_nd::{
-    MDataAddress, MDataKind, MDataSeqEntries, MDataSeqEntryAction, MDataSeqValue, XorName,
+    MapAddress, MapKind, MapSeqEntries, MapSeqEntryAction, MapSeqValue, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -26,9 +26,9 @@ use unwrap::unwrap;
 
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct MDataInfo {
+pub struct MapInfo {
     /// Address of the mutable data, containing its name, type tag, and whether it is sequenced.
-    pub address: MDataAddress,
+    pub address: MapAddress,
     /// Key to encrypt/decrypt the directory content and the nonce to be used for keys
     pub enc_info: Option<(shared_secretbox::Key, SymEncNonce)>,
 
@@ -36,10 +36,10 @@ pub struct MDataInfo {
     pub new_enc_info: Option<(shared_secretbox::Key, SymEncNonce)>,
 }
 
-impl MDataInfo {
-    /// Construct `MDataInfo` for private (encrypted) data with a provided private key.
+impl MapInfo {
+    /// Construct `MapInfo` for private (encrypted) data with a provided private key.
     pub fn new_private(
-        address: MDataAddress,
+        address: MapAddress,
         enc_info: (shared_secretbox::Key, SymEncNonce),
     ) -> Self {
         Self {
@@ -49,8 +49,8 @@ impl MDataInfo {
         }
     }
 
-    /// Construct `MDataInfo` for public data.
-    pub fn new_public(address: MDataAddress) -> Self {
+    /// Construct `MapInfo` for public data.
+    pub fn new_public(address: MapAddress) -> Self {
         Self {
             address,
             enc_info: None,
@@ -58,17 +58,17 @@ impl MDataInfo {
         }
     }
 
-    /// Generate random `MDataInfo` for private (encrypted) mutable data.
-    pub fn random_private(kind: MDataKind, type_tag: u64) -> Result<Self, CoreError> {
-        let address = MDataAddress::from_kind(kind, rand::random(), type_tag);
+    /// Generate random `MapInfo` for private (encrypted) mutable data.
+    pub fn random_private(kind: MapKind, type_tag: u64) -> Result<Self, CoreError> {
+        let address = MapAddress::from_kind(kind, rand::random(), type_tag);
         let enc_info = (shared_secretbox::gen_key(), utils::generate_nonce());
 
         Ok(Self::new_private(address, enc_info))
     }
 
-    /// Generate random `MDataInfo` for public mutable data.
-    pub fn random_public(kind: MDataKind, type_tag: u64) -> Result<Self, CoreError> {
-        let address = MDataAddress::from_kind(kind, rand::random(), type_tag);
+    /// Generate random `MapInfo` for public mutable data.
+    pub fn random_public(kind: MapKind, type_tag: u64) -> Result<Self, CoreError> {
+        let address = MapAddress::from_kind(kind, rand::random(), type_tag);
 
         Ok(Self::new_public(address))
     }
@@ -84,12 +84,12 @@ impl MDataInfo {
     }
 
     /// Returns the address of the data.
-    pub fn address(&self) -> &MDataAddress {
+    pub fn address(&self) -> &MapAddress {
         &self.address
     }
 
     /// Returns the kind.
-    pub fn kind(&self) -> MDataKind {
+    pub fn kind(&self) -> MapKind {
         self.address.kind()
     }
 
@@ -103,7 +103,7 @@ impl MDataInfo {
         self.enc_info.as_ref().map(|&(_, ref nonce)| nonce)
     }
 
-    /// Encrypt the key for the mdata entry accordingly.
+    /// Encrypt the key for the map entry accordingly.
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.new_enc_info {
             enc_entry_key(plain_text, key, seed)
@@ -114,7 +114,7 @@ impl MDataInfo {
         }
     }
 
-    /// Encrypt the value for this mdata entry accordingly.
+    /// Encrypt the value for this map entry accordingly.
     pub fn enc_entry_value(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.new_enc_info {
             symmetric_encrypt(plain_text, key, None)
@@ -125,7 +125,7 @@ impl MDataInfo {
         }
     }
 
-    /// Decrypt key or value of this mdata entry.
+    /// Decrypt key or value of this map entry.
     pub fn decrypt(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.new_enc_info {
             if let Ok(plain) = symmetric_decrypt(cipher, key) {
@@ -157,7 +157,7 @@ impl MDataInfo {
     }
 
     /// Construct FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> FfiMDataInfo {
+    pub fn into_repr_c(self) -> FfiMapInfo {
         let (name, type_tag, kind) = (self.name().0, self.type_tag(), self.kind());
         let seq = md_kind_into_repr_c(kind);
 
@@ -165,7 +165,7 @@ impl MDataInfo {
         let (has_new_enc_info, new_enc_key, new_enc_nonce) =
             enc_info_into_repr_c(self.new_enc_info);
 
-        FfiMDataInfo {
+        FfiMapInfo {
             seq,
             name,
             type_tag,
@@ -181,11 +181,11 @@ impl MDataInfo {
     }
 }
 
-/// Encrypt the entries (both keys and values) using the `MDataInfo`.
+/// Encrypt the entries (both keys and values) using the `MapInfo`.
 pub fn encrypt_entries(
-    info: &MDataInfo,
-    entries: &MDataSeqEntries,
-) -> Result<MDataSeqEntries, CoreError> {
+    info: &MapInfo,
+    entries: &MapSeqEntries,
+) -> Result<MapSeqEntries, CoreError> {
     let mut output = BTreeMap::new();
 
     for (key, value) in entries {
@@ -197,24 +197,24 @@ pub fn encrypt_entries(
     Ok(output)
 }
 
-/// Encrypt entry actions using the `MDataInfo`. The effect of this is that the entries
-/// mutated by the encrypted actions will end up encrypted using the `MDataInfo`.
+/// Encrypt entry actions using the `MapInfo`. The effect of this is that the entries
+/// mutated by the encrypted actions will end up encrypted using the `MapInfo`.
 pub fn encrypt_entry_actions(
-    info: &MDataInfo,
-    actions: &BTreeMap<Vec<u8>, MDataSeqEntryAction>,
-) -> Result<BTreeMap<Vec<u8>, MDataSeqEntryAction>, CoreError> {
+    info: &MapInfo,
+    actions: &BTreeMap<Vec<u8>, MapSeqEntryAction>,
+) -> Result<BTreeMap<Vec<u8>, MapSeqEntryAction>, CoreError> {
     let mut output = BTreeMap::new();
 
     for (key, action) in actions {
         let encrypted_key = info.enc_entry_key(key)?;
         let encrypted_action = match *action {
-            MDataSeqEntryAction::Ins(ref value) => {
-                MDataSeqEntryAction::Ins(encrypt_value(info, value)?)
+            MapSeqEntryAction::Ins(ref value) => {
+                MapSeqEntryAction::Ins(encrypt_value(info, value)?)
             }
-            MDataSeqEntryAction::Update(ref value) => {
-                MDataSeqEntryAction::Update(encrypt_value(info, value)?)
+            MapSeqEntryAction::Update(ref value) => {
+                MapSeqEntryAction::Update(encrypt_value(info, value)?)
             }
-            MDataSeqEntryAction::Del(version) => MDataSeqEntryAction::Del(version),
+            MapSeqEntryAction::Del(version) => MapSeqEntryAction::Del(version),
         };
 
         let _ = output.insert(encrypted_key, encrypted_action);
@@ -223,11 +223,11 @@ pub fn encrypt_entry_actions(
     Ok(output)
 }
 
-/// Decrypt entries using the `MDataInfo`.
+/// Decrypt entries using the `MapInfo`.
 pub fn decrypt_entries(
-    info: &MDataInfo,
-    entries: &MDataSeqEntries,
-) -> Result<MDataSeqEntries, CoreError> {
+    info: &MapInfo,
+    entries: &MapSeqEntries,
+) -> Result<MapSeqEntries, CoreError> {
     let mut output = BTreeMap::new();
 
     for (key, value) in entries {
@@ -240,9 +240,9 @@ pub fn decrypt_entries(
     Ok(output)
 }
 
-/// Decrypt all keys using the `MDataInfo`.
+/// Decrypt all keys using the `MapInfo`.
 pub fn decrypt_keys(
-    info: &MDataInfo,
+    info: &MapInfo,
     keys: &BTreeSet<Vec<u8>>,
 ) -> Result<BTreeSet<Vec<u8>>, CoreError> {
     let mut output = BTreeSet::new();
@@ -254,11 +254,11 @@ pub fn decrypt_keys(
     Ok(output)
 }
 
-/// Decrypt all values using the `MDataInfo`.
+/// Decrypt all values using the `MapInfo`.
 pub fn decrypt_values(
-    info: &MDataInfo,
-    values: &[MDataSeqValue],
-) -> Result<Vec<MDataSeqValue>, CoreError> {
+    info: &MapInfo,
+    values: &[MapSeqValue],
+) -> Result<Vec<MapSeqValue>, CoreError> {
     let mut output = Vec::with_capacity(values.len());
 
     for value in values {
@@ -268,15 +268,15 @@ pub fn decrypt_values(
     Ok(output)
 }
 
-fn encrypt_value(info: &MDataInfo, value: &MDataSeqValue) -> Result<MDataSeqValue, CoreError> {
-    Ok(MDataSeqValue {
+fn encrypt_value(info: &MapInfo, value: &MapSeqValue) -> Result<MapSeqValue, CoreError> {
+    Ok(MapSeqValue {
         data: info.enc_entry_value(&value.data)?,
         version: value.version,
     })
 }
 
-fn decrypt_value(info: &MDataInfo, value: &MDataSeqValue) -> Result<MDataSeqValue, CoreError> {
-    Ok(MDataSeqValue {
+fn decrypt_value(info: &MapInfo, value: &MapSeqValue) -> Result<MapSeqValue, CoreError> {
+    Ok(MapSeqValue {
         data: info.decrypt(&value.data)?,
         version: value.version,
     })
@@ -296,13 +296,13 @@ fn enc_entry_key(
     symmetric_encrypt(plain_text, key, Some(&nonce))
 }
 
-impl ReprC for MDataInfo {
-    type C = *const FfiMDataInfo;
+impl ReprC for MapInfo {
+    type C = *const FfiMapInfo;
     type Error = IpcError;
 
     #[allow(unsafe_code)]
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let FfiMDataInfo {
+        let FfiMapInfo {
             seq,
             name,
             type_tag,
@@ -320,7 +320,7 @@ impl ReprC for MDataInfo {
         let kind = md_kind_clone_from_repr_c(seq);
 
         Ok(Self {
-            address: MDataAddress::from_kind(kind, name, type_tag),
+            address: MapAddress::from_kind(kind, name, type_tag),
             enc_info: enc_info_from_repr_c(has_enc_info, enc_key, enc_nonce),
             new_enc_info: enc_info_from_repr_c(has_new_enc_info, new_enc_key, new_enc_nonce),
         })
@@ -355,10 +355,10 @@ fn enc_info_from_repr_c(
 mod tests {
     use super::*;
 
-    // Ensure that a private mdata info is encrypted.
+    // Ensure that a private map info is encrypted.
     #[test]
-    fn private_mdata_info_encrypts() {
-        let info = unwrap!(MDataInfo::random_private(MDataKind::Seq, 0));
+    fn private_map_info_encrypts() {
+        let info = unwrap!(MapInfo::random_private(MapKind::Seq, 0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
         let enc_key = unwrap!(info.enc_entry_key(&key));
@@ -369,10 +369,10 @@ mod tests {
         assert_eq!(unwrap!(info.decrypt(&enc_val)), val);
     }
 
-    // Ensure that a public mdata info is not encrypted.
+    // Ensure that a public map info is not encrypted.
     #[test]
-    fn public_mdata_info_doesnt_encrypt() {
-        let info = unwrap!(MDataInfo::random_public(MDataKind::Seq, 0));
+    fn public_map_info_doesnt_encrypt() {
+        let info = unwrap!(MapInfo::random_public(MapKind::Seq, 0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
         assert_eq!(unwrap!(info.enc_entry_key(&key)), key);
@@ -383,7 +383,7 @@ mod tests {
     // Test creating and committing new encryption info.
     #[test]
     fn decrypt() {
-        let mut info = unwrap!(MDataInfo::random_private(MDataKind::Seq, 0));
+        let mut info = unwrap!(MapInfo::random_private(MapKind::Seq, 0));
 
         let plain = Vec::from("plaintext");
         let old_cipher = unwrap!(info.enc_entry_value(&plain));

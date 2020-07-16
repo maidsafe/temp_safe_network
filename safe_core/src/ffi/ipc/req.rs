@@ -10,7 +10,7 @@ use crate::ffi::arrays::XorNameArray;
 use crate::ipc::req::permission_set_into_repr_c;
 use ffi_utils::callback::CallbackArgs;
 use ffi_utils::{vec_from_raw_parts, ReprC};
-use safe_nd::MDataPermissionSet;
+use safe_nd::MapPermissionSet;
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -45,7 +45,7 @@ impl ReprC for PermissionSet {
 
 impl CallbackArgs for PermissionSet {
     fn default() -> Self {
-        permission_set_into_repr_c(MDataPermissionSet::new())
+        permission_set_into_repr_c(MapPermissionSet::new())
     }
 }
 
@@ -158,8 +158,8 @@ impl Drop for ContainersReq {
 }
 
 #[repr(C)]
-/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
-pub struct ShareMData {
+/// For use in `ShareMapReq`. Represents a specific `MutableData` that is being shared.
+pub struct ShareMap {
     /// The mutable data type.
     pub type_tag: u64,
     /// The mutable data name.
@@ -170,19 +170,19 @@ pub struct ShareMData {
 
 #[repr(C)]
 /// Represents a request to share mutable data
-pub struct ShareMDataRequest {
+pub struct ShareMapRequest {
     /// Info about the app requesting shared access
     pub app: AppExchangeInfo,
     /// List of MD names & type tags and permissions that need to be shared
-    pub mdata: *const ShareMData,
-    /// Length of the mdata array
-    pub mdata_len: usize,
+    pub map: *const ShareMap,
+    /// Length of the map array
+    pub map_len: usize,
 }
 
-impl Drop for ShareMDataRequest {
+impl Drop for ShareMapRequest {
     fn drop(&mut self) {
         unsafe {
-            let _ = vec_from_raw_parts(self.mdata as *mut ShareMData, self.mdata_len);
+            let _ = vec_from_raw_parts(self.map as *mut ShareMap, self.map_len);
         }
     }
 }

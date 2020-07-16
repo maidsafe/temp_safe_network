@@ -10,7 +10,7 @@
 // level for safe_bindgen to parse correctly
 use crate::ffi::arrays::*;
 use crate::ffi::ipc::req::PermissionSet;
-use crate::ffi::MDataInfo;
+use crate::ffi::MapInfo;
 use ffi_utils::vec_from_raw_parts;
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -55,13 +55,13 @@ pub struct AccessContInfo {
     pub nonce: SymNonce,
 }
 
-/// Information about a container (name, `MDataInfo` and permissions).
+/// Information about a container (name, `MapInfo` and permissions).
 #[repr(C)]
 pub struct ContainerInfo {
     /// Container name as UTF-8 encoded null-terminated string.
     pub name: *const c_char,
-    /// Container's `MDataInfo`.
-    pub mdata_info: MDataInfo,
+    /// Container's `MapInfo`.
+    pub map_info: MapInfo,
     /// App's permissions in the container.
     pub permissions: PermissionSet,
 }
@@ -157,9 +157,9 @@ pub struct MetadataResponse {
     ///
     /// null if not present.
     pub description: *const c_char,
-    /// Xor name of this struct's corresponding MData object.
+    /// Xor name of this struct's corresponding Map object.
     pub xor_name: XorNameArray,
-    /// Type tag of this struct's corresponding MData object.
+    /// Type tag of this struct's corresponding Map object.
     pub type_tag: u64,
 }
 
@@ -192,14 +192,14 @@ impl Drop for MetadataResponse {
 /// Represents an FFI-safe mutable data key.
 #[repr(C)]
 #[derive(Debug)]
-pub struct MDataKey {
+pub struct MapKey {
     /// Pointer to the key.
     pub key: *const u8,
     /// Size of the key.
     pub key_len: usize,
 }
 
-impl Drop for MDataKey {
+impl Drop for MapKey {
     #[allow(unsafe_code)]
     fn drop(&mut self) {
         let _ = unsafe { vec_from_raw_parts(self.key as *mut u8, self.key_len) };
@@ -209,7 +209,7 @@ impl Drop for MDataKey {
 /// Represents the FFI-safe mutable data value.
 #[repr(C)]
 #[derive(Debug)]
-pub struct MDataValue {
+pub struct MapValue {
     /// Pointer to the content.
     pub content: *const u8,
     /// Size of the content.
@@ -218,7 +218,7 @@ pub struct MDataValue {
     pub entry_version: u64,
 }
 
-impl Drop for MDataValue {
+impl Drop for MapValue {
     #[allow(unsafe_code)]
     fn drop(&mut self) {
         let _ = unsafe { vec_from_raw_parts(self.content as *mut u8, self.content_len) };
@@ -228,9 +228,9 @@ impl Drop for MDataValue {
 /// Represents an FFI-safe mutable data (key, value) entry.
 #[repr(C)]
 #[derive(Debug)]
-pub struct MDataEntry {
+pub struct MapEntry {
     /// Mutable data key.
-    pub key: MDataKey,
+    pub key: MapKey,
     /// Mutable data value.
-    pub value: MDataValue,
+    pub value: MapValue,
 }

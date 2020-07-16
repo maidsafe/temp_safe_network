@@ -10,7 +10,7 @@
 #![allow(unsafe_code)]
 
 ///! Core structs for network operations
-use crate::client::{MDataInfo, SafeKey};
+use crate::client::{MapInfo, SafeKey};
 use crate::crypto::{shared_box, shared_secretbox};
 use crate::ffi::ipc::resp as ffi;
 use crate::ipc::req::{
@@ -24,7 +24,7 @@ use bincode::{deserialize, serialize};
 use ffi_utils::{vec_clone_from_raw_parts, vec_into_raw_parts, ReprC, StringError};
 use rand::thread_rng;
 use safe_nd::{
-    AppFullId, ClientPublicId, MDataAddress, MDataPermissionSet, MDataSeqValue, PublicKey, XorName,
+    AppFullId, ClientPublicId, MapAddress, MapPermissionSet, MapSeqValue, PublicKey, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -126,7 +126,7 @@ impl ReprC for AppKeys {
 }
 
 /// Represents an entry for a single app in the access container
-pub type AccessContainerEntry = HashMap<String, (MDataInfo, ContainerPermissions)>;
+pub type AccessContainerEntry = HashMap<String, (MapInfo, ContainerPermissions)>;
 
 /// Convert `AccessContainerEntry` to FFI representation.
 pub fn access_container_entry_into_repr_c(
@@ -134,10 +134,10 @@ pub fn access_container_entry_into_repr_c(
 ) -> Result<ffi::AccessContainerEntry, NulError> {
     let mut vec = Vec::with_capacity(entry.len());
 
-    for (name, (mdata_info, permissions)) in entry {
+    for (name, (map_info, permissions)) in entry {
         vec.push(ffi::ContainerInfo {
             name: CString::new(name)?.into_raw(),
-            mdata_info: mdata_info.into_repr_c(),
+            map_info: map_info.into_repr_c(),
             permissions: container_perms_into_repr_c(&permissions),
         })
     }
@@ -166,10 +166,10 @@ pub unsafe fn access_container_entry_clone_from_repr_c(
 
     for container in input {
         let name = String::clone_from_repr_c(container.name)?;
-        let mdata_info = MDataInfo::clone_from_repr_c(&container.mdata_info)?;
+        let map_info = MapInfo::clone_from_repr_c(&container.map_info)?;
         let permissions = container_perms_from_repr_c(container.permissions)?;
 
-        let _ = output.insert(name, (mdata_info, permissions));
+        let _ = output.insert(name, (map_info, permissions));
     }
 
     Ok(output)
@@ -198,10 +198,10 @@ impl AccessContInfo {
         }
     }
 
-    /// Creates `MDataInfo` from this `AccessContInfo`
-    pub fn into_mdata_info(self, enc_key: shared_secretbox::Key) -> MDataInfo {
-        MDataInfo::new_private(
-            MDataAddress::Seq {
+    /// Creates `MapInfo` from this `AccessContInfo`
+    pub fn into_map_info(self, enc_key: shared_secretbox::Key) -> MapInfo {
+        MapInfo::new_private(
+            MapAddress::Seq {
                 name: self.id,
                 tag: self.tag,
             },
@@ -209,8 +209,8 @@ impl AccessContInfo {
         )
     }
 
-    /// Creates an `AccessContInfo` from a given `MDataInfo`
-    pub fn from_mdata_info(md: &MDataInfo) -> Result<Self, IpcError> {
+    /// Creates an `AccessContInfo` from a given `MapInfo`
+    pub fn from_map_info(md: &MapInfo) -> Result<Self, IpcError> {
         if let Some((_, nonce)) = md.enc_info {
             Ok(Self {
                 id: md.name(),
@@ -219,7 +219,7 @@ impl AccessContInfo {
             })
         } else {
             Err(IpcError::Unexpected(
-                "MDataInfo doesn't contain nonce".to_owned(),
+                "MapInfo doesn't contain nonce".to_owned(),
             ))
         }
     }
@@ -259,7 +259,7 @@ pub struct AppAccess {
     /// App's or user's public key
     pub sign_key: PublicKey,
     /// A list of permissions
-    pub permissions: MDataPermissionSet,
+    pub permissions: MapPermissionSet,
     /// App's user-facing name
     pub name: Option<String>,
     /// App id
@@ -391,31 +391,31 @@ impl ReprC for UserMetadata {
 /// Mutable data key.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
 // TODO: Move to safe-nd, or remove this and use Vec<u8> directly.
-pub struct MDataKey(
+pub struct MapKey(
     /// Key value.
     pub Vec<u8>,
 );
 
-impl MDataKey {
+impl MapKey {
     /// Create the key from bytes.
     pub fn from_bytes(key: &[u8]) -> Self {
         Self(key.into())
     }
 
     /// Construct FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> ffi::MDataKey {
+    pub fn into_repr_c(self) -> ffi::MapKey {
         let (key, key_len) = vec_into_raw_parts(self.0);
 
-        ffi::MDataKey { key, key_len }
+        ffi::MapKey { key, key_len }
     }
 }
 
-impl ReprC for MDataKey {
-    type C = *const ffi::MDataKey;
+impl ReprC for MapKey {
+    type C = *const ffi::MapKey;
     type Error = ();
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let ffi::MDataKey { key, key_len, .. } = *repr_c;
+        let ffi::MapKey { key, key_len, .. } = *repr_c;
         let key = vec_clone_from_raw_parts(key, key_len);
 
         Ok(Self(key))
@@ -424,17 +424,17 @@ impl ReprC for MDataKey {
 
 /// Redefine the Value from safe-nd so that we can `impl ReprC`.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub struct MDataValue {
+pub struct MapValue {
     /// Content of the entry.
     pub content: Vec<u8>,
     /// Version of the entry.
     pub entry_version: u64,
 }
 
-// TODO: Remove this and use SeqMDataValue in safe-nd instead.
-impl MDataValue {
-    /// Convert routing representation to `MDataValue`.
-    pub fn from_routing(value: MDataSeqValue) -> Self {
+// TODO: Remove this and use SeqMapValue in safe-nd instead.
+impl MapValue {
+    /// Convert routing representation to `MapValue`.
+    pub fn from_routing(value: MapSeqValue) -> Self {
         Self {
             content: value.data,
             entry_version: value.version,
@@ -442,10 +442,10 @@ impl MDataValue {
     }
 
     /// Returns FFI counterpart without consuming the object.
-    pub fn into_repr_c(self) -> ffi::MDataValue {
+    pub fn into_repr_c(self) -> ffi::MapValue {
         let (content, content_len) = vec_into_raw_parts(self.content);
 
-        ffi::MDataValue {
+        ffi::MapValue {
             content,
             content_len,
             entry_version: self.entry_version,
@@ -453,12 +453,12 @@ impl MDataValue {
     }
 }
 
-impl ReprC for MDataValue {
-    type C = *const ffi::MDataValue;
+impl ReprC for MapValue {
+    type C = *const ffi::MapValue;
     type Error = ();
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let ffi::MDataValue {
+        let ffi::MapValue {
             content,
             content_len,
             entry_version,
@@ -474,35 +474,35 @@ impl ReprC for MDataValue {
 }
 
 /// Mutable data entry.
-// TODO: Remove this and use SeqMDataEntry in safe-nd instead.
+// TODO: Remove this and use SeqMapEntry in safe-nd instead.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-pub struct MDataEntry {
+pub struct MapEntry {
     /// Key.
-    pub key: MDataKey,
+    pub key: MapKey,
     /// Value.
-    pub value: MDataValue,
+    pub value: MapValue,
 }
 
-impl MDataEntry {
+impl MapEntry {
     /// Construct FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> ffi::MDataEntry {
-        ffi::MDataEntry {
+    pub fn into_repr_c(self) -> ffi::MapEntry {
+        ffi::MapEntry {
             key: self.key.into_repr_c(),
             value: self.value.into_repr_c(),
         }
     }
 }
 
-impl ReprC for MDataEntry {
-    type C = *const ffi::MDataEntry;
+impl ReprC for MapEntry {
+    type C = *const ffi::MapEntry;
     type Error = ();
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let ffi::MDataEntry { ref key, ref value } = *repr_c;
+        let ffi::MapEntry { ref key, ref value } = *repr_c;
 
         Ok(Self {
-            key: MDataKey::clone_from_repr_c(key)?,
-            value: MDataValue::clone_from_repr_c(value)?,
+            key: MapKey::clone_from_repr_c(key)?,
+            value: MapValue::clone_from_repr_c(value)?,
         })
     }
 }
@@ -552,9 +552,9 @@ mod tests {
         assert_eq!(ak.app_full_id, app_full_id);
     }
 
-    // Test converting an `AccessContInfo` to `MDataInfo` and back again.
+    // Test converting an `AccessContInfo` to `MapInfo` and back again.
     #[test]
-    fn access_container_mdata_info() {
+    fn access_container_map_info() {
         let (key, nonce) = (shared_secretbox::gen_key(), utils::generate_nonce());
         let a = AccessContInfo {
             id: XorName([2; XOR_NAME_LEN]),
@@ -562,12 +562,12 @@ mod tests {
             nonce,
         };
 
-        let md = a.clone().into_mdata_info(key.clone());
+        let md = a.clone().into_map_info(key.clone());
 
-        let a2 = AccessContInfo::from_mdata_info(&md).unwrap();
+        let a2 = AccessContInfo::from_map_info(&md).unwrap();
         assert_eq!(a, a2);
 
-        let md2 = a.into_mdata_info(key);
+        let md2 = a.into_map_info(key);
         assert_eq!(md, md2);
     }
 

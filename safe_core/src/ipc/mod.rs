@@ -15,7 +15,7 @@ mod errors;
 
 pub use self::errors::IpcError;
 pub use self::req::{
-    AppExchangeInfo, AuthReq, ContainersReq, IpcReq, Permission, ShareMData, ShareMDataReq,
+    AppExchangeInfo, AuthReq, ContainersReq, IpcReq, Permission, ShareMap, ShareMapReq,
 };
 pub use self::resp::{AuthGranted, IpcResp};
 

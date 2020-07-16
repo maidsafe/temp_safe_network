@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::btree_map;
-use crate::client::{core_client::CoreClient, MDataInfo};
+use crate::client::{core_client::CoreClient, MapInfo};
 use crate::crypto::shared_secretbox;
 use crate::errors::CoreError;
 use crate::nfs::{
@@ -18,7 +18,7 @@ use crate::nfs::{
 use crate::utils::{self, generate_random_vector, test_utils::random_client};
 use crate::DIR_TAG;
 use log::trace;
-use safe_nd::{Error as SndError, MDataKind};
+use safe_nd::{Error as SndError, MapKind};
 use self_encryption::MIN_CHUNK_SIZE;
 use tokio::{sync::mpsc, task::LocalSet};
 
@@ -32,10 +32,10 @@ async fn create_test_file_with_size(
     client: &CoreClient,
     published: bool,
     size: usize,
-) -> Result<(MDataInfo, File), NfsError> {
+) -> Result<(MapInfo, File), NfsError> {
     let c2 = client.clone();
     let c3 = client.clone();
-    let root = unwrap!(MDataInfo::random_private(MDataKind::Seq, DIR_TAG));
+    let root = unwrap!(MapInfo::random_private(MapKind::Seq, DIR_TAG));
     let root2 = root.clone();
 
     let res = create_directory(&client.clone(), &root, btree_map![], btree_map![]).await;
@@ -61,13 +61,13 @@ async fn create_test_file_with_size(
 async fn create_test_file(
     client: &CoreClient,
     published: bool,
-) -> Result<(MDataInfo, File), NfsError> {
+) -> Result<(MapInfo, File), NfsError> {
     create_test_file_with_size(client, published, ORIG_SIZE).await
 }
 
-// Test inserting files to, and fetching from, a public mdata.
-// 1. Create a private mdata with random bytes in `enc_info` and `new_enc_info`.
-// 2. Create a directory for the mdata.
+// Test inserting files to, and fetching from, a public map.
+// 1. Create a private map with random bytes in `enc_info` and `new_enc_info`.
+// 2. Create a directory for the map.
 // 3. Insert a file with an empty filename.
 // 4. Immediately fetch it back and check the contents.
 // 5. Sleep several seconds and repeat step 3.
@@ -81,7 +81,7 @@ async fn file_fetch_public_md() -> Result<(), NfsError> {
     let c6 = client.clone();
     let c7 = client.clone();
 
-    let mut root = unwrap!(MDataInfo::random_public(MDataKind::Unseq, DIR_TAG));
+    let mut root = unwrap!(MapInfo::random_public(MapKind::Unseq, DIR_TAG));
     root.enc_info = Some((shared_secretbox::gen_key(), utils::generate_nonce()));
     root.new_enc_info = Some((shared_secretbox::gen_key(), utils::generate_nonce()));
     let root2 = root.clone();
@@ -122,7 +122,7 @@ async fn file_fetch_public_md() -> Result<(), NfsError> {
     Ok(())
 }
 
-// Test inserting files to, and fetching from, a public mdata.
+// Test inserting files to, and fetching from, a public map.
 // Insert a file as Unpublished Immutable data and verify that it can be fetched.
 // Other clients should not be able to fetch the file.
 // After deletion the file should not be accessible anymore.
@@ -143,7 +143,7 @@ async fn files_stored_in_unpublished_idata() -> Result<(), NfsError> {
         let c6 = client.clone();
         let c7 = client.clone();
 
-        let root = unwrap!(MDataInfo::random_public(MDataKind::Unseq, DIR_TAG));
+        let root = unwrap!(MapInfo::random_public(MapKind::Unseq, DIR_TAG));
 
         create_directory(&client, &root, btree_map![], btree_map![]).await?;
 
@@ -179,7 +179,7 @@ async fn files_stored_in_unpublished_idata() -> Result<(), NfsError> {
 
     let _join_handle2 = local.spawn_local(async move {
         // Get the directory name and try to fetch a file from it
-        let dir: MDataInfo = unwrap!(client1_rx.recv().await);
+        let dir: MapInfo = unwrap!(client1_rx.recv().await);
         let client: CoreClient = random_client()?;
         let res = file_helper::fetch(client.clone(), dir, "").await;
         match res {

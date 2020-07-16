@@ -1,7 +1,7 @@
 use safe_nd::{
     AuthCmd,
     Account, AccountRead, AccountWrite, BlobRead, BlobWrite, DebitAgreementProof, AppPermissions,
-    IData, IDataAddress, MData, MDataAddress, MDataEntryActions, MDataPermissionSet, MapRead,
+    IData, IDataAddress, Map, MapAddress, MapEntryActions, MapPermissionSet, MapRead,
     MapWrite, PublicKey, QueryResponse, SData, SDataAddress, SDataOwner,
     SDataPrivPermissions, SDataPubPermissions, SDataWriteOp, SequenceRead, SequenceWrite, Write, DataCmd, Cmd
 };
@@ -52,7 +52,7 @@ impl TransferActor {
     }
 
     /// Delete sequence
-    pub async fn delete_map(&mut self, address: MDataAddress) -> Result<(), CoreError> {
+    pub async fn delete_map(&mut self, address: MapAddress) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------
@@ -73,7 +73,7 @@ impl TransferActor {
     /// Delete mutable data user permission
     pub async fn delete_map_user_perms(
         &mut self,
-        address: MDataAddress,
+        address: MapAddress,
         user: PublicKey,
         version: u64,
     ) -> Result<(), CoreError> {
@@ -107,9 +107,9 @@ impl TransferActor {
     /// Set mutable data user permissions
     pub async fn set_map_user_perms(
         &mut self,
-        address: MDataAddress,
+        address: MapAddress,
         user: PublicKey,
-        permissions: MDataPermissionSet,
+        permissions: MapPermissionSet,
         version: u64,
     ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
@@ -144,8 +144,8 @@ impl TransferActor {
     /// Mutate mutable data user entries
     pub async fn edit_map_entries(
         &mut self,
-        address: MDataAddress,
-        changes: MDataEntryActions,
+        address: MapAddress,
+        changes: MapEntryActions,
     ) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
@@ -276,7 +276,7 @@ impl TransferActor {
 
     /// Store a new public mutable data object
     /// Wraps msg_contents for payment validation and mutation
-    pub async fn new_map(&mut self, data: MData) -> Result<(), CoreError> {
+    pub async fn new_map(&mut self, data: Map) -> Result<(), CoreError> {
         let mut cm = self.connection_manager();
 
         // --------------------------

@@ -35,7 +35,7 @@ pub enum IpcError {
     /// App is not registered.
     UnknownApp,
     /// User denied request for shared access to MD.
-    ShareMDataDenied,
+    ShareMapDenied,
     /// Requested shared access to non-owned MD.
     InvalidOwner(Vec<(XorName, u64)>),
     /// Message sent between mock and non-mock versions.

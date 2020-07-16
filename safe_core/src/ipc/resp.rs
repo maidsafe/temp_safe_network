@@ -33,7 +33,7 @@ pub enum IpcResp {
     /// Unregistered client.
     Unregistered(Result<BootstrapConfig, IpcError>),
     /// Share mutable data.
-    ShareMData(Result<(), IpcError>),
+    ShareMap(Result<(), IpcError>),
 }
 
 /// It represents the authentication response.

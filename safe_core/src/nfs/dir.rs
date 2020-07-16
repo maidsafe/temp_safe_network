@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::{Client, MDataInfo};
+use crate::client::{Client, MapInfo};
 use crate::errors::CoreError;
 use crate::nfs::NfsError;
 use log::trace;
-use safe_nd::{Error as SndError, MDataPermissionSet, MDataSeqEntries, PublicKey, SeqMutableData};
+use safe_nd::{Error as SndError, MapPermissionSet, MapSeqEntries, PublicKey, SeqMutableData};
 use std::collections::BTreeMap;
 
-/// Create a new directory based on the provided `MDataInfo`.
+/// Create a new directory based on the provided `MapInfo`.
 pub async fn create_directory(
     client: &(impl Client + Sync),
-    dir: &MDataInfo,
-    contents: MDataSeqEntries,
-    perms: BTreeMap<PublicKey, MDataPermissionSet>,
+    dir: &MapInfo,
+    contents: MapSeqEntries,
+    perms: BTreeMap<PublicKey, MapPermissionSet>,
 ) -> Result<(), NfsError> {
     let pub_key = client.owner_key().await;
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::MDataInfo;
+use crate::client::MapInfo;
 use crate::crypto::{shared_box, shared_secretbox};
 use crate::errors::CoreError;
 use crate::utils::{SymEncKey, SymEncNonce, SYM_ENC_KEY_LEN, SYM_ENC_NONCE_LEN};
@@ -16,7 +16,7 @@ use hmac::Hmac;
 use miscreant::aead::Aead;
 use miscreant::aead::Aes128SivAead;
 use rand::{thread_rng, CryptoRng, Rng};
-use safe_nd::{ClientFullId, MDataKind, PublicKey, SafeKey, XorName, XOR_NAME_LEN};
+use safe_nd::{ClientFullId, MapKind, PublicKey, SafeKey, XorName, XOR_NAME_LEN};
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use std::convert::TryInto;
@@ -31,9 +31,9 @@ pub struct Account {
     /// The User Account Keys.
     pub maid_keys: ClientKeys,
     /// The user's access container.
-    pub access_container: MDataInfo,
+    pub access_container: MapInfo,
     /// The user's configuration directory.
-    pub config_root: MDataInfo,
+    pub config_root: MapInfo,
     /// Set to `true` when all root and standard containers
     /// have been created successfully. `false` signifies that
     /// previous attempt might have failed - check on login.
@@ -45,8 +45,8 @@ impl Account {
     pub fn new(maid_keys: ClientKeys) -> Result<Self, CoreError> {
         Ok(Self {
             maid_keys,
-            access_container: MDataInfo::random_private(MDataKind::Seq, DIR_TAG)?,
-            config_root: MDataInfo::random_private(MDataKind::Seq, DIR_TAG)?,
+            access_container: MapInfo::random_private(MapKind::Seq, DIR_TAG)?,
+            config_root: MapInfo::random_private(MapKind::Seq, DIR_TAG)?,
             root_dirs_created: false,
         })
     }

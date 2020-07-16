@@ -11,8 +11,8 @@ pub mod account;
 /// Core client used for testing purposes.
 #[cfg(any(test, feature = "testing"))]
 pub mod core_client;
-/// `MDataInfo` utilities.
-pub mod mdata_info;
+/// `MapInfo` utilities.
+pub mod map_info;
 /// Various APIs wrapped to provide resiliance for common network operations.
 pub mod recoverable_apis;
 /// Safe Transfers wrapper, with Money APIs
@@ -27,7 +27,7 @@ mod mock;
 pub use self::transfer_actor::{ClientTransferValidator, TransferActor};
 
 pub use self::account::ClientKeys;
-pub use self::mdata_info::MDataInfo;
+pub use self::map_info::MapInfo;
 #[cfg(feature = "mock-network")]
 pub use self::mock::vault::mock_vault_path;
 #[cfg(feature = "mock-network")]
@@ -51,9 +51,9 @@ use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
     MsgEnvelope, DataQuery,
      AccountWrite, AppPermissions, BlobRead, BlobWrite, ClientFullId, MsgSender, Cmd, Query,QueryResponse, AuthCmd,
- DebitAgreementProof, IData, IDataAddress, MData, MDataAddress, MDataEntries, AccountRead, AuthQuery,
-    MDataEntryActions, MDataPermissionSet, MDataSeqEntries, MDataSeqEntryActions, MDataSeqValue,
-    MDataUnseqEntryActions, MDataValue, MDataValues, MapRead, MapWrite, Message, MessageId, Money,
+ DebitAgreementProof, IData, IDataAddress, Map, MapAddress, MapEntries, AccountRead, AuthQuery,
+    MapEntryActions, MapPermissionSet, MapSeqEntries, MapSeqEntryActions, MapSeqValue,
+    MapUnseqEntryActions, MapValue, MapValues, MapRead, MapWrite, Message, MessageId, Money,
     PublicId, PublicKey, SData, SDataAction, SDataAddress,
     SDataEntries, SDataEntry, SDataIndex, SDataOwner, SDataPrivPermissions,
     SDataPrivUserPermissions, SDataPubPermissions, SDataPubUserPermissions, SDataUser,
@@ -228,14 +228,14 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("Put Unsequenced MData at {:?}", data.name());
+        trace!("Put Unsequenced Map at {:?}", data.name());
 
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.new_map(MData::Unseq(data)).await
+        actor.new_map(Map::Unseq(data)).await
     }
 
     /// Transfer coin balance
@@ -421,18 +421,18 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("Put Sequenced MData at {:?}", data.name());
+        trace!("Put Sequenced Map at {:?}", data.name());
 
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.new_map(MData::Seq(data)).await
+        actor.new_map(Map::Seq(data)).await
     }
 
     /// Fetch unpublished mutable data from the network
-    async fn get_unseq_mdata(&self, name: XorName, tag: u64) -> Result<UnseqMutableData, CoreError>
+    async fn get_unseq_map(&self, name: XorName, tag: u64) -> Result<UnseqMutableData, CoreError>
     where
         Self: Sized,
     {
@@ -440,34 +440,34 @@ pub trait Client: Clone + Send + Sync {
 
         match send_query(
             self,
-            wrap_map_read(MapRead::Get(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::Get(MapAddress::Unseq { name, tag })),
         )
         .await?
         {
-            QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|mdata| match mdata {
-                MData::Unseq(data) => Ok(data),
-                MData::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
+            QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|map| match map {
+                Map::Unseq(data) => Ok(data),
+                Map::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
             }),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
 
     /// Fetch the value for a given key in a sequenced mutable data
-    async fn get_seq_mdata_value(
+    async fn get_seq_map_value(
         &self,
         name: XorName,
         tag: u64,
         key: Vec<u8>,
-    ) -> Result<MDataSeqValue, CoreError>
+    ) -> Result<MapSeqValue, CoreError>
     where
         Self: Sized,
     {
-        trace!("Fetch MDataValue for {:?}", name);
+        trace!("Fetch MapValue for {:?}", name);
 
         match send_query(
             self,
             wrap_map_read(MapRead::GetValue {
-                address: MDataAddress::Seq { name, tag },
+                address: MapAddress::Seq { name, tag },
                 key,
             }),
         )
@@ -475,8 +475,8 @@ pub trait Client: Clone + Send + Sync {
         {
             QueryResponse::GetMapValue(res) => {
                 res.map_err(CoreError::from).and_then(|value| match value {
-                    MDataValue::Seq(val) => Ok(val),
-                    MDataValue::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
+                    MapValue::Seq(val) => Ok(val),
+                    MapValue::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
                 })
             }
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -484,7 +484,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Fetch the value for a given key in a sequenced mutable data
-    async fn get_unseq_mdata_value(
+    async fn get_unseq_map_value(
         &self,
         name: XorName,
         tag: u64,
@@ -493,12 +493,12 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("Fetch MDataValue for {:?}", name);
+        trace!("Fetch MapValue for {:?}", name);
 
         match send_query(
             self,
             wrap_map_read(MapRead::GetValue {
-                address: MDataAddress::Unseq { name, tag },
+                address: MapAddress::Unseq { name, tag },
                 key,
             }),
         )
@@ -506,8 +506,8 @@ pub trait Client: Clone + Send + Sync {
         {
             QueryResponse::GetMapValue(res) => {
                 res.map_err(CoreError::from).and_then(|value| match value {
-                    MDataValue::Unseq(val) => Ok(val),
-                    MDataValue::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
+                    MapValue::Unseq(val) => Ok(val),
+                    MapValue::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
                 })
             }
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -515,7 +515,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Fetch sequenced mutable data from the network
-    async fn get_seq_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData, CoreError>
+    async fn get_seq_map(&self, name: XorName, tag: u64) -> Result<SeqMutableData, CoreError>
     where
         Self: Sized,
     {
@@ -523,32 +523,32 @@ pub trait Client: Clone + Send + Sync {
 
         match send_query(
             self,
-            wrap_map_read(MapRead::Get(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::Get(MapAddress::Seq { name, tag })),
         )
         .await?
         {
-            QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|mdata| match mdata {
-                MData::Seq(data) => Ok(data),
-                MData::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
+            QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|map| match map {
+                Map::Seq(data) => Ok(data),
+                Map::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
             }),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
 
     /// Mutates sequenced `MutableData` entries in bulk
-    async fn mutate_seq_mdata_entries(
+    async fn mutate_seq_map_entries(
         &self,
         name: XorName,
         tag: u64,
-        actions: MDataSeqEntryActions,
+        actions: MapSeqEntryActions,
     ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
-        trace!("Mutate MData for {:?}", name);
+        trace!("Mutate Map for {:?}", name);
 
-        let mdata_actions = MDataEntryActions::Seq(actions);
-        let address = MDataAddress::Seq { name, tag };
+        let map_actions = MapEntryActions::Seq(actions);
+        let address = MapAddress::Seq { name, tag };
         let _cm = self.inner().lock().await.connection_manager.clone();
 
         let mut actor = self
@@ -556,23 +556,23 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.edit_map_entries(address, mdata_actions).await
+        actor.edit_map_entries(address, map_actions).await
     }
 
     /// Mutates unsequenced `MutableData` entries in bulk
-    async fn mutate_unseq_mdata_entries(
+    async fn mutate_unseq_map_entries(
         &self,
         name: XorName,
         tag: u64,
-        actions: MDataUnseqEntryActions,
+        actions: MapUnseqEntryActions,
     ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
-        trace!("Mutate MData for {:?}", name);
+        trace!("Mutate Map for {:?}", name);
 
-        let mdata_actions = MDataEntryActions::Unseq(actions);
-        let address = MDataAddress::Unseq { name, tag };
+        let map_actions = MapEntryActions::Unseq(actions);
+        let address = MapAddress::Unseq { name, tag };
         let _cm = self.inner().lock().await.connection_manager.clone();
 
         let mut actor = self
@@ -580,11 +580,11 @@ pub trait Client: Clone + Send + Sync {
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        actor.edit_map_entries(address, mdata_actions).await
+        actor.edit_map_entries(address, map_actions).await
     }
 
     /// Get a shell (bare bones) version of `MutableData` from the network.
-    async fn get_seq_mdata_shell(
+    async fn get_seq_map_shell(
         &self,
         name: XorName,
         tag: u64,
@@ -596,13 +596,13 @@ pub trait Client: Clone + Send + Sync {
 
         match send_query(
             self,
-            wrap_map_read(MapRead::GetShell(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::GetShell(MapAddress::Seq { name, tag })),
         )
         .await?
         {
             QueryResponse::GetMapShell(res) => {
-                res.map_err(CoreError::from).and_then(|mdata| match mdata {
-                    MData::Seq(data) => Ok(data),
+                res.map_err(CoreError::from).and_then(|map| match map {
+                    Map::Seq(data) => Ok(data),
                     _ => Err(CoreError::ReceivedUnexpectedData),
                 })
             }
@@ -611,7 +611,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Get a shell (bare bones) version of `MutableData` from the network.
-    async fn get_unseq_mdata_shell(
+    async fn get_unseq_map_shell(
         &self,
         name: XorName,
         tag: u64,
@@ -623,13 +623,13 @@ pub trait Client: Clone + Send + Sync {
 
         match send_query(
             self,
-            wrap_map_read(MapRead::GetShell(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::GetShell(MapAddress::Unseq { name, tag })),
         )
         .await?
         {
             QueryResponse::GetMapShell(res) => {
-                res.map_err(CoreError::from).and_then(|mdata| match mdata {
-                    MData::Unseq(data) => Ok(data),
+                res.map_err(CoreError::from).and_then(|map| match map {
+                    Map::Unseq(data) => Ok(data),
                     _ => Err(CoreError::ReceivedUnexpectedData),
                 })
             }
@@ -638,7 +638,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Get a current version of `MutableData` from the network.
-    async fn get_mdata_version(&self, address: MDataAddress) -> Result<u64, CoreError>
+    async fn get_map_version(&self, address: MapAddress) -> Result<u64, CoreError>
     where
         Self: Sized,
     {
@@ -651,7 +651,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Return a complete list of entries in `MutableData`.
-    async fn list_unseq_mdata_entries(
+    async fn list_unseq_map_entries(
         &self,
         name: XorName,
         tag: u64,
@@ -659,19 +659,19 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("ListMDataEntries for {:?}", name);
+        trace!("ListMapEntries for {:?}", name);
 
         match send_query(
             self,
-            wrap_map_read(MapRead::ListEntries(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::ListEntries(MapAddress::Unseq { name, tag })),
         )
         .await?
         {
-            QueryResponse::ListMDataEntries(res) => {
+            QueryResponse::ListMapEntries(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|entries| match entries {
-                        MDataEntries::Unseq(data) => Ok(data),
-                        MDataEntries::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
+                        MapEntries::Unseq(data) => Ok(data),
+                        MapEntries::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
                     })
             }
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -679,27 +679,27 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Return a complete list of entries in `MutableData`.
-    async fn list_seq_mdata_entries(
+    async fn list_seq_map_entries(
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<MDataSeqEntries, CoreError>
+    ) -> Result<MapSeqEntries, CoreError>
     where
         Self: Sized,
     {
-        trace!("ListSeqMDataEntries for {:?}", name);
+        trace!("ListSeqMapEntries for {:?}", name);
 
         match send_query(
             self,
-            wrap_map_read(MapRead::ListEntries(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::ListEntries(MapAddress::Seq { name, tag })),
         )
         .await?
         {
-            QueryResponse::ListMDataEntries(res) => {
+            QueryResponse::ListMapEntries(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|entries| match entries {
-                        MDataEntries::Seq(data) => Ok(data),
-                        MDataEntries::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
+                        MapEntries::Seq(data) => Ok(data),
+                        MapEntries::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
                     })
             }
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -707,40 +707,40 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Return a list of keys in `MutableData` stored on the network.
-    async fn list_mdata_keys(&self, address: MDataAddress) -> Result<BTreeSet<Vec<u8>>, CoreError>
+    async fn list_map_keys(&self, address: MapAddress) -> Result<BTreeSet<Vec<u8>>, CoreError>
     where
         Self: Sized,
     {
-        trace!("ListMDataKeys for {:?}", address);
+        trace!("ListMapKeys for {:?}", address);
 
         match send_query(self, wrap_map_read(MapRead::ListKeys(address))).await? {
-            QueryResponse::ListMDataKeys(res) => res.map_err(CoreError::from),
+            QueryResponse::ListMapKeys(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
 
     /// Return a list of values in a Sequenced Mutable Data
-    async fn list_seq_mdata_values(
+    async fn list_seq_map_values(
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<Vec<MDataSeqValue>, CoreError>
+    ) -> Result<Vec<MapSeqValue>, CoreError>
     where
         Self: Sized,
     {
-        trace!("List MDataValues for {:?}", name);
+        trace!("List MapValues for {:?}", name);
 
         match send_query(
             self,
-            wrap_map_read(MapRead::ListValues(MDataAddress::Seq { name, tag })),
+            wrap_map_read(MapRead::ListValues(MapAddress::Seq { name, tag })),
         )
         .await?
         {
-            QueryResponse::ListMDataValues(res) => {
+            QueryResponse::ListMapValues(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|values| match values {
-                        MDataValues::Seq(data) => Ok(data),
-                        MDataValues::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
+                        MapValues::Seq(data) => Ok(data),
+                        MapValues::Unseq(_) => Err(CoreError::ReceivedUnexpectedData),
                     })
             }
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -748,11 +748,11 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Return the permissions set for a particular user
-    async fn list_mdata_user_permissions(
+    async fn list_map_user_permissions(
         &self,
-        address: MDataAddress,
+        address: MapAddress,
         user: PublicKey,
-    ) -> Result<MDataPermissionSet, CoreError>
+    ) -> Result<MapPermissionSet, CoreError>
     where
         Self: Sized,
     {
@@ -764,13 +764,13 @@ pub trait Client: Clone + Send + Sync {
         )
         .await?
         {
-            QueryResponse::ListMDataUserPermissions(res) => res.map_err(CoreError::from),
+            QueryResponse::ListMapUserPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
 
     /// Returns a list of values in an Unsequenced Mutable Data
-    async fn list_unseq_mdata_values(
+    async fn list_unseq_map_values(
         &self,
         name: XorName,
         tag: u64,
@@ -778,19 +778,19 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        trace!("List MDataValues for {:?}", name);
+        trace!("List MapValues for {:?}", name);
 
         match send_query(
             self,
-            wrap_map_read(MapRead::ListValues(MDataAddress::Unseq { name, tag })),
+            wrap_map_read(MapRead::ListValues(MapAddress::Unseq { name, tag })),
         )
         .await?
         {
-            QueryResponse::ListMDataValues(res) => {
+            QueryResponse::ListMapValues(res) => {
                 res.map_err(CoreError::from)
                     .and_then(|values| match values {
-                        MDataValues::Unseq(data) => Ok(data),
-                        MDataValues::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
+                        MapValues::Unseq(data) => Ok(data),
+                        MapValues::Seq(_) => Err(CoreError::ReceivedUnexpectedData),
                     })
             }
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -1176,33 +1176,33 @@ pub trait Client: Clone + Send + Sync {
     // ========== END of Sequence Data functions =========
 
     /// Return a list of permissions in `MutableData` stored on the network.
-    async fn list_mdata_permissions(
+    async fn list_map_permissions(
         &self,
-        address: MDataAddress,
-    ) -> Result<BTreeMap<PublicKey, MDataPermissionSet>, CoreError>
+        address: MapAddress,
+    ) -> Result<BTreeMap<PublicKey, MapPermissionSet>, CoreError>
     where
         Self: Sized,
     {
-        trace!("List MDataPermissions for {:?}", address);
+        trace!("List MapPermissions for {:?}", address);
 
         match send_query(self, wrap_map_read(MapRead::ListPermissions(address))).await? {
-            QueryResponse::ListMDataPermissions(res) => res.map_err(CoreError::from),
+            QueryResponse::ListMapPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
     }
 
     /// Updates or inserts a permissions set for a user
-    async fn set_mdata_user_permissions(
+    async fn set_map_user_permissions(
         &self,
-        address: MDataAddress,
+        address: MapAddress,
         user: PublicKey,
-        permissions: MDataPermissionSet,
+        permissions: MapPermissionSet,
         version: u64,
     ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
-        trace!("SetMDataUserPermissions for {:?}", address);
+        trace!("SetMapUserPermissions for {:?}", address);
 
         let mut actor = self
             .transfer_actor()
@@ -1215,16 +1215,16 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Updates or inserts a permissions set for a user
-    async fn del_mdata_user_permissions(
+    async fn del_map_user_permissions(
         &self,
-        address: MDataAddress,
+        address: MapAddress,
         user: PublicKey,
         version: u64,
     ) -> Result<(), CoreError>
     where
         Self: Sized,
     {
-        trace!("DelMDataUserPermissions for {:?}", address);
+        trace!("DelMapUserPermissions for {:?}", address);
 
         let mut actor = self
             .transfer_actor()
@@ -1236,7 +1236,7 @@ pub trait Client: Clone + Send + Sync {
 
     /// Sends an ownership transfer request.
     #[allow(unused)]
-    fn change_mdata_owner(
+    fn change_map_owner(
         &self,
         name: XorName,
         tag: u64,
@@ -1364,7 +1364,7 @@ pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<
 }
 
 /// This trait implements functions that are supposed to be called only by `CoreClient` and `AuthClient`.
-/// Applications are not allowed to `DELETE MData` and get/mutate auth keys, hence `AppClient` does not implement
+/// Applications are not allowed to `DELETE Map` and get/mutate auth keys, hence `AppClient` does not implement
 /// this trait.
 #[async_trait]
 pub trait AuthActions: Client + Clone + 'static {
@@ -1419,8 +1419,8 @@ pub trait AuthActions: Client + Clone + 'static {
 
     }
 
-    /// Delete MData from network
-    async fn delete_mdata(&self, address: MDataAddress) -> Result<(), CoreError>
+    /// Delete Map from network
+    async fn delete_map(&self, address: MapAddress) -> Result<(), CoreError>
     where
         Self: Sized,
     {
@@ -1529,7 +1529,7 @@ mod tests {
         test_utils::{calculate_new_balance, gen_bls_keypair, random_client},
     };
     use safe_nd::{
-        Error as SndError, MDataAction, MDataKind, Money, PubImmutableData,
+        Error as SndError, MapAction, MapKind, Money, PubImmutableData,
         SDataPrivUserPermissions, UnpubImmutableData, XorName,
     };
     use std::str::FromStr;
@@ -1638,18 +1638,18 @@ mod tests {
         Ok(())
     }
 
-    // 1. Create unseq. mdata with some entries and perms and put it on the network
+    // 1. Create unseq. map with some entries and perms and put it on the network
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
-    pub async fn unseq_mdata_test() -> Result<(), CoreError> {
+    pub async fn unseq_map_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
         let tag = 15001;
         let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = Default::default();
         let mut permissions: BTreeMap<_, _> = Default::default();
-        let permission_set = MDataPermissionSet::new().allow(MDataAction::Read);
+        let permission_set = MapPermissionSet::new().allow(MapAction::Read);
         let _ = permissions.insert(client.public_key().await, permission_set);
         let _ = entries.insert(b"key".to_vec(), b"value".to_vec());
         let entries_keys = entries.keys().cloned().collect();
@@ -1663,47 +1663,47 @@ mod tests {
             client.public_key().await,
         );
         client.put_unseq_mutable_data(data.clone()).await?;
-        println!("Put unseq. MData successfully");
+        println!("Put unseq. Map successfully");
 
         let version = client
-            .get_mdata_version(MDataAddress::Unseq { name, tag })
+            .get_map_version(MapAddress::Unseq { name, tag })
             .await?;
         assert_eq!(version, 0);
-        let fetched_entries = client.list_unseq_mdata_entries(name, tag).await?;
+        let fetched_entries = client.list_unseq_map_entries(name, tag).await?;
         assert_eq!(fetched_entries, entries);
         let keys = client
-            .list_mdata_keys(MDataAddress::Unseq { name, tag })
+            .list_map_keys(MapAddress::Unseq { name, tag })
             .await?;
         assert_eq!(keys, entries_keys);
-        let values = client.list_unseq_mdata_values(name, tag).await?;
+        let values = client.list_unseq_map_values(name, tag).await?;
         assert_eq!(values, entries_values);
-        let fetched_data = client.get_unseq_mdata(*data.name(), data.tag()).await?;
+        let fetched_data = client.get_unseq_map(*data.name(), data.tag()).await?;
         assert_eq!(fetched_data.name(), data.name());
         assert_eq!(fetched_data.tag(), data.tag());
         Ok(())
     }
 
-    // 1. Create an put seq. mdata on the network with some entries and permissions.
+    // 1. Create an put seq. map on the network with some entries and permissions.
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
     #[tokio::test]
-    pub async fn seq_mdata_test() -> Result<(), CoreError> {
+    pub async fn seq_map_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
         let tag = 15001;
-        let mut entries: MDataSeqEntries = Default::default();
+        let mut entries: MapSeqEntries = Default::default();
         let _ = entries.insert(
             b"key".to_vec(),
-            MDataSeqValue {
+            MapSeqValue {
                 data: b"value".to_vec(),
                 version: 0,
             },
         );
         let entries_keys = entries.keys().cloned().collect();
-        let entries_values: Vec<MDataSeqValue> = entries.values().cloned().collect();
+        let entries_values: Vec<MapSeqValue> = entries.values().cloned().collect();
         let mut permissions: BTreeMap<_, _> = Default::default();
-        let permission_set = MDataPermissionSet::new().allow(MDataAction::Read);
+        let permission_set = MapPermissionSet::new().allow(MapAction::Read);
         let _ = permissions.insert(client.public_key().await, permission_set);
         let data = SeqMutableData::new_with_data(
             name,
@@ -1714,35 +1714,35 @@ mod tests {
         );
 
         client.put_seq_mutable_data(data.clone()).await?;
-        println!("Put seq. MData successfully");
+        println!("Put seq. Map successfully");
 
-        let fetched_entries = client.list_seq_mdata_entries(name, tag).await?;
+        let fetched_entries = client.list_seq_map_entries(name, tag).await?;
         assert_eq!(fetched_entries, entries);
-        let mdata_shell = client.get_seq_mdata_shell(name, tag).await?;
-        assert_eq!(*mdata_shell.name(), name);
-        assert_eq!(mdata_shell.tag(), tag);
-        assert_eq!(mdata_shell.entries().len(), 0);
+        let map_shell = client.get_seq_map_shell(name, tag).await?;
+        assert_eq!(*map_shell.name(), name);
+        assert_eq!(map_shell.tag(), tag);
+        assert_eq!(map_shell.entries().len(), 0);
         let keys = client
-            .list_mdata_keys(MDataAddress::Seq { name, tag })
+            .list_map_keys(MapAddress::Seq { name, tag })
             .await?;
         assert_eq!(keys, entries_keys);
-        let values = client.list_seq_mdata_values(name, tag).await?;
+        let values = client.list_seq_map_values(name, tag).await?;
         assert_eq!(values, entries_values);
-        let fetched_data = client.get_seq_mdata(name, tag).await?;
+        let fetched_data = client.get_seq_map(name, tag).await?;
         assert_eq!(fetched_data.name(), data.name());
         assert_eq!(fetched_data.tag(), data.tag());
         assert_eq!(fetched_data.entries().len(), 1);
         Ok(())
     }
 
-    // 1. Put seq. mdata on the network and then delete it
+    // 1. Put seq. map on the network and then delete it
     // 2. Try getting the data object. It should panic
     #[tokio::test]
-    pub async fn del_seq_mdata_test() -> Result<(), CoreError> {
+    pub async fn del_seq_map_test() -> Result<(), CoreError> {
         let client = random_client()?;
         let name = XorName(rand::random());
         let tag = 15001;
-        let mdataref = MDataAddress::Seq { name, tag };
+        let mapref = MapAddress::Seq { name, tag };
         let data = SeqMutableData::new_with_data(
             name,
             tag,
@@ -1752,8 +1752,8 @@ mod tests {
         );
 
         client.put_seq_mutable_data(data.clone()).await?;
-        client.delete_mdata(mdataref).await?;
-        let res = client.get_unseq_mdata(*data.name(), data.tag()).await;
+        client.delete_map(mapref).await?;
+        let res = client.get_unseq_map(*data.name(), data.tag()).await;
         match res {
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
             _ => panic!("Unexpected success"),
@@ -1761,14 +1761,14 @@ mod tests {
         Ok(())
     }
 
-    // 1. Put unseq. mdata on the network and then delete it
+    // 1. Put unseq. map on the network and then delete it
     // 2. Try getting the data object. It should panic
     #[tokio::test]
-    pub async fn del_unseq_mdata_test() -> Result<(), CoreError> {
+    pub async fn del_unseq_map_test() -> Result<(), CoreError> {
         let client = random_client()?;
         let name = XorName(rand::random());
         let tag = 15001;
-        let mdataref = MDataAddress::Unseq { name, tag };
+        let mapref = MapAddress::Unseq { name, tag };
         let data = UnseqMutableData::new_with_data(
             name,
             tag,
@@ -1778,9 +1778,9 @@ mod tests {
         );
 
         client.put_unseq_mutable_data(data.clone()).await?;
-        client.delete_mdata(mdataref).await?;
+        client.delete_map(mapref).await?;
 
-        let res = client.get_unseq_mdata(*data.name(), data.tag()).await;
+        let res = client.get_unseq_map(*data.name(), data.tag()).await;
         match res {
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
             _ => panic!("Unexpected success"),
@@ -1978,13 +1978,13 @@ mod tests {
         };
     }
 
-    // 1. Create a client that PUTs some mdata on the network
+    // 1. Create a client that PUTs some map on the network
     // 2. Create a different client that tries to delete the data. It should panic.
     #[tokio::test]
-    pub async fn del_unseq_mdata_permission_test() -> Result<(), CoreError> {
+    pub async fn del_unseq_map_permission_test() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 15001;
-        let mdataref = MDataAddress::Unseq { name, tag };
+        let mapref = MapAddress::Unseq { name, tag };
 
         let client = random_client()?;
         let data = UnseqMutableData::new_with_data(
@@ -1998,7 +1998,7 @@ mod tests {
         client.put_unseq_mutable_data(data).await?;
 
         let client = random_client()?;
-        let res = client.delete_mdata(mdataref).await;
+        let res = client.delete_map(mapref).await;
         match res {
             Err(CoreError::DataError(SndError::AccessDenied)) => (),
             res => panic!("Unexpected result: {:?}", res),
@@ -2009,15 +2009,15 @@ mod tests {
 
 
     #[tokio::test]
-    pub async fn mdata_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<(), CoreError> {
+    pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client() -> Result<(), CoreError> {
         let client = random_client()?;
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
         let mut permissions: BTreeMap<_, _> = Default::default();
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::ManagePermissions);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::ManagePermissions);
         let user = client.public_key().await;
         let random_user = gen_bls_keypair().public_key();
         let random_pk = gen_bls_keypair().public_key();
@@ -2035,7 +2035,7 @@ mod tests {
         );
 
         client.put_seq_mutable_data(test_data_with_different_owner_than_client.clone()).await?;
-        let res = client.get_seq_mdata_shell(test_data_name, 1500).await;
+        let res = client.get_seq_map_shell(test_data_name, 1500).await;
         match res {
             Err(CoreError::DataError(SndError::NoSuchData)) => (),
             Ok(_) => panic!("Unexpected Success: Validating owners should fail"),
@@ -2058,15 +2058,15 @@ mod tests {
     // 3. Fetch the list of permissions and verify the edit.
     // 4. Delete a user's permissions from the permission set and verify the deletion.
     #[tokio::test]
-    pub async fn mdata_can_modify_permissions_test() -> Result<(), CoreError> {
+    pub async fn map_can_modify_permissions_test() -> Result<(), CoreError> {
         let client = random_client()?;
         let name = XorName(rand::random());
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::ManagePermissions);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::ManagePermissions);
         let user = client.public_key().await;
         let random_user = gen_bls_keypair().public_key();
 
@@ -2083,28 +2083,28 @@ mod tests {
 
         client.put_seq_mutable_data(data).await?;
 
-        let new_perm_set = MDataPermissionSet::new()
-            .allow(MDataAction::ManagePermissions)
-            .allow(MDataAction::Read);
+        let new_perm_set = MapPermissionSet::new()
+            .allow(MapAction::ManagePermissions)
+            .allow(MapAction::Read);
         client
-            .set_mdata_user_permissions(MDataAddress::Seq { name, tag }, user, new_perm_set, 1)
+            .set_map_user_permissions(MapAddress::Seq { name, tag }, user, new_perm_set, 1)
             .await?;
         println!("Modified user permissions");
 
         let permissions = client
-            .list_mdata_user_permissions(MDataAddress::Seq { name, tag }, user)
+            .list_map_user_permissions(MapAddress::Seq { name, tag }, user)
             .await?;
-        assert!(!permissions.is_allowed(MDataAction::Insert));
-        assert!(permissions.is_allowed(MDataAction::Read));
-        assert!(permissions.is_allowed(MDataAction::ManagePermissions));
+        assert!(!permissions.is_allowed(MapAction::Insert));
+        assert!(permissions.is_allowed(MapAction::Read));
+        assert!(permissions.is_allowed(MapAction::ManagePermissions));
         println!("Verified new permissions");
 
         client
-            .del_mdata_user_permissions(MDataAddress::Seq { name, tag }, random_user, 2)
+            .del_map_user_permissions(MapAddress::Seq { name, tag }, random_user, 2)
             .await?;
         println!("Deleted permissions");
         let permissions = client
-            .list_mdata_permissions(MDataAddress::Seq { name, tag })
+            .list_map_permissions(MapAddress::Seq { name, tag })
             .await?;
         assert_eq!(permissions.len(), 1);
         println!("Permission set verified");
@@ -2117,30 +2117,30 @@ mod tests {
     // 3. List the entries and verify that the mutation was applied.
     // 4. Fetch a value for a particular key and verify
     #[tokio::test]
-    pub async fn mdata_mutations_test() -> Result<(), CoreError> {
+    pub async fn map_mutations_test() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = XorName(rand::random());
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::Update)
-            .allow(MDataAction::Delete);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete);
         let user = client.public_key().await;
         let _ = permissions.insert(user, permission_set);
-        let mut entries: MDataSeqEntries = Default::default();
+        let mut entries: MapSeqEntries = Default::default();
         let _ = entries.insert(
             b"key1".to_vec(),
-            MDataSeqValue {
+            MapSeqValue {
                 data: b"value".to_vec(),
                 version: 0,
             },
         );
         let _ = entries.insert(
             b"key2".to_vec(),
-            MDataSeqValue {
+            MapSeqValue {
                 data: b"value".to_vec(),
                 version: 0,
             },
@@ -2154,30 +2154,30 @@ mod tests {
         );
         client.put_seq_mutable_data(data).await?;
 
-        let fetched_entries = client.list_seq_mdata_entries(name, tag).await?;
+        let fetched_entries = client.list_seq_map_entries(name, tag).await?;
 
         assert_eq!(fetched_entries, entries);
-        let entry_actions: MDataSeqEntryActions = MDataSeqEntryActions::new()
+        let entry_actions: MapSeqEntryActions = MapSeqEntryActions::new()
             .update(b"key1".to_vec(), b"newValue".to_vec(), 1)
             .del(b"key2".to_vec(), 1)
             .ins(b"key3".to_vec(), b"value".to_vec(), 0);
 
         client
-            .mutate_seq_mdata_entries(name, tag, entry_actions)
+            .mutate_seq_map_entries(name, tag, entry_actions)
             .await?;
 
-        let fetched_entries = client.list_seq_mdata_entries(name, tag).await?;
+        let fetched_entries = client.list_seq_map_entries(name, tag).await?;
         let mut expected_entries: BTreeMap<_, _> = Default::default();
         let _ = expected_entries.insert(
             b"key1".to_vec(),
-            MDataSeqValue {
+            MapSeqValue {
                 data: b"newValue".to_vec(),
                 version: 1,
             },
         );
         let _ = expected_entries.insert(
             b"key3".to_vec(),
-            MDataSeqValue {
+            MapSeqValue {
                 data: b"value".to_vec(),
                 version: 0,
             },
@@ -2186,19 +2186,19 @@ mod tests {
         assert_eq!(fetched_entries, expected_entries);
 
         let fetched_value = client
-            .get_seq_mdata_value(name, tag, b"key3".to_vec())
+            .get_seq_map_value(name, tag, b"key3".to_vec())
             .await?;
 
         assert_eq!(
             fetched_value,
-            MDataSeqValue {
+            MapSeqValue {
                 data: b"value".to_vec(),
                 version: 0
             }
         );
 
         let res = client
-            .get_seq_mdata_value(name, tag, b"wrongKey".to_vec())
+            .get_seq_map_value(name, tag, b"wrongKey".to_vec())
             .await;
         match res {
             Ok(_) => panic!("Unexpected: Entry should not exist"),
@@ -2210,11 +2210,11 @@ mod tests {
         let name = XorName(rand::random());
         let tag = 15001;
         let mut permissions: BTreeMap<_, _> = Default::default();
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::Update)
-            .allow(MDataAction::Delete);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete);
         let user = client.public_key().await;
         let _ = permissions.insert(user, permission_set);
         let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = Default::default();
@@ -2228,29 +2228,29 @@ mod tests {
             client.public_key().await,
         );
         client.put_unseq_mutable_data(data).await?;
-        println!("Put unseq. MData successfully");
+        println!("Put unseq. Map successfully");
 
-        let fetched_entries = client.list_unseq_mdata_entries(name, tag).await?;
+        let fetched_entries = client.list_unseq_map_entries(name, tag).await?;
         assert_eq!(fetched_entries, entries);
-        let entry_actions: MDataUnseqEntryActions = MDataUnseqEntryActions::new()
+        let entry_actions: MapUnseqEntryActions = MapUnseqEntryActions::new()
             .update(b"key1".to_vec(), b"newValue".to_vec())
             .del(b"key2".to_vec())
             .ins(b"key3".to_vec(), b"value".to_vec());
 
         client
-            .mutate_unseq_mdata_entries(name, tag, entry_actions)
+            .mutate_unseq_map_entries(name, tag, entry_actions)
             .await?;
-        let fetched_entries = client.list_unseq_mdata_entries(name, tag).await?;
+        let fetched_entries = client.list_unseq_map_entries(name, tag).await?;
         let mut expected_entries: BTreeMap<_, _> = Default::default();
         let _ = expected_entries.insert(b"key1".to_vec(), b"newValue".to_vec());
         let _ = expected_entries.insert(b"key3".to_vec(), b"value".to_vec());
         assert_eq!(fetched_entries, expected_entries);
         let fetched_value = client
-            .get_unseq_mdata_value(name, tag, b"key1".to_vec())
+            .get_unseq_map_value(name, tag, b"key1".to_vec())
             .await?;
         assert_eq!(fetched_value, b"newValue".to_vec());
         let res = client
-            .get_unseq_mdata_value(name, tag, b"wrongKey".to_vec())
+            .get_unseq_map_value(name, tag, b"wrongKey".to_vec())
             .await;
         match res {
             Ok(_) => panic!("Unexpected: Entry should not exist"),
@@ -2313,18 +2313,18 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn mdata_deletions_should_cost_put_price() -> Result<(), CoreError> {
+    pub async fn map_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
         let client = random_client()?;
 
-        let mdata = UnseqMutableData::new(name, tag, client.public_key().await);
-        client.put_unseq_mutable_data(mdata).await?;
+        let map = UnseqMutableData::new(name, tag, client.public_key().await);
+        client.put_unseq_mutable_data(map).await?;
 
-        let mdata_address = MDataAddress::from_kind(MDataKind::Unseq, name, tag);
+        let map_address = MapAddress::from_kind(MapKind::Unseq, name, tag);
 
         let balance_before_delete = client.get_balance(None).await?;
-        client.delete_mdata(mdata_address).await?;
+        client.delete_map(map_address).await?;
         let new_balance = client.get_balance(None).await?;
 
         // make sure we have _some_ balance
@@ -2742,8 +2742,8 @@ fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {
 //     };
 //     unwrap!(adata.append_owner(owner, 0));
 //     client.put_adata(adata.into()).await?;
-//     let mdata = UnseqMutableData::new(name, tag, client.public_key().await);
-//     client.put_unseq_mutable_data(mdata).await?;
+//     let map = UnseqMutableData::new(name, tag, client.public_key().await);
+//     client.put_unseq_mutable_data(map).await?;
 
 // /// Insert a given login packet at the specified destination
 // async fn insert_login_packet_for(

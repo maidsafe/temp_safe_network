@@ -6,14 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::{Client, MDataInfo};
+use crate::client::{Client, MapInfo};
 use crate::crypto::shared_secretbox;
 use crate::errors::CoreError;
 use crate::nfs::{File, Mode, NfsError, Reader, Writer};
 use crate::self_encryption_storage::SelfEncryptionStorage;
 use bincode::{deserialize, serialize};
 use log::trace;
-use safe_nd::{Error as SndError, MDataSeqEntryActions};
+use safe_nd::{Error as SndError, MapSeqEntryActions};
 use serde::{Deserialize, Serialize};
 
 /// Enum specifying which version should be used in places where a version is required.
@@ -28,7 +28,7 @@ pub enum Version {
 /// Insert the file into the directory.
 pub async fn insert<S>(
     client: impl Client,
-    parent: MDataInfo,
+    parent: MapInfo,
     name: S,
     file: &File,
 ) -> Result<(), NfsError>
@@ -44,10 +44,10 @@ where
     let value = parent.enc_entry_value(&encoded)?;
 
     client
-        .mutate_seq_mdata_entries(
+        .mutate_seq_map_entries(
             parent.name(),
             parent.type_tag(),
-            MDataSeqEntryActions::new().ins(key, value, 0),
+            MapSeqEntryActions::new().ins(key, value, 0),
         )
         .await
         .map_err(From::from)
@@ -56,7 +56,7 @@ where
 /// Get a file and its version from the directory.
 pub async fn fetch<S>(
     client: impl Client,
-    parent: MDataInfo,
+    parent: MapInfo,
     name: S,
 ) -> Result<(u64, File), NfsError>
 where
@@ -65,7 +65,7 @@ where
     let key = parent.enc_entry_key(name.as_ref().as_bytes())?;
 
     let value = client
-        .get_seq_mdata_value(parent.name(), parent.type_tag(), key)
+        .get_seq_map_value(parent.name(), parent.type_tag(), key)
         .await
         .map_err(convert_error)?;
 
@@ -98,7 +98,7 @@ pub async fn read<C: Client + 'static>(
 #[allow(clippy::needless_pass_by_value)]
 pub async fn delete<S>(
     client: impl Client,
-    parent: MDataInfo,
+    parent: MapInfo,
     name: S,
     published: bool,
     version: Version,
@@ -118,7 +118,7 @@ where
     let new_version = match version {
         Version::GetNext => {
             let value = client
-                .get_seq_mdata_value(parent.name(), parent.type_tag(), key.clone())
+                .get_seq_map_value(parent.name(), parent.type_tag(), key.clone())
                 .await
                 .map_err(convert_error)?;
             value.version + 1
@@ -131,10 +131,10 @@ where
         client2.del_unpub_idata(*file.data_map_name()).await?;
     }
     client3
-        .mutate_seq_mdata_entries(
+        .mutate_seq_map_entries(
             parent.name(),
             parent.type_tag(),
-            MDataSeqEntryActions::new().del(key, new_version),
+            MapSeqEntryActions::new().del(key, new_version),
         )
         .await
         .map_err(convert_error)?;
@@ -148,7 +148,7 @@ where
 /// that version incremented by one is then used as the actual version.
 pub async fn update<S>(
     client: impl Client,
-    parent: MDataInfo,
+    parent: MapInfo,
     name: S,
     file: &File,
     version: Version,
@@ -169,7 +169,7 @@ where
     let version = match version {
         Version::GetNext => {
             let value = client
-                .get_seq_mdata_value(parent.name(), parent.type_tag(), key.clone())
+                .get_seq_map_value(parent.name(), parent.type_tag(), key.clone())
                 .await
                 .map_err(convert_error)?;
             value.version + 1
@@ -178,10 +178,10 @@ where
     };
 
     client2
-        .mutate_seq_mdata_entries(
+        .mutate_seq_map_entries(
             parent.name(),
             parent.type_tag(),
-            MDataSeqEntryActions::new().update(key, content, version),
+            MapSeqEntryActions::new().update(key, content, version),
         )
         .await
         .map_err(convert_error)?;

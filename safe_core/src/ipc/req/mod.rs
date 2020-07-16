@@ -10,11 +10,11 @@
 
 mod auth;
 mod containers;
-mod share_mdata;
+mod share_map;
 
 pub use self::auth::AuthReq;
 pub use self::containers::ContainersReq;
-pub use self::share_mdata::{ShareMData, ShareMDataReq};
+pub use self::share_map::{ShareMap, ShareMapReq};
 
 use crate::ffi::ipc::req::{
     AppExchangeInfo as FfiAppExchangeInfo, ContainerPermissions as FfiContainerPermissions,
@@ -22,7 +22,7 @@ use crate::ffi::ipc::req::{
 };
 use crate::ipc::errors::IpcError;
 use ffi_utils::{ReprC, StringError};
-use safe_nd::{MDataAction, MDataPermissionSet};
+use safe_nd::{MapAction, MapPermissionSet};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CString, NulError};
@@ -59,7 +59,7 @@ pub enum IpcReq {
     /// Takes arbitrary user data as `Vec<u8>`, returns bootstrap config.
     Unregistered(Vec<u8>),
     /// Share mutable data.
-    ShareMData(ShareMDataReq),
+    ShareMap(ShareMapReq),
 }
 
 /// Consumes the object and returns the wrapped raw pointer.
@@ -142,19 +142,19 @@ pub fn container_perms_from_repr_c(
 }
 
 /// Transforms a collection of container permissions into `routing::PermissionSet`
-pub fn container_perms_into_permission_set<'a, Iter>(permissions: Iter) -> MDataPermissionSet
+pub fn container_perms_into_permission_set<'a, Iter>(permissions: Iter) -> MapPermissionSet
 where
     Iter: IntoIterator<Item = &'a Permission>,
 {
-    let mut ps = MDataPermissionSet::new();
+    let mut ps = MapPermissionSet::new();
 
     for access in permissions {
         ps = match *access {
-            Permission::Read => ps.allow(MDataAction::Read),
-            Permission::Insert => ps.allow(MDataAction::Insert),
-            Permission::Update => ps.allow(MDataAction::Update),
-            Permission::Delete => ps.allow(MDataAction::Delete),
-            Permission::ManagePermissions => ps.allow(MDataAction::ManagePermissions),
+            Permission::Read => ps.allow(MapAction::Read),
+            Permission::Insert => ps.allow(MapAction::Insert),
+            Permission::Update => ps.allow(MapAction::Update),
+            Permission::Delete => ps.allow(MapAction::Delete),
+            Permission::ManagePermissions => ps.allow(MapAction::ManagePermissions),
         };
     }
 
@@ -188,22 +188,22 @@ pub unsafe fn containers_from_repr_c(
         .collect()
 }
 
-/// Convert a `MDataPermissionSet` into its C representation.
-pub fn permission_set_into_repr_c(perms: MDataPermissionSet) -> FfiPermissionSet {
+/// Convert a `MapPermissionSet` into its C representation.
+pub fn permission_set_into_repr_c(perms: MapPermissionSet) -> FfiPermissionSet {
     FfiPermissionSet {
-        read: perms.is_allowed(MDataAction::Read),
-        insert: perms.is_allowed(MDataAction::Insert),
-        update: perms.is_allowed(MDataAction::Update),
-        delete: perms.is_allowed(MDataAction::Delete),
-        manage_permissions: perms.is_allowed(MDataAction::ManagePermissions),
+        read: perms.is_allowed(MapAction::Read),
+        insert: perms.is_allowed(MapAction::Insert),
+        update: perms.is_allowed(MapAction::Update),
+        delete: perms.is_allowed(MapAction::Delete),
+        manage_permissions: perms.is_allowed(MapAction::ManagePermissions),
     }
 }
 
 /// Create a `PermissionSet` from its C representation.
 pub fn permission_set_clone_from_repr_c(
     perms: FfiPermissionSet,
-) -> Result<MDataPermissionSet, IpcError> {
-    let mut pm = MDataPermissionSet::new();
+) -> Result<MapPermissionSet, IpcError> {
+    let mut pm = MapPermissionSet::new();
 
     if perms.read && !perms.insert && !perms.update && !perms.delete && !perms.manage_permissions {
         // If only `read` is set to true, return an error
@@ -211,23 +211,23 @@ pub fn permission_set_clone_from_repr_c(
     }
 
     if perms.read {
-        pm = pm.allow(MDataAction::Read);
+        pm = pm.allow(MapAction::Read);
     }
 
     if perms.insert {
-        pm = pm.allow(MDataAction::Insert);
+        pm = pm.allow(MapAction::Insert);
     }
 
     if perms.update {
-        pm = pm.allow(MDataAction::Update);
+        pm = pm.allow(MapAction::Update);
     }
 
     if perms.delete {
-        pm = pm.allow(MDataAction::Delete);
+        pm = pm.allow(MapAction::Delete);
     }
 
     if perms.manage_permissions {
-        pm = pm.allow(MDataAction::ManagePermissions);
+        pm = pm.allow(MapAction::ManagePermissions);
     }
 
     Ok(pm)
@@ -303,7 +303,7 @@ mod tests {
     use crate::btree_set;
     use crate::ffi::ipc::req::PermissionSet as FfiPermissionSet;
     use ffi_utils::ReprC;
-    use safe_nd::MDataAction;
+    use safe_nd::MapAction;
     use std::collections::HashMap;
     use std::ffi::CStr;
     use unwrap::unwrap;
@@ -364,10 +364,10 @@ mod tests {
         };
 
         let res = unwrap!(permission_set_clone_from_repr_c(ps));
-        assert!(res.is_allowed(MDataAction::Update));
-        assert!(res.is_allowed(MDataAction::Delete));
-        assert!(!res.is_allowed(MDataAction::Insert));
-        assert!(!res.is_allowed(MDataAction::ManagePermissions));
+        assert!(res.is_allowed(MapAction::Update));
+        assert!(res.is_allowed(MapAction::Delete));
+        assert!(!res.is_allowed(MapAction::Insert));
+        assert!(!res.is_allowed(MapAction::ManagePermissions));
     }
 
     // Testing converting an `AppExchangeInfo` object to its FFI representation and back again.

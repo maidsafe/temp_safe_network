@@ -10,71 +10,71 @@ use super::{permission_set_clone_from_repr_c, permission_set_into_repr_c, AppExc
 use crate::ffi::ipc::req as ffi;
 use crate::ipc::errors::IpcError;
 use ffi_utils::{vec_into_raw_parts, ReprC};
-use safe_nd::{MDataPermissionSet, XorName};
+use safe_nd::{MapPermissionSet, XorName};
 use serde::{Deserialize, Serialize};
 use std::slice;
 
 /// Represents a request to share mutable data.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ShareMDataReq {
+pub struct ShareMapReq {
     /// Info about the app requesting shared access.
     pub app: AppExchangeInfo,
     /// List of MD names & type tags and permissions that need to be shared.
-    pub mdata: Vec<ShareMData>,
+    pub map: Vec<ShareMap>,
 }
 
-/// For use in `ShareMDataReq`. Represents a specific `MutableData` that is being shared.
+/// For use in `ShareMapReq`. Represents a specific `MutableData` that is being shared.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ShareMData {
+pub struct ShareMap {
     /// The mutable data type.
     pub type_tag: u64,
     /// The mutable data name.
     pub name: XorName,
     /// The permissions being requested.
-    pub perms: MDataPermissionSet,
+    pub perms: MapPermissionSet,
 }
 
-impl ShareMDataReq {
+impl ShareMapReq {
     /// Construct FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> Result<ffi::ShareMDataRequest, IpcError> {
-        let mdata_repr_c: Vec<_> = self
-            .mdata
+    pub fn into_repr_c(self) -> Result<ffi::ShareMapRequest, IpcError> {
+        let map_repr_c: Vec<_> = self
+            .map
             .into_iter()
-            .map(ShareMData::into_repr_c)
+            .map(ShareMap::into_repr_c)
             .collect::<Result<_, _>>()?;
 
-        let (mdata, mdata_len) = vec_into_raw_parts(mdata_repr_c);
+        let (map, map_len) = vec_into_raw_parts(map_repr_c);
 
-        Ok(ffi::ShareMDataRequest {
+        Ok(ffi::ShareMapRequest {
             app: self.app.into_repr_c()?,
-            mdata,
-            mdata_len,
+            map,
+            map_len,
         })
     }
 }
 
-impl ReprC for ShareMDataReq {
-    type C = *const ffi::ShareMDataRequest;
+impl ReprC for ShareMapReq {
+    type C = *const ffi::ShareMapRequest;
     type Error = IpcError;
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         Ok(Self {
             app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
-            mdata: {
-                let mdata = slice::from_raw_parts((*repr_c).mdata, (*repr_c).mdata_len);
-                mdata
+            map: {
+                let map = slice::from_raw_parts((*repr_c).map, (*repr_c).map_len);
+                map
                     .iter()
-                    .map(|c| ShareMData::clone_from_repr_c(c))
+                    .map(|c| ShareMap::clone_from_repr_c(c))
                     .collect::<Result<_, _>>()?
             },
         })
     }
 }
 
-impl ShareMData {
+impl ShareMap {
     /// Construct FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> Result<ffi::ShareMData, IpcError> {
-        Ok(ffi::ShareMData {
+    pub fn into_repr_c(self) -> Result<ffi::ShareMap, IpcError> {
+        Ok(ffi::ShareMap {
             type_tag: self.type_tag,
             name: self.name.0,
             perms: permission_set_into_repr_c(self.perms),
@@ -82,8 +82,8 @@ impl ShareMData {
     }
 }
 
-impl ReprC for ShareMData {
-    type C = *const ffi::ShareMData;
+impl ReprC for ShareMap {
+    type C = *const ffi::ShareMap;
     type Error = IpcError;
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {

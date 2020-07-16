@@ -10,8 +10,8 @@ use super::Client;
 use crate::client::AuthActions;
 use crate::errors::CoreError;
 use safe_nd::{
-    AppPermissions, EntryError, Error as SndError, MDataAction, MDataAddress, MDataPermissionSet,
-    MDataSeqEntries, MDataSeqEntryAction, MDataSeqEntryActions, MDataSeqValue, PublicKey,
+    AppPermissions, EntryError, Error as SndError, MapAction, MapAddress, MapPermissionSet,
+    MapSeqEntries, MapSeqEntryAction, MapSeqEntryActions, MapSeqValue, PublicKey,
     SeqMutableData,
 };
 
@@ -26,7 +26,7 @@ const MAX_ATTEMPTS: usize = 10;
 /// If the data already exists, it tries to mutate it so its entries and permissions
 /// are the same as those of the data being put, except it wont delete existing
 /// entries or remove existing permissions.
-pub async fn put_mdata(
+pub async fn put_map(
     client: (impl Client + Sync + Send),
     data: SeqMutableData,
 ) -> Result<(), CoreError> {
@@ -35,17 +35,17 @@ pub async fn put_mdata(
     match client.put_seq_mutable_data(data.clone()).await {
         Ok(_response) => Ok(()),
         Err(e) => match e {
-            CoreError::DataError(SndError::DataExists) => update_mdata(client, data).await,
+            CoreError::DataError(SndError::DataExists) => update_map(client, data).await,
             error => Err(error),
         },
     }
 }
 
 /// Mutates mutable data entries and tries to recover from errors.
-pub async fn mutate_mdata_entries(
+pub async fn mutate_map_entries(
     client: (impl Client + Sync + Send),
-    address: MDataAddress,
-    actions: MDataSeqEntryActions,
+    address: MapAddress,
+    actions: MapSeqEntryActions,
 ) -> Result<(), CoreError> {
     let mut actions_to_try = actions;
     let mut attempts = 0;
@@ -54,7 +54,7 @@ pub async fn mutate_mdata_entries(
 
     while !done_trying {
         response = match client
-            .mutate_seq_mdata_entries(*address.name(), address.tag(), actions_to_try.clone())
+            .mutate_seq_map_entries(*address.name(), address.tag(), actions_to_try.clone())
             .await
         {
             Ok(()) => {
@@ -82,11 +82,11 @@ pub async fn mutate_mdata_entries(
 }
 
 /// Sets user permission on the mutable data and tries to recover from errors.
-pub async fn set_mdata_user_permissions(
+pub async fn set_map_user_permissions(
     client: (impl Client + Sync),
-    address: MDataAddress,
+    address: MapAddress,
     user: PublicKey,
-    permissions: MDataPermissionSet,
+    permissions: MapPermissionSet,
     version: u64,
 ) -> Result<(), CoreError> {
     let mut version_to_try = version;
@@ -96,7 +96,7 @@ pub async fn set_mdata_user_permissions(
 
     while !done_trying {
         response = match client
-            .set_mdata_user_permissions(address, user, permissions.clone(), version_to_try)
+            .set_map_user_permissions(address, user, permissions.clone(), version_to_try)
             .await
         {
             Ok(()) => {
@@ -126,9 +126,9 @@ pub async fn set_mdata_user_permissions(
 }
 
 /// Deletes user permission on the mutable data and tries to recover from errors.
-pub async fn del_mdata_user_permissions(
+pub async fn del_map_user_permissions(
     client: (impl Client + Sync + Send),
-    address: MDataAddress,
+    address: MapAddress,
     user: PublicKey,
     version: u64,
 ) -> Result<(), CoreError> {
@@ -139,7 +139,7 @@ pub async fn del_mdata_user_permissions(
 
     while !done_trying {
         response = match client
-            .del_mdata_user_permissions(address, user, version_to_try)
+            .del_map_user_permissions(address, user, version_to_try)
             .await
         {
             Ok(_) | Err(CoreError::DataError(SndError::NoSuchKey)) => {
@@ -168,7 +168,7 @@ pub async fn del_mdata_user_permissions(
     response
 }
 
-async fn update_mdata(
+async fn update_map(
     client: (impl Client + Sync + Send),
     data: SeqMutableData,
 ) -> Result<(), CoreError> {
@@ -176,14 +176,14 @@ async fn update_mdata(
 
     let address = *data.address();
     let entries = client
-        .list_seq_mdata_entries(*data.name(), data.tag())
+        .list_seq_map_entries(*data.name(), data.tag())
         .await?;
-    let permissions = client.list_mdata_permissions(address).await?;
-    let version = client.get_mdata_version(address).await?;
+    let permissions = client.list_map_permissions(address).await?;
+    let version = client.get_map_version(address).await?;
 
     let next_version = version + 1;
 
-    update_mdata_permissions(
+    update_map_permissions(
         client.clone(),
         address,
         &permissions,
@@ -192,39 +192,39 @@ async fn update_mdata(
     )
     .await?;
 
-    update_mdata_entries(client, address, &entries, data.entries().clone()).await
+    update_map_entries(client, address, &entries, data.entries().clone()).await
 }
 
 // Update the mutable data on the network so it has all the `desired_entries`.
-async fn update_mdata_entries(
+async fn update_map_entries(
     client: (impl Client + Sync + Send),
-    address: MDataAddress,
-    current_entries: &MDataSeqEntries,
-    desired_entries: MDataSeqEntries,
+    address: MapAddress,
+    current_entries: &MapSeqEntries,
+    desired_entries: MapSeqEntries,
 ) -> Result<(), CoreError> {
     let actions = desired_entries
         .into_iter()
         .filter_map(|(key, value)| {
             if let Some(current_value) = current_entries.get(&key) {
                 if current_value.version <= value.version {
-                    Some((key, MDataSeqEntryAction::Update(value)))
+                    Some((key, MapSeqEntryAction::Update(value)))
                 } else {
                     None
                 }
             } else {
-                Some((key, MDataSeqEntryAction::Ins(value)))
+                Some((key, MapSeqEntryAction::Ins(value)))
             }
         })
         .collect::<BTreeMap<_, _>>();
 
-    mutate_mdata_entries(client, address, actions.into()).await
+    mutate_map_entries(client, address, actions.into()).await
 }
 
-async fn update_mdata_permissions(
+async fn update_map_permissions(
     client: (impl Client + Sync + Send),
-    address: MDataAddress,
-    current_permissions: &BTreeMap<PublicKey, MDataPermissionSet>,
-    desired_permissions: BTreeMap<PublicKey, MDataPermissionSet>,
+    address: MapAddress,
+    current_permissions: &BTreeMap<PublicKey, MapPermissionSet>,
+    desired_permissions: BTreeMap<PublicKey, MapPermissionSet>,
     version: u64,
 ) -> Result<(), CoreError> {
     let mut permissions: Vec<_> = desired_permissions
@@ -248,7 +248,7 @@ async fn update_mdata_permissions(
 
     while !success {
         if let Some((user, set)) = permissions.pop() {
-            match set_mdata_user_permissions(client.clone(), address, user, set, version_to_try)
+            match set_map_user_permissions(client.clone(), address, user, set, version_to_try)
                 .await
             {
                 Ok(()) => {
@@ -266,9 +266,9 @@ async fn update_mdata_permissions(
 
 // Modify the given entry actions to fix the entry errors.
 fn fix_entry_actions(
-    actions: MDataSeqEntryActions,
+    actions: MapSeqEntryActions,
     errors: &BTreeMap<Vec<u8>, EntryError>,
-) -> BTreeMap<Vec<u8>, MDataSeqEntryAction> {
+) -> BTreeMap<Vec<u8>, MapSeqEntryAction> {
     actions
         .into_actions()
         .into_iter()
@@ -285,39 +285,39 @@ fn fix_entry_actions(
 }
 
 fn fix_entry_action(
-    action: &MDataSeqEntryAction,
+    action: &MapSeqEntryAction,
     error: &EntryError,
-) -> Option<MDataSeqEntryAction> {
+) -> Option<MapSeqEntryAction> {
     match (action, error) {
-        (MDataSeqEntryAction::Ins(value), EntryError::EntryExists(current_version))
-        | (MDataSeqEntryAction::Update(value), EntryError::InvalidSuccessor(current_version)) => {
-            Some(MDataSeqEntryAction::Update(MDataSeqValue {
+        (MapSeqEntryAction::Ins(value), EntryError::EntryExists(current_version))
+        | (MapSeqEntryAction::Update(value), EntryError::InvalidSuccessor(current_version)) => {
+            Some(MapSeqEntryAction::Update(MapSeqValue {
                 data: value.data.clone(),
                 version: (current_version + 1).into(),
             }))
         }
-        (MDataSeqEntryAction::Update(value), EntryError::NoSuchEntry) => {
-            Some(MDataSeqEntryAction::Ins(value.clone()))
+        (MapSeqEntryAction::Update(value), EntryError::NoSuchEntry) => {
+            Some(MapSeqEntryAction::Ins(value.clone()))
         }
-        (MDataSeqEntryAction::Del(_), EntryError::NoSuchEntry) => None,
-        (MDataSeqEntryAction::Del(_), EntryError::InvalidSuccessor(current_version)) => {
-            Some(MDataSeqEntryAction::Del((current_version + 1).into()))
+        (MapSeqEntryAction::Del(_), EntryError::NoSuchEntry) => None,
+        (MapSeqEntryAction::Del(_), EntryError::InvalidSuccessor(current_version)) => {
+            Some(MapSeqEntryAction::Del((current_version + 1).into()))
         }
         (action, _) => Some(action.clone()),
     }
 }
 
 // Create union of the two permission sets, preferring allows to deny's.
-fn union_permission_sets(a: MDataPermissionSet, b: MDataPermissionSet) -> MDataPermissionSet {
+fn union_permission_sets(a: MapPermissionSet, b: MapPermissionSet) -> MapPermissionSet {
     let actions = [
-        MDataAction::Insert,
-        MDataAction::Update,
-        MDataAction::Delete,
-        MDataAction::ManagePermissions,
+        MapAction::Insert,
+        MapAction::Update,
+        MapAction::Delete,
+        MapAction::ManagePermissions,
     ];
     actions
         .iter()
-        .fold(MDataPermissionSet::new(), |set, &action| {
+        .fold(MapPermissionSet::new(), |set, &action| {
             if a.is_allowed(action) | b.is_allowed(action) {
                 set.allow(action)
             } else if !a.is_allowed(action) | !b.is_allowed(action) {
@@ -372,13 +372,13 @@ pub async fn ins_auth_key_to_client_h(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use safe_nd::MDataSeqValue;
+    use safe_nd::MapSeqValue;
     use unwrap::unwrap;
 
     // Test modifying given entry actions to fix entry errors
     #[test]
     fn test_fix_entry_actions() -> Result<(), CoreError> {
-        let actions = MDataSeqEntryActions::new()
+        let actions = MapSeqEntryActions::new()
             .ins(vec![0], vec![0], 0)
             .ins(vec![1], vec![1], 0)
             .update(vec![2], vec![2], 1)
@@ -400,7 +400,7 @@ mod tests {
         // 0: insert is OK.
         assert_eq!(
             *unwrap!(actions.get([0].as_ref())),
-            MDataSeqEntryAction::Ins(MDataSeqValue {
+            MapSeqEntryAction::Ins(MapSeqValue {
                 data: vec![0],
                 version: 0,
             })
@@ -409,7 +409,7 @@ mod tests {
         // 1: insert is transformed to update
         assert_eq!(
             *unwrap!(actions.get([1].as_ref())),
-            MDataSeqEntryAction::Update(MDataSeqValue {
+            MapSeqEntryAction::Update(MapSeqValue {
                 data: vec![1],
                 version: 3,
             })
@@ -418,7 +418,7 @@ mod tests {
         // 2: update is OK.
         assert_eq!(
             *unwrap!(actions.get([2].as_ref())),
-            MDataSeqEntryAction::Update(MDataSeqValue {
+            MapSeqEntryAction::Update(MapSeqValue {
                 data: vec![2],
                 version: 1,
             })
@@ -427,7 +427,7 @@ mod tests {
         // 3: update is transformed to insert.
         assert_eq!(
             *unwrap!(actions.get([3].as_ref())),
-            MDataSeqEntryAction::Ins(MDataSeqValue {
+            MapSeqEntryAction::Ins(MapSeqValue {
                 data: vec![3],
                 version: 1,
             })
@@ -436,7 +436,7 @@ mod tests {
         // 4: update version is fixed.
         assert_eq!(
             *unwrap!(actions.get([4].as_ref())),
-            MDataSeqEntryAction::Update(MDataSeqValue {
+            MapSeqEntryAction::Update(MapSeqValue {
                 data: vec![4],
                 version: 3,
             })
@@ -445,7 +445,7 @@ mod tests {
         // 5: delete is OK.
         assert_eq!(
             *unwrap!(actions.get([5].as_ref())),
-            MDataSeqEntryAction::Del(1)
+            MapSeqEntryAction::Del(1)
         );
 
         // 6: delete action is removed, as there is nothing to delete.
@@ -454,7 +454,7 @@ mod tests {
         // 7: delete version is fixed.
         assert_eq!(
             *unwrap!(actions.get([7].as_ref())),
-            MDataSeqEntryAction::Del(3)
+            MapSeqEntryAction::Del(3)
         );
 
         Ok(())
@@ -463,19 +463,19 @@ mod tests {
     // Test creating a union of two permission sets
     #[test]
     fn test_union_permission_sets() -> Result<(), CoreError> {
-        let a = MDataPermissionSet::new()
-            .allow(MDataAction::Insert)
-            .deny(MDataAction::Update)
-            .deny(MDataAction::ManagePermissions);
-        let b = MDataPermissionSet::new()
-            .allow(MDataAction::Update)
-            .allow(MDataAction::Delete);
+        let a = MapPermissionSet::new()
+            .allow(MapAction::Insert)
+            .deny(MapAction::Update)
+            .deny(MapAction::ManagePermissions);
+        let b = MapPermissionSet::new()
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete);
 
         let c = union_permission_sets(a, b);
-        assert_eq!(c.is_allowed(MDataAction::Insert), true);
-        assert_eq!(c.is_allowed(MDataAction::Update), true);
-        assert_eq!(c.is_allowed(MDataAction::Delete), true);
-        assert_eq!(c.is_allowed(MDataAction::ManagePermissions), false);
+        assert_eq!(c.is_allowed(MapAction::Insert), true);
+        assert_eq!(c.is_allowed(MapAction::Update), true);
+        assert_eq!(c.is_allowed(MapAction::Delete), true);
+        assert_eq!(c.is_allowed(MapAction::ManagePermissions), false);
 
         Ok(())
     }
@@ -486,12 +486,12 @@ mod tests_with_mock_routing {
     use super::*;
     use crate::btree_map;
     use crate::utils::test_utils::random_client;
-    use safe_nd::{MDataSeqValue, XorName};
+    use safe_nd::{MapSeqValue, XorName};
     use unwrap::unwrap;
 
-    // Test putting mdata and recovering from errors
+    // Test putting map and recovering from errors
     #[tokio::test]
-    async fn put_mdata_with_recovery() -> Result<(), CoreError> {
+    async fn put_map_with_recovery() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name = rand::random();
@@ -499,15 +499,15 @@ mod tests_with_mock_routing {
         let owners = client.public_key().await;
 
         let entries = btree_map![
-             vec![0] => MDataSeqValue {
+             vec![0] => MapSeqValue {
                 data: vec![0, 0],
                 version: 0,
             },
-             vec![1] => MDataSeqValue {
+             vec![1] => MapSeqValue {
                 data: vec![1, 0],
                 version: 1,
             },
-             vec![2] => MDataSeqValue {
+             vec![2] => MapSeqValue {
                 data: vec![2, 0],
                 version: 0,
             }
@@ -517,20 +517,20 @@ mod tests_with_mock_routing {
         let user = PublicKey::from(bls_sk.public_key());
 
         let permissions = btree_map![
-            user => MDataPermissionSet::new().allow(MDataAction::Insert)
+            user => MapPermissionSet::new().allow(MapAction::Insert)
         ];
         let data0 = SeqMutableData::new_with_data(name, tag, entries, permissions, owners);
 
         let entries1 = btree_map![
-            vec![0] => MDataSeqValue {
+            vec![0] => MapSeqValue {
                 data: vec![0, 1],
                 version: 1,
             },
-            vec![1] => MDataSeqValue {
+            vec![1] => MapSeqValue {
                 data: vec![1, 1],
                 version: 0,
             },
-            vec![3] => MDataSeqValue {
+            vec![3] => MapSeqValue {
                 data: vec![3, 1],
                 version: 0,
             }
@@ -540,67 +540,67 @@ mod tests_with_mock_routing {
         let user = PublicKey::from(bls_sk.public_key());
 
         let permissions = btree_map![
-           user => MDataPermissionSet::new().allow(MDataAction::Delete)
+           user => MapPermissionSet::new().allow(MapAction::Delete)
         ];
 
         let data1 = SeqMutableData::new_with_data(name, tag, entries1, permissions, owners);
 
         client.put_seq_mutable_data(data0).await?;
-        put_mdata(client.clone(), data1).await?;
-        let entries = client.list_seq_mdata_entries(name, tag).await?;
+        put_map(client.clone(), data1).await?;
+        let entries = client.list_seq_map_entries(name, tag).await?;
         assert_eq!(entries.len(), 4);
         assert_eq!(
             *unwrap!(entries.get([0].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![0, 1],
                 version: 1,
             }
         );
         assert_eq!(
             *unwrap!(entries.get([1].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![1, 0],
                 version: 1,
             }
         );
 
         let permissions = client
-            .list_mdata_permissions(MDataAddress::Seq { name, tag })
+            .list_map_permissions(MapAddress::Seq { name, tag })
             .await?;
         assert_eq!(permissions.len(), 2);
         assert_eq!(
             *unwrap!(permissions.get(&user)),
-            MDataPermissionSet::new().allow(MDataAction::Delete)
+            MapPermissionSet::new().allow(MapAction::Delete)
         );
 
         Ok(())
     }
 
-    // Test mutating mdata entries and recovering from errors
+    // Test mutating map entries and recovering from errors
     #[tokio::test]
-    async fn mutate_mdata_entries_with_recovery() -> Result<(), CoreError> {
+    async fn mutate_map_entries_with_recovery() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name: XorName = rand::random();
         let tag = 10_000;
         let entries = btree_map![
-            vec![1] => MDataSeqValue {
+            vec![1] => MapSeqValue {
                 data: vec![1],
                 version: 0,
             },
-            vec![2] => MDataSeqValue {
+            vec![2] => MapSeqValue {
                 data: vec![2],
                 version: 0,
             },
-            vec![4] => MDataSeqValue {
+            vec![4] => MapSeqValue {
                 data: vec![4],
                 version: 0,
             },
-            vec![5] => MDataSeqValue {
+            vec![5] => MapSeqValue {
                 data: vec![5],
                 version: 0,
             },
-            vec![7] => MDataSeqValue {
+            vec![7] => MapSeqValue {
                 data: vec![7],
                 version: 0,
             }
@@ -610,7 +610,7 @@ mod tests_with_mock_routing {
 
         client.put_seq_mutable_data(data).await?;
 
-        let actions = MDataSeqEntryActions::new()
+        let actions = MapSeqEntryActions::new()
             .ins(vec![0], vec![0], 0) // normal insert
             .ins(vec![1], vec![1, 0], 0) // insert to existing entry
             .update(vec![2], vec![2, 0], 1) // normal update
@@ -620,41 +620,41 @@ mod tests_with_mock_routing {
             .del(vec![6], 1) // delete of non-existing entry
             .del(vec![7], 0); // delete with invalid version
 
-        mutate_mdata_entries(client.clone(), MDataAddress::Seq { name, tag }, actions).await?;
-        let entries = client.list_seq_mdata_entries(name, tag).await?;
+        mutate_map_entries(client.clone(), MapAddress::Seq { name, tag }, actions).await?;
+        let entries = client.list_seq_map_entries(name, tag).await?;
         assert_eq!(entries.len(), 5);
 
         assert_eq!(
             *unwrap!(entries.get([0].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![0],
                 version: 0,
             }
         );
         assert_eq!(
             *unwrap!(entries.get([1].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![1, 0],
                 version: 1,
             }
         );
         assert_eq!(
             *unwrap!(entries.get([2].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![2, 0],
                 version: 1,
             }
         );
         assert_eq!(
             *unwrap!(entries.get([3].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![3],
                 version: 1,
             }
         );
         assert_eq!(
             *unwrap!(entries.get([4].as_ref())),
-            MDataSeqValue {
+            MapSeqValue {
                 data: vec![4, 0],
                 version: 1,
             }
@@ -668,7 +668,7 @@ mod tests_with_mock_routing {
 
     // Test setting and deleting user permissions and recovering from errors
     #[tokio::test]
-    async fn set_and_del_mdata_user_permissions_with_recovery() -> Result<(), CoreError> {
+    async fn set_and_del_map_user_permissions_with_recovery() -> Result<(), CoreError> {
         let client = random_client()?;
 
         let name: XorName = rand::random();
@@ -690,30 +690,30 @@ mod tests_with_mock_routing {
 
         client.put_seq_mutable_data(data).await?;
         // set with invalid version
-        set_mdata_user_permissions(
+        set_map_user_permissions(
             client.clone(),
             address,
             user0,
-            MDataPermissionSet::new().allow(MDataAction::Insert),
+            MapPermissionSet::new().allow(MapAction::Insert),
             0,
         )
         .await?;
-        let retrieved_permissions = client.list_mdata_user_permissions(address, user0).await?;
+        let retrieved_permissions = client.list_map_user_permissions(address, user0).await?;
         assert_eq!(
             retrieved_permissions,
-            MDataPermissionSet::new().allow(MDataAction::Insert)
+            MapPermissionSet::new().allow(MapAction::Insert)
         );
 
         // delete with invalid version
-        del_mdata_user_permissions(client.clone(), address, user0, 0).await?;
-        let res = client.list_mdata_user_permissions(address, user0).await;
+        del_map_user_permissions(client.clone(), address, user0, 0).await?;
+        let res = client.list_map_user_permissions(address, user0).await;
         match res {
             Err(CoreError::DataError(SndError::NoSuchKey)) => (),
             x => panic!("Unexpected {:?}", x),
         }
 
         // delete of non-existing user
-        del_mdata_user_permissions(client, address, user1, 3).await?;
+        del_map_user_permissions(client, address, user1, 3).await?;
 
         Ok(())
     }

@@ -254,7 +254,7 @@ mod tests {
         let expected_responses = 7;
 
         // our expected data
-        let data = safe_nd::MDataValue::from(vec![6]);
+        let data = safe_nd::MapValue::from(vec![6]);
 
         let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
@@ -307,7 +307,7 @@ mod tests {
         let expected_responses = 7;
 
         // our expected data
-        let data = safe_nd::MDataValue::from(vec![6]);
+        let data = safe_nd::MapValue::from(vec![6]);
 
         let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
@@ -365,7 +365,7 @@ mod tests {
         let expected_responses = 7;
 
         // our expected data
-        let data = safe_nd::MDataValue::from(vec![6]);
+        let data = safe_nd::MapValue::from(vec![6]);
 
         let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
 
@@ -419,8 +419,8 @@ mod tests {
         let expected_responses = 7;
 
         // our expected data
-        let data = safe_nd::MDataValue::from(vec![6]);
-        let other_data = safe_nd::MDataValue::from(vec![77]);
+        let data = safe_nd::MapValue::from(vec![6]);
+        let other_data = safe_nd::MapValue::from(vec![77]);
 
         let response = safe_nd::QueryResponse::GetMapValue(Ok(data));
         let other_response = safe_nd::QueryResponse::GetMapValue(Ok(other_data));
