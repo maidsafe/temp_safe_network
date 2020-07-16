@@ -1,10 +1,10 @@
 use safe_nd::{
     Cmd, DebitAgreementProof, Event, Message, MessageId, Money, PublicKey, Query, QueryResponse,
-    TransferCmd,
+    TransferCmd, TransferQuery,
 };
 use safe_transfers::{ActorEvent, TransferInitiated};
 
-use crate::client::{create_network_message_envelope, Client, TransferActor};
+use crate::client::{create_cmd_message, create_query_message, Client, TransferActor};
 use crate::errors::CoreError;
 
 use log::{debug, info, trace};
@@ -72,8 +72,7 @@ impl TransferActor {
 
         let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let (message, message_id) =
-            create_network_message_envelope(identity.clone(), msg_contents)?;
+        let message = create_query_message(identity.clone(), msg_contents);
         let _bootstrapped = cm.bootstrap(identity).await;
 
         match cm.send_query(&pub_id, &message).await? {
@@ -113,8 +112,7 @@ impl TransferActor {
         );
         let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
-        let (message, _message_id) =
-            create_network_message_envelope(safe_key.clone(), msg_contents)?;
+        let message = create_cmd_message(safe_key.clone(), msg_contents);
 
         self.transfer_actor
             .lock()
@@ -124,14 +122,13 @@ impl TransferActor {
             }));
 
         let debit_proof: DebitAgreementProof = self
-            .await_validation(message.id(), &safe_key.public_id(), &message)
+            .await_validation(&safe_key.public_id(), &message)
             .await?;
 
         // Register the transfer on the network.
         let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(debit_proof.clone()));
 
-        let (message, _message_id) =
-            create_network_message_envelope(safe_key.clone(), msg_contents)?;
+        let message = create_cmd_message(safe_key.clone(), msg_contents);
         let safe_key = self.safe_key.clone();
         trace!(
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",

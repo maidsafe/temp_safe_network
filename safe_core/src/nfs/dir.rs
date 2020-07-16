@@ -22,8 +22,7 @@ pub async fn create_directory(
 ) -> Result<(), NfsError> {
     let pub_key = client.owner_key().await;
 
-    let dir_md =
-        SeqMap::new_with_data(dir.name(), dir.type_tag(), contents, perms, pub_key);
+    let dir_md = SeqMap::new_with_data(dir.name(), dir.type_tag(), contents, perms, pub_key);
 
     trace!("Creating new directory: {:?}", dir);
     client

@@ -164,7 +164,7 @@ pub trait Client: Clone + Send + Sync {
 
     //     let signature = if sign {
     //         match request.clone() {
-    //             Request::Client(req) => {
+    //             Query::Data(req) => {
     //                 let serialised_req =
     //                     bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
     //                 Some(self.full_id().await.sign(&serialised_req))
@@ -352,11 +352,7 @@ pub trait Client: Clone + Send + Sync {
         }
 
         let inner = Arc::downgrade(&self.inner());
-        let res = send_query(
-            self,
-            Request::Client(ClientRequest::Read(Read::Blob(BlobRead::Get(address)))),
-        )
-        .await?;
+        let res = send_query(self, Query::Data(DataQuery::Blob(BlobRead::Get(address)))).await?;
         let data = match res {
             QueryResponse::GetBlob(res) => res.map_err(CoreError::from),
             _ => return Err(CoreError::ReceivedUnexpectedEvent),
@@ -593,11 +589,7 @@ pub trait Client: Clone + Send + Sync {
     }
 
     /// Get a shell (bare bones) version of `Map` from the network.
-    async fn get_unseq_map_shell(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<UnseqMap, CoreError>
+    async fn get_unseq_map_shell(&self, name: XorName, tag: u64) -> Result<UnseqMap, CoreError>
     where
         Self: Sized,
     {

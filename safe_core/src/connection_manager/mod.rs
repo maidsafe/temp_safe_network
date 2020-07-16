@@ -148,7 +148,7 @@ impl Inner {
             )
         })?;
 
-        conn_group.send_query(msg_id, msg).await
+        conn_group.send_query(msg).await
     }
 
     async fn send_cmd(&mut self, pub_id: &PublicId, msg: &Message) -> Result<(), CoreError> {

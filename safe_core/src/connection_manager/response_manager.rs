@@ -77,6 +77,7 @@ impl ResponseManager {
     ) -> Result<(), String> {
         trace!(
             "Handling event: {:?} correlating to : {:?}",
+            event,
             correlating_message_id
         );
 
@@ -97,7 +98,7 @@ impl ResponseManager {
     ) -> Result<(), String> {
         trace!(
             "Handling response for sent msg_id: {:?}, query resp: {:?}",
-            correlating_message,
+            correlating_message_id,
             response
         );
 
@@ -155,13 +156,15 @@ impl ResponseManager {
                     }
                 }
 
-                let _ = self.pending_queries.insert(
-                    msg_id,
-                    (sender, vote_map, current_count, is_validation_request),
-                );
+                let _ = self
+                    .pending_queries
+                    .insert(correlating_message_id, (sender, vote_map, current_count));
             })
             .or_else(|| {
-                trace!("No request found for message ID {:?}", msg_id);
+                trace!(
+                    "No correlating message found for ID {:?}",
+                    correlating_message_id
+                );
                 None
             });
         Ok(())

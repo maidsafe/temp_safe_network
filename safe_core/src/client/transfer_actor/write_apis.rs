@@ -3,7 +3,7 @@ use safe_nd::{
     BlobWrite, Cmd, DataCmd, DebitAgreementProof, Map, MapAddress, MapEntryActions,
     MapPermissionSet, MapRead, MapWrite, PublicKey, QueryResponse, Sequence, SequenceAddress,
     SequenceOwner, SequencePrivatePermissions, SequencePublicPermissions, SequenceRead,
-    SequenceWrite, SequenceWriteOp, Write,
+    SequenceWrite, SequenceWriteOp,
 };
 use safe_transfers::ActorEvent;
 

@@ -1,10 +1,10 @@
 use safe_nd::{
-    DebitAgreementProof, Money, PublicKey, QueryResponse, ReplicaEvent, Request, SignatureShare,
-    SignedTransfer, Transfer, TransferPropagated, Transfers as MoneyRequest,
+    Cmd, DebitAgreementProof, Money, PublicKey, QueryResponse, ReplicaEvent, SignatureShare,
+    SignedTransfer, Transfer, TransferCmd, TransferPropagated,
 };
 use safe_transfers::{ActorEvent, TransfersSynched};
 
-use crate::client::{create_network_message_envelope, Client, TransferActor};
+use crate::client::{create_cmd_message, Client, TransferActor};
 use crate::errors::CoreError;
 
 use std::str::FromStr;
@@ -16,7 +16,6 @@ use threshold_crypto::SecretKeySet;
 
 #[cfg(feature = "simulated-payouts")]
 use rand::thread_rng;
-#[cfg(feature = "simulated-payouts")]
 
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {
@@ -50,10 +49,10 @@ impl TransferActor {
             id: self.simulated_farming_payout_dot,
         };
 
-        let simluated_farming_msg = Cmd::Transfer::SimulatePayout(simulated_transfer.clone());
+        let simluated_farming_cmd =
+            Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
-        let (message, _message_id) =
-            create_network_message_envelope(safe_key.clone(), simluated_farming_msg)?;
+        let message = create_cmd_message(safe_key.clone(), simluated_farming_cmd);
 
         let pub_id = safe_key.public_id();
 

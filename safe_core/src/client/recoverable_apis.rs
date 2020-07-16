@@ -25,10 +25,7 @@ const MAX_ATTEMPTS: usize = 10;
 /// If the data already exists, it tries to mutate it so its entries and permissions
 /// are the same as those of the data being put, except it wont delete existing
 /// entries or remove existing permissions.
-pub async fn put_map(
-    client: (impl Client + Sync + Send),
-    data: SeqMap,
-) -> Result<(), CoreError> {
+pub async fn put_map(client: (impl Client + Sync + Send), data: SeqMap) -> Result<(), CoreError> {
     let client = client.clone();
 
     match client.put_seq_mutable_data(data.clone()).await {
@@ -167,10 +164,7 @@ pub async fn del_map_user_permissions(
     response
 }
 
-async fn update_map(
-    client: (impl Client + Sync + Send),
-    data: SeqMap,
-) -> Result<(), CoreError> {
+async fn update_map(client: (impl Client + Sync + Send), data: SeqMap) -> Result<(), CoreError> {
     let client = client.clone();
 
     let address = *data.address();
@@ -669,13 +663,7 @@ mod tests_with_mock_routing {
         let name: XorName = rand::random();
         let tag = 10_000;
         let owners = client.public_key().await;
-        let data = SeqMap::new_with_data(
-            name,
-            tag,
-            Default::default(),
-            Default::default(),
-            owners,
-        );
+        let data = SeqMap::new_with_data(name, tag, Default::default(), Default::default(), owners);
         let address = *data.address();
         let bls_sk1 = threshold_crypto::SecretKey::random();
         let bls_sk2 = threshold_crypto::SecretKey::random();

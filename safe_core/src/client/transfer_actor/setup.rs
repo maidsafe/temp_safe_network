@@ -1,14 +1,16 @@
 use safe_nd::{
     Cmd, DebitAgreementProof, Message, MessageId, Money, PublicKey, Query, QueryResponse,
-    ReplicaEvent, Request, SignatureShare, SignedTransfer, Transfer, TransferCmd,
-    TransferPropagated, TransferQuery, Transfers as MoneyRequest,
+    ReplicaEvent, SignatureShare, SignedTransfer, Transfer, TransferCmd, TransferPropagated,
+    TransferQuery,
 };
 use safe_transfers::{ActorEvent, TransferActor as SafeTransferActor, TransfersSynched};
 
 use std::str::FromStr;
 
 use crate::client::ConnectionManager;
-use crate::client::{Client, ClientTransferValidator, SafeKey, TransferActor};
+use crate::client::{
+    create_query_message, Client, ClientTransferValidator, SafeKey, TransferActor,
+};
 use crate::errors::CoreError;
 use crdts::Dot;
 
@@ -29,21 +31,18 @@ impl TransferActor {
 
         let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(safe_key.public_key()));
 
-        let (message, message_id) =
-            create_network_message_envelope(safe_key.clone(), keys_query_msg)?;
+        let message = create_query_message(safe_key.clone(), keys_query_msg);
 
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
         let res = cm.send_query(&safe_key.public_id(), &message).await?;
 
-        let r = match res {
+        match res {
             QueryResponse::GetReplicaKeys(pk_set) => Ok(pk_set?),
             _ => Err(CoreError::from(format!(
                 "Unexpected response when retrieving account replica keys for {:?}",
                 safe_key.public_key()
             ))),
-        };
-
-        r
+        }
     }
 
     /// Create a new Transfer Actor for a previously unused public key

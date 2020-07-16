@@ -25,7 +25,7 @@ use quic_p2p::{
 use rand::Rng;
 use safe_nd::{
     DebitAgreementProof, Event as EventMsg, HandshakeRequest, HandshakeResponse, Message,
-    MessageId, MsgEnvelope, NodePublicId, PublicId, QueryResponse,
+    MessageId, MsgEnvelope, MsgSender, NodePublicId, PublicId, QueryResponse,
 };
 
 use futures_util::stream::StreamExt;
@@ -108,8 +108,8 @@ impl ConnectionGroup {
         let mut receiver_future = { self.inner.lock().await.send_query(msg).await? };
 
         let mut response = Err(CoreError::from("No response received."));
-        while let Some(QueryResponse) = receiver_future.next().await {
-            response = Ok(res);
+        while let Some(query_response) = receiver_future.next().await {
+            response = Ok(query_response);
             receiver_future.close();
         }
 
@@ -132,7 +132,7 @@ impl ConnectionGroup {
         self.inner
             .lock()
             .await
-            .send_for_validation(*msg_id, msg)
+            .send_for_validation(transfer_actor, *msg_id, msg)
             .await
     }
 
@@ -402,13 +402,14 @@ impl Connected {
     async fn send_for_validation(
         &mut self,
         quic_p2p: &mut QuicP2p,
+        transfer_actor: &mut TransferActor,
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
         trace!("Sending message {:?}", msg_id);
 
         // set up channel
-        let (sender_future, response_future) = mpsc::unbounded();
+        let (sender_future, mut response_future) = mpsc::unbounded();
 
         let _ = self
             .response_manager
@@ -426,12 +427,12 @@ impl Connected {
         // await response
         let mut response = Err(CoreError::from("No debit agreement proof received"));
 
-        while let Some((res, message_id)) = receiver_future.next().await {
+        while let Some(event) = response_future.next().await {
             // Let the actor handle receipt of each response from elders
             match transfer_actor.handle_validation_event(event).await {
                 Ok(proof) => {
                     if let Some(debit_agreement_proof) = proof {
-                        receiver_future.close();
+                        response_future.close();
                         response = Ok(debit_agreement_proof);
                     };
                 }
@@ -439,7 +440,7 @@ impl Connected {
             }
         }
 
-        self.response_manager.remove_event_listener(&message_id)?;
+        self.response_manager.remove_event_listener(&msg_id)?;
 
         response
     }
@@ -598,11 +599,16 @@ impl State {
     async fn send_for_validation(
         &mut self,
         quic_p2p: &mut QuicP2p,
+        transfer_actor: &mut TransferActor,
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
         match self {
-            State::Connected(state) => state.send_for_validation(quic_p2p, msg_id, msg).await,
+            State::Connected(state) => {
+                state
+                    .send_for_validation(quic_p2p, transfer_actor, msg_id, msg)
+                    .await
+            }
             // This message is not expected for the rest of states
             _state => Err(CoreError::OperationForbidden),
         }
@@ -683,11 +689,12 @@ impl Inner {
 
     async fn send_for_validation(
         &mut self,
+        transfer_actor: &mut TransferActor,
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
         self.state
-            .send_for_validation(&mut self.quic_p2p, msg_id, msg)
+            .send_for_validation(&mut self.quic_p2p, transfer_actor, msg_id, msg)
             .await
     }
 

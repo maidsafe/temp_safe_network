@@ -1,6 +1,6 @@
 use safe_nd::{
     Cmd, Data, DebitAgreementProof, Message, MessageId, MsgEnvelope, MsgSender, PublicId,
-    PublicKey, Query, QueryResponse, TransferCmd,
+    PublicKey, Query, QueryResponse, TransferCmd, TransferQuery,
 };
 
 use safe_transfers::{
@@ -8,14 +8,13 @@ use safe_transfers::{
 };
 
 use crate::client::ConnectionManager;
-use crate::client::{create_network_message_envelope, Client, SafeKey, COST_OF_PUT};
+use crate::client::{create_cmd_message, create_query_message, Client, SafeKey, COST_OF_PUT};
 use crate::errors::CoreError;
 use crdts::Dot;
 use futures::lock::Mutex;
 
 use log::{debug, info, trace, warn};
 
-#[cfg(feature = "simulated-payouts")]
 use std::sync::Arc;
 use threshold_crypto::PublicKeySet;
 
@@ -77,8 +76,7 @@ impl TransferActor {
             since_version: 0,
         });
 
-        let (message, _messafe_id) =
-            create_network_message_envelope(self.safe_key.clone(), msg_contents)?;
+        let message = create_query_message(self.safe_key.clone(), msg_contents);
 
         let _bootstrapped = cm.bootstrap(self.safe_key.clone()).await;
 
@@ -135,12 +133,11 @@ impl TransferActor {
             .transfer(COST_OF_PUT, section_key)?
             .signed_transfer;
 
-        let command = TransferCmd::ValidateTransfer(signed_transfer.clone());
+        let command = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
-        let (transfer_message, message_id) =
-            create_network_message_envelope(safe_key.clone(), command)?;
+        let transfer_message = create_cmd_message(safe_key.clone(), command);
 
         self.transfer_actor
             .lock()
@@ -153,7 +150,7 @@ impl TransferActor {
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
 
         let payment_proof: DebitAgreementProof = self
-            .await_validation(message_id, &safe_key.public_id(), &transfer_message)
+            .await_validation(&safe_key.public_id(), &transfer_message)
             .await?;
 
         debug!("payment proof retrieved");
@@ -163,7 +160,6 @@ impl TransferActor {
     /// Send message and await validation and constructin of DebitAgreementProof
     async fn await_validation(
         &mut self,
-        _message_id: MessageId,
         pub_id: &PublicId,
         message: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
