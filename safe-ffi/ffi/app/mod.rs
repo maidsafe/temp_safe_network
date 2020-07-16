@@ -34,7 +34,9 @@ use safe_nd::ClientFullId;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
+    time::Duration,
 };
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn allocate_test_coins(
@@ -55,7 +57,9 @@ pub unsafe extern "C" fn allocate_test_coins(
         let (pk, sk) = keypair.to_hex_key_pair()?;
         let key_pair = Some(NativeBlsKeyPair { pk, sk });
         let xorname = xorname_from_pk(keypair.pk);
-        async_std::task::block_on(test_create_balance(&ClientFullId::from(keypair.sk), amount))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        runtime.block_on(test_create_balance(&ClientFullId::from(keypair.sk), amount))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl = NativeXorUrlEncoder::encode_safekey(xorname, XorUrlBase::Base32z)?;
         let xorurl_c_str = CString::new(xorurl)?;
         o_cb(
@@ -87,8 +91,10 @@ pub unsafe extern "C" fn auth_app(
         let app_name = String::clone_from_repr_c(app_name)?;
         let app_vendor = String::clone_from_repr_c(app_vendor)?;
         let endpoint = from_c_str_to_str_option(endpoint);
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let auth_response =
-            async_std::task::block_on(Safe::auth_app(&app_id, &app_name, &app_vendor, endpoint))?;
+            runtime.block_on(Safe::auth_app(&app_id, &app_name, &app_vendor, endpoint))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let auth_response = CString::new(auth_response)?;
         o_cb(user_data.0, FFI_RESULT_OK, auth_response.as_ptr());
         Ok(())
@@ -107,7 +113,9 @@ pub unsafe extern "C" fn connect_app(
         let app_id = String::clone_from_repr_c(app_id)?;
         let auth_cred = from_c_str_to_str_option(auth_credentials);
         let mut safe = Safe::default();
-        async_std::task::block_on(safe.connect(&app_id, auth_cred))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        runtime.block_on(safe.connect(&app_id, auth_cred))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(safe)));
         Ok(())
     })

@@ -20,7 +20,11 @@ use ffi_utils::{
 };
 use safe_api::{fetch::SafeData, Safe};
 use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
+use std::{
+    os::raw::{c_char, c_void},
+    time::Duration,
+};
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn fetch(
@@ -50,7 +54,9 @@ pub unsafe extern "C" fn fetch(
         } else {
             Some(end)
         };
-        let content = async_std::task::block_on((*app).fetch(&url, Some((start, end))));
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let content = runtime.block_on((*app).fetch(&url, Some((start, end))));
+        runtime.shutdown_timeout(Duration::from_millis(1));
         invoke_callback(
             content,
             user_data,
@@ -79,7 +85,9 @@ pub unsafe extern "C" fn inspect(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url = String::clone_from_repr_c(url)?;
-        let content = async_std::task::block_on((*app).inspect(&url))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let content = runtime.block_on((*app).inspect(&url))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let content_json = CString::new(serde_json::to_string(&content)?)?;
         o_cb(user_data.0, FFI_RESULT_OK, content_json.as_ptr());
         Ok(())

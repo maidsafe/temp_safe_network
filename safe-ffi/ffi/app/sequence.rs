@@ -16,7 +16,9 @@ use safe_nd::XorName;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
+    time::Duration,
 };
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn create_sequence(
@@ -37,9 +39,10 @@ pub unsafe extern "C" fn create_sequence(
             Some(XorName(*name))
         };
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        let xorurl = async_std::task::block_on(
-            (*app).sequence_create(&data_vec, name, type_tag, is_private),
-        )?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let xorurl =
+            runtime.block_on((*app).sequence_create(&data_vec, name, type_tag, is_private))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_string = CString::new(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, xorurl_string.as_ptr());
         Ok(())
@@ -62,7 +65,9 @@ pub unsafe extern "C" fn get_sequence(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url = String::clone_from_repr_c(url)?;
-        let (version, data) = async_std::task::block_on((*app).sequence_get(&url))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (version, data) = runtime.block_on((*app).sequence_get(&url))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
@@ -87,7 +92,9 @@ pub unsafe extern "C" fn append_sequence(
         let user_data = OpaqueCtx(user_data);
         let url = String::clone_from_repr_c(url)?;
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        async_std::task::block_on((*app).sequence_append(&url, &data_vec))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        runtime.block_on((*app).sequence_append(&url, &data_vec))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(user_data.0, FFI_RESULT_OK);
         Ok(())
     })

@@ -16,7 +16,9 @@ use safe_api::Safe;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
+    time::Duration,
 };
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn parse_url(
@@ -55,9 +57,11 @@ pub unsafe extern "C" fn nrs_map_container_create(
         let user_data = OpaqueCtx(user_data);
         let nrs_str = String::clone_from_repr_c(name)?;
         let link_str = String::clone_from_repr_c(link)?;
-        let (nrs_map_container_xorurl, processed_entries, nrs_map) = async_std::task::block_on(
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (nrs_map_container_xorurl, processed_entries, nrs_map) = runtime.block_on(
             (*app).nrs_map_container_create(&nrs_str, &link_str, set_default, direct_link, dry_run),
         )?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_string = CString::new(nrs_map_container_xorurl)?;
         let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         let ffi_processed_entries = processed_entries_into_repr_c(&processed_entries)?;
@@ -93,9 +97,11 @@ pub unsafe extern "C" fn nrs_map_container_add(
         let user_data = OpaqueCtx(user_data);
         let name_str = String::clone_from_repr_c(name)?;
         let link_str = String::clone_from_repr_c(link)?;
-        let (version, xorurl, _processed_entries, nrs_map) = async_std::task::block_on(
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (version, xorurl, _processed_entries, nrs_map) = runtime.block_on(
             (*app).nrs_map_container_add(&name_str, &link_str, set_default, direct_link, dry_run),
         )?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_string = CString::new(xorurl)?;
         let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         o_cb(
@@ -126,8 +132,10 @@ pub unsafe extern "C" fn nrs_map_container_remove(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let name_str = String::clone_from_repr_c(name)?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (version, xorurl, _processed_entries, nrs_map) =
-            async_std::task::block_on((*app).nrs_map_container_remove(&name_str, dry_run))?;
+            runtime.block_on((*app).nrs_map_container_remove(&name_str, dry_run))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_string = CString::new(xorurl)?;
         let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         o_cb(
@@ -156,8 +164,9 @@ pub unsafe extern "C" fn nrs_map_container_get(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_string = String::clone_from_repr_c(url)?;
-        let (version, nrs_map) =
-            async_std::task::block_on((*app).nrs_map_container_get(&url_string))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (version, nrs_map) = runtime.block_on((*app).nrs_map_container_get(&url_string))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let nrs_map_json = CString::new(serde_json::to_string(&nrs_map)?)?;
         o_cb(user_data.0, FFI_RESULT_OK, nrs_map_json.as_ptr(), version);
         Ok(())

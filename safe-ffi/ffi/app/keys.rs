@@ -14,7 +14,11 @@ use super::{
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::{BlsKeyPair as NativeBlsKeyPair, Safe};
 use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
+use std::{
+    os::raw::{c_char, c_void},
+    time::Duration,
+};
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn generate_keypair(
@@ -53,8 +57,10 @@ pub unsafe extern "C" fn keys_create(
         let from_option = from_c_str_to_str_option(from);
         let preload_option = from_c_str_to_str_option(preload);
         let pk_option = from_c_str_to_str_option(pk);
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (xorurl, keypair) =
-            async_std::task::block_on((*app).keys_create(from_option, preload_option, pk_option))?;
+            runtime.block_on((*app).keys_create(from_option, preload_option, pk_option))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_c_str = CString::new(xorurl)?;
         let keypair = match keypair {
             Some(keypair) => keypair,
@@ -87,9 +93,11 @@ pub unsafe extern "C" fn keys_create_preload_test_coins(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let preload_option = String::clone_from_repr_c(preload)?;
-        let mut app = Safe::default();
+        let mut safe = Safe::default();
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (xorurl, keypair) =
-            async_std::task::block_on(app.keys_create_preload_test_coins(&preload_option))?;
+            runtime.block_on(safe.keys_create_preload_test_coins(&preload_option))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_c_str = CString::new(xorurl)?;
         o_cb(
             user_data.0,
@@ -111,7 +119,9 @@ pub unsafe extern "C" fn keys_balance_from_sk(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let secret_key = String::clone_from_repr_c(sk)?;
-        let balance = async_std::task::block_on((*app).keys_balance_from_sk(&secret_key))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let balance = runtime.block_on((*app).keys_balance_from_sk(&secret_key))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -130,8 +140,9 @@ pub unsafe extern "C" fn keys_balance_from_url(
         let user_data = OpaqueCtx(user_data);
         let key_url = String::clone_from_repr_c(url)?;
         let secret_key = String::clone_from_repr_c(sk)?;
-        let balance =
-            async_std::task::block_on((*app).keys_balance_from_url(&key_url, &secret_key))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let balance = runtime.block_on((*app).keys_balance_from_url(&key_url, &secret_key))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -150,7 +161,9 @@ pub unsafe extern "C" fn validate_sk_for_url(
         let user_data = OpaqueCtx(user_data);
         let key_url = String::clone_from_repr_c(url)?;
         let secret_key = String::clone_from_repr_c(sk)?;
-        let balance = async_std::task::block_on((*app).validate_sk_for_url(&secret_key, &key_url))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let balance = runtime.block_on((*app).validate_sk_for_url(&secret_key, &key_url))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -172,12 +185,10 @@ pub unsafe extern "C" fn keys_transfer(
         let from_key = from_c_str_to_str_option(from);
         let to_key = String::clone_from_repr_c(to)?;
         let amount_tranfer = String::clone_from_repr_c(amount)?;
-        let tx_id = async_std::task::block_on((*app).keys_transfer(
-            &amount_tranfer,
-            from_key,
-            &to_key,
-            Some(id),
-        ))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let tx_id =
+            runtime.block_on((*app).keys_transfer(&amount_tranfer, from_key, &to_key, Some(id)))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(user_data.0, FFI_RESULT_OK, tx_id);
         Ok(())
     })

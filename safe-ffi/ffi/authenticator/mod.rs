@@ -28,7 +28,9 @@ use safe_core::{
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
+    time::Duration,
 };
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub extern "C" fn auth_is_mock() -> bool {
@@ -51,7 +53,9 @@ pub unsafe extern "C" fn log_in(
         let passphrase = String::clone_from_repr_c(passphrase)?;
         let password = String::clone_from_repr_c(password)?;
         let mut authenticator = SafeAuthenticator::default();
-        async_std::task::block_on(authenticator.log_in(&passphrase, &password))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        runtime.block_on(authenticator.log_in(&passphrase, &password))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
@@ -107,7 +111,9 @@ pub unsafe extern "C" fn create_acc(
         let passphrase = String::clone_from_repr_c(passphrase)?;
         let password = String::clone_from_repr_c(password)?;
         let mut authenticator = SafeAuthenticator::default();
-        async_std::task::block_on(authenticator.create_acc(&secret_key, &passphrase, &password))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        runtime.block_on(authenticator.create_acc(&secret_key, &passphrase, &password))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(
             user_data.0,
             FFI_RESULT_OK,
@@ -129,7 +135,9 @@ pub unsafe extern "C" fn autherise_app(
         let user_data = OpaqueCtx(user_data);
         if is_granted {
             let request = String::clone_from_repr_c(request)?;
-            let response = async_std::task::block_on((*app).authorise_app(&request))?;
+            let mut runtime = Runtime::new().expect("Failed to create runtime");
+            let response = runtime.block_on((*app).authorise_app(&request))?;
+            runtime.shutdown_timeout(Duration::from_millis(1));
             o_cb(user_data.0, FFI_RESULT_OK, CString::new(response)?.as_ptr());
         } else {
             let error = Error::from(NativeError::AuthdError("Auth denied".to_string()));
@@ -155,7 +163,9 @@ pub unsafe extern "C" fn revoke_app(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let app_id = String::clone_from_repr_c(app_id)?;
-        async_std::task::block_on((*app).revoke_app(&app_id))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        runtime.block_on((*app).revoke_app(&app_id))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(user_data.0, FFI_RESULT_OK);
         Ok(())
     })
@@ -174,7 +184,9 @@ pub unsafe extern "C" fn authd_app(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let authd_app_list = async_std::task::block_on((*app).authed_apps())?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let authd_app_list = runtime.block_on((*app).authed_apps())?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let (apps, apps_len) = authed_apps_into_repr_c(authd_app_list)?;
         o_cb(user_data.0, FFI_RESULT_OK, apps, apps_len);
         Ok(())
@@ -200,8 +212,10 @@ pub unsafe extern "C" fn decode_req(
 
     catch_unwind_cb(user_data.0, o_err, || -> Result<_> {
         let msg = String::clone_from_repr_c(msg)?;
-
-        match async_std::task::block_on((*app).decode_req(&msg)) {
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let decode_result = runtime.block_on((*app).decode_req(&msg));
+        runtime.shutdown_timeout(Duration::from_millis(1));
+        match decode_result {
             Ok((req_id, auth_req)) => match auth_req {
                 SafeAuthReq::Auth(auth_req) => {
                     let repr_c = auth_req.into_repr_c()?;

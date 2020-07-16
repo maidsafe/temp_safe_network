@@ -17,7 +17,11 @@ use ffi_utils::{
 };
 use safe_api::Safe;
 use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
+use std::{
+    os::raw::{c_char, c_void},
+    time::Duration,
+};
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn files_container_create(
@@ -40,14 +44,16 @@ pub unsafe extern "C" fn files_container_create(
         let user_data = OpaqueCtx(user_data);
         let location_opt = from_c_str_to_str_option(location);
         let destination = from_c_str_to_str_option(dest);
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (xorurl, processed_files, files_map) =
-            async_std::task::block_on((*app).files_container_create(
+            runtime.block_on((*app).files_container_create(
                 location_opt,
                 destination,
                 recursive,
                 follow_links,
                 dry_run,
             ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_string = CString::new(xorurl)?;
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
@@ -77,7 +83,9 @@ pub unsafe extern "C" fn files_container_get(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
-        let (version, files_map) = async_std::task::block_on((*app).files_container_get(&url_str))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (version, files_map) = runtime.block_on((*app).files_container_get(&url_str))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let files_map = files_map_into_repr_c(&files_map)?;
         o_cb(user_data.0, FFI_RESULT_OK, version, &files_map);
         Ok(())
@@ -107,8 +115,9 @@ pub unsafe extern "C" fn files_container_sync(
         let user_data = OpaqueCtx(user_data);
         let location_str = String::clone_from_repr_c(location)?;
         let url_str = String::clone_from_repr_c(url)?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (version, processed_files, files_map) =
-            async_std::task::block_on((*app).files_container_sync(
+            runtime.block_on((*app).files_container_sync(
                 &location_str,
                 &url_str,
                 recursive,
@@ -117,6 +126,7 @@ pub unsafe extern "C" fn files_container_sync(
                 update_nrs,
                 dry_run,
             ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -152,8 +162,9 @@ pub unsafe extern "C" fn files_container_add(
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
         let source_str = String::clone_from_repr_c(source_file)?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (version, processed_files, files_map) =
-            async_std::task::block_on((*app).files_container_add(
+            runtime.block_on((*app).files_container_add(
                 &source_str,
                 &url_str,
                 force,
@@ -161,6 +172,7 @@ pub unsafe extern "C" fn files_container_add(
                 follow_links,
                 dry_run,
             ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -196,9 +208,13 @@ pub unsafe extern "C" fn files_container_add_from_raw(
         let user_data = OpaqueCtx(user_data);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
         let url_str = String::clone_from_repr_c(url)?;
-        let (version, processed_files, files_map) = async_std::task::block_on(
-            (*app).files_container_add_from_raw(&data_vec, &url_str, force, update_nrs, dry_run),
-        )?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (version, processed_files, files_map) =
+            runtime
+                .block_on((*app).files_container_add_from_raw(
+                    &data_vec, &url_str, force, update_nrs, dry_run,
+                ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(
@@ -226,11 +242,13 @@ pub unsafe extern "C" fn files_put_public_immutable(
         let user_data = OpaqueCtx(user_data);
         let media_type_str = from_c_str_to_str_option(media_type);
         let data_vec = vec_clone_from_raw_parts(data, data_len);
-        let xorurl = async_std::task::block_on((*app).files_put_public_immutable(
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let xorurl = runtime.block_on((*app).files_put_public_immutable(
             &data_vec,
             media_type_str,
             dry_run,
         ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let xorurl_string = CString::new(xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, xorurl_string.as_ptr());
         Ok(())
@@ -266,9 +284,10 @@ pub unsafe extern "C" fn files_get_public_immutable(
             Some(end)
         };
 
-        let data = async_std::task::block_on(
-            (*app).files_get_public_immutable(&url_str, Some((start, end))),
-        )?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let data =
+            runtime.block_on((*app).files_get_public_immutable(&url_str, Some((start, end))))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
         Ok(())
     })
@@ -293,9 +312,11 @@ pub unsafe extern "C" fn files_container_remove_path(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let url_str = String::clone_from_repr_c(url)?;
-        let (version, processed_files, files_map) = async_std::task::block_on(
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let (version, processed_files, files_map) = runtime.block_on(
             (*app).files_container_remove_path(&url_str, recursive, update_nrs, dry_run),
         )?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let files_map = files_map_into_repr_c(&files_map)?;
         let ffi_processed_files = processed_files_into_repr_c(&processed_files)?;
         o_cb(

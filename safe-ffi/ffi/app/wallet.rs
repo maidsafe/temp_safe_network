@@ -19,7 +19,9 @@ use safe_api::Safe;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
+    time::Duration,
 };
+use tokio::runtime::Runtime;
 
 #[no_mangle]
 pub unsafe extern "C" fn wallet_create(
@@ -29,7 +31,9 @@ pub unsafe extern "C" fn wallet_create(
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
-        let wallet_xorurl = async_std::task::block_on((*app).wallet_create())?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let wallet_xorurl = runtime.block_on((*app).wallet_create())?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let wallet_xorurl_c_str = CString::new(wallet_xorurl)?;
         o_cb(user_data.0, FFI_RESULT_OK, wallet_xorurl_c_str.as_ptr());
         Ok(())
@@ -51,12 +55,14 @@ pub unsafe extern "C" fn wallet_insert(
         let key_url_str = String::clone_from_repr_c(key_url)?;
         let secret_key_str = String::clone_from_repr_c(secret_key)?;
         let name_str = from_c_str_to_str_option(name);
-        let wallet_name = async_std::task::block_on((*app).wallet_insert(
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let wallet_name = runtime.block_on((*app).wallet_insert(
             &key_url_str,
             name_str,
             set_default,
             &secret_key_str,
         ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let wallet_name_c_str = CString::new(wallet_name)?;
         o_cb(user_data.0, FFI_RESULT_OK, wallet_name_c_str.as_ptr());
         Ok(())
@@ -73,7 +79,9 @@ pub unsafe extern "C" fn wallet_balance(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_url = String::clone_from_repr_c(url)?;
-        let balance = async_std::task::block_on((*app).wallet_balance(&wallet_url))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let balance = runtime.block_on((*app).wallet_balance(&wallet_url))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let amount_result = CString::new(balance)?;
         o_cb(user_data.0, FFI_RESULT_OK, amount_result.as_ptr());
         Ok(())
@@ -95,8 +103,10 @@ pub unsafe extern "C" fn wallet_get_default_balance(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_url = String::clone_from_repr_c(url)?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
         let (spendable, version) =
-            async_std::task::block_on((*app).wallet_get_default_balance(&wallet_url))?;
+            runtime.block_on((*app).wallet_get_default_balance(&wallet_url))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let wallet_spendable = wallet_spendable_balance_into_repr_c(&spendable)?;
         o_cb(user_data.0, FFI_RESULT_OK, &wallet_spendable, version);
         Ok(())
@@ -118,12 +128,14 @@ pub unsafe extern "C" fn wallet_transfer(
         let from_key = from_c_str_to_str_option(from);
         let to_key = String::clone_from_repr_c(to)?;
         let amount_tranfer = String::clone_from_repr_c(amount)?;
-        let tx_id = async_std::task::block_on((*app).wallet_transfer(
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let tx_id = runtime.block_on((*app).wallet_transfer(
             &amount_tranfer,
             from_key,
             &to_key,
             Some(id),
         ))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         o_cb(user_data.0, FFI_RESULT_OK, tx_id);
         Ok(())
     })
@@ -143,7 +155,9 @@ pub unsafe extern "C" fn wallet_get(
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
         let user_data = OpaqueCtx(user_data);
         let wallet_url = String::clone_from_repr_c(url)?;
-        let spendables = async_std::task::block_on((*app).wallet_get(&wallet_url))?;
+        let mut runtime = Runtime::new().expect("Failed to create runtime");
+        let spendables = runtime.block_on((*app).wallet_get(&wallet_url))?;
+        runtime.shutdown_timeout(Duration::from_millis(1));
         let wallet_spendable = wallet_spendable_balances_into_repr_c(&spendables)?;
         o_cb(user_data.0, FFI_RESULT_OK, &wallet_spendable);
         Ok(())
