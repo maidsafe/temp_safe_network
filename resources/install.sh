@@ -15,7 +15,7 @@ safe_cli_install_dir() {
 }
 
 safe_cli_latest_version() {
-  echo "0.12.0"
+  curl -s https://api.github.com/repos/maidsafe/safe-api/releases/latest | grep -oP 'tag_name\": \"\K.*(?=\")'
 }
 
 safe_cli_download() {
