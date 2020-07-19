@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::node_ops::{NodeDuty, PaymentDuty, NodeOperation, MessagingDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_nd::{
     Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
@@ -43,6 +43,9 @@ impl DataPayment {
 
     // The code in this method is a bit messy, needs to be cleaned up.
     pub fn process(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
+        use NodeDuty::*;
+        use NodeOperation::*;
+        
         let PaymentDuty::ProcessPayment(msg) = duty;
         let payment = match &msg.message {
             Message::Cmd {
@@ -63,7 +66,8 @@ impl DataPayment {
         use TransferError::*;
         if recipient_is_not_section {
             let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
-            return self.decisions.error(error, msg.id(), &msg.origin);
+            let result = self.decisions.error(error, msg.id(), msg.origin.address());
+            return result.map(|c| RunAsNode(ProcessMessaging(c)));
         }
         let registration = self.replica_mut().register(&payment);
         let result = match registration {
@@ -78,12 +82,9 @@ impl DataPayment {
             Err(error) => self.decisions.error(
                 CmdError::Transfer(TransferRegistration(error)),
                 msg.id(),
-                &msg.origin,
+                msg.origin.address(),
             ),
         };
-        use NodeDuty::*;
-        use NodeOperation::*;
-        
         result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 

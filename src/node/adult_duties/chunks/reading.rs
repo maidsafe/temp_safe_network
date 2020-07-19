@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{cmd::MessagingDuty, utils};
+use crate::{node::node_ops::MessagingDuty, utils};
 use log::error;
 use safe_nd::{Address, BlobRead, MsgEnvelope, MsgSender};
 use serde::Serialize;

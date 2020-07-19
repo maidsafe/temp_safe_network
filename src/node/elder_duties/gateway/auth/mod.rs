@@ -10,7 +10,7 @@ mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
 use crate::{
-    cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping, utils,
+    node::node_ops::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping, utils,
 };
 use log::warn;
 use safe_nd::{
@@ -97,7 +97,7 @@ impl Auth {
         if let Err(error) = result {
             return self
                 .decisions
-                .error(CmdError::Auth(error), msg.message.id(), &msg.origin);
+                .error(CmdError::Auth(error), msg.message.id(), msg.origin.address());
         }
         None
     }
@@ -123,7 +123,8 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise(&mut self, auth_cmd: AuthCmd, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
+    pub(super) fn finalise(&mut self, auth_cmd: &AuthCmd, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
+        use AuthCmd::*;
         let result = match auth_cmd {
             InsAuthKey {
                 key,
@@ -140,7 +141,7 @@ impl Auth {
         if let Err(error) = result {
             return self
                 .decisions
-                .error(CmdError::Auth(error), msg_id, origin);
+                .error(CmdError::Auth(error), msg_id, origin.address());
         }
         None
     }
@@ -156,7 +157,7 @@ impl Auth {
                     self.decisions.error(
                         CmdError::Auth(NdError::AccessDenied),
                         msg.id(),
-                        &msg.origin,
+                        msg.origin.address(),
                     )
                 }
             }

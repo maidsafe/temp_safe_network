@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping};
-use crate::{chunk_store::BlobChunkStor, cmd::MessagingDuty, node::Init, Config, Result};
+use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping, node_ops::MessagingDuty};
+use crate::{chunk_store::BlobChunkStor, node::state_db::Init, Config, Result};
 use log::{error, info};
 use safe_nd::{
     AdultDuties, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId, MsgSender,
@@ -55,7 +55,7 @@ impl ChunkStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         if let Err(error) = self.try_store(data) {
-            return self.decisions.error(CmdError::Data(error), msg_id, &origin);
+            return self.decisions.error(CmdError::Data(error), msg_id, origin.address());
         }
         None
     }
@@ -172,7 +172,7 @@ impl ChunkStorage {
         };
 
         if let Err(error) = result {
-            return self.decisions.error(CmdError::Data(error), msg_id, &origin);
+            return self.decisions.error(CmdError::Data(error), msg_id, origin.address());
         }
         None
     }

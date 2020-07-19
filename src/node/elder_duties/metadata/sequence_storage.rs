@@ -8,22 +8,23 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    cmd::MessagingDuty,
+    node::node_ops::MessagingDuty,
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::Init,
+    node::state_db::Init,
     Config, Result,
 };
 use safe_nd::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex, SequenceOwner, SequencePermissions,
-    SequencePrivPermissions, SequencePubPermissions, SequenceUser, SequenceWriteOp, SequenceRead,
+    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, SequenceWriteOp, SequenceRead,
     SequenceWrite,
 };
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
+    path::Path,
 };
 
 pub(super) struct SequenceStorage {
@@ -35,15 +36,14 @@ pub(super) struct SequenceStorage {
 impl SequenceStorage {
     pub(super) fn new(
         keys: NodeKeys,
-        config: &Config,
+        root_dir: &Path,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         decisions: ElderMsgWrapping,
     ) -> Result<Self> {
-        let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
         let chunks = SequenceChunkStore::new(
-            &root_dir,
+            root_dir,
             max_capacity,
             Rc::clone(total_used_space),
             init_mode,
@@ -86,8 +86,8 @@ impl SequenceStorage {
             Edit(operation) => self.edit(operation, msg_id, origin),
             Delete(address) => self.delete(address, msg_id, origin),
             SetOwner(operation) => self.set_owner(operation, msg_id, origin),
-            SetPubPermissions(operation) => self.set_public_permissions(operation, msg_id, origin),
-            SetPrivPermissions(operation) => {
+            SetPublicPermissions(operation) => self.set_public_permissions(operation, msg_id, origin),
+            SetPrivatePermissions(operation) => {
                 self.set_private_permissions(operation, msg_id, origin)
             }
         }
@@ -276,7 +276,7 @@ impl SequenceStorage {
 
     fn set_public_permissions(
         &mut self,
-        write_op: SequenceWriteOp<SequencePubPermissions>,
+        write_op: SequenceWriteOp<SequencePublicPermissions>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -295,7 +295,7 @@ impl SequenceStorage {
 
     fn set_private_permissions(
         &mut self,
-        write_op: SequenceWriteOp<SequencePrivPermissions>,
+        write_op: SequenceWriteOp<SequencePrivatePermissions>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {

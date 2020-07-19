@@ -13,15 +13,20 @@ mod keys;
 mod msg_wrapping;
 mod section_querying;
 mod node_ops;
+mod state_db;
 
+pub use crate::node::state_db::{Command, Init};
 use crate::{
-    cmd::{GroupDecision, MessagingDuty},
-    messaging::{ClientMessaging, Messaging, Receiver, Received},
     node::{
-        node_duties::{msg_analysis::NodeOperation, messaging::Receiver},
+        node_ops::{
+            GroupDecision, MessagingDuty, NodeDuty, NodeOperation, GatewayDuty, PaymentDuty,
+            MetadataDuty, ChunkDuty, RewardDuty, TransferDuty, ElderDuty, AdultDuty,
+        },
+        node_duties::{NodeDuties, AgeLevel, messaging::{Receiver, Received}},
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
         keys::NodeKeys,
+        state_db::{dump_state, read_state},
     },
     utils, Config, Result,
 };
@@ -37,21 +42,19 @@ use std::{
     rc::Rc,
 };
 
-const STATE_FILENAME: &str = "state";
-
 /// Main node struct.
 pub struct Node<R: CryptoRng + Rng> {
     id: NodeFullId,
     keys: NodeKeys,
     //root_dir: PathBuf,
-    duties: Duties,
+    duties: NodeDuties,
     receiver: Receiver,
     routing: Rc<RefCell<Routing>>,
     rng: R,
 }
 
 impl<R: CryptoRng + Rng> Node<R> {
-    /// Create and start vault. This will block until a `Command` to free it is fired.
+    /// Initialize a new node.
     pub fn new(
         routing: Routing,
         receiver: Receiver,
@@ -60,7 +63,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     ) -> Result<Self> {
         let mut init_mode = Init::Load;
 
-        let (is_elder, id) = Self::read_state(&config)?.unwrap_or_else(|| {
+        let (is_elder, id) = read_state(&config)?.unwrap_or_else(|| {
             let id = NodeFullId::new(&mut rng);
             init_mode = Init::New;
             (false, id)
@@ -73,25 +76,25 @@ impl<R: CryptoRng + Rng> Node<R> {
         let keypair = Rc::new(RefCell::new(utils::key_pair(routing.clone())?));
         let keys = NodeKeys::new(keypair);
 
-        let age_based_duties = if is_elder {
+        let age_level = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
             let duties = ElderDuties::new(
                 id.public_id().clone(),
                 keys.clone(),
-                &config,
+                &root_dir,
                 &total_used_space,
                 init_mode,
                 routing.clone(),
             )?;
-            AgeBasedDuties::Elder(duties)
+            AgeLevel::Elder(duties)
         } else {
             info!("Initializing new node as Infant");
-            AgeBasedDuties::Infant
+            AgeLevel::Infant
         };
 
-        let duties = Duties::new(
+        let duties = NodeDuties::new(
             keys.clone(),
-            age_based_duties, 
+            age_level, 
             routing.clone(), 
             config.clone(),
         );
@@ -99,13 +102,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         let node = Self {
             id,
             keys,
-            //root_dir: root_dir.to_path_buf(),
             duties,
             receiver,
             routing,
             rng,
         };
-        node.dump_state()?;
+
+        let is_elder = matches!(duties, AgeLevel::Elder { .. });
+        dump_state(is_elder, root_dir, id)?;
+
         Ok(node)
     }
 
@@ -122,27 +127,9 @@ impl<R: CryptoRng + Rng> Node<R> {
         self.routing.borrow().is_elder()
     }
 
-    fn node_duties(&mut self) -> &mut Duties {
-        &mut self.duties
-    }
-
-    fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
-        use AgeBasedDuties::*;
-        match &mut self.duties.age_based {
-            Adult(ref mut duties) => Some(duties),
-            _ => None,
-        }
-    }
-
-    fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
-        use AgeBasedDuties::*;
-        match &mut self.duties.age_based {
-            Elder(ref mut duties) => Some(duties),
-            _ => None,
-        }
-    }
-
-    /// Runs the main event loop. Blocks until the node is terminated.
+    /// Starts the node, and runs the main event loop.
+    /// Blocks until the node is terminated, which is done
+    /// by client sending in a `Command` to free it.
     pub fn run(&mut self) {
         use NodeOperation::*;
         use GatewayDuty::*;
@@ -176,114 +163,53 @@ impl<R: CryptoRng + Rng> Node<R> {
                 RunAsRewards(duty) => self.run_as_rewards(duty),
                 RunAsAdult(duty) => self.run_as_adult(duty),
                 RunAsElder(duty) => self.run_as_elder(duty),
-                RunAsNode(duty) => self.node_duties().process(duty),
+                RunAsNode(duty) => self.run_as_node(duty),
                 Unknown => None,
             }
         }
     }
 
-    fn run_as_adult(&mut self, duty: node_ops::AdultDuty) -> Option<NodeOperation> {
+    fn run_as_gateway(&mut self, duty: GatewayDuty) -> Option<NodeOperation> {
+        self.duties.elder_duties()?.gateway().process(&duty)
+    }
+
+    fn run_as_payment(&mut self, duty: PaymentDuty) -> Option<NodeOperation> {
+        self.duties.elder_duties()?.data_payment().process(&duty)
+    }
+
+    fn run_as_transfers(&mut self, duty: TransferDuty) -> Option<NodeOperation> {
+        self.duties.elder_duties()?.transfers().process(&duty)
+    }
+    
+    fn run_as_metadata(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
+        self.duties.elder_duties()?.metadata().process(&duty)
+    }
+
+    fn run_as_rewards(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
+        self.duties.elder_duties()?.rewards().process(&duty)
+    }
+
+    fn run_as_node(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
+        self.duties.process(duty)
+    }
+    
+    fn run_as_elder(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
+        self.duties.elder_duties()?.process(duty)
+    }
+
+    fn run_as_adult(&mut self, duty: AdultDuty) -> Option<NodeOperation> {
         // if let Some(duties) = self.adult_duties() {
         //     duties.process(&duty)
         // } else {
         //     error!("Invalid message assignment: {:?}", duty);
         //     None
         // }
-        self.adult_duties()?.process(&duty)
+        self.duties.adult_duties()?.process(&duty)
     }
-
-    fn run_as_elder(&mut self, duty: node_ops::ElderDuty) -> Option<NodeOperation> {
-        self.elder_duties()?.process(&duty)
-    }
-
-    fn run_as_gateway(&mut self, duty: node_ops::GatewayDuty) -> Option<NodeOperation> {
-        self.elder_duties()?.gateway().process(&duty)
-    }
-
-    fn run_as_payment(&mut self, duty: node_ops::PaymentDuty) -> Option<NodeOperation> {
-        self.elder_duties()?.data_payment().process(&duty)
-    }
-
-    fn run_as_transfers(&mut self, duty: node_ops::TransferDuty) -> Option<NodeOperation> {
-        self.elder_duties()?.transfers().process(&duty)
-    }
-    
-    fn run_as_metadata(&mut self, duty: node_ops::MetadataDuty) -> Option<NodeOperation> {
-        self.elder_duties()?.metadata().process(&duty)
-    }
-
-    fn run_as_rewards(&mut self, duty: node_ops::RewardDuty) -> Option<NodeOperation> {
-        self.elder_duties()?.rewards().process(&duty)
-    }
-
-    ///
-    fn vote_for(&mut self, cmd: GroupDecision) -> Option<MessagingDuty> {
-        self.routing
-            .borrow_mut()
-            .vote_for_user_event(utils::serialise(&cmd))
-            .map_or_else(
-                |_err| {
-                    error!("Cannot vote. node is not an elder");
-                    None
-                },
-                |()| None,
-            )
-    }
-
-    // ///
-    // fn send(&mut self, outbound: MessagingDuty) -> Option<MessagingDuty> {
-    //     use MessagingDuty::*;
-    //     match outbound {
-    //         SendToClient(msg) => {
-    //             if self.msg_analysis.is_dst_for(&msg) {
-    //                 self.elder_duties()?.gateway().push_to_client(&msg)
-    //             } else {
-    //                 Some(SendToSection(msg))
-    //             }
-    //         }
-    //         SendToNode(msg) => self.messaging.borrow_mut().send_to_node(msg),
-    //         SendToAdults { targets, msg } => {
-    //             self.messaging.borrow_mut().send_to_nodes(targets, &msg)
-    //         }
-    //         SendToSection(msg) => self.messaging.borrow_mut().send_to_network(msg),
-    //         VoteFor(decision) => self.vote_for(decision),
-    //     }
-    // }
-
-    fn dump_state(&self) -> Result<()> {
-        let path = self.root_dir.join(STATE_FILENAME);
-        let is_elder = matches!(self.duties, AgeBasedDuties::Elder { .. });
-        Ok(fs::write(path, utils::serialise(&(is_elder, &self.id)))?)
-    }
-
-    /// Returns Some((is_elder, ID)) or None if file doesn't exist.
-    fn read_state(config: &Config) -> Result<Option<(bool, NodeFullId)>> {
-        let path = config.root_dir()?.join(STATE_FILENAME);
-        if !path.is_file() {
-            return Ok(None);
-        }
-        let contents = fs::read(path)?;
-        Ok(Some(bincode::deserialize(&contents)?))
-    }
-    
 }
 
 impl<R: CryptoRng + Rng> Display for Node<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.public_id())
     }
-}
-
-/// Specifies whether to try loading cached data from disk, or to just construct a new instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Init {
-    Load,
-    New,
-}
-
-/// Command that the user can send to a running node to control its execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Command {
-    /// Shutdown the vault
-    Shutdown,
 }

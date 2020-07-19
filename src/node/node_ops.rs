@@ -6,18 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{HandshakeResponse, MsgEnvelope, XorName, Address, MessageId, SignedTransfer, DebitAgreementProof};
+use safe_nd::{RewardCounter, AccountId, HandshakeResponse, PublicKey, MsgEnvelope, XorName, Address, MessageId, SignedTransfer, DebitAgreementProof};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
-// /// Node internal cmds, about what requests to make.
-// /// Any network node
-// #[derive(Debug)]
-// #[allow(clippy::large_enum_variant)]
-// pub(crate) enum MessagingChain {
-//     Single(MessagingDuty),
-//     Multiple(Vec<MessagingDuty>),
-// }
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and
@@ -103,8 +95,8 @@ pub enum ElderDuty {
         age: u8,
     },
     ProcessElderChange {
-        /// The prefix of our section.
-        prefix: Prefix,
+        // /// The prefix of our section.
+        // prefix: Prefix,
         /// The BLS public key of our section.
         key: PublicKey,
         /// The set of elders of our section.
@@ -178,14 +170,14 @@ pub enum RewardDuty {
     AccumulateReward {
         ///
         data: Vec<u8>
-    }
+    },
     ///
     AddNewAccount {
         ///
         id: AccountId, 
         ///
         node_id: XorName
-    }
+    },
     ///
     AddRelocatedAccount {
         ///
@@ -212,7 +204,10 @@ pub enum RewardDuty {
         node_id: XorName,
         ///
         counter: RewardCounter,
-    }
+    },
+    PrepareAccountMove {
+        node_id: XorName
+    },
 }
 
 // --------------- Transfers ---------------
@@ -295,16 +290,16 @@ pub enum InternalTransferCmd {
         ///
         origin: Address,
     },
-    // ///
-    // InitiateRewardPayout {
-    //     signed_transfer: SignedTransfer,
-    //     msg_id: MessageId, 
-    //     origin: Address,
-    // },
-    // ///
-    // FinaliseRewardPayout {
-    //     debit_agreement: DebitAgreementProof,
-    //     msg_id: MessageId, 
-    //     origin: Address,
-    // },
+    ///
+    InitiateRewardPayout {
+        signed_transfer: SignedTransfer,
+        msg_id: MessageId, 
+        origin: Address,
+    },
+    ///
+    FinaliseRewardPayout {
+        debit_agreement: DebitAgreementProof,
+        msg_id: MessageId, 
+        origin: Address,
+    },
 }

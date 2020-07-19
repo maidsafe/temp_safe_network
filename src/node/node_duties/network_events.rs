@@ -9,7 +9,11 @@
 use safe_nd::{
     MsgEnvelope, XorName, PublicKey,
 };
+use log::{trace, error, info};
 use super::msg_analysis::NetworkMsgAnalysis;
+use crate::node::node_ops::{NodeDuty, GroupDecision, GatewayDuty, RewardDuty, ElderDuty, NodeOperation};
+use routing::event::Event as RoutingEvent;
+use hex_fmt::HexFmt;
 
 pub struct NetworkEvents {
     analysis: NetworkMsgAnalysis,
@@ -28,6 +32,7 @@ impl NetworkEvents {
         use GatewayDuty::*;
         use RewardDuty::*;
         use ElderDuty::*;
+        use NodeDuty::*;
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<GroupDecision>(&custom_event) {
@@ -40,19 +45,19 @@ impl NetworkEvents {
             }
             RoutingEvent::Promoted => {
                 info!("Node promoted to Elder");
-                Some(NodeDuty::BecomeElder)
+                Some(RunAsNode(BecomeElder))
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 Some(RunAsElder(ProcessLostMember {
                     name: XorName(name.0), 
                     age, 
-                })
+                }))
             }
             RoutingEvent::MemberJoined { name, previous_name, .. } => {
                 trace!("New member has joined the section");
-                info!("No. of Elders: {}", self.routing.borrow().our_elders().count());
-                info!("No. of Adults: {}", self.routing.borrow().our_adults().count());
+                // info!("No. of Elders: {}", self.routing.borrow().our_elders().count());
+                // info!("No. of Adults: {}", self.routing.borrow().our_adults().count());
                 Some(RunAsRewards(AddRelocatedAccount {
                     old_node_id: XorName(name.0), 
                     new_node_id: XorName(previous_name.0),
@@ -60,7 +65,7 @@ impl NetworkEvents {
             }
             RoutingEvent::Connected(_) => {
                 info!("Node promoted to Adult");
-                Some(NodeDuty::BecomeAdult)
+                Some(RunAsNode(BecomeAdult))
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
@@ -71,12 +76,12 @@ impl NetworkEvents {
                 );
                 self.evaluate_msg(content)
             }
-            RoutingEvent::EldersChanged { prefix, key, elders } => {
+            RoutingEvent::EldersChanged { key, elders, .. } => {
                 Some(RunAsElder(ProcessElderChange {
-                    prefix, 
+                    //prefix, 
                     key: PublicKey::Bls(key), 
-                    elders,
-                })
+                    elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                }))
             },
             // Ignore all other events
             _ => None,

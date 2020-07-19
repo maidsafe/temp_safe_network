@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping,
     node::section_querying::SectionQuerying, node::Init, utils, Config, Result, ToDbKey,
 };
 use log::{info, trace, warn};
@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
+    path::Path,
 };
 use tiny_keccak::sha3_256;
 
@@ -52,15 +53,15 @@ pub(super) struct BlobRegister {
 
 impl BlobRegister {
     pub(super) fn new(
-        config: &Config,
+        root_dir: &Path,
         init_mode: Init,
         decisions: ElderMsgWrapping,
         section_querying: SectionQuerying,
     ) -> Result<Self> {
-        let root_dir = config.root_dir()?;
-        let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
-        let holders = utils::new_db(&root_dir, HOLDER_META_DB_NAME, init_mode)?;
-        let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
+        //let root_dir = config.root_dir()?;
+        let metadata = utils::new_db(root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
+        let holders = utils::new_db(root_dir, HOLDER_META_DB_NAME, init_mode)?;
+        let full_adults = utils::new_db(root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
         Ok(Self {
             metadata,

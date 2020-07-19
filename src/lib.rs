@@ -42,5 +42,5 @@ pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
-    node::{Command, Node as Vault},
+    node::{state_db::Command, Node as Vault},
 };

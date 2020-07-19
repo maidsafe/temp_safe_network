@@ -10,7 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::Init, Config, Result};
+use crate::{node::node_ops::MessagingDuty, node::keys::NodeKeys, node::state_db::Init, Config, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use writing::Writing;

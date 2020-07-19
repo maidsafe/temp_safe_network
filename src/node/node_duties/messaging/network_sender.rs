@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::MessagingDuty, utils};
-pub use client::{ClientInfo, ClientMessaging, ClientMsg};
+use crate::{node::node_ops::{MessagingDuty, GroupDecision}, utils};
 use log::{error, info};
 use routing::{DstLocation, Node as Routing, SrcLocation};
 use safe_nd::{Address, MsgEnvelope, XorName};
@@ -26,7 +25,7 @@ impl NetworkSender {
         match msg.destination() {
             Address::Node(_) => self.send_to_node(msg),
             Address::Section(_) => self.send_to_network(msg),
-            Address::Client(_) => Some(MessagingDuty::SendToClient(msg)),
+            Address::Client(_) => return None, // Some(MessagingDuty::SendToClient(msg)),
         }
     }
 
@@ -35,7 +34,7 @@ impl NetworkSender {
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
             Address::Section(_) => return Some(MessagingDuty::SendToSection(msg)),
-            Address::Client(_) => return Some(MessagingDuty::SendToClient(msg)),
+            Address::Client(_) => return None, // Some(MessagingDuty::SendToClient(msg)),
         };
         self.routing
             .borrow_mut()
@@ -98,6 +97,20 @@ impl NetworkSender {
                     info!("Sent to section with: {:?}", msg);
                     None
                 },
+            )
+    }
+    
+    ///
+    pub fn vote_for(&mut self, decision: GroupDecision) -> Option<MessagingDuty> {
+        self.routing
+            .borrow_mut()
+            .vote_for_user_event(utils::serialise(&decision))
+            .map_or_else(
+                |_err| {
+                    error!("Cannot vote; node is not an Elder");
+                    None
+                },
+                |()| None,
             )
     }
 }

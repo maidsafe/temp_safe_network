@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
 use log::trace;
 use safe_nd::{
     Account, AccountWrite, BlobRead, BlobWrite, Cmd, CmdError, DataCmd, DataQuery,
@@ -94,7 +94,7 @@ impl Sequences {
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
             Delete(address) => self.initiate_deletion(address, msg),
-            SetPubPermissions { .. } | SetPrivPermissions { .. } | SetOwner { .. } | Edit(..) => {
+            SetPublicPermissions { .. } | SetPrivatePermissions { .. } | SetOwner { .. } | Edit(..) => {
                 self.initiate_edit(msg)
             }
         }
@@ -113,7 +113,7 @@ impl Sequences {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
-                &msg.origin,
+                msg.origin.address(),
             );
         }
         self.decisions.vote(msg)
@@ -129,7 +129,7 @@ impl Sequences {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
-                &msg.origin,
+                msg.origin.address(),
             );
         }
         self.decisions.vote(msg)
@@ -223,7 +223,7 @@ impl Blobs {
                 return self.decisions.error(
                     CmdError::Data(NdError::InvalidOwners),
                     msg.id(),
-                    &msg.origin,
+                    msg.origin.address(),
                 );
             }
         }
@@ -242,7 +242,7 @@ impl Blobs {
             self.decisions.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
-                &msg.origin,
+                msg.origin.address(),
             )
         }
     }
@@ -323,7 +323,7 @@ impl Maps {
             return self.decisions.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
-                &msg.origin,
+                msg.origin.address(),
             );
         }
 
@@ -391,7 +391,7 @@ impl Accounts {
             return self.decisions.error(
                 CmdError::Data(NdError::ExceededSize),
                 msg.id(),
-                &msg.origin,
+                msg.origin.address(),
             );
         }
         self.decisions.vote(msg)

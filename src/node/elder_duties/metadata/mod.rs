@@ -15,8 +15,8 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
-    cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping,
-    node::section_querying::SectionQuerying, node::Init, Config, Result,
+    node::node_ops::{NodeDuty, NodeOperation, MessagingDuty, MetadataDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping,
+    node::section_querying::SectionQuerying, node::state_db::Init, Config, Result,
 };
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
@@ -29,6 +29,7 @@ use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
+    path::Path,
 };
 use writing::Writing;
 
@@ -48,20 +49,20 @@ pub(crate) struct Metadata {
 impl Metadata {
     pub fn new(
         keys: NodeKeys,
-        config: &Config,
+        root_dir: &Path,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         section_querying: SectionQuerying,
     ) -> Result<Self> {
         let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Metadata);
         let account_storage =
-            AccountStorage::new(config, total_used_space, init_mode, decisions.clone())?;
+            AccountStorage::new(root_dir, total_used_space, init_mode, decisions.clone())?;
         let blob_register =
-            BlobRegister::new(config, init_mode, decisions.clone(), section_querying)?;
-        let map_storage = MapStorage::new(config, total_used_space, init_mode, decisions.clone())?;
+            BlobRegister::new(root_dir, init_mode, decisions.clone(), section_querying)?;
+        let map_storage = MapStorage::new(root_dir, total_used_space, init_mode, decisions.clone())?;
         let sequence_storage = SequenceStorage::new(
             keys.clone(),
-            config,
+            root_dir,
             total_used_space,
             init_mode,
             decisions.clone(),
@@ -79,11 +80,21 @@ impl Metadata {
         })
     }
 
-    pub fn process(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    pub fn process(&mut self, duty: &MetadataDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
+        use MetadataDuty::*;
         use NodeOperation::*;
 
-        let result = match &msg.message {
+        let result = match duty {
+            ProcessRead(msg)
+            | ProcessWrite(msg) => self.process_msg(msg),
+        };
+
+        result.map(|c| RunAsNode(ProcessMessaging(c)))
+    }
+
+    fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+        match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
                 ..
@@ -99,9 +110,7 @@ impl Metadata {
                 reading.get_result(&self.elder_stores)
             }
             _ => None, // only Queries and Cmds from client is handled at Metadata
-        };
-
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        }
     }
 
     // This should be called whenever a node leaves the section. It fetches the list of data that was

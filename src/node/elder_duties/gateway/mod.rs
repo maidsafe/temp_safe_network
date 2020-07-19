@@ -14,21 +14,22 @@ use self::{
     validation::Validation,
 };
 use crate::{
-    cmd::{GroupDecision, MessagingDuty},
-    messaging::{ClientMessaging, ClientMsg, Onboarding, InputParsing},
+    node::{section_querying::SectionQuerying, node_ops::{NodeDuty, GatewayDuty, NodeOperation, GroupDecision, MessagingDuty}},
+    node::node_duties::messaging::{ClientMsgTracking, ClientInput, ClientMsg, Onboarding, InputParsing},
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::Init,
+    node::state_db::Init,
     Config, Result,
 };
 use routing::TransportEvent as ClientEvent;
 use bytes::Bytes;
-use log::trace;
+use log::{trace, error, info};
 use rand::CryptoRng;
-use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
+use safe_nd::{Cmd, Address, AuthCmd, ElderDuties, Message, MsgEnvelope, PublicId, NodePublicId, Query};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
+    path::Path,
 };
 
 pub(crate) struct Gateway {
@@ -45,12 +46,10 @@ impl Gateway {
     pub fn new(
         id: NodePublicId,
         keys: NodeKeys,
-        config: &Config,
+        root_dir: &Path,
         init_mode: Init,
         section: SectionQuerying,
     ) -> Result<Self> {
-        let root_dir = config.root_dir()?;
-        let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
 
         let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Gateway);
@@ -100,7 +99,7 @@ impl Gateway {
              /// Temporary, while Authenticator is not implemented at app layer.
             /// If a request within MessagingDuty::ForwardClientRequest issued by us in `handle_group_decision`
             /// was made by Gateway and destined to our section, this is where the actual request will end up.
-            return self.auth.finalise(auth_cmd, msg.id(), &msg.origin),
+            return self.auth.finalise(auth_cmd, msg.id(), &msg.origin);
         } else {
             // so, it wasn't really for Gateway after all
             None
@@ -109,22 +108,22 @@ impl Gateway {
 
     /// Basically.. when Gateway nodes have agreed,
     /// they'll forward the request into the network.
-    fn process_group_decision(&mut self, decision: GroupDecision) -> Option<MessagingDuty> {
+    fn process_group_decision(&mut self, decision: &GroupDecision) -> Option<MessagingDuty> {
         use GroupDecision::*;
-        trace!("{}: Group decided on {:?}", self, cmd);
+        trace!("{}: Group decided on {:?}", self, decision);
         match decision {
-            Forward(msg) => Some(MessagingDuty::SendToSection(msg)),
+            Forward(msg) => Some(MessagingDuty::SendToSection(msg.clone())),
         }
     }
 
     /// Will only act on this (i.e. return an action) if node is currently an Elder.
-    fn process_client_event(&mut self, event: ClientEvent) -> Option<MessagingDuty> {
+    fn process_client_event(&mut self, event: &ClientEvent) -> Option<MessagingDuty> {
         use ClientEvent::*;
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
         match event {
             ConnectedTo { peer } => {
                 if !self.onboarding.contains(peer.peer_addr()) {
-                    info!("{}: Connected to new client on {}", self, peer_addr);
+                    info!("{}: Connected to new client on {}", self, peer.peer_addr());
                 }
             }
             ConnectionFailure { peer, .. } => {

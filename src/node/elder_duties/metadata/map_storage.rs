@@ -8,9 +8,9 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MapChunkStore},
-    cmd::MessagingDuty,
+    node::node_ops::MessagingDuty,
     node::msg_wrapping::ElderMsgWrapping,
-    node::Init,
+    node::state_db::Init,
     Config, Result,
 };
 use safe_nd::{
@@ -22,6 +22,7 @@ use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
+    path::Path,
 };
 
 pub(super) struct MapStorage {
@@ -31,15 +32,14 @@ pub(super) struct MapStorage {
 
 impl MapStorage {
     pub(super) fn new(
-        config: &Config,
+        root_dir: &Path,
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         decisions: ElderMsgWrapping,
     ) -> Result<Self> {
-        let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
         let chunks = MapChunkStore::new(
-            &root_dir,
+            root_dir,
             max_capacity,
             Rc::clone(total_used_space),
             init_mode,
@@ -411,7 +411,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         if let Err(error) = result {
-            self.decisions.error(CmdError::Data(error), msg_id, origin)
+            self.decisions.error(CmdError::Data(error), msg_id, origin.address())
         } else {
             None
         }

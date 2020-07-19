@@ -195,9 +195,6 @@ impl Onboarding {
                 self, peer_addr
             );
             Some(MessagingDuty::DisconnectClient(peer_addr))
-            // if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
-            //     warn!("{}: Could not disconnect client: {:?}", self, err);
-            // }
         }
     }
 

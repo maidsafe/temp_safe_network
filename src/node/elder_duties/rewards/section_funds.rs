@@ -1,5 +1,5 @@
 use super::validator::Validator;
-use crate::{cmd::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
 use safe_nd::{AccountId, Message, MessageId, Money, NetworkCmd, NetworkTransferCmd, TransferValidated};
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
@@ -26,7 +26,7 @@ impl SectionFunds {
                     None
                 } else {
                     self.decisions.send(Message::NetworkCmd {
-                        cmd: Transfer(InitiateRewardPayout(event.signed_transfer)),
+                        cmd: Transfers(InitiateRewardPayout(event.signed_transfer)),
                         id: MessageId::new(),
                     })
                 }
@@ -48,7 +48,7 @@ impl SectionFunds {
                     None
                 } else {
                     self.decisions.send(Message::NetworkCmd {
-                        cmd: Transfer(FinaliseRewardPayout(event.proof?)),
+                        cmd: Transfers(FinaliseRewardPayout(event.proof?)),
                         id: MessageId::new(),
                     })
                 }

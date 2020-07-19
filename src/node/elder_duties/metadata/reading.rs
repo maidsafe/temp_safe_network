@@ -10,7 +10,7 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::cmd::MessagingDuty;
+use crate::node::node_ops::MessagingDuty;
 use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MsgEnvelope, SequenceRead};
 
 pub(super) struct Reading {

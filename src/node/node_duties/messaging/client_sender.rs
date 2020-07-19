@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{cmd::MessagingDuty, utils};
-pub use client::{ClientInfo, ClientMessaging, ClientMsg};
-use log::{error, info};
+use crate::{node::node_ops::MessagingDuty, utils};
+use log::{error, info, warn};
 use routing::{DstLocation, Node as Routing, SrcLocation};
-use safe_nd::{Address, MsgEnvelope, XorName};
-use std::{cell::RefCell, collections::BTreeSet, rc::Rc, net::SocketAddr};
+use safe_nd::{Address, MsgEnvelope, XorName, HandshakeResponse};
+use std::{cell::RefCell, collections::BTreeSet, fmt::{self, Display, Formatter}, rc::Rc, net::SocketAddr};
+use serde::Serialize;
+use bytes::Bytes;
 
 pub(super) struct ClientSender {
     routing: Rc<RefCell<Routing>>,
@@ -22,16 +23,23 @@ impl ClientSender {
         Self { routing }
     }
 
-    pub fn send(&self, recipient: SocketAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub fn send(&self, recipient: SocketAddr, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match msg.destination() {
-            Address::Node(_) => Some(MessagingDuty::SendToNode(msg)),
-            Address::Section(_) => Some(MessagingDuty::SendToSection(msg)),
-            Address::Client(_) => self.send_to_client(recipient, msg),
+            Address::Node(_) => Some(MessagingDuty::SendToNode(msg.clone())),
+            Address::Section(_) => Some(MessagingDuty::SendToSection(msg.clone())),
+            Address::Client(_) => self.send_any_to_client(recipient, msg),
         }
     }
 
-    fn send_to_client(&self, recipient: SocketAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        self.send_any_to_client(recipient, msg)
+    pub fn handshake(&self, recipient: SocketAddr, hs: &HandshakeResponse) -> Option<MessagingDuty> {
+        self.send_any_to_client(recipient, hs)
+    }
+
+    pub fn disconnect(&self, peer_addr: SocketAddr) -> Option<MessagingDuty> {
+        if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
+            warn!("{}: Could not disconnect client: {:?}", self, err);
+        }
+        None
     }
 
     fn send_any_to_client<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) -> Option<MessagingDuty> {
@@ -49,5 +57,11 @@ impl ClientSender {
             );
         }
         None
+    }
+}
+
+impl Display for ClientSender {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", "ClientSender")
     }
 }

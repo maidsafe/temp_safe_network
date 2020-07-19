@@ -6,21 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod messaging;
 mod network_events;
 mod msg_analysis;
 mod accumulation;
-mod messaging;
 
 use network_events::NetworkEvents;
-use msg_analysis::{NodeOperation, NetworkMsgAnalysis};
+use msg_analysis::NetworkMsgAnalysis;
 use accumulation::Accumulation;
-use messaging::{Messaging, Receiver, Received};
 use crate::{
-    cmd::{GroupDecision, MessagingDuty},
+    node::node_ops::{NodeDuty, GroupDecision, NodeOperation, MessagingDuty},
     node::{
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
         keys::NodeKeys,
+        node_duties::messaging::{Messaging, Receiver, Received},
     },
     Config, Result,
 };
@@ -31,35 +31,51 @@ use std::{
 };
 
 #[allow(clippy::large_enum_variant)]
-enum AgeBasedDuties {
+pub enum AgeLevel {
     Infant,
     Adult(AdultDuties),
     Elder(ElderDuties),
 }
 
 pub struct NodeDuties {
-    keys: NodeKeys
-    age_based: AgeBasedDuties,
+    keys: NodeKeys,
+    age_level: AgeLevel,
     network_events: NetworkEvents,
     messaging: Messaging,
     routing: Rc<RefCell<Routing>>,
-    config: Config,
+    root_dir: Path,
 }
 
 impl NodeDuties {
     
-    pub fn new(keys: NodeKeys, age_based: AgeBasedDuties,
-        routing: Rc<RefCell<Routing>>, config: Config) -> Self {
+    pub fn new(keys: NodeKeys, age_level: AgeLevel,
+        routing: Rc<RefCell<Routing>>, root_dir: Path) -> Self {
             let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
             let messaging = Messaging::new(routing.clone());
             Self {
                 keys,
-                age_based,
+                age_level,
                 network_events,
                 messaging,
                 routing,
-                config,
+                root_dir,
             }
+    }
+
+    pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
+        use AgeLevel::*;
+        match &mut self.age_level {
+            Adult(ref mut duties) => Some(duties),
+            _ => None,
+        }
+    }
+
+    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
+        use AgeLevel::*;
+        match &mut self.age_level {
+            Elder(ref mut duties) => Some(duties),
+            _ => None,
+        }
     }
 
     pub fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
@@ -72,34 +88,35 @@ impl NodeDuties {
         }
     }
 
-    fn become_adult(&mut self) -> Result<()> {
-        use AgeBasedDuties::*;
+    fn become_adult(&mut self) -> Option<NodeOperation> {
+        use AgeLevel::*;
         // let mut config = Config::default();
         // config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
-        self.age_based = Adult(AdultDuties::new(self.keys.clone(), &self.config, &total_used_space, Init::New)?);
-        Ok(())
+        if let Ok(duties) = AdultDuties::new(self.keys.clone(), &self.root_dir, &total_used_space, Init::New) {
+            self.age_level = Adult(duties);
+            dump_state(false, root_dir, id)?;
+        }
+        None
     }
 
-    fn become_elder(&mut self) -> Result<()> {
-        use AgeBasedDuties::*;
+    fn become_elder(&mut self) -> Option<NodeOperation> {
+        use AgeLevel::*;
         // let mut config = Config::default();
         // config.set_root_dir(self.root_dir.clone());
         let total_used_space = Rc::new(Cell::new(0));
 
-        input_parsing: InputParsing,
-        section: SectionQuerying,
-        client_msg_tracking: ClientMsgTracking,
-
-        let duties = ElderDuties::new(
+        if let Ok(duties) = ElderDuties::new(
+            self.id.clone(),
             self.keys.clone(),
-            &self.config,
+            &self.root_dir,
             &total_used_space,
             Init::New,
-            routing.clone(),
-            ClientMessaging::new(self.id.public_id().clone(), routing),
-        )?;
-        self.age_based = Elder(duties);
-        Ok(())
+            self.routing.clone(),
+        ) {
+            self.age_level = Elder(duties);
+            dump_state(true, &root_dir, id)?;
+        }
+        None
     }
 }

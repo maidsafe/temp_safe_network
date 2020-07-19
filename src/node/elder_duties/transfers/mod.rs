@@ -9,9 +9,9 @@
 pub mod replica_manager;
 
 pub use self::replica_manager::ReplicaManager;
-use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::node_ops::{NodeDuty, TransferDuty, NodeOperation, MessagingDuty, InternalTransferCmd, InternalTransferQuery}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_nd::{
-    Cmd, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, MsgEnvelope,
+    Address, Cmd, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, MsgEnvelope,
     MsgSender, NetworkCmd, NetworkCmdError, NetworkTransferError, PublicKey, Query, QueryResponse,
     SignedTransfer, TransferCmd, TransferError, TransferQuery, NetworkTransferCmd,
 };
@@ -77,81 +77,81 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub fn process(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        let result = match msg.message.clone() {
-            Message::Cmd {
-                cmd: Cmd::Transfer(cmd),
-                ..
-            } => self.handle_client_cmd(cmd, msg),
-            Message::NetworkCmd { cmd, .. } => self.handle_network_cmd(cmd, msg.id(), &msg.origin),
-            Message::Query {
-                query: Query::Transfer(query),
-                ..
-            } => self.handle_client_query(query, msg),
-            _ => None,
-        };
+    pub fn process(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
         use NodeOperation::*;
+        
+        let result = match duty {
+            ProcessQuery(query) => self.process_query(query),
+            ProcessCmd(cmd) => self.process_cmd(cmd),
+        };
         
         result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
-    fn handle_network_cmd(
+    fn process_query(
         &mut self,
-        cmd: NetworkCmd,
-        msg_id: MessageId,
-        origin: &MsgSender,
+        query: InternalTransferQuery,
     ) -> Option<MessagingDuty> {
-        use NetworkCmd::*;
-        match cmd {
-            PropagateTransfer(debit_proof) => {
-                self.receive_propagated(&debit_proof, msg_id, &origin)
-            }
-            InitiateRewardPayout(_signed_transfer) => None, // TODO
-            FinaliseRewardPayout(debit_proof) => {
-                match self.replica.borrow_mut().register(&debit_proof) {
-                    Ok(None) => None,
-                    Ok(Some(event)) => {
-                        // the transfer is then propagated, and will reach the recipient section
-                        self.decisions.send(Message::NetworkCmd {
-                            cmd: PropagateTransfer(event.debit_proof),
-                            id: MessageId::new(),
-                        })
-                    }
-                    Err(error) => self.decisions.error(
-                        CmdError::Transfer(TransferError::TransferRegistration(error)),
-                        msg_id,
-                        &origin,
-                    ),
-                }
-            }
-            _ => None, // others should not end up here (NetworkCmd should preferrably be subdivided more)
-        }
+        use InternalTransferQuery::*;
+        let result = match query {
+            GetReplicaKeys {
+                account_id,
+                msg_id, 
+                origin,
+            } => self.get_replica_pks(public_key, msg),
+            GetBalance {
+                account_id,
+                msg_id, 
+                origin,
+            } => self.balance(public_key, msg),
+            GetHistory {
+                at,
+                since_version,
+                msg_id, 
+                origin,
+            } => self.history(at, since_version, msg),
+        };
     }
 
-    fn handle_client_cmd(&mut self, cmd: TransferCmd, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn process_cmd(&mut self, cmd: InternalTransferCmd) {
+        use InternalTransferCmd::*;
         match cmd {
-            TransferCmd::ValidateTransfer(signed_transfer) => {
-                self.validate(signed_transfer, msg.id(), &msg.origin)
-            }
-            TransferCmd::RegisterTransfer(proof) => self.register(&proof, msg.id(), &msg.origin),
             #[cfg(feature = "simulated-payouts")]
-            TransferCmd::SimulatePayout(transfer) => self
+            /// Cmd to simulate a farming payout
+            SimulatePayout {
+                transfer,
+                msg_id, 
+                origin,
+            } => self
                 .replica
                 .borrow_mut()
-                .credit_without_proof(transfer, msg.id(), *self.id.name()),
-        }
-    }
-
-    fn handle_client_query(
-        &mut self,
-        query: TransferQuery,
-        msg: &MsgEnvelope,
-    ) -> Option<MessagingDuty> {
-        match query {
-            TransferQuery::GetBalance(public_key) => self.balance(public_key, msg),
-            TransferQuery::GetReplicaKeys(public_key) => self.get_replica_pks(public_key, msg),
-            TransferQuery::GetHistory { at, since_version } => self.history(at, since_version, msg),
+                .credit_without_proof(transfer, msg_id, origin),
+            ValidateTransfer {
+                signed_transfer,
+                msg_id, 
+                origin,
+            } => self.validate(signed_transfer, msg_id, origin),
+            RegisterTransfer {
+                debit_agreement,
+                msg_id, 
+                origin,
+            } => self.register(&debit_agreement, msg_id, origin),
+            PropagateTransfer {
+                debit_agreement,
+                msg_id, 
+                origin,
+            } => self.receive_propagated(&debit_agreement, msg_id, origin),
+            InitiateRewardPayout {
+                signed_transfer,
+                msg_id, 
+                origin,
+            } => None, // TODO
+            FinaliseRewardPayout {
+                debit_agreement,
+                msg_id, 
+                origin,
+            } => self.finalise_reward_payout(&debit_agreement, msg_id, origin),
         }
     }
 
@@ -215,7 +215,7 @@ impl Transfers {
         &mut self,
         transfer: SignedTransfer,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
@@ -231,7 +231,7 @@ impl Transfers {
                 id: MessageId::new(),
                 error: CmdError::Transfer(TransferError::TransferValidation(error)),
                 correlation_id: msg_id,
-                cmd_origin: origin.address(),
+                cmd_origin: origin,
             },
         };
         self.decisions.send(message)
@@ -243,11 +243,11 @@ impl Transfers {
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
         use NetworkCmd::*;
         use NetworkTransferCmd::*;
-        
+
         let message = match self.replica.borrow_mut().register(proof) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NetworkCmd {
@@ -258,7 +258,7 @@ impl Transfers {
                 id: MessageId::new(),
                 error: CmdError::Transfer(TransferError::TransferRegistration(error)),
                 correlation_id: msg_id,
-                cmd_origin: origin.address(),
+                cmd_origin: origin,
             },
         };
         self.decisions.send(message)
@@ -268,11 +268,11 @@ impl Transfers {
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destination.
-    pub(crate) fn receive_propagated(
+    fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
         use NetworkTransferError::*;
         // We will just validate the proofs and then apply the event.
@@ -285,10 +285,30 @@ impl Transfers {
                 error: NetworkCmdError::Transfers(TransferPropagation(err)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
-                cmd_origin: origin.address(),
+                cmd_origin: origin,
             },
         };
         self.decisions.send(message)
+    }
+
+    fn finalise_reward_payout(&mut self, debit_agreement: &DebitAgreementProof,
+        msg_id: MessageId, 
+        origin: Address) -> Option<MessagingDuty> {
+        match self.replica.borrow_mut().register(&debit_agreement) {
+            Ok(None) => None,
+            Ok(Some(event)) => {
+                // the transfer is then propagated, and will reach the recipient section
+                self.decisions.send(Message::NetworkCmd {
+                    cmd: NetworkCmd::Transfers(PropagateTransfer(event.debit_proof)),
+                    id: MessageId::new(),
+                })
+            }
+            Err(error) => self.decisions.error(
+                CmdError::Transfer(TransferError::TransferRegistration(error)),
+                msg_id,
+                origin,
+            ),
+        }
     }
 
     #[cfg(feature = "simulated-payouts")]

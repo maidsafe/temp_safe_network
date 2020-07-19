@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    cmd::{GroupDecision, MessagingDuty},
+    node::node_ops::{GroupDecision, MessagingDuty},
     node::keys::NodeKeys,
     utils,
 };
 use safe_nd::{
     AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NetworkCmdError, XorName,
+    NetworkCmdError, XorName, Address,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -56,9 +56,9 @@ impl AdultMsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
-        self.inner.error(error, msg_id, &origin)
+        self.inner.error(error, msg_id, origin)
     }
 }
 
@@ -94,18 +94,18 @@ impl ElderMsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
-        self.inner.error(error, msg_id, &origin)
+        self.inner.error(error, msg_id, origin)
     }
 
     pub fn network_error(
         &self,
         error: NetworkCmdError,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
-        self.inner.network_error(error, msg_id, &origin)
+        self.inner.network_error(error, msg_id, origin)
     }
 }
 
@@ -137,13 +137,13 @@ impl MsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
         self.send(Message::CmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,
-            cmd_origin: origin.address(),
+            cmd_origin: origin,
         })
     }
 
@@ -151,13 +151,13 @@ impl MsgWrapping {
         &self,
         error: NetworkCmdError,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: Address,
     ) -> Option<MessagingDuty> {
         self.send(Message::NetworkCmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,
-            cmd_origin: origin.address(),
+            cmd_origin: origin,
         })
     }
 

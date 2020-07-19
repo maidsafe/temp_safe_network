@@ -9,7 +9,7 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{cmd::MessagingDuty, node::keys::NodeKeys, node::Init, Config, Result};
+use crate::{node::node_ops::{AdultDuty, ChunkDuty, NodeDuty, NodeOperation, MessagingDuty}, node::keys::NodeKeys, node::state_db::Init, Config, Result};
 use safe_nd::MsgEnvelope;
 use std::{
     cell::Cell,
@@ -33,11 +33,18 @@ impl AdultDuties {
         Ok(Self { keys, chunks })
     }
 
-    pub fn process(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    pub fn process(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
+        use AdultDuty::*;
+        use ChunkDuty::*;
         use NodeOperation::*;
-
-        let result = self.chunks.receive_msg(msg);
+        
+        let RunAsChunks(chunk_duty) = duty;
+        let result = match chunk_duty {
+            ReadChunk(msg)
+            | WriteChunk(msg) => self.chunks.receive_msg(msg),
+        };
+        
         result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 }

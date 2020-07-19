@@ -12,10 +12,10 @@ mod validator;
 
 use self::section_funds::SectionFunds;
 pub use self::{system::FarmingSystem, validator::Validator};
-use crate::{internal_msgs::{MessagingDuty, RewardDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::node_ops::{NodeDuty, NodeOperation, MessagingDuty, RewardDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_farming::{Accumulation, StorageRewards};
 use safe_nd::{
-    AccountId, ElderDuties, Error, Message, MessageId, Money, MsgSender, NetworkCmd, NetworkCmdError,
+    AccountId, ElderDuties, Error, Message, MessageId, Money, Address, NetworkCmd, NetworkCmdError,
     NetworkEvent, NetworkRewardError, RewardCounter, XorName, NetworkRewardCmd,
 };
 use safe_transfers::TransferActor;
@@ -73,12 +73,15 @@ impl Rewards {
             } => self.add_relocated_account(old_node_id, new_node_id),
             ClaimRewardCounter {
                 old_node_id, new_node_id, msg_id, origin,
-            } => self.claim_rewards(old_node_id, new_node_id, msg_id, origin),
+            } => self.claim_rewards(old_node_id, new_node_id, msg_id, &origin),
             ReceiveClaimedRewards {
                 id,
                 node_id,
                 counter,
             } => self.receive_claimed_rewards(id, node_id, counter),
+            PrepareAccountMove {
+                node_id,
+            } => self.node_left(node_id)
         };
         use NodeDuty::*;
         use NodeOperation::*;
@@ -122,8 +125,8 @@ impl Rewards {
     fn receive_claimed_rewards(
         &mut self,
         id: AccountId,
-        node_id: &XorName,
-        counter: &RewardCounter,
+        node_id: XorName,
+        counter: RewardCounter,
     ) -> Option<MessagingDuty> {
         // TODO: Consider this validation code here, and the flow..
         // .. because we are receiving an event triggered by our cmd, something is very odd
@@ -133,7 +136,7 @@ impl Rewards {
         // But exact course to take there needs to be chiseled out.
 
         // Try get the account..
-        match self.node_accounts.get(node_id) {
+        match self.node_accounts.get(&node_id) {
             None => {
                 // "Invalid receive: No such account found to receive the rewards.".to_string()
                 return None;
@@ -153,7 +156,7 @@ impl Rewards {
                 // Set the stage to `Active`
                 let _ = self
                     .node_accounts
-                    .insert(*node_id, RewardAccount::Active(id));
+                    .insert(node_id, RewardAccount::Active(id));
                 // If any reward was accumulated,
                 // we initiate payout to the account.
                 if counter.reward > Money::zero() {
@@ -190,7 +193,7 @@ impl Rewards {
 
     /// 4. When the section becomes aware that a node has left,
     /// it is flagged for being awaiting move.
-    pub fn node_left(&mut self, node_id: XorName) -> Option<MessagingDuty> {
+    fn node_left(&mut self, node_id: XorName) -> Option<MessagingDuty> {
         let id = match self.node_accounts.get(&node_id) {
             Some(RewardAccount::Active(id)) => *id,
             Some(RewardAccount::AwaitingStart) // hmm.. left when AwaitingStart is a tricky case..
@@ -207,7 +210,7 @@ impl Rewards {
     /// will locally be executing `add_account(..)` of this very module,
     /// thereby sending a cmd to the old section, leading to this method
     /// here being called. An event will be sent back with the claimed counter.
-    pub fn claim_rewards(
+    fn claim_rewards(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
@@ -230,7 +233,7 @@ impl Rewards {
                         account_id: *id,
                     }),
                     msg_id,
-                    origin,
+                    *origin,
                 );
             }
             Some(RewardAccount::AwaitingStart) // todo: return error, but we need to have the account id in that case, or change / extend the current error(s)
@@ -244,7 +247,7 @@ impl Rewards {
                 return self.decisions.network_error(
                     Rewards(RewardClaiming { error, account_id }),
                     msg_id,
-                    origin,
+                    *origin,
                 );
             }
         };
