@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod state_db;
+
 mod adult_duties;
 mod elder_duties;
 mod node_duties;
@@ -13,40 +15,33 @@ mod keys;
 mod msg_wrapping;
 mod section_querying;
 mod node_ops;
-mod state_db;
 
 pub use crate::node::state_db::{Command, Init};
 use crate::{
     node::{
         node_ops::{
-            GroupDecision, MessagingDuty, NodeDuty, NodeOperation, GatewayDuty, PaymentDuty,
-            MetadataDuty, ChunkDuty, RewardDuty, TransferDuty, ElderDuty, AdultDuty,
+            NodeDuty, NodeOperation, GatewayDuty, PaymentDuty,
+            MetadataDuty, RewardDuty, TransferDuty, ElderDuty, AdultDuty,
         },
-        node_duties::{NodeDuties, AgeLevel, messaging::{Receiver, Received}},
-        adult_duties::AdultDuties,
-        elder_duties::ElderDuties,
+        node_duties::{NodeDuties, messaging::{Receiver, Received}},
         keys::NodeKeys,
-        state_db::{dump_state, read_state},
+        state_db::{NodeInfo, read_state, AgeGroup},
     },
     utils, Config, Result,
 };
-use log::{error, info, warn};
+use log::warn;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::NodeFullId;
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     fmt::{self, Display, Formatter},
-    fs,
     net::SocketAddr,
     rc::Rc,
 };
 
 /// Main node struct.
 pub struct Node<R: CryptoRng + Rng> {
-    id: NodeFullId,
-    keys: NodeKeys,
-    //root_dir: PathBuf,
     duties: NodeDuties,
     receiver: Receiver,
     routing: Rc<RefCell<Routing>>,
@@ -61,55 +56,48 @@ impl<R: CryptoRng + Rng> Node<R> {
         config: &Config,
         mut rng: R,
     ) -> Result<Self> {
-        let mut init_mode = Init::Load;
+        let root_dir_buf = config.root_dir()?;
+        let root_dir = root_dir_buf.as_path();
 
-        let (is_elder, id) = read_state(&config)?.unwrap_or_else(|| {
+        let (age_group, id) = read_state(&root_dir)?.unwrap_or_else(|| {
             let id = NodeFullId::new(&mut rng);
-            init_mode = Init::New;
-            (false, id)
+            (Infant, id)
         });
-
-        let root_dir = config.root_dir()?;
-        let root_dir = root_dir.as_path();
 
         let routing = Rc::new(RefCell::new(routing));
         let keypair = Rc::new(RefCell::new(utils::key_pair(routing.clone())?));
         let keys = NodeKeys::new(keypair);
 
-        let age_level = if is_elder {
-            let total_used_space = Rc::new(Cell::new(0));
-            let duties = ElderDuties::new(
-                id.public_id().clone(),
-                keys.clone(),
-                &root_dir,
-                &total_used_space,
-                init_mode,
-                routing.clone(),
-            )?;
-            AgeLevel::Elder(duties)
-        } else {
-            info!("Initializing new node as Infant");
-            AgeLevel::Infant
+        let node_info = NodeInfo {
+            id: *id.public_id(),
+            keys,
+            root_dir: root_dir_buf,
+            init_mode: Init::New,
+            /// Upper limit in bytes for allowed network storage on this node.
+            /// An Adult would be using the space for chunks, 
+            /// while an Elder uses it for metadata.
+            max_storage_capacity: config.max_capacity(),
         };
 
-        let duties = NodeDuties::new(
-            keys.clone(),
-            age_level, 
-            routing.clone(), 
-            config.clone(),
+        let mut duties = NodeDuties::new(
+            id,
+            node_info,
+            routing.clone(),
         );
 
+        use AgeGroup::*;
+        match age_group {
+            Infant => None,
+            Adult => duties.process(node_ops::NodeDuty::BecomeAdult),
+            Elder => duties.process(node_ops::NodeDuty::BecomeElder),
+        };
+
         let node = Self {
-            id,
-            keys,
             duties,
             receiver,
             routing,
             rng,
         };
-
-        let is_elder = matches!(duties, AgeLevel::Elder { .. });
-        dump_state(is_elder, root_dir, id)?;
 
         Ok(node)
     }
@@ -186,7 +174,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 
     fn run_as_rewards(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.rewards().process(&duty)
+        self.duties.elder_duties()?.rewards().process(duty)
     }
 
     fn run_as_node(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
@@ -210,6 +198,6 @@ impl<R: CryptoRng + Rng> Node<R> {
 
 impl<R: CryptoRng + Rng> Display for Node<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.public_id())
+        write!(formatter, "{}", self.duties.id())
     }
 }

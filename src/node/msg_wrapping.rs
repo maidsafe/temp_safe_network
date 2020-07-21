@@ -13,7 +13,7 @@ use crate::{
 };
 use safe_nd::{
     AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NetworkCmdError, XorName, Address,
+    NodeCmdError, XorName, Address,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -101,7 +101,7 @@ impl ElderMsgWrapping {
 
     pub fn network_error(
         &self,
-        error: NetworkCmdError,
+        error: NodeCmdError,
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
@@ -149,11 +149,11 @@ impl MsgWrapping {
 
     pub fn network_error(
         &self,
-        error: NetworkCmdError,
+        error: NodeCmdError,
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
-        self.send(Message::NetworkCmdError {
+        self.send(Message::NodeCmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,

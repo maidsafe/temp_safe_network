@@ -20,7 +20,7 @@ use std::{
 pub(crate) struct DataPayment {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 /// An Elder in S(R) is responsible for
@@ -33,11 +33,11 @@ pub(crate) struct DataPayment {
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl DataPayment {
     pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
-        let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
+        let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
         Self {
             keys,
             replica,
-            decisions,
+            wrapping,
         }
     }
 
@@ -66,7 +66,7 @@ impl DataPayment {
         use TransferError::*;
         if recipient_is_not_section {
             let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
-            let result = self.decisions.error(error, msg.id(), msg.origin.address());
+            let result = self.wrapping.error(error, msg.id(), msg.origin.address());
             return result.map(|c| RunAsNode(ProcessMessaging(c)));
         }
         let registration = self.replica_mut().register(&payment);
@@ -75,11 +75,11 @@ impl DataPayment {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             },
-            Err(error) => Err(error), // not using TransferPropagation error, since that is for NetworkCmds, so wouldn't be returned to client.
+            Err(error) => Err(error), // not using TransferPropagation error, since that is for NodeCmds, so wouldn't be returned to client.
         };
         let result = match result {
-            Ok(_) => self.decisions.forward(msg),
-            Err(error) => self.decisions.error(
+            Ok(_) => self.wrapping.forward(msg),
+            Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferRegistration(error)),
                 msg.id(),
                 msg.origin.address(),

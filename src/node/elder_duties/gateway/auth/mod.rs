@@ -23,15 +23,15 @@ use std::fmt::{self, Display, Formatter};
 pub(super) struct Auth {
     keys: NodeKeys,
     auth_keys: AuthKeysDb,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Auth {
-    pub fn new(keys: NodeKeys, auth_keys: AuthKeysDb, decisions: ElderMsgWrapping) -> Self {
+    pub fn new(keys: NodeKeys, auth_keys: AuthKeysDb, wrapping: ElderMsgWrapping) -> Self {
         Self {
             keys,
             auth_keys,
-            decisions,
+            wrapping,
         }
     }
 
@@ -45,7 +45,7 @@ impl Auth {
         };
         use AuthCmd::*;
         match auth_cmd {
-            InsAuthKey { .. } | DelAuthKey { .. } => self.decisions.vote(msg),
+            InsAuthKey { .. } | DelAuthKey { .. } => self.wrapping.vote(msg),
         }
     }
 
@@ -96,7 +96,7 @@ impl Auth {
 
         if let Err(error) = result {
             return self
-                .decisions
+                .wrapping
                 .error(CmdError::Auth(error), msg.message.id(), msg.origin.address());
         }
         None
@@ -112,7 +112,7 @@ impl Auth {
             _ => return None,
         };
         let result = Ok(self.auth_keys.list_keys_and_version(msg.origin.id()));
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListAuthKeysAndVersion(result),
             id: MessageId::new(),
             /// ID of causing query.
@@ -140,7 +140,7 @@ impl Auth {
         };
         if let Err(error) = result {
             return self
-                .decisions
+                .wrapping
                 .error(CmdError::Auth(error), msg_id, origin.address());
         }
         None
@@ -154,7 +154,7 @@ impl Auth {
                 if self.is_valid_client_signature(&msg) {
                     None
                 } else {
-                    self.decisions.error(
+                    self.wrapping.error(
                         CmdError::Auth(NdError::AccessDenied),
                         msg.id(),
                         msg.origin.address(),

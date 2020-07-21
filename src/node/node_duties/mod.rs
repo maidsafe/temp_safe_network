@@ -13,66 +13,69 @@ mod accumulation;
 
 use network_events::NetworkEvents;
 use msg_analysis::NetworkMsgAnalysis;
-use accumulation::Accumulation;
 use crate::{
-    node::node_ops::{NodeDuty, GroupDecision, NodeOperation, MessagingDuty},
     node::{
+        node_ops::{NodeOperation, NodeDuty},
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
-        keys::NodeKeys,
-        node_duties::messaging::{Messaging, Receiver, Received},
+        node_duties::messaging::Messaging,
+        state_db::{AgeGroup, NodeInfo, dump_state},
     },
-    Config, Result,
 };
+use safe_nd::{NodeFullId, NodePublicId};
 use routing::Node as Routing;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
 
+
 #[allow(clippy::large_enum_variant)]
-pub enum AgeLevel {
+pub enum DutyLevel {
     Infant,
     Adult(AdultDuties),
     Elder(ElderDuties),
 }
 
 pub struct NodeDuties {
-    keys: NodeKeys,
-    age_level: AgeLevel,
+    id: NodeFullId,
+    node_info: NodeInfo,
+    duty_level: DutyLevel,
     network_events: NetworkEvents,
     messaging: Messaging,
     routing: Rc<RefCell<Routing>>,
-    root_dir: Path,
 }
 
 impl NodeDuties {
     
-    pub fn new(keys: NodeKeys, age_level: AgeLevel,
-        routing: Rc<RefCell<Routing>>, root_dir: Path) -> Self {
+    pub fn new(id: NodeFullId, node_info: NodeInfo, routing: Rc<RefCell<Routing>>) -> Self {
             let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
             let messaging = Messaging::new(routing.clone());
             Self {
-                keys,
-                age_level,
+                id,
+                node_info,
+                duty_level: DutyLevel::Infant,
                 network_events,
                 messaging,
                 routing,
-                root_dir,
             }
     }
 
+    pub fn id(&self) -> &NodePublicId {
+        self.id.public_id()
+    }
+
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
-        use AgeLevel::*;
-        match &mut self.age_level {
+        use DutyLevel::*;
+        match &mut self.duty_level {
             Adult(ref mut duties) => Some(duties),
             _ => None,
         }
     }
 
     pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
-        use AgeLevel::*;
-        match &mut self.age_level {
+        use DutyLevel::*;
+        match &mut self.duty_level {
             Elder(ref mut duties) => Some(duties),
             _ => None,
         }
@@ -89,33 +92,32 @@ impl NodeDuties {
     }
 
     fn become_adult(&mut self) -> Option<NodeOperation> {
-        use AgeLevel::*;
-        // let mut config = Config::default();
-        // config.set_root_dir(self.root_dir.clone());
+        use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
-        if let Ok(duties) = AdultDuties::new(self.keys.clone(), &self.root_dir, &total_used_space, Init::New) {
-            self.age_level = Adult(duties);
-            dump_state(false, root_dir, id)?;
+        if let Ok(duties) = AdultDuties::new(self.node_info.clone(), &total_used_space) {
+            self.duty_level = Adult(duties);
+            // NB: This is wrong, shouldn't write to disk here,
+            // let it be upper layer resp.
+            // Also, "Error-to-Unit" is not a good conversion..
+            dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
         }
         None
     }
 
     fn become_elder(&mut self) -> Option<NodeOperation> {
-        use AgeLevel::*;
-        // let mut config = Config::default();
-        // config.set_root_dir(self.root_dir.clone());
+        use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
 
         if let Ok(duties) = ElderDuties::new(
-            self.id.clone(),
-            self.keys.clone(),
-            &self.root_dir,
+            self.node_info.clone(),
             &total_used_space,
-            Init::New,
             self.routing.clone(),
         ) {
-            self.age_level = Elder(duties);
-            dump_state(true, &root_dir, id)?;
+            self.duty_level = Elder(duties);
+            // NB: This is wrong, shouldn't write to disk here,
+            // let it be upper layer resp.
+            // Also, "Error-to-Unit" is not a good conversion..
+            dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
         }
         None
     }

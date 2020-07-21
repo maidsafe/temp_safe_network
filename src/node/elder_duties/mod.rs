@@ -22,9 +22,10 @@ use self::{
 use crate::{
     node::node_ops::{NodeDuty, ElderDuty, NodeOperation, RewardDuty, MessagingDuty}, node::keys::NodeKeys,
     node::section_querying::SectionQuerying, node::state_db::Init, utils, Config, Result,
+    node::state_db::NodeInfo,
 };
 use routing::{Node as Routing, RoutingError};
-use safe_nd::{NodePublicId, XorName};
+use safe_nd::XorName;
 use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
@@ -45,25 +46,20 @@ pub(crate) struct ElderDuties {
 
 impl ElderDuties {
     pub fn new(
-        id: NodePublicId,
-        keys: NodeKeys,
-        root_dir: &Path,
+        info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
 
         let section_querying = SectionQuerying::new(routing.clone());
 
         // Gateway
-        let gateway = Gateway::new(id, keys.clone(), root_dir, init_mode, section_querying.clone())?;
+        let gateway = Gateway::new(info.clone(), section_querying.clone())?;
         
         // Metadata
         let metadata = Metadata::new(
-            keys.clone(),
-            root_dir,
+            info.clone(),
             &total_used_space,
-            init_mode,
             section_querying,
         )?;
 
@@ -71,19 +67,19 @@ impl ElderDuties {
         let replica_manager = Self::replica_manager(routing.clone())?;
 
         // Transfers
-        let transfers = Transfers::new(keys.clone(), replica_manager.clone());
+        let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
 
         // DataPayment
-        let data_payment = DataPayment::new(keys.clone(), replica_manager.clone());
+        let data_payment = DataPayment::new(info.keys.clone(), replica_manager.clone());
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
         let pk_set = replica_manager.borrow().replicas_pk_set().unwrap();
         let actor = TransferActor::new(keypair, pk_set, Validator {});
-        let rewards = Rewards::new(keys.clone(), actor);
+        let rewards = Rewards::new(info.keys.clone(), actor);
 
         Ok(Self {
-            keys,
+            keys: info.keys,
             gateway,
             metadata,
             transfers,

@@ -11,8 +11,8 @@ use crate::{
     node::node_ops::MessagingDuty,
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::state_db::Init,
-    Config, Result,
+    node::state_db::NodeInfo,
+    Result,
 };
 use safe_nd::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
@@ -24,34 +24,30 @@ use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
-    path::Path,
 };
 
 pub(super) struct SequenceStorage {
     keys: NodeKeys,
     chunks: SequenceChunkStore,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl SequenceStorage {
     pub(super) fn new(
-        keys: NodeKeys,
-        root_dir: &Path,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
-        decisions: ElderMsgWrapping,
+        wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
-        let max_capacity = config.max_capacity();
         let chunks = SequenceChunkStore::new(
-            root_dir,
-            max_capacity,
+            node_info.path(),
+            node_info.max_storage_capacity,
             Rc::clone(total_used_space),
-            init_mode,
+            node_info.init_mode,
         )?;
         Ok(Self {
-            keys,
+            keys: node_info.keys(),
             chunks,
-            decisions,
+            wrapping,
         })
     }
 
@@ -116,7 +112,7 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self.get_chunk(address, SequenceAction::Read, origin);
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequence(result),
             id: MessageId::new(),
             query_origin: origin.address(),
@@ -180,7 +176,7 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| sequence.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceRange(result),
             id: MessageId::new(),
             query_origin: origin.address(),
@@ -200,7 +196,7 @@ impl SequenceStorage {
                     Some(entry) => Ok((sequence.entries_index() - 1, entry.to_vec())),
                     None => Err(NdError::NoSuchEntry),
                 });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceLastEntry(result),
             id: MessageId::new(),
             query_origin: origin.address(),
@@ -220,7 +216,7 @@ impl SequenceStorage {
                 let index = sequence.owners_index() - 1;
                 sequence.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceOwner(result),
             id: MessageId::new(),
             query_origin: origin.address(),
@@ -241,7 +237,7 @@ impl SequenceStorage {
                 let index = sequence.permissions_index() - 1;
                 sequence.user_permissions(user, index)
             });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceUserPermissions(result),
             id: MessageId::new(),
             query_origin: origin.address(),
@@ -266,7 +262,7 @@ impl SequenceStorage {
                 };
                 Ok(res)
             });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequencePermissions(result),
             id: MessageId::new(),
             query_origin: origin.address(),
@@ -374,7 +370,7 @@ impl SequenceStorage {
             Ok(_) => return None,
             Err(error) => error,
         };
-        self.decisions.send(Message::CmdError {
+        self.wrapping.send(Message::CmdError {
             id: MessageId::new(),
             error: CmdError::Data(error),
             correlation_id: msg_id,

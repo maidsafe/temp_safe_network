@@ -10,8 +10,8 @@ use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
     node::node_ops::MessagingDuty,
     node::msg_wrapping::ElderMsgWrapping,
-    node::state_db::Init,
-    Config, Result,
+    node::state_db::NodeInfo,
+    Result,
 };
 use safe_nd::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
@@ -26,24 +26,22 @@ use std::{
 
 pub(super) struct AccountStorage {
     chunks: AccountChunkStore,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl AccountStorage {
     pub fn new(
-        root_dir: &Path,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
-        decisions: ElderMsgWrapping,
+        wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
-        let max_capacity = config.max_capacity();
         let chunks = AccountChunkStore::new(
-            root_dir,
-            max_capacity,
+            node_info.path(),
+            node_info.max_storage_capacity,
             Rc::clone(total_used_space),
-            init_mode,
+            node_info.init_mode,
         )?;
-        Ok(Self { chunks, decisions })
+        Ok(Self { chunks, wrapping })
     }
 
     pub(super) fn read(
@@ -62,7 +60,7 @@ impl AccountStorage {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
             response: QueryResponse::GetAccount(result),
             correlation_id: msg_id,
@@ -148,7 +146,7 @@ impl AccountStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         if let Err(error) = result {
-            return self.decisions.send(Message::CmdError {
+            return self.wrapping.send(Message::CmdError {
                 id: MessageId::new(),
                 error: CmdError::Data(error),
                 correlation_id: msg_id,

@@ -24,12 +24,12 @@ pub(crate) struct Validation {
 }
 
 impl Validation {
-    pub fn new(decisions: ElderMsgWrapping) -> Self {
+    pub fn new(wrapping: ElderMsgWrapping) -> Self {
         Self {
-            blobs: Blobs::new(decisions.clone()),
-            maps: Maps::new(decisions.clone()),
-            sequences: Sequences::new(decisions.clone()),
-            accounts: Accounts::new(decisions),
+            blobs: Blobs::new(wrapping.clone()),
+            maps: Maps::new(wrapping.clone()),
+            sequences: Sequences::new(wrapping.clone()),
+            accounts: Accounts::new(wrapping),
         }
     }
 
@@ -73,18 +73,18 @@ impl Validation {
 
 #[derive(Clone)]
 pub(crate) struct Sequences {
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Sequences {
-    pub fn new(decisions: ElderMsgWrapping) -> Self {
-        Self { decisions }
+    pub fn new(wrapping: ElderMsgWrapping) -> Self {
+        Self { wrapping }
     }
 
     // client query
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let _ = self.extract_read(msg)?;
-        self.decisions.forward(msg)
+        self.wrapping.forward(msg)
     }
 
     // on client request
@@ -110,13 +110,13 @@ impl Sequences {
                 self,
                 msg.origin.id()
             );
-            return self.decisions.error(
+            return self.wrapping.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
                 msg.origin.address(),
             );
         }
-        self.decisions.vote(msg)
+        self.wrapping.vote(msg)
     }
 
     // on client request
@@ -126,18 +126,18 @@ impl Sequences {
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
         if address.is_pub() {
-            return self.decisions.error(
+            return self.wrapping.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
                 msg.origin.address(),
             );
         }
-        self.decisions.vote(msg)
+        self.wrapping.vote(msg)
     }
 
     // on client request
     fn initiate_edit(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        self.decisions.vote(msg)
+        self.wrapping.vote(msg)
     }
 
     fn extract_read(&self, msg: &MsgEnvelope) -> Option<SequenceRead> {
@@ -177,18 +177,18 @@ impl Display for Sequences {
 
 #[derive(Clone)]
 pub(crate) struct Blobs {
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Blobs {
-    pub fn new(decisions: ElderMsgWrapping) -> Self {
-        Self { decisions }
+    pub fn new(wrapping: ElderMsgWrapping) -> Self {
+        Self { wrapping }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let _read = self.extract_read(msg)?;
-        self.decisions.forward(msg)
+        self.wrapping.forward(msg)
         // TODO: We don't check for the existence of a valid signature for published data,
         // since it's free for anyone to get.  However, as a means of spam prevention, we
         // could change this so that signatures are required, and the signatures would need
@@ -220,14 +220,14 @@ impl Blobs {
                     self,
                     msg.origin.id()
                 );
-                return self.decisions.error(
+                return self.wrapping.error(
                     CmdError::Data(NdError::InvalidOwners),
                     msg.id(),
                     msg.origin.address(),
                 );
             }
         }
-        self.decisions.vote(msg)
+        self.wrapping.vote(msg)
     }
 
     // on client request
@@ -237,9 +237,9 @@ impl Blobs {
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
         if address.kind() == BlobKind::Private {
-            self.decisions.vote(msg)
+            self.wrapping.vote(msg)
         } else {
-            self.decisions.error(
+            self.wrapping.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
                 msg.origin.address(),
@@ -284,18 +284,18 @@ impl Display for Blobs {
 
 #[derive(Clone)]
 pub(crate) struct Maps {
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Maps {
-    pub fn new(decisions: ElderMsgWrapping) -> Self {
-        Self { decisions }
+    pub fn new(wrapping: ElderMsgWrapping) -> Self {
+        Self { wrapping }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let _read = self.extract_read(msg)?;
-        self.decisions.forward(msg)
+        self.wrapping.forward(msg)
     }
 
     // on client request
@@ -305,7 +305,7 @@ impl Maps {
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
             Delete(..) | Edit { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
-                self.decisions.vote(msg)
+                self.wrapping.vote(msg)
             }
         }
     }
@@ -320,14 +320,14 @@ impl Maps {
                 self,
                 msg.origin.id()
             );
-            return self.decisions.error(
+            return self.wrapping.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
                 msg.origin.address(),
             );
         }
 
-        self.decisions.vote(msg)
+        self.wrapping.vote(msg)
     }
 
     fn extract_read(&self, msg: &MsgEnvelope) -> Option<MapRead> {
@@ -367,18 +367,18 @@ impl Display for Maps {
 
 #[derive(Clone)]
 pub(super) struct Accounts {
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Accounts {
-    pub fn new(decisions: ElderMsgWrapping) -> Self {
-        Self { decisions }
+    pub fn new(wrapping: ElderMsgWrapping) -> Self {
+        Self { wrapping }
     }
 
     // on client request
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if self.is_account_read(msg) {
-            self.decisions.vote(msg)
+            self.wrapping.vote(msg)
         } else {
             None
         }
@@ -388,13 +388,13 @@ impl Accounts {
     pub fn initiate_write(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let account = self.extract_account_write(msg)?;
         if !account.size_is_valid() {
-            return self.decisions.error(
+            return self.wrapping.error(
                 CmdError::Data(NdError::ExceededSize),
                 msg.id(),
                 msg.origin.address(),
             );
         }
-        self.decisions.vote(msg)
+        self.wrapping.vote(msg)
     }
 
     fn is_account_read(&self, msg: &MsgEnvelope) -> bool {

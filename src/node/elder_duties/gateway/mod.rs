@@ -18,14 +18,16 @@ use crate::{
     node::node_duties::messaging::{ClientMsgTracking, ClientInput, ClientMsg, Onboarding, InputParsing},
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::state_db::Init,
+    node::state_db::NodeInfo,
     Config, Result,
 };
+use rand_chacha::ChaChaRng;
+use rand_core::SeedableRng;
 use routing::TransportEvent as ClientEvent;
 use bytes::Bytes;
 use log::{trace, error, info};
 use rand::CryptoRng;
-use safe_nd::{Cmd, Address, AuthCmd, ElderDuties, Message, MsgEnvelope, PublicId, NodePublicId, Query};
+use safe_nd::{Cmd, Address, AuthCmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -44,24 +46,21 @@ pub(crate) struct Gateway {
 
 impl Gateway {
     pub fn new(
-        id: NodePublicId,
-        keys: NodeKeys,
-        root_dir: &Path,
-        init_mode: Init,
+        info: NodeInfo,
         section: SectionQuerying,
     ) -> Result<Self> {
-        let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
+        let auth_keys_db = AuthKeysDb::new(info.root_dir, info.init_mode)?;
 
-        let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Gateway);
-        let auth = Auth::new(keys.clone(), auth_keys_db, decisions.clone());
-        let data = Validation::new(decisions);
+        let wrapping = ElderMsgWrapping::new(info.keys.clone(), ElderDuties::Gateway);
+        let auth = Auth::new(info.keys.clone(), auth_keys_db, wrapping.clone());
+        let data = Validation::new(wrapping);
 
-        let onboarding = Onboarding::new(id.clone());
+        let onboarding = Onboarding::new(info.id.clone());
         let input_parsing = InputParsing::new();
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {
-            keys,
+            keys: info.keys,
             auth,
             data,
             section,
@@ -116,7 +115,7 @@ impl Gateway {
         }
     }
 
-    /// Will only act on this (i.e. return an action) if node is currently an Elder.
+    /// This is where client input is parsed.
     fn process_client_event(&mut self, event: &ClientEvent) -> Option<MessagingDuty> {
         use ClientEvent::*;
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
@@ -138,8 +137,8 @@ impl Gateway {
                             return result;
                         }
                     }
-                    ClientInput::Handshake(hs) => {
-                        self.onboarding.process(hs, peer.peer_addr(), &mut rng)
+                    ClientInput::Handshake(request) => {
+                        self.onboarding.process(request, peer.peer_addr(), &mut rng)
                     }
                 }
                 
@@ -153,7 +152,7 @@ impl Gateway {
                 );
             }
             UnsentUserMessage { peer, .. } => {
-                info!("{}: Not sent Message to: {}", self, peer.peer_addr());
+                info!("{}: Could not send message to: {}", self, peer.peer_addr());
             }
             BootstrapFailure | BootstrappedTo { .. } => {
                 error!("Unexpected bootstrapping client event")
@@ -197,13 +196,6 @@ impl Gateway {
             _ => None, // error..!
         }
     }
-
-        // pub fn push_to_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-    //     // TODO: Handle this result
-    //     let _ = self.messaging.send_to_client(msg);
-    //     None
-    // }
-
 }
 
 impl Display for Gateway {

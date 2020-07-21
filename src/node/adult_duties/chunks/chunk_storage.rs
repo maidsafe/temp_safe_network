@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping, node_ops::MessagingDuty};
-use crate::{chunk_store::BlobChunkStor, node::state_db::Init, Config, Result};
+use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
 use log::{error, info};
 use safe_nd::{
     AdultDuties, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId, MsgSender,
-    NetworkCmdError, NetworkDataError, NetworkEvent, QueryResponse, Result as NdResult, Signature,
+    NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
     cell::Cell,
@@ -21,30 +21,26 @@ use std::{
 
 pub(crate) struct ChunkStorage {
     keys: NodeKeys,
-    chunks: BlobChunkStor,
-    decisions: AdultMsgWrapping,
+    chunks: BlobChunkStore,
+    wrapping: AdultMsgWrapping,
 }
 
 impl ChunkStorage {
     pub(crate) fn new(
-        keys: NodeKeys,
-        config: &Config,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
     ) -> Result<Self> {
-        let root_dir = config.root_dir()?;
-        let max_capacity = config.max_capacity();
-        let chunks = BlobChunkStor::new(
-            &root_dir,
-            max_capacity,
+        let chunks = BlobChunkStore::new(
+            node_info.path(),
+            node_info.max_storage_capacity,
             Rc::clone(total_used_space),
-            init_mode,
+            node_info.init_mode,
         )?;
-        let decisions = AdultMsgWrapping::new(keys.clone(), AdultDuties::ChunkStorage);
+        let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);
         Ok(Self {
-            keys,
+            keys: node_info.keys(),
             chunks,
-            decisions,
+            wrapping,
         })
     }
 
@@ -55,7 +51,7 @@ impl ChunkStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         if let Err(error) = self.try_store(data) {
-            return self.decisions.error(CmdError::Data(error), msg_id, origin.address());
+            return self.wrapping.error(CmdError::Data(error), msg_id, origin.address());
         }
         None
     }
@@ -68,17 +64,17 @@ impl ChunkStorage {
         accumulated_signature: &Signature,
     ) -> Option<MessagingDuty> {
         let message = match self.try_store(data) {
-            Ok(()) => Message::NetworkEvent {
-                event: NetworkEvent::DuplicationComplete {
+            Ok(()) => Message::NodeEvent {
+                event: NodeEvent::DuplicationComplete {
                     chunk: *data.address(),
                     proof: accumulated_signature.clone(),
                 },
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(error) => Message::NetworkCmdError {
+            Err(error) => Message::NodeCmdError {
                 id: MessageId::new(),
-                error: NetworkCmdError::Data(NetworkDataError::ChunkDuplication {
+                error: NodeCmdError::Data(NodeDataError::ChunkDuplication {
                     address: *data.address(),
                     error,
                 }),
@@ -86,7 +82,7 @@ impl ChunkStorage {
                 cmd_origin: origin.address(),
             },
         };
-        self.decisions.send(message)
+        self.wrapping.send(message)
     }
 
     fn try_store(&mut self, data: &Blob) -> NdResult<()> {
@@ -113,7 +109,7 @@ impl ChunkStorage {
             .chunks
             .get(&address)
             .map_err(|error| error.to_string().into());
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
             response: QueryResponse::GetBlob(result),
             correlation_id: msg_id,
@@ -172,7 +168,7 @@ impl ChunkStorage {
         };
 
         if let Err(error) = result {
-            return self.decisions.error(CmdError::Data(error), msg_id, origin.address());
+            return self.wrapping.error(CmdError::Data(error), msg_id, origin.address());
         }
         None
     }

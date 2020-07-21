@@ -10,8 +10,8 @@ use crate::{
     chunk_store::{error::Error as ChunkStoreError, MapChunkStore},
     node::node_ops::MessagingDuty,
     node::msg_wrapping::ElderMsgWrapping,
-    node::state_db::Init,
-    Config, Result,
+    node::state_db::NodeInfo,
+    Result,
 };
 use safe_nd::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions,
@@ -22,29 +22,26 @@ use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
-    path::Path,
 };
 
 pub(super) struct MapStorage {
     chunks: MapChunkStore,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl MapStorage {
     pub(super) fn new(
-        root_dir: &Path,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
-        decisions: ElderMsgWrapping,
+        wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
-        let max_capacity = config.max_capacity();
         let chunks = MapChunkStore::new(
-            root_dir,
-            max_capacity,
+            node_info.path(),
+            node_info.max_storage_capacity,
             Rc::clone(total_used_space),
-            init_mode,
+            node_info.init_mode,
         )?;
-        Ok(Self { chunks, decisions })
+        Ok(Self { chunks, wrapping })
     }
 
     pub(super) fn read(&self, read: &MapRead, msg: &MsgEnvelope) -> Option<MessagingDuty> {
@@ -236,7 +233,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self.get_chunk(&address, origin, MapAction::Read)?;
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMap(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -254,7 +251,7 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.shell());
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMapShell(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -272,7 +269,7 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.version());
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMapVersion(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -301,7 +298,7 @@ impl MapStorage {
                 .map(MapValue::from)
                 .ok_or_else(|| NdError::NoSuchEntry),
         });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMapValue(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -319,7 +316,7 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.keys());
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapKeys(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -339,7 +336,7 @@ impl MapStorage {
             Map::Seq(map) => Ok(map.values().into()),
             Map::Unseq(map) => Ok(map.values().into()),
         });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapValues(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -359,7 +356,7 @@ impl MapStorage {
             Map::Seq(map) => Ok(map.entries().clone().into()),
             Map::Unseq(map) => Ok(map.entries().clone().into()),
         });
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapEntries(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -377,7 +374,7 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.permissions());
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapPermissions(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -396,7 +393,7 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MapPermissionSet::clone));
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapUserPermissions(result),
             id: MessageId::new(),
             correlation_id: msg_id,
@@ -411,7 +408,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         if let Err(error) = result {
-            self.decisions.error(CmdError::Data(error), msg_id, origin.address())
+            self.wrapping.error(CmdError::Data(error), msg_id, origin.address())
         } else {
             None
         }

@@ -38,7 +38,7 @@ const CHUNK_STORE_DIR: &str = "chunks";
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 
-pub(crate) type BlobChunkStor = ChunkStore<Blob>;
+pub(crate) type BlobChunkStore = ChunkStore<Blob>;
 pub(crate) type MapChunkStore = ChunkStore<Map>;
 pub(crate) type SequenceChunkStore = ChunkStore<Sequence>;
 pub(crate) type AccountChunkStore = ChunkStore<Account>;
@@ -190,7 +190,7 @@ pub(crate) trait Subdir {
     fn subdir() -> &'static Path;
 }
 
-impl Subdir for BlobChunkStor {
+impl Subdir for BlobChunkStore {
     fn subdir() -> &'static Path {
         Path::new("immutable")
     }

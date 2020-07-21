@@ -15,8 +15,8 @@ pub use self::{system::FarmingSystem, validator::Validator};
 use crate::{node::node_ops::{NodeDuty, NodeOperation, MessagingDuty, RewardDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_farming::{Accumulation, StorageRewards};
 use safe_nd::{
-    AccountId, ElderDuties, Error, Message, MessageId, Money, Address, NetworkCmd, NetworkCmdError,
-    NetworkEvent, NetworkRewardError, RewardCounter, XorName, NetworkRewardCmd,
+    AccountId, ElderDuties, Error, Message, MessageId, Money, Address, NodeCmd, NodeCmdError,
+    NodeEvent, NodeRewardError, RewardCounter, XorName, NodeRewardCmd,
 };
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
@@ -25,7 +25,7 @@ pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
     node_accounts: HashMap<XorName, RewardAccount>,
     section_funds: SectionFunds,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 #[derive(PartialEq)]
@@ -43,17 +43,17 @@ pub enum RewardAccount {
 
 impl Rewards {
     pub fn new(keys: NodeKeys, actor: TransferActor<Validator>) -> Self {
-        let decisions = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
+        let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
         let acc = Accumulation::new(Default::default(), Default::default());
         let base_cost = Money::from_nano(1);
         let algo = StorageRewards::new(base_cost);
         let farming = FarmingSystem::new(algo, acc);
-        let section_funds = SectionFunds::new(actor, decisions.clone());
+        let section_funds = SectionFunds::new(actor, wrapping.clone());
         Self {
             farming,
             node_accounts: Default::default(),
             section_funds,
-            decisions,
+            wrapping,
         }
     }
 
@@ -102,14 +102,14 @@ impl Rewards {
         old_node_id: XorName,
         new_node_id: XorName,
     ) -> Option<MessagingDuty> {
-        use NetworkCmd::*;
-        use NetworkRewardCmd::*;
+        use NodeCmd::*;
+        use NodeRewardCmd::*;
 
         let _ = self
             .node_accounts
             .insert(new_node_id, RewardAccount::AwaitingStart);
 
-        self.decisions.send(Message::NetworkCmd {
+        self.wrapping.send(Message::NodeCmd {
             cmd: Rewards(ClaimRewardCounter {
                 old_node_id,
                 new_node_id,
@@ -187,7 +187,7 @@ impl Rewards {
         let factor = 2.0;
         match self.farming.reward(data_hash, num_bytes, factor) {
             Ok(_) => None,
-            Err(_err) => None, // todo: NetworkCmdError. Or not? This is an internal thing..
+            Err(_err) => None, // todo: NodeCmdError. Or not? This is an internal thing..
         }
     }
 
@@ -217,15 +217,15 @@ impl Rewards {
         msg_id: MessageId,
         origin: &Address,
     ) -> Option<MessagingDuty> {
-        use NetworkCmdError::*;
-        use NetworkRewardError::*;
+        use NodeCmdError::*;
+        use NodeRewardError::*;
 
         let account_id = match self.node_accounts.get(&old_node_id) {
             Some(RewardAccount::AwaitingMove(id)) => *id,
             Some(RewardAccount::Active(id)) => {
                 // ..means the node has not left, and was not
                 // marked as awaiting move..
-                return self.decisions.network_error(
+                return self.wrapping.network_error(
                     Rewards(RewardClaiming {
                         error: Error::NetworkOther(
                             "InvalidClaim: Account is not awaiting move.".to_string(),
@@ -244,7 +244,7 @@ impl Rewards {
         let counter = match self.farming.claim(account_id) {
             Ok(counter) => counter,
             Err(error) => {
-                return self.decisions.network_error(
+                return self.wrapping.network_error(
                     Rewards(RewardClaiming { error, account_id }),
                     msg_id,
                     *origin,
@@ -261,8 +261,8 @@ impl Rewards {
         // will pay out any accumulated rewards to the account.
         // From there on, they accumulate rewards for the node
         // until it is being relocated again.
-        self.decisions.send(Message::NetworkEvent {
-            event: NetworkEvent::RewardCounterClaimed {
+        self.wrapping.send(Message::NodeEvent {
+            event: NodeEvent::RewardCounterClaimed {
                 new_node_id,
                 account_id,
                 counter,

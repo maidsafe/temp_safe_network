@@ -8,13 +8,13 @@
 
 use crate::{
     node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping,
-    node::section_querying::SectionQuerying, node::Init, utils, Config, Result, ToDbKey,
+    node::section_querying::SectionQuerying, node::NodeInfo, utils, Config, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     BlobRead, BlobWrite, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId,
-    MsgEnvelope, NetworkCmd, PublicKey, QueryResponse, Result as NdResult, XorName, NetworkDataCmd,
+    MsgEnvelope, NodeCmd, PublicKey, QueryResponse, Result as NdResult, XorName, NodeDataCmd,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -24,12 +24,12 @@ use std::{
 };
 use tiny_keccak::sha3_256;
 
-const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
+const BLOB_META_DB_NAME: &str = "immutable_data.db";
 const HOLDER_META_DB_NAME: &str = "holder_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
-// The number of separate copies of an ImmutableData chunk which should be maintained.
-const IMMUTABLE_DATA_COPY_COUNT: usize = 4;
-const IMMUTABLE_DATA_ADULT_COPY_COUNT: usize = 3;
+// The number of separate copies of a blob chunk which should be maintained.
+const CHUNK_COPY_COUNT: usize = 4;
+const CHUNK_ADULT_COPY_COUNT: usize = 3;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct ChunkMetadata {
@@ -47,28 +47,27 @@ pub(super) struct BlobRegister {
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
     section_querying: SectionQuerying,
 }
 
 impl BlobRegister {
     pub(super) fn new(
-        root_dir: &Path,
-        init_mode: Init,
-        decisions: ElderMsgWrapping,
+        node_info: NodeInfo,
+        wrapping: ElderMsgWrapping,
         section_querying: SectionQuerying,
     ) -> Result<Self> {
         //let root_dir = config.root_dir()?;
-        let metadata = utils::new_db(root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
-        let holders = utils::new_db(root_dir, HOLDER_META_DB_NAME, init_mode)?;
-        let full_adults = utils::new_db(root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
+        let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
+        let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
+        let full_adults = utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode)?;
 
         Ok(Self {
             metadata,
             holders,
             full_adults,
             section_querying,
-            decisions,
+            wrapping,
         })
     }
 
@@ -82,7 +81,7 @@ impl BlobRegister {
 
     fn store(&mut self, data: Blob, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
-            self.decisions.send(Message::CmdError {
+            self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
                 cmd_origin: msg.origin.address(),
@@ -93,7 +92,7 @@ impl BlobRegister {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
         let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()) {
-            if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
+            if metadata.holders.len() == CHUNK_COPY_COUNT {
                 if data.is_pub() {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
                     return None;
@@ -110,7 +109,7 @@ impl BlobRegister {
 
                 for holder_xorname in closest_holders {
                     if !existing_holders.contains(&holder_xorname)
-                        && existing_holders.len() < IMMUTABLE_DATA_COPY_COUNT
+                        && existing_holders.len() < CHUNK_COPY_COUNT
                     {
                         let _ = existing_holders.insert(holder_xorname);
                     }
@@ -126,12 +125,12 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        self.decisions.send_to_adults(target_holders, msg)
+        self.wrapping.send_to_adults(target_holders, msg)
     }
 
     fn delete(&mut self, address: BlobAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
-            self.decisions.send(Message::CmdError {
+            self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
                 cmd_origin: msg.origin.address(),
@@ -150,7 +149,7 @@ impl BlobRegister {
             }
         };
 
-        self.decisions.send_to_adults(metadata.holders, msg)
+        self.wrapping.send_to_adults(metadata.holders, msg)
     }
 
     pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<MessagingDuty>> {
@@ -174,8 +173,8 @@ impl BlobRegister {
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
     ) -> Vec<MessagingDuty> {
-        use NetworkCmd::*;
-        use NetworkDataCmd::*;
+        use NodeCmd::*;
+        use NodeDataCmd::*;
         
         self.get_new_holders_for_chunk(&address)
             .into_iter()
@@ -184,7 +183,7 @@ impl BlobRegister {
                 hash_bytes.extend_from_slice(&address.name().0);
                 hash_bytes.extend_from_slice(&new_holder.0);
                 let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
-                Message::NetworkCmd {
+                Message::NodeCmd {
                     cmd: Data(DuplicateChunk {
                         new_holder,
                         address,
@@ -193,7 +192,7 @@ impl BlobRegister {
                     id: message_id,
                 }
             })
-            .filter_map(|message| self.decisions.send(message))
+            .filter_map(|message| self.wrapping.send(message))
             .collect()
     }
 
@@ -206,7 +205,7 @@ impl BlobRegister {
 
     fn get(&self, address: BlobAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         let query_error = |error: NdError| {
-            self.decisions.send(Message::QueryResponse {
+            self.wrapping.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
                 id: MessageId::new(),
                 query_origin: msg.origin.address(),
@@ -225,7 +224,7 @@ impl BlobRegister {
             }
         };
 
-        self.decisions.send_to_adults(metadata.holders, msg)
+        self.wrapping.send_to_adults(metadata.holders, msg)
     }
 
     pub(super) fn update_holders(
@@ -525,12 +524,12 @@ impl BlobRegister {
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        let take = IMMUTABLE_DATA_ADULT_COPY_COUNT;
+        let take = CHUNK_ADULT_COPY_COUNT;
         let mut closest_adults = self
             .section_querying
             .our_adults_sorted_by_distance_to(&target, take);
-        if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
-            let take = IMMUTABLE_DATA_COPY_COUNT - closest_adults.len();
+        if closest_adults.len() < CHUNK_COPY_COUNT {
+            let take = CHUNK_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
                 .section_querying
                 .our_elders_sorted_by_distance_to(&target, take);

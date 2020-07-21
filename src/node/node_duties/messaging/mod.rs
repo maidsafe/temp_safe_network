@@ -3,6 +3,7 @@ pub mod client_sender;
 pub mod network_sender;
 pub mod receiver;
 
+pub use receiver::{Receiver, Received};
 use crate::node::node_ops::{NodeOperation, NodeDuty, MessagingDuty};
 use client_sender::ClientSender;
 use network_sender::NetworkSender;

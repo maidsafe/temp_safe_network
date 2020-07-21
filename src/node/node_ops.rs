@@ -215,91 +215,70 @@ pub enum RewardDuty {
 ///
 pub enum TransferDuty {
     ///
-    ProcessQuery(InternalTransferQuery),
+    ProcessQuery {
+        query: TransferQuery,
+        ///
+        msg_id: MessageId, 
+        ///
+        origin: Address,
+    },
     ///
-    ProcessCmd(InternalTransferCmd)
+    ProcessCmd { 
+        cmd: TransferCmd,
+        ///
+        msg_id: MessageId, 
+        ///
+        origin: Address,
+    }
 }
 
-pub enum InternalTransferQuery {
+pub enum TransferQuery {
     /// Get the PublicKeySet for replicas of a given PK
-    GetReplicaKeys {
-        ///
-        account_id: PublicKey,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
-    },
+    GetReplicaKeys(AccountId),
     /// Get key balance.
-    GetBalance {
-        ///
-        account_id: PublicKey,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
-    },
+    GetBalance(AccountId),
     /// Get key transfers since specified version.
     GetHistory {
         /// The balance key.
-        at: PublicKey,
+        at: AccountId,
         /// The last version of transfers we know of.
         since_version: usize,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
     },
 }
 
-pub enum InternalTransferCmd {
+pub enum TransferCmd {
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout
-    SimulatePayout {
-        ///
-        transfer: Transfer,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
-    },
+    SimulatePayout(Transfer),
     /// The cmd to validate a transfer.
-    ValidateTransfer {
-        ///
-        signed_transfer: SignedTransfer,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
-    },
+    ValidateTransfer(SignedTransfer),
     /// The cmd to register the consensused transfer.
-    RegisterTransfer {
-        ///
-        debit_agreement: DebitAgreementProof,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
-    },
+    RegisterTransfer(DebitAgreementProof),
     ///
-    PropagateTransfer {
-        ///
-        debit_agreement: DebitAgreementProof,
-        ///
-        msg_id: MessageId, 
-        ///
-        origin: Address,
-    },
+    PropagateTransfer(DebitAgreementProof),
     ///
-    InitiateRewardPayout {
-        signed_transfer: SignedTransfer,
-        msg_id: MessageId, 
-        origin: Address,
-    },
+    InitiateRewardPayout(SignedTransfer),
     ///
-    FinaliseRewardPayout {
-        debit_agreement: DebitAgreementProof,
-        msg_id: MessageId, 
-        origin: Address,
-    },
+    FinaliseRewardPayout(DebitAgreementProof),
+}
+
+impl From<safe_nd::TransferCmd> for TransferCmd {
+    fn from(cmd: safe_nd::TransferCmd) -> Self {
+        match cmd {
+            #[cfg(feature = "simulated-payouts")]
+            safe_nd::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+            safe_nd::TransferCmd::ValidateTransfer(signed_transfer) => Self::ValidateTransfer(signed_transfer),
+            safe_nd::TransferCmd::RegisterTransfer(debit_agreement) => Self::RegisterTransfer(debit_agreement),
+        }
+    }
+}
+
+impl From<safe_nd::TransferQuery> for TransferQuery {
+    fn from(cmd: safe_nd::TransferQuery) -> Self {
+        match cmd {
+            safe_nd::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
+            safe_nd::TransferQuery::GetBalance(signed_transfer) => Self::GetBalance(signed_transfer),
+            safe_nd::TransferQuery::GetHistory { at, since_version } => Self::GetHistory { at, since_version },
+        }
+    }
 }

@@ -9,11 +9,11 @@
 pub mod replica_manager;
 
 pub use self::replica_manager::ReplicaManager;
-use crate::{node::node_ops::{NodeDuty, TransferDuty, NodeOperation, MessagingDuty, InternalTransferCmd, InternalTransferQuery}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::node_ops::{NodeDuty, TransferCmd, TransferQuery, TransferDuty, NodeOperation, MessagingDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
 use safe_nd::{
     Address, Cmd, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, MsgEnvelope,
-    MsgSender, NetworkCmd, NetworkCmdError, NetworkTransferError, PublicKey, Query, QueryResponse,
-    SignedTransfer, TransferCmd, TransferError, TransferQuery, NetworkTransferCmd,
+    MsgSender, NodeCmd, NodeCmdError, NodeTransferError, PublicKey, Query, QueryResponse,
+    SignedTransfer, TransferError, NodeTransferCmd,
 };
 use std::{
     cell::RefCell,
@@ -49,16 +49,16 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 pub(crate) struct Transfers {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Transfers {
     pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
-        let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Transfer);
+        let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Transfer);
         Self {
             keys,
             replica,
-            decisions,
+            wrapping,
         }
     }
 
@@ -79,11 +79,20 @@ impl Transfers {
     /// section, the actual business logic is executed.
     pub fn process(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
+        use TransferDuty::*;
         use NodeOperation::*;
         
         let result = match duty {
-            ProcessQuery(query) => self.process_query(query),
-            ProcessCmd(cmd) => self.process_cmd(cmd),
+            ProcessQuery {
+                query,
+                msg_id,
+                origin,
+            } => self.process_query(query, *msg_id, *origin),
+            ProcessCmd {
+                cmd,
+                msg_id,
+                origin,
+            } => self.process_cmd(cmd, *msg_id, *origin),
         };
         
         result.map(|c| RunAsNode(ProcessMessaging(c)))
@@ -91,120 +100,91 @@ impl Transfers {
 
     fn process_query(
         &mut self,
-        query: InternalTransferQuery,
+        query: &TransferQuery,
+        msg_id: MessageId,
+        origin: Address,
     ) -> Option<MessagingDuty> {
-        use InternalTransferQuery::*;
-        let result = match query {
-            GetReplicaKeys {
-                account_id,
-                msg_id, 
-                origin,
-            } => self.get_replica_pks(public_key, msg),
-            GetBalance {
-                account_id,
-                msg_id, 
-                origin,
-            } => self.balance(public_key, msg),
+        use TransferQuery::*;
+        match query {
+            GetReplicaKeys(account_id) => self.get_replica_pks(account_id, msg_id, origin),
+            GetBalance(account_id) => self.balance(account_id, msg_id, origin),
             GetHistory {
                 at,
                 since_version,
-                msg_id, 
-                origin,
-            } => self.history(at, since_version, msg),
-        };
+            } => self.history(at, *since_version, msg_id, origin),
+        }
     }
 
-    fn process_cmd(&mut self, cmd: InternalTransferCmd) {
-        use InternalTransferCmd::*;
+    fn process_cmd(&mut self, cmd: &TransferCmd, 
+        msg_id: MessageId,
+        origin: Address,) -> Option<MessagingDuty> {
+        use TransferCmd::*;
         match cmd {
             #[cfg(feature = "simulated-payouts")]
             /// Cmd to simulate a farming payout
-            SimulatePayout {
-                transfer,
-                msg_id, 
-                origin,
-            } => self
+            SimulatePayout(transfer) => self
                 .replica
                 .borrow_mut()
                 .credit_without_proof(transfer, msg_id, origin),
-            ValidateTransfer {
-                signed_transfer,
-                msg_id, 
-                origin,
-            } => self.validate(signed_transfer, msg_id, origin),
-            RegisterTransfer {
-                debit_agreement,
-                msg_id, 
-                origin,
-            } => self.register(&debit_agreement, msg_id, origin),
-            PropagateTransfer {
-                debit_agreement,
-                msg_id, 
-                origin,
-            } => self.receive_propagated(&debit_agreement, msg_id, origin),
-            InitiateRewardPayout {
-                signed_transfer,
-                msg_id, 
-                origin,
-            } => None, // TODO
-            FinaliseRewardPayout {
-                debit_agreement,
-                msg_id, 
-                origin,
-            } => self.finalise_reward_payout(&debit_agreement, msg_id, origin),
+            ValidateTransfer(signed_transfer) => self.validate(signed_transfer.clone(), msg_id, origin),
+            RegisterTransfer(debit_agreement) => self.register(&debit_agreement, msg_id, origin),
+            PropagateTransfer(debit_agreement) => self.receive_propagated(&debit_agreement, msg_id, origin),
+            InitiateRewardPayout(signed_transfer) => None, // TODO
+            FinaliseRewardPayout(debit_agreement) => self.finalise_reward_payout(&debit_agreement, msg_id, origin),
         }
     }
 
     /// Get the PublicKeySet of our replicas
-    fn get_replica_pks(&self, _public_key: PublicKey, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn get_replica_pks(&self, _account_id: &PublicKey, msg_id: MessageId, origin: Address) -> Option<MessagingDuty> {
         // validate signature
         let result = match self.replica.borrow().replicas_pk_set() {
             None => Err(Error::NoSuchKey),
             Some(keys) => Ok(keys),
         };
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetReplicaKeys(result),
             id: MessageId::new(),
-            correlation_id: msg.id(),
-            query_origin: msg.origin.address(),
+            correlation_id: msg_id,
+            query_origin: origin,
         })
     }
 
-    fn balance(&self, public_key: PublicKey, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn balance(&self, account_id: &PublicKey, msg_id: MessageId, origin: Address) -> Option<MessagingDuty> {
         // validate signature
         let result = self
             .replica
             .borrow()
-            .balance(&public_key)
+            .balance(account_id)
             .ok_or(Error::NoSuchBalance);
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetBalance(result),
             id: MessageId::new(),
-            correlation_id: msg.id(),
-            query_origin: msg.origin.address(),
+            correlation_id: msg_id,
+            query_origin: origin,
         })
     }
 
     fn history(
         &self,
-        public_key: PublicKey,
+        account_id: &PublicKey,
         _since_version: usize,
-        msg: &MsgEnvelope,
+        msg_id: MessageId, 
+        origin: Address
     ) -> Option<MessagingDuty> {
         // validate signature
         let result = match self
             .replica
             .borrow()
-            .history(&public_key) // since_version
+            .history(account_id) // since_version
         {
             None => Ok(vec![]),
             Some(history) => Ok(history.clone()),
         };
-        self.decisions.send(Message::QueryResponse {
+        self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetHistory(result),
             id: MessageId::new(),
-            correlation_id: msg.id(),
-            query_origin: msg.origin.address(),
+            correlation_id: msg_id,
+            query_origin: origin,
         })
     }
 
@@ -221,7 +201,7 @@ impl Transfers {
             Ok(None) => return None,
             Ok(Some(event)) => Message::Event {
                 event: Event::TransferValidated {
-                    client: (*origin.id()).into(),
+                    client: origin.xorname(),
                     event,
                 },
                 id: MessageId::new(),
@@ -234,7 +214,7 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.decisions.send(message)
+        self.wrapping.send(message)
     }
 
     /// Registration of a transfer is requested,
@@ -245,12 +225,12 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
-        use NetworkCmd::*;
-        use NetworkTransferCmd::*;
+        use NodeCmd::*;
+        use NodeTransferCmd::*;
 
         let message = match self.replica.borrow_mut().register(proof) {
             Ok(None) => return None,
-            Ok(Some(event)) => Message::NetworkCmd {
+            Ok(Some(event)) => Message::NodeCmd {
                 cmd: Transfers(PropagateTransfer(event.debit_proof)),
                 id: MessageId::new(),
             },
@@ -261,7 +241,7 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.decisions.send(message)
+        self.wrapping.send(message)
     }
 
     /// The only step that is triggered by a Replica.
@@ -274,36 +254,37 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
-        use NetworkTransferError::*;
+        use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.borrow_mut().receive_propagated(proof) {
             Ok(_) => return None,
             // self.send(Message {
             //     event: Event::TransferReceived
             // }),
-            Err(err) => Message::NetworkCmdError {
-                error: NetworkCmdError::Transfers(TransferPropagation(err)),
+            Err(err) => Message::NodeCmdError {
+                error: NodeCmdError::Transfers(TransferPropagation(err)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
                 cmd_origin: origin,
             },
         };
-        self.decisions.send(message)
+        self.wrapping.send(message)
     }
 
     fn finalise_reward_payout(&mut self, debit_agreement: &DebitAgreementProof,
         msg_id: MessageId, 
         origin: Address) -> Option<MessagingDuty> {
+        use NodeTransferCmd::*;
         match self.replica.borrow_mut().register(&debit_agreement) {
             Ok(None) => None,
             Ok(Some(event)) => {
                 // the transfer is then propagated, and will reach the recipient section
-                self.decisions.send(Message::NetworkCmd {
-                    cmd: NetworkCmd::Transfers(PropagateTransfer(event.debit_proof)),
+                self.wrapping.send(Message::NodeCmd {
+                    cmd: NodeCmd::Transfers(PropagateTransfer(event.debit_proof)),
                     id: MessageId::new(),
                 })
             }
-            Err(error) => self.decisions.error(
+            Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferError::TransferRegistration(error)),
                 msg_id,
                 origin,

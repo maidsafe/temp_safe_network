@@ -16,7 +16,7 @@ mod writing;
 
 use crate::{
     node::node_ops::{NodeDuty, NodeOperation, MessagingDuty, MetadataDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping,
-    node::section_querying::SectionQuerying, node::state_db::Init, Config, Result,
+    node::section_querying::SectionQuerying, node::state_db::NodeInfo, Result,
 };
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
@@ -29,7 +29,6 @@ use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
-    path::Path,
 };
 use writing::Writing;
 
@@ -43,29 +42,25 @@ use writing::Writing;
 pub(crate) struct Metadata {
     keys: NodeKeys,
     elder_stores: ElderStores,
-    decisions: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping,
 }
 
 impl Metadata {
     pub fn new(
-        keys: NodeKeys,
-        root_dir: &Path,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
         section_querying: SectionQuerying,
     ) -> Result<Self> {
-        let decisions = ElderMsgWrapping::new(keys.clone(), ElderDuties::Metadata);
+        let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
         let account_storage =
-            AccountStorage::new(root_dir, total_used_space, init_mode, decisions.clone())?;
+            AccountStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
         let blob_register =
-            BlobRegister::new(root_dir, init_mode, decisions.clone(), section_querying)?;
-        let map_storage = MapStorage::new(root_dir, total_used_space, init_mode, decisions.clone())?;
+            BlobRegister::new(node_info.clone(), wrapping.clone(), section_querying)?;
+        let map_storage = MapStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
         let sequence_storage = SequenceStorage::new(
-            keys.clone(),
-            root_dir,
+            node_info.clone(),
             total_used_space,
-            init_mode,
-            decisions.clone(),
+            wrapping.clone(),
         )?;
         let elder_stores = ElderStores::new(
             account_storage,
@@ -74,9 +69,9 @@ impl Metadata {
             sequence_storage,
         );
         Ok(Self {
-            keys,
+            keys: node_info.keys(),
             elder_stores,
-            decisions,
+            wrapping,
         })
     }
 

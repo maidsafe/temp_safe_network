@@ -9,8 +9,7 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{node::node_ops::{AdultDuty, ChunkDuty, NodeDuty, NodeOperation, MessagingDuty}, node::keys::NodeKeys, node::state_db::Init, Config, Result};
-use safe_nd::MsgEnvelope;
+use crate::{node::node_ops::{AdultDuty, ChunkDuty, NodeDuty, NodeOperation}, node::keys::NodeKeys, node::state_db::NodeInfo, Result};
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -24,12 +23,11 @@ pub(crate) struct AdultDuties {
 
 impl AdultDuties {
     pub fn new(
-        keys: NodeKeys,
-        config: &Config,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        init_mode: Init,
     ) -> Result<Self> {
-        let chunks = Chunks::new(keys.clone(), &config, &total_used_space, init_mode)?;
+        let keys = node_info.keys();
+        let chunks = Chunks::new(node_info, &total_used_space)?;
         Ok(Self { keys, chunks })
     }
 
