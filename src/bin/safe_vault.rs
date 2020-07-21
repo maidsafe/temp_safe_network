@@ -29,11 +29,11 @@
 
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, Record};
-use routing::{Node, NodeConfig};
-use safe_vault::{self, write_connection_info, Command, Config, Vault};
+use routing::{Node as Routing, NodeConfig};
+use safe_vault::{self, write_connection_info, Command, Config, Node, Receiver};
 use self_update::cargo_crate_version;
 use self_update::Status;
-use std::{io::Write, process};
+use std::{cell::RefCell, io::Write, process, rc::Rc};
 use structopt::{clap, StructOpt};
 use unwrap::unwrap;
 
@@ -127,26 +127,21 @@ fn main() {
     node_config.first = config.is_first();
     node_config.transport_config = config.network_config().clone();
     node_config.network_params.recommended_section_size = 500;
-    let (routing_node, routing_rx, client_rx) = Node::new(node_config);
+    let (routing, routing_rx, client_rx) = Routing::new(node_config);
 
     let is_first = config.is_first();
 
-    if is_first && !routing_node.is_running() {
+    if is_first && !routing.is_running() {
         log::error!("{}", IGD_ERROR_MESSAGE);
         println!("{}", IGD_ERROR_MESSAGE);
         process::exit(1);
     }
 
     let mut rng = rand::thread_rng();
+    let routing = Rc::new(RefCell::new(routing));
+    let receiver = Receiver::new(routing_rx, client_rx, command_rx, routing.clone());
 
-    match Vault::new(
-        routing_node,
-        routing_rx,
-        client_rx,
-        &config,
-        command_rx,
-        &mut rng,
-    ) {
+    match Node::new(receiver, routing, &config, &mut rng) {
         Ok(mut vault) => match vault.our_connection_info() {
             Ok(our_conn_info) => {
                 println!(

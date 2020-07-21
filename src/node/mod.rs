@@ -16,14 +16,12 @@ mod node_duties;
 mod node_ops;
 mod section_querying;
 
+pub use crate::node::node_duties::messaging::Receiver;
 pub use crate::node::state_db::{Command, Init};
 use crate::{
     node::{
         keys::NodeKeys,
-        node_duties::{
-            messaging::{Received, Receiver},
-            NodeDuties,
-        },
+        node_duties::{messaging::Received, NodeDuties},
         node_ops::{
             AdultDuty, ElderDuty, GatewayDuty, MetadataDuty, NodeDuty, NodeOperation, PaymentDuty,
             RewardDuty, TransferDuty,
@@ -52,7 +50,12 @@ pub struct Node<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> Node<R> {
     /// Initialize a new node.
-    pub fn new(routing: Routing, receiver: Receiver, config: &Config, mut rng: R) -> Result<Self> {
+    pub fn new(
+        receiver: Receiver,
+        routing: Rc<RefCell<Routing>>,
+        config: &Config,
+        mut rng: R,
+    ) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
@@ -61,12 +64,11 @@ impl<R: CryptoRng + Rng> Node<R> {
             (Infant, id)
         });
 
-        let routing = Rc::new(RefCell::new(routing));
         let keypair = Rc::new(RefCell::new(utils::key_pair(routing.clone())?));
         let keys = NodeKeys::new(keypair);
 
         let node_info = NodeInfo {
-            id: *id.public_id(),
+            id: id.public_id().clone(),
             keys,
             root_dir: root_dir_buf,
             init_mode: Init::New,
@@ -79,7 +81,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut duties = NodeDuties::new(id, node_info, routing.clone(), rng);
 
         use AgeGroup::*;
-        match age_group {
+        let _ = match age_group {
             Infant => None,
             Adult => duties.process(node_ops::NodeDuty::BecomeAdult),
             Elder => duties.process(node_ops::NodeDuty::BecomeElder),
@@ -128,6 +130,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     }
                     continue;
                 }
+                Received::Shutdown => break,
             };
             self.process_while_any(Some(result));
         }

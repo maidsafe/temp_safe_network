@@ -40,7 +40,7 @@ impl Display for ClientMsg {
 pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
     let msg = match bincode::deserialize(&bytes) {
         Ok((
-            public_id @ PublicId,
+            public_id,
             msg
             @
             MsgEnvelope {
@@ -50,7 +50,7 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
             },
         ))
         | Ok((
-            public_id @ PublicId,
+            public_id,
             msg
             @
             MsgEnvelope {

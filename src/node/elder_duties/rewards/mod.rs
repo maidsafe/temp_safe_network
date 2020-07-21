@@ -235,7 +235,7 @@ impl Rewards {
                         account_id: *id,
                     }),
                     msg_id,
-                    *origin,
+                    origin,
                 );
             }
             Some(RewardAccount::AwaitingStart) // todo: return error, but we need to have the account id in that case, or change / extend the current error(s)
@@ -249,7 +249,7 @@ impl Rewards {
                 return self.wrapping.network_error(
                     Rewards(RewardClaiming { error, account_id }),
                     msg_id,
-                    *origin,
+                    origin,
                 );
             }
         };

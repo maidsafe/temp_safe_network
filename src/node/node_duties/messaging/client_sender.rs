@@ -28,7 +28,7 @@ impl ClientSender {
         Self { routing }
     }
 
-    pub fn send(&self, recipient: SocketAddr, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub fn send(&mut self, recipient: SocketAddr, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         match msg.destination() {
             Address::Node(_) => Some(MessagingDuty::SendToNode(msg.clone())),
             Address::Section(_) => Some(MessagingDuty::SendToSection(msg.clone())),
@@ -37,7 +37,7 @@ impl ClientSender {
     }
 
     pub fn handshake(
-        &self,
+        &mut self,
         recipient: SocketAddr,
         hs: &HandshakeResponse,
     ) -> Option<MessagingDuty> {

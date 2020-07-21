@@ -27,7 +27,7 @@ use std::{
     cell::Cell,
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
-    marker::PhantoMap,
+    marker::PhantomData,
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -50,7 +50,7 @@ pub(crate) struct ChunkStore<T: Chunk> {
     // Maximum space allowed for all `ChunkStore`s to consume.
     max_capacity: u64,
     used_space: UsedSpace,
-    _phantom: PhantoMap<T>,
+    _phantom: PhantomData<T>,
 }
 
 impl<T> ChunkStore<T>
@@ -83,7 +83,7 @@ where
             dir,
             max_capacity,
             used_space,
-            _phantom: PhantoMap,
+            _phantom: PhantomData,
         })
     }
 }

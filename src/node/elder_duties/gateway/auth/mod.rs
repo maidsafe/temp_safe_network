@@ -99,7 +99,7 @@ impl Auth {
             return self.wrapping.error(
                 CmdError::Auth(error),
                 msg.message.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             );
         }
         None
@@ -147,7 +147,7 @@ impl Auth {
         if let Err(error) = result {
             return self
                 .wrapping
-                .error(CmdError::Auth(error), msg_id, origin.address());
+                .error(CmdError::Auth(error), msg_id, &origin.address());
         }
         None
     }
@@ -163,7 +163,7 @@ impl Auth {
                     self.wrapping.error(
                         CmdError::Auth(NdError::AccessDenied),
                         msg.id(),
-                        msg.origin.address(),
+                        &msg.origin.address(),
                     )
                 }
             }

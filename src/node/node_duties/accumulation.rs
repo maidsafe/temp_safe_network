@@ -39,7 +39,7 @@ impl Accumulation {
             MsgSender::Section {
                 signature: Signature::Bls(_),
                 ..
-            } => return Some(*msg), // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
+            } => return Some(msg.clone()), // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
             _ => return None, // no other variation is valid
         };
         info!(
@@ -112,6 +112,7 @@ impl Accumulation {
                 _ => return None, // invalid use case, we only accumulate from Nodes
             };
             // Replace the Node with the Section.
+            let mut msg = msg;
             let _ = msg.proxies.pop();
             return Some(msg.with_proxy(sender));
         // beware that we might have to forgo the proxies vector

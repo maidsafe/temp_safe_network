@@ -408,7 +408,7 @@ impl MapStorage {
     ) -> Option<MessagingDuty> {
         if let Err(error) = result {
             self.wrapping
-                .error(CmdError::Data(error), msg_id, origin.address())
+                .error(CmdError::Data(error), msg_id, &origin.address())
         } else {
             None
         }

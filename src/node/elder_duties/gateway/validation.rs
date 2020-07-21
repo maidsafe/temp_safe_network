@@ -114,7 +114,7 @@ impl Sequences {
             return self.wrapping.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             );
         }
         self.wrapping.vote(msg)
@@ -130,7 +130,7 @@ impl Sequences {
             return self.wrapping.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             );
         }
         self.wrapping.vote(msg)
@@ -224,7 +224,7 @@ impl Blobs {
                 return self.wrapping.error(
                     CmdError::Data(NdError::InvalidOwners),
                     msg.id(),
-                    msg.origin.address(),
+                    &msg.origin.address(),
                 );
             }
         }
@@ -243,7 +243,7 @@ impl Blobs {
             self.wrapping.error(
                 CmdError::Data(NdError::InvalidOperation),
                 msg.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             )
         }
     }
@@ -324,7 +324,7 @@ impl Maps {
             return self.wrapping.error(
                 CmdError::Data(NdError::InvalidOwners),
                 msg.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             );
         }
 
@@ -392,7 +392,7 @@ impl Accounts {
             return self.wrapping.error(
                 CmdError::Data(NdError::ExceededSize),
                 msg.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             );
         }
         self.wrapping.vote(msg)

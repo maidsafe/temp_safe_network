@@ -43,7 +43,7 @@ use writing::Writing;
 /// the structures + their metadata - handled at `Elders` - with
 /// all underlying data being chunks stored at `Adults`.
 
-pub(crate) struct Metadata {
+pub struct Metadata {
     keys: NodeKeys,
     elder_stores: ElderStores,
     wrapping: ElderMsgWrapping,

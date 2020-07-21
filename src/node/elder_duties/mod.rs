@@ -36,7 +36,7 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct ElderDuties<R: CryptoRng + Rng> {
+pub struct ElderDuties<R: CryptoRng + Rng> {
     keys: NodeKeys,
     metadata: Metadata,
     transfers: Transfers,

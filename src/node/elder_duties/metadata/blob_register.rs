@@ -227,6 +227,7 @@ impl BlobRegister {
         self.wrapping.send_to_adults(metadata.holders, msg)
     }
 
+    #[allow(unused)]
     pub(super) fn update_holders(
         &mut self,
         address: BlobAddress,
@@ -453,7 +454,7 @@ impl BlobRegister {
         &mut self,
         node: XorName,
     ) -> NdResult<BTreeMap<BlobAddress, BTreeSet<XorName>>> {
-        let mut Blob_addresses: BTreeMap<BlobAddress, BTreeSet<XorName>> = BTreeMap::new();
+        let mut blob_addresses: BTreeMap<BlobAddress, BTreeSet<XorName>> = BTreeMap::new();
         let chunk_holder = self.get_holder(node);
 
         if let Ok(holder) = chunk_holder {
@@ -466,7 +467,7 @@ impl BlobRegister {
                         warn!("doesn't contain the holder",);
                     }
 
-                    let _ = Blob_addresses.insert(chunk_address, metadata.holders.clone());
+                    let _ = blob_addresses.insert(chunk_address, metadata.holders.clone());
 
                     if metadata.holders.is_empty() {
                         if let Err(error) = self.metadata.rem(&db_key) {
@@ -484,7 +485,7 @@ impl BlobRegister {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
 
-        Ok(Blob_addresses)
+        Ok(blob_addresses)
     }
 
     fn get_holder(&self, holder: XorName) -> NdResult<HolderMetadata> {

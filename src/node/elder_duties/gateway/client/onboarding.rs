@@ -11,7 +11,7 @@ use crate::node::section_querying::SectionQuerying;
 use crate::utils;
 use log::{debug, info, warn};
 use rand::{CryptoRng, Rng};
-use safe_nd::{HandshakeRequest, HandshakeResponse, NodePublicId, PublicId, Signature, XorName};
+use safe_nd::{HandshakeRequest, HandshakeResponse, NodePublicId, PublicId, Signature};
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
@@ -27,16 +27,6 @@ impl Display for ClientInfo {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.public_id.name())
     }
-}
-
-pub enum OnboardingDecision {
-    Continue(OnboardingStep),
-    Disconnect(SocketAddr),
-}
-
-pub struct OnboardingStep {
-    peer_address: SocketAddr,
-    response: HandshakeResponse,
 }
 
 pub struct Onboarding {
@@ -63,7 +53,7 @@ impl Onboarding {
     }
 
     pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-        if let Some(client) = self.clients.remove(&peer_addr) {
+        if let Some(_client) = self.clients.remove(&peer_addr) {
             // info!(
             //     "{}: Disconnected from {:?} on {}",
             //     self, client.public_id, peer_addr
@@ -240,31 +230,31 @@ impl Onboarding {
     //     }
     // }
 
-    fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
-        self.clients
-            .iter()
-            .filter_map(|(peer_addr, client)| {
-                if &client.public_id == id {
-                    Some(*peer_addr)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
+    // fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
+    //     self.clients
+    //         .iter()
+    //         .filter_map(|(peer_addr, client)| {
+    //             if &client.public_id == id {
+    //                 Some(*peer_addr)
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect()
+    // }
 
-    fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
-        self.clients
-            .values()
-            .filter_map(|client| {
-                if client.public_id.name() == name {
-                    Some(client.public_id.clone())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>()
-    }
+    // fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
+    //     self.clients
+    //         .values()
+    //         .filter_map(|client| {
+    //             if client.public_id.name() == name {
+    //                 Some(client.public_id.clone())
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect::<Vec<_>>()
+    // }
 }
 
 impl Display for Onboarding {

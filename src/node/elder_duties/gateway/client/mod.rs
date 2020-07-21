@@ -15,7 +15,8 @@ pub use self::client_input_parse::{
 pub use self::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info};
-use safe_nd::{Address, Message, MessageId, MsgEnvelope, NodePublicId};
+use rand::{CryptoRng, Rng};
+use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, NodePublicId};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
@@ -37,6 +38,23 @@ impl ClientMsgTracking {
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
+    }
+
+    pub fn contains(&mut self, peer_addr: SocketAddr) -> bool {
+        self.onboarding.contains(peer_addr)
+    }
+
+    pub fn process_handshake<R: CryptoRng + Rng>(
+        &mut self,
+        handshake: HandshakeRequest,
+        peer_addr: SocketAddr,
+        rng: &mut R,
+    ) -> Option<MessagingDuty> {
+        self.onboarding.process(handshake, peer_addr, rng)
+    }
+
+    pub fn remove_client(&mut self, peer_addr: SocketAddr) {
+        self.onboarding.remove_client(peer_addr)
     }
 
     /// If

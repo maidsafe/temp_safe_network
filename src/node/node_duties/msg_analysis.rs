@@ -46,11 +46,12 @@ impl NetworkMsgAnalysis {
     /// remote msgs from the network, i.e.
     /// it is not evaluating msgs sent
     /// directly from the client.
-    pub fn evaluate(&self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         use NodeDuty::*;
         use NodeOperation::*;
         let result = if self.should_accumulate(msg) {
-            self.evaluate(&self.accumulation.process(msg)?)? // recursive call at most 1 level deep if process is some
+            let msg = self.accumulation.process(msg)?;
+            self.evaluate(&msg)?
         } else if let Some(duty) = self.try_messaging(msg) {
             // Identified as an outbound msg, to be sent on the wire.
             RunAsNode(ProcessMessaging(duty))
@@ -377,7 +378,7 @@ impl NetworkMsgAnalysis {
 
         if from_rewards_section() && self.is_dst_for(msg) && self.is_elder() {
             use NodeRewardCmd::*;
-            let duty = match msg.message {
+            let duty = match &msg.message {
                 Message::NodeCmd {
                     cmd:
                         NodeCmd::Rewards(ClaimRewardCounter {
@@ -386,9 +387,9 @@ impl NetworkMsgAnalysis {
                         }),
                     id,
                 } => RewardDuty::ClaimRewardCounter {
-                    old_node_id,
-                    new_node_id,
-                    msg_id: id,
+                    old_node_id: *old_node_id,
+                    new_node_id: *new_node_id,
+                    msg_id: *id,
                     origin: msg.origin.address(),
                 },
                 Message::NodeEvent {
@@ -400,9 +401,9 @@ impl NetworkMsgAnalysis {
                         },
                     ..
                 } => RewardDuty::ReceiveClaimedRewards {
-                    id: account_id,
-                    node_id: new_node_id,
-                    counter,
+                    id: *account_id,
+                    node_id: *new_node_id,
+                    counter: counter.clone(),
                 },
                 _ => return None,
             };
@@ -423,7 +424,7 @@ impl NetworkMsgAnalysis {
         let shall_process =
             |msg| from_single_gateway_elder() && self.is_dst_for(msg) && self.is_elder();
 
-        let duty = match msg.message {
+        let duty = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
@@ -432,7 +433,7 @@ impl NetworkMsgAnalysis {
                     return None;
                 }
                 TransferDuty::ProcessCmd {
-                    cmd: cmd.into(),
+                    cmd: cmd.clone().into(),
                     msg_id: msg.id(),
                     origin: msg.origin.address(),
                 }
@@ -445,7 +446,7 @@ impl NetworkMsgAnalysis {
                     return None;
                 }
                 TransferDuty::ProcessQuery {
-                    query: query.into(),
+                    query: query.clone().into(),
                     msg_id: msg.id(),
                     origin: msg.origin.address(),
                 }

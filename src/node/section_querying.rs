@@ -11,7 +11,7 @@ use safe_nd::XorName;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
-pub(crate) struct SectionQuerying {
+pub struct SectionQuerying {
     routing: Rc<RefCell<Routing>>,
 }
 

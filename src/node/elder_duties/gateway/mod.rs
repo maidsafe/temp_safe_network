@@ -34,12 +34,11 @@ use routing::TransportEvent as ClientEvent;
 use safe_nd::{Address, Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
 use std::fmt::{self, Display, Formatter};
 
-pub(crate) struct Gateway<R: CryptoRng + Rng> {
+pub struct Gateway<R: CryptoRng + Rng> {
     keys: NodeKeys,
     auth: Auth,
     data: Validation,
     section: SectionQuerying,
-    onboarding: Onboarding,
     client_msg_tracking: ClientMsgTracking,
     rng: R,
 }
@@ -52,7 +51,7 @@ impl<R: CryptoRng + Rng> Gateway<R> {
         let auth = Auth::new(info.keys.clone(), auth_keys_db, wrapping.clone());
         let data = Validation::new(wrapping);
 
-        let onboarding = Onboarding::new(info.id.clone(), section);
+        let onboarding = Onboarding::new(info.id.clone(), section.clone());
         let client_msg_tracking = ClientMsgTracking::new(info.id, onboarding);
 
         let gateway = Self {
@@ -60,7 +59,6 @@ impl<R: CryptoRng + Rng> Gateway<R> {
             auth,
             data,
             section,
-            onboarding,
             client_msg_tracking,
             rng,
         };
@@ -114,18 +112,17 @@ impl<R: CryptoRng + Rng> Gateway<R> {
     /// This is where client input is parsed.
     fn process_client_event(&mut self, event: &ClientEvent) -> Option<MessagingDuty> {
         use ClientEvent::*;
-        let mut rng = ChaChaRng::from_seed(self.rng.gen());
         match event {
             ConnectedTo { peer } => {
-                if !self.onboarding.contains(peer.peer_addr()) {
+                if !self.client_msg_tracking.contains(peer.peer_addr()) {
                     info!("{}: Connected to new client on {}", self, peer.peer_addr());
                 }
             }
             ConnectionFailure { peer, .. } => {
-                self.onboarding.remove_client(peer.peer_addr());
+                self.client_msg_tracking.remove_client(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                let parsed = if self.onboarding.contains(peer.peer_addr()) {
+                let parsed = if self.client_msg_tracking.contains(peer.peer_addr()) {
                     try_deserialize_msg(msg)
                 } else {
                     try_deserialize_handshake(msg, peer.peer_addr())
@@ -141,7 +138,12 @@ impl<R: CryptoRng + Rng> Gateway<R> {
                         msg
                     }
                     ClientInput::Handshake(request) => {
-                        return self.onboarding.process(request, peer.peer_addr(), &mut rng);
+                        let mut rng = ChaChaRng::from_seed(self.rng.gen());
+                        return self.client_msg_tracking.process_handshake(
+                            request,
+                            peer.peer_addr(),
+                            &mut rng,
+                        );
                     }
                 };
 

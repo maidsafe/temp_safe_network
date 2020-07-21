@@ -56,7 +56,7 @@ impl AdultMsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: Address,
+        origin: &Address,
     ) -> Option<MessagingDuty> {
         self.inner.error(error, msg_id, origin)
     }
@@ -94,7 +94,7 @@ impl ElderMsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: Address,
+        origin: &Address,
     ) -> Option<MessagingDuty> {
         self.inner.error(error, msg_id, origin)
     }
@@ -103,7 +103,7 @@ impl ElderMsgWrapping {
         &self,
         error: NodeCmdError,
         msg_id: MessageId,
-        origin: Address,
+        origin: &Address,
     ) -> Option<MessagingDuty> {
         self.inner.network_error(error, msg_id, origin)
     }
@@ -137,13 +137,13 @@ impl MsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: Address,
+        origin: &Address,
     ) -> Option<MessagingDuty> {
         self.send(Message::CmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,
-            cmd_origin: origin,
+            cmd_origin: origin.clone(),
         })
     }
 
@@ -151,13 +151,13 @@ impl MsgWrapping {
         &self,
         error: NodeCmdError,
         msg_id: MessageId,
-        origin: Address,
+        origin: &Address,
     ) -> Option<MessagingDuty> {
         self.send(Message::NodeCmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,
-            cmd_origin: origin,
+            cmd_origin: origin.clone(),
         })
     }
 

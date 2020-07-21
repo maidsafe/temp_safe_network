@@ -11,6 +11,7 @@ use crossbeam_channel::{Receiver as Channel, Select};
 use routing::{event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent};
 use std::{cell::RefCell, rc::Rc};
 
+///
 pub struct Receiver {
     network_receiver: Channel<RoutingEvent>,
     client_receiver: Channel<ClientEvent>,
@@ -30,6 +31,7 @@ pub struct ReceivingChannel {
 }
 
 impl Receiver {
+    ///
     pub fn new(
         network_receiver: Channel<RoutingEvent>,
         client_receiver: Channel<ClientEvent>,

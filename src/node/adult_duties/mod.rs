@@ -21,7 +21,7 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct AdultDuties {
+pub struct AdultDuties {
     keys: NodeKeys,
     chunks: Chunks,
 }

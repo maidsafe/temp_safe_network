@@ -52,7 +52,7 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
-pub(crate) struct Transfers {
+pub struct Transfers {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
@@ -93,12 +93,12 @@ impl Transfers {
                 query,
                 msg_id,
                 origin,
-            } => self.process_query(query, *msg_id, *origin),
+            } => self.process_query(query, *msg_id, origin.clone()),
             ProcessCmd {
                 cmd,
                 msg_id,
                 origin,
-            } => self.process_cmd(cmd, *msg_id, *origin),
+            } => self.process_cmd(cmd, *msg_id, origin.clone()),
         };
 
         result.map(|c| RunAsNode(ProcessMessaging(c)))
@@ -312,7 +312,7 @@ impl Transfers {
             Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferError::TransferRegistration(error)),
                 msg_id,
-                origin,
+                &origin,
             ),
         }
     }

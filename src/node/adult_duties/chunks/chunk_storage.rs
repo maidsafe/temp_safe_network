@@ -50,11 +50,12 @@ impl ChunkStorage {
         if let Err(error) = self.try_store(data) {
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, origin.address());
+                .error(CmdError::Data(error), msg_id, &origin.address());
         }
         None
     }
 
+    #[allow(unused)]
     pub(crate) fn take_duplicate(
         &mut self,
         data: &Blob,
@@ -169,7 +170,7 @@ impl ChunkStorage {
         if let Err(error) = result {
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, origin.address());
+                .error(CmdError::Data(error), msg_id, &origin.address());
         }
         None
     }

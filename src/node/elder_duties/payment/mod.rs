@@ -19,7 +19,7 @@ use std::{
     rc::Rc,
 };
 
-pub(crate) struct DataPayment {
+pub struct DataPayment {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
@@ -68,7 +68,7 @@ impl DataPayment {
         use TransferError::*;
         if recipient_is_not_section {
             let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
-            let result = self.wrapping.error(error, msg.id(), msg.origin.address());
+            let result = self.wrapping.error(error, msg.id(), &msg.origin.address());
             return result.map(|c| RunAsNode(ProcessMessaging(c)));
         }
         let registration = self.replica_mut().register(&payment);
@@ -84,7 +84,7 @@ impl DataPayment {
             Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferRegistration(error)),
                 msg.id(),
-                msg.origin.address(),
+                &msg.origin.address(),
             ),
         };
         result.map(|c| RunAsNode(ProcessMessaging(c)))

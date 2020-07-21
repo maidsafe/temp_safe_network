@@ -200,7 +200,7 @@ impl ReplicaManager {
         requester: PublicId,
         transfer: Transfer,
         message_id: MessageId,
-        origin: Address,
+        origin: &Address,
     ) -> Option<MessagingDuty> {
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";

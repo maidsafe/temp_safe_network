@@ -42,7 +42,7 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
     network_events: NetworkEvents,
     messaging: Messaging,
     routing: Rc<RefCell<Routing>>,
-    rng: R,
+    rng: Option<R>,
 }
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
@@ -56,7 +56,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             network_events,
             messaging,
             routing,
-            rng,
+            rng: Some(rng),
         }
     }
 
@@ -107,11 +107,14 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
 
+        if matches!(self.duty_level, Elder(_)) {
+            return None;
+        }
         if let Ok(duties) = ElderDuties::new(
             self.node_info.clone(),
             &total_used_space,
             self.routing.clone(),
-            self.rng,
+            self.rng.take()?,
         ) {
             self.duty_level = Elder(duties);
             // NB: This is wrong, shouldn't write to disk here,
