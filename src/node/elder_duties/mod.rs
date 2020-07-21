@@ -20,9 +20,12 @@ use self::{
     transfers::{replica_manager::ReplicaManager, Transfers},
 };
 use crate::{
-    node::node_ops::{NodeDuty, ElderDuty, NodeOperation, RewardDuty, MessagingDuty}, node::keys::NodeKeys,
-    node::section_querying::SectionQuerying, node::state_db::Init, utils, Config, Result,
+    node::keys::NodeKeys,
+    node::node_ops::{ElderDuty, MessagingDuty, NodeDuty, NodeOperation, RewardDuty},
+    node::section_querying::SectionQuerying,
+    node::state_db::Init,
     node::state_db::NodeInfo,
+    utils, Config, Result,
 };
 use routing::{Node as Routing, RoutingError};
 use safe_nd::XorName;
@@ -30,8 +33,8 @@ use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
-    rc::Rc,
     path::Path,
+    rc::Rc,
 };
 
 pub(crate) struct ElderDuties {
@@ -50,18 +53,13 @@ impl ElderDuties {
         total_used_space: &Rc<Cell<u64>>,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
-
         let section_querying = SectionQuerying::new(routing.clone());
 
         // Gateway
         let gateway = Gateway::new(info.clone(), section_querying.clone())?;
-        
+
         // Metadata
-        let metadata = Metadata::new(
-            info.clone(),
-            &total_used_space,
-            section_querying,
-        )?;
+        let metadata = Metadata::new(info.clone(), &total_used_space, section_querying)?;
 
         // (AT2 Replicas)
         let replica_manager = Self::replica_manager(routing.clone())?;
@@ -112,13 +110,10 @@ impl ElderDuties {
     pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         use ElderDuty::*;
         match duty {
-            ProcessLostMember { 
-                name,
-                age,
-            } => self.member_left(name, age),
+            ProcessLostMember { name, age } => self.member_left(name, age),
             ProcessJoinedMember {
                 old_node_id,
-                new_node_id,        
+                new_node_id,
             } => self.relocated_member_joined(old_node_id, new_node_id),
             ProcessElderChange { .. } => self.elders_changed(),
         }
@@ -131,7 +126,10 @@ impl ElderDuties {
     ) -> Option<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
-        self.rewards.process(RewardDuty::AddRelocatedAccount { old_node_id, new_node_id })
+        self.rewards.process(RewardDuty::AddRelocatedAccount {
+            old_node_id,
+            new_node_id,
+        })
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
@@ -141,7 +139,8 @@ impl ElderDuties {
     fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
-        self.rewards.process(RewardDuty::PrepareAccountMove { node_id })
+        self.rewards
+            .process(RewardDuty::PrepareAccountMove { node_id })
         // For now, we skip chunk duplication logic.
         //self.metadata.trigger_chunk_duplication(XorName(name.0))
     }
@@ -160,7 +159,7 @@ impl ElderDuties {
         )?;
         None
     }
-    
+
     fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
         let node = routing.borrow();
         let public_key_set = node.public_key_set()?;

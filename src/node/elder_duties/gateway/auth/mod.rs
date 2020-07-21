@@ -10,7 +10,8 @@ mod auth_keys;
 
 pub use self::auth_keys::AuthKeysDb;
 use crate::{
-    node::node_ops::MessagingDuty, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping, utils,
+    node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping, node::node_ops::MessagingDuty,
+    utils,
 };
 use log::warn;
 use safe_nd::{
@@ -95,9 +96,11 @@ impl Auth {
         };
 
         if let Err(error) = result {
-            return self
-                .wrapping
-                .error(CmdError::Auth(error), msg.message.id(), msg.origin.address());
+            return self.wrapping.error(
+                CmdError::Auth(error),
+                msg.message.id(),
+                msg.origin.address(),
+            );
         }
         None
     }
@@ -123,7 +126,12 @@ impl Auth {
     }
 
     // on consensus
-    pub(super) fn finalise(&mut self, auth_cmd: &AuthCmd, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
+    pub(super) fn finalise(
+        &mut self,
+        auth_cmd: &AuthCmd,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<MessagingDuty> {
         use AuthCmd::*;
         let result = match auth_cmd {
             InsAuthKey {
@@ -134,9 +142,7 @@ impl Auth {
             } => self
                 .auth_keys
                 .insert(origin.id(), *key, *version, *permissions),
-            DelAuthKey { key, version, .. } => {
-                self.auth_keys.delete(origin.id(), *key, *version)
-            }
+            DelAuthKey { key, version, .. } => self.auth_keys.delete(origin.id(), *key, *version),
         };
         if let Err(error) = result {
             return self

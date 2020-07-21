@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::node_ops::{GroupDecision, MessagingDuty},
     node::keys::NodeKeys,
+    node::node_ops::{GroupDecision, MessagingDuty},
     utils,
 };
 use safe_nd::{
-    AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeCmdError, XorName, Address,
+    Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
+    NodeCmdError, XorName,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;

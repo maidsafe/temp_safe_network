@@ -6,15 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Config, Result, node::node_duties::DutyLevel};
-use crate::{
-    node::keys::NodeKeys,
-    utils,
-};
+use crate::{node::keys::NodeKeys, utils};
+use crate::{node::node_duties::DutyLevel, Config, Result};
 use log::{error, info, warn};
 use routing::Node as Routing;
-use serde::{Serialize, Deserialize};
 use safe_nd::{NodeFullId, NodePublicId};
+use serde::{Deserialize, Serialize};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -70,7 +67,7 @@ pub struct NodeInfo {
     pub root_dir: PathBuf,
     pub init_mode: Init,
     /// Upper limit in bytes for allowed network storage on this node.
-    /// An Adult would be using the space for chunks, 
+    /// An Adult would be using the space for chunks,
     /// while an Elder uses it for metadata.
     pub max_storage_capacity: u64,
 }

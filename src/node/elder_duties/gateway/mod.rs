@@ -14,20 +14,25 @@ use self::{
     validation::Validation,
 };
 use crate::{
-    node::{section_querying::SectionQuerying, node_ops::{NodeDuty, GatewayDuty, NodeOperation, GroupDecision, MessagingDuty}},
-    node::node_duties::messaging::{ClientMsgTracking, ClientInput, ClientMsg, Onboarding, InputParsing},
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
+    node::node_duties::messaging::{
+        ClientInput, ClientMsg, ClientMsgTracking, InputParsing, Onboarding,
+    },
     node::state_db::NodeInfo,
+    node::{
+        node_ops::{GatewayDuty, GroupDecision, MessagingDuty, NodeDuty, NodeOperation},
+        section_querying::SectionQuerying,
+    },
     Config, Result,
 };
+use bytes::Bytes;
+use log::{error, info, trace};
+use rand::CryptoRng;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use routing::TransportEvent as ClientEvent;
-use bytes::Bytes;
-use log::{trace, error, info};
-use rand::CryptoRng;
-use safe_nd::{Cmd, Address, AuthCmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
+use safe_nd::{Address, AuthCmd, Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -45,10 +50,7 @@ pub(crate) struct Gateway {
 }
 
 impl Gateway {
-    pub fn new(
-        info: NodeInfo,
-        section: SectionQuerying,
-    ) -> Result<Self> {
+    pub fn new(info: NodeInfo, section: SectionQuerying) -> Result<Self> {
         let auth_keys_db = AuthKeysDb::new(info.root_dir, info.init_mode)?;
 
         let wrapping = ElderMsgWrapping::new(info.keys.clone(), ElderDuties::Gateway);
@@ -73,8 +75,8 @@ impl Gateway {
     }
 
     pub fn process(&mut self, cmd: &GatewayDuty) -> Option<NodeOperation> {
-        use NodeDuty::*;
         use GatewayDuty::*;
+        use NodeDuty::*;
         use NodeOperation::*;
         let result = match cmd {
             ProcessMsg(msg) => self.process_msg(msg),
@@ -94,8 +96,9 @@ impl Gateway {
         } else if let Message::Cmd {
             cmd: Cmd::Auth(auth_cmd),
             ..
-        } = &msg.message {
-             /// Temporary, while Authenticator is not implemented at app layer.
+        } = &msg.message
+        {
+            /// Temporary, while Authenticator is not implemented at app layer.
             /// If a request within MessagingDuty::ForwardClientRequest issued by us in `handle_group_decision`
             /// was made by Gateway and destined to our section, this is where the actual request will end up.
             return self.auth.finalise(auth_cmd, msg.id(), &msg.origin);
@@ -129,10 +132,14 @@ impl Gateway {
                 self.onboarding.remove_client(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                let parsed = self.input_parsing.try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
+                let parsed =
+                    self.input_parsing
+                        .try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
                 match parsed {
                     ClientInput::Msgs(msg) => {
-                        let result = self.client_msg_tracking.track_incoming(msg.id, peer.peer_addr());
+                        let result = self
+                            .client_msg_tracking
+                            .track_incoming(msg.id, peer.peer_addr());
                         if result.is_some() {
                             return result;
                         }
@@ -141,7 +148,7 @@ impl Gateway {
                         self.onboarding.process(request, peer.peer_addr(), &mut rng)
                     }
                 }
-                
+
                 return self.process_client_msg(parsed.client.public_id, &parsed.msg);
             }
             SentUserMessage { peer, .. } => {
@@ -165,11 +172,7 @@ impl Gateway {
     }
 
     /// Process a msg from a client.
-    fn process_client_msg(
-        &mut self,
-        client: PublicId,
-        msg: &MsgEnvelope,
-    ) -> Option<MessagingDuty> {
+    fn process_client_msg(&mut self, client: PublicId, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error);
         };

@@ -51,10 +51,9 @@ impl SectionQuerying {
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
     }
-    
+
     pub fn our_elders(&self) -> Vec<XorName> {
-        self
-            .routing
+        self.routing
             .borrow_mut()
             .our_elders()
             .into_iter()
@@ -63,11 +62,9 @@ impl SectionQuerying {
     }
 
     pub fn matches_our_prefix(&self, name: XorName) -> bool {
-        self
-            .routing
+        self.routing
             .borrow()
             .matches_our_prefix(&routing::XorName(name.0))
             .unwrap_or(false)
     }
-    
 }

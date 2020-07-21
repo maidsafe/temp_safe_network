@@ -10,7 +10,7 @@ use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping, node_ops::Mess
 use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
 use log::{error, info};
 use safe_nd::{
-    AdultDuties, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId, MsgSender,
+    AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
     NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
@@ -26,10 +26,7 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) fn new(
-        node_info: NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
-    ) -> Result<Self> {
+    pub(crate) fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunks = BlobChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
@@ -51,7 +48,9 @@ impl ChunkStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         if let Err(error) = self.try_store(data) {
-            return self.wrapping.error(CmdError::Data(error), msg_id, origin.address());
+            return self
+                .wrapping
+                .error(CmdError::Data(error), msg_id, origin.address());
         }
         None
     }
@@ -168,7 +167,9 @@ impl ChunkStorage {
         };
 
         if let Err(error) = result {
-            return self.wrapping.error(CmdError::Data(error), msg_id, origin.address());
+            return self
+                .wrapping
+                .error(CmdError::Data(error), msg_id, origin.address());
         }
         None
     }

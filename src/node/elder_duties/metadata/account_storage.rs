@@ -8,8 +8,8 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
-    node::node_ops::MessagingDuty,
     node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::MessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
@@ -20,8 +20,8 @@ use safe_nd::{
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
-    rc::Rc,
     path::Path,
+    rc::Rc,
 };
 
 pub(super) struct AccountStorage {
@@ -56,7 +56,12 @@ impl AccountStorage {
         }
     }
 
-    fn get(&self, address: &XorName, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
+    fn get(
+        &self,
+        address: &XorName,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<MessagingDuty> {
         let result = self
             .account(origin.id(), address)
             .map(Account::into_data_and_signature);

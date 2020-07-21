@@ -52,11 +52,7 @@ impl Accumulation {
         );
         match self.messages.entry(msg.id()) {
             Entry::Vacant(entry) => {
-                let _ = entry.insert((
-                    msg.clone(),
-                    msg.origin.clone(),
-                    vec![signature.clone()],
-                ));
+                let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![signature.clone()]));
             }
             Entry::Occupied(mut entry) => {
                 let (_, _, signatures) = entry.get_mut();
@@ -69,10 +65,10 @@ impl Accumulation {
     fn try_aggregate(&mut self, msg: &MsgEnvelope) -> Option<MsgEnvelope> {
         let msg_id = msg.id();
         let (_, _, signatures) = self.messages.get(&msg_id)?;
-        
+
         // NB: This is wrong! pk set should come with the sig share.
         // use routing::ProofShare etc.
-        
+
         // THIS IS WRONG v
         let public_key_set = self.routing_node.borrow().public_key_set().ok()?.clone();
         // THIS IS WRONG ^
@@ -85,7 +81,7 @@ impl Accumulation {
         if public_key_set.threshold() >= signatures.len() {
             return None;
         }
-        
+
         let (msg, _sender, signatures) = self.messages.remove(&msg_id)?;
         let signed_data = utils::serialise(&msg);
         for sig in &signatures {
@@ -102,7 +98,7 @@ impl Accumulation {
             .ok()?;
         if public_key_set.public_key().verify(&signature, &signed_data) {
             let _ = self.completed.insert(msg_id);
-            
+
             // THIS IS WRONG v
             let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
             // THIS IS WRONG ^
@@ -120,12 +116,12 @@ impl Accumulation {
             // Replace the Node with the Section.
             let _ = msg.proxies.pop();
             return Some(msg.with_proxy(sender));
-            // beware that we might have to forgo the proxies vector
-            // and instead just have a most recent proxy, if we are seeing
-            // different order on the proxies on the msgs to be accumulated
-            // (otherwise, the signature won't aggregate, since it is not over the same data)
-            // perhaps it can be solved by ordering the vec, but maybe that defeats
-            // part of the purpose; to see the path.
+        // beware that we might have to forgo the proxies vector
+        // and instead just have a most recent proxy, if we are seeing
+        // different order on the proxies on the msgs to be accumulated
+        // (otherwise, the signature won't aggregate, since it is not over the same data)
+        // perhaps it can be solved by ordering the vec, but maybe that defeats
+        // part of the purpose; to see the path.
         } else {
             error!("Accumulated signature is invalid");
             None

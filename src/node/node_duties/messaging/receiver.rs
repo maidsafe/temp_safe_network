@@ -9,10 +9,7 @@
 use crate::node::state_db::Command;
 use crossbeam_channel::{Receiver as Channel, Select};
 use routing::{event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 pub struct Receiver {
     network_receiver: Channel<RoutingEvent>,
@@ -33,10 +30,12 @@ pub struct ReceivingChannel {
 }
 
 impl Receiver {
-    pub fn new(network_receiver: Channel<RoutingEvent>,
+    pub fn new(
+        network_receiver: Channel<RoutingEvent>,
         client_receiver: Channel<ClientEvent>,
         command_receiver: Channel<Command>,
-        routing: Rc<RefCell<Routing>>) -> Self {
+        routing: Rc<RefCell<Routing>>,
+    ) -> Self {
         Self {
             network_receiver,
             client_receiver,
@@ -82,9 +81,7 @@ impl Receiver {
                     Command::Shutdown => Received::Shutdown,
                 }
             }
-            index => {
-                Received::Unknown(ReceivingChannel { index })
-            }
+            index => Received::Unknown(ReceivingChannel { index }),
         }
     }
 }

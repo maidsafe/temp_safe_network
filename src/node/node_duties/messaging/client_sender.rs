@@ -7,12 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{node::node_ops::MessagingDuty, utils};
+use bytes::Bytes;
 use log::{error, info, warn};
 use routing::{DstLocation, Node as Routing, SrcLocation};
-use safe_nd::{Address, MsgEnvelope, XorName, HandshakeResponse};
-use std::{cell::RefCell, collections::BTreeSet, fmt::{self, Display, Formatter}, rc::Rc, net::SocketAddr};
+use safe_nd::{Address, HandshakeResponse, MsgEnvelope, XorName};
 use serde::Serialize;
-use bytes::Bytes;
+use std::{
+    cell::RefCell,
+    collections::BTreeSet,
+    fmt::{self, Display, Formatter},
+    net::SocketAddr,
+    rc::Rc,
+};
 
 pub(super) struct ClientSender {
     routing: Rc<RefCell<Routing>>,
@@ -31,7 +37,11 @@ impl ClientSender {
         }
     }
 
-    pub fn handshake(&self, recipient: SocketAddr, hs: &HandshakeResponse) -> Option<MessagingDuty> {
+    pub fn handshake(
+        &self,
+        recipient: SocketAddr,
+        hs: &HandshakeResponse,
+    ) -> Option<MessagingDuty> {
         self.send_any_to_client(recipient, hs)
     }
 
@@ -42,7 +52,11 @@ impl ClientSender {
         None
     }
 
-    fn send_any_to_client<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) -> Option<MessagingDuty> {
+    fn send_any_to_client<T: Serialize>(
+        &mut self,
+        recipient: SocketAddr,
+        msg: &T,
+    ) -> Option<MessagingDuty> {
         let msg = utils::serialise(msg);
         let bytes = Bytes::from(msg);
 

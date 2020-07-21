@@ -9,7 +9,12 @@
 mod chunks;
 
 use self::chunks::Chunks;
-use crate::{node::node_ops::{AdultDuty, ChunkDuty, NodeDuty, NodeOperation}, node::keys::NodeKeys, node::state_db::NodeInfo, Result};
+use crate::{
+    node::keys::NodeKeys,
+    node::node_ops::{AdultDuty, ChunkDuty, NodeDuty, NodeOperation},
+    node::state_db::NodeInfo,
+    Result,
+};
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -22,27 +27,23 @@ pub(crate) struct AdultDuties {
 }
 
 impl AdultDuties {
-    pub fn new(
-        node_info: NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
-    ) -> Result<Self> {
+    pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let keys = node_info.keys();
         let chunks = Chunks::new(node_info, &total_used_space)?;
         Ok(Self { keys, chunks })
     }
 
     pub fn process(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
-        use NodeDuty::*;
         use AdultDuty::*;
         use ChunkDuty::*;
+        use NodeDuty::*;
         use NodeOperation::*;
-        
+
         let RunAsChunks(chunk_duty) = duty;
         let result = match chunk_duty {
-            ReadChunk(msg)
-            | WriteChunk(msg) => self.chunks.receive_msg(msg),
+            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg),
         };
-        
+
         result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 }

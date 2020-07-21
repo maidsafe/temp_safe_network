@@ -6,29 +6,26 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod messaging;
-mod network_events;
-mod msg_analysis;
 mod accumulation;
+pub mod messaging;
+mod msg_analysis;
+mod network_events;
 
-use network_events::NetworkEvents;
-use msg_analysis::NetworkMsgAnalysis;
-use crate::{
-    node::{
-        node_ops::{NodeOperation, NodeDuty},
-        adult_duties::AdultDuties,
-        elder_duties::ElderDuties,
-        node_duties::messaging::Messaging,
-        state_db::{AgeGroup, NodeInfo, dump_state},
-    },
+use crate::node::{
+    adult_duties::AdultDuties,
+    elder_duties::ElderDuties,
+    node_duties::messaging::Messaging,
+    node_ops::{NodeDuty, NodeOperation},
+    state_db::{dump_state, AgeGroup, NodeInfo},
 };
-use safe_nd::{NodeFullId, NodePublicId};
+use msg_analysis::NetworkMsgAnalysis;
+use network_events::NetworkEvents;
 use routing::Node as Routing;
+use safe_nd::{NodeFullId, NodePublicId};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-
 
 #[allow(clippy::large_enum_variant)]
 pub enum DutyLevel {
@@ -47,18 +44,17 @@ pub struct NodeDuties {
 }
 
 impl NodeDuties {
-    
     pub fn new(id: NodeFullId, node_info: NodeInfo, routing: Rc<RefCell<Routing>>) -> Self {
-            let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
-            let messaging = Messaging::new(routing.clone());
-            Self {
-                id,
-                node_info,
-                duty_level: DutyLevel::Infant,
-                network_events,
-                messaging,
-                routing,
-            }
+        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
+        let messaging = Messaging::new(routing.clone());
+        Self {
+            id,
+            node_info,
+            duty_level: DutyLevel::Infant,
+            network_events,
+            messaging,
+            routing,
+        }
     }
 
     pub fn id(&self) -> &NodePublicId {

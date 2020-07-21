@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::{MessagingDuty, GroupDecision}, utils};
+use crate::{
+    node::node_ops::{GroupDecision, MessagingDuty},
+    utils,
+};
 use log::{error, info};
 use routing::{DstLocation, Node as Routing, SrcLocation};
 use safe_nd::{Address, MsgEnvelope, XorName};
@@ -99,7 +102,7 @@ impl NetworkSender {
                 },
             )
     }
-    
+
     ///
     pub fn vote_for(&mut self, decision: GroupDecision) -> Option<MessagingDuty> {
         self.routing

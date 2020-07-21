@@ -7,7 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::transfers::replica_manager::ReplicaManager;
-use crate::{node::node_ops::{NodeDuty, PaymentDuty, NodeOperation, MessagingDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
+use crate::{
+    node::keys::NodeKeys,
+    node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::{MessagingDuty, NodeDuty, NodeOperation, PaymentDuty},
+};
 use safe_nd::{
     Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
@@ -45,7 +49,7 @@ impl DataPayment {
     pub fn process(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
         use NodeOperation::*;
-        
+
         let PaymentDuty::ProcessPayment(msg) = duty;
         let payment = match &msg.message {
             Message::Cmd {

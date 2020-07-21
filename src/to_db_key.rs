@@ -8,7 +8,7 @@
 
 use crate::utils;
 use safe_nd::{
-    ClientPublicId, BlobAddress, MapAddress, NodePublicId, PublicKey, SequenceAddress, XorName,
+    BlobAddress, ClientPublicId, MapAddress, NodePublicId, PublicKey, SequenceAddress, XorName,
 };
 use serde::Serialize;
 

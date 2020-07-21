@@ -27,14 +27,14 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::{distributions::Standard, Rng};
 use safe_nd::{
-    AppPermissions, ClientFullId, ClientRequest, Coins, CoinsRequest, EntryError, Error as NdError,
-    Blob, BlobAddress, BlobRequest, LoginPacket, LoginPacketRequest, Map, MapAction,
-    MapAddress, MapEntries, MapKind, MapPermissionSet, MapRequest, MapSeqEntryActions,
-    MapSeqValue, MapUnseqEntryActions, MapValue, MapValues, Message, MessageId,
-    PubImmutableData, PublicKey, Result as NdResult, Sequence, SequenceAddress, SequenceIndex, SequenceOwner,
+    AppPermissions, Blob, BlobAddress, BlobRequest, ClientFullId, ClientRequest, Coins,
+    CoinsRequest, EntryError, Error as NdError, LoginPacket, LoginPacketRequest, Map, MapAction,
+    MapAddress, MapEntries, MapKind, MapPermissionSet, MapRequest, MapSeqEntryActions, MapSeqValue,
+    MapUnseqEntryActions, MapValue, MapValues, Message, MessageId, PubImmutableData, PublicKey,
+    Result as NdResult, SeqMutableData, Sequence, SequenceAddress, SequenceIndex, SequenceOwner,
     SequencePrivUserPermissions, SequencePubUserPermissions, SequenceRequest, SequenceUser,
-    SequenceUserPermissions, SequenceWriteOp, SeqMutableData, Transaction, UnpubImmutableData,
-    UnseqMutableData, XorName,
+    SequenceUserPermissions, SequenceWriteOp, Transaction, UnpubImmutableData, UnseqMutableData,
+    XorName,
 };
 use safe_vault::{Result, COST_OF_PUT};
 use std::collections::{BTreeMap, BTreeSet};
@@ -959,9 +959,7 @@ fn delete_immutable_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::Blob(BlobRequest::DeleteUnpub(BlobAddress::Pub(
-            pub_Blob_address,
-        ))),
+        Request::Blob(BlobRequest::DeleteUnpub(BlobAddress::Pub(pub_Blob_address))),
         NdError::InvalidOperation,
     );
 
@@ -2511,7 +2509,8 @@ fn sequence_append_to_public() -> Result<()> {
 
     let _op = pub_Sequence.set_owner(owner_a);
 
-    let perms_0 = btreemap![SequenceUser::Key(owner_b) => SequencePubUserPermissions::new(true, true)];
+    let perms_0 =
+        btreemap![SequenceUser::Key(owner_b) => SequencePubUserPermissions::new(true, true)];
 
     let _op = pub_Sequence.set_pub_permissions(perms_0)?;
     let _op = pub_Sequence.append(b"one".to_vec());
@@ -2626,7 +2625,8 @@ fn sequence_append_concurrently_from_diff_clients() -> Result<()> {
     let _op = pub_Sequence.set_owner(owner_a);
 
     // client_b can also append
-    let perms_0 = btreemap![SequenceUser::Key(owner_b) => SequencePubUserPermissions::new(true, true)];
+    let perms_0 =
+        btreemap![SequenceUser::Key(owner_b) => SequencePubUserPermissions::new(true, true)];
 
     let _op = pub_Sequence.set_pub_permissions(perms_0)?;
     let _op = pub_Sequence.append(b"one".to_vec());

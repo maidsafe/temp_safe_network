@@ -6,24 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{RewardCounter, AccountId, HandshakeResponse, PublicKey, MsgEnvelope, XorName, Address, MessageId, SignedTransfer, DebitAgreementProof};
+use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
+use safe_nd::{
+    AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
+    RewardCounter, SignedTransfer, XorName,
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
-use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and
 /// exit point of remote messages.
 /// In other words, when communication from another
 /// participant at the network arrives, it is analysed
-/// and interpreted into an internal message, that can 
+/// and interpreted into an internal message, that can
 /// then be passed along to its proper processing module
 /// at the node. At a node module, the result of such a call
 /// is also an internal message.
 /// Finally, an internal message might be destined for Messaging
 /// module, by which it leaves the physical boundary of this node
 /// and is sent on the wire to some other destination(s) on the network.
-/// 
+///
 // #[derive(Debug)]
 // #[allow(clippy::large_enum_variant)]
 // pub(crate) enum NodeOperations {
@@ -63,7 +66,10 @@ pub enum GroupDecision {
 #[allow(clippy::large_enum_variant)]
 pub enum MessagingDuty {
     /// Send to a client.
-    SendToClient { address: SocketAddr, msg: MsgEnvelope },
+    SendToClient {
+        address: SocketAddr,
+        msg: MsgEnvelope,
+    },
     /// Send to a single node.
     SendToNode(MsgEnvelope),
     /// Send to a section.
@@ -76,8 +82,11 @@ pub enum MessagingDuty {
     /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
     VoteFor(GroupDecision),
-    /// 
-    SendHandshake { address: SocketAddr, response: HandshakeResponse },
+    ///
+    SendHandshake {
+        address: SocketAddr,
+        response: HandshakeResponse,
+    },
     ///
     DisconnectClient(SocketAddr),
 }
@@ -90,7 +99,7 @@ pub enum NodeDuty {
 }
 
 pub enum ElderDuty {
-    ProcessLostMember { 
+    ProcessLostMember {
         name: XorName,
         age: u8,
     },
@@ -169,14 +178,14 @@ pub enum RewardDuty {
     ///
     AccumulateReward {
         ///
-        data: Vec<u8>
+        data: Vec<u8>,
     },
     ///
     AddNewAccount {
         ///
-        id: AccountId, 
+        id: AccountId,
         ///
-        node_id: XorName
+        node_id: XorName,
     },
     ///
     AddRelocatedAccount {
@@ -188,11 +197,11 @@ pub enum RewardDuty {
     ///
     ClaimRewardCounter {
         ///
-        old_node_id: XorName, 
+        old_node_id: XorName,
         ///
-        new_node_id: XorName, 
+        new_node_id: XorName,
         ///
-        msg_id: MessageId, 
+        msg_id: MessageId,
         ///
         origin: Address,
     },
@@ -206,7 +215,7 @@ pub enum RewardDuty {
         counter: RewardCounter,
     },
     PrepareAccountMove {
-        node_id: XorName
+        node_id: XorName,
     },
 }
 
@@ -218,18 +227,18 @@ pub enum TransferDuty {
     ProcessQuery {
         query: TransferQuery,
         ///
-        msg_id: MessageId, 
+        msg_id: MessageId,
         ///
         origin: Address,
     },
     ///
-    ProcessCmd { 
+    ProcessCmd {
         cmd: TransferCmd,
         ///
-        msg_id: MessageId, 
+        msg_id: MessageId,
         ///
         origin: Address,
-    }
+    },
 }
 
 pub enum TransferQuery {
@@ -267,8 +276,12 @@ impl From<safe_nd::TransferCmd> for TransferCmd {
         match cmd {
             #[cfg(feature = "simulated-payouts")]
             safe_nd::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-            safe_nd::TransferCmd::ValidateTransfer(signed_transfer) => Self::ValidateTransfer(signed_transfer),
-            safe_nd::TransferCmd::RegisterTransfer(debit_agreement) => Self::RegisterTransfer(debit_agreement),
+            safe_nd::TransferCmd::ValidateTransfer(signed_transfer) => {
+                Self::ValidateTransfer(signed_transfer)
+            }
+            safe_nd::TransferCmd::RegisterTransfer(debit_agreement) => {
+                Self::RegisterTransfer(debit_agreement)
+            }
         }
     }
 }
@@ -277,8 +290,12 @@ impl From<safe_nd::TransferQuery> for TransferQuery {
     fn from(cmd: safe_nd::TransferQuery) -> Self {
         match cmd {
             safe_nd::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
-            safe_nd::TransferQuery::GetBalance(signed_transfer) => Self::GetBalance(signed_transfer),
-            safe_nd::TransferQuery::GetHistory { at, since_version } => Self::GetHistory { at, since_version },
+            safe_nd::TransferQuery::GetBalance(signed_transfer) => {
+                Self::GetBalance(signed_transfer)
+            }
+            safe_nd::TransferQuery::GetHistory { at, since_version } => {
+                Self::GetHistory { at, since_version }
+            }
         }
     }
 }

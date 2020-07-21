@@ -12,11 +12,15 @@ mod validator;
 
 use self::section_funds::SectionFunds;
 pub use self::{system::FarmingSystem, validator::Validator};
-use crate::{node::node_ops::{NodeDuty, NodeOperation, MessagingDuty, RewardDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping};
+use crate::{
+    node::keys::NodeKeys,
+    node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::{MessagingDuty, NodeDuty, NodeOperation, RewardDuty},
+};
 use safe_farming::{Accumulation, StorageRewards};
 use safe_nd::{
-    AccountId, ElderDuties, Error, Message, MessageId, Money, Address, NodeCmd, NodeCmdError,
-    NodeEvent, NodeRewardError, RewardCounter, XorName, NodeRewardCmd,
+    AccountId, Address, ElderDuties, Error, Message, MessageId, Money, NodeCmd, NodeCmdError,
+    NodeEvent, NodeRewardCmd, NodeRewardError, RewardCounter, XorName,
 };
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
@@ -60,38 +64,36 @@ impl Rewards {
     pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
-            AccumulateReward {
-                data,
-            } => self.accumulate_reward(data),
-            AddNewAccount {
-                id, 
-                node_id,
-            } => self.add_account(id, node_id),
+            AccumulateReward { data } => self.accumulate_reward(data),
+            AddNewAccount { id, node_id } => self.add_account(id, node_id),
             AddRelocatedAccount {
                 old_node_id,
                 new_node_id,
             } => self.add_relocated_account(old_node_id, new_node_id),
             ClaimRewardCounter {
-                old_node_id, new_node_id, msg_id, origin,
+                old_node_id,
+                new_node_id,
+                msg_id,
+                origin,
             } => self.claim_rewards(old_node_id, new_node_id, msg_id, &origin),
             ReceiveClaimedRewards {
                 id,
                 node_id,
                 counter,
             } => self.receive_claimed_rewards(id, node_id, counter),
-            PrepareAccountMove {
-                node_id,
-            } => self.node_left(node_id)
+            PrepareAccountMove { node_id } => self.node_left(node_id),
         };
         use NodeDuty::*;
         use NodeOperation::*;
-        
+
         result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
     /// 0. A brand new node has joined our section.
     fn add_account(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
-        let _ = self.node_accounts.insert(node_id, RewardAccount::Active(id));
+        let _ = self
+            .node_accounts
+            .insert(node_id, RewardAccount::Active(id));
         None
     }
 

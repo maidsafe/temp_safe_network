@@ -6,33 +6,30 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{
-    MsgEnvelope, XorName, PublicKey,
-};
-use log::{trace, error, info};
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::node_ops::{NodeDuty, GroupDecision, GatewayDuty, RewardDuty, ElderDuty, NodeOperation};
-use routing::event::Event as RoutingEvent;
+use crate::node::node_ops::{
+    ElderDuty, GatewayDuty, GroupDecision, NodeDuty, NodeOperation, RewardDuty,
+};
 use hex_fmt::HexFmt;
+use log::{error, info, trace};
+use routing::event::Event as RoutingEvent;
+use safe_nd::{MsgEnvelope, PublicKey, XorName};
 
 pub struct NetworkEvents {
     analysis: NetworkMsgAnalysis,
 }
 
 impl NetworkEvents {
-
     pub fn new(analysis: NetworkMsgAnalysis) -> Self {
-        Self {
-            analysis
-        }
+        Self { analysis }
     }
 
     pub fn process(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
-        use NodeOperation::*;
-        use GatewayDuty::*;
-        use RewardDuty::*;
         use ElderDuty::*;
+        use GatewayDuty::*;
         use NodeDuty::*;
+        use NodeOperation::*;
+        use RewardDuty::*;
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<GroupDecision>(&custom_event) {
@@ -50,16 +47,20 @@ impl NetworkEvents {
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 Some(RunAsElder(ProcessLostMember {
-                    name: XorName(name.0), 
-                    age, 
+                    name: XorName(name.0),
+                    age,
                 }))
             }
-            RoutingEvent::MemberJoined { name, previous_name, .. } => {
+            RoutingEvent::MemberJoined {
+                name,
+                previous_name,
+                ..
+            } => {
                 trace!("New member has joined the section");
                 // info!("No. of Elders: {}", self.routing.borrow().our_elders().count());
                 // info!("No. of Adults: {}", self.routing.borrow().our_adults().count());
                 Some(RunAsRewards(AddRelocatedAccount {
-                    old_node_id: XorName(name.0), 
+                    old_node_id: XorName(name.0),
                     new_node_id: XorName(previous_name.0),
                 }))
             }
@@ -78,11 +79,11 @@ impl NetworkEvents {
             }
             RoutingEvent::EldersChanged { key, elders, .. } => {
                 Some(RunAsElder(ProcessElderChange {
-                    //prefix, 
-                    key: PublicKey::Bls(key), 
+                    //prefix,
+                    key: PublicKey::Bls(key),
                     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
                 }))
-            },
+            }
             // Ignore all other events
             _ => None,
         }

@@ -10,22 +10,25 @@ pub mod state_db;
 
 mod adult_duties;
 mod elder_duties;
-mod node_duties;
 mod keys;
 mod msg_wrapping;
-mod section_querying;
+mod node_duties;
 mod node_ops;
+mod section_querying;
 
 pub use crate::node::state_db::{Command, Init};
 use crate::{
     node::{
-        node_ops::{
-            NodeDuty, NodeOperation, GatewayDuty, PaymentDuty,
-            MetadataDuty, RewardDuty, TransferDuty, ElderDuty, AdultDuty,
-        },
-        node_duties::{NodeDuties, messaging::{Receiver, Received}},
         keys::NodeKeys,
-        state_db::{NodeInfo, read_state, AgeGroup},
+        node_duties::{
+            messaging::{Received, Receiver},
+            NodeDuties,
+        },
+        node_ops::{
+            AdultDuty, ElderDuty, GatewayDuty, MetadataDuty, NodeDuty, NodeOperation, PaymentDuty,
+            RewardDuty, TransferDuty,
+        },
+        state_db::{read_state, AgeGroup, NodeInfo},
     },
     utils, Config, Result,
 };
@@ -50,12 +53,7 @@ pub struct Node<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> Node<R> {
     /// Initialize a new node.
-    pub fn new(
-        routing: Routing,
-        receiver: Receiver,
-        config: &Config,
-        mut rng: R,
-    ) -> Result<Self> {
+    pub fn new(routing: Routing, receiver: Receiver, config: &Config, mut rng: R) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
@@ -74,16 +72,12 @@ impl<R: CryptoRng + Rng> Node<R> {
             root_dir: root_dir_buf,
             init_mode: Init::New,
             /// Upper limit in bytes for allowed network storage on this node.
-            /// An Adult would be using the space for chunks, 
+            /// An Adult would be using the space for chunks,
             /// while an Elder uses it for metadata.
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(
-            id,
-            node_info,
-            routing.clone(),
-        );
+        let mut duties = NodeDuties::new(id, node_info, routing.clone());
 
         use AgeGroup::*;
         match age_group {
@@ -119,15 +113,19 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub fn run(&mut self) {
-        use NodeOperation::*;
         use GatewayDuty::*;
         use NodeDuty::*;
+        use NodeOperation::*;
         loop {
             let result = match self.receiver.next() {
                 Received::Client(event) => RunAsGateway(ProcessClientEvent(event)),
                 Received::Network(event) => RunAsNode(ProcessNetworkEvent(event)),
                 Received::Unknown(channel) => {
-                    if let Err(err) = self.routing.borrow_mut().handle_selected_operation(channel.index) {
+                    if let Err(err) = self
+                        .routing
+                        .borrow_mut()
+                        .handle_selected_operation(channel.index)
+                    {
                         warn!("Could not process operation: {}", err);
                     }
                     continue;
@@ -140,7 +138,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     ///
     pub fn process_while_any(&mut self, op: Option<NodeOperation>) {
         use NodeOperation::*;
-        
+
         let mut next_op = op;
         while let Some(op) = next_op {
             next_op = match op {
@@ -168,7 +166,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn run_as_transfers(&mut self, duty: TransferDuty) -> Option<NodeOperation> {
         self.duties.elder_duties()?.transfers().process(&duty)
     }
-    
+
     fn run_as_metadata(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
         self.duties.elder_duties()?.metadata().process(&duty)
     }
@@ -180,7 +178,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn run_as_node(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
         self.duties.process(duty)
     }
-    
+
     fn run_as_elder(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         self.duties.elder_duties()?.process(duty)
     }

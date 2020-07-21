@@ -1,5 +1,5 @@
 use super::validator::Validator;
-use crate::{node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::msg_wrapping::ElderMsgWrapping, node::node_ops::MessagingDuty};
 use safe_nd::{AccountId, Message, MessageId, Money, NodeCmd, NodeTransferCmd, TransferValidated};
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
@@ -14,7 +14,11 @@ impl SectionFunds {
         Self { actor, wrapping }
     }
 
-    pub fn initiate_reward_payout(&mut self, amount: Money, to: AccountId) -> Option<MessagingDuty> {
+    pub fn initiate_reward_payout(
+        &mut self,
+        amount: Money,
+        to: AccountId,
+    ) -> Option<MessagingDuty> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
         match self.actor.transfer(amount, to) {

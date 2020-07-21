@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping};
+use crate::{node::msg_wrapping::ElderMsgWrapping, node::node_ops::MessagingDuty};
 use log::trace;
 use safe_nd::{
-    Account, AccountWrite, BlobRead, BlobWrite, Cmd, CmdError, DataCmd, DataQuery,
-    Error as NdError, Blob, BlobAddress, BlobKind, Map, MapRead, MapWrite, Message,
-    MsgEnvelope, Query, Sequence, SequenceAddress, SequenceRead, SequenceWrite,
+    Account, AccountWrite, Blob, BlobAddress, BlobKind, BlobRead, BlobWrite, Cmd, CmdError,
+    DataCmd, DataQuery, Error as NdError, Map, MapRead, MapWrite, Message, MsgEnvelope, Query,
+    Sequence, SequenceAddress, SequenceRead, SequenceWrite,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -94,9 +94,10 @@ impl Sequences {
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
             Delete(address) => self.initiate_deletion(address, msg),
-            SetPublicPermissions { .. } | SetPrivatePermissions { .. } | SetOwner { .. } | Edit(..) => {
-                self.initiate_edit(msg)
-            }
+            SetPublicPermissions { .. }
+            | SetPrivatePermissions { .. }
+            | SetOwner { .. }
+            | Edit(..) => self.initiate_edit(msg),
         }
     }
 

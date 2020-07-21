@@ -8,17 +8,17 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    node::node_ops::MessagingDuty,
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::MessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
 use safe_nd::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
-    Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex, SequenceOwner, SequencePermissions,
-    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, SequenceWriteOp, SequenceRead,
-    SequenceWrite,
+    Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex, SequenceOwner,
+    SequencePermissions, SequencePrivatePermissions, SequencePublicPermissions, SequenceRead,
+    SequenceUser, SequenceWrite, SequenceWriteOp,
 };
 use std::{
     cell::Cell,
@@ -82,7 +82,9 @@ impl SequenceStorage {
             Edit(operation) => self.edit(operation, msg_id, origin),
             Delete(address) => self.delete(address, msg_id, origin),
             SetOwner(operation) => self.set_owner(operation, msg_id, origin),
-            SetPublicPermissions(operation) => self.set_public_permissions(operation, msg_id, origin),
+            SetPublicPermissions(operation) => {
+                self.set_public_permissions(operation, msg_id, origin)
+            }
             SetPrivatePermissions(operation) => {
                 self.set_private_permissions(operation, msg_id, origin)
             }
@@ -175,7 +177,11 @@ impl SequenceStorage {
     ) -> Option<MessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| sequence.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
+            .and_then(|sequence| {
+                sequence
+                    .in_range(range.0, range.1)
+                    .ok_or(NdError::NoSuchEntry)
+            });
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceRange(result),
             id: MessageId::new(),
@@ -190,12 +196,12 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result =
-            self.get_chunk(address, SequenceAction::Read, origin)
-                .and_then(|sequence| match sequence.last_entry() {
-                    Some(entry) => Ok((sequence.entries_index() - 1, entry.to_vec())),
-                    None => Err(NdError::NoSuchEntry),
-                });
+        let result = self
+            .get_chunk(address, SequenceAction::Read, origin)
+            .and_then(|sequence| match sequence.last_entry() {
+                Some(entry) => Ok((sequence.entries_index() - 1, entry.to_vec())),
+                None => Err(NdError::NoSuchEntry),
+            });
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceLastEntry(result),
             id: MessageId::new(),
@@ -334,10 +340,15 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
-        let result = self.edit_chunk(address, SequenceAction::Append, origin, move |mut sequence| {
-            sequence.apply_crdt_op(write_op.crdt_op);
-            Ok(sequence)
-        });
+        let result = self.edit_chunk(
+            address,
+            SequenceAction::Append,
+            origin,
+            move |mut sequence| {
+                sequence.apply_crdt_op(write_op.crdt_op);
+                Ok(sequence)
+            },
+        );
         self.ok_or_error(result, msg_id, origin)
     }
 

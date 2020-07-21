@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::node_ops::MessagingDuty, node::msg_wrapping::ElderMsgWrapping,
+    node::msg_wrapping::ElderMsgWrapping, node::node_ops::MessagingDuty,
     node::section_querying::SectionQuerying, node::NodeInfo, utils, Config, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    BlobRead, BlobWrite, CmdError, Error as NdError, Blob, BlobAddress, Message, MessageId,
-    MsgEnvelope, NodeCmd, PublicKey, QueryResponse, Result as NdResult, XorName, NodeDataCmd,
+    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, Error as NdError, Message, MessageId,
+    MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -60,7 +60,8 @@ impl BlobRegister {
         //let root_dir = config.root_dir()?;
         let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
         let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
-        let full_adults = utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode)?;
+        let full_adults =
+            utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode)?;
 
         Ok(Self {
             metadata,
@@ -175,7 +176,7 @@ impl BlobRegister {
     ) -> Vec<MessagingDuty> {
         use NodeCmd::*;
         use NodeDataCmd::*;
-        
+
         self.get_new_holders_for_chunk(&address)
             .into_iter()
             .map(|new_holder| {

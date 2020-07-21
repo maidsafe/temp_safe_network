@@ -10,7 +10,9 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{node::node_ops::MessagingDuty, node::keys::NodeKeys, node::state_db::NodeInfo, Result};
+use crate::{
+    node::keys::NodeKeys, node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result,
+};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use writing::Writing;
@@ -30,10 +32,7 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub fn new(
-        node_info: NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
-    ) -> Result<Self> {
+    pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let keys = node_info.keys();
         let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
 

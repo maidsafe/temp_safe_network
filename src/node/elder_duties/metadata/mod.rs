@@ -15,8 +15,12 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
-    node::node_ops::{NodeDuty, NodeOperation, MessagingDuty, MetadataDuty}, node::keys::NodeKeys, node::msg_wrapping::ElderMsgWrapping,
-    node::section_querying::SectionQuerying, node::state_db::NodeInfo, Result,
+    node::keys::NodeKeys,
+    node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::{MessagingDuty, MetadataDuty, NodeDuty, NodeOperation},
+    node::section_querying::SectionQuerying,
+    node::state_db::NodeInfo,
+    Result,
 };
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
@@ -57,11 +61,8 @@ impl Metadata {
         let blob_register =
             BlobRegister::new(node_info.clone(), wrapping.clone(), section_querying)?;
         let map_storage = MapStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
-        let sequence_storage = SequenceStorage::new(
-            node_info.clone(),
-            total_used_space,
-            wrapping.clone(),
-        )?;
+        let sequence_storage =
+            SequenceStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,
@@ -76,13 +77,12 @@ impl Metadata {
     }
 
     pub fn process(&mut self, duty: &MetadataDuty) -> Option<NodeOperation> {
-        use NodeDuty::*;
         use MetadataDuty::*;
+        use NodeDuty::*;
         use NodeOperation::*;
 
         let result = match duty {
-            ProcessRead(msg)
-            | ProcessWrite(msg) => self.process_msg(msg),
+            ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg),
         };
 
         result.map(|c| RunAsNode(ProcessMessaging(c)))
