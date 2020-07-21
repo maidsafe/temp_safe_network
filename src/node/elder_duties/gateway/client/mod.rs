@@ -6,41 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use self::onboarding::Onboarding;
-use crate::{cmd::MessagingDuty, utils};
-use bytes::Bytes;
-use log::{debug, error, info, trace, warn};
-use rand::{CryptoRng, Rng};
-use routing::Node as Routing;
-use safe_nd::{
-    Address, Error, HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope,
-    MsgSender, NodePublicId, PublicId, Result, Signature, XorName,
+mod client_input_parse;
+mod onboarding;
+
+pub use self::client_input_parse::{
+    try_deserialize_handshake, try_deserialize_msg, ClientInput, ClientMsg,
 };
-use serde::Serialize;
+pub use self::onboarding::Onboarding;
+use crate::node::node_ops::MessagingDuty;
+use log::{error, info};
+use safe_nd::{Address, Message, MessageId, MsgEnvelope, NodePublicId};
 use std::{
-    cell::RefCell,
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    rc::Rc,
 };
-
-#[derive(Clone, Debug)]
-pub struct ClientMsg {
-    pub client: ClientInfo,
-    pub msg: MsgEnvelope,
-}
-
-#[derive(Clone, Debug)]
-pub struct ClientInfo {
-    pub public_id: PublicId,
-}
-
-impl Display for ClientInfo {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.public_id.name())
-    }
-}
 
 pub struct ClientMsgTracking {
     id: NodePublicId,
@@ -53,21 +33,29 @@ impl ClientMsgTracking {
     pub fn new(id: NodePublicId, onboarding: Onboarding) -> Self {
         Self {
             id,
+            onboarding,
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
     }
 
-    /// If 
-    pub fn track_incoming(&mut self, msg_id: MessageId, client_address: SocketAddr) -> Option<MessagingDuty> {
+    /// If
+    pub fn track_incoming(
+        &mut self,
+        msg_id: MessageId,
+        client_address: SocketAddr,
+    ) -> Option<MessagingDuty> {
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
-            return Some(MessagingDuty::SendToClient { address: client_address, msg });
+            return Some(MessagingDuty::SendToClient {
+                address: client_address,
+                msg,
+            });
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
-            let _ = ve.insert(peer_addr);
+            let _ = ve.insert(client_address);
             None
         } else {
             info!(
@@ -118,10 +106,12 @@ impl ClientMsgTracking {
             }
         };
 
-        Some(MessagingDuty::SendToClient { address: client_address, msg })
+        Some(MessagingDuty::SendToClient {
+            address: client_address,
+            msg: msg.clone(),
+        })
     }
 
-    
     // #[allow(unused)]
     // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
     //     for client_id in self.lookup_client_and_its_apps(client) {
@@ -154,32 +144,31 @@ impl ClientMsgTracking {
     //     }
     // }
 
-    fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
-        self.clients
-            .iter()
-            .filter_map(|(peer_addr, client)| {
-                if &client.public_id == id {
-                    Some(*peer_addr)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
+    // fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
+    //     self.clients
+    //         .iter()
+    //         .filter_map(|(peer_addr, client)| {
+    //             if &client.public_id == id {
+    //                 Some(*peer_addr)
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect()
+    // }
 
-    fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
-        self.clients
-            .values()
-            .filter_map(|client| {
-                if client.public_id.name() == name {
-                    Some(client.public_id.clone())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>()
-    }
-
+    // fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
+    //     self.clients
+    //         .values()
+    //         .filter_map(|client| {
+    //             if client.public_id.name() == name {
+    //                 Some(client.public_id.clone())
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect::<Vec<_>>()
+    // }
 }
 
 impl Display for ClientMsgTracking {

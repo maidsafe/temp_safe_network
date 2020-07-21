@@ -21,42 +21,42 @@ use self::{
 };
 use crate::{
     node::keys::NodeKeys,
-    node::node_ops::{ElderDuty, MessagingDuty, NodeDuty, NodeOperation, RewardDuty},
+    node::node_ops::{ElderDuty, NodeOperation, RewardDuty},
     node::section_querying::SectionQuerying,
-    node::state_db::Init,
     node::state_db::NodeInfo,
-    utils, Config, Result,
+    utils, Result,
 };
+use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, RoutingError};
 use safe_nd::XorName;
 use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
-    path::Path,
     rc::Rc,
 };
 
-pub(crate) struct ElderDuties {
+pub(crate) struct ElderDuties<R: CryptoRng + Rng> {
     keys: NodeKeys,
     metadata: Metadata,
     transfers: Transfers,
-    gateway: Gateway,
+    gateway: Gateway<R>,
     data_payment: DataPayment,
     rewards: Rewards,
     routing: Rc<RefCell<Routing>>,
 }
 
-impl ElderDuties {
+impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub fn new(
         info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         routing: Rc<RefCell<Routing>>,
+        rng: R,
     ) -> Result<Self> {
         let section_querying = SectionQuerying::new(routing.clone());
 
         // Gateway
-        let gateway = Gateway::new(info.clone(), section_querying.clone())?;
+        let gateway = Gateway::new(info.clone(), section_querying.clone(), rng)?;
 
         // Metadata
         let metadata = Metadata::new(info.clone(), &total_used_space, section_querying)?;
@@ -87,7 +87,7 @@ impl ElderDuties {
         })
     }
 
-    pub fn gateway(&mut self) -> &mut Gateway {
+    pub fn gateway(&mut self) -> &mut Gateway<R> {
         &mut self.gateway
     }
 
@@ -177,7 +177,7 @@ impl ElderDuties {
     }
 }
 
-impl Display for ElderDuties {
+impl<R: CryptoRng + Rng> Display for ElderDuties<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.keys.public_key())
     }

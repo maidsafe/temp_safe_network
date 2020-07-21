@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
+mod client;
 mod validation;
 
 use self::{
@@ -14,52 +15,45 @@ use self::{
     validation::Validation,
 };
 use crate::{
+    node::elder_duties::gateway::client::{
+        try_deserialize_handshake, try_deserialize_msg, ClientInput, ClientMsgTracking, Onboarding,
+    },
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_duties::messaging::{
-        ClientInput, ClientMsg, ClientMsgTracking, InputParsing, Onboarding,
-    },
     node::state_db::NodeInfo,
     node::{
         node_ops::{GatewayDuty, GroupDecision, MessagingDuty, NodeDuty, NodeOperation},
         section_querying::SectionQuerying,
     },
-    Config, Result,
+    Result,
 };
-use bytes::Bytes;
 use log::{error, info, trace};
-use rand::CryptoRng;
+use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
 use routing::TransportEvent as ClientEvent;
-use safe_nd::{Address, AuthCmd, Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
-use std::{
-    fmt::{self, Display, Formatter},
-    net::SocketAddr,
-    path::Path,
-};
+use safe_nd::{Address, Cmd, ElderDuties, Message, MsgEnvelope, PublicId, Query};
+use std::fmt::{self, Display, Formatter};
 
-pub(crate) struct Gateway {
+pub(crate) struct Gateway<R: CryptoRng + Rng> {
     keys: NodeKeys,
     auth: Auth,
     data: Validation,
     section: SectionQuerying,
     onboarding: Onboarding,
-    input_parsing: InputParsing,
     client_msg_tracking: ClientMsgTracking,
+    rng: R,
 }
 
-impl Gateway {
-    pub fn new(info: NodeInfo, section: SectionQuerying) -> Result<Self> {
+impl<R: CryptoRng + Rng> Gateway<R> {
+    pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
         let auth_keys_db = AuthKeysDb::new(info.root_dir, info.init_mode)?;
 
         let wrapping = ElderMsgWrapping::new(info.keys.clone(), ElderDuties::Gateway);
         let auth = Auth::new(info.keys.clone(), auth_keys_db, wrapping.clone());
         let data = Validation::new(wrapping);
 
-        let onboarding = Onboarding::new(info.id.clone());
-        let input_parsing = InputParsing::new();
-        let client_msg_tracking = ClientMsgTracking::new(onboarding);
+        let onboarding = Onboarding::new(info.id.clone(), section);
+        let client_msg_tracking = ClientMsgTracking::new(info.id, onboarding);
 
         let gateway = Self {
             keys: info.keys,
@@ -67,8 +61,8 @@ impl Gateway {
             data,
             section,
             onboarding,
-            input_parsing,
             client_msg_tracking,
+            rng,
         };
 
         Ok(gateway)
@@ -87,10 +81,9 @@ impl Gateway {
     }
 
     fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        use AuthCmd::*;
         if let Address::Client(xorname) = &msg.destination() {
             if self.section.handles(&xorname) {
-                self.client_msg_tracking.match_outgoing(msg)
+                return self.client_msg_tracking.match_outgoing(msg);
             }
             None
         } else if let Message::Cmd {
@@ -98,9 +91,9 @@ impl Gateway {
             ..
         } = &msg.message
         {
-            /// Temporary, while Authenticator is not implemented at app layer.
-            /// If a request within MessagingDuty::ForwardClientRequest issued by us in `handle_group_decision`
-            /// was made by Gateway and destined to our section, this is where the actual request will end up.
+            // Temporary, while Authenticator is not implemented at app layer.
+            // If a request within MessagingDuty::ForwardClientRequest issued by us in `handle_group_decision`
+            // was made by Gateway and destined to our section, this is where the actual request will end up.
             return self.auth.finalise(auth_cmd, msg.id(), &msg.origin);
         } else {
             // so, it wasn't really for Gateway after all
@@ -132,24 +125,27 @@ impl Gateway {
                 self.onboarding.remove_client(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                let parsed =
-                    self.input_parsing
-                        .try_parse_client_msg(peer.peer_addr(), &msg, &mut rng)?;
-                match parsed {
-                    ClientInput::Msgs(msg) => {
+                let parsed = if self.onboarding.contains(peer.peer_addr()) {
+                    try_deserialize_msg(msg)
+                } else {
+                    try_deserialize_handshake(msg, peer.peer_addr())
+                }?;
+                let parsed = match parsed {
+                    ClientInput::Msg(msg) => {
                         let result = self
                             .client_msg_tracking
-                            .track_incoming(msg.id, peer.peer_addr());
+                            .track_incoming(msg.id(), peer.peer_addr());
                         if result.is_some() {
                             return result;
                         }
+                        msg
                     }
                     ClientInput::Handshake(request) => {
-                        self.onboarding.process(request, peer.peer_addr(), &mut rng)
+                        return self.onboarding.process(request, peer.peer_addr(), &mut rng);
                     }
-                }
+                };
 
-                return self.process_client_msg(parsed.client.public_id, &parsed.msg);
+                return self.process_client_msg(parsed.public_id, &parsed.msg);
             }
             SentUserMessage { peer, .. } => {
                 trace!(
@@ -201,7 +197,7 @@ impl Gateway {
     }
 }
 
-impl Display for Gateway {
+impl<R: CryptoRng + Rng> Display for Gateway<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.keys.public_key())
     }

@@ -1,9 +1,7 @@
 use crate::utils;
 use log::{error, info};
 use routing::Node;
-use safe_nd::{
-    BlobAddress, Message, MessageId, MsgEnvelope, MsgSender, Signature, SignatureShare, XorName,
-};
+use safe_nd::{BlobAddress, MessageId, MsgEnvelope, MsgSender, Signature, SignatureShare, XorName};
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;

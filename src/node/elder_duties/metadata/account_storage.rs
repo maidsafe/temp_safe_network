@@ -20,7 +20,6 @@ use safe_nd::{
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
-    path::Path,
     rc::Rc,
 };
 

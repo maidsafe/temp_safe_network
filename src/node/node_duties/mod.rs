@@ -20,6 +20,7 @@ use crate::node::{
 };
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
+use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::{NodeFullId, NodePublicId};
 use std::{
@@ -28,23 +29,24 @@ use std::{
 };
 
 #[allow(clippy::large_enum_variant)]
-pub enum DutyLevel {
+pub enum DutyLevel<R: CryptoRng + Rng> {
     Infant,
     Adult(AdultDuties),
-    Elder(ElderDuties),
+    Elder(ElderDuties<R>),
 }
 
-pub struct NodeDuties {
+pub struct NodeDuties<R: CryptoRng + Rng> {
     id: NodeFullId,
     node_info: NodeInfo,
-    duty_level: DutyLevel,
+    duty_level: DutyLevel<R>,
     network_events: NetworkEvents,
     messaging: Messaging,
     routing: Rc<RefCell<Routing>>,
+    rng: R,
 }
 
-impl NodeDuties {
-    pub fn new(id: NodeFullId, node_info: NodeInfo, routing: Rc<RefCell<Routing>>) -> Self {
+impl<R: CryptoRng + Rng> NodeDuties<R> {
+    pub fn new(id: NodeFullId, node_info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Self {
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
         let messaging = Messaging::new(routing.clone());
         Self {
@@ -54,6 +56,7 @@ impl NodeDuties {
             network_events,
             messaging,
             routing,
+            rng,
         }
     }
 
@@ -69,7 +72,7 @@ impl NodeDuties {
         }
     }
 
-    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
+    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R>> {
         use DutyLevel::*;
         match &mut self.duty_level {
             Elder(ref mut duties) => Some(duties),
@@ -108,6 +111,7 @@ impl NodeDuties {
             self.node_info.clone(),
             &total_used_space,
             self.routing.clone(),
+            self.rng,
         ) {
             self.duty_level = Elder(duties);
             // NB: This is wrong, shouldn't write to disk here,

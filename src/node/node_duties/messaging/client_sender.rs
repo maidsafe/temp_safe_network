@@ -8,13 +8,12 @@
 
 use crate::{node::node_ops::MessagingDuty, utils};
 use bytes::Bytes;
-use log::{error, info, warn};
-use routing::{DstLocation, Node as Routing, SrcLocation};
-use safe_nd::{Address, HandshakeResponse, MsgEnvelope, XorName};
+use log::warn;
+use routing::Node as Routing;
+use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
 use serde::Serialize;
 use std::{
     cell::RefCell,
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     rc::Rc,

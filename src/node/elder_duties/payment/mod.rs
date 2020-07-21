@@ -10,11 +10,9 @@ use super::transfers::replica_manager::ReplicaManager;
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, NodeDuty, NodeOperation, PaymentDuty},
+    node::node_ops::{NodeDuty, NodeOperation, PaymentDuty},
 };
-use safe_nd::{
-    Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
-};
+use safe_nd::{Cmd, CmdError, ElderDuties, Error, Message, PublicKey, Result, TransferError};
 use std::{
     cell::{RefCell, RefMut},
     fmt::{self, Display, Formatter},

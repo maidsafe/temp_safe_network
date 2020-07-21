@@ -6,102 +6,77 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::utils;
 use bytes::Bytes;
-use log::{debug, error, info, trace, warn};
-use rand::{CryptoRng, Rng};
-use routing::Node as Routing;
-use safe_nd::{
-    Address, Error, HandshakeRequest, HandshakeResponse, Message, MessageId, MsgEnvelope,
-    MsgSender, NodePublicId, PublicId, Result, Signature, XorName,
-};
-use serde::Serialize;
+use log::info;
+use safe_nd::{HandshakeRequest, Message, MessageId, MsgEnvelope, MsgSender, PublicId};
 use std::{
-    cell::RefCell,
-    collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    rc::Rc,
 };
 
 pub enum ClientInput {
+    Msg(ClientMsg),
     Handshake(HandshakeRequest),
-    Msg(MsgEnvelope),
 }
 
-struct InputParsing {
-
+#[derive(Clone, Debug)]
+pub struct ClientMsg {
+    pub msg: MsgEnvelope,
+    pub public_id: PublicId,
 }
 
-impl InputParsing {
-    
-    pub fn new() -> Self {
-        Self {
-        
+impl ClientMsg {
+    pub fn id(&self) -> MessageId {
+        self.msg.id()
+    }
+}
+
+impl Display for ClientMsg {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}, {}", self.public_id.name(), &self.msg.id().0)
+    }
+}
+
+pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
+    let msg = match bincode::deserialize(&bytes) {
+        Ok((
+            public_id @ PublicId,
+            msg
+            @
+            MsgEnvelope {
+                message: Message::Cmd { .. },
+                origin: MsgSender::Client { .. },
+                ..
+            },
+        ))
+        | Ok((
+            public_id @ PublicId,
+            msg
+            @
+            MsgEnvelope {
+                message: Message::Query { .. },
+                origin: MsgSender::Client { .. },
+                ..
+            },
+        )) => ClientMsg { msg, public_id },
+        _ => return None, // Only cmds and queries from client are allowed through here.
+    };
+
+    Some(ClientInput::Msg(msg))
+}
+
+pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option<ClientInput> {
+    let hs = match bincode::deserialize(&bytes) {
+        Ok(hs @ HandshakeRequest::Bootstrap(_))
+        | Ok(hs @ HandshakeRequest::Join(_))
+        | Ok(hs @ HandshakeRequest::ChallengeResult(_)) => hs,
+        Err(err) => {
+            info!(
+                "Failed to deserialize client input from {} as a handshake: {}",
+                peer_addr, err
+            );
+            return None;
         }
-    }
-
-    pub fn try_parse_client_input<R: CryptoRng + Rng>(
-        &mut self,
-        peer_addr: SocketAddr,
-        bytes: &Bytes,
-        rng: &mut R,
-    ) -> Option<ClientInput> {
-        match self.clients.get(&peer_addr).cloned() {
-            None => self.try_deserialize_handshake(&bytes, peer_addr, rng),
-            Some(client) => self.try_deserialize_msg(bytes),
-                // if self.shall_handle_request(msg.message.id(), peer_addr) {
-                //     trace!(
-                //         "{}: Received ({:?} {:?}) from {}",
-                //         self,
-                //         "msg.get_type()",
-                //         msg.message.id(),
-                //         client,
-                //     );
-                //     return Some(ClientMsg { client, msg });
-                // }
-        }
-    }
-
-    fn try_deserialize_msg(&mut self, bytes: &Bytes) -> Option<ClientInput> {
-        let msg = match bincode::deserialize(&bytes) {
-            Ok(
-                msg
-                @
-                MsgEnvelope {
-                    message: Message::Cmd { .. },
-                    origin: MsgSender::Client { .. },
-                    ..
-                },
-            )
-            | Ok(
-                msg
-                @
-                MsgEnvelope {
-                    message: Message::Query { .. },
-                    origin: MsgSender::Client { .. },
-                    ..
-                },
-            ) => msg,
-            _ => return None, // Only cmds and queries from client are allowed through here.
-        };
-
-        Some(ClientInput::Msg(msg))
-    }
-
-    fn try_deserialize_handshake(&mut self, bytes: &Bytes, peer_addr: SocketAddr) -> Option<ClientInput> {
-        let hs = match bincode::deserialize(&bytes) {
-            Ok(hs @ HandshakeRequest::Bootstrap(_))
-            | Ok(hs @ HandshakeRequest::Join(_))
-            | Ok( hs @ HandshakeRequest::ChallengeResult(_)) => hs,
-            Err(err) => {
-                info!(
-                    "{}: Failed to deserialize client input from {} as a handshake: {}",
-                    self, peer_addr, err
-                );
-                return None;
-            }
-        };
-        Some(ClientInput::Handshake(hs))
-    }
+    };
+    Some(ClientInput::Handshake(hs))
 }

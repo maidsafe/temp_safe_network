@@ -17,9 +17,9 @@ use crate::{
     },
 };
 use safe_nd::{
-    Address, Cmd, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId,
-    MsgEnvelope, MsgSender, NodeCmd, NodeCmdError, NodeTransferCmd, NodeTransferError, PublicKey,
-    Query, QueryResponse, SignedTransfer, TransferError,
+    Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
+    NodeCmdError, NodeTransferCmd, NodeTransferError, PublicKey, QueryResponse, SignedTransfer,
+    TransferError,
 };
 use std::{
     cell::RefCell,

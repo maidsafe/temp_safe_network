@@ -6,19 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::Result;
 use crate::{node::keys::NodeKeys, utils};
-use crate::{node::node_duties::DutyLevel, Config, Result};
-use log::{error, info, warn};
-use routing::Node as Routing;
 use safe_nd::{NodeFullId, NodePublicId};
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::{Cell, RefCell},
-    fmt::{self, Display, Formatter},
     fs,
-    net::SocketAddr,
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 const STATE_FILENAME: &str = "state";

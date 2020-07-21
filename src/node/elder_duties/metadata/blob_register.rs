@@ -8,7 +8,7 @@
 
 use crate::{
     node::msg_wrapping::ElderMsgWrapping, node::node_ops::MessagingDuty,
-    node::section_querying::SectionQuerying, node::NodeInfo, utils, Config, Result, ToDbKey,
+    node::section_querying::SectionQuerying, node::NodeInfo, utils, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
-    path::Path,
 };
 use tiny_keccak::sha3_256;
 

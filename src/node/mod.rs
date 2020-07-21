@@ -45,10 +45,9 @@ use std::{
 
 /// Main node struct.
 pub struct Node<R: CryptoRng + Rng> {
-    duties: NodeDuties,
+    duties: NodeDuties<R>,
     receiver: Receiver,
     routing: Rc<RefCell<Routing>>,
-    rng: R,
 }
 
 impl<R: CryptoRng + Rng> Node<R> {
@@ -77,7 +76,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(id, node_info, routing.clone());
+        let mut duties = NodeDuties::new(id, node_info, routing.clone(), rng);
 
         use AgeGroup::*;
         match age_group {
@@ -90,7 +89,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             duties,
             receiver,
             routing,
-            rng,
         };
 
         Ok(node)

@@ -17,7 +17,7 @@ use log::error;
 use routing::Node as Routing;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
-    NodeEvent, NodeRewardCmd, Query, TransferCmd, TransferQuery, XorName,
+    NodeEvent, NodeRewardCmd, Query, XorName,
 };
 use std::{cell::RefCell, rc::Rc};
 
