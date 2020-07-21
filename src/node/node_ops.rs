@@ -9,7 +9,7 @@
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
-    RewardCounter, SignedTransfer, XorName,
+    RewardCounter, SignedTransfer, TransferValidated, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
@@ -217,6 +217,8 @@ pub enum RewardDuty {
     PrepareAccountMove {
         node_id: XorName,
     },
+    ///
+    ReceiveRewardValidation(TransferValidated),
 }
 
 // --------------- Transfers ---------------
@@ -266,9 +268,9 @@ pub enum TransferCmd {
     ///
     PropagateTransfer(DebitAgreementProof),
     ///
-    InitiateRewardPayout(SignedTransfer),
+    ValidateRewardPayout(SignedTransfer),
     ///
-    FinaliseRewardPayout(DebitAgreementProof),
+    RegisterRewardPayout(DebitAgreementProof),
 }
 
 impl From<safe_nd::TransferCmd> for TransferCmd {

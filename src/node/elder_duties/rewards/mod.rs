@@ -82,6 +82,7 @@ impl Rewards {
                 counter,
             } => self.receive_claimed_rewards(id, node_id, counter),
             PrepareAccountMove { node_id } => self.node_left(node_id),
+            ReceiveRewardValidation(validation) => self.section_funds.receive(validation),
         };
         use NodeDuty::*;
         use NodeOperation::*;

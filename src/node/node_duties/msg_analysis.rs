@@ -405,6 +405,10 @@ impl NetworkMsgAnalysis {
                     node_id: *new_node_id,
                     counter: counter.clone(),
                 },
+                Message::NodeEvent {
+                    event: NodeEvent::RewardPayoutValidated(validation),
+                    ..
+                } => RewardDuty::ReceiveRewardValidation(validation.clone()),
                 _ => return None,
             };
             return Some(duty);

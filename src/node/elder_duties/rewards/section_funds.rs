@@ -30,7 +30,7 @@ impl SectionFunds {
                     None
                 } else {
                     self.wrapping.send(Message::NodeCmd {
-                        cmd: Transfers(InitiateRewardPayout(event.signed_transfer)),
+                        cmd: Transfers(ValidateRewardPayout(event.signed_transfer)),
                         id: MessageId::new(),
                     })
                 }
@@ -52,7 +52,7 @@ impl SectionFunds {
                     None
                 } else {
                     self.wrapping.send(Message::NodeCmd {
-                        cmd: Transfers(FinaliseRewardPayout(event.proof?)),
+                        cmd: Transfers(RegisterRewardPayout(event.proof?)),
                         id: MessageId::new(),
                     })
                 }

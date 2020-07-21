@@ -18,8 +18,8 @@ use crate::{
 };
 use safe_nd::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
-    NodeCmdError, NodeTransferCmd, NodeTransferError, PublicKey, QueryResponse, SignedTransfer,
-    TransferError,
+    NodeCmdError, NodeEvent, NodeTransferCmd, NodeTransferError, PublicKey, QueryResponse,
+    SignedTransfer, TransferError,
 };
 use std::{
     cell::RefCell,
@@ -135,13 +135,14 @@ impl Transfers {
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin)
             }
-            RegisterTransfer(debit_agreement) => self.register(&debit_agreement, msg_id, origin),
+            ValidateRewardPayout(signed_transfer) => {
+                self.validate_reward_payout(signed_transfer.clone(), msg_id, origin)
+            }
+            RegisterTransfer(debit_agreement) | RegisterRewardPayout(debit_agreement) => {
+                self.register(&debit_agreement, msg_id, origin)
+            }
             PropagateTransfer(debit_agreement) => {
                 self.receive_propagated(&debit_agreement, msg_id, origin)
-            }
-            InitiateRewardPayout(signed_transfer) => None, // TODO
-            FinaliseRewardPayout(debit_agreement) => {
-                self.finalise_reward_payout(&debit_agreement, msg_id, origin)
             }
         }
     }
@@ -239,6 +240,32 @@ impl Transfers {
         self.wrapping.send(message)
     }
 
+    /// This validation will render a signature over the
+    /// original request (ValidateTransfer), giving a partial
+    /// proof by this individual Elder, that the transfer is valid.
+    fn validate_reward_payout(
+        &mut self,
+        transfer: SignedTransfer,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Option<MessagingDuty> {
+        let message = match self.replica.borrow_mut().validate(transfer) {
+            Ok(None) => return None,
+            Ok(Some(event)) => Message::NodeEvent {
+                event: NodeEvent::RewardPayoutValidated(event),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+            },
+            Err(error) => Message::CmdError {
+                id: MessageId::new(),
+                error: CmdError::Transfer(TransferError::TransferValidation(error)),
+                correlation_id: msg_id,
+                cmd_origin: origin,
+            },
+        };
+        self.wrapping.send(message)
+    }
+
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     fn register(
@@ -250,20 +277,18 @@ impl Transfers {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
-        let message = match self.replica.borrow_mut().register(proof) {
+        match self.replica.borrow_mut().register(proof) {
             Ok(None) => return None,
-            Ok(Some(event)) => Message::NodeCmd {
+            Ok(Some(event)) => self.wrapping.send(Message::NodeCmd {
                 cmd: Transfers(PropagateTransfer(event.debit_proof)),
                 id: MessageId::new(),
-            },
-            Err(error) => Message::CmdError {
-                id: MessageId::new(),
-                error: CmdError::Transfer(TransferError::TransferRegistration(error)),
-                correlation_id: msg_id,
-                cmd_origin: origin,
-            },
-        };
-        self.wrapping.send(message)
+            }),
+            Err(error) => self.wrapping.error(
+                CmdError::Transfer(TransferError::TransferRegistration(error)),
+                msg_id,
+                &origin,
+            ),
+        }
     }
 
     /// The only step that is triggered by a Replica.
@@ -291,30 +316,6 @@ impl Transfers {
             },
         };
         self.wrapping.send(message)
-    }
-
-    fn finalise_reward_payout(
-        &mut self,
-        debit_agreement: &DebitAgreementProof,
-        msg_id: MessageId,
-        origin: Address,
-    ) -> Option<MessagingDuty> {
-        use NodeTransferCmd::*;
-        match self.replica.borrow_mut().register(&debit_agreement) {
-            Ok(None) => None,
-            Ok(Some(event)) => {
-                // the transfer is then propagated, and will reach the recipient section
-                self.wrapping.send(Message::NodeCmd {
-                    cmd: NodeCmd::Transfers(PropagateTransfer(event.debit_proof)),
-                    id: MessageId::new(),
-                })
-            }
-            Err(error) => self.wrapping.error(
-                CmdError::Transfer(TransferError::TransferRegistration(error)),
-                msg_id,
-                &origin,
-            ),
-        }
     }
 
     #[cfg(feature = "simulated-payouts")]
