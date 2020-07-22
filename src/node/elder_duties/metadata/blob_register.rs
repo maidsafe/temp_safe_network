@@ -144,7 +144,7 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != *msg.origin.id() {
+            if data_owner != msg.origin.id() {
                 return cmd_error(NdError::AccessDenied);
             }
         };
@@ -219,7 +219,7 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != *msg.origin.id() {
+            if data_owner != msg.origin.id() {
                 return query_error(NdError::AccessDenied);
             }
         };

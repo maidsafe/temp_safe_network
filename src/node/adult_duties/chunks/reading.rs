@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{node::node_ops::MessagingDuty, utils};
+use crate::node::node_ops::MessagingDuty;
 use log::error;
 use safe_nd::{Address, BlobRead, MsgEnvelope, MsgSender};
-use serde::Serialize;
 
 pub(super) struct Reading {
     read: BlobRead,
@@ -25,7 +24,7 @@ impl Reading {
     pub fn get_result(&self, storage: &ChunkStorage) -> Option<MessagingDuty> {
         let BlobRead::Get(address) = self.read;
         if let Address::Section(_) = self.msg.most_recent_sender().address() {
-            if self.verify(&self.msg.message) {
+            if self.verify_msg() {
                 storage.get(address, self.msg.id(), &self.msg.origin)
             } else {
                 error!("Accumulated signature is invalid!");
@@ -50,11 +49,9 @@ impl Reading {
         }
     }
 
-    fn verify<T: Serialize>(&self, data: &T) -> bool {
+    fn verify_msg(&self) -> bool {
         match self.msg.most_recent_sender() {
-            MsgSender::Section { id, signature, .. } => {
-                id.verify(signature, &utils::serialise(data)).is_ok()
-            }
+            MsgSender::Section { .. } => self.msg.verify(),
             _ => false,
         }
     }

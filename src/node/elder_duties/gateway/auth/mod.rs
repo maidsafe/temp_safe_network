@@ -114,7 +114,7 @@ impl Auth {
             } => (),
             _ => return None,
         };
-        let result = Ok(self.auth_keys.list_keys_and_version(msg.origin.id()));
+        let result = Ok(self.auth_keys.list_keys_and_version(&msg.origin.id()));
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListAuthKeysAndVersion(result),
             id: MessageId::new(),
@@ -141,8 +141,8 @@ impl Auth {
                 ..
             } => self
                 .auth_keys
-                .insert(origin.id(), *key, *version, *permissions),
-            DelAuthKey { key, version, .. } => self.auth_keys.delete(origin.id(), *key, *version),
+                .insert(&origin.id(), *key, *version, *permissions),
+            DelAuthKey { key, version, .. } => self.auth_keys.delete(&origin.id(), *key, *version),
         };
         if let Err(error) = result {
             return self
@@ -189,7 +189,7 @@ impl Auth {
 
     fn is_valid_client_signature(&self, msg: &MsgEnvelope) -> bool {
         let signature = match &msg.origin {
-            MsgSender::Client { signature, .. } => signature,
+            MsgSender::Client(proof) => proof.signature(),
             _ => return false,
         };
         match msg

@@ -105,7 +105,7 @@ impl Sequences {
     fn initiate_creation(&mut self, chunk: Sequence, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
-        if chunk.check_is_last_owner(*msg.origin.id()).is_err() {
+        if chunk.check_is_last_owner(msg.origin.id()).is_err() {
             trace!(
                 "{}: {} attempted to store Sequence with invalid owners.",
                 self,
@@ -215,7 +215,7 @@ impl Blobs {
         // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
         // by their Client owners.
         if let Blob::Private(ref unpub_chunk) = &chunk {
-            if unpub_chunk.owner() != msg.origin.id() {
+            if unpub_chunk.owner() != &msg.origin.id() {
                 trace!(
                     "{}: {} attempted Put UnpubBlob with invalid owners field.",
                     self,
@@ -315,7 +315,7 @@ impl Maps {
     fn initiate_creation(&mut self, chunk: Map, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         // Assert that the owner's public key has been added to the chunk, to avoid Apps
         // putting chunks which can't be retrieved by their Client owners.
-        if chunk.owner() != *msg.origin.id() {
+        if chunk.owner() != msg.origin.id() {
             trace!(
                 "{}: {} attempted to store Map with invalid owners field.",
                 self,

@@ -1,27 +1,20 @@
 use crate::utils;
 use log::{error, info};
-use routing::Node;
-use safe_nd::{BlobAddress, MessageId, MsgEnvelope, MsgSender, Signature, SignatureShare, XorName};
-use std::cell::RefCell;
-use std::collections::{hash_map::Entry, BTreeSet, HashMap, HashSet};
-use std::rc::Rc;
+use safe_nd::{BlsProof, MessageId, MsgEnvelope, MsgSender, Proof, SignatureShare};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);
-type DuplicationInfo = (BlobAddress, BTreeSet<XorName>, Vec<SignatureShare>);
+//type DuplicationInfo = (BlobAddress, BTreeSet<XorName>, Vec<SignatureShare>);
 
 pub struct Accumulation {
-    routing_node: Rc<RefCell<Node>>,
     messages: HashMap<MessageId, RequestInfo>,
-    duplications: HashMap<MessageId, DuplicationInfo>,
     completed: HashSet<MessageId>,
 }
 
 impl Accumulation {
-    pub fn new(routing_node: Rc<RefCell<Node>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            routing_node,
             messages: Default::default(),
-            duplications: Default::default(),
             completed: Default::default(),
         }
     }
@@ -33,14 +26,14 @@ impl Accumulation {
         }
         let signature = match msg.most_recent_sender() {
             MsgSender::Node {
-                signature: Signature::BlsShare(share),
+                proof: Proof::BlsShare(share),
                 ..
-            } => share,
-            MsgSender::Section {
-                signature: Signature::Bls(_),
-                ..
-            } => return Some(msg.clone()), // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
-            _ => return None, // no other variation is valid
+            } => SignatureShare {
+                index: share.index,
+                share: share.signature_share.clone(),
+            },
+            MsgSender::Section { .. } => return Some(msg.clone()), // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
+            _ => return None,                                      // no other variation is valid
         };
         info!(
             "{}: Accumulating signatures for {:?}",
@@ -50,11 +43,11 @@ impl Accumulation {
         );
         match self.messages.entry(msg.id()) {
             Entry::Vacant(entry) => {
-                let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![signature.clone()]));
+                let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![signature]));
             }
             Entry::Occupied(mut entry) => {
                 let (_, _, signatures) = entry.get_mut();
-                signatures.push(signature.clone());
+                signatures.push(signature);
             }
         }
         self.try_aggregate(msg)
@@ -64,12 +57,13 @@ impl Accumulation {
         let msg_id = msg.id();
         let (_, _, signatures) = self.messages.get(&msg_id)?;
 
-        // NB: This is wrong! pk set should come with the sig share.
-        // use routing::ProofShare etc.
-
-        // THIS IS WRONG v
-        let public_key_set = self.routing_node.borrow().public_key_set().ok()?.clone();
-        // THIS IS WRONG ^
+        let public_key_set = match msg.most_recent_sender() {
+            MsgSender::Node {
+                proof: Proof::BlsShare(share),
+                ..
+            } => &share.public_key_set,
+            _ => return None,
+        };
 
         info!(
             "Got {} signatures. We need {}",
@@ -97,18 +91,14 @@ impl Accumulation {
         if public_key_set.public_key().verify(&signature, &signed_data) {
             let _ = self.completed.insert(msg_id);
 
-            // THIS IS WRONG v
-            let id = safe_nd::PublicKey::Bls(public_key_set.public_key());
-            // THIS IS WRONG ^
+            let proof = BlsProof {
+                public_key: public_key_set.public_key(),
+                signature: signature,
+            };
 
-            let signature = safe_nd::Signature::Bls(signature);
             // upgrade sender to Section, since it accumulated
             let sender = match msg.most_recent_sender() {
-                MsgSender::Node { duty, .. } => MsgSender::Section {
-                    id,
-                    duty: *duty,
-                    signature,
-                },
+                MsgSender::Node { duty, .. } => MsgSender::Section { duty: *duty, proof },
                 _ => return None, // invalid use case, we only accumulate from Nodes
             };
             // Replace the Node with the Section.

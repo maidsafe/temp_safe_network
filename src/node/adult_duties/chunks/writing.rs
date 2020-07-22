@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::{node::node_ops::MessagingDuty, utils};
+use crate::node::node_ops::MessagingDuty;
 use log::error;
 use safe_nd::{BlobWrite, MsgEnvelope, MsgSender};
-use serde::Serialize;
 
 pub(super) struct Writing {
     write: BlobWrite,
@@ -26,7 +25,7 @@ impl Writing {
         use BlobWrite::*;
         match &self.write {
             New(data) => {
-                if self.verify(&self.msg) {
+                if self.verify_msg() {
                     storage.store(&data, self.msg.id(), &self.msg.origin)
                 } else {
                     error!("Accumulated signature for {:?} is invalid!", &self.msg.id());
@@ -34,7 +33,8 @@ impl Writing {
                 }
             }
             DeletePrivate(address) => {
-                if self.verify(&address) {
+                if self.verify_msg() {
+                    // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
                     storage.delete(*address, self.msg.id(), &self.msg.origin)
                 } else {
                     error!("Accumulated signature is invalid!");
@@ -44,11 +44,9 @@ impl Writing {
         }
     }
 
-    fn verify<T: Serialize>(&self, data: &T) -> bool {
+    fn verify_msg(&self) -> bool {
         match self.msg.most_recent_sender() {
-            MsgSender::Section { id, signature, .. } => {
-                id.verify(signature, &utils::serialise(data)).is_ok()
-            }
+            MsgSender::Section { .. } => self.msg.verify(),
             _ => false,
         }
     }

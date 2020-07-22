@@ -162,11 +162,9 @@ impl MsgWrapping {
     }
 
     fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
-        let signature = self.keys.sign(&utils::serialise(data));
         MsgSender::Node {
-            id: self.keys.public_key(),
             duty: self.duty,
-            signature,
+            proof: self.keys.produce_proof(&utils::serialise(data)),
         }
     }
 

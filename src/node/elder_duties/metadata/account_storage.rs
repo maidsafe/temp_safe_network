@@ -62,7 +62,7 @@ impl AccountStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .account(origin.id(), address)
+            .account(&origin.id(), address)
             .map(Account::into_data_and_signature);
         self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
@@ -93,7 +93,7 @@ impl AccountStorage {
     ) -> Option<MessagingDuty> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
-        } else if account.owner() != origin.id() {
+        } else if account.owner() != &origin.id() {
             Err(NdError::InvalidOwners)
         } else {
             // also check the signature
@@ -111,7 +111,7 @@ impl AccountStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .account(origin.id(), updated_account.address())
+            .account(&origin.id(), updated_account.address())
             .and_then(|existing_account| {
                 if !updated_account.size_is_valid() {
                     Err(NdError::ExceededSize)

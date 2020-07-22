@@ -133,7 +133,7 @@ impl SequenceStorage {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             _ => error.to_string().into(),
         })?;
-        data.check_permission(action, *origin.id())?;
+        data.check_permission(action, origin.id())?;
         Ok(data)
     }
 
@@ -156,7 +156,7 @@ impl SequenceStorage {
                 if sequence.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    sequence.check_is_last_owner(*origin.id())
+                    sequence.check_is_last_owner(origin.id())
                 }
             })
             .and_then(|_| {

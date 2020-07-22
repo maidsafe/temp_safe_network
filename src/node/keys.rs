@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::utils;
-use safe_nd::{Keypair, PublicKey, Signature};
+use safe_nd::{BlsProof, BlsProofShare, Ed25519Proof, Keypair, Proof, PublicKey, Signature};
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
@@ -27,5 +27,32 @@ impl NodeKeys {
 
     pub fn sign<T: Serialize>(&self, data: &T) -> Signature {
         self.keys.borrow().sign(&utils::serialise(data))
+    }
+
+    pub fn produce_proof<T: Serialize>(&self, data: &T) -> Proof {
+        match self.sign(data) {
+            Signature::BlsShare(share) => Proof::BlsShare(BlsProofShare {
+                index: share.index,
+                signature_share: share.share,
+                public_key_set: match self.keys.borrow().bls_share() {
+                    Some(share) => share.public_key_set.clone(),
+                    None => unreachable!(), // this is admittedly not very elegant code..
+                },
+            }),
+            Signature::Ed25519(signature) => Proof::Ed25519(Ed25519Proof {
+                public_key: match self.public_key() {
+                    PublicKey::Ed25519(key) => key,
+                    _ => unreachable!(), // this is admittedly not very elegant code..
+                },
+                signature,
+            }),
+            Signature::Bls(signature) => Proof::Bls(BlsProof {
+                public_key: match self.public_key() {
+                    PublicKey::Bls(key) => key,
+                    _ => unreachable!(), // this is admittedly not very elegant code..
+                },
+                signature,
+            }),
+        }
     }
 }

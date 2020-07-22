@@ -103,10 +103,7 @@ impl MapStorage {
                     ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                     error => error.to_string().into(),
                 })
-                .and_then(move |map| {
-                    map.check_permissions(action, *origin.id())
-                        .map(move |_| map)
-                }),
+                .and_then(move |map| map.check_permissions(action, origin.id()).map(move |_| map)),
         )
     }
 
@@ -168,7 +165,7 @@ impl MapStorage {
                 error => error.to_string().into(),
             })
             .and_then(|map| {
-                map.check_is_owner(*origin.id())?;
+                map.check_is_owner(origin.id())?;
                 self.chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
@@ -188,7 +185,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.check_permissions(MapAction::ManagePermissions, *origin.id())?;
+            data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
         })
@@ -204,7 +201,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.check_permissions(MapAction::ManagePermissions, *origin.id())?;
+            data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.del_user_permissions(user, version)?;
             Ok(data)
         })
@@ -219,7 +216,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.mutate_entries(actions, *origin.id())?;
+            data.mutate_entries(actions, origin.id())?;
             Ok(data)
         })
     }

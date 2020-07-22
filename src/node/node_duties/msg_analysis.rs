@@ -35,7 +35,7 @@ pub struct NetworkMsgAnalysis {
 impl NetworkMsgAnalysis {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
         Self {
-            accumulation: Accumulation::new(routing.clone()),
+            accumulation: Accumulation::new(),
             routing,
         }
     }
