@@ -24,6 +24,7 @@ use safe_nd::{
 };
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
+use tiny_keccak::sha3_256;
 
 pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
@@ -186,9 +187,9 @@ impl Rewards {
     /// a write request, the accounts accumulate reward.
     fn accumulate_reward(&mut self, data: Vec<u8>) -> Option<MessagingDuty> {
         let num_bytes = data.len() as u64;
-        let data_hash = data;
-        let factor = 2.0;
-        match self.farming.reward(data_hash, num_bytes, factor) {
+        let hash = sha3_256(&data).to_vec(); // todo: fix the parameter type down-streams (in safe-farming)
+        let factor = 2.0; // NB: The logics for deriving an appropriate factor is TBD.
+        match self.farming.reward(hash, num_bytes, factor) {
             Ok(_) => None,
             Err(_err) => None, // todo: NodeCmdError. Or not? This is an internal thing..
         }
