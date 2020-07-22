@@ -6,6 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#[cfg(feature = "simulated-payouts")]
+use safe_nd::Transfer;
+
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,

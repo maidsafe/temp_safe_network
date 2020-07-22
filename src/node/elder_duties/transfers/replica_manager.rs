@@ -18,9 +18,11 @@ use threshold_crypto::{PublicKeySet, SecretKeyShare};
 use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::{cmd::MessagingDuty, cmd::TransferCmd, msg::Message},
+    crate::node::node_ops::MessagingDuty,
     rand::thread_rng,
-    safe_nd::{MessageId, PublicId, PublicKey, Signature, SignatureShare, Transfer, XorName},
+    safe_nd::{
+        Address, MessageId, PublicId, PublicKey, Signature, SignatureShare, Transfer, XorName,
+    },
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 
@@ -195,13 +197,7 @@ impl ReplicaManager {
 
 #[cfg(feature = "simulated-payouts")]
 impl ReplicaManager {
-    pub fn credit_without_proof(
-        &mut self,
-        requester: PublicId,
-        transfer: Transfer,
-        message_id: MessageId,
-        origin: &Address,
-    ) -> Option<MessagingDuty> {
+    pub fn credit_without_proof(&mut self, transfer: Transfer) -> Option<MessagingDuty> {
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();
@@ -230,16 +226,7 @@ impl ReplicaManager {
                 },
             }))
             .ok()?;
-        // Respond to the Client with TransferRegistered
-        Some(MessagingDuty::Transfer(TransferCmd::RespondToGateway {
-            sender,
-            msg: Message::Response {
-                response: Response::TransferRegistration(Ok(TransferRegistered { debit_proof })),
-                requester,
-                message_id,
-                proof: None,
-            },
-        }))
+        None
     }
 
     pub fn debit_without_proof(&mut self, transfer: Transfer) {

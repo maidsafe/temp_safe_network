@@ -131,7 +131,7 @@ impl Transfers {
             SimulatePayout(transfer) => self
                 .replica
                 .borrow_mut()
-                .credit_without_proof(transfer, msg_id, origin),
+                .credit_without_proof(transfer.clone()),
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin)
             }
