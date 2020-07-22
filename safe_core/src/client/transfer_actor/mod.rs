@@ -93,8 +93,11 @@ impl TransferActor {
 
         let mut actor = self.transfer_actor.lock().await;
         match actor.synch(history) {
-            Ok(synced_transfers) => {
-                actor.apply(ActorEvent::TransfersSynched(synced_transfers));
+            Ok(synced_transfer_outcome) => {
+                if let Some(transfers) = synced_transfer_outcome {
+                    actor.apply(ActorEvent::TransfersSynched(transfers));
+
+                }          
             }
             Err(error) => {
                 if !error
@@ -130,7 +133,7 @@ impl TransferActor {
             .transfer_actor
             .lock()
             .await
-            .transfer(COST_OF_PUT, section_key)?
+            .transfer(COST_OF_PUT, section_key)?.ok_or_else(||CoreError::from("No transfer produced by actor."))?
             .signed_transfer;
 
         let command = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));

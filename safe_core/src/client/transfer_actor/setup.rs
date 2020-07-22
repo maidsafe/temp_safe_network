@@ -63,7 +63,7 @@ impl TransferActor {
         let validator = ClientTransferValidator {};
 
         let transfer_actor = Arc::new(Mutex::new(SafeTransferActor::new(
-            safe_key.clone(),
+            safe_key.keypair(),
             replicas_pk_set.clone(),
             validator,
         )));
@@ -121,10 +121,8 @@ impl TransferActor {
         let validator = ClientTransferValidator {};
 
         let transfer_actor =
-            SafeTransferActor::new(safe_key.clone(), replicas_pk_set.clone(), validator);
+            SafeTransferActor::new(safe_key.keypair(), replicas_pk_set.clone(), validator);
 
-        // let pending_validations: HashMap<MessageId, mpsc::UnboundedSender<DebitAgreementProof>> =
-        //     HashMap::new();
         let mut full_actor = Self {
             safe_key,
             transfer_actor: Arc::new(Mutex::new(transfer_actor)),
