@@ -21,6 +21,8 @@ use safe_nd::{
 };
 use std::{cell::RefCell, rc::Rc};
 
+// NB: This approach is not entirely good, so will be improved.
+
 /// Currently, this is only evaluating
 /// remote msgs from the network, i.e.
 /// it is not evaluating msgs sent
@@ -230,18 +232,20 @@ impl NetworkMsgAnalysis {
             _ => false,
         };
 
-        let is_gateway_msg = from_network_to_client()
-            || (from_client()
-                && agreed_by_gateway_section()
-                && is_auth_cmd()
-                && self.is_dst_for(msg)
-                && self.is_elder());
+        let shall_process = |msg| {
+            from_network_to_client()
+                || (from_client()
+                    && agreed_by_gateway_section()
+                    && is_auth_cmd()
+                    && self.is_dst_for(msg)
+                    && self.is_elder())
+        };
 
-        if is_gateway_msg {
-            Some(GatewayDuty::ProcessMsg(msg.clone()))
-        } else {
-            None
+        if !shall_process(msg) {
+            return None;
         }
+
+        Some(GatewayDuty::ProcessMsg(msg.clone())) // TODO: Fix these for type safety
     }
 
     /// We do not accumulate these request, they are executed
@@ -267,12 +271,18 @@ impl NetworkMsgAnalysis {
             _ => false,
         };
 
-        if is_data_write() && from_gateway_single_elder() && self.is_dst_for(msg) && self.is_elder()
-        {
-            Some(PaymentDuty::ProcessPayment(msg.clone()))
-        } else {
-            None
+        let shall_process = |msg| {
+            is_data_write()
+                && from_gateway_single_elder()
+                && self.is_dst_for(msg)
+                && self.is_elder()
+        };
+
+        if !shall_process(msg) {
+            return None;
         }
+
+        Some(PaymentDuty::ProcessPayment(msg.clone())) // TODO: Fix these for type safety
     }
 
     /// After the data write sent from Payment Elders has been
@@ -314,9 +324,9 @@ impl NetworkMsgAnalysis {
         let is_correct_dst = |msg| self.is_dst_for(msg) && self.is_elder();
 
         let duty = if is_data_query() && from_single_gateway_elder() && is_correct_dst(msg) {
-            MetadataDuty::ProcessRead(msg.clone())
+            MetadataDuty::ProcessRead(msg.clone()) // TODO: Fix these for type safety
         } else if is_data_cmd() && from_payment_section() && is_correct_dst(msg) {
-            MetadataDuty::ProcessWrite(msg.clone())
+            MetadataDuty::ProcessWrite(msg.clone()) // TODO: Fix these for type safety
         } else {
             return None;
         };
@@ -354,17 +364,21 @@ impl NetworkMsgAnalysis {
             _ => false,
         };
 
-        if from_metadata_section() && self.is_dst_for(msg) && self.is_adult() {
-            let duty = if is_chunk_cmd() {
-                AdultDuty::RunAsChunks(ChunkDuty::WriteChunk(msg.clone()))
-            } else if is_chunk_query() {
-                AdultDuty::RunAsChunks(ChunkDuty::ReadChunk(msg.clone()))
-            } else {
-                return None;
-            };
-            return Some(duty);
+        let shall_process =
+            |msg| from_metadata_section() && self.is_dst_for(msg) && self.is_adult();
+
+        if !shall_process(msg) {
+            return None;
         }
-        None
+
+        let duty = if is_chunk_cmd() {
+            AdultDuty::RunAsChunks(ChunkDuty::WriteChunk(msg.clone()))
+        } else if is_chunk_query() {
+            AdultDuty::RunAsChunks(ChunkDuty::ReadChunk(msg.clone()))
+        } else {
+            return None;
+        };
+        return Some(duty);
     }
 
     fn try_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
@@ -376,44 +390,48 @@ impl NetworkMsgAnalysis {
             _ => false,
         };
 
-        if from_rewards_section() && self.is_dst_for(msg) && self.is_elder() {
-            use NodeRewardCmd::*;
-            let duty = match &msg.message {
-                Message::NodeCmd {
-                    cmd:
-                        NodeCmd::Rewards(ClaimRewardCounter {
-                            old_node_id,
-                            new_node_id,
-                        }),
-                    id,
-                } => RewardDuty::ClaimRewardCounter {
-                    old_node_id: *old_node_id,
-                    new_node_id: *new_node_id,
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                },
-                Message::NodeEvent {
-                    event:
-                        NodeEvent::RewardCounterClaimed {
-                            account_id,
-                            new_node_id,
-                            counter,
-                        },
-                    ..
-                } => RewardDuty::ReceiveClaimedRewards {
-                    id: *account_id,
-                    node_id: *new_node_id,
-                    counter: counter.clone(),
-                },
-                Message::NodeEvent {
-                    event: NodeEvent::RewardPayoutValidated(validation),
-                    ..
-                } => RewardDuty::ReceiveRewardValidation(validation.clone()),
-                _ => return None,
-            };
-            return Some(duty);
+        let shall_process = |msg| from_rewards_section() && self.is_dst_for(msg) && self.is_elder();
+
+        if !shall_process(msg) {
+            return None;
         }
-        None
+
+        use NodeRewardCmd::*;
+        let duty = match &msg.message {
+            Message::NodeCmd {
+                cmd:
+                    NodeCmd::Rewards(ClaimRewardCounter {
+                        old_node_id,
+                        new_node_id,
+                    }),
+                id,
+            } => RewardDuty::ClaimRewardCounter {
+                old_node_id: *old_node_id,
+                new_node_id: *new_node_id,
+                msg_id: *id,
+                origin: msg.origin.address(),
+            },
+            Message::NodeEvent {
+                event:
+                    NodeEvent::RewardCounterClaimed {
+                        account_id,
+                        new_node_id,
+                        counter,
+                    },
+                ..
+            } => RewardDuty::ReceiveClaimedRewards {
+                id: *account_id,
+                node_id: *new_node_id,
+                counter: counter.clone(),
+            },
+            Message::NodeEvent {
+                event: NodeEvent::RewardPayoutValidated(validation),
+                ..
+            } => RewardDuty::ReceiveRewardValidation(validation.clone()),
+            _ => return None,
+        };
+
+        return Some(duty);
     }
 
     fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
