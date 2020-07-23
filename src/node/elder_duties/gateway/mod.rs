@@ -45,14 +45,14 @@ pub struct Gateway<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> Gateway<R> {
     pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
-        let auth_keys_db = AuthKeysDb::new(info.root_dir, info.init_mode)?;
+        let auth_keys_db = AuthKeysDb::new(info.root_dir.clone(), info.init_mode)?;
 
         let wrapping = ElderMsgWrapping::new(info.keys.clone(), ElderDuties::Gateway);
         let auth = Auth::new(info.keys.clone(), auth_keys_db, wrapping.clone());
         let data = Validation::new(wrapping);
 
-        let onboarding = Onboarding::new(info.id.clone(), section.clone());
-        let client_msg_tracking = ClientMsgTracking::new(info.id, onboarding);
+        let onboarding = Onboarding::new(info.public_id().clone(), section.clone());
+        let client_msg_tracking = ClientMsgTracking::new(info.public_id().clone(), onboarding);
 
         let gateway = Self {
             keys: info.keys,

@@ -57,7 +57,7 @@ impl ClientMsgTracking {
         self.onboarding.remove_client(peer_addr)
     }
 
-    /// If
+    ///
     pub fn track_incoming(
         &mut self,
         msg_id: MessageId,

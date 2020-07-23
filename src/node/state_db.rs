@@ -8,7 +8,7 @@
 
 use crate::Result;
 use crate::{node::keys::NodeKeys, utils};
-use safe_nd::{NodeFullId, NodePublicId};
+use safe_nd::{NodeKeypairs, NodePublicId};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -17,13 +17,13 @@ use std::{
 
 const STATE_FILENAME: &str = "state";
 
-pub fn dump_state(age_group: AgeGroup, root_dir: &Path, id: &NodeFullId) -> Result<()> {
+pub fn dump_state(age_group: AgeGroup, root_dir: &Path, id: &NodeKeypairs) -> Result<()> {
     let path = root_dir.join(STATE_FILENAME);
     Ok(fs::write(path, utils::serialise(&(age_group, id)))?)
 }
 
 /// Returns Some((age_group, ID)) or None if file doesn't exist.
-pub fn read_state(root_dir: &Path) -> Result<Option<(AgeGroup, NodeFullId)>> {
+pub fn read_state(root_dir: &Path) -> Result<Option<(AgeGroup, NodeKeypairs)>> {
     let path = root_dir.join(STATE_FILENAME);
     if !path.is_file() {
         return Ok(None);
@@ -56,7 +56,6 @@ pub enum Command {
 /// Command that the user can send to a running node to control its execution.
 #[derive(Clone)]
 pub struct NodeInfo {
-    pub id: NodePublicId,
     pub keys: NodeKeys,
     pub root_dir: PathBuf,
     pub init_mode: Init,
@@ -69,6 +68,10 @@ pub struct NodeInfo {
 impl NodeInfo {
     pub fn path(&self) -> &Path {
         self.root_dir.as_path()
+    }
+
+    pub fn public_id(&self) -> NodePublicId {
+        self.keys.public_id()
     }
 
     pub fn keys(&self) -> NodeKeys {

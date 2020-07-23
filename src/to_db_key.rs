@@ -8,7 +8,7 @@
 
 use crate::utils;
 use safe_nd::{
-    BlobAddress, ClientPublicId, MapAddress, NodePublicId, PublicKey, SequenceAddress, XorName,
+    BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress, XorName,
 };
 use serde::Serialize;
 
@@ -25,6 +25,6 @@ impl ToDbKey for SequenceAddress {}
 impl ToDbKey for ClientPublicId {}
 impl ToDbKey for BlobAddress {}
 impl ToDbKey for MapAddress {}
-impl ToDbKey for NodePublicId {}
+impl ToDbKey for PublicId {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}

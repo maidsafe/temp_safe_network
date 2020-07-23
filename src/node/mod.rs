@@ -28,12 +28,12 @@ use crate::{
         },
         state_db::{read_state, AgeGroup, NodeInfo},
     },
-    utils, Config, Result,
+    Config, Result,
 };
 use log::warn;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::NodeFullId;
+use safe_nd::NodeKeypairs;
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -59,16 +59,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
-        let (age_group, id) = read_state(&root_dir)?.unwrap_or_else(|| {
-            let id = NodeFullId::new(&mut rng);
-            (Infant, id)
+        let (age_group, keypairs) = read_state(&root_dir)?.unwrap_or_else(|| {
+            let keypairs = NodeKeypairs::new(&mut rng);
+            (Infant, keypairs)
         });
 
-        let keypair = Rc::new(RefCell::new(utils::key_pair(routing.clone())?));
-        let keys = NodeKeys::new(keypair);
+        let keypairs = Rc::new(RefCell::new(keypairs));
+        let keys = NodeKeys::new(keypairs);
 
         let node_info = NodeInfo {
-            id: id.public_id().clone(),
             keys,
             root_dir: root_dir_buf,
             init_mode: Init::New,
@@ -78,7 +77,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(id, node_info, routing.clone(), rng);
+        let mut duties = NodeDuties::new(node_info, routing.clone(), rng);
 
         use AgeGroup::*;
         let _ = match age_group {
