@@ -53,17 +53,14 @@ impl Onboarding {
     }
 
     pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-        if let Some(_client) = self.clients.remove(&peer_addr) {
-            // info!(
-            //     "{}: Disconnected from {:?} on {}",
-            //     self, client.public_id, peer_addr
-            // );
+        if let Some(client) = self.clients.remove(&peer_addr) {
+            info!(
+                "{}: Removed client {:?} on {}",
+                self, client.public_id, peer_addr
+            );
         } else {
             let _ = self.client_candidates.remove(&peer_addr);
-            // info!(
-            //     "{}: Disconnected from client candidate on {}",
-            //     self, peer_addr
-            // );
+            info!("{}: Removed client candidate on {}", self, peer_addr);
         }
     }
 
@@ -83,6 +80,10 @@ impl Onboarding {
     }
 
     fn try_bootstrap(&self, peer_addr: SocketAddr, client_id: &PublicId) -> Option<MessagingDuty> {
+        info!(
+            "{}: Trying to bootstrap..: {} on {}",
+            self, client_id, peer_addr
+        );
         let elders = if self.section.matches_our_prefix(*client_id.name()) {
             self.section
                 .our_elders()
@@ -122,6 +123,7 @@ impl Onboarding {
         client_id: PublicId,
         rng: &mut R,
     ) -> Option<MessagingDuty> {
+        info!("{}: Trying to join..: {} on {}", self, client_id, peer_addr);
         if self.section.matches_our_prefix(*client_id.name()) {
             let challenge = utils::random_vec(rng, 8);
             let _ = self
@@ -182,22 +184,6 @@ impl Onboarding {
             Some(MessagingDuty::DisconnectClient(peer_addr))
         }
     }
-
-    // fn send<T: Serialize>(&mut self, recipient: SocketAddr, msg: &T) {
-    //     let msg = utils::serialise(msg);
-    //     let msg = Bytes::from(msg);
-
-    //     if let Err(e) = self
-    //         .routing
-    //         .borrow_mut()
-    //         .send_message_to_client(recipient, msg, 0)
-    //     {
-    //         warn!(
-    //             "{}: Could not send message to client {}: {:?}",
-    //             self, recipient, e
-    //         );
-    //     }
-    // }
 
     // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
     //     for client_id in self.lookup_client_and_its_apps(client) {

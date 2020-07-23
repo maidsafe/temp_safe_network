@@ -8,7 +8,7 @@
 
 use crate::{node::node_ops::MessagingDuty, utils};
 use bytes::Bytes;
-use log::warn;
+use log::{info, warn};
 use routing::Node as Routing;
 use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
 use serde::Serialize;
@@ -48,6 +48,9 @@ impl ClientSender {
         if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
             warn!("{}: Could not disconnect client: {:?}", self, err);
         }
+
+        info!("{}: Disconnected from {}", self, peer_addr);
+
         None
     }
 

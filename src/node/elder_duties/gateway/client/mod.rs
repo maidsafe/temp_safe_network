@@ -129,64 +129,6 @@ impl ClientMsgTracking {
             msg: msg.clone(),
         })
     }
-
-    // #[allow(unused)]
-    // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
-    //     for client_id in self.lookup_client_and_its_apps(client) {
-    //         self.send_notification_to_client(&client_id, &TransferNotification(receipt.clone()));
-    //     }
-    // }
-
-    // pub(crate) fn send_notification_to_client(
-    //     &mut self,
-    //     client_id: &PublicId,
-    //     notification: &TransferNotification,
-    // ) {
-    //     let peer_addrs = self.lookup_client_peer_addrs(&client_id);
-
-    //     if peer_addrs.is_empty() {
-    //         warn!(
-    //             "{}: can't notify {} as none of the instances of the client is connected.",
-    //             self, client_id
-    //         );
-    //         return;
-    //     };
-
-    //     for peer_addr in peer_addrs {
-    //         self.send(
-    //             peer_addr,
-    //             &Message::TransferNotification {
-    //                 payload: notification.clone(),
-    //             },
-    //         )
-    //     }
-    // }
-
-    // fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
-    //     self.clients
-    //         .iter()
-    //         .filter_map(|(peer_addr, client)| {
-    //             if &client.public_id == id {
-    //                 Some(*peer_addr)
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect()
-    // }
-
-    // fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
-    //     self.clients
-    //         .values()
-    //         .filter_map(|client| {
-    //             if client.public_id.name() == name {
-    //                 Some(client.public_id.clone())
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect::<Vec<_>>()
-    // }
 }
 
 impl Display for ClientMsgTracking {
