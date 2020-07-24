@@ -22,10 +22,7 @@ use crate::{
     node::{
         keys::NodeKeys,
         node_duties::{messaging::Received, NodeDuties},
-        node_ops::{
-            AdultDuty, ElderDuty, GatewayDuty, MetadataDuty, NodeDuty, NodeOperation, PaymentDuty,
-            RewardDuty, TransferDuty,
-        },
+        node_ops::{ClientDuty, ElderDuty, KeySectionDuty, NodeDuty, NodeOperation},
         state_db::{read_state, AgeGroup, NodeInfo},
     },
     Config, Result,
@@ -112,12 +109,16 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub fn run(&mut self) {
-        use GatewayDuty::*;
+        use ClientDuty::*;
+        use ElderDuty::*;
+        use KeySectionDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;
         loop {
             let result = match self.receiver.next() {
-                Received::Client(event) => RunAsGateway(ProcessClientEvent(event)),
+                Received::Client(event) => {
+                    RunAsElder(RunAsKeySection(RunAsGateway(ProcessClientEvent(event))))
+                }
                 Received::Network(event) => RunAsNode(ProcessNetworkEvent(event)),
                 Received::Unknown(channel) => {
                     if let Err(err) = self
@@ -142,55 +143,12 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut next_op = op;
         while let Some(op) = next_op {
             next_op = match op {
-                RunAsGateway(duty) => self.run_as_gateway(duty),
-                RunAsPayment(duty) => self.run_as_payment(duty),
-                RunAsTransfers(duty) => self.run_as_transfers(duty),
-                RunAsMetadata(duty) => self.run_as_metadata(duty),
-                RunAsRewards(duty) => self.run_as_rewards(duty),
-                RunAsAdult(duty) => self.run_as_adult(duty),
-                RunAsElder(duty) => self.run_as_elder(duty),
-                RunAsNode(duty) => self.run_as_node(duty),
+                RunAsAdult(duty) => self.duties.adult_duties().unwrap().process(&duty),
+                RunAsElder(duty) => self.duties.elder_duties().unwrap().process(duty),
+                RunAsNode(duty) => self.duties.process(duty),
                 Unknown => None,
             }
         }
-    }
-
-    fn run_as_gateway(&mut self, duty: GatewayDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.gateway().process(&duty)
-    }
-
-    fn run_as_payment(&mut self, duty: PaymentDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.data_payment().process(&duty)
-    }
-
-    fn run_as_transfers(&mut self, duty: TransferDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.transfers().process(&duty)
-    }
-
-    fn run_as_metadata(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.metadata().process(&duty)
-    }
-
-    fn run_as_rewards(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.rewards().process(duty)
-    }
-
-    fn run_as_node(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
-        self.duties.process(duty)
-    }
-
-    fn run_as_elder(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
-        self.duties.elder_duties()?.process(duty)
-    }
-
-    fn run_as_adult(&mut self, duty: AdultDuty) -> Option<NodeOperation> {
-        // if let Some(duties) = self.adult_duties() {
-        //     duties.process(&duty)
-        // } else {
-        //     error!("Invalid message assignment: {:?}", duty);
-        //     None
-        // }
-        self.duties.adult_duties()?.process(&duty)
     }
 }
 

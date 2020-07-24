@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::node_ops::{
-    ElderDuty, GatewayDuty, GroupDecision, NodeDuty, NodeOperation, RewardDuty,
-};
+use crate::node::node_ops::{ElderDuty, GroupDecision, KeySectionDuty, NodeDuty, NodeOperation};
 use hex_fmt::HexFmt;
 use log::{error, info, trace};
 use routing::event::Event as RoutingEvent;
@@ -26,14 +24,15 @@ impl NetworkEvents {
 
     pub fn process(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
         use ElderDuty::*;
-        use GatewayDuty::*;
+        use KeySectionDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;
-        use RewardDuty::*;
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<GroupDecision>(&custom_event) {
-                    Ok(group_decision) => Some(RunAsGateway(ProcessGroupDecision(group_decision))),
+                    Ok(group_decision) => Some(RunAsElder(RunAsKeySection(ProcessGroupDecision(
+                        group_decision,
+                    )))),
                     Err(e) => {
                         error!("Invalid GroupDecision passed from Routing: {:?}", e);
                         None
@@ -59,7 +58,7 @@ impl NetworkEvents {
                 trace!("New member has joined the section");
                 // info!("No. of Elders: {}", self.routing.borrow().our_elders().count());
                 // info!("No. of Adults: {}", self.routing.borrow().our_adults().count());
-                Some(RunAsRewards(AddRelocatedAccount {
+                Some(RunAsElder(ProcessJoinedMember {
                     old_node_id: XorName(name.0),
                     new_node_id: XorName(previous_name.0),
                 }))

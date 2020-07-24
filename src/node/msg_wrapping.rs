@@ -6,16 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    node::keys::NodeKeys,
-    node::node_ops::{GroupDecision, MessagingDuty},
-    utils,
-};
+use crate::{node::keys::NodeKeys, node::node_ops::MessagingDuty, utils};
+use log::info;
 use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
     NodeCmdError, XorName,
 };
-use log::info;
 use serde::Serialize;
 use std::collections::BTreeSet;
 
@@ -67,10 +63,6 @@ impl ElderMsgWrapping {
     pub fn new(keys: NodeKeys, duty: ElderDuties) -> Self {
         let inner = MsgWrapping::new(keys, Duty::Elder(duty));
         Self { inner }
-    }
-
-    pub fn vote(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        Some(MessagingDuty::VoteFor(GroupDecision::Process(msg.clone())))
     }
 
     pub fn forward(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {

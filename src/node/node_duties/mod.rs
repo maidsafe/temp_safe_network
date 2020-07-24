@@ -16,6 +16,7 @@ use crate::node::{
     elder_duties::ElderDuties,
     node_duties::messaging::Messaging,
     node_ops::{NodeDuty, NodeOperation},
+    section_querying::SectionQuerying,
     state_db::NodeInfo,
 };
 use msg_analysis::NetworkMsgAnalysis;
@@ -52,7 +53,9 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         routing: Rc<RefCell<Routing>>,
         rng: R,
     ) -> Self {
-        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
+        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(SectionQuerying::new(
+            routing.clone(),
+        )));
         let messaging = Messaging::new(routing.clone());
         Self {
             keys,

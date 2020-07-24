@@ -11,8 +11,8 @@ use safe_nd::Transfer;
 
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 use safe_nd::{
-    AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
-    RewardCounter, SignedTransfer, TransferValidated, XorName,
+    AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
+    MsgSender, PublicId, PublicKey, RewardCounter, SignedTransfer, TransferValidated, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
@@ -38,11 +38,6 @@ use std::{collections::BTreeSet, net::SocketAddr};
 // }
 
 pub enum NodeOperation {
-    RunAsGateway(GatewayDuty),
-    RunAsPayment(PaymentDuty),
-    RunAsMetadata(MetadataDuty),
-    RunAsRewards(RewardDuty),
-    RunAsTransfers(TransferDuty),
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
     RunAsNode(NodeDuty),
@@ -57,7 +52,11 @@ pub enum GroupDecision {
     /// When Gateway nodes consider a request
     /// valid, they will vote for it to be forwarded.
     /// As they reach consensus, this is then carried out.
-    Process(MsgEnvelope),
+    Process {
+        cmd: AuthCmd,
+        msg_id: MessageId,
+        origin: MsgSender,
+    },
 }
 
 // --------------- Messaging ---------------
@@ -118,11 +117,8 @@ pub enum ElderDuty {
         old_node_id: XorName,
         new_node_id: XorName,
     },
-    // RunAsGateway(GatewayDuty),
-    // RunAsPayment(PaymentDuty),
-    // RunAsMetadata(MetadataDuty),
-    // RunAsRewards(RewardDuty),
-    // RunAsTransfers(TransferDuty),
+    RunAsKeySection(KeySectionDuty),
+    RunAsDataSection(DataSectionDuty),
 }
 
 pub enum AdultDuty {
@@ -134,16 +130,53 @@ pub enum AdultDuty {
 // -- most common next local step. From there, it is sent out on the network.
 // -- It is important to stress that _only_ MessagingDuty does sending on to the network.
 
+pub enum KeySectionDuty {
+    ///
+    EvaluateClientMsg {
+        public_id: PublicId,
+        msg: MsgEnvelope,
+    },
+    ///
+    ProcessGroupDecision(GroupDecision),
+    ///
+    RunAsAuth(AuthDuty),
+    ///
+    RunAsGateway(ClientDuty),
+    ///
+    RunAsPayment(PaymentDuty),
+    ///
+    RunAsTransfers(TransferDuty),
+}
+
+pub enum DataSectionDuty {
+    ///
+    RunAsMetadata(MetadataDuty),
+    ///
+    RunAsRewards(RewardDuty),
+}
+
+pub enum AuthDuty {
+    Process {
+        cmd: AuthCmd,
+        msg_id: MessageId,
+        origin: MsgSender,
+    },
+    ListAuthKeysAndVersion {
+        /// The Client id.
+        client: PublicKey,
+        msg_id: MessageId,
+        origin: MsgSender,
+    },
+}
+
 // --------------- Gateway ---------------
 
 /// Gateway duties are run at Elders.
-pub enum GatewayDuty {
+pub enum ClientDuty {
     ///
-    ProcessMsg(MsgEnvelope),
+    RouteToClient(MsgEnvelope),
     ///
     ProcessClientEvent(ClientEvent),
-    ///
-    ProcessGroupDecision(GroupDecision),
 }
 
 // --------------- Payment ---------------

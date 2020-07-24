@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::state_db::AgeGroup;
 use routing::Node as Routing;
 use safe_nd::XorName;
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};
@@ -19,6 +20,10 @@ pub struct SectionQuerying {
 impl SectionQuerying {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
         Self { routing }
+    }
+
+    pub fn our_name(&self) -> XorName {
+        XorName(self.routing.borrow().id().name().0)
     }
 
     /// This can be asked for anything that has an XorName.
@@ -91,5 +96,37 @@ impl SectionQuerying {
             .take(count)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
+    }
+
+    pub fn is_elder(&self) -> bool {
+        if let AgeGroup::Elder = self.our_duties() {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_adult(&self) -> bool {
+        if let AgeGroup::Adult = self.our_duties() {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn our_duties(&self) -> AgeGroup {
+        if self.routing.borrow().is_elder() {
+            AgeGroup::Elder
+        } else if self
+            .routing
+            .borrow()
+            .our_adults()
+            .map(|c| c.name())
+            .any(|x| x == self.routing.borrow().name())
+        {
+            AgeGroup::Adult
+        } else {
+            AgeGroup::Infant
+        }
     }
 }

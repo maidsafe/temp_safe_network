@@ -8,18 +8,15 @@
 
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
-    AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NodeDuty, NodeOperation,
-    PaymentDuty, RewardDuty, TransferDuty,
+    AdultDuty, ChunkDuty, ClientDuty, DataSectionDuty, ElderDuty, KeySectionDuty, MessagingDuty,
+    MetadataDuty, NodeDuty, NodeOperation, RewardDuty,
 };
-use crate::node::state_db::AgeGroup;
-
+use crate::node::section_querying::SectionQuerying;
 use log::error;
-use routing::Node as Routing;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
     NodeEvent, NodeRewardCmd, Query, XorName,
 };
-use std::{cell::RefCell, rc::Rc};
 
 // NB: This approach is not entirely good, so will be improved.
 
@@ -29,14 +26,14 @@ use std::{cell::RefCell, rc::Rc};
 /// directly from the client.
 pub struct NetworkMsgAnalysis {
     accumulation: Accumulation,
-    routing: Rc<RefCell<Routing>>,
+    section: SectionQuerying,
 }
 
 impl NetworkMsgAnalysis {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
+    pub fn new(section: SectionQuerying) -> Self {
         Self {
             accumulation: Accumulation::new(),
-            routing,
+            section,
         }
     }
 
@@ -49,6 +46,9 @@ impl NetworkMsgAnalysis {
     /// it is not evaluating msgs sent
     /// directly from the client.
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        use DataSectionDuty::*;
+        use ElderDuty::*;
+        use KeySectionDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;
         let result = if self.should_accumulate(msg) {
@@ -57,26 +57,20 @@ impl NetworkMsgAnalysis {
         } else if let Some(duty) = self.try_messaging(msg) {
             // Identified as an outbound msg, to be sent on the wire.
             RunAsNode(ProcessMessaging(duty))
-        } else if let Some(duty) = self.try_gateway(msg) {
+        } else if let Some(duty) = self.try_client_entry(msg) {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
-            RunAsGateway(duty)
-        } else if let Some(duty) = self.try_data_payment(msg) {
-            // Incoming msg from `Gateway`!
-            RunAsPayment(duty) // Payment Elders should just execute and send onwards.
+            RunAsElder(RunAsKeySection(RunAsGateway(duty)))
         } else if let Some(duty) = self.try_metadata(msg) {
             // Accumulated msg from `Payment`!
-            RunAsMetadata(duty)
+            RunAsElder(RunAsDataSection(RunAsMetadata(duty)))
         } else if let Some(duty) = self.try_adult(msg) {
             // Accumulated msg from `Metadata`!
             RunAsAdult(duty)
         } else if let Some(duty) = self.try_rewards(msg) {
             // Identified as a Rewards msg
-            RunAsRewards(duty)
-        } else if let Some(duty) = self.try_transfers(msg) {
-            // Identified as a Transfers msg
-            RunAsTransfers(duty)
+            RunAsElder(RunAsDataSection(RunAsRewards(duty)))
         } else {
             error!("Unknown message destination: {:?}", msg.id());
             Unknown
@@ -88,7 +82,7 @@ impl NetworkMsgAnalysis {
         use Address::*;
         let destined_for_network = || match msg.destination() {
             Client(address) => !self.self_is_handler_for(&address),
-            Node(address) => routing::XorName(address.0) != *self.routing.borrow().id().name(),
+            Node(address) => address != self.section.our_name(),
             Section(address) => !self.self_is_handler_for(&address),
         };
 
@@ -183,7 +177,7 @@ impl NetworkMsgAnalysis {
     // ---- .... -----
 
     // todo: eval all msg types!
-    fn try_gateway(&self, msg: &MsgEnvelope) -> Option<GatewayDuty> {
+    fn try_client_entry(&self, msg: &MsgEnvelope) -> Option<ClientDuty> {
         let is_our_client_msg = || match msg.destination() {
             Address::Client(address) => self.self_is_handler_for(&address),
             _ => false,
@@ -195,37 +189,7 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
-        Some(GatewayDuty::ProcessMsg(msg.clone())) // TODO: Fix these for type safety
-    }
-
-    /// We do not accumulate these request, they are executed
-    /// at once (i.e. payment carried out) and sent on to
-    /// Metadata section. (They however, will accumulate those msgs.)
-    /// The reason for this is that the payment request is already signed
-    /// by the client and validated by its replicas,
-    /// so there is no reason to accumulate it here.
-    fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
-        let from_client = || match msg.origin {
-            MsgSender::Client { .. } => true,
-            _ => false,
-        };
-
-        let is_data_write = || match msg.message {
-            Message::Cmd {
-                cmd: Cmd::Data { .. },
-                ..
-            } => true,
-            _ => false,
-        };
-
-        let shall_process =
-            |msg| is_data_write() && from_client() && self.is_dst_for(msg) && self.is_elder();
-
-        if !shall_process(msg) {
-            return None;
-        }
-
-        Some(PaymentDuty::ProcessPayment(msg.clone())) // TODO: Fix these for type safety
+        Some(ClientDuty::RouteToClient(msg.clone()))
     }
 
     /// After the data write sent from Payment Elders has been
@@ -377,83 +341,15 @@ impl NetworkMsgAnalysis {
         return Some(duty);
     }
 
-    fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
-        let from_client = || match msg.origin {
-            MsgSender::Client { .. } => true,
-            _ => false,
-        };
-
-        let shall_process = |msg| from_client() && self.is_dst_for(msg) && self.is_elder();
-
-        let duty = match &msg.message {
-            Message::Cmd {
-                cmd: Cmd::Transfer(cmd),
-                ..
-            } => {
-                if !shall_process(msg) {
-                    return None;
-                }
-                TransferDuty::ProcessCmd {
-                    cmd: cmd.clone().into(),
-                    msg_id: msg.id(),
-                    origin: msg.origin.address(),
-                }
-            }
-            Message::Query {
-                query: Query::Transfer(query),
-                ..
-            } => {
-                if !shall_process(msg) {
-                    return None;
-                }
-                TransferDuty::ProcessQuery {
-                    query: query.clone().into(),
-                    msg_id: msg.id(),
-                    origin: msg.origin.address(),
-                }
-            }
-            _ => return None,
-        };
-        Some(duty)
-    }
-
     fn self_is_handler_for(&self, address: &XorName) -> bool {
-        let xorname = routing::XorName(address.0);
-        match self.routing.borrow().matches_our_prefix(&xorname) {
-            Ok(result) => result,
-            _ => false,
-        }
+        self.section.handles(address)
     }
 
     fn is_elder(&self) -> bool {
-        if let AgeGroup::Elder = self.our_duties() {
-            true
-        } else {
-            false
-        }
+        self.section.is_elder()
     }
 
     fn is_adult(&self) -> bool {
-        if let AgeGroup::Adult = self.our_duties() {
-            true
-        } else {
-            false
-        }
-    }
-
-    fn our_duties(&self) -> AgeGroup {
-        if self.routing.borrow().is_elder() {
-            AgeGroup::Elder
-        } else if self
-            .routing
-            .borrow()
-            .our_adults()
-            .map(|c| c.name())
-            .any(|x| x == self.routing.borrow().name())
-        {
-            AgeGroup::Adult
-        } else {
-            AgeGroup::Infant
-        }
+        self.section.is_adult()
     }
 }

@@ -6,13 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod client_input_parse;
-mod onboarding;
-
-pub use self::client_input_parse::{
+pub use super::client_input_parse::{
     try_deserialize_handshake, try_deserialize_msg, ClientInput, ClientMsg,
 };
-pub use self::onboarding::Onboarding;
+pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info};
 use rand::{CryptoRng, Rng};

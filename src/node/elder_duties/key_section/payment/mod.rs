@@ -19,7 +19,7 @@ use std::{
     rc::Rc,
 };
 
-pub struct DataPayment {
+pub struct Payments {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
@@ -30,10 +30,10 @@ pub struct DataPayment {
 /// requests from S(G) (Gateway nodes).
 /// These will simply be forwarded requests
 /// from clients.
-/// At DataPayment, a local request to Transfers module
+/// At Payments, a local request to Transfers module
 /// will clear the payment, and thereafter the node forwards
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
-impl DataPayment {
+impl Payments {
     pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
         Self {
@@ -102,7 +102,7 @@ impl DataPayment {
     }
 }
 
-impl Display for DataPayment {
+impl Display for Payments {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.keys.public_key())
     }
