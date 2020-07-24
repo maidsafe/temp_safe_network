@@ -117,7 +117,7 @@ impl Sequences {
                 &msg.origin.address(),
             );
         }
-        self.wrapping.vote(msg)
+        self.wrapping.forward(msg)
     }
 
     // on client request
@@ -133,12 +133,12 @@ impl Sequences {
                 &msg.origin.address(),
             );
         }
-        self.wrapping.vote(msg)
+        self.wrapping.forward(msg)
     }
 
     // on client request
     fn initiate_edit(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        self.wrapping.vote(msg)
+        self.wrapping.forward(msg)
     }
 
     fn extract_read(&self, msg: &MsgEnvelope) -> Option<SequenceRead> {
@@ -228,7 +228,7 @@ impl Blobs {
                 );
             }
         }
-        self.wrapping.vote(msg)
+        self.wrapping.forward(msg)
     }
 
     // on client request
@@ -238,7 +238,7 @@ impl Blobs {
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
         if address.kind() == BlobKind::Private {
-            self.wrapping.vote(msg)
+            self.wrapping.forward(msg)
         } else {
             self.wrapping.error(
                 CmdError::Data(NdError::InvalidOperation),
@@ -306,7 +306,7 @@ impl Maps {
         match write {
             New(chunk) => self.initiate_creation(chunk, msg),
             Delete(..) | Edit { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
-                self.wrapping.vote(msg)
+                self.wrapping.forward(msg)
             }
         }
     }
@@ -328,7 +328,7 @@ impl Maps {
             );
         }
 
-        self.wrapping.vote(msg)
+        self.wrapping.forward(msg)
     }
 
     fn extract_read(&self, msg: &MsgEnvelope) -> Option<MapRead> {
@@ -379,7 +379,7 @@ impl Accounts {
     // on client request
     pub fn initiate_read(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if self.is_account_read(msg) {
-            self.wrapping.vote(msg)
+            self.wrapping.forward(msg)
         } else {
             None
         }
@@ -395,7 +395,7 @@ impl Accounts {
                 &msg.origin.address(),
             );
         }
-        self.wrapping.vote(msg)
+        self.wrapping.forward(msg)
     }
 
     fn is_account_read(&self, msg: &MsgEnvelope) -> bool {

@@ -78,6 +78,17 @@ impl<R: CryptoRng + Rng> Gateway<R> {
         result.map(|c| RunAsNode(ProcessMessaging(c)))
     }
 
+    /// Basically.. when Gateway nodes have voted and agreed,
+    /// that this is a valid client request to handle locally,
+    /// they'll process it locally.
+    fn process_group_decision(&mut self, decision: &GroupDecision) -> Option<MessagingDuty> {
+        use GroupDecision::*;
+        trace!("{}: Group decided on {:?}", self, decision);
+        match decision {
+            Process(msg) => self.process_msg(msg),
+        }
+    }
+
     fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if let Address::Client(xorname) = &msg.destination() {
             if self.section.handles(&xorname) {
@@ -96,16 +107,6 @@ impl<R: CryptoRng + Rng> Gateway<R> {
         } else {
             // so, it wasn't really for Gateway after all
             None
-        }
-    }
-
-    /// Basically.. when Gateway nodes have agreed,
-    /// they'll forward the request into the network.
-    fn process_group_decision(&mut self, decision: &GroupDecision) -> Option<MessagingDuty> {
-        use GroupDecision::*;
-        trace!("{}: Group decided on {:?}", self, decision);
-        match decision {
-            Forward(msg) => Some(MessagingDuty::SendToSection(msg.clone())),
         }
     }
 

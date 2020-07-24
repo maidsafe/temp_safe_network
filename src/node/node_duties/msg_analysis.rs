@@ -91,20 +91,9 @@ impl NetworkMsgAnalysis {
             Node(address) => routing::XorName(address.0) != *self.routing.borrow().id().name(),
             Section(address) => !self.self_is_handler_for(&address),
         };
-        let from_client = || match msg.most_recent_sender() {
-            MsgSender::Client { .. } => true,
-            _ => false,
-        };
-        let is_auth_cmd = || match msg.message {
-            Message::Cmd {
-                cmd: Cmd::Auth { .. },
-                ..
-            } => true,
-            _ => false,
-        };
 
-        if destined_for_network() || (from_client() && !is_auth_cmd()) {
-            Some(MessagingDuty::SendToSection(msg.clone()))
+        if destined_for_network() {
+            Some(MessagingDuty::SendToSection(msg.clone())) // wrapping.forward
         } else {
             None
         }
@@ -255,11 +244,8 @@ impl NetworkMsgAnalysis {
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
     fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
-        let from_gateway_single_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
-                duty: Duty::Elder(ElderDuties::Gateway),
-                ..
-            } => true,
+        let from_client = || match msg.origin {
+            MsgSender::Client { .. } => true,
             _ => false,
         };
 
@@ -271,12 +257,8 @@ impl NetworkMsgAnalysis {
             _ => false,
         };
 
-        let shall_process = |msg| {
-            is_data_write()
-                && from_gateway_single_elder()
-                && self.is_dst_for(msg)
-                && self.is_elder()
-        };
+        let shall_process =
+            |msg| is_data_write() && from_client() && self.is_dst_for(msg) && self.is_elder();
 
         if !shall_process(msg) {
             return None;

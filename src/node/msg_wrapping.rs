@@ -69,8 +69,7 @@ impl ElderMsgWrapping {
     }
 
     pub fn vote(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        let msg = self.inner.set_proxy(msg);
-        Some(MessagingDuty::VoteFor(GroupDecision::Forward(msg)))
+        Some(MessagingDuty::VoteFor(GroupDecision::Process(msg.clone())))
     }
 
     pub fn forward(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {

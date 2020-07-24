@@ -57,7 +57,7 @@ pub enum GroupDecision {
     /// When Gateway nodes consider a request
     /// valid, they will vote for it to be forwarded.
     /// As they reach consensus, this is then carried out.
-    Forward(MsgEnvelope),
+    Process(MsgEnvelope),
 }
 
 // --------------- Messaging ---------------
