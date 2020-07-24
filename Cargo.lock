@@ -219,9 +219,9 @@ checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
 name = "bincode"
-version = "1.2.1"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5753e2a71534719bf3f4e57006c3a4f0d2c672a4b676eec84161f763eca87dbf"
+checksum = "f30d3a39baa26f9651f17b375061f3233dde33424a8b72b0dbe93a68a0bc896d"
 dependencies = [
  "byteorder",
  "serde",
@@ -772,9 +772,9 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
 name = "ffi_utils"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "429a449983b4ef2cae75c920146cd9f86566b9dd1a310c012907fed222d0f6a9"
+checksum = "245e34abfc6aedb678ae03b18bce30983f6c6b68dc6813a29d8f39d7e8a218ee"
 dependencies = [
  "base64 0.9.3",
  "log 0.4.8",
@@ -2054,7 +2054,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "bincode",
  "crdts",
@@ -2085,7 +2085,7 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.16.3"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator"
-version = "0.16.3"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2136,7 +2136,7 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator_ffi"
-version = "0.16.3"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2177,7 +2177,7 @@ dependencies = [
 
 [[package]]
 name = "safe_core"
-version = "0.41.3"
+version = "0.42.1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2251,8 +2251,9 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.17.0"
-source = "git+https://github.com/maidsafe/self-encryption#a16d27a3b86b45eb69f8b977711642b105af0aff"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccbad0610b64c80e4a7f698eade1fcda8e37ebc459766e5e77c69d94fe20e387"
 dependencies = [
  "aes",
  "async-trait",

@@ -1,5 +1,13 @@
 # Safe Core - Change Log
 
+## [0.42.1]
+- Update ffi-utils to 0.17.0
+
+## [0.42.0]
+- Added of SequenceData APIs
+- Removed of AppendOnlyData APIs
+- Standardize cargo dependency versioning
+
 ## [0.41.3]
 - Fix CI deploy
 
