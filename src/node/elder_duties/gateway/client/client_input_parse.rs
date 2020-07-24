@@ -61,7 +61,7 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
         )) => ClientMsg { msg, public_id },
         _ => return None, // Only cmds and queries from client are allowed through here.
     };
-
+    info!("Deserialized client msg from {}", msg.public_id);
     Some(ClientInput::Msg(msg))
 }
 

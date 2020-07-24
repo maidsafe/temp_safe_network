@@ -15,6 +15,7 @@ use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
     NodeCmdError, XorName,
 };
+use log::info;
 use serde::Serialize;
 use std::collections::BTreeSet;
 
@@ -138,6 +139,7 @@ impl MsgWrapping {
         msg_id: MessageId,
         origin: &Address,
     ) -> Option<MessagingDuty> {
+        info!("Error {:?}", error);
         self.send(Message::CmdError {
             id: MessageId::new(),
             error,
