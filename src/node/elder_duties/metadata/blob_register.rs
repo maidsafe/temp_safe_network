@@ -533,7 +533,7 @@ impl BlobRegister {
             let take = CHUNK_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
                 .section_querying
-                .our_elders_sorted_by_distance_to(&target, take);
+                .our_elder_names_sorted_by_distance_to(&target, take);
             closest_adults.append(&mut closest_elders);
             closest_adults
         } else {

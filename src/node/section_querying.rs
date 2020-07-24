@@ -8,7 +8,7 @@
 
 use routing::Node as Routing;
 use safe_nd::XorName;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 
 #[derive(Clone)]
 pub struct SectionQuerying {
@@ -32,27 +32,14 @@ impl SectionQuerying {
         }
     }
 
-    pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
+    pub fn matches_our_prefix(&self, name: XorName) -> bool {
         self.routing
             .borrow()
-            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
-            .into_iter()
-            .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
+            .matches_our_prefix(&routing::XorName(name.0))
+            .unwrap_or(false)
     }
 
-    pub fn our_elders_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
-        self.routing
-            .borrow()
-            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
-            .into_iter()
-            .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
-    }
-
-    pub fn our_elders(&self) -> Vec<XorName> {
+    pub fn our_elder_names(&self) -> Vec<XorName> {
         self.routing
             .borrow_mut()
             .our_elders()
@@ -61,10 +48,48 @@ impl SectionQuerying {
             .collect::<Vec<_>>()
     }
 
-    pub fn matches_our_prefix(&self, name: XorName) -> bool {
+    pub fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
+        self.routing
+            .borrow_mut()
+            .our_elders()
+            .into_iter()
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn our_elder_addresses_sorted_by_distance_to(
+        &self,
+        name: &XorName,
+    ) -> Vec<(XorName, SocketAddr)> {
         self.routing
             .borrow()
-            .matches_our_prefix(&routing::XorName(name.0))
-            .unwrap_or(false)
+            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
+            .into_iter()
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn our_elder_names_sorted_by_distance_to(
+        &self,
+        name: &XorName,
+        count: usize,
+    ) -> Vec<XorName> {
+        self.routing
+            .borrow()
+            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
+        self.routing
+            .borrow()
+            .our_elders_sorted_by_distance_to(&routing::XorName(name.0))
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
     }
 }

@@ -85,21 +85,11 @@ impl Onboarding {
             self, client_id, peer_addr
         );
         let elders = if self.section.matches_our_prefix(*client_id.name()) {
-            self.section
-                .our_elders()
-                .into_iter()
-                .map(|elder_address| (elder_address, peer_addr))
-                .collect::<Vec<_>>()
+            self.section.our_elder_addresses()
         } else {
             let closest_known_elders = self
                 .section
-                .our_elders_sorted_by_distance_to(client_id.name(), 7) // ach, hard coded seven
-                .into_iter()
-                .map(|elder_address| {
-                    (elder_address, peer_addr)
-                })
-                .collect::<Vec<_>>();
-
+                .our_elder_addresses_sorted_by_distance_to(client_id.name());
             if closest_known_elders.is_empty() {
                 warn!(
                     "{}: No closest known elders in any section we know of",
