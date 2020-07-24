@@ -184,53 +184,14 @@ impl NetworkMsgAnalysis {
 
     // todo: eval all msg types!
     fn try_gateway(&self, msg: &MsgEnvelope) -> Option<GatewayDuty> {
-        let from_client = || match msg.origin {
-            MsgSender::Client { .. } => true,
-            _ => false,
-        };
-        let agreed_by_gateway_section = || match msg.most_recent_sender() {
-            MsgSender::Section {
-                duty: Duty::Elder(ElderDuties::Gateway),
-                ..
-            } => true,
-            _ => false,
-        };
-        let is_auth_cmd = || match msg.message {
-            Message::Cmd {
-                cmd: Cmd::Auth { .. },
-                ..
-            } => true,
+        let is_our_client_msg = || match msg.destination() {
+            Address::Client(address) => self.self_is_handler_for(&address),
             _ => false,
         };
 
-        let from_network_to_client = || match msg.destination() {
-            Address::Client(xorname) => {
-                let from_gateway = match msg.most_recent_sender() {
-                    MsgSender::Node {
-                        duty: Duty::Elder(ElderDuties::Gateway),
-                        ..
-                    }
-                    | MsgSender::Section {
-                        duty: Duty::Elder(ElderDuties::Gateway),
-                        ..
-                    } => true,
-                    _ => false,
-                };
-                !from_gateway && self.self_is_handler_for(&xorname)
-            }
-            _ => false,
-        };
+        let shall_process = || is_our_client_msg() && self.is_elder();
 
-        let shall_process = |msg| {
-            from_network_to_client()
-                || (from_client()
-                    && agreed_by_gateway_section()
-                    && is_auth_cmd()
-                    && self.is_dst_for(msg)
-                    && self.is_elder())
-        };
-
-        if !shall_process(msg) {
+        if !shall_process() {
             return None;
         }
 
