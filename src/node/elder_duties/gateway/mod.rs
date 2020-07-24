@@ -22,7 +22,9 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::state_db::NodeInfo,
     node::{
-        node_ops::{GatewayDuty, GroupDecision, MessagingDuty, NodeDuty, NodeOperation},
+        node_ops::{
+            GatewayDuty, GroupDecision, MessagingDuty, NodeDuty, NodeOperation, TransferDuty,
+        },
         section_querying::SectionQuerying,
     },
     Result,
@@ -68,14 +70,11 @@ impl<R: CryptoRng + Rng> Gateway<R> {
 
     pub fn process(&mut self, cmd: &GatewayDuty) -> Option<NodeOperation> {
         use GatewayDuty::*;
-        use NodeDuty::*;
-        use NodeOperation::*;
-        let result = match cmd {
-            ProcessMsg(msg) => self.process_msg(msg),
+        match cmd {
+            ProcessMsg(msg) => wrap(self.process_msg(msg)),
             ProcessClientEvent(event) => self.process_client_event(event),
-            ProcessGroupDecision(decision) => self.process_group_decision(decision),
-        };
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+            ProcessGroupDecision(decision) => wrap(self.process_group_decision(decision)),
+        }
     }
 
     /// Basically.. when Gateway nodes have voted and agreed,
@@ -111,7 +110,7 @@ impl<R: CryptoRng + Rng> Gateway<R> {
     }
 
     /// This is where client input is parsed.
-    fn process_client_event(&mut self, event: &ClientEvent) -> Option<MessagingDuty> {
+    fn process_client_event(&mut self, event: &ClientEvent) -> Option<NodeOperation> {
         use ClientEvent::*;
         match event {
             ConnectedTo { peer } => {
@@ -134,17 +133,17 @@ impl<R: CryptoRng + Rng> Gateway<R> {
                             .client_msg_tracking
                             .track_incoming(msg.id(), peer.peer_addr());
                         if result.is_some() {
-                            return result;
+                            return wrap(result);
                         }
                         msg
                     }
                     ClientInput::Handshake(request) => {
                         let mut rng = ChaChaRng::from_seed(self.rng.gen());
-                        return self.client_msg_tracking.process_handshake(
+                        return wrap(self.client_msg_tracking.process_handshake(
                             request,
                             peer.peer_addr(),
                             &mut rng,
-                        );
+                        ));
                     }
                 };
 
@@ -171,33 +170,70 @@ impl<R: CryptoRng + Rng> Gateway<R> {
     }
 
     /// Process a msg from a client.
-    fn process_client_msg(&mut self, client: PublicId, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn process_client_msg(&mut self, client: PublicId, msg: &MsgEnvelope) -> Option<NodeOperation> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
-            return Some(error);
+            return wrap(Some(error));
         };
         if let Some(error) = self.auth.authorise_app(&client, &msg) {
-            return Some(error);
+            return wrap(Some(error));
         }
 
         match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Auth(_), ..
-            } => self.auth.initiate(msg),
+            } => wrap(self.auth.initiate(msg)),
             Message::Query {
                 query: Query::Auth(_),
                 ..
-            } => self.auth.list_keys_and_version(msg),
+            } => wrap(self.auth.list_keys_and_version(msg)),
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
                 ..
-            } => self.data.initiate_write(cmd, msg),
+            } => wrap(self.data.initiate_write(cmd, msg)),
             Message::Query {
                 query: Query::Data(data_query),
                 ..
-            } => self.data.initiate_read(data_query, msg),
+            } => wrap(self.data.initiate_read(data_query, msg)),
+            Message::Query {
+                query: Query::Transfer(_),
+                ..
+            }
+            | Message::Cmd {
+                cmd: Cmd::Transfer(_),
+                ..
+            } => self.process_transfer(msg),
             _ => None, // error..!
         }
     }
+
+    fn process_transfer(&self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        let duty = match &msg.message {
+            Message::Query {
+                query: Query::Transfer(query),
+                ..
+            } => TransferDuty::ProcessQuery {
+                query: query.clone().into(),
+                msg_id: msg.id(),
+                origin: msg.origin.address(),
+            },
+            Message::Cmd {
+                cmd: Cmd::Transfer(cmd),
+                ..
+            } => TransferDuty::ProcessCmd {
+                cmd: cmd.clone().into(),
+                msg_id: msg.id(),
+                origin: msg.origin.address(),
+            },
+            _ => return None, // error..!
+        };
+        Some(NodeOperation::RunAsTransfers(duty))
+    }
+}
+
+fn wrap(option: Option<MessagingDuty>) -> Option<NodeOperation> {
+    use NodeDuty::*;
+    use NodeOperation::*;
+    option.map(|c| RunAsNode(ProcessMessaging(c)))
 }
 
 impl<R: CryptoRng + Rng> Display for Gateway<R> {
