@@ -417,16 +417,12 @@ impl NetworkMsgAnalysis {
     }
 
     fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
-        let from_single_gateway_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
-                duty: Duty::Elder(ElderDuties::Gateway),
-                ..
-            } => true,
+        let from_client = || match msg.origin {
+            MsgSender::Client { .. } => true,
             _ => false,
         };
 
-        let shall_process =
-            |msg| from_single_gateway_elder() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = |msg| from_client() && self.is_dst_for(msg) && self.is_elder();
 
         let duty = match &msg.message {
             Message::Cmd {
