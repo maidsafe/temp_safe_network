@@ -65,7 +65,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         });
 
         let keypairs = Rc::new(RefCell::new(keypairs));
-        let keys = NodeKeys::new(keypairs);
+        let keys = NodeKeys::new(keypairs.clone());
 
         let node_info = NodeInfo {
             keys,
@@ -77,7 +77,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(node_info, routing.clone(), rng);
+        let mut duties = NodeDuties::new(keypairs, node_info, routing.clone(), rng);
 
         use AgeGroup::*;
         let _ = match age_group {
