@@ -161,7 +161,11 @@ impl Bootstrapping {
         let token = rand::thread_rng().gen();
         let handshake = HandshakeRequest::Bootstrap(self.full_id.public_id());
         let msg = Bytes::from(unwrap!(serialize(&handshake)));
+
+        trace!("qp2p sending bootstrappedtoooo");
         quic_p2p.send(Peer::Node(socket), msg, token);
+        trace!("qp2p sending bootstrappedtoooo after");
+
     }
 
     fn handle_new_message(
@@ -243,6 +247,7 @@ impl Joining {
         _sender_id: NodePublicId,
         challenge: Vec<u8>,
     ) {
+        trace!("Handling challenge");
         if let Some(connected) = self.connected_elders.get_mut(&sender_addr) {
             // safe to unwrap as we just found this elder before calling this method.
             if connected.sent_challenge {
@@ -252,7 +257,11 @@ impl Joining {
             let token = rand::thread_rng().gen();
             let response = HandshakeRequest::ChallengeResult(self.full_id.sign(&challenge));
             let msg = Bytes::from(unwrap!(serialize(&response)));
+
+            trace!("sending challenge reponse");
             quic_p2p.send(connected.elder.peer.clone(), msg, token);
+            trace!("qp2p sending challenge response after");
+
             connected.sent_challenge = true;
         } else {
             // Doesn't have this connected peer?
@@ -272,13 +281,20 @@ impl Joining {
             let handshake = HandshakeRequest::Join(self.full_id.public_id());
             let msg = Bytes::from(unwrap!(serialize(&handshake)));
             quic_p2p.send(peer, msg, token);
+            trace!("qp2p sending join  after");
+
         } else {
             // Invalid state
         }
     }
 
     fn is_everyone_joined(&self) -> bool {
-        self.connected_elders.values().all(|e| e.sent_challenge)
+        self.connected_elders.values().all(|e| {
+            trace!("checking connected elders {:?}", e.sent_challenge);
+
+            e.sent_challenge
+        } 
+    )
     }
 
     fn handle_new_message(
@@ -293,6 +309,8 @@ impl Joining {
                 self.handle_challenge(quic_p2p, peer_addr, node_public_id, challenge);
 
                 if self.is_everyone_joined() {
+
+                    trace!("Transtionnnnnnnn");
                     return Transition::ToConnected;
                 }
             }
@@ -315,6 +333,8 @@ struct Connected {
 
 impl Connected {
     fn new(old_state: Joining) -> Self {
+
+        info!("Connected to network");
         // trigger the connection future
         let _ = old_state.connection_hook.send(Ok(()));
 
@@ -325,13 +345,18 @@ impl Connected {
             elders: old_state
                 .connected_elders
                 .into_iter()
-                .map(|(k, v)| (k, v.elder))
+                .map(|(k, v)| {
+                    info!("elder socker:: {:?}", k);
+                    // info!("elder:: {:?}", v.elder);
+                    (k, v.elder)
+                })
                 .collect(),
             full_id: old_state.full_id,
         }
     }
 
     fn get_envelope_for_message(&self, message: Message) -> MsgEnvelope {
+        trace!("Putting message in envelope: {:?}", message);
         let signature = self
             .full_id
             .sign(&unwrap::unwrap!(bincode::serialize(&message)));
@@ -388,7 +413,9 @@ impl Connected {
     ) -> Result<(), CoreError> {
         trace!("Sending cmd message {:?}", msg_id);
 
-        let bytes = Bytes::from(unwrap!(serialize(msg)));
+        let envelope = self.get_envelope_for_message(msg.clone());
+
+        let bytes = Bytes::from(unwrap!(serialize(&envelope)));
         {
             for peer in self.elders.values().map(Elder::peer) {
                 let token = rand::random();
@@ -406,7 +433,8 @@ impl Connected {
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
-        trace!("Sending message {:?}", msg_id);
+        trace!("Sending message for validation {:?}", msg_id);
+
 
         // set up channel
         let (sender_future, mut response_future) = mpsc::unbounded();
@@ -415,8 +443,10 @@ impl Connected {
             .response_manager
             .add_event_listener(msg_id, sender_future);
 
+        let envelope = self.get_envelope_for_message(msg.clone());
+
         // send the message to our elders list
-        let bytes = Bytes::from(unwrap!(serialize(msg)));
+        let bytes = Bytes::from(unwrap!(serialize(&envelope)));
         {
             for peer in self.elders.values().map(Elder::peer) {
                 let token = rand::random();
@@ -674,12 +704,15 @@ impl Inner {
         &mut self,
         msg: &Message,
     ) -> Result<channel::mpsc::UnboundedReceiver<QueryResponse>, CoreError> {
+        trace!("Send Query: {:?}", msg);
+
         self.state.send_query(&mut self.quic_p2p, msg).await
     }
 
     async fn send_cmd(&mut self, msg_id: MessageId, msg: &Message) -> Result<(), CoreError> {
         let response = self.state.send_cmd(&mut self.quic_p2p, msg_id, msg).await;
 
+        trace!("Send CMD: {:?}", msg);
         // arbitrary delay to allow network to catchup & simplify test writing
         #[cfg(feature = "testing")]
         std::thread::sleep(Duration::from_millis(5500));
@@ -755,9 +788,20 @@ impl Inner {
         */
     }
 
-    fn handle_sent_user_message(&mut self, _peer_addr: SocketAddr, _msg: Bytes, _token: Token) {
+    fn handle_sent_user_message(&mut self, _peer_addr: SocketAddr, msg: Bytes, _token: Token) {
         // TODO: check if we have handled the challenge?
         trace!("{}: Sent user message", self.id);
+
+        match deserialize(&msg) {
+            Ok(MsgEnvelope { message, .. }) => {
+                trace!(
+                    "Message was sent: {:?}",
+                    message
+                );
+            }
+            Ok(x) => println!("Unexpected send message type {:?}", x),
+            Err(e) => println!("Unexpected error deserializing a sent message {:?}", e),
+        }
     }
 
     fn handle_unsent_user_message(&mut self, peer_addr: SocketAddr, msg: &Bytes, token: Token) {
@@ -796,7 +840,7 @@ impl Inner {
             }
         }
         trace!(
-            "{}: Recvd connection failure for {}, {}",
+            "{}: Recvd connection failure for {}, {:#?}",
             self.id,
             peer_addr,
             err

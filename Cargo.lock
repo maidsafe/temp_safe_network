@@ -570,17 +570,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derive_more"
-version = "0.99.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc655351f820d774679da6cdc23355a93de496867d8203496675162e17b1d671"
-dependencies = [
- "proc-macro2 1.0.18",
- "quote 1.0.7",
- "syn 1.0.33",
-]
-
-[[package]]
 name = "diff"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1590,14 +1579,11 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea016023972754185c58c0ce82b51866fc665aac3fa827c0df2477e6845698fc"
 dependencies = [
  "base64 0.10.1",
  "bincode",
  "bytes 0.5.5",
  "crossbeam-channel",
- "derive_more",
  "directories 1.0.2",
  "err-derive",
  "futures",
@@ -2252,8 +2238,7 @@ dependencies = [
 [[package]]
 name = "self_encryption"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccbad0610b64c80e4a7f698eade1fcda8e37ebc459766e5e77c69d94fe20e387"
+source = "git+https://github.com/maidsafe/self-encryption#9d3db6e5562a05e562640bcf2a293ef083c17a69"
 dependencies = [
  "aes",
  "async-trait",
@@ -3048,8 +3033,3 @@ name = "zeroize"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ddfeb6eee2fb3b262ef6e0898a52b7563bb8e0d5955a313b3cf2f808246ea14"
-
-[[patch.unused]]
-name = "quic-p2p"
-version = "0.6.2"
-source = "git+https://github.com/maidsafe/quic-p2p#7610eb8d322feb77fcc97913c59e288209605cbe"

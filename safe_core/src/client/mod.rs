@@ -1515,11 +1515,15 @@ mod tests {
     // Test putting, getting, and deleting unpub blob.
     #[tokio::test]
     async fn unpub_blob_test() -> Result<(), CoreError> {
+        println!("blob_Test________");
         crate::utils::test_utils::init_log();
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
-
+        println!("blob_Test_______pre client_");
+        
         let client = random_client()?;
+        println!("blob_Test_______post client_");
+
         let client9 = client.clone();
 
         let value = unwrap!(generate_random_vector::<u8>(10));

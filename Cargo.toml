@@ -18,4 +18,4 @@ safe-nd = { path = "../safe-nd"}
 safe-transfers = { path = "../safe-transfers"}
 # safe-transfers = { git = "https://github.com/oetyng/safe-transfers.git", branch = "separate_read_write" }
 self_encryption = {git="https://github.com/maidsafe/self-encryption"}
-quic-p2p = {git="https://github.com/maidsafe/quic-p2p"}
+quic-p2p = {path="../quic-p2p"}
