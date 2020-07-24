@@ -122,11 +122,12 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         ) {
             self.duty_level = Elder(duties);
             let node = self.routing.borrow();
+            let index = node.our_index().ok()?;
             let bls_secret_key = node.secret_key_share().ok()?;
             let public_key_set = node.public_key_set().ok()?.clone();
             self.keys
                 .borrow_mut()
-                .set_bls_keys(bls_secret_key.clone(), public_key_set);
+                .set_bls_keys(index, bls_secret_key.clone(), public_key_set);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
             // Also, "Error-to-Unit" is not a good conversion..
