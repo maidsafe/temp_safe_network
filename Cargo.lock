@@ -1589,8 +1589,9 @@ dependencies = [
 
 [[package]]
 name = "quic-p2p"
-version = "0.6.2"
-source = "git+https://github.com/maidsafe/quic-p2p#7610eb8d322feb77fcc97913c59e288209605cbe"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea016023972754185c58c0ce82b51866fc665aac3fa827c0df2477e6845698fc"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -3046,3 +3047,8 @@ name = "zeroize"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ddfeb6eee2fb3b262ef6e0898a52b7563bb8e0d5955a313b3cf2f808246ea14"
+
+[[patch.unused]]
+name = "quic-p2p"
+version = "0.6.2"
+source = "git+https://github.com/maidsafe/quic-p2p#7610eb8d322feb77fcc97913c59e288209605cbe"
