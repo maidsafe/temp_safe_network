@@ -49,7 +49,7 @@ impl Onboarding {
 
     /// Query
     pub fn contains(&mut self, peer_addr: SocketAddr) -> bool {
-        self.clients.contains_key(&peer_addr) || self.client_candidates.contains_key(&peer_addr)
+        self.clients.contains_key(&peer_addr)
     }
 
     pub fn remove_client(&mut self, peer_addr: SocketAddr) {
