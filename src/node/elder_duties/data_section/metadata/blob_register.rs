@@ -127,6 +127,13 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
+        let results: Vec<_> = (&target_holders)
+            .into_iter()
+            .map(|holder| self.set_chunk_holder(*data.address(), *holder, msg.origin.id()))
+            .filter(|res| res.is_err())
+            .collect();
+        if results.len() > 0 {}
+
         self.wrapping.send_to_adults(target_holders, msg)
     }
 
@@ -151,7 +158,95 @@ impl BlobRegister {
             }
         };
 
+        let results: Vec<_> = (&metadata.holders)
+            .into_iter()
+            .map(|holder_name| self.remove_chunk_holder(address, *holder_name))
+            .collect();
+        if results.len() > 0 {}
+
         self.wrapping.send_to_adults(metadata.holders, msg)
+    }
+
+    fn set_chunk_holder(
+        &mut self,
+        blob_address: BlobAddress,
+        holder: XorName,
+        origin: PublicKey,
+    ) -> Result<()> {
+        // TODO -
+        // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
+        //   next closest non-full adult, or elder if none.  Also update the metadata for this
+        //   chunk.  Not known yet where we'll get the chunk from to do that.
+
+        let db_key = blob_address.to_db_key();
+        let mut metadata = self.get_metadata_for(blob_address).unwrap_or_default();
+        if blob_address.is_unpub() {
+            metadata.owner = Some(origin);
+        }
+
+        let _ = metadata.holders.insert(holder);
+
+        if let Err(error) = self.metadata.set(&db_key, &metadata) {
+            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+            return Err(error.into());
+        }
+
+        // We're acting as data handler, received request from client handlers
+        let mut holders_metadata = self.get_holder(holder).unwrap_or_default();
+        let _ = holders_metadata.chunks.insert(blob_address);
+
+        if let Err(error) = self.holders.set(&holder.to_db_key(), &holders_metadata) {
+            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+            return Err(error.into());
+        }
+        Ok(())
+    }
+
+    fn remove_chunk_holder(
+        &mut self,
+        blob_address: BlobAddress,
+        holder_name: XorName,
+    ) -> Result<()> {
+        let db_key = blob_address.to_db_key();
+        let metadata = self.get_metadata_for(blob_address);
+        if let Ok(mut metadata) = metadata {
+            let holder = self.get_holder(holder_name);
+
+            // Remove the chunk from the holder metadata
+            if let Ok(mut holder) = holder {
+                let _ = holder.chunks.remove(&blob_address);
+                if holder.chunks.is_empty() {
+                    if let Err(error) = self.holders.rem(&holder_name.to_db_key()) {
+                        warn!(
+                            "{}: Failed to delete holder metadata from DB: {:?}",
+                            self, error
+                        );
+                    }
+                } else if let Err(error) = self.holders.set(&holder_name.to_db_key(), &holder) {
+                    warn!(
+                        "{}: Failed to write holder metadata to DB: {:?}",
+                        self, error
+                    );
+                }
+            }
+
+            // Remove the holder from the chunk metadata
+            let _ = metadata.holders.remove(&holder_name);
+            if metadata.holders.is_empty() {
+                if let Err(error) = self.metadata.rem(&db_key) {
+                    warn!(
+                        "{}: Failed to delete chunk metadata from DB: {:?}",
+                        self, error
+                    );
+                }
+            } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+                warn!(
+                    "{}: Failed to write chunk metadata to DB: {:?}",
+                    self, error
+                );
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<NodeOperation> {
@@ -233,226 +328,30 @@ impl BlobRegister {
     pub(super) fn update_holders(
         &mut self,
         address: BlobAddress,
-        sender: XorName,
+        holder: XorName,
         result: NdResult<()>,
         message_id: MessageId,
     ) -> Option<MessagingDuty> {
-        if result.is_ok() {
-            let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
-            if !chunk_metadata.holders.insert(sender) {
-                warn!(
-                    "{}: {} already registered as a holder for {:?}",
-                    self, sender, address
-                );
-            }
-            if let Err(error) = self.metadata.set(&address.to_db_key(), &chunk_metadata) {
-                warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-            }
-            let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
-            if !holders_metadata.chunks.insert(address) {
-                warn!(
-                    "{}: {} already registered as a holder for {:?}",
-                    self, sender, &address
-                );
-            }
-            if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
-                warn!(
-                    "{}: Failed to write holder metadata to DB: {:?}",
-                    self, error
-                );
-            }
-            info!("Duplication process completed for: {:?}", message_id);
-        } else {
-            // Todo: take care of the mutation failure case
+        let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
+        let _ = chunk_metadata.holders.insert(holder);
+        if let Err(error) = self.metadata.set(&address.to_db_key(), &chunk_metadata) {
+            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
+        let mut holders_metadata = self.get_holder(holder).unwrap_or_default();
+        let _ = holders_metadata.chunks.insert(address);
+        if let Err(error) = self.holders.set(&holder.to_db_key(), &holders_metadata) {
+            warn!(
+                "{}: Failed to write holder metadata to DB: {:?}",
+                self, error
+            );
+        }
+        info!("Duplication process completed for: {:?}", message_id);
         None
     }
 
-    // pub(super) fn handle_write_result(
-    //     &mut self,
-    //     sender: XorName,
-    //     requester: PublicId,
-    //     result: NdResult<()>,
-    //     message_id: MessageId,
-    //     request: Request,
-    // ) -> Option<MessagingDuty> {
-    //     match &request {
-    //         Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::New(data)))) => {
-    //             self.handle_store_result(*data.address(), sender, &result, message_id, requester)
-    //         }
-    //         Request::Node(NodeRequest::Write(Write::Blob(BlobWrite::DeletePrivate(address)))) => {
-    //             self.handle_delete_result(*address, sender, result, message_id, requester)
-    //         }
-    //         _ => None,
-    //     }
-    // }
-
-    // pub(super) fn handle_store_result(
-    //     &mut self,
-    //     Blob_address: BlobAddress,
-    //     sender: XorName,
-    //     _result: &NdResult<()>,
-    //     message_id: MessageId,
-    //     requester: PublicId,
-    // ) -> Option<MessagingDuty> {
-    //     // TODO -
-    //     // - if Ok, and this is the final of the three responses send success back to client handlers and
-    //     //   then on to the client.  Note: there's no functionality in place yet to know whether
-    //     //   this is the last response or not.
-    //     // - if Ok, and this is not the last response, just return `None` here.
-    //     // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
-    //     //   next closest non-full adult, or elder if none.  Also update the metadata for this
-    //     //   chunk.  Not known yet where we'll get the chunk from to do that.
-    //     //
-    //     // For phase 1, we can leave many of these unanswered.
-
-    //     // TODO - we'll assume `result` is success for phase 1.
-    //     let db_key = Blob_address.to_db_key();
-    //     let mut metadata = self.get_metadata_for(Blob_address).unwrap_or_default();
-    //     if Blob_address.is_unpub() {
-    //         metadata.owner = Some(*utils::own_key(&requester)?);
-    //     }
-
-    //     if !metadata.holders.insert(sender) {
-    //         warn!(
-    //             "{}: {} already registered as a holder for {:?}",
-    //             self, sender, &Blob_address
-    //         );
-    //     }
-
-    //     if let Err(error) = self.metadata.set(&db_key, &metadata) {
-    //         warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-    //         // TODO - send failure back to client handlers (hopefully won't accumulate), or
-    //         //        maybe self-terminate if we can't fix this error?
-    //     }
-    //     debug!(
-    //         "{:?}, Entry {:?} has {:?} holders",
-    //         self.id,
-    //         Blob_address,
-    //         metadata.holders.len()
-    //     );
-
-    //     // We're acting as data handler, received request from client handlers
-    //     let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
-
-    //     if !holders_metadata.chunks.insert(Blob_address) {
-    //         warn!(
-    //             "{}: {} already registered as a holder for {:?}",
-    //             self, sender, &Blob_address
-    //         );
-    //     }
-
-    //     if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
-    //         warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-    //     }
-
-    //     // Should we wait for multiple responses
-    //     wrap(MetadataCmd::RespondToGateway {
-    //         sender: *Blob_address.name(),
-    //         msg: Message::Response {
-    //             requester,
-    //             response: Response::Write(Ok(())),
-    //             message_id,
-    //             proof: None,
-    //         },
-    //     })
-    // }
-
-    // pub(super) fn handle_delete_result(
-    //     &mut self,
-    //     Blob_address: BlobAddress,
-    //     sender: XorName,
-    //     result: NdResult<()>,
-    //     message_id: MessageId,
-    //     requester: PublicId,
-    // ) -> Option<MessagingDuty> {
-    //     if let Err(err) = &result {
-    //         warn!("{}: Node reports error deleting: {}", self, err);
-    //     } else {
-    //         let db_key = Blob_address.to_db_key();
-    //         let metadata = self.get_metadata_for(Blob_address);
-
-    //         if let Ok(mut metadata) = metadata {
-    //             let holder = self.get_holder(sender);
-
-    //             // Remove the chunk from the holder metadata
-    //             if let Ok(mut holder) = holder {
-    //                 let _ = holder.chunks.remove(&Blob_address);
-
-    //                 if holder.chunks.is_empty() {
-    //                     if let Err(error) = self.holders.rem(&sender.to_db_key()) {
-    //                         warn!(
-    //                             "{}: Failed to delete holder metadata from DB: {:?}",
-    //                             self, error
-    //                         );
-    //                     }
-    //                 } else if let Err(error) = self.holders.set(&sender.to_db_key(), &holder) {
-    //                     warn!(
-    //                         "{}: Failed to write holder metadata to DB: {:?}",
-    //                         self, error
-    //                     );
-    //                 }
-    //             }
-
-    //             // Remove the holder from the chunk metadata
-    //             if !metadata.holders.remove(&sender) {
-    //                 warn!(
-    //                     "{}: {} is not registered as a holder for {:?}",
-    //                     self, sender, &Blob_address
-    //                 );
-    //             }
-    //             if metadata.holders.is_empty() {
-    //                 if let Err(error) = self.metadata.rem(&db_key) {
-    //                     warn!(
-    //                         "{}: Failed to delete chunk metadata from DB: {:?}",
-    //                         self, error
-    //                     );
-    //                     // TODO - Send failure back to client handlers?
-    //                 }
-    //             } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
-    //                 warn!(
-    //                     "{}: Failed to write chunk metadata to DB: {:?}",
-    //                     self, error
-    //                 );
-    //                 // TODO - Send failure back to client handlers?
-    //             }
-    //         };
-    //     }
-
-    //     // TODO: Different responses from adults?
-    //     wrap(MetadataCmd::RespondToGateway {
-    //         sender: *Blob_address.name(),
-    //         msg: Message::Response {
-    //             requester,
-    //             response: Response::Write(result),
-    //             message_id,
-    //             proof: None,
-    //         },
-    //     })
-    // }
-
-    // pub(super) fn handle_get_result(
-    //     &self,
-    //     result: NdResult<Blob>,
-    //     message_id: MessageId,
-    //     requester: PublicId,
-    //     proof: (Request, Signature),
-    // ) -> Option<MessagingDuty> {
-    //     let response = Response::GetBlob(result);
-    //     wrap(MetadataCmd::RespondToGateway {
-    //         sender: *self.id.name(),
-    //         msg: Message::Response {
-    //             requester,
-    //             response,
-    //             message_id,
-    //             proof: Some(proof),
-    //         },
-    //     })
-    // }
-
     // Updates the metadata of the chunks help by a node that left.
     // Returns the list of chunks that were held along with the remaining holders.
-    pub fn remove_holder(
+    fn remove_holder(
         &mut self,
         node: XorName,
     ) -> NdResult<BTreeMap<BlobAddress, BTreeSet<XorName>>> {

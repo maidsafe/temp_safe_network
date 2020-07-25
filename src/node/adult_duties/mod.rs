@@ -11,7 +11,7 @@ mod chunks;
 use self::chunks::Chunks;
 use crate::{
     node::keys::NodeKeys,
-    node::node_ops::{AdultDuty, ChunkDuty, NodeDuty, NodeOperation},
+    node::node_ops::{AdultDuty, ChunkDuty, NodeOperation},
     node::state_db::NodeInfo,
     Result,
 };
