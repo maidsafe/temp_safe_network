@@ -138,9 +138,12 @@ impl<R: CryptoRng + Rng> Node<R> {
         while let Some(op) = next_op {
             next_op = match op {
                 Single(operation) => self.process(operation),
-                Multiple(ops) => Some(NodeOperation::from_many(
-                    ops.into_iter().filter_map(|c| self.process(c)).collect(),
-                )),
+                Multiple(ops) => Some(
+                    ops.into_iter()
+                        .filter_map(|c| self.process(c))
+                        .collect::<Vec<_>>()
+                        .into(),
+                ),
             }
         }
     }
@@ -148,8 +151,8 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn process(&mut self, duty: NetworkDuty) -> Option<NodeOperation> {
         use NetworkDuty::*;
         match duty {
-            RunAsAdult(duty) => self.duties.adult_duties().unwrap().process(&duty),
-            RunAsElder(duty) => self.duties.elder_duties().unwrap().process(duty),
+            RunAsAdult(duty) => self.duties.adult_duties()?.process(&duty),
+            RunAsElder(duty) => self.duties.elder_duties()?.process(duty),
             RunAsNode(duty) => self.duties.process(duty),
             Unknown => None,
         }

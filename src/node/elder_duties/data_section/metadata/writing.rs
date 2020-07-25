@@ -38,7 +38,7 @@ impl Writing {
 
     fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<NodeOperation> {
         let result = register.write(write, &self.msg);
-        result.map(|c| NodeOperation::from_many(vec![c.into(), self.farm()]))
+        result.map(|c| vec![c.into(), self.farm()].into())
     }
 
     fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<NodeOperation> {

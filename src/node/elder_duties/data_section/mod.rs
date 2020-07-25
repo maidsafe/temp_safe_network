@@ -70,14 +70,13 @@ impl DataSection {
         old_node_id: XorName,
         new_node_id: XorName,
     ) -> Option<NodeOperation> {
-        // marks the reward account as
-        // awaiting claiming of the counter
-        self.rewards.process(RewardDuty::AddRelocatedAccount {
+        // Adds the relocated account.
+        let first = self.rewards.process(RewardDuty::AddRelocatedAccount {
             old_node_id,
             new_node_id,
-        })
-        // For now, we skip chunk duplication logic.
-        //self.metadata.trigger_chunk_duplication(XorName(name.0))
+        });
+        let second = self.metadata.trigger_chunk_duplication(new_node_id);
+        Some(vec![first, second].into())
     }
 
     /// Name of the node
@@ -85,9 +84,10 @@ impl DataSection {
     pub fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
-        self.rewards
-            .process(RewardDuty::PrepareAccountMove { node_id })
-        // For now, we skip chunk duplication logic.
-        //self.metadata.trigger_chunk_duplication(XorName(name.0))
+        let first = self
+            .rewards
+            .process(RewardDuty::PrepareAccountMove { node_id });
+        let second = self.metadata.trigger_chunk_duplication(node_id);
+        Some(vec![first, second].into())
     }
 }

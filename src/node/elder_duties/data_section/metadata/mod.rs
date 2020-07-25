@@ -17,7 +17,7 @@ mod writing;
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, MetadataDuty, NodeOperation},
+    node::node_ops::{MetadataDuty, NodeOperation},
     node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     Result,
@@ -106,8 +106,7 @@ impl Metadata {
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    #[allow(unused)]
-    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<MessagingDuty>> {
+    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<NodeOperation> {
         self.elder_stores.blob_register_mut().duplicate_chunks(node)
     }
 

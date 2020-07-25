@@ -7,8 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::msg_wrapping::ElderMsgWrapping, node::node_ops::MessagingDuty,
-    node::section_querying::SectionQuerying, node::NodeInfo, utils, Result, ToDbKey,
+    node::msg_wrapping::ElderMsgWrapping,
+    node::node_ops::{MessagingDuty, NodeOperation},
+    node::section_querying::SectionQuerying,
+    node::NodeInfo,
+    utils, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
@@ -56,7 +59,6 @@ impl BlobRegister {
         wrapping: ElderMsgWrapping,
         section_querying: SectionQuerying,
     ) -> Result<Self> {
-        //let root_dir = config.root_dir()?;
         let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
         let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
         let full_adults =
@@ -152,7 +154,7 @@ impl BlobRegister {
         self.wrapping.send_to_adults(metadata.holders, msg)
     }
 
-    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<Vec<MessagingDuty>> {
+    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<NodeOperation> {
         trace!("Duplicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
@@ -165,14 +167,14 @@ impl BlobRegister {
             .flatten()
             .collect();
 
-        Some(cmds)
+        Some(cmds.into())
     }
 
     fn get_duplication_msgs(
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> Vec<MessagingDuty> {
+    ) -> Vec<NodeOperation> {
         use NodeCmd::*;
         use NodeDataCmd::*;
 
@@ -192,7 +194,7 @@ impl BlobRegister {
                     id: message_id,
                 }
             })
-            .filter_map(|message| self.wrapping.send(message))
+            .filter_map(|message| self.wrapping.send(message).map(|c| c.into()))
             .collect()
     }
 

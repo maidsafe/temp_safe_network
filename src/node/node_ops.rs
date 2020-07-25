@@ -39,7 +39,7 @@ pub enum NodeOperation {
 }
 
 impl NodeOperation {
-    pub fn from_many(ops: Vec<NodeOperation>) -> NodeOperation {
+    fn from_many(ops: Vec<NodeOperation>) -> NodeOperation {
         use NodeOperation::*;
         let multiple = ops
             .into_iter()
@@ -50,6 +50,18 @@ impl NodeOperation {
             .flatten()
             .collect();
         Multiple(multiple)
+    }
+}
+
+impl Into<NodeOperation> for Vec<NodeOperation> {
+    fn into(self) -> NodeOperation {
+        NodeOperation::from_many(self.into_iter().collect())
+    }
+}
+
+impl Into<NodeOperation> for Vec<Option<NodeOperation>> {
+    fn into(self) -> NodeOperation {
+        NodeOperation::from_many(self.into_iter().filter_map(|c| c).collect())
     }
 }
 
