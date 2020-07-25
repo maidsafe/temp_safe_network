@@ -19,7 +19,9 @@ use crate::{
     node::keys::NodeKeys,
     node::state_db::NodeInfo,
     node::{
-        node_ops::{ClientDuty, ElderDuty, KeySectionDuty, MessagingDuty, NodeDuty, NodeOperation},
+        node_ops::{
+            ElderDuty, GatewayDuty, KeySectionDuty, MessagingDuty, NodeDuty, NodeOperation,
+        },
         section_querying::SectionQuerying,
     },
     Result,
@@ -53,15 +55,15 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         Ok(gateway)
     }
 
-    pub fn process(&mut self, cmd: &ClientDuty) -> Option<NodeOperation> {
-        use ClientDuty::*;
+    pub fn process(&mut self, cmd: &GatewayDuty) -> Option<NodeOperation> {
+        use GatewayDuty::*;
         match cmd {
-            RouteToClient(msg) => wrap(self.route_to_client(msg)),
+            FindClientFor(msg) => wrap(self.try_find_client(msg)),
             ProcessClientEvent(event) => self.process_client_event(event),
         }
     }
 
-    fn route_to_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if let Address::Client(xorname) = &msg.destination() {
             if self.section.handles(&xorname) {
                 return self.client_msg_tracking.match_outgoing(msg);

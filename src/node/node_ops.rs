@@ -141,7 +141,7 @@ pub enum KeySectionDuty {
     ///
     RunAsAuth(AuthDuty),
     ///
-    RunAsGateway(ClientDuty),
+    RunAsGateway(GatewayDuty),
     ///
     RunAsPayment(PaymentDuty),
     ///
@@ -172,9 +172,9 @@ pub enum AuthDuty {
 // --------------- Gateway ---------------
 
 /// Gateway duties are run at Elders.
-pub enum ClientDuty {
+pub enum GatewayDuty {
     ///
-    RouteToClient(MsgEnvelope),
+    FindClientFor(MsgEnvelope),
     ///
     ProcessClientEvent(ClientEvent),
 }

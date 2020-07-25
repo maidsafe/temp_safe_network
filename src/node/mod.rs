@@ -22,7 +22,7 @@ use crate::{
     node::{
         keys::NodeKeys,
         node_duties::{messaging::Received, NodeDuties},
-        node_ops::{ClientDuty, ElderDuty, KeySectionDuty, NodeDuty, NodeOperation},
+        node_ops::{ElderDuty, GatewayDuty, KeySectionDuty, NodeDuty, NodeOperation},
         state_db::{read_state, AgeGroup, NodeInfo},
     },
     Config, Result,
@@ -109,8 +109,8 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub fn run(&mut self) {
-        use ClientDuty::*;
         use ElderDuty::*;
+        use GatewayDuty::*;
         use KeySectionDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;

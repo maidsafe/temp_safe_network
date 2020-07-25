@@ -24,20 +24,12 @@ impl NetworkSender {
         Self { routing }
     }
 
-    // pub fn send(&self, msg: MsgEnvelope) -> Option<MessagingDuty> {
-    //     match msg.destination() {
-    //         Address::Node(_) => self.send_to_node(msg),
-    //         Address::Section(_) => self.send_to_network(msg),
-    //         Address::Client(_) => return None, // Some(MessagingDuty::SendToClient(msg)),
-    //     }
-    // }
-
     pub fn send_to_node(&self, msg: MsgEnvelope) -> Option<MessagingDuty> {
         let name = *self.routing.borrow().id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
             Address::Section(_) => return Some(MessagingDuty::SendToSection(msg)),
-            Address::Client(_) => return None, // Some(MessagingDuty::SendToClient(msg)),
+            Address::Client(_) => return None,
         };
         self.routing
             .borrow_mut()

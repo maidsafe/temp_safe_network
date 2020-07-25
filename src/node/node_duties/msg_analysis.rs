@@ -8,7 +8,7 @@
 
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
-    AdultDuty, ChunkDuty, ClientDuty, DataSectionDuty, ElderDuty, KeySectionDuty, MessagingDuty,
+    AdultDuty, ChunkDuty, DataSectionDuty, ElderDuty, GatewayDuty, KeySectionDuty, MessagingDuty,
     MetadataDuty, NodeDuty, NodeOperation, RewardDuty,
 };
 use crate::node::section_querying::SectionQuerying;
@@ -177,7 +177,7 @@ impl NetworkMsgAnalysis {
     // ---- .... -----
 
     // todo: eval all msg types!
-    fn try_client_entry(&self, msg: &MsgEnvelope) -> Option<ClientDuty> {
+    fn try_client_entry(&self, msg: &MsgEnvelope) -> Option<GatewayDuty> {
         let is_our_client_msg = || match msg.destination() {
             Address::Client(address) => self.self_is_handler_for(&address),
             _ => false,
@@ -189,7 +189,7 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
-        Some(ClientDuty::RouteToClient(msg.clone()))
+        Some(GatewayDuty::FindClientFor(msg.clone()))
     }
 
     /// After the data write sent from Payment Elders has been
