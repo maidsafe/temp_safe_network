@@ -9,13 +9,13 @@
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
     AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NetworkDuty, NodeOperation,
-    RewardDuty,
+    RewardDuty, TransferCmd, TransferDuty,
 };
 use crate::node::section_querying::SectionQuerying;
 use log::error;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
-    NodeEvent, NodeRewardCmd, Query, XorName,
+    NodeEvent, NodeRewardCmd, NodeTransferCmd, Query, XorName,
 };
 
 // NB: This approach is not entirely good, so will be improved.
@@ -57,6 +57,8 @@ impl NetworkMsgAnalysis {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
+            duty.into()
+        } else if let Some(duty) = self.try_transfers(msg) {
             duty.into()
         } else if let Some(duty) = self.try_metadata(msg) {
             // Accumulated msg from `Payment`!
@@ -361,6 +363,73 @@ impl NetworkMsgAnalysis {
             } => Some(RewardDuty::ClaimRewardCounter {
                 old_node_id: *old_node_id,
                 new_node_id: *new_node_id,
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            _ => None,
+        }
+    }
+
+    // Check internal transfer cmds.
+    fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+        use NodeTransferCmd::*;
+
+        // From Transfer module we get `PropagateTransfer`.
+
+        let from_transfer_elder = || match msg.most_recent_sender() {
+            MsgSender::Node {
+                duty: Duty::Elder(ElderDuties::Transfer),
+                ..
+            } => true,
+            _ => false,
+        };
+        let shall_process = |msg| from_transfer_elder() && self.is_dst_for(msg) && self.is_elder();
+
+        if shall_process(msg) {
+            return match &msg.message {
+                Message::NodeCmd {
+                    cmd: NodeCmd::Transfers(PropagateTransfer(debit_agreement)),
+                    id,
+                } => Some(TransferDuty::ProcessCmd {
+                    cmd: TransferCmd::PropagateTransfer(debit_agreement.clone()),
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                _ => None,
+            };
+        }
+
+        // From Rewards module, we get
+        // `ValidateRewardPayout` and `RegisterRewardPayout`.
+
+        let from_rewards_elder = || match msg.most_recent_sender() {
+            MsgSender::Node {
+                duty: Duty::Elder(ElderDuties::Rewards),
+                ..
+            } => true,
+            _ => false,
+        };
+
+        let shall_process = |msg| from_rewards_elder() && self.is_dst_for(msg) && self.is_elder();
+
+        if !shall_process(msg) {
+            return None;
+        }
+
+        match &msg.message {
+            Message::NodeCmd {
+                cmd: NodeCmd::Transfers(ValidateRewardPayout(signed_transfer)),
+                id,
+            } => Some(TransferDuty::ProcessCmd {
+                cmd: TransferCmd::ValidateRewardPayout(signed_transfer.clone()),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            Message::NodeCmd {
+                cmd: NodeCmd::Transfers(RegisterRewardPayout(debit_agreement)),
+                id,
+            } => Some(TransferDuty::ProcessCmd {
+                cmd: TransferCmd::RegisterRewardPayout(debit_agreement.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
