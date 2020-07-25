@@ -25,7 +25,6 @@ use safe_nd::{
 };
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
-use tiny_keccak::sha3_256;
 
 pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
@@ -65,7 +64,7 @@ impl Rewards {
     pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
-            AccumulateReward { data } => self.accumulate_reward(data),
+            AccumulateReward { points, msg_id } => self.accumulate_reward(points, msg_id),
             AddNewAccount { id, node_id } => self.add_account(id, node_id),
             AddRelocatedAccount {
                 old_node_id,
@@ -200,11 +199,10 @@ impl Rewards {
 
     /// 3. Every time the section receives
     /// a write request, the accounts accumulate reward.
-    fn accumulate_reward(&mut self, data: Vec<u8>) -> Option<MessagingDuty> {
-        let num_bytes = data.len() as u64;
-        let hash = sha3_256(&data).to_vec(); // todo: fix the parameter type down-streams (in safe-farming)
+    fn accumulate_reward(&mut self, points: u64, msg_id: MessageId) -> Option<MessagingDuty> {
+        let hash = (msg_id.0).0.to_vec(); // todo: fix the parameter type down-streams (in safe-farming)
         let factor = 2.0; // NB: The logics for deriving an appropriate factor is TBD.
-        match self.farming.reward(hash, num_bytes, factor) {
+        match self.farming.reward(hash, points, factor) {
             Ok(_) => None,
             Err(_err) => None, // todo: NodeCmdError. Or not? This is an internal thing..
         }

@@ -93,13 +93,23 @@ pub enum MessagingDuty {
     DisconnectClient(SocketAddr),
 }
 
+// --------------- Node ---------------
+
+/// Common duties run by all nodes.
 pub enum NodeDuty {
+    ///
     BecomeAdult,
+    ///
     BecomeElder,
+    ///
     ProcessMessaging(MessagingDuty),
+    ///
     ProcessNetworkEvent(NetworkEvent),
 }
 
+// --------------- Elder ---------------
+
+/// Duties only run as an Elder.
 pub enum ElderDuty {
     ProcessLostMember {
         name: XorName,
@@ -121,7 +131,11 @@ pub enum ElderDuty {
     RunAsDataSection(DataSectionDuty),
 }
 
+// --------------- Adult ---------------
+
+/// Duties only run as an Adult.
 pub enum AdultDuty {
+    ///
     RunAsChunks(ChunkDuty),
 }
 
@@ -130,6 +144,9 @@ pub enum AdultDuty {
 // -- most common next local step. From there, it is sent out on the network.
 // -- It is important to stress that _only_ MessagingDuty does sending on to the network.
 
+// --------------- KeySection ---------------
+
+/// Duties only run as a Key section.
 pub enum KeySectionDuty {
     ///
     EvaluateClientMsg {
@@ -148,6 +165,9 @@ pub enum KeySectionDuty {
     RunAsTransfers(TransferDuty),
 }
 
+// --------------- DataSection ---------------
+
+/// Duties only run as a Data section.
 pub enum DataSectionDuty {
     ///
     RunAsMetadata(MetadataDuty),
@@ -155,33 +175,48 @@ pub enum DataSectionDuty {
     RunAsRewards(RewardDuty),
 }
 
+// --------------- Auth (Temporary!) ---------------
+
+/// These things will be handled client
+/// side instead, in the Authenticator app.
 pub enum AuthDuty {
+    ///
     Process {
+        ///
         cmd: AuthCmd,
+        ///
         msg_id: MessageId,
+        ///
         origin: MsgSender,
     },
+    ///
     ListAuthKeysAndVersion {
         /// The Client id.
         client: PublicKey,
+        ///
         msg_id: MessageId,
+        ///
         origin: MsgSender,
     },
 }
 
 // --------------- Gateway ---------------
 
-/// Gateway duties are run at Elders.
+/// Gateway duties imply interfacing with clients.
 pub enum GatewayDuty {
-    ///
+    /// Messages from network to client
+    /// such as query responses, events and errors,
+    /// are piped through the Gateway, to find the
+    /// connection info to the client.
     FindClientFor(MsgEnvelope),
-    ///
+    /// Incoming events from clients are parsed
+    /// at the Gateway, and forwarded to other modules.
     ProcessClientEvent(ClientEvent),
 }
 
 // --------------- Payment ---------------
 
-///
+/// Payment for data.
 pub enum PaymentDuty {
     ///
     ProcessPayment(MsgEnvelope),
@@ -199,7 +234,7 @@ pub enum MetadataDuty {
 
 // --------------- Chunks ---------------
 
-/// Chunk duties.
+/// Chunk storage and retrieval is done at Adults.
 pub enum ChunkDuty {
     ///
     ReadChunk(MsgEnvelope),
@@ -209,12 +244,26 @@ pub enum ChunkDuty {
 
 // --------------- Rewards ---------------
 
-///
+/// Nodes participating in the system are
+/// rewarded for their work. 
+/// Elders are responsible for the duties of 
+/// keeping track of rewards, and issuing 
+/// payouts form the section account.
 pub enum RewardDuty {
-    ///
+    /// Whenever there has been write
+    /// operations on the network, we 
+    /// accumulate rewards for the nodes 
+    /// of our section.
     AccumulateReward {
-        ///
-        data: Vec<u8>,
+        /// The points can be anything,
+        /// but in our StorageReward system,
+        /// it is the number of bytes of a write
+        /// operation.
+        points: u64,
+        /// Idempotency.
+        /// An individual write operation can 
+        /// only lead to a farming reward once.
+        msg_id: MessageId,
     },
     ///
     AddNewAccount {
@@ -223,14 +272,18 @@ pub enum RewardDuty {
         ///
         node_id: XorName,
     },
-    ///
+    /// We add relocated nodes to our rewards
+    /// system, so that they can participate
+    /// in the farming rewards.
     AddRelocatedAccount {
         ///
         old_node_id: XorName,
         ///
         new_node_id: XorName,
     },
-    ///
+    /// When a node is relocated from us, the other
+    /// section will claim the reward counter, so that
+    /// they can pay it out to their new node.
     ClaimRewardCounter {
         ///
         old_node_id: XorName,
@@ -241,7 +294,8 @@ pub enum RewardDuty {
         ///
         origin: Address,
     },
-    ///
+    /// When a node has been relocated to our section
+    /// we receive the reward counter from the other section.
     ReceiveClaimedRewards {
         ///
         id: AccountId,
@@ -250,9 +304,12 @@ pub enum RewardDuty {
         ///
         counter: RewardCounter,
     },
-    ///
+    /// When a node has left for some reason,
+    /// we prepare for its reward counter to be claimed.
     PrepareAccountMove { node_id: XorName },
-    ///
+    /// The distributed Actor of a section,
+    /// receives and accumulates the validated 
+    /// reward payout from its Replicas,
     ReceiveRewardValidation(TransferValidated),
 }
 
