@@ -26,13 +26,10 @@ impl NetworkEvents {
         use ElderDuty::*;
         use KeySectionDuty::*;
         use NodeDuty::*;
-        use NodeOperation::*;
         match event {
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<GroupDecision>(&custom_event) {
-                    Ok(group_decision) => Some(RunAsElder(RunAsKeySection(ProcessGroupDecision(
-                        group_decision,
-                    )))),
+                    Ok(group_decision) => Some(ProcessGroupDecision(group_decision).into()),
                     Err(e) => {
                         error!("Invalid GroupDecision passed from Routing: {:?}", e);
                         None
@@ -41,14 +38,17 @@ impl NetworkEvents {
             }
             RoutingEvent::Promoted => {
                 info!("Node promoted to Elder");
-                Some(RunAsNode(BecomeElder))
+                Some(BecomeElder.into())
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
-                Some(RunAsElder(ProcessLostMember {
-                    name: XorName(name.0),
-                    age,
-                }))
+                Some(
+                    ProcessLostMember {
+                        name: XorName(name.0),
+                        age,
+                    }
+                    .into(),
+                )
             }
             RoutingEvent::MemberJoined {
                 name,
@@ -58,14 +58,17 @@ impl NetworkEvents {
                 trace!("New member has joined the section");
                 // info!("No. of Elders: {}", self.routing.borrow().our_elders().count());
                 // info!("No. of Adults: {}", self.routing.borrow().our_adults().count());
-                Some(RunAsElder(ProcessJoinedMember {
-                    old_node_id: XorName(name.0),
-                    new_node_id: XorName(previous_name.0),
-                }))
+                Some(
+                    ProcessJoinedMember {
+                        old_node_id: XorName(name.0),
+                        new_node_id: XorName(previous_name.0),
+                    }
+                    .into(),
+                )
             }
             RoutingEvent::Connected(_) => {
                 info!("Node promoted to Adult");
-                Some(RunAsNode(BecomeAdult))
+                Some(BecomeAdult.into())
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
@@ -77,11 +80,14 @@ impl NetworkEvents {
                 self.evaluate_msg(content)
             }
             RoutingEvent::EldersChanged { key, elders, .. } => {
-                Some(RunAsElder(ProcessElderChange {
-                    //prefix,
-                    key: PublicKey::Bls(key),
-                    elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-                }))
+                Some(
+                    ProcessElderChange {
+                        //prefix,
+                        key: PublicKey::Bls(key),
+                        elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                    }
+                    .into(),
+                )
             }
             // Ignore all other events
             _ => None,

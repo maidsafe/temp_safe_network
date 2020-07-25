@@ -12,9 +12,7 @@ pub use self::replica_manager::ReplicaManager;
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{
-        MessagingDuty, NodeDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery,
-    },
+    node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use safe_nd::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
@@ -84,10 +82,7 @@ impl Transfers {
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
     pub fn process(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
-        use NodeDuty::*;
-        use NodeOperation::*;
         use TransferDuty::*;
-
         let result = match duty {
             ProcessQuery {
                 query,
@@ -101,7 +96,7 @@ impl Transfers {
             } => self.process_cmd(cmd, *msg_id, origin.clone()),
         };
 
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        result.map(|c| c.into())
     }
 
     fn process_query(

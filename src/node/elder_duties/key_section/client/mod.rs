@@ -19,9 +19,7 @@ use crate::{
     node::keys::NodeKeys,
     node::state_db::NodeInfo,
     node::{
-        node_ops::{
-            ElderDuty, GatewayDuty, KeySectionDuty, MessagingDuty, NodeDuty, NodeOperation,
-        },
+        node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
         section_querying::SectionQuerying,
     },
     Result,
@@ -58,7 +56,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub fn process(&mut self, cmd: &GatewayDuty) -> Option<NodeOperation> {
         use GatewayDuty::*;
         match cmd {
-            FindClientFor(msg) => wrap(self.try_find_client(msg)),
+            FindClientFor(msg) => self.try_find_client(msg).map(|c| c.into()),
             ProcessClientEvent(event) => self.process_client_event(event),
         }
     }
@@ -96,26 +94,26 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                             .client_msg_tracking
                             .track_incoming(msg.id(), peer.peer_addr());
                         if result.is_some() {
-                            return wrap(result);
+                            return result.map(|c| c.into());
                         }
                         msg
                     }
                     ClientInput::Handshake(request) => {
                         let mut rng = ChaChaRng::from_seed(self.rng.gen());
-                        return wrap(self.client_msg_tracking.process_handshake(
-                            request,
-                            peer.peer_addr(),
-                            &mut rng,
-                        ));
+                        return self
+                            .client_msg_tracking
+                            .process_handshake(request, peer.peer_addr(), &mut rng)
+                            .map(|c| c.into());
                     }
                 };
-                use ElderDuty::*;
                 use KeySectionDuty::*;
-                use NodeOperation::*;
-                return Some(RunAsElder(RunAsKeySection(EvaluateClientMsg {
-                    public_id: parsed.public_id,
-                    msg: parsed.msg,
-                })));
+                return Some(
+                    EvaluateClientMsg {
+                        public_id: parsed.public_id,
+                        msg: parsed.msg,
+                    }
+                    .into(),
+                );
             }
             SentUserMessage { peer, .. } => {
                 trace!(
@@ -136,12 +134,6 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         }
         None
     }
-}
-
-fn wrap(option: Option<MessagingDuty>) -> Option<NodeOperation> {
-    use NodeDuty::*;
-    use NodeOperation::*;
-    option.map(|c| RunAsNode(ProcessMessaging(c)))
 }
 
 impl<R: CryptoRng + Rng> Display for ClientGateway<R> {

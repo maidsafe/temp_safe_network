@@ -8,8 +8,8 @@
 
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
-    AdultDuty, ChunkDuty, DataSectionDuty, ElderDuty, GatewayDuty, KeySectionDuty, MessagingDuty,
-    MetadataDuty, NodeDuty, NodeOperation, RewardDuty,
+    AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NetworkDuty, NodeOperation,
+    RewardDuty,
 };
 use crate::node::section_querying::SectionQuerying;
 use log::error;
@@ -46,34 +46,30 @@ impl NetworkMsgAnalysis {
     /// it is not evaluating msgs sent
     /// directly from the client.
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        use DataSectionDuty::*;
-        use ElderDuty::*;
-        use KeySectionDuty::*;
-        use NodeDuty::*;
         use NodeOperation::*;
         let result = if self.should_accumulate(msg) {
             let msg = self.accumulation.process(msg)?;
             self.evaluate(&msg)?
         } else if let Some(duty) = self.try_messaging(msg) {
             // Identified as an outbound msg, to be sent on the wire.
-            RunAsNode(ProcessMessaging(duty))
+            duty.into()
         } else if let Some(duty) = self.try_client_entry(msg) {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
-            RunAsElder(RunAsKeySection(RunAsGateway(duty)))
+            duty.into()
         } else if let Some(duty) = self.try_metadata(msg) {
             // Accumulated msg from `Payment`!
-            RunAsElder(RunAsDataSection(RunAsMetadata(duty)))
+            duty.into()
         } else if let Some(duty) = self.try_adult(msg) {
             // Accumulated msg from `Metadata`!
-            RunAsAdult(duty)
+            duty.into()
         } else if let Some(duty) = self.try_rewards(msg) {
             // Identified as a Rewards msg
-            RunAsElder(RunAsDataSection(RunAsRewards(duty)))
+            duty.into()
         } else {
             error!("Unknown message destination: {:?}", msg.id());
-            Unknown
+            Single(NetworkDuty::Unknown)
         };
         Some(result)
     }

@@ -17,7 +17,7 @@ mod writing;
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, MetadataDuty, NodeDuty, NodeOperation},
+    node::node_ops::{MessagingDuty, MetadataDuty, NodeOperation},
     node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     Result,
@@ -78,17 +78,12 @@ impl Metadata {
 
     pub fn process(&mut self, duty: &MetadataDuty) -> Option<NodeOperation> {
         use MetadataDuty::*;
-        use NodeDuty::*;
-        use NodeOperation::*;
-
-        let result = match duty {
+        match duty {
             ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg),
-        };
-
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        }
     }
 
-    fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { cmd, .. },
@@ -102,7 +97,7 @@ impl Metadata {
                 ..
             } => {
                 let reading = Reading::new(query.clone(), msg.clone());
-                reading.get_result(&self.elder_stores)
+                reading.get_result(&self.elder_stores).map(|c| c.into())
             }
             _ => None, // only Queries and Cmds from client is handled at Metadata
         }

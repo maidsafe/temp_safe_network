@@ -10,7 +10,10 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::MessagingDuty;
+use crate::{
+    node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
+    utils,
+};
 use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite};
 
 pub(super) struct Writing {
@@ -23,7 +26,7 @@ impl Writing {
         Self { cmd, msg }
     }
 
-    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<MessagingDuty> {
+    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<NodeOperation> {
         use DataCmd::*;
         match self.cmd.clone() {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
@@ -33,27 +36,46 @@ impl Writing {
         }
     }
 
-    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<MessagingDuty> {
-        register.write(write, &self.msg)
+    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<NodeOperation> {
+        let result = register.write(write, &self.msg);
+        result.map(|c| NodeOperation::from_many(vec![c.into(), self.farm()]))
     }
 
-    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<MessagingDuty> {
-        storage.write(write, self.msg.id(), &self.msg.origin)
+    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<NodeOperation> {
+        self.try_farm(storage.write(write, self.msg.id(), &self.msg.origin))
     }
 
     fn sequence(
         &mut self,
         write: SequenceWrite,
         storage: &mut SequenceStorage,
-    ) -> Option<MessagingDuty> {
-        storage.write(write, self.msg.id(), &self.msg.origin)
+    ) -> Option<NodeOperation> {
+        self.try_farm(storage.write(write, self.msg.id(), &self.msg.origin))
     }
 
     fn account(
         &mut self,
         write: AccountWrite,
         storage: &mut AccountStorage,
-    ) -> Option<MessagingDuty> {
-        storage.write(write, self.msg.id(), &self.msg.origin)
+    ) -> Option<NodeOperation> {
+        self.try_farm(storage.write(write, self.msg.id(), &self.msg.origin))
+    }
+
+    fn try_farm(&self, result: Option<MessagingDuty>) -> Option<NodeOperation> {
+        if result.is_some() {
+            result.map(|c| c.into())
+        } else {
+            Some(self.farm())
+        }
+    }
+
+    fn farm(&self) -> NodeOperation {
+        use RewardDuty::*;
+        let points = utils::serialise(&self.cmd).len() as u64;
+        AccumulateReward {
+            points,
+            msg_id: self.msg.id(),
+        }
+        .into()
     }
 }

@@ -10,7 +10,7 @@ use super::transfers::replica_manager::ReplicaManager;
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeDuty, NodeOperation, PaymentDuty},
+    node::node_ops::{NodeOperation, PaymentDuty},
 };
 use safe_nd::{Cmd, CmdError, ElderDuties, Error, Message, PublicKey, Result, TransferError};
 use std::{
@@ -45,9 +45,6 @@ impl Payments {
 
     // The code in this method is a bit messy, needs to be cleaned up.
     pub fn process(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
-        use NodeDuty::*;
-        use NodeOperation::*;
-
         let PaymentDuty::ProcessPayment(msg) = duty;
         let payment = match &msg.message {
             Message::Cmd {
@@ -69,7 +66,7 @@ impl Payments {
         if recipient_is_not_section {
             let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
             let result = self.wrapping.error(error, msg.id(), &msg.origin.address());
-            return result.map(|c| RunAsNode(ProcessMessaging(c)));
+            return result.map(|c| c.into());
         }
         let registration = self.replica_mut().register(&payment);
         let result = match registration {
@@ -87,7 +84,7 @@ impl Payments {
                 &msg.origin.address(),
             ),
         };
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        result.map(|c| c.into())
     }
 
     fn section_account_id(&self) -> Result<PublicKey> {

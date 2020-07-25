@@ -7,8 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::node_ops::{
-    ElderDuty, GroupDecision, KeySectionDuty, MessagingDuty, NodeDuty, NodeOperation, PaymentDuty,
-    TransferDuty,
+    GroupDecision, MessagingDuty, NodeOperation, PaymentDuty, TransferDuty,
 };
 
 use crate::node::section_querying::SectionQuerying;
@@ -27,15 +26,12 @@ impl ClientMsgAnalysis {
     }
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        use KeySectionDuty::*;
-        use NodeDuty::*;
-        use NodeOperation::*;
         if let Some(duty) = self.try_data_payment(msg) {
-            wrap(RunAsPayment(duty))
+            Some(duty.into())
         } else if let Some(duty) = self.try_transfers(msg) {
-            wrap(RunAsTransfers(duty))
+            Some(duty.into())
         } else if let Some(duty) = self.try_auth(msg) {
-            Some(RunAsNode(ProcessMessaging(duty)))
+            Some(duty.into())
         } else {
             None
         }
@@ -133,10 +129,4 @@ impl ClientMsgAnalysis {
     fn is_elder(&self) -> bool {
         self.section.is_elder()
     }
-}
-
-fn wrap(duty: KeySectionDuty) -> Option<NodeOperation> {
-    use ElderDuty::*;
-    use NodeOperation::*;
-    Some(RunAsElder(RunAsKeySection(duty)))
 }

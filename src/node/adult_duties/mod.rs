@@ -36,15 +36,12 @@ impl AdultDuties {
     pub fn process(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
-        use NodeDuty::*;
-        use NodeOperation::*;
-
         let RunAsChunks(chunk_duty) = duty;
         let result = match chunk_duty {
             ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg),
         };
 
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        result.map(|c| c.into())
     }
 }
 

@@ -22,7 +22,7 @@ use crate::{
     node::{
         keys::NodeKeys,
         node_duties::{messaging::Received, NodeDuties},
-        node_ops::{ElderDuty, GatewayDuty, KeySectionDuty, NodeDuty, NodeOperation},
+        node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
         state_db::{read_state, AgeGroup, NodeInfo},
     },
     Config, Result,
@@ -109,17 +109,12 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub fn run(&mut self) {
-        use ElderDuty::*;
         use GatewayDuty::*;
-        use KeySectionDuty::*;
         use NodeDuty::*;
-        use NodeOperation::*;
         loop {
             let result = match self.receiver.next() {
-                Received::Client(event) => {
-                    RunAsElder(RunAsKeySection(RunAsGateway(ProcessClientEvent(event))))
-                }
-                Received::Network(event) => RunAsNode(ProcessNetworkEvent(event)),
+                Received::Client(event) => ProcessClientEvent(event).into(),
+                Received::Network(event) => ProcessNetworkEvent(event).into(),
                 Received::Unknown(channel) => {
                     if let Err(err) = self
                         .routing
@@ -137,17 +132,26 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 
     ///
-    pub fn process_while_any(&mut self, op: Option<NodeOperation>) {
+    fn process_while_any(&mut self, op: Option<NodeOperation>) {
         use NodeOperation::*;
-
         let mut next_op = op;
         while let Some(op) = next_op {
             next_op = match op {
-                RunAsAdult(duty) => self.duties.adult_duties().unwrap().process(&duty),
-                RunAsElder(duty) => self.duties.elder_duties().unwrap().process(duty),
-                RunAsNode(duty) => self.duties.process(duty),
-                Unknown => None,
+                Single(operation) => self.process(operation),
+                Multiple(ops) => Some(NodeOperation::from_many(
+                    ops.into_iter().filter_map(|c| self.process(c)).collect(),
+                )),
             }
+        }
+    }
+
+    fn process(&mut self, duty: NetworkDuty) -> Option<NodeOperation> {
+        use NetworkDuty::*;
+        match duty {
+            RunAsAdult(duty) => self.duties.adult_duties().unwrap().process(&duty),
+            RunAsElder(duty) => self.duties.elder_duties().unwrap().process(duty),
+            RunAsNode(duty) => self.duties.process(duty),
+            Unknown => None,
         }
     }
 }

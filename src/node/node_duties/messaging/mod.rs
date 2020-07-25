@@ -10,7 +10,7 @@ pub mod client_sender;
 pub mod network_sender;
 pub mod receiver;
 
-use crate::node::node_ops::{MessagingDuty, NodeDuty, NodeOperation};
+use crate::node::node_ops::{MessagingDuty, NodeOperation};
 use client_sender::ClientSender;
 use network_sender::NetworkSender;
 pub use receiver::{Received, Receiver};
@@ -44,9 +44,7 @@ impl Messaging {
             SendHandshake { address, response } => self.client_sender.handshake(address, &response),
             DisconnectClient(address) => self.client_sender.disconnect(address),
         };
-        use NodeDuty::*;
-        use NodeOperation::*;
 
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        result.map(|c| c.into())
     }
 }

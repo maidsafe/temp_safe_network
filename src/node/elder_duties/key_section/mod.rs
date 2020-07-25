@@ -21,9 +21,7 @@ use self::{
 };
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{
-        AuthDuty, ElderDuty, GroupDecision, KeySectionDuty, MessagingDuty, NodeDuty, NodeOperation,
-    },
+    node::node_ops::{AuthDuty, GroupDecision, KeySectionDuty, NodeOperation},
     node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     Result,
@@ -90,10 +88,10 @@ impl<R: CryptoRng + Rng> KeySection<R> {
 
     fn evaluate(&mut self, public_id: PublicId, msg: &MsgEnvelope) -> Option<NodeOperation> {
         if let Some(error) = self.auth.verify_client_signature(msg) {
-            return wrap(Some(error));
+            return Some(error.into());
         };
         if let Some(error) = self.auth.authorise_app(&public_id, &msg) {
-            return wrap(Some(error));
+            return Some(error.into());
         }
         self.msg_analysis.evaluate(msg)
     }
@@ -102,21 +100,21 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// that this is a valid client request to handle locally,
     /// they'll process it locally.
     fn process_group_decision(&mut self, decision: GroupDecision) -> Option<NodeOperation> {
-        use ElderDuty::*;
         use GroupDecision::*;
-        use KeySectionDuty::*;
-        use NodeOperation::*;
         trace!("KeySection: Group decided on {:?}", decision);
         match decision {
             Process {
                 cmd,
                 msg_id,
                 origin,
-            } => Some(RunAsElder(RunAsKeySection(RunAsAuth(AuthDuty::Process {
-                cmd,
-                msg_id,
-                origin,
-            })))),
+            } => Some(
+                AuthDuty::Process {
+                    cmd,
+                    msg_id,
+                    origin,
+                }
+                .into(),
+            ),
         }
     }
 
@@ -204,9 +202,3 @@ impl<R: CryptoRng + Rng> KeySection<R> {
 //     };
 //     Some(NodeOperation::RunAsTransfers(duty))
 // }
-
-fn wrap(option: Option<MessagingDuty>) -> Option<NodeOperation> {
-    use NodeDuty::*;
-    use NodeOperation::*;
-    option.map(|c| RunAsNode(ProcessMessaging(c)))
-}

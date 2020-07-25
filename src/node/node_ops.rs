@@ -32,12 +32,28 @@ use std::{collections::BTreeSet, net::SocketAddr};
 ///
 // #[derive(Debug)]
 // #[allow(clippy::large_enum_variant)]
-// pub(crate) enum NodeOperations {
-//     Single(NodeOperation),
-//     Multiple(Vec<NodeOperation>),
-// }
 
 pub enum NodeOperation {
+    Single(NetworkDuty),
+    Multiple(Vec<NetworkDuty>),
+}
+
+impl NodeOperation {
+    pub fn from_many(ops: Vec<NodeOperation>) -> NodeOperation {
+        use NodeOperation::*;
+        let multiple = ops
+            .into_iter()
+            .map(|c| match c {
+                Single(duty) => vec![duty],
+                Multiple(duties) => duties,
+            })
+            .flatten()
+            .collect();
+        Multiple(multiple)
+    }
+}
+
+pub enum NetworkDuty {
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
     RunAsNode(NodeDuty),
@@ -57,6 +73,28 @@ pub enum GroupDecision {
         msg_id: MessageId,
         origin: MsgSender,
     },
+}
+
+// --------------- Node ---------------
+
+/// Common duties run by all nodes.
+pub enum NodeDuty {
+    ///
+    BecomeAdult,
+    ///
+    BecomeElder,
+    ///
+    ProcessMessaging(MessagingDuty),
+    ///
+    ProcessNetworkEvent(NetworkEvent),
+}
+
+impl Into<NodeOperation> for NodeDuty {
+    fn into(self) -> NodeOperation {
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsNode(self))
+    }
 }
 
 // --------------- Messaging ---------------
@@ -93,18 +131,13 @@ pub enum MessagingDuty {
     DisconnectClient(SocketAddr),
 }
 
-// --------------- Node ---------------
-
-/// Common duties run by all nodes.
-pub enum NodeDuty {
-    ///
-    BecomeAdult,
-    ///
-    BecomeElder,
-    ///
-    ProcessMessaging(MessagingDuty),
-    ///
-    ProcessNetworkEvent(NetworkEvent),
+impl Into<NodeOperation> for MessagingDuty {
+    fn into(self) -> NodeOperation {
+        use NetworkDuty::*;
+        use NodeDuty::*;
+        use NodeOperation::*;
+        Single(RunAsNode(ProcessMessaging(self)))
+    }
 }
 
 // --------------- Elder ---------------
@@ -131,12 +164,28 @@ pub enum ElderDuty {
     RunAsDataSection(DataSectionDuty),
 }
 
+impl Into<NodeOperation> for ElderDuty {
+    fn into(self) -> NodeOperation {
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(self))
+    }
+}
+
 // --------------- Adult ---------------
 
 /// Duties only run as an Adult.
 pub enum AdultDuty {
     ///
     RunAsChunks(ChunkDuty),
+}
+
+impl Into<NodeOperation> for AdultDuty {
+    fn into(self) -> NodeOperation {
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsAdult(self))
+    }
 }
 
 // -- All duties below solely process and produce internal msgs
@@ -163,6 +212,15 @@ pub enum KeySectionDuty {
     RunAsPayment(PaymentDuty),
     ///
     RunAsTransfers(TransferDuty),
+}
+
+impl Into<NodeOperation> for KeySectionDuty {
+    fn into(self) -> NodeOperation {
+        use ElderDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsKeySection(self)))
+    }
 }
 
 // --------------- DataSection ---------------
@@ -200,6 +258,16 @@ pub enum AuthDuty {
     },
 }
 
+impl Into<NodeOperation> for AuthDuty {
+    fn into(self) -> NodeOperation {
+        use ElderDuty::*;
+        use KeySectionDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsKeySection(RunAsAuth(self))))
+    }
+}
+
 // --------------- Gateway ---------------
 
 /// Gateway duties imply interfacing with clients.
@@ -214,12 +282,32 @@ pub enum GatewayDuty {
     ProcessClientEvent(ClientEvent),
 }
 
+impl Into<NodeOperation> for GatewayDuty {
+    fn into(self) -> NodeOperation {
+        use ElderDuty::*;
+        use KeySectionDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
+    }
+}
+
 // --------------- Payment ---------------
 
 /// Payment for data.
 pub enum PaymentDuty {
     ///
     ProcessPayment(MsgEnvelope),
+}
+
+impl Into<NodeOperation> for PaymentDuty {
+    fn into(self) -> NodeOperation {
+        use ElderDuty::*;
+        use KeySectionDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsKeySection(RunAsPayment(self))))
+    }
 }
 
 // --------------- Metadata ---------------
@@ -230,6 +318,16 @@ pub enum MetadataDuty {
     ProcessRead(MsgEnvelope),
     ///
     ProcessWrite(MsgEnvelope),
+}
+
+impl Into<NodeOperation> for MetadataDuty {
+    fn into(self) -> NodeOperation {
+        use DataSectionDuty::*;
+        use ElderDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
+    }
 }
 
 // --------------- Chunks ---------------
@@ -245,14 +343,14 @@ pub enum ChunkDuty {
 // --------------- Rewards ---------------
 
 /// Nodes participating in the system are
-/// rewarded for their work. 
-/// Elders are responsible for the duties of 
-/// keeping track of rewards, and issuing 
+/// rewarded for their work.
+/// Elders are responsible for the duties of
+/// keeping track of rewards, and issuing
 /// payouts form the section account.
 pub enum RewardDuty {
     /// Whenever there has been write
-    /// operations on the network, we 
-    /// accumulate rewards for the nodes 
+    /// operations on the network, we
+    /// accumulate rewards for the nodes
     /// of our section.
     AccumulateReward {
         /// The points can be anything,
@@ -261,7 +359,7 @@ pub enum RewardDuty {
         /// operation.
         points: u64,
         /// Idempotency.
-        /// An individual write operation can 
+        /// An individual write operation can
         /// only lead to a farming reward once.
         msg_id: MessageId,
     },
@@ -308,9 +406,19 @@ pub enum RewardDuty {
     /// we prepare for its reward counter to be claimed.
     PrepareAccountMove { node_id: XorName },
     /// The distributed Actor of a section,
-    /// receives and accumulates the validated 
+    /// receives and accumulates the validated
     /// reward payout from its Replicas,
     ReceiveRewardValidation(TransferValidated),
+}
+
+impl Into<NodeOperation> for RewardDuty {
+    fn into(self) -> NodeOperation {
+        use DataSectionDuty::*;
+        use ElderDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
+    }
 }
 
 // --------------- Transfers ---------------
@@ -333,6 +441,16 @@ pub enum TransferDuty {
         ///
         origin: Address,
     },
+}
+
+impl Into<NodeOperation> for TransferDuty {
+    fn into(self) -> NodeOperation {
+        use ElderDuty::*;
+        use KeySectionDuty::*;
+        use NetworkDuty::*;
+        use NodeOperation::*;
+        Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
+    }
 }
 
 pub enum TransferQuery {

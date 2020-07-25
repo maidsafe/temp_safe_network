@@ -12,7 +12,7 @@ pub use self::auth_keys::AuthKeysDb;
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{AuthDuty, MessagingDuty, NodeDuty, NodeOperation},
+    node::node_ops::{AuthDuty, MessagingDuty, NodeOperation},
     utils,
 };
 use log::warn;
@@ -40,8 +40,6 @@ impl Auth {
 
     pub fn process(&mut self, duty: AuthDuty) -> Option<NodeOperation> {
         use AuthDuty::*;
-        use NodeDuty::*;
-        use NodeOperation::*;
         let result = match duty {
             Process {
                 cmd,
@@ -52,7 +50,7 @@ impl Auth {
                 self.list_auth_keys_and_version(msg_id, origin)
             }
         };
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        result.map(|c| c.into())
     }
 
     fn list_auth_keys_and_version(

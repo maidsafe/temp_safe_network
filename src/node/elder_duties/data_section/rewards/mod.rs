@@ -15,7 +15,7 @@ pub use self::{system::FarmingSystem, validator::Validator};
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, NodeDuty, NodeOperation, RewardDuty},
+    node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
 };
 use log::{info, warn};
 use safe_farming::{Accumulation, RewardCounterSet, StorageRewards};
@@ -84,10 +84,8 @@ impl Rewards {
             PrepareAccountMove { node_id } => self.prepare_move(node_id),
             ReceiveRewardValidation(validation) => self.section_funds.receive(validation),
         };
-        use NodeDuty::*;
-        use NodeOperation::*;
 
-        result.map(|c| RunAsNode(ProcessMessaging(c)))
+        result.map(|c| c.into())
     }
 
     /// 0. A brand new node has joined our section.
