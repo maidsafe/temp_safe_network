@@ -82,6 +82,10 @@ impl Accumulation {
                 .verify(&sig.share, &signed_data)
             {
                 error!("Invalid signature share");
+                // should not just return, instead:
+                // remove the faulty sig, then insert
+                // the rest back into messages.
+                // One bad egg can't be allowed to ruin it all.
                 return None;
             }
         }

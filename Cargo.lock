@@ -2178,7 +2178,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-farming"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-farming.git#83656b8b71863464fefd2b402797a80ef08a1771"
+source = "git+https://github.com/oetyng/safe-farming.git#c761720250b1744d6a0ba6622805a129d599380c"
 dependencies = [
  "bincode",
  "crdts",

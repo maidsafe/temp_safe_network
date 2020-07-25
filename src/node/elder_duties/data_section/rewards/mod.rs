@@ -17,7 +17,8 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeDuty, NodeOperation, RewardDuty},
 };
-use safe_farming::{Accumulation, StorageRewards};
+use log::{info, warn};
+use safe_farming::{Accumulation, RewardCounterSet, StorageRewards};
 use safe_nd::{
     AccountId, Address, ElderDuties, Error, Message, MessageId, Money, NodeCmd, NodeCmdError,
     NodeEvent, NodeRewardCmd, NodeRewardError, RewardCounter, XorName,
@@ -33,11 +34,10 @@ pub struct Rewards {
     wrapping: ElderMsgWrapping,
 }
 
-#[derive(PartialEq)]
 pub enum RewardAccount {
     /// When added.
-    AwaitingStart,
-    /// After having received the counter, the
+    AwaitingStart(RewardCounterSet),
+    /// After having received the counters, the
     /// stage of the RewardAccount is `Active`.
     Active(AccountId),
     /// After a node leaves the section
@@ -82,7 +82,7 @@ impl Rewards {
                 node_id,
                 counter,
             } => self.receive_claimed_rewards(id, node_id, counter),
-            PrepareAccountMove { node_id } => self.node_left(node_id),
+            PrepareAccountMove { node_id } => self.prepare_move(node_id),
             ReceiveRewardValidation(validation) => self.section_funds.receive(validation),
         };
         use NodeDuty::*;
@@ -108,10 +108,11 @@ impl Rewards {
     ) -> Option<MessagingDuty> {
         use NodeCmd::*;
         use NodeRewardCmd::*;
+        use RewardAccount::*;
 
-        let _ = self
-            .node_accounts
-            .insert(new_node_id, RewardAccount::AwaitingStart);
+        let elder_count = 7; // todo, fix better source
+        let account = AwaitingStart(RewardCounterSet::new(elder_count, vec![]).ok()?);
+        let _ = self.node_accounts.insert(new_node_id, account);
 
         self.wrapping.send(Message::NodeCmd {
             cmd: Rewards(ClaimRewardCounter {
@@ -132,29 +133,40 @@ impl Rewards {
         node_id: XorName,
         counter: RewardCounter,
     ) -> Option<MessagingDuty> {
-        // TODO: Consider this validation code here, and the flow..
-        // .. because we are receiving an event triggered by our cmd, something is very odd
-        // most likely a bug, if we ever hit these errors.
-        // So, it doesn't make much sense to send some error msg on the wire.
+        // If we ever hit these errors, something is very odd
+        // most likely a bug, because we are receiving an event triggered by our cmd.
+        // So, it doesn't make much sense to send some error msg back on the wire.
         // Makes more sense to panic, or log and just drop the request.
         // But exact course to take there needs to be chiseled out.
 
         // Try get the account..
-        match self.node_accounts.get(&node_id) {
+        let counter_set = match self.node_accounts.get_mut(&node_id) {
             None => {
-                // "Invalid receive: No such account found to receive the rewards.".to_string()
+                warn!("Invalid receive: No such account found to receive the rewards.");
                 return None;
             }
             Some(account) => {
-                // ..and validate its state.
-                if *account != RewardAccount::AwaitingStart {
-                    // "Invalid receive: Account is not awaiting start.".to_string()
-                    return None;
+                match account {
+                    // ..and validate its state.
+                    RewardAccount::AwaitingStart(set) => set,
+                    _ => {
+                        warn!("Invalid receive: Account is not awaiting start.");
+                        return None;
+                    }
                 }
             }
         };
 
+        // Add the counter to the set.
+        counter_set.add(counter);
+
+        info!("Reward counter added (total: {})", counter_set.len());
+
+        // And try to get an agreed value..
+        let counter = counter_set.agreed_value()?;
+
         // Add the account to our farming.
+        // It will now be eligible for farming rewards.
         match self.farming.add_account(id, counter.work) {
             Ok(_) => {
                 // Set the stage to `Active`
@@ -164,20 +176,23 @@ impl Rewards {
                 // If any reward was accumulated,
                 // we initiate payout to the account.
                 if counter.reward > Money::zero() {
+                    info!("Initiating reward payout to: {}.", id);
                     return self
                         .section_funds
                         .initiate_reward_payout(counter.reward, id);
                 }
                 None
             }
-            Err(_error) => {
+            Err(error) => {
                 // Really, the same comment about error
                 // as above, applies here as well..
                 // There is nothing the old section can do about this error
                 // and it should be a bug, so, something other than sending
                 // an error to the old section needs to be done here.
-
-                // "Failed to receive! Error: {_error}.".to_string()
+                warn!(
+                    "Failed to add account and agreed counter! Error: {}.",
+                    error
+                );
                 None
             }
         }
@@ -197,10 +212,10 @@ impl Rewards {
 
     /// 4. When the section becomes aware that a node has left,
     /// it is flagged for being awaiting move.
-    fn node_left(&mut self, node_id: XorName) -> Option<MessagingDuty> {
+    fn prepare_move(&mut self, node_id: XorName) -> Option<MessagingDuty> {
         let id = match self.node_accounts.get(&node_id) {
             Some(RewardAccount::Active(id)) => *id,
-            Some(RewardAccount::AwaitingStart) // hmm.. left when AwaitingStart is a tricky case..
+            Some(RewardAccount::AwaitingStart(_)) // hmm.. left when AwaitingStart is a tricky case..
             | Some(RewardAccount::AwaitingMove(_))
             | None => return None,
         };
@@ -240,7 +255,7 @@ impl Rewards {
                     origin,
                 );
             }
-            Some(RewardAccount::AwaitingStart) // todo: return error, but we need to have the account id in that case, or change / extend the current error(s)
+            Some(RewardAccount::AwaitingStart(_)) // todo: return error, but we need to have the account id in that case, or change / extend the current error(s)
             | None => return None,
         };
 

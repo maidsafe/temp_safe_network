@@ -87,7 +87,7 @@ impl NetworkMsgAnalysis {
         };
 
         if destined_for_network() {
-            Some(MessagingDuty::SendToSection(msg.clone())) // wrapping.forward
+            Some(MessagingDuty::SendToSection(msg.clone())) // Forwards without stamping the duty (was not processed).
         } else {
             None
         }
@@ -278,10 +278,12 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
+        use AdultDuty::*;
+        use ChunkDuty::*;
         let duty = if is_chunk_cmd() {
-            AdultDuty::RunAsChunks(ChunkDuty::WriteChunk(msg.clone()))
+            RunAsChunks(WriteChunk(msg.clone()))
         } else if is_chunk_query() {
-            AdultDuty::RunAsChunks(ChunkDuty::ReadChunk(msg.clone()))
+            RunAsChunks(ReadChunk(msg.clone()))
         } else {
             return None;
         };
@@ -289,35 +291,35 @@ impl NetworkMsgAnalysis {
     }
 
     fn try_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
-        let from_rewards_section = || match msg.most_recent_sender() {
-            MsgSender::Section {
+        let result = self.try_nonacc_rewards(msg);
+        if result.is_some() {
+            return result;
+        }
+        self.try_accumulated_rewards(msg)
+    }
+
+    // Check non-accumulated reward msgs.
+    fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+        let from_rewards_elder = || match msg.most_recent_sender() {
+            MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Rewards),
                 ..
             } => true,
             _ => false,
         };
-
-        let shall_process = |msg| from_rewards_section() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = |msg| from_rewards_elder() && self.is_dst_for(msg) && self.is_elder();
 
         if !shall_process(msg) {
             return None;
         }
 
-        use NodeRewardCmd::*;
-        let duty = match &msg.message {
-            Message::NodeCmd {
-                cmd:
-                    NodeCmd::Rewards(ClaimRewardCounter {
-                        old_node_id,
-                        new_node_id,
-                    }),
-                id,
-            } => RewardDuty::ClaimRewardCounter {
-                old_node_id: *old_node_id,
-                new_node_id: *new_node_id,
-                msg_id: *id,
-                origin: msg.origin.address(),
-            },
+        // RewardPayoutValidated and ReceiveClaimedRewards
+        // do not need accumulation since they are accumulated in the domain logic.
+        match &msg.message {
+            Message::NodeEvent {
+                event: NodeEvent::RewardPayoutValidated(validation),
+                ..
+            } => Some(RewardDuty::ReceiveRewardValidation(validation.clone())),
             Message::NodeEvent {
                 event:
                     NodeEvent::RewardCounterClaimed {
@@ -326,19 +328,48 @@ impl NetworkMsgAnalysis {
                         counter,
                     },
                 ..
-            } => RewardDuty::ReceiveClaimedRewards {
+            } => Some(RewardDuty::ReceiveClaimedRewards {
                 id: *account_id,
                 node_id: *new_node_id,
                 counter: counter.clone(),
-            },
-            Message::NodeEvent {
-                event: NodeEvent::RewardPayoutValidated(validation),
-                ..
-            } => RewardDuty::ReceiveRewardValidation(validation.clone()),
-            _ => return None,
-        };
+            }),
+            _ => None,
+        }
+    }
 
-        return Some(duty);
+    // Check accumulated reward msgs.
+    fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+        let from_rewards_section = || match msg.most_recent_sender() {
+            MsgSender::Section {
+                duty: Duty::Elder(ElderDuties::Rewards),
+                ..
+            } => true,
+            _ => false,
+        };
+        let shall_process_accumulated =
+            |msg| from_rewards_section() && self.is_dst_for(msg) && self.is_elder();
+
+        if !shall_process_accumulated(msg) {
+            return None;
+        }
+
+        use NodeRewardCmd::*;
+        match &msg.message {
+            Message::NodeCmd {
+                cmd:
+                    NodeCmd::Rewards(ClaimRewardCounter {
+                        old_node_id,
+                        new_node_id,
+                    }),
+                id,
+            } => Some(RewardDuty::ClaimRewardCounter {
+                old_node_id: *old_node_id,
+                new_node_id: *new_node_id,
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            _ => None,
+        }
     }
 
     fn self_is_handler_for(&self, address: &XorName) -> bool {

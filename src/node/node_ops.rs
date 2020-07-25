@@ -250,9 +250,8 @@ pub enum RewardDuty {
         ///
         counter: RewardCounter,
     },
-    PrepareAccountMove {
-        node_id: XorName,
-    },
+    ///
+    PrepareAccountMove { node_id: XorName },
     ///
     ReceiveRewardValidation(TransferValidated),
 }
