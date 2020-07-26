@@ -52,28 +52,28 @@ impl<A: RewardAlgo> FarmingSystem<A> {
     /// section count, percent filled etc. etc.
     pub fn reward(
         &mut self,
-        data_hash: Vec<u8>,
+        reward_id: Vec<u8>,
         num_bytes: u64,
         factor: f64,
     ) -> Result<safe_nd::Money> {
-        // first query for accumulated work of all
+        // First query for accumulated work of all.
         let accounts_work: HashMap<AccountId, Work> = self
             .accumulation
             .get_all()
             .iter()
             .map(|(id, acc)| (*id, acc.work))
             .collect();
-        // calculate the work cost for the number of bytes to store
+        // Calculate the work cost for the number of bytes to store.
         let work_cost = self.farming_algo.work_cost(num_bytes);
-        // scale the reward by the factor
+        // Scale the reward by the factor.
         let total_reward = self.farming_algo.total_reward(factor, work_cost);
-        // distribute according to previously performed work
+        // Distribute according to previously performed work.
         let distribution = self.farming_algo.distribute(total_reward, accounts_work);
 
-        // validate the operation
-        let e = self.accumulation.accumulate(data_hash, distribution)?;
+        // Validate the operation.
+        let e = self.accumulation.accumulate(reward_id, distribution)?;
 
-        // apply the result, reward counter is now incremented
+        // Apply the result. Reward counters are now incremented
         // i.e. both the reward amount and the work performed.
         self.accumulation
             .apply(AccumulationEvent::RewardsAccumulated(e));

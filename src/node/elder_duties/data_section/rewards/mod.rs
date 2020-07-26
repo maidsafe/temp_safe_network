@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod section_funds;
-mod system;
+mod farming;
 mod validator;
 
 use self::section_funds::SectionFunds;
-pub use self::{system::FarmingSystem, validator::Validator};
+pub use self::{farming::FarmingSystem, validator::Validator};
 use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
@@ -201,8 +201,20 @@ impl Rewards {
         let hash = (msg_id.0).0.to_vec(); // todo: fix the parameter type down-streams (in safe-farming)
         let factor = 2.0; // NB: The logics for deriving an appropriate factor is TBD.
         match self.farming.reward(hash, points, factor) {
-            Ok(_) => None,
-            Err(_err) => None, // todo: NodeCmdError. Or not? This is an internal thing..
+            Ok(amount) => {
+                info!(
+                    "Rewarded {} for {} points by write id {:?}.",
+                    amount, points, msg_id
+                );
+                None
+            }
+            Err(error) => {
+                warn!(
+                    "Failed to accumulate reward! Error: {}, msg id: {:?}.",
+                    error, msg_id
+                );
+                None
+            }
         }
     }
 
