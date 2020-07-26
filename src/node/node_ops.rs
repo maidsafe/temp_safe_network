@@ -9,6 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
 
+use crate::node::economy::MintingMetrics;
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
@@ -421,6 +422,8 @@ pub enum RewardDuty {
     /// receives and accumulates the validated
     /// reward payout from its Replicas,
     ReceiveRewardValidation(TransferValidated),
+    /// Updates the figures used in reward calculation.
+    UpdateRewards(MintingMetrics),
 }
 
 impl Into<NodeOperation> for RewardDuty {

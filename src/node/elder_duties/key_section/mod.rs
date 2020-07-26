@@ -57,7 +57,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let replica_manager = Self::replica_manager(routing.clone())?;
 
         // Payments
-        let payments = Payments::new(info.keys.clone(), replica_manager.clone());
+        let payments = Payments::new(info.keys.clone(), routing.clone(), replica_manager.clone());
 
         // Transfers
         let transfers = Transfers::new(info.keys.clone(), replica_manager);
@@ -124,13 +124,17 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();
         let our_index = self.routing.borrow().our_index().ok()?;
-        self.transfers.update_replica_on_churn(
+        if let Err(_) = self.transfers.update_replica_on_churn(
             pub_key_set,
             sec_key_share,
             our_index,
             proof_chain,
-        )?;
-        None
+        ) {
+            // we must crash if we can't update the replica
+            // the node can't work correctly without it..
+        }
+        // update payment costs
+        self.payments.update_costs()
     }
 
     fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
@@ -149,56 +153,3 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         Ok(Rc::new(RefCell::new(replica_manager)))
     }
 }
-
-// /// Process a msg from a client.
-// fn evaluate_client_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-//     match &msg.message {
-//         Message::Cmd {
-//             cmd: Cmd::Auth(_), ..
-//         } => wrap(self.auth.initiate(msg)),
-//         Message::Query {
-//             query: Query::Auth(_),
-//             ..
-//         } => wrap(self.auth.list_keys_and_version(msg)),
-//         Message::Query {
-//             query: Query::Transfer(query),
-//             ..
-//         } => self.transfers.process_query(query, msg.id(), msg.origin.address())
-//         | Message::Cmd {
-//             cmd: Cmd::Transfer(cmd),
-//             ..
-//         } => self.transfers.process_cmd(cmd, msg.id(), msg.origin.address()),
-//         Message::Cmd {
-//             cmd: Cmd::Data { cmd, .. },
-//             ..
-//         } => self.payment.process(cmd),
-//         Message::Query {
-//             query: Query::Data(data_query),
-//             ..
-//         } => forward,
-//         _ => None, // error..!
-//     }
-// }
-
-// fn process_transfer(&self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-//     let duty = match &msg.message {
-//         Message::Query {
-//             query: Query::Transfer(query),
-//             ..
-//         } => TransferDuty::ProcessQuery {
-//             query: query.clone().into(),
-//             msg_id: msg.id(),
-//             origin: msg.origin.address(),
-//         },
-//         Message::Cmd {
-//             cmd: Cmd::Transfer(cmd),
-//             ..
-//         } => TransferDuty::ProcessCmd {
-//             cmd: cmd.clone().into(),
-//             msg_id: msg.id(),
-//             origin: msg.origin.address(),
-//         },
-//         _ => return None, // error..!
-//     };
-//     Some(NodeOperation::RunAsTransfers(duty))
-// }

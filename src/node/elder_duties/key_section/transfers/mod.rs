@@ -16,7 +16,7 @@ use crate::{
 };
 use safe_nd::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
-    NodeCmdError, NodeEvent, NodeTransferCmd, NodeTransferError, PublicKey, QueryResponse,
+    NodeCmdError, NodeEvent, NodeTransferCmd, NodeTransferError, PublicKey, QueryResponse, Result,
     SignedTransfer, TransferError,
 };
 use std::{
@@ -72,11 +72,10 @@ impl Transfers {
         sec_key_share: SecretKeyShare,
         index: usize,
         proof_chain: SectionProofChain,
-    ) -> Option<()> {
+    ) -> Result<()> {
         self.replica
             .borrow_mut()
             .churn(sec_key_share, index, pub_key_set, proof_chain)
-            .ok()
     }
 
     /// When handled by Elders in the dst

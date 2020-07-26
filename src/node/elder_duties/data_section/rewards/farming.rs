@@ -1,5 +1,5 @@
 use safe_farming::{Accumulation, AccumulationEvent, RewardAlgo};
-use safe_nd::{AccountId, Result, RewardCounter, Work};
+use safe_nd::{AccountId, Money, Result, RewardCounter, Work};
 use std::collections::HashMap;
 
 pub struct FarmingSystem<A: RewardAlgo> {
@@ -23,6 +23,10 @@ impl<A: RewardAlgo> FarmingSystem<A> {
     pub fn add_account(&mut self, id: AccountId, work: Work) -> Result<()> {
         let e = self.accumulation.add_account(id, work)?;
         Ok(self.accumulation.apply(AccumulationEvent::AccountAdded(e)))
+    }
+
+    pub fn set_base_cost(&mut self, base_cost: Money) {
+        self.farming_algo.set(base_cost)
     }
 
     /// Factor is a number > 0, by which reward will be increased or decreased.
@@ -55,7 +59,7 @@ impl<A: RewardAlgo> FarmingSystem<A> {
         reward_id: Vec<u8>,
         num_bytes: u64,
         factor: f64,
-    ) -> Result<safe_nd::Money> {
+    ) -> Result<Money> {
         // First query for accumulated work of all.
         let accounts_work: HashMap<AccountId, Work> = self
             .accumulation

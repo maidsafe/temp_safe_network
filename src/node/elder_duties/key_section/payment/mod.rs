@@ -6,13 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod calc;
+
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{
+    node::economy::MintingMetrics,
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeOperation, PaymentDuty},
+    node::node_ops::{NodeOperation, PaymentDuty, RewardDuty},
 };
-use safe_nd::{Cmd, CmdError, ElderDuties, Error, Message, PublicKey, Result, TransferError};
+use calc::Economy;
+use routing::Node as Routing;
+use safe_nd::{
+    Cmd, CmdError, ElderDuties, Error, Message, Money, PublicKey, Result, TransferError,
+};
 use std::{
     cell::{RefCell, RefMut},
     fmt::{self, Display, Formatter},
@@ -23,6 +30,10 @@ pub struct Payments {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
+    calc: Economy,
+    store_cost: Money,
+    previous_counter: u64,
+    counter: u64,
 }
 
 /// An Elder in S(R) is responsible for
@@ -34,13 +45,41 @@ pub struct Payments {
 /// will clear the payment, and thereafter the node forwards
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl Payments {
-    pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+    pub fn new(
+        keys: NodeKeys,
+        routing: Rc<RefCell<Routing>>,
+        replica: Rc<RefCell<ReplicaManager>>,
+    ) -> Self {
         let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
+        let calc = Economy::new(keys.public_key(), routing, replica.clone());
         Self {
             keys,
             replica,
             wrapping,
+            calc,
+            store_cost: Money::zero(),
+            previous_counter: 1,
+            counter: 1,
         }
+    }
+
+    pub fn update_costs(&mut self) -> Option<NodeOperation> {
+        let indicator = self.calc.update_indicator()?;
+        let cost_base = indicator.period_cost_base.as_nano();
+        let load = self.counter as f64 / self.previous_counter as f64;
+        let store_cost = load * cost_base as f64;
+        self.store_cost = Money::from_nano(store_cost as u64);
+        self.previous_counter = self.counter;
+        self.counter = 1;
+
+        Some(
+            RewardDuty::UpdateRewards(MintingMetrics {
+                key: indicator.period_key,
+                store_cost: self.store_cost,
+                velocity: indicator.minting_velocity,
+            })
+            .into(),
+        )
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
@@ -77,7 +116,19 @@ impl Payments {
             Err(error) => Err(error), // not using TransferPropagation error, since that is for NodeCmds, so wouldn't be returned to client.
         };
         let result = match result {
-            Ok(_) => self.wrapping.forward(msg),
+            Ok(_) => {
+                self.counter += 1;
+                // Paying too little will see the amount be forfeited.
+                // This is because it is easy to know the cost by querying,
+                // so you are forced to do the job properly, instead of burdoning the network.
+                if self.store_cost > payment.amount() {
+                    let error =
+                        CmdError::Transfer(TransferRegistration(Error::InsufficientBalance)); // todo, better error, like `TooLowPayment`
+                    let result = self.wrapping.error(error, msg.id(), &msg.origin.address());
+                    return result.map(|c| c.into());
+                }
+                self.wrapping.forward(msg)
+            }
             Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferRegistration(error)),
                 msg.id(),

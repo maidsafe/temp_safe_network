@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod section_funds;
 mod farming;
+mod section_funds;
 mod validator;
 
 use self::section_funds::SectionFunds;
 pub use self::{farming::FarmingSystem, validator::Validator};
 use crate::{
+    node::economy::MintingMetrics,
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
@@ -30,6 +31,7 @@ pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
     node_accounts: HashMap<XorName, RewardAccount>,
     section_funds: SectionFunds,
+    minting_metrics: MintingMetrics,
     wrapping: ElderMsgWrapping,
 }
 
@@ -47,7 +49,7 @@ pub enum RewardAccount {
 
 impl Rewards {
     pub fn new(keys: NodeKeys, actor: TransferActor<Validator>) -> Self {
-        let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
+        let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Rewards);
         let acc = Accumulation::new(Default::default(), Default::default());
         let base_cost = Money::from_nano(1);
         let algo = StorageRewards::new(base_cost);
@@ -57,6 +59,11 @@ impl Rewards {
             farming,
             node_accounts: Default::default(),
             section_funds,
+            minting_metrics: MintingMetrics {
+                key: keys.public_key(),
+                store_cost: base_cost,
+                velocity: 2,
+            },
             wrapping,
         }
     }
@@ -83,6 +90,11 @@ impl Rewards {
             } => self.receive_claimed_rewards(id, node_id, counter),
             PrepareAccountMove { node_id } => self.prepare_move(node_id),
             ReceiveRewardValidation(validation) => self.section_funds.receive(validation),
+            UpdateRewards(metrics) => {
+                self.farming.set_base_cost(metrics.store_cost);
+                self.minting_metrics = metrics;
+                None
+            }
         };
 
         result.map(|c| c.into())
@@ -199,8 +211,8 @@ impl Rewards {
     /// a write request, the accounts accumulate reward.
     fn accumulate_reward(&mut self, points: u64, msg_id: MessageId) -> Option<MessagingDuty> {
         let hash = (msg_id.0).0.to_vec(); // todo: fix the parameter type down-streams (in safe-farming)
-        let factor = 2.0; // NB: The logics for deriving an appropriate factor is TBD.
-        match self.farming.reward(hash, points, factor) {
+        let factor = self.minting_metrics.velocity;
+        match self.farming.reward(hash, points, factor as f64) {
             Ok(amount) => {
                 info!(
                     "Rewarded {} for {} points by write id {:?}.",
