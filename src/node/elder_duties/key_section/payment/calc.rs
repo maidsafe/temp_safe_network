@@ -60,7 +60,7 @@ impl Economy {
         let period_cost_base = Money::from_nano(section_balance as u64 / total_nodes / NANOS);
         // This is the factor that determines how fast new money should be minted.
         let minting_velocity = (1.0 / farmed_percent) as u8;
-        
+
         self.indicator = Indicator {
             period_key: section_account,
             period_cost_base,

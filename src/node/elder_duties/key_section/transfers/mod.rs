@@ -129,10 +129,10 @@ impl Transfers {
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin)
             }
-            ValidateRewardPayout(signed_transfer) => {
-                self.validate_reward_payout(signed_transfer.clone(), msg_id, origin)
+            ValidateSectionPayout(signed_transfer) => {
+                self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
             }
-            RegisterTransfer(debit_agreement) | RegisterRewardPayout(debit_agreement) => {
+            RegisterTransfer(debit_agreement) | RegisterSectionPayout(debit_agreement) => {
                 self.register(&debit_agreement, msg_id, origin)
             }
             PropagateTransfer(debit_agreement) => {
@@ -237,7 +237,7 @@ impl Transfers {
     /// This validation will render a signature over the
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
-    fn validate_reward_payout(
+    fn validate_section_payout(
         &mut self,
         transfer: SignedTransfer,
         msg_id: MessageId,
@@ -246,7 +246,7 @@ impl Transfers {
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NodeEvent {
-                event: NodeEvent::RewardPayoutValidated(event),
+                event: NodeEvent::SectionPayoutValidated(event),
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },

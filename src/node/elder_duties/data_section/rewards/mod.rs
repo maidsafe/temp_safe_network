@@ -68,6 +68,10 @@ impl Rewards {
         }
     }
 
+    pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeOperation> {
+        Some(self.section_funds.transition(to)?.into())
+    }
+
     pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
@@ -89,7 +93,7 @@ impl Rewards {
                 counter,
             } => self.receive_claimed_rewards(id, node_id, counter),
             PrepareAccountMove { node_id } => self.prepare_move(node_id),
-            ReceiveRewardValidation(validation) => self.section_funds.receive(validation),
+            ReceivePayoutValidation(validation) => self.section_funds.receive(validation),
             UpdateRewards(metrics) => {
                 self.farming.set_base_cost(metrics.store_cost);
                 self.minting_metrics = metrics;

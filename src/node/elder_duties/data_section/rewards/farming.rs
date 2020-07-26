@@ -54,12 +54,7 @@ impl<A: RewardAlgo> FarmingSystem<A> {
     /// relevant to the implementing layer.
     /// In SAFE Network context, those parameters could be node count,
     /// section count, percent filled etc. etc.
-    pub fn reward(
-        &mut self,
-        reward_id: Vec<u8>,
-        num_bytes: u64,
-        factor: f64,
-    ) -> Result<Money> {
+    pub fn reward(&mut self, reward_id: Vec<u8>, num_bytes: u64, factor: f64) -> Result<Money> {
         // First query for accumulated work of all.
         let accounts_work: HashMap<AccountId, Work> = self
             .accumulation

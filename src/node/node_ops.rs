@@ -421,7 +421,7 @@ pub enum RewardDuty {
     /// The distributed Actor of a section,
     /// receives and accumulates the validated
     /// reward payout from its Replicas,
-    ReceiveRewardValidation(TransferValidated),
+    ReceivePayoutValidation(TransferValidated),
     /// Updates the figures used in reward calculation.
     UpdateRewards(MintingMetrics),
 }
@@ -493,9 +493,9 @@ pub enum TransferCmd {
     ///
     PropagateTransfer(DebitAgreementProof),
     ///
-    ValidateRewardPayout(SignedTransfer),
+    ValidateSectionPayout(SignedTransfer),
     ///
-    RegisterRewardPayout(DebitAgreementProof),
+    RegisterSectionPayout(DebitAgreementProof),
 }
 
 impl From<safe_nd::TransferCmd> for TransferCmd {

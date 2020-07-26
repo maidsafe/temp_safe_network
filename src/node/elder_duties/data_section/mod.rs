@@ -34,6 +34,8 @@ pub struct DataSection {
     metadata: Metadata,
     ///
     rewards: Rewards,
+    ///
+    routing: Rc<RefCell<Routing>>,
 }
 
 impl DataSection {
@@ -54,7 +56,11 @@ impl DataSection {
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
         let rewards = Rewards::new(info.keys.clone(), actor);
 
-        Ok(Self { metadata, rewards })
+        Ok(Self {
+            metadata,
+            rewards,
+            routing,
+        })
     }
 
     pub fn process(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
@@ -63,6 +69,14 @@ impl DataSection {
             RunAsMetadata(duty) => self.metadata.process(&duty),
             RunAsRewards(duty) => self.rewards.process(duty),
         }
+    }
+
+    // Transition the section funds account to the new key.
+    pub fn elders_changed(&mut self) -> Option<NodeOperation> {
+        let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
+        let keypair = utils::key_pair(self.routing.clone()).ok()?;
+        let actor = TransferActor::new(keypair, pub_key_set, Validator {});
+        self.rewards.transition(actor)
     }
 
     pub fn relocated_member_joined(

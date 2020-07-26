@@ -311,13 +311,13 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
-        // RewardPayoutValidated and ReceiveClaimedRewards
+        // SectionPayoutValidated and ReceiveClaimedRewards
         // do not need accumulation since they are accumulated in the domain logic.
         match &msg.message {
             Message::NodeEvent {
-                event: NodeEvent::RewardPayoutValidated(validation),
+                event: NodeEvent::SectionPayoutValidated(validation),
                 ..
-            } => Some(RewardDuty::ReceiveRewardValidation(validation.clone())),
+            } => Some(RewardDuty::ReceivePayoutValidation(validation.clone())),
             Message::NodeEvent {
                 event:
                     NodeEvent::RewardCounterClaimed {
@@ -400,7 +400,7 @@ impl NetworkMsgAnalysis {
         }
 
         // From Rewards module, we get
-        // `ValidateRewardPayout` and `RegisterRewardPayout`.
+        // `ValidateSectionPayout` and `RegisterSectionPayout`.
 
         let from_rewards_elder = || match msg.most_recent_sender() {
             MsgSender::Node {
@@ -418,18 +418,18 @@ impl NetworkMsgAnalysis {
 
         match &msg.message {
             Message::NodeCmd {
-                cmd: NodeCmd::Transfers(ValidateRewardPayout(signed_transfer)),
+                cmd: NodeCmd::Transfers(ValidateSectionPayout(signed_transfer)),
                 id,
             } => Some(TransferDuty::ProcessCmd {
-                cmd: TransferCmd::ValidateRewardPayout(signed_transfer.clone()),
+                cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
             Message::NodeCmd {
-                cmd: NodeCmd::Transfers(RegisterRewardPayout(debit_agreement)),
+                cmd: NodeCmd::Transfers(RegisterSectionPayout(debit_agreement)),
                 id,
             } => Some(TransferDuty::ProcessCmd {
-                cmd: TransferCmd::RegisterRewardPayout(debit_agreement.clone()),
+                cmd: TransferCmd::RegisterSectionPayout(debit_agreement.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
