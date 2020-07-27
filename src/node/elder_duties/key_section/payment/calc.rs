@@ -32,8 +32,8 @@ impl Economy {
         let mut instance = Self {
             indicator: Indicator {
                 period_key: section_account,
-                minting_velocity: 2,
-                period_cost_base: Money::zero(),
+                minting_velocity: 2.0,
+                period_base_cost: Money::zero(),
             },
             routing,
             replica,
@@ -42,6 +42,9 @@ impl Economy {
         instance
     }
 
+    /// The calculations within this method
+    /// are temporary and should not be considered
+    /// a final solution. It's something to work with during test nets.
     pub fn update_indicator(&mut self) -> Option<Indicator> {
         let routing = self.routing.borrow();
         let prefix = routing.our_prefix()?;
@@ -54,23 +57,36 @@ impl Economy {
         // Apprx. number of nodes in the network.
         let total_nodes = total_sections * (adult_count + elder_count);
 
+        // The portion of total supply, that this section responsible for.
+        let section_portion = (u32::MAX as u64 * NANOS / total_sections) as f64;
         let section_account = PublicKey::Bls(self.replica.borrow().replicas_pk_set()?.public_key());
+        // The actual balance of this section.
         let section_balance = self.replica.borrow().balance(&section_account)?.as_nano() as f64;
 
-        let section_portion = (u32::MAX as u64 * NANOS / total_sections) as f64;
+        // Percentages of farmed and unfarmed.
         let unfarmed_percent = section_balance / section_portion;
         let farmed_percent = 1.0 - unfarmed_percent;
-        // This is the basis for store cost during the period.
-        let period_cost_base =
-            Money::from_nano(section_balance as u64 / (total_nodes * total_nodes) / NANOS);
+
         // This is the factor that determines how fast new money should be minted.
-        let minting_velocity = (unfarmed_percent / farmed_percent) as u8;
+        // Faster when less is farmed, slower when more is farmed.
+        let minting_velocity = unfarmed_percent / farmed_percent;
+
+        // Some obscure tricks to get the base cost within reasonable values
+        // for very small as well as very large networks (up to about 130 billion nodes).
+        let numerator = 1 / (total_nodes * total_nodes) / NANOS;
+        let denominator = (minting_velocity.powf(prefix_len as f64) + (1.0 / NANOS as f64)) * 1.0
+            / (NANOS as f64).powf(0.5);
+
+        // This is the basis for store cost during the period.
+        let period_base_cost = u64::max(1, (numerator as f64 / denominator) as u64);
+        let period_base_cost = Money::from_nano(period_base_cost);
 
         self.indicator = Indicator {
             period_key: section_account,
-            period_cost_base,
+            period_base_cost,
             minting_velocity,
         };
+
         Some(self.indicator.clone())
     }
 }

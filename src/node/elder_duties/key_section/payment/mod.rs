@@ -67,7 +67,7 @@ impl Payments {
 
     pub fn update_costs(&mut self) -> Option<NodeOperation> {
         let indicator = self.calc.update_indicator()?;
-        let cost_base = indicator.period_cost_base.as_nano();
+        let cost_base = indicator.period_base_cost.as_nano();
         let load = self.counter as f64 / self.previous_counter as f64;
         let store_cost = load * cost_base as f64;
         self.store_cost = Money::from_nano(store_cost as u64);

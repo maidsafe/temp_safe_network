@@ -19,11 +19,11 @@ pub struct Indicator {
     pub period_key: PublicKey,
     /// The velocity is a scaling
     /// factor which determines the net money issuance.
-    pub minting_velocity: u8,
+    pub minting_velocity: f64,
     /// Used to calculate the store cost
     /// to be used during a period
     /// (i.e. a specific Elder constellation).
-    pub period_cost_base: Money,
+    pub period_base_cost: Money,
 }
 
 /// MintingMetrics are valid through
@@ -41,5 +41,5 @@ pub struct MintingMetrics {
     pub store_cost: Money,
     /// The velocity is a scaling
     /// factor which determines the net money issuance.
-    pub velocity: u8,
+    pub velocity: f64,
 }

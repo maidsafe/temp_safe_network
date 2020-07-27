@@ -65,7 +65,7 @@ impl Rewards {
             minting_metrics: MintingMetrics {
                 key: keys.public_key(),
                 store_cost: base_cost,
-                velocity: 2,
+                velocity: 2.0,
             },
             wrapping,
         }
@@ -219,7 +219,7 @@ impl Rewards {
     fn accumulate_reward(&mut self, points: u64, msg_id: MessageId) -> Option<MessagingDuty> {
         let hash = (msg_id.0).0.to_vec(); // todo: fix the parameter type down-streams (in safe-farming)
         let factor = self.minting_metrics.velocity;
-        match self.farming.reward(hash, points, factor as f64) {
+        match self.farming.reward(hash, points, factor) {
             Ok(amount) => {
                 info!(
                     "Rewarded {} for {} points by write id {:?}.",
