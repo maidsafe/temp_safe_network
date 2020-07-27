@@ -124,7 +124,7 @@ pub unsafe extern "C" fn create_acc(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn autherise_app(
+pub unsafe extern "C" fn authorise_app(
     app: *mut SafeAuthenticator,
     request: *const c_char,
     is_granted: bool,
