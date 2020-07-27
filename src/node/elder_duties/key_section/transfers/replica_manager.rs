@@ -20,9 +20,7 @@ use routing::SectionProofChain;
 use {
     crate::node::node_ops::MessagingDuty,
     rand::thread_rng,
-    safe_nd::{
-        Address, MessageId, PublicId, PublicKey, Signature, SignatureShare, Transfer, XorName,
-    },
+    safe_nd::{PublicKey, Signature, SignatureShare, Transfer},
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 

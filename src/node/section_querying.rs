@@ -45,6 +45,7 @@ impl SectionQuerying {
             .unwrap_or(false)
     }
 
+    #[allow(unused)]
     pub fn our_elder_names(&self) -> Vec<XorName> {
         self.routing
             .borrow_mut()

@@ -45,6 +45,7 @@ use writing::Writing;
 pub struct Metadata {
     keys: NodeKeys,
     elder_stores: ElderStores,
+    #[allow(unused)]
     wrapping: ElderMsgWrapping,
 }
 

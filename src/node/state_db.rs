@@ -18,6 +18,7 @@ use std::{
 const STATE_FILENAME: &str = "state";
 
 /// Writes the info to disk.
+#[allow(unused)]
 pub fn dump_state(age_group: AgeGroup, root_dir: &Path, id: &NodeKeypairs) -> Result<()> {
     let path = root_dir.join(STATE_FILENAME);
     Ok(fs::write(path, utils::serialise(&(age_group, id)))?)

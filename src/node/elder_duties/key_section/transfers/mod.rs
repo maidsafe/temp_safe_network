@@ -128,7 +128,7 @@ impl Transfers {
         use TransferCmd::*;
         match cmd {
             #[cfg(feature = "simulated-payouts")]
-            /// Cmd to simulate a farming payout
+            // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self
                 .replica
                 .borrow_mut()
@@ -319,6 +319,7 @@ impl Transfers {
         self.wrapping.send(message)
     }
 
+    #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
     pub fn pay(&mut self, transfer: Transfer) {
         self.replica.borrow_mut().debit_without_proof(transfer)
