@@ -42,7 +42,6 @@ use writing::Writing;
 /// has been implemented; where the data types are all simply
 /// the structures + their metadata - handled at `Elders` - with
 /// all underlying data being chunks stored at `Adults`.
-
 pub struct Metadata {
     keys: NodeKeys,
     elder_stores: ElderStores,

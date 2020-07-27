@@ -10,6 +10,8 @@ use safe_farming::{Accumulation, AccumulationEvent, RewardAlgo};
 use safe_nd::{AccountId, Money, Result, RewardCounter, Work};
 use std::collections::HashMap;
 
+/// The calculation and distribution
+/// of farming rewards.
 pub struct FarmingSystem<A: RewardAlgo> {
     farming_algo: A,
     accumulation: Accumulation,

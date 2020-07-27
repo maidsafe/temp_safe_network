@@ -23,6 +23,9 @@ use safe_nd::{
 };
 use std::fmt::{self, Display, Formatter};
 
+/// Auth is a module that is being deprecated in favour
+/// of client side Authenticator. (The module is an optimisation
+/// but introduces excessive complexity/responsibility for the network.)
 pub(super) struct Auth {
     keys: NodeKeys,
     auth_keys: AuthKeysDb,

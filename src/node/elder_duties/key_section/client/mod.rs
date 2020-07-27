@@ -31,6 +31,8 @@ use routing::TransportEvent as ClientEvent;
 use safe_nd::{Address, MsgEnvelope};
 use std::fmt::{self, Display, Formatter};
 
+/// A client gateway routes messages
+/// back and forth between a client and the network.
 pub struct ClientGateway<R: CryptoRng + Rng> {
     keys: NodeKeys,
     section: SectionQuerying,

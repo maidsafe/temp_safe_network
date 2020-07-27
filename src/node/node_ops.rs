@@ -236,9 +236,9 @@ pub enum KeySectionDuty {
     RunAsAuth(AuthDuty),
     /// As a Gateway, the node interfaces with
     /// clients, interpreting handshakes and msgs,
-    /// and also relating network msgs (such as cmd errors
-    /// and query responses, with earlier client
-    /// msgs) as to route them to the correct client.
+    /// and also correlating network msgs (such as cmd errors
+    /// and query responses) with earlier client
+    /// msgs, as to route them to the correct client.
     RunAsGateway(GatewayDuty),
     /// Payment for data writes.
     RunAsPayment(PaymentDuty),
@@ -400,7 +400,7 @@ pub enum ChunkDuty {
 /// rewarded for their work.
 /// Elders are responsible for the duties of
 /// keeping track of rewards, and issuing
-/// payouts form the section account.
+/// payouts from the section account.
 pub enum RewardDuty {
     /// Whenever there has been write
     /// operations on the network, we

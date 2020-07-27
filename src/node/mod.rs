@@ -132,7 +132,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         }
     }
 
-    ///
+    /// Keeps processing resulting node operations.
     fn process_while_any(&mut self, op: Option<NodeOperation>) {
         use NodeOperation::*;
         let mut next_op = op;
@@ -155,7 +155,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             RunAsAdult(duty) => self.duties.adult_duties()?.process(&duty),
             RunAsElder(duty) => self.duties.elder_duties()?.process(duty),
             RunAsNode(duty) => self.duties.process(duty),
-            Unknown => None,
         }
     }
 }

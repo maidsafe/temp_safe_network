@@ -15,6 +15,8 @@ use routing::Node as Routing;
 use safe_nd::{Cmd, Message, MsgEnvelope, MsgSender, Query};
 use std::{cell::RefCell, rc::Rc};
 
+/// Evaluates msgs sent directly from a client,
+/// i.e. not remote msgs from the network.
 pub struct ClientMsgAnalysis {
     section: SectionQuerying,
 }

@@ -28,6 +28,14 @@ use std::{
     rc::Rc,
 };
 
+/// An Elder in a KeySection is responsible for
+/// data payment, and will receive write
+/// requests from clients.
+/// At Payments, a local request to Transfers module
+/// will clear the payment, and thereafter the node forwards
+/// the actual write request (without payment info) to a DataSection,
+/// which would be a section closest to the data
+/// (where it is then handled by Elders with Metadata duties).
 pub struct Payments {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
@@ -38,12 +46,6 @@ pub struct Payments {
     counter: u64,
 }
 
-/// An Elder in S(R) is responsible for
-/// data payment, and will receive write
-/// requests from clients.
-/// At Payments, a local request to Transfers module
-/// will clear the payment, and thereafter the node forwards
-/// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
 impl Payments {
     pub fn new(
         keys: NodeKeys,

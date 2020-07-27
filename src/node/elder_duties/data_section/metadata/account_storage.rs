@@ -23,6 +23,10 @@ use std::{
     rc::Rc,
 };
 
+/// Operations over the data type Account.
+/// NB: This type is to be deprecated, as it
+/// will be handled client side at Authenticator,
+/// and stored as any other data to the network.
 pub(super) struct AccountStorage {
     chunks: AccountChunkStore,
     wrapping: ElderMsgWrapping,

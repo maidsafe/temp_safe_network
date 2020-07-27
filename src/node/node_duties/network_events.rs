@@ -13,6 +13,8 @@ use log::{error, info, trace};
 use routing::event::Event as RoutingEvent;
 use safe_nd::{MsgEnvelope, PublicKey, XorName};
 
+/// Maps events from the transport layer
+/// into domain messages for the various modules.
 pub struct NetworkEvents {
     analysis: NetworkMsgAnalysis,
 }

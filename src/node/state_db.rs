@@ -33,7 +33,7 @@ pub fn read_state(root_dir: &Path) -> Result<Option<(AgeGroup, NodeKeypairs)>> {
     Ok(Some(bincode::deserialize(&contents)?))
 }
 
-/// A node is withing one
+/// A node is within one
 /// out of three age groups.
 #[derive(Serialize, Deserialize)]
 pub enum AgeGroup {
@@ -57,8 +57,8 @@ pub enum Command {
 }
 
 /// Info about the node used
-/// to inits its various dbs,
-/// among things.
+/// to init its various dbs
+/// (among things).
 #[derive(Clone)]
 pub struct NodeInfo {
     pub keys: NodeKeys,

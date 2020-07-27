@@ -26,6 +26,7 @@ use std::{
     rc::Rc,
 };
 
+/// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
     keys: NodeKeys,
     chunks: SequenceChunkStore,

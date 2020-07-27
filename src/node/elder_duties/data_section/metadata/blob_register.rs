@@ -44,6 +44,7 @@ struct HolderMetadata {
     chunks: BTreeSet<BlobAddress>,
 }
 
+/// Operations over the data type Blob.
 pub(super) struct BlobRegister {
     metadata: PickleDb,
     holders: PickleDb,

@@ -9,6 +9,11 @@
 use safe_nd::PublicKey;
 use safe_transfers::ReplicaValidator;
 
+/// Should be validating
+/// other replica groups, i.e.
+/// make sure they are run at Elders
+/// of sections we know of.
+/// TBD.
 pub struct Validator {}
 
 impl ReplicaValidator for Validator {

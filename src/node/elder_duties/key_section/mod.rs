@@ -32,6 +32,17 @@ use routing::{Node as Routing, RoutingError};
 use safe_nd::{ElderDuties, MsgEnvelope, PublicId};
 use std::{cell::RefCell, rc::Rc};
 
+/// A Key Section interfaces with clients,
+/// who are essentially a public key,
+/// (hence the name Key Section), used by
+/// a specific socket address.
+/// The Gateway deals with onboarding (handshakes etc)
+/// and routing messages back and forth to clients.
+/// Payments deals with the payment for data writes,
+/// while transfers deals with sending money between keys.
+/// Auth is a module that is being deprecated in favour
+/// of client side Authenticator. (The module is an optimisation
+/// but introduces excessive complexity/responsibility for the network.)
 pub struct KeySection<R: CryptoRng + Rng> {
     auth: Auth,
     gateway: ClientGateway<R>,

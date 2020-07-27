@@ -11,7 +11,10 @@ use crossbeam_channel::{Receiver as Channel, Select};
 use routing::{event::Event as RoutingEvent, Node as Routing, TransportEvent as ClientEvent};
 use std::{cell::RefCell, rc::Rc};
 
-///
+/// A receiver of events from
+/// the underlaying transport layer.
+/// These events originate from other nodes
+/// in the network as well as from connected clients.
 pub struct Receiver {
     network_receiver: Channel<RoutingEvent>,
     client_receiver: Channel<ClientEvent>,

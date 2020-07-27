@@ -29,6 +29,14 @@ impl Display for ClientInfo {
     }
 }
 
+/// A client is defined as a public key
+/// used by a specific socket address.
+/// Onboarding module deals with new and existing
+/// client connections to the section closest to the
+/// public key of that client.
+/// Most notably, this is the handshake process
+/// taking place between a connecting client and
+/// the Elders of this section.
 pub struct Onboarding {
     id: NodePublicId,
     section: SectionQuerying,

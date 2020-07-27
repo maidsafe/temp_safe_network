@@ -14,6 +14,9 @@ use std::{cell::RefCell, rc::Rc};
 
 const NANOS: u64 = 1_000_000_000;
 
+/// Produces indicators for
+/// the SAFE Network economy, specifically
+/// the cost of storage and the minting of new money.
 pub struct Economy {
     indicator: Indicator,
     routing: Rc<RefCell<Routing>>,

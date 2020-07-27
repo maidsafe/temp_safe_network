@@ -14,6 +14,9 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);
 //type DuplicationInfo = (BlobAddress, BTreeSet<XorName>, Vec<SignatureShare>);
 
+/// Accumulation of messages signed by individual nodes
+/// into messages that are stamped as originating from a section.
+/// This happens when enough signatures have been accumulated.
 pub struct Accumulation {
     messages: HashMap<MessageId, RequestInfo>,
     completed: HashSet<MessageId>,

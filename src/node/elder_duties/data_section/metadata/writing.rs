@@ -16,6 +16,7 @@ use crate::{
 };
 use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite};
 
+/// Write operations on data.
 pub(super) struct Writing {
     cmd: DataCmd,
     msg: MsgEnvelope,

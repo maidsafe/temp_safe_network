@@ -11,6 +11,8 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 
+/// The various data type stores,
+/// that are only managed at Elders.
 pub(super) struct ElderStores {
     account_storage: AccountStorage,
     blob_register: BlobRegister,
