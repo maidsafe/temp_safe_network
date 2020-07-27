@@ -289,7 +289,7 @@ pub unsafe extern "C" fn decode_auth_unregistered_req(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn autherise_unregistered_app(
+pub unsafe extern "C" fn encode_connection_info(
     req_id: u32,
     is_granted: bool,
     user_data: *mut c_void,
