@@ -26,6 +26,10 @@ use {
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 
+/// Manages an instance of an AT2 Replica,
+/// which is responsible for a number of AT2 Actors,
+/// both those of clients but also the distributed
+/// Actor run by this section.
 pub struct ReplicaManager {
     store: EventStore,
     replica: Replica,

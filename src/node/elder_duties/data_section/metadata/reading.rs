@@ -13,6 +13,7 @@ use super::{
 use crate::node::node_ops::MessagingDuty;
 use safe_nd::{AccountRead, BlobRead, DataQuery, MapRead, MsgEnvelope, SequenceRead};
 
+/// Read operations on data.
 pub(super) struct Reading {
     query: DataQuery,
     msg: MsgEnvelope,

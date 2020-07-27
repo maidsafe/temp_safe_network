@@ -14,8 +14,23 @@ use std::{
     net::SocketAddr,
 };
 
+/*
+Parsing of bytes received from a client,
+which are interpreted into two different
+kinds of input; messages and handshake requests.
+*/
+
+/// The different types
+/// of input to the network
+/// from a client.
 pub enum ClientInput {
+    /// Messages sent from a connected
+    /// client, in order to use the services
+    /// of the network.
     Msg(ClientMsg),
+    /// Requests sent in the bootstrapping
+    /// process, where a client connects
+    /// to the network.
     Handshake(HandshakeRequest),
 }
 

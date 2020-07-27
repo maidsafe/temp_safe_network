@@ -15,6 +15,7 @@ use routing::{DstLocation, Node as Routing, SrcLocation};
 use safe_nd::{Address, MsgEnvelope, XorName};
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 
+/// Sending of msgs to other nodes in the network.
 pub(super) struct NetworkSender {
     routing: Rc<RefCell<Routing>>,
 }

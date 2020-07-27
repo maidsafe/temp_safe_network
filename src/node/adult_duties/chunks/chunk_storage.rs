@@ -19,6 +19,7 @@ use std::{
     rc::Rc,
 };
 
+/// Storage of data chunks.
 pub(crate) struct ChunkStorage {
     keys: NodeKeys,
     chunks: BlobChunkStore,

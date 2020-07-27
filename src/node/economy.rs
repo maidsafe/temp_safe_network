@@ -15,8 +15,14 @@ use safe_nd::{Money, PublicKey};
 /// factor which determines the net money issuance.
 #[derive(Clone)]
 pub struct Indicator {
+    /// The current BLS key of the section.
     pub period_key: PublicKey,
+    /// The velocity is a scaling
+    /// factor which determines the net money issuance.
     pub minting_velocity: u8,
+    /// Used to calculate the store cost
+    /// to be used during a period
+    /// (i.e. a specific Elder constellation).
     pub period_cost_base: Money,
 }
 
@@ -28,7 +34,12 @@ pub struct Indicator {
 /// calculation of store cost and minting velocity.
 #[derive(Clone)]
 pub struct MintingMetrics {
+    /// The current BLS key of the section.
     pub key: PublicKey,
+    /// The calculated store cost for the period,
+    /// (i.e. the specific Elder constellation represented by the PublicKey).
     pub store_cost: Money,
+    /// The velocity is a scaling
+    /// factor which determines the net money issuance.
     pub velocity: u8,
 }

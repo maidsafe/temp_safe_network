@@ -20,6 +20,8 @@ use std::{
     net::SocketAddr,
 };
 
+/// Tracks incoming and outgoingg messages
+/// between client and network.
 pub struct ClientMsgTracking {
     id: NodePublicId,
     onboarding: Onboarding,

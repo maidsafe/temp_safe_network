@@ -19,6 +19,7 @@ use std::{
     rc::Rc,
 };
 
+/// Sending of messages to clients.
 pub(super) struct ClientSender {
     routing: Rc<RefCell<Routing>>,
 }

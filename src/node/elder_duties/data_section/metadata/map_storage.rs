@@ -24,6 +24,7 @@ use std::{
     rc::Rc,
 };
 
+/// Operations over the data type Map.
 pub(super) struct MapStorage {
     chunks: MapChunkStore,
     wrapping: ElderMsgWrapping,

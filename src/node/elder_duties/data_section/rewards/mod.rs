@@ -27,6 +27,9 @@ use safe_nd::{
 use safe_transfers::TransferActor;
 use std::collections::HashMap;
 
+/// The accumulation and paying
+/// out of rewards to nodes for
+/// their work in the network.
 pub struct Rewards {
     farming: FarmingSystem<StorageRewards>,
     node_accounts: HashMap<XorName, RewardAccount>,

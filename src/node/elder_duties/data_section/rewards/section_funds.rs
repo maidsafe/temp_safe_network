@@ -15,6 +15,8 @@ use safe_nd::{
 use safe_transfers::{ActorEvent, TransferActor};
 use ActorEvent::*;
 
+/// The management of section funds,
+/// via the usage of a distributed AT2 Actor.
 pub(super) struct SectionFunds {
     actor: TransferActor<Validator>,
     next_actor: Option<TransferActor<Validator>>,

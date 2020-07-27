@@ -25,6 +25,7 @@ use std::{
     rc::Rc,
 };
 
+/// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {
     keys: NodeKeys,
     key_section: KeySection<R>,

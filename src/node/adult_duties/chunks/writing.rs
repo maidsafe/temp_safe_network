@@ -11,6 +11,7 @@ use crate::node::node_ops::MessagingDuty;
 use log::error;
 use safe_nd::{BlobWrite, MsgEnvelope, MsgSender};
 
+/// Write operations on data chunks.
 pub(super) struct Writing {
     write: BlobWrite,
     msg: MsgEnvelope,

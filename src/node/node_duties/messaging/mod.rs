@@ -17,6 +17,8 @@ pub use receiver::{Received, Receiver};
 use routing::Node as Routing;
 use std::{cell::RefCell, rc::Rc};
 
+/// Sending of messages
+/// to nodes and clients in the network.
 pub struct Messaging {
     client_sender: ClientSender,
     network_sender: NetworkSender,

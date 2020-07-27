@@ -26,6 +26,7 @@ use std::{
     rc::Rc,
 };
 
+/// Operations on data chunks.
 pub(crate) struct Chunks {
     keys: NodeKeys,
     chunk_storage: ChunkStorage,

@@ -36,6 +36,10 @@ pub enum DutyLevel<R: CryptoRng + Rng> {
     Elder(ElderDuties<R>),
 }
 
+/// Node duties are those that all nodes
+/// carry out. (TBD: adjust for Infant level, which might be doing nothing now).
+/// Within the duty level, there are then additional
+/// duties to be carried out, depending on the level.
 pub struct NodeDuties<R: CryptoRng + Rng> {
     keys: Rc<RefCell<NodeKeypairs>>,
     node_info: NodeInfo,

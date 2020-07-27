@@ -34,11 +34,18 @@ Transfers is the layer that manages
 interaction with an AT2 Replica.
 
 Flow overview:
-1. Client-to-Elders: Request::ValidateTransfer
-2. Elders-to-Client: Response::TransferValidation
-3. Client-to-Elders: Request::RegisterTransfer
-4. Elders-to-Client: Response::TransferRegistration
-5. Elders-to-Elders: Request::PropagateTransfer
+
+Client transfers
+1. Client-to-Elders: Cmd::ValidateTransfer
+2. Elders-to-Client: Event::TransferValidated
+3. Client-to-Elders: Cmd::RegisterTransfer
+4. Elders-to-Elders: NodeCmd::PropagateTransfer
+
+Section transfers (such as reward payout)
+1. Elders-to-Elders: NodeCmd::ValidateSectionPayout
+2. Elders-to-Elders: NodeEvent::SectionPayoutValidated
+3. Elders-to-Elders: NodeCmd::RegisterSectionPayout
+4. Elders-to-Elders: NodeCmd::PropagateTransfer
 
 The Replica is the part of an AT2 system
 that forms validating groups, and signs individual

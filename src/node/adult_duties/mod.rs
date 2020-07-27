@@ -21,6 +21,8 @@ use std::{
     rc::Rc,
 };
 
+/// The main duty of an Adult node is
+/// storage and retrieval of data chunks.
 pub struct AdultDuties {
     keys: NodeKeys,
     chunks: Chunks,

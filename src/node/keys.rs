@@ -13,6 +13,9 @@ use safe_nd::{
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
+/// Abstraction over
+/// the key pairs of the node,
+/// to simplify its usage in various modules.
 #[derive(Clone)]
 pub struct NodeKeys {
     keys: Rc<RefCell<NodeKeypairs>>,

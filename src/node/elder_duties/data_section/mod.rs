@@ -28,13 +28,17 @@ use std::{
     rc::Rc,
 };
 
-///
+/// A DataSection is responsible for
+/// the storage and retrieval of data,
+/// and the rewarding of nodes in the section
+/// for participating in these duties.
 pub struct DataSection {
-    ///
+    /// The logic for managing data.
     metadata: Metadata,
-    ///
+    /// Rewards for performing storage
+    /// services to the network.
     rewards: Rewards,
-    ///
+    /// The transport layer.
     routing: Rc<RefCell<Routing>>,
 }
 
