@@ -1,9 +1,10 @@
 #!/bin/bash
 
 set -e -x;
-
-# Deny any warnings that occur.
 export RUSTFLAGS="-D warnings"
 
-scripts/clippy-real
-scripts/clippy-mock
+cargo clippy --features=testing --all-targets --manifest-path=safe_core/Cargo.toml
+cargo clippy --features=testing --all-targets --manifest-path=safe_authenticator/Cargo.toml
+cargo clippy --features=testing --all-targets --manifest-path=safe_authenticator_ffi/Cargo.toml
+cargo clippy --features=testing --all-targets --manifest-path=safe_app/Cargo.toml
+cargo clippy --all-targets --manifest-path=tests/Cargo.toml

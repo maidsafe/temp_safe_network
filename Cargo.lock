@@ -570,6 +570,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "0.99.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "298998b1cf6b5b2c8a7b023dfd45821825ce3ba8a8af55c921a0e734e4653f76"
+dependencies = [
+ "proc-macro2 1.0.18",
+ "quote 1.0.7",
+ "syn 1.0.33",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1579,11 +1590,14 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea016023972754185c58c0ce82b51866fc665aac3fa827c0df2477e6845698fc"
 dependencies = [
  "base64 0.10.1",
  "bincode",
  "bytes 0.5.5",
  "crossbeam-channel",
+ "derive_more",
  "directories 1.0.2",
  "err-derive",
  "futures",
@@ -2040,7 +2054,26 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
+version = "0.10.0"
+source = "git+https://github.com/oetyng/safe-nd?branch=messaging_refactor#5fa10196ab6efd452cadf14de3a4b07aff00d8bc"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.6.5",
+ "serde",
+ "sha3",
+ "threshold_crypto",
+ "tiny-keccak",
+ "unwrap",
+]
+
+[[package]]
+name = "safe-nd"
 version = "0.10.1"
+source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#214c00b48346640b37c3a5c4af57fffa1f1449fd"
 dependencies = [
  "bincode",
  "crdts",
@@ -2058,13 +2091,14 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
+source = "git+https://github.com/oetyng/safe-transfers.git?branch=messaging_refactor#67607af66c6b853fbba31ebfb22fa622116d346c"
 dependencies = [
  "bincode",
  "crdts",
  "itertools",
  "log 0.4.8",
  "rand 0.6.5",
- "safe-nd",
+ "safe-nd 0.10.0",
  "serde",
  "threshold_crypto",
 ]
@@ -2084,7 +2118,7 @@ dependencies = [
  "lru-cache",
  "miscreant",
  "rand 0.6.5",
- "safe-nd",
+ "safe-nd 0.10.1",
  "safe_authenticator",
  "safe_bindgen",
  "safe_core",
@@ -2111,7 +2145,7 @@ dependencies = [
  "log 0.4.8",
  "lru-cache",
  "rand 0.6.5",
- "safe-nd",
+ "safe-nd 0.10.1",
  "safe_core",
  "serde",
  "threshold_crypto",
@@ -2132,7 +2166,7 @@ dependencies = [
  "jni",
  "log 0.4.8",
  "rand 0.6.5",
- "safe-nd",
+ "safe-nd 0.10.1",
  "safe_authenticator",
  "safe_bindgen",
  "safe_core",
@@ -2188,7 +2222,7 @@ dependencies = [
  "quic-p2p",
  "rand 0.6.5",
  "regex 1.3.9",
- "safe-nd",
+ "safe-nd 0.10.1",
  "safe-transfers",
  "self_encryption",
  "serde",
@@ -2238,7 +2272,8 @@ dependencies = [
 [[package]]
 name = "self_encryption"
 version = "0.18.0"
-source = "git+https://github.com/maidsafe/self-encryption#9d3db6e5562a05e562640bcf2a293ef083c17a69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccbad0610b64c80e4a7f698eade1fcda8e37ebc459766e5e77c69d94fe20e387"
 dependencies = [
  "aes",
  "async-trait",
@@ -2544,7 +2579,7 @@ dependencies = [
  "async-trait",
  "ffi_utils",
  "futures",
- "safe-nd",
+ "safe-nd 0.10.1",
  "safe_app",
  "safe_authenticator",
  "safe_core",
