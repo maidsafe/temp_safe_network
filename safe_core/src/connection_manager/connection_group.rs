@@ -24,6 +24,7 @@ use quic_p2p::{
 };
 use rand::Rng;
 use safe_nd::{
+    BlsProof,
     DebitAgreementProof, Event as EventMsg, HandshakeRequest, HandshakeResponse, Message,
     MessageId, MsgEnvelope, MsgSender, NodePublicId, PublicId, QueryResponse,
 };
@@ -360,14 +361,14 @@ impl Connected {
         let signature = self
             .full_id
             .sign(&unwrap::unwrap!(bincode::serialize(&message)));
-        let origin = MsgSender::Client {
-            id: self.full_id.public_key(),
+        let msg_proof = BlsProof {
+            public_key: self.full_id.public_key(),
             signature,
         };
 
         MsgEnvelope {
             message,
-            origin,
+            origin: MsgSender(msg_proof),
             proxies: Default::default(),
         }
     }

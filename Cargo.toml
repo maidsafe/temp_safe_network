@@ -13,7 +13,7 @@ members = ["safe_app", "safe_authenticator", "safe_authenticator_ffi", "safe_cor
 # safe-nd = { path = "../safe-nd"}
 safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "farming" }
 
-# safe-transfers = { path = "../safe-transfers"}
-safe-transfers = { git = "https://github.com/oetyng/safe-transfers.git", branch = "messaging_refactor" }
+safe-transfers = { path = "../safe-transfers"}
+# safe-transfers = { git = "https://github.com/oetyng/safe-transfers.git", branch = "messaging_refactor" }
 # self_encryption = {git="https://github.com/maidsafe/self-encryption"}
 # quic-p2p = {path="../quic-p2p"}

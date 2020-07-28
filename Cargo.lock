@@ -2054,24 +2054,6 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.10.0"
-source = "git+https://github.com/oetyng/safe-nd?branch=messaging_refactor#5fa10196ab6efd452cadf14de3a4b07aff00d8bc"
-dependencies = [
- "bincode",
- "crdts",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.6.5",
- "serde",
- "sha3",
- "threshold_crypto",
- "tiny-keccak",
- "unwrap",
-]
-
-[[package]]
-name = "safe-nd"
 version = "0.10.1"
 source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#214c00b48346640b37c3a5c4af57fffa1f1449fd"
 dependencies = [
@@ -2091,14 +2073,13 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-transfers.git?branch=messaging_refactor#67607af66c6b853fbba31ebfb22fa622116d346c"
 dependencies = [
  "bincode",
  "crdts",
  "itertools",
  "log 0.4.8",
  "rand 0.6.5",
- "safe-nd 0.10.0",
+ "safe-nd",
  "serde",
  "threshold_crypto",
 ]
@@ -2118,7 +2099,7 @@ dependencies = [
  "lru-cache",
  "miscreant",
  "rand 0.6.5",
- "safe-nd 0.10.1",
+ "safe-nd",
  "safe_authenticator",
  "safe_bindgen",
  "safe_core",
@@ -2145,7 +2126,7 @@ dependencies = [
  "log 0.4.8",
  "lru-cache",
  "rand 0.6.5",
- "safe-nd 0.10.1",
+ "safe-nd",
  "safe_core",
  "serde",
  "threshold_crypto",
@@ -2166,7 +2147,7 @@ dependencies = [
  "jni",
  "log 0.4.8",
  "rand 0.6.5",
- "safe-nd 0.10.1",
+ "safe-nd",
  "safe_authenticator",
  "safe_bindgen",
  "safe_core",
@@ -2222,7 +2203,7 @@ dependencies = [
  "quic-p2p",
  "rand 0.6.5",
  "regex 1.3.9",
- "safe-nd 0.10.1",
+ "safe-nd",
  "safe-transfers",
  "self_encryption",
  "serde",
@@ -2579,7 +2560,7 @@ dependencies = [
  "async-trait",
  "ffi_utils",
  "futures",
- "safe-nd 0.10.1",
+ "safe-nd",
  "safe_app",
  "safe_authenticator",
  "safe_core",
