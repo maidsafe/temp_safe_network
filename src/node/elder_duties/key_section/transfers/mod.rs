@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub mod replica_manager;
+mod store;
 
 pub use self::replica_manager::ReplicaManager;
 use crate::{
@@ -202,7 +203,7 @@ impl Transfers {
             .history(account_id) // since_version
         {
             None => Ok(vec![]),
-            Some(history) => Ok(history.clone()),
+            Some(history) => Ok(history),
         };
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetHistory(result),

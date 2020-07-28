@@ -6,13 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::store::TransferStore;
+use crate::{node::state_db::NodeInfo, Error, Result};
+use log::info;
 use safe_nd::{
-    AccountId, DebitAgreementProof, Error, KnownGroupAdded, Money, PublicKey as NdPublicKey,
-    ReplicaEvent, Result, SignedTransfer, TransferPropagated, TransferRegistered,
+    AccountId, DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey,
+    ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
     TransferValidated,
 };
 use safe_transfers::TransferReplica as Replica;
-use std::collections::HashMap;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
 use routing::SectionProofChain;
@@ -29,44 +31,57 @@ use {
 /// both those of clients but also the distributed
 /// Actor run by this section.
 pub struct ReplicaManager {
-    store: EventStore,
     replica: Replica,
+    store: TransferStore,
     section_proof_chain: SectionProofChain,
 }
 
 #[allow(unused)]
 impl ReplicaManager {
     pub(crate) fn new(
+        info: NodeInfo,
         secret_key: &SecretKeyShare,
         key_index: usize,
         peer_replicas: &PublicKeySet,
         events: Vec<ReplicaEvent>,
         section_proof_chain: SectionProofChain,
     ) -> Result<Self> {
-        let mut store = EventStore {
-            streams: Default::default(),
-            group_changes: Default::default(),
-        };
-        /// OKs on empty vec as well, only errors from underlying storage.
-        match store.init(events.clone()) {
-            Ok(()) => {
-                let mut replica = Replica::from_history(
-                    secret_key.clone(),
-                    key_index,
-                    peer_replicas.clone(),
-                    events,
-                )?;
-                Ok(Self {
-                    store,
-                    replica,
-                    section_proof_chain,
-                })
+        let mut store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
+        if events.is_empty() {
+            let events = store.try_load()?;
+            let mut replica = Replica::from_history(
+                secret_key.clone(),
+                key_index,
+                peer_replicas.clone(),
+                events,
+            )?;
+            Ok(Self {
+                store,
+                replica,
+                section_proof_chain,
+            })
+        } else {
+            /// OKs on empty vec as well, only errors from underlying storage.
+            match store.init(events.clone()) {
+                Ok(()) => {
+                    let mut replica = Replica::from_history(
+                        secret_key.clone(),
+                        key_index,
+                        peer_replicas.clone(),
+                        events,
+                    )?;
+                    Ok(Self {
+                        store,
+                        replica,
+                        section_proof_chain,
+                    })
+                }
+                Err(e) => Err(Error::NetworkData(NdError::InvalidOperation)), // todo: storage error
             }
-            Err(e) => Err(Error::InvalidOperation), // todo: storage error
         }
     }
 
-    pub(crate) fn history(&self, id: &AccountId) -> Option<&Vec<ReplicaEvent>> {
+    pub(crate) fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
         self.store.history(id)
     }
 
@@ -80,22 +95,22 @@ impl ReplicaManager {
         index: usize,
         peer_replicas: PublicKeySet,
         section_proof_chain: SectionProofChain,
-    ) -> Result<()> {
+    ) -> NdResult<()> {
         match self.store.try_load() {
             Ok(events) => {
                 self.replica = Replica::from_history(secret_key, index, peer_replicas, events)?;
                 self.section_proof_chain = section_proof_chain;
-                //info!("Successfully updated Replica details on churn");
+                info!("Successfully updated Replica details on churn");
                 Ok(())
             }
-            Err(e) => Err(Error::InvalidOperation), // todo: storage error
+            Err(e) => Err(NdError::InvalidOperation), // todo: storage error
         }
     }
 
     pub(crate) fn validate(
         &mut self,
         transfer: SignedTransfer,
-    ) -> Result<Option<TransferValidated>> {
+    ) -> NdResult<Option<TransferValidated>> {
         let result = self.replica.validate(transfer);
         if let Ok(Some(event)) = result {
             match self.persist(ReplicaEvent::TransferValidated(event.clone())) {
@@ -110,15 +125,15 @@ impl ReplicaManager {
     pub(crate) fn register(
         &mut self,
         proof: &DebitAgreementProof,
-    ) -> Result<Option<TransferRegistered>> {
+    ) -> NdResult<Option<TransferRegistered>> {
         let serialized = bincode::serialize(&proof.signed_transfer)
-            .map_err(|e| Error::NetworkOther(e.to_string()))?;
+            .map_err(|e| NdError::NetworkOther(e.to_string()))?;
         let sig = proof
             .debiting_replicas_sig
             .clone()
             .into_bls()
             .ok_or_else(|| {
-                Error::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
+                NdError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
             })?;
         let section_keys = self.section_proof_chain.clone();
 
@@ -147,16 +162,16 @@ impl ReplicaManager {
     pub(crate) fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,
-    ) -> Result<Option<TransferPropagated>> {
+    ) -> NdResult<Option<TransferPropagated>> {
         let serialized = bincode::serialize(&proof.signed_transfer)
-            .map_err(|e| Error::NetworkOther(e.to_string()))?;
+            .map_err(|e| NdError::NetworkOther(e.to_string()))?;
         let section_keys = self.section_proof_chain.clone();
         let sig = proof
             .debiting_replicas_sig
             .clone()
             .into_bls()
             .ok_or_else(|| {
-                Error::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
+                NdError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
             })?;
 
         let result = self.replica.receive_propagated(proof, move || {
@@ -185,10 +200,14 @@ impl ReplicaManager {
         }
     }
 
-    fn persist(&mut self, event: ReplicaEvent) -> Result<()> {
-        self.store.try_append(event.clone())?;
-        self.replica.apply(event);
-        Ok(())
+    fn persist(&mut self, event: ReplicaEvent) -> NdResult<()> {
+        match self.store.try_append(event.clone()) {
+            Ok(_) => {
+                self.replica.apply(event);
+                Ok(())
+            }
+            Err(error) => Err(NdError::NetworkOther("todo..".to_string())),
+        }
     }
 
     /// Get the replica's PK set
@@ -233,68 +252,5 @@ impl ReplicaManager {
 
     pub fn debit_without_proof(&mut self, transfer: Transfer) {
         self.replica.debit_without_proof(transfer)
-    }
-}
-
-/// Disk storage
-struct EventStore {
-    streams: HashMap<AccountId, Vec<ReplicaEvent>>,
-    group_changes: Vec<KnownGroupAdded>,
-}
-
-/// In memory store lacks transactionality
-impl EventStore {
-    fn history(&self, id: &AccountId) -> Option<&Vec<ReplicaEvent>> {
-        self.streams.get(id)
-    }
-
-    fn try_load(&self) -> Result<Vec<ReplicaEvent>> {
-        // Only the order within the streams is important, not between streams.
-        Ok(self
-            .streams
-            .values()
-            .cloned()
-            .flatten()
-            .collect::<Vec<ReplicaEvent>>())
-    }
-
-    fn init(&mut self, events: Vec<ReplicaEvent>) -> Result<()> {
-        for event in events {
-            self.try_append(event)?;
-        }
-        Ok(())
-    }
-
-    fn try_append(&mut self, event: ReplicaEvent) -> Result<()> {
-        match event.clone() {
-            ReplicaEvent::KnownGroupAdded(e) => {
-                self.group_changes.push(e);
-            }
-            ReplicaEvent::TransferPropagated(e) => {
-                let id = e.to();
-                match self.streams.get_mut(&id) {
-                    Some(stream) => stream.push(event),
-                    None => {
-                        // Creates if not exists. A stream always starts with a credit.
-                        let _ = self.streams.insert(id, vec![event]);
-                    }
-                }
-            }
-            ReplicaEvent::TransferValidated(e) => {
-                let id = e.from();
-                match self.streams.get_mut(&id) {
-                    Some(stream) => stream.push(event),
-                    None => return Err(Error::InvalidOperation), // A stream cannot start with a debit.
-                }
-            }
-            ReplicaEvent::TransferRegistered(e) => {
-                let id = e.from();
-                match self.streams.get_mut(&id) {
-                    Some(stream) => stream.push(event),
-                    None => return Err(Error::InvalidOperation), // A stream cannot start with a debit.
-                }
-            }
-        };
-        Ok(())
     }
 }

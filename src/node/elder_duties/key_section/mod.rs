@@ -65,7 +65,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let gateway = ClientGateway::new(info.clone(), section_querying, rng)?;
 
         // (AT2 Replicas)
-        let replica_manager = Self::replica_manager(routing.clone())?;
+        let replica_manager = Self::replica_manager(info.clone(), routing.clone())?;
 
         // Payments
         let payments = Payments::new(info.keys.clone(), routing.clone(), replica_manager.clone());
@@ -149,13 +149,17 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         self.payments.update_costs()
     }
 
-    fn replica_manager(routing: Rc<RefCell<Routing>>) -> Result<Rc<RefCell<ReplicaManager>>> {
+    fn replica_manager(
+        info: NodeInfo,
+        routing: Rc<RefCell<Routing>>,
+    ) -> Result<Rc<RefCell<ReplicaManager>>> {
         let node = routing.borrow();
         let public_key_set = node.public_key_set()?;
         let secret_key_share = node.secret_key_share()?;
         let key_index = node.our_index()?;
         let proof_chain = node.our_history().ok_or(RoutingError::InvalidState)?;
         let replica_manager = ReplicaManager::new(
+            info,
             secret_key_share,
             key_index,
             public_key_set,
