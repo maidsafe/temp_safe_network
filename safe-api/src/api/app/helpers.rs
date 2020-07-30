@@ -11,10 +11,11 @@ use super::common::{parse_hex, sk_from_hex};
 use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
-use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey, XorName};
+use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey};
 use std::str::{self, FromStr};
 use std::time;
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
+use xor_name::XorName;
 
 /// The conversion from coin to raw value
 const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;

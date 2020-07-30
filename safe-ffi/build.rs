@@ -18,11 +18,11 @@ fn main() {
 #[cfg(feature = "bindings")]
 mod bindings {
     use safe_bindgen::{Bindgen, FilterMode, LangC, LangCSharp};
-    use safe_nd::XOR_NAME_LEN;
     use std::collections::HashMap;
     use std::env;
     use std::path::Path;
     use unwrap::unwrap;
+    use xor_name::XOR_NAME_LEN;
 
     const BLS_PUBLIC_KEY_LEN: usize = 48;
 

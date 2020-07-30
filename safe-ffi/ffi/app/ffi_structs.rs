@@ -22,9 +22,9 @@ use safe_api::{
     xorurl::SafeUrl as NativeSafeUrl,
     BlsKeyPair as NativeBlsKeyPair, ProcessedEntries as NativeProcessedEntries,
 };
-use safe_nd::XOR_NAME_LEN;
 use std::ffi::CString;
 use std::os::raw::c_char;
+use xor_name::XOR_NAME_LEN;
 
 /// Array containing `XorName` bytes.
 /// Adding this here because bindgen not picking this correctly from the safe-nd.

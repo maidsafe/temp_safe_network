@@ -17,13 +17,13 @@ use predicates::prelude::*;
 use safe_api::{
     fetch::{SafeContentType, SafeDataType},
     xorurl::{XorUrlBase, XorUrlEncoder},
-    XorName,
 };
 use safe_cmd_test_utilities::{
     get_random_nrs_string, parse_nrs_create_output, upload_test_folder, CLI, SAFE_PROTOCOL,
 };
 use std::process::Command;
 use unwrap::unwrap;
+use xor_name::XorName;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
 

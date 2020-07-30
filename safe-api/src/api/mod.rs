@@ -20,7 +20,7 @@ mod errors;
 #[cfg(feature = "app")]
 pub use app::*;
 #[cfg(feature = "app")]
-pub use safe_nd::XorName;
+pub use xor_name::XorName;
 
 #[cfg(feature = "authenticator")]
 pub use authenticator::*;

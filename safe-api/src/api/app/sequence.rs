@@ -13,7 +13,7 @@ use crate::{
     Error, Result,
 };
 use log::debug;
-use safe_nd::XorName;
+use xor_name::XorName;
 
 impl Safe {
     /// Create a Public Sequence on the network

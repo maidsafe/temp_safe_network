@@ -20,12 +20,12 @@ use lazy_static::lazy_static;
 use log::{debug, trace};
 use safe_nd::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
-    XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io::Write, str, sync::Arc};
 use threshold_crypto::{PublicKey, SecretKey};
 use tiny_keccak::sha3_256;
+use xor_name::XorName;
 
 const FAKE_VAULT_FILE: &str = "./fake_vault_data.json";
 

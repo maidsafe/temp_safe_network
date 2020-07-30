@@ -24,7 +24,7 @@ human-panic = "1.0.1"
 log = "~0.4.6"
 pretty-hex = "~0.1.1"
 prettytable-rs = "~0.8"
-rand = "~0.6.5"
+rand = "~0.7.3"
 relative-path = "~0.4.0"
 reqwest = "~0.9.22"
 rpassword = "4.0.5"
@@ -40,6 +40,7 @@ num-traits = "~0.2"
 indicatif = { git="https://github.com/mibac138/indicatif", branch="mpb-tick" }
 console = "~0.10.0"
 percent-encoding = "2.1.0"
+xor_name = "1"
 
 [features]
 scl-mock = ["safe-api/scl-mock"]
@@ -59,13 +60,14 @@ assert_cmd = "~0.11.1"
 duct = "~0.12.0"
 predicates = "1.0.0"
 pretty_assertions = "~0.6.1"
-safe-nd = "~0.10.1"
+safe-nd = "~0.11.0"
 unwrap = "1.2.1"
 criterion = "~0.3"
 walkdir = "2.3.1"
 tiny-keccak = "1.5.0"
 multibase = "~0.6.0"
 safe-cmd-test-utilities = { path = "../safe-cmd-test-utilities" }
+xor_name = "1"
 
 [dev-dependencies.cargo-husky]
 version = "1"

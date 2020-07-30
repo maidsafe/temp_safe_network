@@ -22,9 +22,10 @@ use safe_nd::{
     ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
     MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
     SDataPrivUserPermissions, SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction,
-    TransactionId, XorName,
+    TransactionId,
 };
 use std::collections::BTreeMap;
+use xor_name::XorName;
 
 pub use threshold_crypto::{PublicKey, SecretKey};
 

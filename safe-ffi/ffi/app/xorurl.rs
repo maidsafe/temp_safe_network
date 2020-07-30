@@ -14,11 +14,11 @@ use super::{
 };
 use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::xorurl::{SafeContentType, SafeDataType, SafeUrl as NativeSafeUrl, XorUrlBase};
-use safe_nd::XorName;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},
 };
+use xor_name::XorName;
 
 #[no_mangle]
 pub unsafe extern "C" fn safe_url_encode(

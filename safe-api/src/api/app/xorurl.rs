@@ -15,12 +15,12 @@ use super::{
 use crate::{Error, Result};
 use log::{debug, info, trace, warn};
 use multibase::{decode, encode, Base};
-use safe_nd::{XorName, XOR_NAME_LEN};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tiny_keccak::sha3_256;
 use uhttp_uri::HttpUri;
-use url::Url; // for parsing raw path
+use url::Url;
+use xor_name::{XorName, XOR_NAME_LEN}; // for parsing raw path
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 const SAFE_URL_SCHEME: &str = "safe";

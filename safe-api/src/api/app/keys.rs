@@ -18,9 +18,10 @@ use crate::{
     Error, Result,
 };
 use rand_core::RngCore;
-use safe_nd::{Coins, XorName};
+use safe_nd::Coins;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::{PublicKey, SecretKey};
+use xor_name::XorName;
 
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>

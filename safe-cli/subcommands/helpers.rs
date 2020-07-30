@@ -12,12 +12,13 @@ use ansi_term::Style;
 use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::{nrs_map::NrsMap, XorName, XOR_NAME_LEN};
+use safe_api::nrs_map::NrsMap;
 use serde::ser::Serialize;
 use std::{
     collections::BTreeMap,
     io::{stdin, stdout, Read, Write},
 };
+use xor_name::{XorName, XOR_NAME_LEN};
 
 const UNKNOWN_PUBLIC_NAME: &str = "<unknown>";
 

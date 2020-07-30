@@ -19,9 +19,10 @@ use crate::{
 };
 use log::debug;
 use rand_core::RngCore;
-use safe_nd::{Coins, XorName};
+use safe_nd::Coins;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use xor_name::XorName;
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
