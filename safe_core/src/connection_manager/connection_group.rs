@@ -780,10 +780,15 @@ impl Inner {
         // TODO: check if we have handled the challenge?
         trace!("{}: Sent user message", self.id);
 
+        // TODO: remove logging here.
         match deserialize(&msg) {
             Ok(MsgEnvelope { message, .. }) => {
-                trace!("Message was sent: {:?}", message);
-            }
+                trace!("MessageEnvelope was sent, the message: {:?}", message);
+            },
+            // Ok(x) => println!("Unexpected send message type {:?}", x),
+            // Ok(HandshakeRequest::ChallengeResult(sig) ) => println!("Handshake req result {:?}",sig),
+            // Ok(HandshakeRequest::Bootstrap{..} ) => println!("Handshake req bootstrap"),
+            // Ok(HandshakeRequest::Join{..} ) => println!("Handshake req join"),
             Err(e) => trace!("Unexpected error deserializing a sent qp2p message. (Checking for MsgEnvelope) {:?}", e),
         }
     }
