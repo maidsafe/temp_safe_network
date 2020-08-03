@@ -579,7 +579,7 @@ async fn encryption() -> Result<(), NfsError> {
     let c3 = client.clone();
     let c4 = client.clone();
 
-    let content: Vec<u8> = unwrap!(generate_random_vector(ORIG_SIZE));
+    let content: Vec<u8> = generate_random_vector(ORIG_SIZE);
     let content2 = content.clone();
 
     let key = shared_secretbox::gen_key();

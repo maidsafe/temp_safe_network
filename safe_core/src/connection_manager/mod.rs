@@ -18,7 +18,7 @@ use connection_group::ConnectionGroup;
 use futures::lock::Mutex;
 use log::{error, trace};
 use quic_p2p::Config as QuicP2pConfig;
-use safe_nd::{DebitAgreementProof, Message, MsgEnvelope, PublicId, QueryResponse};
+use safe_nd::{DebitAgreementProof, Message, PublicId, QueryResponse};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
@@ -140,8 +140,6 @@ impl Inner {
         pub_id: &PublicId,
         msg: &Message,
     ) -> Result<QueryResponse, CoreError> {
-        let msg_id = msg.id();
-
         let conn_group = self.groups.get_mut(&pub_id).ok_or_else(|| {
             CoreError::Unexpected(
                 "No connection group found - did you call `bootstrap`?".to_string(),

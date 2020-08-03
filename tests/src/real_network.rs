@@ -258,8 +258,8 @@ fn mdata_operations() {
     let auth_h = setup_test();
 
     // Create and authorise an app.
-    let app_id = unwrap!(utils::generate_readable_string(10));
-    let ffi_app_id = unwrap!(CString::new(app_id.clone()));
+    let app_id = utils::generate_readable_string(10);
+    let ffi_app_id = CString::new(app_id.clone());
     println!("App ID: {}", app_id);
 
     let app_info = AppExchangeInfo {
@@ -478,8 +478,8 @@ fn authorisation_and_revocation() {
     let auth_h = setup_test();
 
     // Create and authorise an app.
-    let app_id = unwrap!(utils::generate_readable_string(10));
-    let ffi_app_id = unwrap!(CString::new(app_id.clone()));
+    let app_id = utils::generate_readable_string(10);
+    let ffi_app_id = CString::new(app_id.clone());
     println!("App ID: {}", app_id);
 
     let app_info = AppExchangeInfo {
@@ -516,7 +516,7 @@ fn authorisation_and_revocation() {
     // Put file into container.
     println!("Creating file...");
 
-    let file_name = format!("{}.mp4", unwrap!(utils::generate_readable_string(10)));
+    let file_name = format!("{}.mp4", utils::generate_readable_string(10));
     println!("File name: {}", file_name.clone());
 
     let videos_md = unsafe {

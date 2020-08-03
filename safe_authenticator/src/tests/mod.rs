@@ -55,8 +55,8 @@ mod mock_routing {
         // Add a request hook to forbid root dir modification. In this case
         // account creation operation will be failed, but login still should
         // be possible afterwards.
-        let locator = generate_random_string(10)?;
-        let password = generate_random_string(10)?;
+        let locator = generate_random_string(10);
+        let password = generate_random_string(10);
         let client_id = gen_client_id();
 
         test_create_balance(&client_id, Money::from_str("10")?).await?;
@@ -176,8 +176,8 @@ mod mock_routing {
     #[tokio::test]
     async fn app_authentication_recovery() {
         use safe_core::client::Client;
-        let locator = generate_random_string(10).unwrap();
-        let password = generate_random_string(10).unwrap();
+        let locator = generate_random_string(10);
+        let password = generate_random_string(10);
         let client_id = gen_client_id();
 
         test_create_balance(&client_id, Money::from_str("10").unwrap())

@@ -51,8 +51,8 @@ where
     // just print it out.
     let on_network_event = |net_event| trace!("Unexpected NetworkEvent occurred: {:?}", net_event);
     let client_creator = |net_tx| {
-        let acc_locator = unwrap!(utils::generate_random_string(10));
-        let acc_password = unwrap!(utils::generate_random_string(10));
+        let acc_locator = utils::generate_random_string(10);
+        let acc_password = utils::generate_random_string(10);
 
         // blocking on the thread here as part of tests. Core client construction is async
         futures::executor::block_on(CoreClient::new(&acc_locator, &acc_password, net_tx))

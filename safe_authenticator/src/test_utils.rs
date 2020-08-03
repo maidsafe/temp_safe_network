@@ -84,8 +84,8 @@ pub fn init_log() {
 /// Creates a new random account for authenticator. Returns the `Authenticator`
 /// instance and the locator and password strings.
 pub async fn create_authenticator() -> (Authenticator, String, String) {
-    let locator: String = unwrap!(utils::generate_readable_string(10));
-    let password: String = unwrap!(utils::generate_readable_string(10));
+    let locator: String = utils::generate_readable_string(10);
+    let password: String = utils::generate_readable_string(10);
     let client_id = gen_client_id();
 
     let coins = unwrap!(Money::from_str("100"));
@@ -223,10 +223,10 @@ pub async fn register_rand_app(
 /// Creates a random `AppExchangeInfo`
 pub fn rand_app() -> AppExchangeInfo {
     AppExchangeInfo {
-        id: unwrap!(utils::generate_readable_string(10)),
+        id: utils::generate_readable_string(10),
         scope: None,
-        name: unwrap!(utils::generate_readable_string(10)),
-        vendor: unwrap!(utils::generate_readable_string(10)),
+        name: utils::generate_readable_string(10),
+        vendor: utils::generate_readable_string(10),
     }
 }
 
@@ -434,8 +434,8 @@ where
     NetObs: FnMut(NetworkEvent) + Send + 'static,
 {
     let client_creator = |net_tx| -> Result<AuthClient, AuthError> {
-        let acc_locator = utils::generate_random_string(10)?;
-        let acc_password = utils::generate_random_string(10)?;
+        let acc_locator = utils::generate_random_string(10);
+        let acc_password = utils::generate_random_string(10);
         let client_id = gen_client_id();
 
         // block on for test cretion at the moment

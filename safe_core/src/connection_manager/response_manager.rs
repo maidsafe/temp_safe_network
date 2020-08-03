@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use futures::channel::mpsc;
-use log::{debug, trace};
-use safe_nd::{CmdError, Event, MessageId, MsgEnvelope, QueryResponse};
+use log::trace;
+use safe_nd::{Event, MessageId, QueryResponse};
 use std::collections::HashMap;
 
 type ResponseRequiredCount = usize;
 type VoteCount = usize;
 type VoteMap = HashMap<QueryResponse, VoteCount>;
-type IsValidationRequest = bool;
+// type IsValidationRequest = bool;
 
 pub struct ResponseManager {
     /// MessageId to send_future channel map

@@ -233,7 +233,7 @@ mod tests {
     async fn create_and_retrieve_1kb_unencrypted_put_retrieval_of_encrypted(
     ) -> Result<(), CoreError> {
         let size = 1024;
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let value = value.clone();
         let key = shared_secretbox::gen_key();
@@ -255,7 +255,7 @@ mod tests {
     async fn create_and_retrieve_1kb_encrypted_put_retrieval_of_unencrypted(
     ) -> Result<(), CoreError> {
         let size = 1024;
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let value = value.clone();
         let key = shared_secretbox::gen_key();
@@ -278,7 +278,7 @@ mod tests {
     async fn create_and_retrieve_1kb_encrypted_put_pub_retrieval_of_unpub() -> Result<(), CoreError>
     {
         let size = 1024;
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let client = random_client()?;
         let client2 = client.clone();
@@ -300,7 +300,7 @@ mod tests {
     {
         let size = 1024;
 
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let client = random_client()?;
         let client2 = client.clone();
@@ -361,7 +361,7 @@ mod tests {
     async fn create_and_retrieve_10mb_unencrypted_put_retrieval_of_encrypted(
     ) -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let value = value.clone();
         let key = shared_secretbox::gen_key();
@@ -383,7 +383,7 @@ mod tests {
     async fn create_and_retrieve_10mb_encrypted_put_retrieval_of_unencrypted(
     ) -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let value = value.clone();
         let key = shared_secretbox::gen_key();
@@ -406,7 +406,7 @@ mod tests {
     async fn create_and_retrieve_10mb_encrypted_put_pub_retrieval_of_unpub() -> Result<(), CoreError>
     {
         let size = 1024 * 1024 * 10;
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let client = random_client()?;
         let client2 = client.clone();
@@ -428,7 +428,7 @@ mod tests {
     {
         let size = 1024 * 1024 * 10;
 
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
 
         let client = random_client()?;
         let client2 = client.clone();
@@ -450,7 +450,7 @@ mod tests {
         create_and_index_based_retrieve(1024).await
     }
     async fn create_and_index_based_retrieve(size: usize) -> Result<(), CoreError> {
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
         {
             // Read first half
             let client = random_client()?;
@@ -466,7 +466,7 @@ mod tests {
             assert_eq!(fetched_value, value[0..size / 2].to_vec());
         }
 
-        let value2 = utils::generate_random_vector(size)?;
+        let value2 = utils::generate_random_vector(size);
         {
             // Read Second half
             let client = random_client()?;
@@ -498,7 +498,7 @@ mod tests {
         published: bool,
         key: Option<shared_secretbox::Key>,
     ) -> Result<(), CoreError> {
-        let value = utils::generate_random_vector(size)?;
+        let value = utils::generate_random_vector(size);
         let value_before = value.clone();
         let value_before2 = value.clone();
 

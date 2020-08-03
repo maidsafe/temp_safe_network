@@ -23,7 +23,7 @@ use futures::lock::Mutex;
 use log::{info, trace};
 use rand::rngs::StdRng;
 use rand::{thread_rng, SeedableRng};
-use safe_nd::{Account, ClientFullId, PublicKey, QueryResponse};
+use safe_nd::{Account, ClientFullId, PublicKey};
 
 use std::sync::Arc;
 use std::time::Duration;

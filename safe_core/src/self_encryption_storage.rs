@@ -9,10 +9,11 @@
 use super::{Client, CoreError};
 use async_trait::async_trait;
 use log::trace;
-use safe_nd::{Blob, BlobAddress, PrivateBlob, PublicBlob, XorName, XOR_NAME_LEN};
+use safe_nd::{Blob, BlobAddress, PrivateBlob, PublicBlob};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network storage is the concrete type which self-encryption crate will use
 /// to put or get data from the network.

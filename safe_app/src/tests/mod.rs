@@ -255,7 +255,7 @@ async fn app_container_creation() -> Result<(), AppError> {
 // 2. Try to read them as unregistered.
 #[tokio::test]
 async fn unregistered_client() -> Result<(), AppError> {
-    let pub_idata_content = utils::generate_random_vector(30)?;
+    let pub_idata_content = utils::generate_random_vector(30);
 
     // Registered Client PUTs something onto the network.
     let (pub_idata_addr, pub_sdata_addr, priv_sdata_addr) = {
@@ -296,7 +296,7 @@ async fn unregistered_client() -> Result<(), AppError> {
 // as they are not allowed to PUT data into the network.
 #[tokio::test]
 async fn unregistered_client_put() {
-    let pub_idata = PubImmutableData::new(utils::generate_random_vector(30).unwrap());
+    let pub_idata = PubImmutableData::new(utils::generate_random_vector(30));
 
     let app = App::unregistered(|| (), None).await.unwrap();
     // Unregistered Client should not be able to PUT data.
@@ -312,7 +312,7 @@ async fn unregistered_client_put() {
 // in the permission set.
 #[tokio::test]
 async fn public_data_access() -> Result<(), AppError> {
-    let pub_idata_content = utils::generate_random_vector(30)?;
+    let pub_idata_content = utils::generate_random_vector(30);
 
     // Create a random client and store some data
     let (pub_idata_addr, pub_sdata_addr) = {

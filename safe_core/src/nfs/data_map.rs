@@ -13,8 +13,9 @@ use crate::client::Client;
 use crate::crypto::shared_secretbox;
 use crate::nfs::NfsError;
 use bincode::{deserialize, serialize};
-use safe_nd::{BlobAddress, XorName};
+use safe_nd::BlobAddress;
 use self_encryption::DataMap;
+use xor_name::XorName;
 
 // Get `DataMap` from the network.
 // If the `DataMap` is encrypted, an `encryption_key` must be passed in to decrypt it.

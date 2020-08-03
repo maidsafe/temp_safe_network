@@ -1,16 +1,10 @@
-use safe_nd::{
-    Cmd, DebitAgreementProof, Message, MessageId, Money, PublicKey, Query, QueryResponse,
-    ReplicaEvent, SignatureShare, SignedTransfer, Transfer, TransferCmd, TransferPropagated,
-    TransferQuery,
-};
-use safe_transfers::{ActorEvent, TransferActor as SafeTransferActor, TransfersSynched};
+use safe_nd::{Money, PublicKey, Query, QueryResponse, TransferQuery};
+use safe_transfers::TransferActor as SafeTransferActor;
 
 use std::str::FromStr;
 
 use crate::client::ConnectionManager;
-use crate::client::{
-    create_query_message, Client, ClientTransferValidator, SafeKey, TransferActor,
-};
+use crate::client::{create_query_message, ClientTransferValidator, SafeKey, TransferActor};
 use crate::errors::CoreError;
 use crdts::Dot;
 
@@ -31,7 +25,7 @@ impl TransferActor {
 
         let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(safe_key.public_key()));
 
-        let message = create_query_message(safe_key.clone(), keys_query_msg);
+        let message = create_query_message(keys_query_msg);
 
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
         let res = cm.send_query(&safe_key.public_id(), &message).await?;

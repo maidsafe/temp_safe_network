@@ -1,9 +1,8 @@
 use safe_nd::{
-    Account, AccountRead, AccountWrite, AppPermissions, AuthCmd, Blob, BlobAddress, BlobRead,
-    BlobWrite, Cmd, DataCmd, DebitAgreementProof, Map, MapAddress, MapEntryActions,
-    MapPermissionSet, MapRead, MapWrite, PublicKey, QueryResponse, Sequence, SequenceAddress,
-    SequenceOwner, SequencePrivatePermissions, SequencePublicPermissions, SequenceRead,
-    SequenceWrite, SequenceWriteOp,
+    Account, AccountWrite, AppPermissions, AuthCmd, Blob, BlobAddress, BlobWrite, Cmd, DataCmd,
+    DebitAgreementProof, Map, MapAddress, MapEntryActions, MapPermissionSet, MapWrite, PublicKey,
+    Sequence, SequenceAddress, SequenceOwner, SequencePrivatePermissions,
+    SequencePublicPermissions, SequenceWrite, SequenceWriteOp,
 };
 use safe_transfers::ActorEvent;
 
@@ -27,7 +26,7 @@ impl TransferActor {
         //---------------------------------
         let msg_contents =
             wrap_blob_write(BlobWrite::DeletePrivate(address), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -46,7 +45,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_seq_write(SequenceWrite::Delete(address), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -65,7 +64,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_map_write(MapWrite::Delete(address), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -98,7 +97,7 @@ impl TransferActor {
             payment_proof.clone(),
         );
 
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
 
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
@@ -134,7 +133,7 @@ impl TransferActor {
             payment_proof.clone(),
         );
 
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
 
         // TODO what will be the correct reponse here?... We have it validated, so registered?
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
@@ -162,7 +161,7 @@ impl TransferActor {
         let msg_contents =
             wrap_map_write(MapWrite::Edit { address, changes }, payment_proof.clone());
 
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -184,7 +183,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_seq_write(SequenceWrite::SetOwner(op), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -210,7 +209,7 @@ impl TransferActor {
             SequenceWrite::SetPrivatePermissions(op),
             payment_proof.clone(),
         );
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -236,7 +235,7 @@ impl TransferActor {
             SequenceWrite::SetPublicPermissions(op),
             payment_proof.clone(),
         );
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -259,7 +258,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_seq_write(SequenceWrite::Edit(op), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -279,7 +278,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_seq_write(SequenceWrite::New(data), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -299,7 +298,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_map_write(MapWrite::New(data), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -319,7 +318,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_blob_write(BlobWrite::New(data), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -340,7 +339,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_account_write(AccountWrite::New(account), payment_proof.clone());
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -360,15 +359,12 @@ impl TransferActor {
         //---------------------------------
         // The _actual_ message
         //---------------------------------
-        let msg_contents = wrap_auth_cmd(
-            AuthCmd::DelAuthKey {
-                client: self.safe_key.public_key(),
-                key,
-                version,
-            },
-            payment_proof.clone(),
-        );
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let msg_contents = wrap_auth_cmd(AuthCmd::DelAuthKey {
+            client: self.safe_key.public_key(),
+            key,
+            version,
+        });
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -393,16 +389,13 @@ impl TransferActor {
         //---------------------------------
         // The _actual_ message
         //---------------------------------
-        let msg_contents = wrap_auth_cmd(
-            AuthCmd::InsAuthKey {
-                client: self.safe_key.public_key(),
-                permissions,
-                key,
-                version,
-            },
-            payment_proof.clone(),
-        );
-        let message = create_cmd_message(self.safe_key.clone(), msg_contents);
+        let msg_contents = wrap_auth_cmd(AuthCmd::InsAuthKey {
+            client: self.safe_key.public_key(),
+            permissions,
+            key,
+            version,
+        });
+        let message = create_cmd_message(msg_contents);
         let _ = cm.send_cmd(&self.safe_key.public_id(), &message).await?;
 
         self.apply_write_locally(payment_proof).await
@@ -418,7 +411,7 @@ impl TransferActor {
             .register(debit_proof.clone())?
             .ok_or_else(|| CoreError::from("No events to register for proof."))?;
 
-        actor.apply(ActorEvent::TransferRegistrationSent(register_event));
+        actor.apply(ActorEvent::TransferRegistrationSent(register_event))?;
 
         Ok(())
     }
@@ -430,7 +423,7 @@ mod tests {
 
     use super::*;
     use crate::client::transfer_actor::test_utils::get_keys_and_connection_manager;
-    use safe_nd::{Error as SndError, XorName};
+    use xor_name::XorName;
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
@@ -484,6 +477,6 @@ fn wrap_account_write(write: AccountWrite, payment: DebitAgreementProof) -> Cmd 
     }
 }
 
-fn wrap_auth_cmd(cmd: AuthCmd, payment: DebitAgreementProof) -> Cmd {
+fn wrap_auth_cmd(cmd: AuthCmd) -> Cmd {
     Cmd::Auth(cmd)
 }

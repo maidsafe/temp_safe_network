@@ -186,7 +186,7 @@ async fn setup() -> Stash {
 
     let auth_req0 = {
         let app_exchange_info = AppExchangeInfo {
-            id: utils::generate_random_string_rng(&mut rng, 16),
+            id: utils::generate_random_string(16),
             scope: None,
             name: "test-app-0".to_string(),
             vendor: "test-vendor-0".to_string(),
@@ -202,7 +202,7 @@ async fn setup() -> Stash {
 
     let auth_req1 = {
         let app_exchange_info = AppExchangeInfo {
-            id: utils::generate_random_string_rng(&mut rng, 16),
+            id: utils::generate_random_string(16),
             scope: None,
             name: "test-app-1".to_string(),
             vendor: "test-vendor-1".to_string(),
@@ -219,8 +219,8 @@ async fn setup() -> Stash {
     unwrap!(test_create_balance(&client_id, unwrap!(Money::from_str("10"))).await);
 
     Stash {
-        locator: utils::generate_random_string_rng(&mut rng, 16),
-        password: utils::generate_random_string_rng(&mut rng, 16),
+        locator: utils::generate_random_string(16),
+        password: utils::generate_random_string(16),
         client_id,
         auth_req0,
         auth_req1,

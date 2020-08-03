@@ -39,18 +39,17 @@ use log::{debug, info, trace};
 use lru::LruCache;
 use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
-    AccountRead, AccountWrite, AppPermissions, AuthCmd, AuthQuery, Blob, BlobAddress, BlobRead,
-    BlobWrite, ClientFullId, Cmd, DataQuery, DebitAgreementProof, Map, MapAddress, MapEntries,
-    MapEntryActions, MapPermissionSet, MapRead, MapSeqEntries, MapSeqEntryActions, MapSeqValue,
-    MapUnseqEntryActions, MapValue, MapValues, MapWrite, Message, MessageId, Money, MsgEnvelope,
-    MsgSender, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence, SequenceAction,
+    AppPermissions, AuthQuery, Blob, BlobAddress, BlobRead, ClientFullId, Cmd, DataQuery, Map,
+    MapAddress, MapEntries, MapEntryActions, MapPermissionSet, MapRead, MapSeqEntries,
+    MapSeqEntryActions, MapSeqValue, MapUnseqEntryActions, MapValue, MapValues, Message, MessageId,
+    Money, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence, SequenceAction,
     SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex, SequenceOwner,
     SequencePrivUserPermissions, SequencePrivatePermissions, SequencePubUserPermissions,
-    SequencePublicPermissions, SequenceRead, SequenceUser, SequenceUserPermissions, SequenceWrite,
-    TransferRegistered, UnseqMap, XorName,
+    SequencePublicPermissions, SequenceRead, SequenceUser, SequenceUserPermissions, UnseqMap,
 };
 use std::sync::Arc;
-use unwrap::unwrap;
+
+use xor_name::XorName;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -69,7 +68,7 @@ pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
 }
 
 // Build and sign Cmd Message Envelope
-pub(crate) fn create_cmd_message(safe_key: SafeKey, msg_contents: Cmd) -> Message {
+pub(crate) fn create_cmd_message(msg_contents: Cmd) -> Message {
     trace!("Creating cmd message");
 
     let id = MessageId::new();
@@ -81,7 +80,7 @@ pub(crate) fn create_cmd_message(safe_key: SafeKey, msg_contents: Cmd) -> Messag
 }
 
 // Build and sign Query Message Envelope
-pub(crate) fn create_query_message(safe_key: SafeKey, msg_contents: Query) -> Message {
+pub(crate) fn create_query_message(msg_contents: Query) -> Message {
     trace!("Creating query message");
 
     let id = MessageId::new();
@@ -96,9 +95,7 @@ async fn send_query(client: &impl Client, query: Query) -> Result<QueryResponse,
 
     println!("-->>Request going out: {:?}", query);
 
-    let safe_key = client.full_id().await;
-
-    let message = create_query_message(safe_key, query);
+    let message = create_query_message(query);
     let inner = client.inner();
     let cm = &mut inner.lock().await.connection_manager;
     cm.send_query(&client.public_id().await, &message).await
@@ -1247,7 +1244,7 @@ pub trait Client: Clone + Send + Sync {
 }
 
 /// Creates a throw-away client to execute requests sequentially.
-async fn temp_client<F, R>(identity: &ClientFullId, mut func: F) -> Result<R, CoreError>
+pub async fn temp_client<F, R>(identity: &ClientFullId, mut func: F) -> Result<R, CoreError>
 where
     F: FnMut(&mut ConnectionManager, &SafeKey) -> Result<R, CoreError>,
 {
@@ -1288,7 +1285,7 @@ pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<
 
     let public_key = full_id.public_key();
 
-    let response = actor
+    actor
         .trigger_simulated_farming_payout(public_key, amount)
         .await?;
 
@@ -1468,9 +1465,11 @@ mod tests {
     };
     use safe_nd::{
         Error as SndError, MapAction, MapKind, Money, PrivateBlob, PublicBlob,
-        SequencePrivUserPermissions, XorName,
+        SequencePrivUserPermissions,
     };
     use std::str::FromStr;
+    use unwrap::unwrap;
+    use xor_name::XorName;
 
     // Test putting and getting pub blob.
     #[tokio::test]
@@ -1479,7 +1478,7 @@ mod tests {
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
 
-        let value = unwrap!(generate_random_vector::<u8>(10));
+        let value = generate_random_vector::<u8>(10);
         let data = PublicBlob::new(value.clone());
         let address = *data.address();
         let pk = gen_bls_keypair().public_key();
@@ -1526,7 +1525,7 @@ mod tests {
 
         let client9 = client.clone();
 
-        let value = unwrap!(generate_random_vector::<u8>(10));
+        let value = generate_random_vector::<u8>(10);
         let data = PrivateBlob::new(value.clone(), client.public_key().await);
         let data2 = data.clone();
         let data3 = data.clone();
@@ -1907,7 +1906,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let data = PublicBlob::new(unwrap!(generate_random_vector::<u8>(10)));
+        let data = PublicBlob::new(generate_random_vector::<u8>(10));
         let res = client.put_blob(data).await;
         match res {
             Err(CoreError::DataError(SndError::InsufficientBalance)) => (),
@@ -1951,8 +1950,6 @@ mod tests {
     pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client(
     ) -> Result<(), CoreError> {
         let client = random_client()?;
-        // The `random_client()` initializes the client with 10 money.
-        let start_bal = unwrap!(Money::from_str("10"));
         let mut permissions: BTreeMap<_, _> = Default::default();
         let permission_set = MapPermissionSet::new()
             .allow(MapAction::Read)
@@ -2235,10 +2232,7 @@ mod tests {
     pub async fn blob_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let client = random_client()?;
 
-        let blob = PrivateBlob::new(
-            unwrap!(generate_random_vector::<u8>(10)),
-            client.public_key().await,
-        );
+        let blob = PrivateBlob::new(generate_random_vector::<u8>(10), client.public_key().await);
         let blob_address = *blob.name();
         client.put_blob(blob).await?;
 
@@ -2604,7 +2598,7 @@ mod tests {
                     err
                 )))
             }
-            Ok(res) => {
+            Ok(_res) => {
                 return Err(CoreError::from(
                     "Unexpectedly retrieved a deleted Private Sequence!",
                 ))
@@ -2641,21 +2635,14 @@ mod tests {
                     err
                 )))
             }
-            Ok(data) => Ok(()),
+            Ok(_data) => Ok(()),
         }
     }
 }
 
+/*
 fn wrap_blob_read(read: BlobRead) -> Query {
     Query::Data(DataQuery::Blob(read))
-}
-
-fn wrap_map_read(read: MapRead) -> Query {
-    Query::Data(DataQuery::Map(read))
-}
-
-fn wrap_seq_read(read: SequenceRead) -> Query {
-    Query::Data(DataQuery::Sequence(read))
 }
 
 fn wrap_account_read(read: AccountRead) -> Query {
@@ -2664,6 +2651,15 @@ fn wrap_account_read(read: AccountRead) -> Query {
 
 fn wrap_client_auth_cmd(auth_cmd: AuthCmd) -> Cmd {
     Cmd::Auth(auth_cmd)
+}
+*/
+
+fn wrap_map_read(read: MapRead) -> Query {
+    Query::Data(DataQuery::Map(read))
+}
+
+fn wrap_seq_read(read: SequenceRead) -> Query {
+    Query::Data(DataQuery::Sequence(read))
 }
 
 fn wrap_client_auth_query(auth_query: AuthQuery) -> Query {

@@ -14,7 +14,6 @@ pub mod test_utils;
 
 use crate::errors::CoreError;
 use bincode::{deserialize, serialize};
-use log::error;
 use miscreant::aead::Aead;
 use miscreant::Aes128SivAead;
 use rand::distributions::{Alphanumeric, Distribution, Standard};
@@ -120,17 +119,8 @@ pub fn symmetric_decrypt(cipher_text: &[u8], secret_key: &SymEncKey) -> Result<V
 /// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the
 /// returned `String` will likely be around `4 * length` as most of the randomly-generated `char`s
 /// will consume 4 elements of the `String`.
-pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
-    let mut os_rng = OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    })?;
-
-    Ok(generate_random_string_rng(&mut os_rng, length))
-}
-
-/// Generates a random `String` using provided `length` and `rng`.
-pub fn generate_random_string_rng<T: Rng>(rng: &mut T, length: usize) -> String {
+pub fn generate_random_string(length: usize) -> String {
+    let mut rng = OsRng;
     ::std::iter::repeat(())
         .map(|()| rng.gen::<char>())
         .filter(|c| *c != '\u{0}')
@@ -138,42 +128,21 @@ pub fn generate_random_string_rng<T: Rng>(rng: &mut T, length: usize) -> String 
         .collect()
 }
 
-/// Generates a readable `String` using only ASCII characters.
-pub fn generate_readable_string(length: usize) -> Result<String, CoreError> {
-    let mut os_rng = OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    })?;
-
-    Ok(generate_readable_string_rng(&mut os_rng, length))
-}
-
-/// Generates a readable `String` using provided `length` and `rng.
-pub fn generate_readable_string_rng<T: Rng>(rng: &mut T, length: usize) -> String {
+/// Generates a readable `String` using provided `length` and only ASCII characters.
+pub fn generate_readable_string(length: usize) -> String {
+    let mut rng = OsRng;
     ::std::iter::repeat(())
         .map(|()| rng.sample(Alphanumeric))
         .take(length)
         .collect()
 }
 
-/// Generate a random vector of given length.
-pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
+/// Generates a random vector using provided `length`.
+pub fn generate_random_vector<T>(length: usize) -> Vec<T>
 where
     Standard: Distribution<T>,
 {
-    let mut os_rng = OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    })?;
-
-    Ok(generate_random_vector_rng(&mut os_rng, length))
-}
-
-/// Generates a random vector using provided `length` and `rng`.
-pub fn generate_random_vector_rng<T, R: Rng>(rng: &mut R, length: usize) -> Vec<T>
-where
-    Standard: Distribution<T>,
-{
+    let mut rng = OsRng;
     ::std::iter::repeat(())
         .map(|()| rng.gen::<T>())
         .take(length)
@@ -215,16 +184,15 @@ pub fn bin_data_format(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use unwrap::unwrap;
 
     const SIZE: usize = 10;
 
     // Test `generate_random_string` and that the results are not repeated.
     #[test]
     fn random_string() {
-        let str0 = unwrap!(generate_random_string(SIZE));
-        let str1 = unwrap!(generate_random_string(SIZE));
-        let str2 = unwrap!(generate_random_string(SIZE));
+        let str0 = generate_random_string(SIZE);
+        let str1 = generate_random_string(SIZE);
+        let str2 = generate_random_string(SIZE);
 
         assert_ne!(str0, str1);
         assert_ne!(str0, str2);
@@ -238,9 +206,9 @@ mod tests {
     // Test `generate_random_vector` and that the results are not repeated.
     #[test]
     fn random_vector() {
-        let vec0 = unwrap!(generate_random_vector::<u8>(SIZE));
-        let vec1 = unwrap!(generate_random_vector::<u8>(SIZE));
-        let vec2 = unwrap!(generate_random_vector::<u8>(SIZE));
+        let vec0 = generate_random_vector::<u8>(SIZE);
+        let vec1 = generate_random_vector::<u8>(SIZE);
+        let vec2 = generate_random_vector::<u8>(SIZE);
 
         assert_ne!(vec0, vec1);
         assert_ne!(vec0, vec2);
@@ -256,8 +224,8 @@ mod tests {
     fn secrets_derivation() {
         // Random pass-phrase
         {
-            let secret_0 = unwrap!(generate_random_string(SIZE));
-            let secret_1 = unwrap!(generate_random_string(SIZE));
+            let secret_0 = generate_random_string(SIZE);
+            let secret_1 = generate_random_string(SIZE);
             let (password, keyword, pin) = derive_secrets(secret_0.as_bytes(), secret_1.as_bytes());
             assert_ne!(pin, keyword);
             assert_ne!(password, pin);

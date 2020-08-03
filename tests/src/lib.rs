@@ -31,7 +31,7 @@ use unwrap::unwrap;
 // 2. Try to read it as unregistered.
 #[tokio::test]
 async fn unregistered_client() -> Result<(), AppError> {
-    let orig_data = PubImmutableData::new(unwrap!(utils::generate_random_vector(30)));
+    let orig_data = PubImmutableData::new(utils::generate_random_vector(30));
 
     let client = random_client()?;
     // Registered Client PUTs something onto the network.

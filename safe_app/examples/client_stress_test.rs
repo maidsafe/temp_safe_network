@@ -123,8 +123,8 @@ async fn main() {
     {
         (locator.to_string(), password.to_string())
     } else {
-        let new_locator = utils::generate_readable_string_rng(&mut rng, 20);
-        let new_password = utils::generate_readable_string_rng(&mut rng, 20);
+        let new_locator = utils::generate_readable_string(20);
+        let new_password = utils::generate_readable_string(20);
         println!(
             "A new account will be created.\nLocator: {}\nPassword: {}",
             new_locator, new_password
@@ -169,7 +169,7 @@ async fn main() {
 
     for _ in 0..immutable_data_count {
         // Construct data
-        let data = PubImmutableData::new(utils::generate_random_vector_rng(&mut rng, 1024));
+        let data = PubImmutableData::new(utils::generate_random_vector(1024));
         println!("{:?}", data.name());
         stored_data.push(Data::Immutable(data.into()));
     }

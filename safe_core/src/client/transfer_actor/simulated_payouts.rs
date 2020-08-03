@@ -1,21 +1,7 @@
-use safe_nd::{
-    Cmd, DebitAgreementProof, Money, PublicKey, QueryResponse, ReplicaEvent, SignatureShare,
-    SignedTransfer, Transfer, TransferCmd, TransferPropagated,
-};
-use safe_transfers::{ActorEvent, TransfersSynched};
+use safe_nd::{Cmd, Money, PublicKey, Transfer, TransferCmd};
 
-use crate::client::{create_cmd_message, Client, TransferActor};
+use crate::client::{create_cmd_message, TransferActor};
 use crate::errors::CoreError;
-
-use std::str::FromStr;
-
-use log::{debug, info, trace};
-
-#[cfg(feature = "simulated-payouts")]
-use threshold_crypto::SecretKeySet;
-
-#[cfg(feature = "simulated-payouts")]
-use rand::thread_rng;
 
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {
@@ -38,7 +24,7 @@ impl TransferActor {
         to: PublicKey,
         amount: Money,
     ) -> Result<(), CoreError> {
-        info!("Triggering a test farming payout to: {:?}", &to);
+        dbg!("Triggering a test farming payout to: {:?}", &to);
         let mut cm = self.connection_manager();
         let safe_key = self.safe_key.clone();
         self.simulated_farming_payout_dot.apply_inc();
@@ -52,7 +38,7 @@ impl TransferActor {
         let simluated_farming_cmd =
             Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
-        let message = create_cmd_message(safe_key.clone(), simluated_farming_cmd);
+        let message = create_cmd_message(simluated_farming_cmd);
 
         let pub_id = safe_key.public_id();
 
@@ -62,7 +48,7 @@ impl TransferActor {
         // If we're getting the payout for our own actor, update it here
         if to == self.safe_key.public_key() {
             // get full history from network and apply locally
-            self.get_history().await;
+            self.get_history().await?;
         }
         Ok(())
     }
@@ -79,6 +65,7 @@ mod tests {
     use super::*;
 
     use crate::client::transfer_actor::test_utils::get_keys_and_connection_manager;
+    use std::str::FromStr;
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]

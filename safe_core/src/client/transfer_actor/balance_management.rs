@@ -1,10 +1,10 @@
 use safe_nd::{
-    Cmd, DebitAgreementProof, Event, Message, MessageId, Money, PublicKey, Query, QueryResponse,
-    TransferCmd, TransferQuery,
+    Cmd, DebitAgreementProof, Event, Money, PublicKey, Query, QueryResponse, TransferCmd,
+    TransferQuery,
 };
 use safe_transfers::{ActorEvent, TransferInitiated};
 
-use crate::client::{create_cmd_message, create_query_message, Client, TransferActor};
+use crate::client::{create_cmd_message, create_query_message, TransferActor};
 use crate::errors::CoreError;
 
 use log::{debug, info, trace};
@@ -24,7 +24,7 @@ impl TransferActor {
     ) -> Result<Option<DebitAgreementProof>, CoreError> {
         debug!("Handling validation event: {:?}", event);
         let validation = match event {
-            Event::TransferValidated { client, event } => event,
+            Event::TransferValidated { event, .. } => event,
             _ => {
                 return Err(CoreError::from(format!(
                     "Unexpected event received at TransferActor, {:?}",
@@ -51,7 +51,7 @@ impl TransferActor {
 
         actor.apply(ActorEvent::TransferValidationReceived(
             transfer_validation.clone(),
-        ));
+        ))?;
 
         Ok(transfer_validation.proof)
     }
@@ -73,7 +73,7 @@ impl TransferActor {
 
         let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let message = create_query_message(identity.clone(), msg_contents);
+        let message = create_query_message(msg_contents);
         let _bootstrapped = cm.bootstrap(identity).await;
 
         match cm.send_query(&pub_id, &message).await? {
@@ -114,14 +114,14 @@ impl TransferActor {
         );
         let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
-        let message = create_cmd_message(safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
 
         self.transfer_actor
             .lock()
             .await
             .apply(ActorEvent::TransferInitiated(TransferInitiated {
                 signed_transfer,
-            }));
+            }))?;
 
         let debit_proof: DebitAgreementProof = self
             .await_validation(&safe_key.public_id(), &message)
@@ -130,7 +130,7 @@ impl TransferActor {
         // Register the transfer on the network.
         let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(debit_proof.clone()));
 
-        let message = create_cmd_message(safe_key.clone(), msg_contents);
+        let message = create_cmd_message(msg_contents);
         let safe_key = self.safe_key.clone();
         trace!(
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",
@@ -145,7 +145,7 @@ impl TransferActor {
             .register(debit_proof)?
             .ok_or_else(|| CoreError::from("No transfer event to register locally"))?;
 
-        actor.apply(ActorEvent::TransferRegistrationSent(register_event.clone()));
+        actor.apply(ActorEvent::TransferRegistrationSent(register_event.clone()))?;
 
         Ok(())
     }

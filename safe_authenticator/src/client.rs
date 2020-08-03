@@ -545,8 +545,8 @@ mod tests {
     async fn registered_client() -> Result<(), AuthError> {
         let (net_tx, _) = mpsc::unbounded();
 
-        let sec_0 = utils::generate_random_string(10)?;
-        let sec_1 = utils::generate_random_string(10)?;
+        let sec_0 = utils::generate_random_string(10);
+        let sec_1 = utils::generate_random_string(10);
         let client_id = gen_client_id();
         test_create_balance(&client_id, unwrap!(Money::from_str("10"))).await?;
 
@@ -565,8 +565,8 @@ mod tests {
     // Test creating and logging in to an account on the network.
     #[tokio::test]
     async fn login() -> Result<(), AuthError> {
-        let sec_0 = utils::generate_random_string(10)?;
-        let sec_1 = utils::generate_random_string(10)?;
+        let sec_0 = utils::generate_random_string(10);
+        let sec_1 = utils::generate_random_string(10);
         let client_id = gen_client_id();
 
         test_create_balance(&client_id, Money::from_str("10")?).await?;
@@ -606,7 +606,7 @@ mod tests {
             }
         }
 
-        let seed = utils::generate_random_string(30)?;
+        let seed = utils::generate_random_string(30);
         let client_id = gen_client_id();
         test_create_balance(&client_id, unwrap!(Money::from_str("10"))).await?;
 
@@ -627,8 +627,8 @@ mod tests {
     // Test creation of an access container.
     #[tokio::test]
     async fn access_container_creation() {
-        let sec_0 = utils::generate_random_string(10).unwrap();
-        let sec_1 = utils::generate_random_string(10).unwrap();
+        let sec_0 = utils::generate_random_string(10);
+        let sec_1 = utils::generate_random_string(10);
         let client_id = gen_client_id();
 
         test_create_balance(&client_id, unwrap!(Money::from_str("10")))
@@ -658,8 +658,8 @@ mod tests {
     // Test setting the configuration root directory.
     #[tokio::test]
     async fn config_root_dir_creation() -> Result<(), AuthError> {
-        let sec_0 = utils::generate_random_string(10)?;
-        let sec_1 = utils::generate_random_string(10)?;
+        let sec_0 = utils::generate_random_string(10);
+        let sec_1 = utils::generate_random_string(10);
         let client_id = gen_client_id();
 
         test_create_balance(&client_id, unwrap!(Money::from_str("10"))).await?;
@@ -739,7 +739,7 @@ mod tests {
             Err(err) => panic!("Unexpected {:?}", err),
         }
 
-        let data = utils::generate_random_vector(4)?;
+        let data = utils::generate_random_vector(4);
         let data = PubImmutableData::new(data);
 
         match client.put_idata(data).await {

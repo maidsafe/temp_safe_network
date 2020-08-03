@@ -15,12 +15,13 @@ use crate::utils::{
     self, symmetric_decrypt, symmetric_encrypt, SymEncKey, SymEncNonce, SYM_ENC_NONCE_LEN,
 };
 use ffi_utils::ReprC;
-use safe_nd::{MapAddress, MapKind, MapSeqEntries, MapSeqEntryAction, MapSeqValue, XorName};
+use safe_nd::{MapAddress, MapKind, MapSeqEntries, MapSeqEntryAction, MapSeqValue};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto;
 use tiny_keccak::sha3_256;
 use unwrap::unwrap;
+use xor_name::XorName;
 
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]

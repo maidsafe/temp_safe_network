@@ -1,6 +1,6 @@
 use safe_nd::{
-    Cmd, Data, DebitAgreementProof, Message, MessageId, MsgEnvelope, MsgSender, PublicId,
-    PublicKey, Query, QueryResponse, TransferCmd, TransferQuery,
+    Cmd, DebitAgreementProof, Message, PublicId, PublicKey, Query, QueryResponse, TransferCmd,
+    TransferQuery,
 };
 
 use safe_transfers::{
@@ -8,7 +8,7 @@ use safe_transfers::{
 };
 
 use crate::client::ConnectionManager;
-use crate::client::{create_cmd_message, create_query_message, Client, SafeKey, COST_OF_PUT};
+use crate::client::{create_cmd_message, create_query_message, SafeKey, COST_OF_PUT};
 use crate::errors::CoreError;
 use crdts::Dot;
 use futures::lock::Mutex;
@@ -18,9 +18,13 @@ use log::{debug, info, trace, warn};
 use std::sync::Arc;
 use threshold_crypto::PublicKeySet;
 
+/// Module for Money balance management
 pub mod balance_management;
+/// Module for setting up SafeTransferActor
 pub mod setup;
+/// Module for simulating Money for testing
 pub mod simulated_payouts;
+/// Module containing all PUT apis
 pub mod write_apis;
 
 #[cfg(test)]
@@ -53,14 +57,13 @@ impl TransferActor {
 
     /// Get a payment proof
     pub async fn get_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
-        let mut cm = self.connection_manager();
-
         // --------------------------
         // Payment for PUT
         // --------------------------
         self.create_write_payment_proof().await
     }
 
+    /// Fetch our connection manager
     pub fn connection_manager(&self) -> ConnectionManager {
         self.connection_manager.clone()
     }
@@ -76,7 +79,7 @@ impl TransferActor {
             since_version: 0,
         });
 
-        let message = create_query_message(self.safe_key.clone(), msg_contents);
+        let message = create_query_message(msg_contents);
 
         let _bootstrapped = cm.bootstrap(self.safe_key.clone()).await;
 
@@ -95,7 +98,7 @@ impl TransferActor {
         match actor.synch(history) {
             Ok(synced_transfer_outcome) => {
                 if let Some(transfers) = synced_transfer_outcome {
-                    actor.apply(ActorEvent::TransfersSynched(transfers));
+                    actor.apply(ActorEvent::TransfersSynched(transfers))?;
                 }
             }
             Err(error) => {
@@ -140,14 +143,14 @@ impl TransferActor {
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
-        let transfer_message = create_cmd_message(safe_key.clone(), command);
+        let transfer_message = create_cmd_message(command);
 
         self.transfer_actor
             .lock()
             .await
             .apply(ActorEvent::TransferInitiated(TransferInitiated {
                 signed_transfer,
-            }));
+            }))?;
 
         // setup connection manager
         let _bootstrapped = cm.bootstrap(safe_key.clone()).await;

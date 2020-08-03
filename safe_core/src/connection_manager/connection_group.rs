@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::response_manager::ResponseManager;
-use crate::{client::SafeKey, client::TransferActor, utils, CoreError};
+use crate::{client::SafeKey, client::TransferActor, CoreError};
 use bincode::{deserialize, serialize};
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
@@ -24,8 +24,8 @@ use quic_p2p::{
 };
 use rand::Rng;
 use safe_nd::{
-    BlsProof, DebitAgreementProof, Event as EventMsg, HandshakeRequest, HandshakeResponse, Message,
-    MessageId, MsgEnvelope, MsgSender, NodePublicId, Proof, PublicId, QueryResponse,
+    BlsProof, DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId,
+    MsgEnvelope, MsgSender, NodePublicId, Proof, PublicId, QueryResponse,
 };
 
 use futures_util::stream::StreamExt;
@@ -257,9 +257,6 @@ impl Joining {
             let response = HandshakeRequest::ChallengeResult(self.full_id.sign(&challenge));
             let msg = Bytes::from(unwrap!(serialize(&response)));
 
-            let demsg: HandshakeRequest = unwrap!(deserialize(&msg));
-
-
             warn!("HandshakeRequest::ChallengeResult");
             quic_p2p.send(connected.elder.peer.clone(), msg.clone(), token);
             warn!("HandshakeRequest::ChallengeResult sent {:?}", msg);
@@ -307,11 +304,11 @@ impl Joining {
     ) -> Transition {
         match deserialize(&msg) {
             Ok(HandshakeResponse::Challenge(PublicId::Node(node_public_id), challenge)) => {
-                trace!("Got the challenge from {:?}", peer_addr);
+                dbg!("Got the challenge from {:?}", peer_addr);
                 self.handle_challenge(quic_p2p, peer_addr, node_public_id, challenge);
 
                 if self.is_everyone_joined() {
-                    trace!("Transtionnnnnnnn");
+                    dbg!("Transtionnnnnnnn");
                     return Transition::ToConnected;
                 }
             }
@@ -357,9 +354,7 @@ impl Connected {
 
     fn get_envelope_for_message(&self, message: Message) -> MsgEnvelope {
         trace!("Putting message in envelope: {:?}", message);
-        let sign = self
-            .full_id
-            .sign(&unwrap::unwrap!(bincode::serialize(&message)));
+        let sign = self.full_id.sign(&unwrap::unwrap!(serialize(&message)));
         let msg_proof = BlsProof {
             public_key: self.full_id.public_key().bls().unwrap(),
             signature: sign.into_bls().unwrap(),
@@ -474,14 +469,7 @@ impl Connected {
         response
     }
 
-    fn handle_new_network_message(
-        &mut self,
-        _quic_p2p: &mut QuicP2p,
-        peer_addr: SocketAddr,
-        msg: Bytes,
-    ) -> Transition {
-        dbg!("{}: Message: {}.", peer_addr, utils::bin_data_format(&msg),);
-
+    fn handle_new_network_message(&mut self, _quic_p2p: &mut QuicP2p, msg: Bytes) -> Transition {
         match deserialize(&msg) {
             Ok(MsgEnvelope { message, .. }) => {
                 match message {
@@ -542,7 +530,6 @@ impl Connected {
             // Ok(Message::TransferNotification { payload }) => {
             //     trace!("Got transfer_id notification: {:?}", payload);
             // }
-            Ok(_msg) => error!("Unexpected message type, expected response."),
             Err(e) => {
                 error!("Unexpected error: {:?}", e);
             }
@@ -671,9 +658,11 @@ impl State {
         msg: Bytes,
     ) -> Transition {
         match self {
-            State::Bootstrapping(state) => state.handle_new_network_message(quic_p2p, peer_addr, msg),
+            State::Bootstrapping(state) => {
+                state.handle_new_network_message(quic_p2p, peer_addr, msg)
+            }
             State::Joining(state) => state.handle_new_network_message(quic_p2p, peer_addr, msg),
-            State::Connected(state) => state.handle_new_network_message(quic_p2p, peer_addr, msg),
+            State::Connected(state) => state.handle_new_network_message(quic_p2p, msg),
             State::Terminated => Transition::None,
         }
     }
@@ -751,13 +740,13 @@ impl Inner {
             SentUserMessage { peer, msg, token } => {
                 self.handle_sent_user_message(peer.peer_addr(), msg, token)
             }
-            UnsentUserMessage { peer, msg, token } => {
-                self.handle_unsent_user_message(peer.peer_addr(), &msg, token)
-            }
+            UnsentUserMessage { msg, .. } => self.handle_unsent_user_message(&msg),
             NewMessage { peer, msg } => {
-                let transition =
-                    self.state
-                        .handle_new_network_message(&mut self.quic_p2p, peer.peer_addr(), msg);
+                let transition = self.state.handle_new_network_message(
+                    &mut self.quic_p2p,
+                    peer.peer_addr(),
+                    msg,
+                );
 
                 match transition {
                     Transition::None => (), // do nothing
@@ -795,12 +784,11 @@ impl Inner {
             Ok(MsgEnvelope { message, .. }) => {
                 trace!("Message was sent: {:?}", message);
             }
-            Ok(x) => println!("Unexpected send message type {:?}", x),
             Err(e) => trace!("Unexpected error deserializing a sent qp2p message. (Checking for MsgEnvelope) {:?}", e),
         }
     }
 
-    fn handle_unsent_user_message(&mut self, peer_addr: SocketAddr, msg: &Bytes, token: Token) {
+    fn handle_unsent_user_message(&mut self, msg: &Bytes) {
         // TODO: check if we have handled the challenge?
 
         match deserialize(msg) {
@@ -811,11 +799,11 @@ impl Inner {
                 );
                 // self.handle_unsent_message(peer_addr, request, message_id, token)
             }
-            Ok(_) => println!("Unexpected message type"),
             Err(e) => println!("Unexpected error {:?}", e),
         }
     }
 
+    #[allow(unused)]
     fn handle_unsent_message(
         &mut self,
         _peer_addr: SocketAddr,

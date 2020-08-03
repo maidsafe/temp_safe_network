@@ -216,8 +216,8 @@ mod tests {
     // Test creating an account and logging in.
     #[test]
     fn create_account_and_login() -> Result<(), AuthError> {
-        let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
-        let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+        let acc_locator = unwrap!(CString::new(utils::generate_random_string(10)));
+        let acc_password = unwrap!(CString::new(utils::generate_random_string(10)));
 
         {
             let auth_h: *mut Authenticator = unsafe {
@@ -269,8 +269,8 @@ mod tests {
 
         safe_authenticator::test_utils::init_log();
 
-        let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
-        let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+        let acc_locator = unwrap!(CString::new(utils::generate_random_string(10)));
+        let acc_password = unwrap!(CString::new(utils::generate_random_string(10)));
 
         {
             let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -336,8 +336,8 @@ mod tests {
     // Test account usage statistics before and after a mutation.
     #[test]
     fn account_info() -> Result<(), AuthError> {
-        let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
-        let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+        let acc_locator = unwrap!(CString::new(utils::generate_random_string(10)));
+        let acc_password = unwrap!(CString::new(utils::generate_random_string(10)));
 
         let auth: *mut Authenticator = unsafe {
             unwrap!(call_1(|ud, cb| create_client_with_acc(
