@@ -167,7 +167,7 @@ impl Bootstrapping {
         dbg!("HandshakeRequest::Bootstrap after");
     }
 
-    fn handle_new_message(
+    fn handle_new_network_message(
         &mut self,
         quic_p2p: &mut QuicP2p,
         peer_addr: SocketAddr,
@@ -257,9 +257,12 @@ impl Joining {
             let response = HandshakeRequest::ChallengeResult(self.full_id.sign(&challenge));
             let msg = Bytes::from(unwrap!(serialize(&response)));
 
-            dbg!("HandshakeRequest::ChallengeResult");
-            quic_p2p.send(connected.elder.peer.clone(), msg, token);
-            dbg!("HandshakeRequest::ChallengeResult sent");
+            let demsg: HandshakeRequest = unwrap!(deserialize(&msg));
+
+
+            warn!("HandshakeRequest::ChallengeResult");
+            quic_p2p.send(connected.elder.peer.clone(), msg.clone(), token);
+            warn!("HandshakeRequest::ChallengeResult sent {:?}", msg);
 
             connected.sent_challenge = true;
         } else {
@@ -296,7 +299,7 @@ impl Joining {
         })
     }
 
-    fn handle_new_message(
+    fn handle_new_network_message(
         &mut self,
         quic_p2p: &mut QuicP2p,
         peer_addr: SocketAddr,
@@ -471,7 +474,7 @@ impl Connected {
         response
     }
 
-    fn handle_new_message(
+    fn handle_new_network_message(
         &mut self,
         _quic_p2p: &mut QuicP2p,
         peer_addr: SocketAddr,
@@ -661,16 +664,16 @@ impl State {
         }
     }
 
-    fn handle_new_message(
+    fn handle_new_network_message(
         &mut self,
         quic_p2p: &mut QuicP2p,
         peer_addr: SocketAddr,
         msg: Bytes,
     ) -> Transition {
         match self {
-            State::Bootstrapping(state) => state.handle_new_message(quic_p2p, peer_addr, msg),
-            State::Joining(state) => state.handle_new_message(quic_p2p, peer_addr, msg),
-            State::Connected(state) => state.handle_new_message(quic_p2p, peer_addr, msg),
+            State::Bootstrapping(state) => state.handle_new_network_message(quic_p2p, peer_addr, msg),
+            State::Joining(state) => state.handle_new_network_message(quic_p2p, peer_addr, msg),
+            State::Connected(state) => state.handle_new_network_message(quic_p2p, peer_addr, msg),
             State::Terminated => Transition::None,
         }
     }
@@ -754,7 +757,7 @@ impl Inner {
             NewMessage { peer, msg } => {
                 let transition =
                     self.state
-                        .handle_new_message(&mut self.quic_p2p, peer.peer_addr(), msg);
+                        .handle_new_network_message(&mut self.quic_p2p, peer.peer_addr(), msg);
 
                 match transition {
                     Transition::None => (), // do nothing
@@ -793,7 +796,7 @@ impl Inner {
                 trace!("Message was sent: {:?}", message);
             }
             Ok(x) => println!("Unexpected send message type {:?}", x),
-            Err(e) => trace!("Unexpected error deserializing a sent message {:?}", e),
+            Err(e) => trace!("Unexpected error deserializing a sent qp2p message. (Checking for MsgEnvelope) {:?}", e),
         }
     }
 
