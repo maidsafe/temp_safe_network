@@ -1520,7 +1520,7 @@ mod tests {
         // The `random_client()` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
         println!("blob_Test_______pre client_");
-        
+
         let client = random_client()?;
         println!("blob_Test_______post client_");
 

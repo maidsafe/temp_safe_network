@@ -2073,6 +2073,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
+source = "git+https://github.com/maidsafe/safe-transfers.git#7f4811752dfb2a18b27fe082b99045ed8d880a00"
 dependencies = [
  "bincode",
  "crdts",

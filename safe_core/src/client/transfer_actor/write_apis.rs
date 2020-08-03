@@ -414,7 +414,9 @@ impl TransferActor {
     ) -> Result<(), CoreError> {
         let mut actor = self.transfer_actor.lock().await;
         // First register with local actor, then reply.
-        let register_event = actor.register(debit_proof.clone())?.ok_or_else(||CoreError::from("No events to register for proof."))?;
+        let register_event = actor
+            .register(debit_proof.clone())?
+            .ok_or_else(|| CoreError::from("No events to register for proof."))?;
 
         actor.apply(ActorEvent::TransferRegistrationSent(register_event));
 
