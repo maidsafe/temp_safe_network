@@ -34,7 +34,7 @@ impl File {
             created: Utc::now(),
             modified: Utc::now(),
             user_metadata,
-            data_map_name: XorName::default(),
+            data_map_name: XorName::random(),
             published,
         }
     }

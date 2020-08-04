@@ -50,6 +50,8 @@ impl ResponseManager {
     ) -> Result<(), String> {
         let (sender, count) = value;
         let the_request = (sender, VoteMap::default(), count);
+
+        println!("Awaiting response to msg_id: {:#?}", msg_id);
         let _ = self.pending_queries.insert(msg_id, the_request);
         Ok(())
     }
@@ -76,7 +78,7 @@ impl ResponseManager {
         event: Event,
     ) -> Result<(), String> {
         trace!(
-            "Handling event: {:?} correlating to : {:?}",
+            "Handling event: {:?} correlating to : {:#?}",
             event,
             correlating_message_id
         );
@@ -96,8 +98,8 @@ impl ResponseManager {
         correlating_message_id: MessageId,
         response: QueryResponse,
     ) -> Result<(), String> {
-        trace!(
-            "Handling response for sent msg_id: {:?}, query resp: {:?}",
+        println!(
+            "Handling response for sent msg_id: {:#?}, query resp: {:?}",
             correlating_message_id,
             response
         );

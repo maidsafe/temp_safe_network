@@ -430,7 +430,7 @@ mod tests {
     async fn transfer_actor_with_no_balance_cannot_store_data() -> Result<(), CoreError> {
         let (safe_key, cm) = get_keys_and_connection_manager().await;
 
-        let data = Sequence::new_pub(safe_key.public_key(), XorName::default(), 33323);
+        let data = Sequence::new_pub(safe_key.public_key(), XorName::random(), 33323);
 
         let mut initial_actor =
             TransferActor::new_no_initial_balance(safe_key.clone(), cm.clone()).await?;

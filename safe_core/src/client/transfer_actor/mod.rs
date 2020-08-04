@@ -86,6 +86,7 @@ impl TransferActor {
         // This is a normal response manager request. We want quorum on this for now...
         let res = cm.send_query(&self.safe_key.public_id(), &message).await?;
 
+        println!("Lessseeeeeeeeeeeeeeeeeeeeeeeeee  res {:?}", &res);
         let history = match res {
             QueryResponse::GetHistory(history) => history.map_err(CoreError::from),
             _ => Err(CoreError::from(format!(

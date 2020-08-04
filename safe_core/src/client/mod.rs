@@ -52,6 +52,7 @@ use std::sync::Arc;
 use xor_name::XorName;
 
 use std::collections::{BTreeMap, BTreeSet};
+use rand::{Rng, thread_rng};
 
 /// Capacity of the immutable data cache.
 pub const IMMUT_DATA_CACHE_SIZE: usize = 300;
@@ -70,8 +71,10 @@ pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
 // Build and sign Cmd Message Envelope
 pub(crate) fn create_cmd_message(msg_contents: Cmd) -> Message {
     trace!("Creating cmd message");
-
-    let id = MessageId::new();
+    let mut rng = thread_rng();
+    let random_xor = rng.gen::<XorName>();
+    let id = MessageId(random_xor);
+    println!("cmd msg id: {:?}", id);
 
     Message::Cmd {
         cmd: msg_contents,
@@ -83,7 +86,11 @@ pub(crate) fn create_cmd_message(msg_contents: Cmd) -> Message {
 pub(crate) fn create_query_message(msg_contents: Query) -> Message {
     trace!("Creating query message");
 
-    let id = MessageId::new();
+    let mut rng = thread_rng();
+    let random_xor = rng.gen::<XorName>();
+    let id = MessageId(random_xor);
+
+    println!("query msg id: {:?}", id);
     Message::Query {
         query: msg_contents,
         id,
