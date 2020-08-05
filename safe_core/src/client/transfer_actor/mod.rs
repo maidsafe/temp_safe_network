@@ -86,7 +86,6 @@ impl TransferActor {
         // This is a normal response manager request. We want quorum on this for now...
         let res = cm.send_query(&self.safe_key.public_id(), &message).await?;
 
-        println!("Lessseeeeeeeeeeeeeeeeeeeeeeeeee  res {:?}", &res);
         let history = match res {
             QueryResponse::GetHistory(history) => history.map_err(CoreError::from),
             _ => Err(CoreError::from(format!(
@@ -111,7 +110,9 @@ impl TransferActor {
                     return Err(CoreError::from(error));
                 }
 
-                warn!("No transfer history retrieved for pk: {:?}", public_key);
+                warn!("No new transfer history  by TransferActor for pk: {:?}", public_key);
+
+                warn!("current balance {:?}", actor.balance());
             }
         }
 
@@ -146,6 +147,7 @@ impl TransferActor {
 
         let transfer_message = create_cmd_message(command);
 
+
         self.transfer_actor
             .lock()
             .await
@@ -170,7 +172,7 @@ impl TransferActor {
         pub_id: &PublicId,
         message: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
-        trace!("Awaiting transfer validation");
+        info!("Awaiting transfer validation");
         let mut cm = self.connection_manager();
 
         let proof = cm.send_for_validation(&pub_id, &message, self).await?;

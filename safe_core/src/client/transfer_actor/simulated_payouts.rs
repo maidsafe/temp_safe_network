@@ -2,7 +2,7 @@ use safe_nd::{Cmd, Money, PublicKey, Transfer, TransferCmd};
 
 use crate::client::{create_cmd_message, TransferActor};
 use crate::errors::CoreError;
-
+use log::info;
 /// Handle all Money transfers and Write API requests for a given ClientId.
 impl TransferActor {
     #[cfg(not(feature = "simulated-payouts"))]
@@ -24,7 +24,7 @@ impl TransferActor {
         to: PublicKey,
         amount: Money,
     ) -> Result<(), CoreError> {
-        dbg!("Triggering a test farming payout to: {:?}", &to);
+        info!("Triggering a simulated farming payout to: {:?}", &to);
         let mut cm = self.connection_manager();
         let safe_key = self.safe_key.clone();
         self.simulated_farming_payout_dot.apply_inc();
@@ -34,7 +34,7 @@ impl TransferActor {
             amount,
             id: self.simulated_farming_payout_dot,
         };
-
+        
         let simluated_farming_cmd =
             Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
@@ -47,6 +47,11 @@ impl TransferActor {
 
         // If we're getting the payout for our own actor, update it here
         if to == self.safe_key.public_key() {
+
+            info!("Applying simulated payout locally, via query for history...");
+
+            // std::thread::sleep(std::time::Duration::from_millis(15500));
+
             // get full history from network and apply locally
             self.get_history().await?;
         }

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use futures::channel::mpsc;
-use log::trace;
+use log::{info, trace};
 use safe_nd::{Event, MessageId, QueryResponse};
 use std::collections::HashMap;
 
@@ -51,7 +51,7 @@ impl ResponseManager {
         let (sender, count) = value;
         let the_request = (sender, VoteMap::default(), count);
 
-        println!("Awaiting response to msg_id: {:#?}", msg_id);
+        trace!("Awaiting response to msg_id: {:#?}", msg_id);
         let _ = self.pending_queries.insert(msg_id, the_request);
         Ok(())
     }
@@ -77,7 +77,7 @@ impl ResponseManager {
         correlating_message_id: MessageId,
         event: Event,
     ) -> Result<(), String> {
-        trace!(
+        info!(
             "Handling event: {:?} correlating to : {:#?}",
             event,
             correlating_message_id
@@ -98,8 +98,8 @@ impl ResponseManager {
         correlating_message_id: MessageId,
         response: QueryResponse,
     ) -> Result<(), String> {
-        println!(
-            "Handling response for sent msg_id: {:#?}, query resp: {:?}",
+        trace!(
+            "Handling query response for sent msg_id: {:#?}, resp: {:?}",
             correlating_message_id,
             response
         );
@@ -164,8 +164,8 @@ impl ResponseManager {
             })
             .or_else(|| {
                 trace!(
-                    "No correlating message found for ID {:?}",
-                    correlating_message_id
+                    "No correlating message found for ID {:?}. Response was: {:?}. It may be that enough responses were already received.",
+                    correlating_message_id, response
                 );
                 None
             });

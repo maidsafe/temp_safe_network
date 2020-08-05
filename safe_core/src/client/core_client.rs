@@ -93,13 +93,10 @@ impl CoreClient {
 
         let balance_client_id = SafeKey::client(balance_client_id);
         let balance_pub_id = balance_client_id.public_id();
-        info!("preeeeeee BOOOOOOOOOOOOOOOOOOTSTAPPPEEDDDDDDDDDDD");
 
         // Create the connection manager
         let mut connection_manager =
             attempt_bootstrap(&Config::new().quic_p2p, &net_tx, balance_client_id.clone()).await?;
-
-        info!("BOOOOOOOOOOOOOOOOOOTSTAPPPEEDDDDDDDDDDD");
 
         connection_manager = connection_manager_wrapper_fn(connection_manager);
 
@@ -109,8 +106,6 @@ impl CoreClient {
         let mut the_actor =
             TransferActor::new(balance_client_id.clone(), connection_manager.clone()).await?;
         let transfer_actor = Some(the_actor.clone());
-
-        info!("TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa setup");
 
         let _ = the_actor.new_account(new_login_packet).await?;
 

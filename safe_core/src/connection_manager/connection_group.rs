@@ -161,10 +161,7 @@ impl Bootstrapping {
         let token = rand::thread_rng().gen();
         let handshake = HandshakeRequest::Bootstrap(self.full_id.public_id());
         let msg = Bytes::from(unwrap!(serialize(&handshake)));
-
-        dbg!("HandshakeRequest::Bootstrap");
         quic_p2p.send(Peer::Node(socket), msg, token);
-        dbg!("HandshakeRequest::Bootstrap after");
     }
 
     fn handle_new_network_message(
@@ -246,21 +243,18 @@ impl Joining {
         _sender_id: NodePublicId,
         challenge: Vec<u8>,
     ) {
-        dbg!("Handling challenge");
+        trace!("Handling challenge");
         if let Some(connected) = self.connected_elders.get_mut(&sender_addr) {
             // safe to unwrap as we just found this elder before calling this method.
             if connected.sent_challenge {
-                warn!("Already sent challenge to {:?}; ignoring.", sender_addr);
+                trace!("Already sent challenge to {:?}; ignoring.", sender_addr);
                 return;
             }
             let token = rand::thread_rng().gen();
             let response = HandshakeRequest::ChallengeResult(self.full_id.sign(&challenge));
             let msg = Bytes::from(unwrap!(serialize(&response)));
 
-            warn!("HandshakeRequest::ChallengeResult");
             quic_p2p.send(connected.elder.peer.clone(), msg.clone(), token);
-            warn!("HandshakeRequest::ChallengeResult sent {:?}", msg);
-
             connected.sent_challenge = true;
         } else {
             // Doesn't have this connected peer?
@@ -268,7 +262,7 @@ impl Joining {
     }
 
     fn handle_connected_to(&mut self, quic_p2p: &mut QuicP2p, peer: Peer) {
-        dbg!("Handling connected_to");
+        trace!("Handling connected_to");
         if let Peer::Node(socket) = &peer {
             let _ = self.connected_elders.insert(
                 *socket,
@@ -278,11 +272,9 @@ impl Joining {
                 },
             );
             let token = rand::thread_rng().gen();
-            dbg!("HandshakeRequest::Join");
             let handshake = HandshakeRequest::Join(self.full_id.public_id());
             let msg = Bytes::from(unwrap!(serialize(&handshake)));
             quic_p2p.send(peer, msg, token);
-            dbg!("HandshakeRequest::Join sent");
         } else {
             // Invalid state
         }
@@ -304,11 +296,10 @@ impl Joining {
     ) -> Transition {
         match deserialize(&msg) {
             Ok(HandshakeResponse::Challenge(PublicId::Node(node_public_id), challenge)) => {
-                dbg!("Got the challenge from {:?}", peer_addr);
+                trace!("Got the challenge from {:?}", peer_addr);
                 self.handle_challenge(quic_p2p, peer_addr, node_public_id, challenge);
 
                 if self.is_everyone_joined() {
-                    dbg!("Transtionnnnnnnn");
                     return Transition::ToConnected;
                 }
             }
@@ -343,8 +334,7 @@ impl Connected {
                 .connected_elders
                 .into_iter()
                 .map(|(k, v)| {
-                    info!("elder socker:: {:?}", k);
-                    // info!("elder:: {:?}", v.elder);
+                    trace!("Connecting to elder on socket: {:?}", k);
                     (k, v.elder)
                 })
                 .collect(),
@@ -378,7 +368,7 @@ impl Connected {
         quic_p2p: &mut QuicP2p,
         msg: &Message,
     ) -> Result<mpsc::UnboundedReceiver<QueryResponse>, CoreError> {
-        trace!("Sending message {:?}", msg.id());
+        info!("Sending query message {:?} w/ id: {:?}", &msg, &msg.id());
 
         let envelope = self.get_envelope_for_message(msg.clone());
 
@@ -406,7 +396,7 @@ impl Connected {
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<(), CoreError> {
-        trace!("Sending cmd message {:?}", msg_id);
+        info!("Sending cmd message {:?} w/ id: {:?}", &msg, &msg_id);
 
         let envelope = self.get_envelope_for_message(msg.clone());
 
@@ -428,7 +418,7 @@ impl Connected {
         msg_id: MessageId,
         msg: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
-        trace!("Sending message for validation {:?}", msg_id);
+        info!("Sending message for validation {:?}", msg);
 
         // set up channel
         let (sender_future, mut response_future) = mpsc::unbounded();
@@ -512,14 +502,13 @@ impl Connected {
                         cmd_origin,
                         id,
                     } => {
-                        trace!(
+                        warn!(
                             "CmdError: from: {:?}, correlation_id: {:?}, error: {:?}, msg_id: {:?}",
                             cmd_origin,
                             correlation_id,
                             &error,
                             id
                         );
-                        warn!("CmdError received: {:?}", &error);
                         // let _ = self.response_manager.handle_query_response(correlation_id, response);
                     }
                     _ => {
@@ -631,7 +620,7 @@ impl State {
     }
 
     fn handle_bootstrapped_to(&mut self, quic_p2p: &mut QuicP2p, socket: SocketAddr) {
-        dbg!("Bootstrapped; SocketAddr: {:?}", socket);
+        trace!("Bootstrapped; SocketAddr: {:?}", socket);
         match self {
             State::Bootstrapping(state) => state.handle_bootstrapped_to(quic_p2p, socket),
             // This message is not expected for the rest of states
@@ -731,6 +720,8 @@ impl Inner {
 
     fn handle_quic_p2p_event(&mut self, event: Event) {
         use Event::*;
+
+        trace!("qp2p event received: {:?}", event);
         // should handle new messages sent by vault (assuming it's only the `Challenge::Request` for now)
         // if the message is found to be related to a certain `ConnectionGroup`, `connection_group.response_manager.handle_query_response(message_id, response)` should be called.
         match event {
