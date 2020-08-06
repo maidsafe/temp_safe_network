@@ -15,7 +15,6 @@ use crate::config_handler::Config;
 use crate::connection_manager::ConnectionManager;
 use crate::crypto::{shared_box, shared_secretbox};
 use crate::errors::CoreError;
-use crate::ipc::BootstrapConfig;
 use crate::network_event::NetworkTx;
 use crate::utils;
 use async_trait::async_trait;
@@ -25,8 +24,8 @@ use rand::rngs::StdRng;
 use rand::{thread_rng, SeedableRng};
 use safe_nd::{Account, ClientFullId, PublicKey};
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashSet, sync::Arc};
+use std::{net::SocketAddr, time::Duration};
 use tiny_keccak::sha3_256;
 
 /// Barebones Client object used for testing purposes.
@@ -139,7 +138,7 @@ impl Client for CoreClient {
         self.public_key().await
     }
 
-    async fn config(&self) -> Option<BootstrapConfig> {
+    async fn config(&self) -> Option<HashSet<SocketAddr>> {
         None
     }
 

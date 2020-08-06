@@ -33,14 +33,6 @@
 
 // Public exports. See https://github.com/maidsafe/safe_client_libs/wiki/Export-strategy.
 
-// Export FFI interface.
-
-pub use ffi::arrays::*;
-pub use ffi::ipc::req::*;
-pub use ffi::ipc::resp::*;
-pub use ffi::nfs::*;
-pub use ffi::*;
-
 // Export public core interface.
 
 pub use self::client::{
@@ -52,7 +44,7 @@ pub use self::client::{mock_vault_path, MockConnectionManager as ConnectionManag
 pub use self::config_handler::config_dir;
 #[cfg(not(feature = "mock-network"))]
 pub use self::connection_manager::ConnectionManager;
-pub use self::errors::{core_error_code, safe_nd_error_core, CoreError};
+pub use self::errors::CoreError;
 pub use self::network_event::{NetworkEvent, NetworkRx, NetworkTx};
 pub use self::self_encryption_storage::{
     SEStorageError as SelfEncryptionStorageError, SelfEncryptionStorage,
@@ -66,16 +58,8 @@ pub mod blob;
 pub mod client;
 /// Config file handling.
 pub mod config_handler;
-/// Core structs and associated functionality
-pub mod core_structs;
 /// Cryptographic utilities.
 pub mod crypto;
-/// FFI.
-pub mod ffi;
-/// Inter-Process Communication utilities.
-pub mod ipc;
-/// NFS utilities.
-pub mod nfs;
 /// Implements the Self Encryption storage trait.
 pub mod self_encryption_storage;
 /// Utility functions.

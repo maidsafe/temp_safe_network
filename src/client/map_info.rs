@@ -8,13 +8,9 @@
 
 use crate::crypto::shared_secretbox;
 use crate::errors::CoreError;
-use crate::ffi::arrays::{SymNonce, SymSecretKey};
-use crate::ffi::{md_kind_clone_from_repr_c, md_kind_into_repr_c, MapInfo as FfiMapInfo};
-use crate::ipc::IpcError;
 use crate::utils::{
     self, symmetric_decrypt, symmetric_encrypt, SymEncKey, SymEncNonce, SYM_ENC_NONCE_LEN,
 };
-use ffi_utils::ReprC;
 use safe_nd::{MapAddress, MapKind, MapSeqEntries, MapSeqEntryAction, MapSeqValue};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -154,30 +150,6 @@ impl MapInfo {
             self.enc_info = Some(new_enc_info);
         }
     }
-
-    /// Construct FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> FfiMapInfo {
-        let (name, type_tag, kind) = (self.name().0, self.type_tag(), self.kind());
-        let seq = md_kind_into_repr_c(kind);
-
-        let (has_enc_info, enc_key, enc_nonce) = enc_info_into_repr_c(self.enc_info);
-        let (has_new_enc_info, new_enc_key, new_enc_nonce) =
-            enc_info_into_repr_c(self.new_enc_info);
-
-        FfiMapInfo {
-            seq,
-            name,
-            type_tag,
-
-            has_enc_info,
-            enc_key,
-            enc_nonce,
-
-            has_new_enc_info,
-            new_enc_key,
-            new_enc_nonce,
-        }
-    }
 }
 
 /// Encrypt the entries (both keys and values) using the `MapInfo`.
@@ -293,61 +265,6 @@ fn enc_entry_key(
         unwrap!(sha3_256(&pt)[..SYM_ENC_NONCE_LEN].try_into())
     };
     symmetric_encrypt(plain_text, key, Some(&nonce))
-}
-
-impl ReprC for MapInfo {
-    type C = *const FfiMapInfo;
-    type Error = IpcError;
-
-    #[allow(unsafe_code)]
-    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let FfiMapInfo {
-            seq,
-            name,
-            type_tag,
-
-            has_enc_info,
-            enc_key,
-            enc_nonce,
-
-            has_new_enc_info,
-            new_enc_key,
-            new_enc_nonce,
-        } = *repr_c;
-
-        let name = XorName(name);
-        let kind = md_kind_clone_from_repr_c(seq);
-
-        Ok(Self {
-            address: MapAddress::from_kind(kind, name, type_tag),
-            enc_info: enc_info_from_repr_c(has_enc_info, enc_key, enc_nonce),
-            new_enc_info: enc_info_from_repr_c(has_new_enc_info, new_enc_key, new_enc_nonce),
-        })
-    }
-}
-
-// Helper function for converting to FFI representation.
-fn enc_info_into_repr_c(
-    info: Option<(shared_secretbox::Key, SymEncNonce)>,
-) -> (bool, SymSecretKey, SymNonce) {
-    if let Some((key, nonce)) = info {
-        (true, *key, nonce)
-    } else {
-        (false, Default::default(), Default::default())
-    }
-}
-
-// Helper function for converting from FFI representation.
-fn enc_info_from_repr_c(
-    is_set: bool,
-    key: SymSecretKey,
-    nonce: SymNonce,
-) -> Option<(shared_secretbox::Key, SymEncNonce)> {
-    if is_set {
-        Some((shared_secretbox::Key::from_raw(&key), nonce))
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]

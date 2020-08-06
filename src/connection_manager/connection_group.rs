@@ -504,10 +504,7 @@ impl Connected {
                     } => {
                         warn!(
                             "CmdError: from: {:?}, correlation_id: {:?}, error: {:?}, msg_id: {:?}",
-                            cmd_origin,
-                            correlation_id,
-                            &error,
-                            id
+                            cmd_origin, correlation_id, &error, id
                         );
                         // let _ = self.response_manager.handle_query_response(correlation_id, response);
                     }

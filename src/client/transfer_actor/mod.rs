@@ -110,7 +110,10 @@ impl TransferActor {
                     return Err(CoreError::from(error));
                 }
 
-                warn!("No new transfer history  by TransferActor for pk: {:?}", public_key);
+                warn!(
+                    "No new transfer history  by TransferActor for pk: {:?}",
+                    public_key
+                );
 
                 warn!("current balance {:?}", actor.balance());
             }
@@ -146,7 +149,6 @@ impl TransferActor {
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
         let transfer_message = create_cmd_message(command);
-
 
         self.transfer_actor
             .lock()

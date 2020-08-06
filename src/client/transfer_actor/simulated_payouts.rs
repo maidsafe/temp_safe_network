@@ -34,7 +34,7 @@ impl TransferActor {
             amount,
             id: self.simulated_farming_payout_dot,
         };
-        
+
         let simluated_farming_cmd =
             Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
@@ -47,7 +47,6 @@ impl TransferActor {
 
         // If we're getting the payout for our own actor, update it here
         if to == self.safe_key.public_key() {
-
             info!("Applying simulated payout locally, via query for history...");
 
             // std::thread::sleep(std::time::Duration::from_millis(15500));

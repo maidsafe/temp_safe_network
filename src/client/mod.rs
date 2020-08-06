@@ -31,7 +31,6 @@ use crate::config_handler::Config;
 use crate::connection_manager::ConnectionManager;
 use crate::crypto::{shared_box, shared_secretbox};
 use crate::errors::CoreError;
-use crate::ipc::BootstrapConfig;
 use crate::network_event::{NetworkEvent, NetworkTx};
 use core::time::Duration;
 use futures::{channel::mpsc, lock::Mutex};
@@ -51,8 +50,11 @@ use std::sync::Arc;
 
 use xor_name::XorName;
 
-use std::collections::{BTreeMap, BTreeSet};
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    net::SocketAddr,
+};
 
 /// Capacity of the immutable data cache.
 pub const IMMUT_DATA_CACHE_SIZE: usize = 300;
@@ -64,7 +66,7 @@ pub const SEQUENCE_CRDT_REPLICA_SIZE: usize = 300;
 pub const COST_OF_PUT: Money = Money::from_nano(1);
 
 /// Return the `crust::Config` associated with the `crust::Service` (if any).
-pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
+pub fn bootstrap_config() -> Result<HashSet<SocketAddr>, CoreError> {
     Ok(Config::new().quic_p2p.hard_coded_contacts)
 }
 
@@ -134,7 +136,7 @@ pub trait Client: Clone + Send + Sync {
     async fn owner_key(&self) -> PublicKey;
 
     /// Return a `crust::Config` if the `Client` was initialized with one.
-    async fn config(&self) -> Option<BootstrapConfig>;
+    async fn config(&self) -> Option<HashSet<SocketAddr>>;
 
     /// Return an associated `ClientInner` type which is expected to contain fields associated with
     /// the implementing type.

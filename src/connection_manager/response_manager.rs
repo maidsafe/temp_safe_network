@@ -79,8 +79,7 @@ impl ResponseManager {
     ) -> Result<(), String> {
         info!(
             "Handling event: {:?} correlating to : {:#?}",
-            event,
-            correlating_message_id
+            event, correlating_message_id
         );
 
         let _ = self
