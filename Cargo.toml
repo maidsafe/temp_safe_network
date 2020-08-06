@@ -7,7 +7,7 @@
 # permissions and limitations relating to use of the SAFE Network Software.
 
 [workspace]
-members = ["safe_app", "safe_authenticator", "safe_authenticator_ffi", "safe_core", "tests"]
+members = ["safe_core", "tests"]
 
 [patch.crates-io]
 # safe-nd = { path = "../safe-nd"}
