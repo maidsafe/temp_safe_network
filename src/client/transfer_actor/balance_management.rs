@@ -58,12 +58,10 @@ impl TransferActor {
 
     /// Get the current balance for this TransferActor PK (by default) or any other...
     pub async fn get_balance_from_network(
-        &self,
+        &mut self,
         pk: Option<PublicKey>,
     ) -> Result<Money, CoreError> {
         info!("Getting balance for {:?} or self", pk);
-        let mut cm = self.connection_manager();
-
         let identity = self.safe_key.clone();
         let pub_id = identity.public_id();
 
@@ -74,9 +72,13 @@ impl TransferActor {
         let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
         let message = create_query_message(msg_contents);
-        let _bootstrapped = cm.bootstrap(identity).await;
+        self.connection_manager.bootstrap().await?;
 
-        match cm.send_query(&pub_id, &message).await? {
+        match self
+            .connection_manager
+            .send_query(&pub_id, &message)
+            .await?
+        {
             QueryResponse::GetBalance(balance) => balance.map_err(CoreError::from),
             _ => Err(CoreError::from("Unexpected response when querying balance")),
         }
@@ -85,7 +87,6 @@ impl TransferActor {
     /// Send money
     pub async fn send_money(&mut self, to: PublicKey, amount: Money) -> Result<(), CoreError> {
         info!("Sending money");
-        let mut cm = self.connection_manager();
 
         //set up message
         let safe_key = self.safe_key.clone();
@@ -137,7 +138,10 @@ impl TransferActor {
             debit_proof
         );
 
-        let _ = cm.send_cmd(&safe_key.public_id(), &message).await?;
+        let _ = self
+            .connection_manager
+            .send_cmd(&safe_key.public_id(), &message)
+            .await?;
 
         let mut actor = self.transfer_actor.lock().await;
         // First register with local actor, then reply.
@@ -169,7 +173,8 @@ mod tests {
         let (safe_key, cm) = get_keys_and_connection_manager().await;
         let (safe_key2, _cm) = get_keys_and_connection_manager().await;
 
-        let mut initial_actor = TransferActor::new(safe_key.clone(), cm.clone()).await?;
+        let mut initial_actor =
+            TransferActor::new(safe_key.clone(), self.connection_manager.clone()).await?;
 
         let _ = initial_actor
             .send_money(safe_key2.public_key(), Money::from_str("1")?)

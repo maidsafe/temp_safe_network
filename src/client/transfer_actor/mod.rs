@@ -31,7 +31,6 @@ pub mod write_apis;
 pub mod test_utils;
 
 /// Handle Money Transfers, requests and locally stores a balance
-#[derive(Clone, Debug)]
 pub struct TransferActor {
     transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator>>>,
     safe_key: SafeKey,
@@ -63,14 +62,8 @@ impl TransferActor {
         self.create_write_payment_proof().await
     }
 
-    /// Fetch our connection manager
-    pub fn connection_manager(&self) -> ConnectionManager {
-        self.connection_manager.clone()
-    }
-
     /// Retrieve the history of the acocunt from the network and apply to our local actor
     pub async fn get_history(&mut self) -> Result<(), CoreError> {
-        let mut cm = self.connection_manager();
         let public_key = self.safe_key.public_key();
         info!("Getting SafeTransfers history for pk: {:?}", public_key);
 
@@ -81,10 +74,13 @@ impl TransferActor {
 
         let message = create_query_message(msg_contents);
 
-        let _bootstrapped = cm.bootstrap(self.safe_key.clone()).await;
+        let _bootstrapped = self.connection_manager.bootstrap().await;
 
         // This is a normal response manager request. We want quorum on this for now...
-        let res = cm.send_query(&self.safe_key.public_id(), &message).await?;
+        let res = self
+            .connection_manager
+            .send_query(&self.safe_key.public_id(), &message)
+            .await?;
 
         let history = match res {
             QueryResponse::GetHistory(history) => history.map_err(CoreError::from),
@@ -126,8 +122,6 @@ impl TransferActor {
     async fn create_write_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
         info!("Sending requests for payment for write operation");
 
-        let mut cm = self.connection_manager();
-
         //set up message
         let safe_key = self.safe_key.clone();
 
@@ -158,7 +152,7 @@ impl TransferActor {
             }))?;
 
         // setup connection manager
-        let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
+        let _bootstrapped = self.connection_manager.bootstrap().await;
 
         let payment_proof: DebitAgreementProof = self
             .await_validation(&safe_key.public_id(), &transfer_message)
@@ -175,11 +169,12 @@ impl TransferActor {
         message: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
         info!("Awaiting transfer validation");
-        let mut cm = self.connection_manager();
+        //let mut cm = self.connection_manager();
 
-        let proof = cm.send_for_validation(&pub_id, &message, self).await?;
+        //let proof = self.connection_manager.send_cmd(&pub_id, &message).await?;
 
-        Ok(proof)
+        //Ok(proof)
+        unimplemented!()
     }
 }
 
@@ -193,7 +188,9 @@ mod tests {
     #[tokio::test]
     async fn transfer_actor_creation__() {
         let (safe_key, cm) = get_keys_and_connection_manager().await;
-        let _transfer_actor = TransferActor::new(safe_key, cm.clone()).await.unwrap();
+        let _transfer_actor = TransferActor::new(safe_key, self.connection_manager.clone())
+            .await
+            .unwrap();
 
         assert!(true);
     }

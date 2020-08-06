@@ -500,17 +500,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derive_more"
-version = "0.99.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "298998b1cf6b5b2c8a7b023dfd45821825ce3ba8a8af55c921a0e734e4653f76"
-dependencies = [
- "proc-macro2 1.0.19",
- "quote 1.0.7",
- "syn 1.0.38",
-]
-
-[[package]]
 name = "digest"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1369,14 +1358,12 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea016023972754185c58c0ce82b51866fc665aac3fa827c0df2477e6845698fc"
+source = "git+https://github.com/bochaco/quic-p2p.git?branch=async-api#41bcd2bf3cce38a6c308ddde9d9d40bf46f5cbce"
 dependencies = [
  "base64 0.10.1",
  "bincode",
  "bytes 0.5.6",
  "crossbeam-channel",
- "derive_more",
  "directories 1.0.2",
  "err-derive",
  "futures",

@@ -19,7 +19,7 @@ impl TransferActor {
     /// Get our replica instance PK set
     pub async fn get_replica_keys(
         safe_key: SafeKey,
-        mut cm: ConnectionManager,
+        cm: &mut ConnectionManager,
     ) -> Result<PublicKeySet, CoreError> {
         trace!("Getting replica keys for {:?}", safe_key);
 
@@ -27,7 +27,7 @@ impl TransferActor {
 
         let message = create_query_message(keys_query_msg);
 
-        let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
+        cm.bootstrap().await?;
         let res = cm.send_query(&safe_key.public_id(), &message).await?;
 
         match res {
@@ -42,7 +42,7 @@ impl TransferActor {
     /// Create a new Transfer Actor for a previously unused public key
     pub async fn new(
         safe_key: SafeKey,
-        connection_manager: ConnectionManager,
+        mut connection_manager: ConnectionManager,
     ) -> Result<Self, CoreError> {
         info!(
             "Initiating Safe Transfer Actor for PK {:?}",
@@ -52,7 +52,7 @@ impl TransferActor {
             Dot::new(PublicKey::from(SecretKey::random().public_key()), 0);
 
         let replicas_pk_set =
-            TransferActor::get_replica_keys(safe_key.clone(), connection_manager.clone()).await?;
+            TransferActor::get_replica_keys(safe_key.clone(), &mut connection_manager).await?;
 
         let validator = ClientTransferValidator {};
 
@@ -100,7 +100,7 @@ impl TransferActor {
     pub async fn for_existing_account(
         safe_key: SafeKey,
         // history: History,
-        connection_manager: ConnectionManager,
+        mut connection_manager: ConnectionManager,
     ) -> Result<Self, CoreError> {
         info!(
             "Setting up SafeTransferActor for existing PK : {:?}",
@@ -110,7 +110,7 @@ impl TransferActor {
             Dot::new(PublicKey::from(SecretKey::random().public_key()), 0);
 
         let replicas_pk_set =
-            TransferActor::get_replica_keys(safe_key.clone(), connection_manager.clone()).await?;
+            TransferActor::get_replica_keys(safe_key.clone(), &mut connection_manager).await?;
 
         let validator = ClientTransferValidator {};
 

@@ -198,23 +198,6 @@ pub trait Client: Clone + Send + Sync {
         inner.lock().await.timeout = duration;
     }
 
-    /// Restart the client and reconnect to the network.
-    async fn restart_network(&self) -> Result<(), CoreError> {
-        trace!("Restarting the network connection");
-
-        let inner = self.inner();
-        let mut inner = inner.lock().await;
-
-        inner.connection_manager.restart_network();
-
-        inner
-            .net_tx
-            .unbounded_send(NetworkEvent::Connected)
-            .map_err(|error| CoreError::from(format!("{:?}", error)))?;
-
-        Ok(())
-    }
-
     /// Put unsequenced mutable data to the network
     async fn put_unseq_mutable_data(&self, data: UnseqMap) -> Result<(), CoreError>
     where
@@ -537,7 +520,6 @@ pub trait Client: Clone + Send + Sync {
 
         let map_actions = MapEntryActions::Seq(actions);
         let address = MapAddress::Seq { name, tag };
-        let _cm = self.inner().lock().await.connection_manager.clone();
 
         let mut actor = self
             .transfer_actor()
@@ -561,7 +543,6 @@ pub trait Client: Clone + Send + Sync {
 
         let map_actions = MapEntryActions::Unseq(actions);
         let address = MapAddress::Unseq { name, tag };
-        let _cm = self.inner().lock().await.connection_manager.clone();
 
         let mut actor = self
             .transfer_actor()
@@ -935,14 +916,12 @@ pub trait Client: Clone + Send + Sync {
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
-        // Finally we can send the mutation to the network's replicas
-        let _cm = self.inner().lock().await.connection_manager.clone();
-
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
+        // Finally we can send the mutation to the network's replicas
         actor.append_to_sequence(op).await
     }
 
@@ -1033,14 +1012,12 @@ pub trait Client: Clone + Send + Sync {
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
-        // Finally we can send the mutation to the network's replicas
-        let _cm = self.inner().lock().await.connection_manager.clone();
-
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
+        // Finally we can send the mutation to the network's replicas
         actor.edit_sequence_public_perms(op).await
     }
 
@@ -1073,14 +1050,12 @@ pub trait Client: Clone + Send + Sync {
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
-        // Finally we can send the mutation to the network's replicas
-        let _cm = self.inner().lock().await.connection_manager.clone();
-
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
+        // Finally we can send the mutation to the network's replicas
         actor.edit_sequence_private_perms(op).await
     }
 
@@ -1128,14 +1103,12 @@ pub trait Client: Clone + Send + Sync {
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
-        // Finally we can send the mutation to the network's replicas
-        let _cm = self.inner().lock().await.connection_manager.clone();
-
         let mut actor = self
             .transfer_actor()
             .await
             .ok_or(CoreError::from("No TransferActor found for client."))?;
 
+        // Finally we can send the mutation to the network's replicas
         actor.set_sequence_owner(op).await
     }
 
@@ -1262,13 +1235,8 @@ where
     let (net_tx, _net_rx) = mpsc::unbounded();
 
     let mut cm = attempt_bootstrap(&Config::new().quic_p2p, &net_tx, full_id.clone()).await?;
-    let _actor = TransferActor::new(full_id.clone(), cm.clone());
 
-    let res = func(&mut cm, &full_id);
-
-    cm.disconnect(&full_id.public_id()).await?;
-
-    res
+    func(&mut cm, &full_id)
 }
 
 /// Create a new mock balance at an arbitrary address.
@@ -1279,10 +1247,10 @@ pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<
 
     let (net_tx, _net_rx) = mpsc::unbounded();
 
-    let mut cm = attempt_bootstrap(&Config::new().quic_p2p, &net_tx, full_id.clone()).await?;
+    let cm = attempt_bootstrap(&Config::new().quic_p2p, &net_tx, full_id.clone()).await?;
 
     // actor starts with 10....
-    let mut actor = TransferActor::new(full_id.clone(), cm.clone()).await?;
+    let mut actor = TransferActor::new(full_id.clone(), cm).await?;
 
     let public_id = full_id.public_id();
 
@@ -1297,8 +1265,6 @@ pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<
     actor
         .trigger_simulated_farming_payout(public_key, amount)
         .await?;
-
-    cm.disconnect(&full_id.public_id()).await?;
 
     Ok(())
 }
@@ -1449,8 +1415,8 @@ pub async fn attempt_bootstrap(
     let mut attempts: u32 = 0;
 
     loop {
-        let mut connection_manager = ConnectionManager::new(qp2p_config.clone(), &net_tx.clone())?;
-        let res = connection_manager.bootstrap(safe_key.clone()).await;
+        let mut connection_manager = ConnectionManager::new(qp2p_config.clone(), safe_key.clone())?;
+        let res = connection_manager.bootstrap().await;
         match res {
             Ok(()) => return Ok(connection_manager),
             Err(err) => {
