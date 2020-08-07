@@ -28,7 +28,7 @@ impl TransferActor {
         let message = create_query_message(keys_query_msg);
 
         cm.bootstrap().await?;
-        let res = cm.send_query(&safe_key.public_id(), &message).await?;
+        let res = cm.send_query(&message).await?;
 
         match res {
             QueryResponse::GetReplicaKeys(pk_set) => Ok(pk_set?),

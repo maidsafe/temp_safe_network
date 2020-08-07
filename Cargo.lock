@@ -1358,7 +1358,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "git+https://github.com/bochaco/quic-p2p.git?branch=async-api#41bcd2bf3cce38a6c308ddde9d9d40bf46f5cbce"
+source = "git+https://github.com/bochaco/quic-p2p.git?branch=async-api#63806b7804e3665fa9add1786a63edb2468508d6"
 dependencies = [
  "base64 0.10.1",
  "bincode",

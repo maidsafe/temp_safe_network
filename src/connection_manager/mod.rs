@@ -6,29 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use tokio::time::timeout;
-
-use crate::{client::SafeKey, network_event::NetworkEvent, network_event::NetworkTx, CoreError};
-use log::{error, info, trace};
-use safe_nd::{
-    BlsProof, DebitAgreementProof, HandshakeRequest, HandshakeResponse, Message, MessageId,
-    MsgEnvelope, MsgSender, NodePublicId, Proof, PublicId, QueryResponse,
-};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    time::Duration,
-};
-
+use crate::{client::SafeKey, CoreError};
 use bincode::{deserialize, serialize};
 use bytes::Bytes;
+use log::{error, info, trace};
 use quic_p2p::{self, Config as QuicP2pConfig, Connection, QuicP2pAsync};
+use safe_nd::{
+    BlsProof, HandshakeRequest, HandshakeResponse, Message, MsgEnvelope, MsgSender, Proof,
+    PublicId, QueryResponse,
+};
 use std::net::SocketAddr;
 
-const CONNECTION_TIMEOUT_SECS: u64 = 30;
-
-/// Initialises `QuicP2p` instance. Establishes new connections.
+/// Initialises `QuicP2p` instance which can bootstrap to the network, establish
+/// connections and send messages to several nodes, as well as await responses from them.
 pub struct ConnectionManager {
-    //config: QuicP2pConfig,
     full_id: SafeKey,
     quic_p2p: QuicP2pAsync,
     elders: Vec<Connection>,
@@ -47,7 +38,7 @@ impl ConnectionManager {
         })
     }
 
-    /// Connect to Client Handlers that manage the provided ID.
+    /// Bootstrap to the network maintaining connections to several nodes.
     pub async fn bootstrap(&mut self) -> Result<(), CoreError> {
         trace!(
             "Trying to bootstrap to the network with public_id: {:?}",
@@ -62,14 +53,13 @@ impl ConnectionManager {
         self.connect_to_elders(elders_addrs).await
     }
 
-    /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`.
-    pub async fn send_cmd(&mut self, pub_id: &PublicId, msg: &Message) -> Result<(), CoreError> {
+    /// Send a `Message` to the network without awaiting for a response.
+    pub async fn send_cmd(&mut self, msg: &Message) -> Result<(), CoreError> {
         info!("Sending command message {:?} w/ id: {:?}", &msg, &msg.id());
         let envelope = self.get_envelope_for_message(msg.clone())?;
         let msg_bytes = Bytes::from(serialize(&envelope)?);
-        // send withou awaiting for a response
-        trace!("Sending command to Elders...");
 
+        trace!("Sending command to Elders...");
         // TODO: send to all elders in parallel and find majority on responses
         self.elders[0]
             .send_only(msg_bytes)
@@ -77,18 +67,13 @@ impl ConnectionManager {
             .map_err(|err| CoreError::from(err))
     }
 
-    /// Send `message` via the `ConnectionGroup` specified by our given `pub_id`.
-    pub async fn send_query(
-        &mut self,
-        pub_id: &PublicId,
-        msg: &Message,
-    ) -> Result<QueryResponse, CoreError> {
+    /// Send a `Message` to the network awaiting for the response.
+    pub async fn send_query(&mut self, msg: &Message) -> Result<QueryResponse, CoreError> {
         info!("Sending query message {:?} w/ id: {:?}", &msg, &msg.id());
         let envelope = self.get_envelope_for_message(msg.clone())?;
         let msg_bytes = Bytes::from(serialize(&envelope)?);
-        // send and await response
-        trace!("Sending message to Elders...");
 
+        trace!("Sending message to Elders...");
         // TODO: send to all elders in parallel and find majority on responses
         let response = self.elders[0].send(msg_bytes).await?;
 
@@ -96,11 +81,6 @@ impl ConnectionManager {
             Ok(res) => {
                 trace!("Query response received");
                 Ok(res)
-            }
-            Ok(_) => {
-                let err_msg = "Unexpected message type when expecting a 'Response'.".to_string();
-                error!("{}", err_msg);
-                Err(CoreError::Unexpected(err_msg))
             }
             Err(e) => {
                 let err_msg = format!("Unexpected error: {:?}", e);
@@ -112,6 +92,7 @@ impl ConnectionManager {
 
     // Private helpers
 
+    // Put a `Message` in an envelope so it can be sent to the network
     fn get_envelope_for_message(&self, message: Message) -> Result<MsgEnvelope, CoreError> {
         trace!("Putting message in envelope: {:?}", message);
         let sign = self.full_id.sign(&serialize(&message)?);
@@ -127,6 +108,8 @@ impl ConnectionManager {
         })
     }
 
+    // Bootstrap to the network to obtaining the list of
+    // nodes we should establish connections with
     async fn bootstrap_and_handshake(&mut self) -> Result<Vec<SocketAddr>, CoreError> {
         trace!("Bootstrapping with contacts...");
         let mut node_connection = self.quic_p2p.bootstrap().await?;
@@ -157,6 +140,8 @@ impl ConnectionManager {
         }
     }
 
+    // Connect to a set of Elders nodes which will be
+    // the receipients of our messages on the network.
     async fn connect_to_elders(&mut self, elders_addrs: Vec<SocketAddr>) -> Result<(), CoreError> {
         // TODO: connect to all Elders in parallel
         let peer_addr = elders_addrs[0];

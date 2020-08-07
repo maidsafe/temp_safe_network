@@ -31,7 +31,7 @@ use crate::config_handler::Config;
 use crate::connection_manager::ConnectionManager;
 use crate::crypto::{shared_box, shared_secretbox};
 use crate::errors::CoreError;
-use crate::network_event::{NetworkEvent, NetworkTx};
+use crate::network_event::NetworkTx;
 use core::time::Duration;
 use futures::{channel::mpsc, lock::Mutex};
 use log::{debug, info, trace};
@@ -107,7 +107,7 @@ async fn send_query(client: &impl Client, query: Query) -> Result<QueryResponse,
     let message = create_query_message(query);
     let inner = client.inner();
     let cm = &mut inner.lock().await.connection_manager;
-    cm.send_query(&client.public_id().await, &message).await
+    cm.send_query(&message).await
 }
 
 /// Trait providing an interface for self-authentication client implementations, so they can

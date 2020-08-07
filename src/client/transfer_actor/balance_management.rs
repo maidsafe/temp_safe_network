@@ -63,8 +63,6 @@ impl TransferActor {
     ) -> Result<Money, CoreError> {
         info!("Getting balance for {:?} or self", pk);
         let identity = self.safe_key.clone();
-        let pub_id = identity.public_id();
-
         let public_key = pk.unwrap_or(identity.public_key());
 
         // let request = Self::wrap_money_request(Query::GetBalance(public_key));
@@ -74,11 +72,7 @@ impl TransferActor {
         let message = create_query_message(msg_contents);
         self.connection_manager.bootstrap().await?;
 
-        match self
-            .connection_manager
-            .send_query(&pub_id, &message)
-            .await?
-        {
+        match self.connection_manager.send_query(&message).await? {
             QueryResponse::GetBalance(balance) => balance.map_err(CoreError::from),
             _ => Err(CoreError::from("Unexpected response when querying balance")),
         }
@@ -132,16 +126,12 @@ impl TransferActor {
         let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(debit_proof.clone()));
 
         let message = create_cmd_message(msg_contents);
-        let safe_key = self.safe_key.clone();
         trace!(
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",
             debit_proof
         );
 
-        let _ = self
-            .connection_manager
-            .send_cmd(&safe_key.public_id(), &message)
-            .await?;
+        let _ = self.connection_manager.send_cmd(&message).await?;
 
         let mut actor = self.transfer_actor.lock().await;
         // First register with local actor, then reply.

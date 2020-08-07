@@ -77,10 +77,7 @@ impl TransferActor {
         let _bootstrapped = self.connection_manager.bootstrap().await;
 
         // This is a normal response manager request. We want quorum on this for now...
-        let res = self
-            .connection_manager
-            .send_query(&self.safe_key.public_id(), &message)
-            .await?;
+        let res = self.connection_manager.send_query(&message).await?;
 
         let history = match res {
             QueryResponse::GetHistory(history) => history.map_err(CoreError::from),

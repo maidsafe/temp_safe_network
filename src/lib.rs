@@ -70,12 +70,5 @@ mod connection_manager;
 mod errors;
 mod network_event;
 
-/// All Maidsafe tagging should positive-offset from this.
-pub const MAIDSAFE_TAG: u64 = 5_483_000;
 /// `Map` type tag for a directory.
 pub const DIR_TAG: u64 = 15_000;
-
-/// Gets name of the dedicated container of the given app.
-pub fn app_container_name(app_id: &str) -> String {
-    format!("apps/{}", app_id)
-}
