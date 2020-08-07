@@ -6,15 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-/// User Account information.
-pub mod account;
-/// Core client used for testing purposes.
-#[cfg(any(test, feature = "testing"))]
-pub mod core_client;
 /// `MapInfo` utilities.
 pub mod map_info;
-/// Various APIs wrapped to provide resiliance for common network operations.
-pub mod recoverable_apis;
+
 /// Safe Transfers wrapper, with Money APIs
 pub mod transfer_actor;
 
@@ -23,9 +17,7 @@ use async_trait::async_trait;
 // safe-transfers wrapper
 pub use self::transfer_actor::{ClientTransferValidator, TransferActor};
 
-pub use self::account::ClientKeys;
 pub use self::map_info::MapInfo;
-pub use safe_nd::SafeKey;
 
 use crate::config_handler::Config;
 use crate::connection_manager::ConnectionManager;
@@ -70,88 +62,84 @@ pub fn bootstrap_config() -> Result<HashSet<SocketAddr>, CoreError> {
     Ok(Config::new().quic_p2p.hard_coded_contacts)
 }
 
-// Build and sign Cmd Message Envelope
-pub(crate) fn create_cmd_message(msg_contents: Cmd) -> Message {
-    trace!("Creating cmd message");
-    let mut rng = thread_rng();
-    let random_xor = rng.gen::<XorName>();
-    let id = MessageId(random_xor);
-    println!("cmd msg id: {:?}", id);
+/// Client object
+#[derive(Clone)]
+pub struct Client {
+    full_id: ClientFullId,
 
-    Message::Cmd {
-        cmd: msg_contents,
-        id,
-    }
-}
+    transfer_actor: Arc<Mutex<TransferActor>>,
 
-// Build and sign Query Message Envelope
-pub(crate) fn create_query_message(msg_contents: Query) -> Message {
-    trace!("Creating query message");
-
-    let mut rng = thread_rng();
-    let random_xor = rng.gen::<XorName>();
-    let id = MessageId(random_xor);
-
-    println!("query msg id: {:?}", id);
-    Message::Query {
-        query: msg_contents,
-        id,
-    }
-}
-
-async fn send_query(client: &impl Client, query: Query) -> Result<QueryResponse, CoreError> {
-    // `sign` should be false for GETs on published data, true otherwise.
-
-    println!("-->>Request going out: {:?}", query);
-
-    let message = create_query_message(query);
-    let inner = client.inner();
-    let cm = &mut inner.lock().await.connection_manager;
-    cm.send_query(&message).await
+    blob_cache: Arc<Mutex<LruCache<BlobAddress, Blob>>>,
+    /// Sequence CRDT replica
+    sequence_cache: Arc<Mutex<LruCache<SequenceAddress, Sequence>>>,
 }
 
 /// Trait providing an interface for self-authentication client implementations, so they can
 /// interface all requests from high-level APIs to the actual routing layer and manage all
 /// interactions with it. Clients are non-blocking, with an asynchronous API using the futures
 /// abstraction from the futures-rs crate.
-#[async_trait]
-pub trait Client: Clone + Send + Sync {
-    /// Associated message type.
-    type Context;
+impl Client {
+    /// This will create a basic Client object which is sufficient only for testing purposes.
+    pub async fn new() -> Result<Self, CoreError> {
+        // TODO: generate a random SecretKey IF none provided.
+        use rand::thread_rng;
 
-    /// Return the client's ID.
-    async fn full_id(&self) -> SafeKey;
+        let mut rng = thread_rng();
+        let full_id = ClientFullId::new_ed25519(&mut rng);
 
+        // Create the connection manager
+        let mut connection_manager =
+            attempt_bootstrap(&Config::new().quic_p2p, full_id.clone()).await?;
+
+        let mut the_actor = TransferActor::new(full_id.clone(), connection_manager).await?;
+        let transfer_actor = the_actor.clone();
+
+        // TODO: Do we need this again?
+        // connection_manager
+        // .bootstrap(maid_keys.client_safe_key())
+        // .await?;
+
+        Self {
+            full_id,
+            transfer_actor,
+            blob_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+            sequence_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
+        }
+    }
+
+    async fn full_id(&self) -> ClientFullId {
+        self.full_id
+    }
+
+    async fn owner_key(&self) -> PublicKey {
+        self.public_key().await
+    }
+
+    async fn public_encryption_key(&self) -> threshold_crypto::PublicKey {
+        self.keys.enc_public_key
+    }
+
+    async fn secret_encryption_key(&self) -> shared_box::SecretKey {
+        self.keys.enc_secret_key.clone()
+    }
+
+    async fn secret_symmetric_key(&self) -> shared_secretbox::Key {
+        self.keys.enc_key.clone()
+    }
+
+    /// Return the TransferActor for this client
+    async fn transfer_actor(&self) -> Option<TransferActor> {
+        self.transfer_actor.clone()
+    }
     /// Return the client's public ID.
-    async fn public_id(&self) -> PublicId {
+    pub async fn public_id(&self) -> PublicId {
         self.full_id().await.public_id()
     }
 
     /// Returns the client's public key.
-    async fn public_key(&self) -> PublicKey {
+    pub async fn public_key(&self) -> PublicKey {
         self.full_id().await.public_key()
     }
-
-    /// Returns the client's owner key.
-    async fn owner_key(&self) -> PublicKey;
-
-    /// Return a `crust::Config` if the `Client` was initialized with one.
-    async fn config(&self) -> Option<HashSet<SocketAddr>>;
-
-    /// Return an associated `ClientInner` type which is expected to contain fields associated with
-    /// the implementing type.
-    fn inner(&self) -> Arc<Mutex<Inner>>
-    where
-        Self: Sized;
-
-    /// Return the TransferActor for this client
-    async fn transfer_actor(&self) -> Option<TransferActor>;
-
-    /// Return the public encryption key.
-    async fn public_encryption_key(&self) -> threshold_crypto::PublicKey;
-
-    /// Return the secret encryption key.
-    async fn secret_encryption_key(&self) -> shared_box::SecretKey;
 
     /// Return the public and secret encryption keys.
     async fn encryption_keypair(&self) -> (threshold_crypto::PublicKey, shared_box::SecretKey) {
@@ -160,42 +148,9 @@ pub trait Client: Clone + Send + Sync {
         (enc_key, sec_key)
     }
 
-    /// Return the symmetric encryption key.
-    async fn secret_symmetric_key(&self) -> shared_secretbox::Key;
-
-    // /// Create a `Message` from the given request.
-    // /// This function adds the requester signature and message ID.
-    // async fn compose_message(&self, request: Request, sign: bool) -> Result<Message, CoreError> {
-    //     let message_id = MessageId::new();
-
-    //     let signature = if sign {
-    //         match request.clone() {
-    //             Query::Data(req) => {
-    //                 let serialised_req =
-    //                     bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
-    //                 Some(self.full_id().await.sign(&serialised_req))
-    //             }
-    //             // Request::Node(req) => {
-    //             //     let serialised_req =
-    //             //         bincode::serialize(&(&req, message_id)).map_err(CoreError::from)?;
-    //             //     Some(self.full_id().await.sign(&serialised_req))
-    //             // }
-    //         }
-    //     } else {
-    //         None
-    //     };
-
-    //     Ok(Message::Request {
-    //         request,
-    //         message_id,
-    //         signature,
-    //     })
-    // }
-
     /// Set request timeout.
     async fn set_timeout(&self, duration: Duration) {
-        let inner = self.inner();
-        inner.lock().await.timeout = duration;
+        self.timeout = duration;
     }
 
     /// Put unsequenced mutable data to the network
@@ -284,30 +239,13 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("Get balance for {:?}", client_id);
-        // TODO: another api for getting local only...
-        // TODO: handle client_id passed in, or remove
 
-        match self.full_id().await {
-            SafeKey::Client(_) => {
-                // we're a standard client grabbing our own key's balance
-                self.transfer_actor()
-                    .await
-                    .ok_or(CoreError::from("No TransferActor found for client."))?
-                    .get_balance_from_network(None)
-                    .await
-            }
-            SafeKey::App(_) => {
-                // we're an app. We have no balance made at this key (yet in general)
-                // so we want to check our owner's balance.
-                // TODO: Apps should have their own keys w/ loaded amounts.
-                // ownership / perms should come down to keys on a wallet... (how would this look vault side?)
-                self.transfer_actor()
-                    .await
-                    .ok_or(CoreError::from("No TransferActor found for app client."))?
-                    .get_balance_from_network(Some(self.owner_key().await))
-                    .await
-            }
-        }
+        // we're a standard client grabbing our own key's balance
+        self.transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?
+            .get_balance_from_network(None)
+            .await
     }
 
     /// Put immutable data to the network.
@@ -334,27 +272,26 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("Fetch Blob");
 
-        let inner = self.inner();
-        if let Some(data) = inner.lock().await.blob_cache.get_mut(&address) {
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+
+        if let Some(data) = self.blob_cache.get_mut(&address) {
             trace!("Blob found in cache.");
             return Ok(data.clone());
         }
 
-        let inner = Arc::downgrade(&self.inner());
-        let res = send_query(self, Query::Data(DataQuery::Blob(BlobRead::Get(address)))).await?;
+        let res = actor
+            .send_query(self, Query::Data(DataQuery::Blob(BlobRead::Get(address))))
+            .await?;
         let data = match res {
             QueryResponse::GetBlob(res) => res.map_err(CoreError::from),
             _ => return Err(CoreError::ReceivedUnexpectedEvent),
         }?;
 
-        if let Some(inner) = inner.upgrade() {
-            // Put to cache
-            let _ = inner
-                .lock()
-                .await
-                .blob_cache
-                .put(*data.address(), data.clone());
-        };
+        // Put to cache
+        self.blob_cache.put(*data.address(), data.clone());
         Ok(data)
     }
 
@@ -363,20 +300,10 @@ pub trait Client: Clone + Send + Sync {
     where
         Self: Sized,
     {
-        let inner = self.inner();
-        if inner
-            .lock()
-            .await
-            .blob_cache
-            .pop(&BlobAddress::Private(name))
-            .is_some()
-        {
+        if self.blob_cache.pop(&BlobAddress::Private(name)).is_some() {
             trace!("Deleted PrivateBlob from cache.");
         }
 
-        let inner = self.inner().clone();
-
-        let _ = Arc::downgrade(&inner);
         trace!("Delete Private Blob at {:?}", name);
 
         let mut actor = self
@@ -408,12 +335,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("Fetch Unsequenced Mutable Data");
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::Get(MapAddress::Unseq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::Get(MapAddress::Unseq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|map| match map {
                 Map::Unseq(data) => Ok(data),
@@ -434,15 +366,20 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("Fetch MapValue for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::GetValue {
-                address: MapAddress::Seq { name, tag },
-                key,
-            }),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::GetValue {
+                    address: MapAddress::Seq { name, tag },
+                    key,
+                }),
+            )
+            .await?
         {
             QueryResponse::GetMapValue(res) => {
                 res.map_err(CoreError::from).and_then(|value| match value {
@@ -465,15 +402,20 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("Fetch MapValue for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::GetValue {
-                address: MapAddress::Unseq { name, tag },
-                key,
-            }),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::GetValue {
+                    address: MapAddress::Unseq { name, tag },
+                    key,
+                }),
+            )
+            .await?
         {
             QueryResponse::GetMapValue(res) => {
                 res.map_err(CoreError::from).and_then(|value| match value {
@@ -491,12 +433,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("Fetch Sequenced Mutable Data");
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::Get(MapAddress::Seq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::Get(MapAddress::Seq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::GetMap(res) => res.map_err(CoreError::from).and_then(|map| match map {
                 Map::Seq(data) => Ok(data),
@@ -558,12 +505,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("GetMapShell for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::GetShell(MapAddress::Seq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::GetShell(MapAddress::Seq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::GetMapShell(res) => {
                 res.map_err(CoreError::from).and_then(|map| match map {
@@ -582,11 +534,17 @@ pub trait Client: Clone + Send + Sync {
     {
         trace!("GetMapShell for {:?}", name);
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::GetShell(MapAddress::Unseq { name, tag })),
-        )
-        .await?
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::GetShell(MapAddress::Unseq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::GetMapShell(res) => {
                 res.map_err(CoreError::from).and_then(|map| match map {
@@ -604,8 +562,15 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("GetMapVersion for {:?}", address);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(self, wrap_map_read(MapRead::GetVersion(address))).await? {
+        match actor
+            .send_query(self, wrap_map_read(MapRead::GetVersion(address)))
+            .await?
+        {
             QueryResponse::GetMapVersion(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -621,12 +586,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("ListMapEntries for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::ListEntries(MapAddress::Unseq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::ListEntries(MapAddress::Unseq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::ListMapEntries(res) => {
                 res.map_err(CoreError::from)
@@ -649,12 +619,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("ListSeqMapEntries for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::ListEntries(MapAddress::Seq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::ListEntries(MapAddress::Seq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::ListMapEntries(res) => {
                 res.map_err(CoreError::from)
@@ -673,8 +648,15 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("ListMapKeys for {:?}", address);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(self, wrap_map_read(MapRead::ListKeys(address))).await? {
+        match actor
+            .send_query(self, wrap_map_read(MapRead::ListKeys(address)))
+            .await?
+        {
             QueryResponse::ListMapKeys(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -690,12 +672,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("List MapValues for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::ListValues(MapAddress::Seq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::ListValues(MapAddress::Seq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::ListMapValues(res) => {
                 res.map_err(CoreError::from)
@@ -718,12 +705,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("GetMapUserPermissions for {:?}", address);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::ListUserPermissions { address, user }),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::ListUserPermissions { address, user }),
+            )
+            .await?
         {
             QueryResponse::ListMapUserPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
@@ -740,12 +732,17 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("List MapValues for {:?}", name);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(
-            self,
-            wrap_map_read(MapRead::ListValues(MapAddress::Unseq { name, tag })),
-        )
-        .await?
+        match actor
+            .send_query(
+                self,
+                wrap_map_read(MapRead::ListValues(MapAddress::Unseq { name, tag })),
+            )
+            .await?
         {
             QueryResponse::ListMapValues(res) => {
                 res.map_err(CoreError::from)
@@ -782,12 +779,7 @@ pub trait Client: Clone + Send + Sync {
         actor.new_sequence(data.clone()).await?;
 
         // Store in local Sequence CRDT replica
-        let _ = self
-            .inner()
-            .lock()
-            .await
-            .sequence_cache
-            .put(*data.address(), data);
+        let _ = self.sequence_cache.put(*data.address(), data);
 
         Ok(address)
     }
@@ -815,12 +807,7 @@ pub trait Client: Clone + Send + Sync {
         actor.new_sequence(data.clone()).await?;
 
         // Store in local Sequence CRDT replica
-        let _ = self
-            .inner()
-            .lock()
-            .await
-            .sequence_cache
-            .put(*data.address(), data);
+        let _ = self.sequence_cache.put(*data.address(), data);
 
         Ok(address)
     }
@@ -832,14 +819,22 @@ pub trait Client: Clone + Send + Sync {
         // TODO: implement some logic to refresh data from the network if local replica
         // is too old, to mitigate the risk of successfully apply mutations locally but which
         // can fail on other replicas, e.g. due to being out of sync with permissions/owner
-        if let Some(sequence) = self.inner().lock().await.sequence_cache.get(&address) {
+        if let Some(sequence) = self.sequence_cache.get(&address) {
             trace!("Sequence found in local CRDT replica");
             return Ok(sequence.clone());
         }
 
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
+
         trace!("Sequence not found in local CRDT replica");
         // Let's fetch it from the network then
-        let sequence = match send_query(self, wrap_seq_read(SequenceRead::Get(address))).await? {
+        let sequence = match actor
+            .send_query(self, wrap_seq_read(SequenceRead::Get(address)))
+            .await?
+        {
             QueryResponse::GetSequence(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }?;
@@ -847,9 +842,6 @@ pub trait Client: Clone + Send + Sync {
         trace!("Store Sequence in local CRDT replica");
         // Store in local Sequence CRDT replica
         let _ = self
-            .inner()
-            .lock()
-            .await
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
@@ -910,9 +902,6 @@ pub trait Client: Clone + Send + Sync {
 
         // Update the local Sequence CRDT replica
         let _ = self
-            .inner()
-            .lock()
-            .await
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
@@ -1006,9 +995,6 @@ pub trait Client: Clone + Send + Sync {
 
         // Update the local Sequence CRDT replica
         let _ = self
-            .inner()
-            .lock()
-            .await
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
@@ -1044,9 +1030,6 @@ pub trait Client: Clone + Send + Sync {
 
         // Update the local Sequence CRDT replica
         let _ = self
-            .inner()
-            .lock()
-            .await
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
@@ -1097,9 +1080,6 @@ pub trait Client: Clone + Send + Sync {
 
         // Update the local Sequence CRDT replica
         let _ = self
-            .inner()
-            .lock()
-            .await
             .sequence_cache
             .put(*sequence.address(), sequence.clone());
 
@@ -1117,7 +1097,7 @@ pub trait Client: Clone + Send + Sync {
         trace!("Delete Private Sequence Data {:?}", address.name());
 
         // Delete it from local Sequence CRDT replica
-        let _ = self.inner().lock().await.sequence_cache.pop(&address);
+        let _ = self.sequence_cache.pop(&address);
 
         trace!("Deleted local Private Sequence {:?}", address.name());
 
@@ -1140,8 +1120,15 @@ pub trait Client: Clone + Send + Sync {
         Self: Sized,
     {
         trace!("List MapPermissions for {:?}", address);
+        let actor = self
+            .transfer_actor()
+            .await
+            .ok_or(CoreError::from("No TransferActor found for client."))?;
 
-        match send_query(self, wrap_map_read(MapRead::ListPermissions(address))).await? {
+        match actor
+            .send_query(self, wrap_map_read(MapRead::ListPermissions(address)))
+            .await?
+        {
             QueryResponse::ListMapPermissions(res) => res.map_err(CoreError::from),
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         }
@@ -1226,15 +1213,13 @@ pub trait Client: Clone + Send + Sync {
 }
 
 /// Creates a throw-away client to execute requests sequentially.
-pub async fn temp_client<F, R>(identity: &ClientFullId, mut func: F) -> Result<R, CoreError>
+pub async fn temp_client<F, R>(full_id: &ClientFullId, mut func: F) -> Result<R, CoreError>
 where
-    F: FnMut(&mut ConnectionManager, &SafeKey) -> Result<R, CoreError>,
+    F: FnMut(&mut ConnectionManager, &ClientFullId) -> Result<R, CoreError>,
 {
-    let full_id = SafeKey::client(identity.clone());
-
     let (net_tx, _net_rx) = mpsc::unbounded();
 
-    let mut cm = attempt_bootstrap(&Config::new().quic_p2p, &net_tx, full_id.clone()).await?;
+    let mut cm = attempt_bootstrap(&Config::new().quic_p2p, full_id.clone()).await?;
 
     func(&mut cm, &full_id)
 }
@@ -1243,24 +1228,23 @@ where
 pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<(), CoreError> {
     trace!("Create test balance of {} for {:?}", amount, owner);
 
-    let full_id = SafeKey::client(owner.clone());
+    let full_id = owner.clone();
 
     let (net_tx, _net_rx) = mpsc::unbounded();
 
-    let cm = attempt_bootstrap(&Config::new().quic_p2p, &net_tx, full_id.clone()).await?;
+    let cm = attempt_bootstrap(&Config::new().quic_p2p, full_id.clone()).await?;
 
     // actor starts with 10....
-    let mut actor = TransferActor::new(full_id.clone(), cm).await?;
+    let mut actor = TransferActor::new(&full_id.clone(), cm).await?;
 
     let public_id = full_id.public_id();
 
-    // Create the balance for the client
-    let _new_balance_owner = match public_id.clone() {
-        PublicId::Client(id) => *id.public_key(),
-        x => return Err(CoreError::from(format!("Unexpected ID type {:?}", x))),
-    };
+    // TODO: Adjust this test... it's sending to itself?
 
-    let public_key = full_id.public_key();
+    // Create the balance for the client
+    let _new_balance_owner = public_id.public_key();
+
+    let public_key = *full_id.public_key();
 
     actor
         .trigger_simulated_farming_payout(public_key, amount)
@@ -1269,153 +1253,16 @@ pub async fn test_create_balance(owner: &ClientFullId, amount: Money) -> Result<
     Ok(())
 }
 
-/// This trait implements functions that are supposed to be called only by `CoreClient` and `AuthClient`.
-/// Applications are not allowed to `DELETE Map` and get/mutate auth keys, hence `AppClient` does not implement
-/// this trait.
-#[async_trait]
-pub trait AuthActions: Client + Clone + 'static {
-    /// Fetches a list of authorised keys and version.
-    async fn list_auth_keys_and_version(
-        &self,
-    ) -> Result<(BTreeMap<PublicKey, AppPermissions>, u64), CoreError>
-    where
-        Self: Sized,
-    {
-        trace!("ListAuthKeysAndVersion");
-
-        let client_pk = self.public_key().await;
-
-        match send_query(
-            self,
-            wrap_client_auth_query(AuthQuery::ListAuthKeysAndVersion { client: client_pk }),
-        )
-        .await?
-        {
-            QueryResponse::ListAuthKeysAndVersion(res) => res.map_err(CoreError::from),
-            _ => Err(CoreError::ReceivedUnexpectedEvent),
-        }
-    }
-
-    /// Adds a new authorised key.
-    async fn ins_auth_key(
-        &self,
-        key: PublicKey,
-        permissions: AppPermissions,
-        version: u64,
-    ) -> Result<(), CoreError>
-    where
-        Self: Sized,
-    {
-        trace!("InsAuthKey ({:?})", key);
-
-        self.transfer_actor()
-            .await
-            .ok_or(CoreError::from("No TransferActor found for client."))?
-            .insert_auth_key(key, permissions, version)
-            .await
-    }
-
-    /// Removes an authorised key.
-    async fn del_auth_key(&self, key: PublicKey, version: u64) -> Result<(), CoreError>
-    where
-        Self: Sized,
-    {
-        trace!("DelAuthKey ({:?})", key);
-
-        self.transfer_actor()
-            .await
-            .ok_or(CoreError::from("No TransferActor found for client."))?
-            .delete_auth_key(key, version)
-            .await
-    }
-
-    /// Delete Map from network
-    async fn delete_map(&self, address: MapAddress) -> Result<(), CoreError>
-    where
-        Self: Sized,
-    {
-        trace!("Delete entire Mutable Data at {:?}", address);
-
-        let mut actor = self
-            .transfer_actor()
-            .await
-            .ok_or(CoreError::from("No TransferActor found for client."))?;
-
-        actor.delete_map(address).await
-    }
-}
-
-// TODO: Consider deprecating this struct once trait fields are stable. See
-// https://github.com/nikomatsakis/fields-in-traits-rfc.
-/// Struct containing fields expected by the `Client` trait. Implementers of `Client` should be
-/// composed around this struct.
-#[allow(unused)] // FIXME
-pub struct Inner {
-    connection_manager: ConnectionManager,
-    blob_cache: LruCache<BlobAddress, Blob>,
-    /// Sequence CRDT replica
-    sequence_cache: LruCache<SequenceAddress, Sequence>,
-    timeout: Duration,
-    net_tx: NetworkTx,
-}
-
-impl Inner {
-    /// Create a new `ClientInner` object.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(connection_manager: ConnectionManager, timeout: Duration, net_tx: NetworkTx) -> Inner
-    where
-        Self: Sized,
-    {
-        Self {
-            connection_manager,
-            blob_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            sequence_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
-            timeout,
-            net_tx,
-        }
-    }
-
-    /// Get the connection manager associated with the client
-    pub fn cm(&mut self) -> &mut ConnectionManager
-    where
-        Self: Sized,
-    {
-        &mut self.connection_manager
-    }
-}
-
-/// Send a request and wait for a response.
-/// This function is blocking.
-// pub async fn req(
-//     cm: &mut ConnectionManager,
-//     request: Request,
-//     full_id_new: &SafeKey,
-// ) -> Result<Response, CoreError> {
-//     let message_id = MessageId::new();
-//     let signature = full_id_new.sign(&unwrap!(bincode::serialize(&(&request, message_id))));
-
-//     cm.send_query(
-//         &full_id_new.public_id(),
-//         &Message::Request {
-//             request,
-//             message_id,
-//             signature: Some(signature),
-//         },
-//     )
-//     .await
-// }
-
 /// Utility function that bootstraps a client to the network. If there is a failure then it retries.
 /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
 pub async fn attempt_bootstrap(
     qp2p_config: &QuicP2pConfig,
-    net_tx: &NetworkTx,
-    safe_key: SafeKey,
+    full_id: ClientFullId,
 ) -> Result<ConnectionManager, CoreError> {
     let mut attempts: u32 = 0;
 
     loop {
-        let mut connection_manager = ConnectionManager::new(qp2p_config.clone(), safe_key.clone())?;
+        let mut connection_manager = ConnectionManager::new(qp2p_config.clone(), full_id.clone())?;
         let res = connection_manager.bootstrap().await;
         match res {
             Ok(()) => return Ok(connection_manager),
@@ -1428,6 +1275,35 @@ pub async fn attempt_bootstrap(
                 }
             }
         }
+    }
+}
+
+// Build and sign Cmd Message Envelope
+pub(crate) fn create_cmd_message(msg_contents: Cmd) -> Message {
+    trace!("Creating cmd message");
+    let mut rng = thread_rng();
+    let random_xor = rng.gen::<XorName>();
+    let id = MessageId(random_xor);
+    println!("cmd msg id: {:?}", id);
+
+    Message::Cmd {
+        cmd: msg_contents,
+        id,
+    }
+}
+
+// Build and sign Query Message Envelope
+pub(crate) fn create_query_message(msg_contents: Query) -> Message {
+    trace!("Creating query message");
+
+    let mut rng = thread_rng();
+    let random_xor = rng.gen::<XorName>();
+    let id = MessageId(random_xor);
+
+    println!("query msg id: {:?}", id);
+    Message::Query {
+        query: msg_contents,
+        id,
     }
 }
 

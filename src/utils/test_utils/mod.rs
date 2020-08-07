@@ -6,12 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(feature = "mock-network")]
-mod sync;
-
-#[cfg(feature = "mock-network")]
-pub use self::sync::Synchronizer;
-use crate::client::core_client::CoreClient;
 use crate::client::{Client, COST_OF_PUT};
 use crate::network_event::{NetworkEvent, NetworkTx};
 use crate::utils::{self};

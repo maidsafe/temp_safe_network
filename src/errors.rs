@@ -6,12 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::self_encryption_storage::SEStorageError;
+// use crate::self_encryption_storage::SEStorageError;
 use bincode::Error as SerialisationError;
 use futures::channel::mpsc::SendError;
 use quic_p2p::QuicP2pError;
 use safe_nd::Error as SndError;
-use self_encryption::SelfEncryptionError;
 use std::error::Error as StdError;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io;
@@ -51,8 +50,6 @@ pub enum CoreError {
     UnsuccessfulPwHash,
     /// Blocking operation was cancelled.
     OperationAborted,
-    /// Error while self-encrypting data.
-    SelfEncryption(SelfEncryptionError<SEStorageError>),
     /// The request has timed out.
     RequestTimeout,
     /// Configuration file error.
@@ -96,12 +93,6 @@ impl From<SndError> for CoreError {
 impl From<mpsc::RecvError> for CoreError {
     fn from(_: mpsc::RecvError) -> Self {
         Self::OperationAborted
-    }
-}
-
-impl From<SelfEncryptionError<SEStorageError>> for CoreError {
-    fn from(error: SelfEncryptionError<SEStorageError>) -> Self {
-        Self::SelfEncryption(error)
     }
 }
 
@@ -159,9 +150,6 @@ impl Debug for CoreError {
             }
             Self::UnsuccessfulPwHash => write!(formatter, "CoreError::UnsuccessfulPwHash"),
             Self::OperationAborted => write!(formatter, "CoreError::OperationAborted"),
-            Self::SelfEncryption(ref error) => {
-                write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
-            }
             Self::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
             Self::ConfigError(ref error) => {
                 write!(formatter, "CoreError::ConfigError -> {:?}", error)
@@ -206,9 +194,6 @@ impl Display for CoreError {
                 "Unable to complete computation for password hashing"
             ),
             Self::OperationAborted => write!(formatter, "Blocking operation was cancelled"),
-            Self::SelfEncryption(ref error) => {
-                write!(formatter, "Self-encryption error: {}", error)
-            }
             Self::RequestTimeout => write!(formatter, "RequestTimeout"),
             Self::ConfigError(ref error) => write!(formatter, "Config file error: {}", error),
             Self::IoError(ref error) => write!(formatter, "Io error: {}", error),
@@ -221,7 +206,6 @@ impl StdError for CoreError {
     fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             Self::EncodeDecodeError(ref err) => Some(err),
-            Self::SelfEncryption(ref err) => Some(err),
             Self::DataError(ref err) => Some(err),
             Self::QuicP2p(ref err) => Some(err),
             _ => None,

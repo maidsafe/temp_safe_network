@@ -36,36 +36,24 @@
 // Export public core interface.
 
 pub use self::client::{
-    map_info, recoverable_apis, test_create_balance, AuthActions, Client, ClientKeys,
-    ClientTransferValidator, MapInfo, TransferActor,
+    map_info, test_create_balance, Client, ClientTransferValidator, MapInfo, TransferActor,
 };
-#[cfg(feature = "mock-network")]
-pub use self::client::{mock_vault_path, MockConnectionManager as ConnectionManager};
 pub use self::config_handler::config_dir;
-#[cfg(not(feature = "mock-network"))]
 pub use self::connection_manager::ConnectionManager;
 pub use self::errors::CoreError;
 pub use self::network_event::{NetworkEvent, NetworkRx, NetworkTx};
-pub use self::self_encryption_storage::{
-    SEStorageError as SelfEncryptionStorageError, SelfEncryptionStorage,
-};
 pub use self::utils::logging;
 pub use quic_p2p::Config as QuicP2pConfig;
 
-/// Utilities for handling `Blob`.
-pub mod blob;
 /// Client trait and related constants.
 pub mod client;
 /// Config file handling.
 pub mod config_handler;
 /// Cryptographic utilities.
 pub mod crypto;
-/// Implements the Self Encryption storage trait.
-pub mod self_encryption_storage;
 /// Utility functions.
 pub mod utils;
 
-#[cfg(not(feature = "mock-network"))]
 mod connection_manager;
 mod errors;
 mod network_event;

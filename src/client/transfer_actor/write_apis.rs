@@ -330,7 +330,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_auth_cmd(AuthCmd::DelAuthKey {
-            client: self.safe_key.public_key(),
+            client: *self.full_id.public_key(),
             key,
             version,
         });
@@ -358,7 +358,7 @@ impl TransferActor {
         // The _actual_ message
         //---------------------------------
         let msg_contents = wrap_auth_cmd(AuthCmd::InsAuthKey {
-            client: self.safe_key.public_key(),
+            client: *self.full_id.public_key(),
             permissions,
             key,
             version,

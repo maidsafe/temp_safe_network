@@ -1,6 +1,6 @@
 use safe_nd::{
-    Cmd, DebitAgreementProof, Message, PublicId, PublicKey, Query, QueryResponse, TransferCmd,
-    TransferQuery,
+    ClientFullId, Cmd, DebitAgreementProof, Message, PublicId, PublicKey, Query, QueryResponse,
+    TransferCmd, TransferQuery,
 };
 
 use safe_transfers::{
@@ -8,7 +8,7 @@ use safe_transfers::{
 };
 
 use crate::client::ConnectionManager;
-use crate::client::{create_cmd_message, create_query_message, SafeKey, COST_OF_PUT};
+use crate::client::{create_cmd_message, create_query_message, COST_OF_PUT};
 use crate::errors::CoreError;
 use crdts::Dot;
 use futures::lock::Mutex;
@@ -33,7 +33,7 @@ pub mod test_utils;
 /// Handle Money Transfers, requests and locally stores a balance
 pub struct TransferActor {
     transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator>>>,
-    safe_key: SafeKey,
+    full_id: ClientFullId,
     replicas_pk_set: PublicKeySet,
     simulated_farming_payout_dot: Dot<PublicKey>,
     connection_manager: ConnectionManager,
@@ -64,7 +64,7 @@ impl TransferActor {
 
     /// Retrieve the history of the acocunt from the network and apply to our local actor
     pub async fn get_history(&mut self) -> Result<(), CoreError> {
-        let public_key = self.safe_key.public_key();
+        let public_key = *self.full_id.public_key();
         info!("Getting SafeTransfers history for pk: {:?}", public_key);
 
         let msg_contents = Query::Transfer(TransferQuery::GetHistory {
@@ -120,7 +120,7 @@ impl TransferActor {
         info!("Sending requests for payment for write operation");
 
         //set up message
-        let safe_key = self.safe_key.clone();
+        let safe_key = self.full_id.clone();
 
         self.get_history().await?;
 
@@ -172,6 +172,15 @@ impl TransferActor {
 
         //Ok(proof)
         unimplemented!()
+    }
+
+    async fn send_query(&mut self, query: Query) -> Result<QueryResponse, CoreError> {
+        // `sign` should be false for GETs on published data, true otherwise.
+
+        println!("-->>Request going out: {:?}", query);
+
+        let message = create_query_message(query);
+        self.connection_manager.send_query(&message).await
     }
 }
 

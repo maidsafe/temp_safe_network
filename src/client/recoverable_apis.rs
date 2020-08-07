@@ -25,7 +25,7 @@ const MAX_ATTEMPTS: usize = 10;
 /// If the data already exists, it tries to mutate it so its entries and permissions
 /// are the same as those of the data being put, except it wont delete existing
 /// entries or remove existing permissions.
-pub async fn put_map(client: (impl Client + Sync + Send), data: SeqMap) -> Result<(), CoreError> {
+pub async fn put_map(client: Client, data: SeqMap) -> Result<(), CoreError> {
     let client = client.clone();
 
     match client.put_seq_mutable_data(data.clone()).await {
@@ -39,7 +39,7 @@ pub async fn put_map(client: (impl Client + Sync + Send), data: SeqMap) -> Resul
 
 /// Mutates mutable data entries and tries to recover from errors.
 pub async fn mutate_map_entries(
-    client: (impl Client + Sync + Send),
+    client: Client,
     address: MapAddress,
     actions: MapSeqEntryActions,
 ) -> Result<(), CoreError> {
@@ -79,7 +79,7 @@ pub async fn mutate_map_entries(
 
 /// Sets user permission on the mutable data and tries to recover from errors.
 pub async fn set_map_user_permissions(
-    client: (impl Client + Sync),
+    client: Client,
     address: MapAddress,
     user: PublicKey,
     permissions: MapPermissionSet,
@@ -123,7 +123,7 @@ pub async fn set_map_user_permissions(
 
 /// Deletes user permission on the mutable data and tries to recover from errors.
 pub async fn del_map_user_permissions(
-    client: (impl Client + Sync + Send),
+    client: Client,
     address: MapAddress,
     user: PublicKey,
     version: u64,
@@ -164,7 +164,7 @@ pub async fn del_map_user_permissions(
     response
 }
 
-async fn update_map(client: (impl Client + Sync + Send), data: SeqMap) -> Result<(), CoreError> {
+async fn update_map(client: Client, data: SeqMap) -> Result<(), CoreError> {
     let client = client.clone();
 
     let address = *data.address();
@@ -190,7 +190,7 @@ async fn update_map(client: (impl Client + Sync + Send), data: SeqMap) -> Result
 
 // Update the mutable data on the network so it has all the `desired_entries`.
 async fn update_map_entries(
-    client: (impl Client + Sync + Send),
+    client: Client,
     address: MapAddress,
     current_entries: &MapSeqEntries,
     desired_entries: MapSeqEntries,
@@ -214,7 +214,7 @@ async fn update_map_entries(
 }
 
 async fn update_map_permissions(
-    client: (impl Client + Sync + Send),
+    client: Client,
     address: MapAddress,
     current_permissions: &BTreeMap<PublicKey, MapPermissionSet>,
     desired_permissions: BTreeMap<PublicKey, MapPermissionSet>,
@@ -317,46 +317,6 @@ fn union_permission_sets(a: MapPermissionSet, b: MapPermissionSet) -> MapPermiss
         })
 }
 
-/// Insert key to Client Handler.
-/// Covers the `InvalidSuccessor` error case (it should not fail if the key already exists).
-pub async fn ins_auth_key_to_client_h(
-    client: &(impl Client + AuthActions + Sync),
-    key: PublicKey,
-    permissions: AppPermissions,
-    version: u64,
-) -> Result<(), CoreError> {
-    let mut attempts: usize = 0;
-    let mut version_to_try = version;
-    let client = client.clone();
-    let mut done_trying = false;
-    let mut response: Result<(), CoreError> = Err(CoreError::RequestTimeout);
-
-    while !done_trying {
-        response = match client.ins_auth_key(key, permissions, version_to_try).await {
-            Ok(_) => {
-                done_trying = true;
-                Ok(())
-            }
-            Err(CoreError::DataError(SndError::InvalidSuccessor(current_version)))
-                if attempts < MAX_ATTEMPTS =>
-            {
-                attempts += 1;
-                version_to_try = current_version + 1;
-                Ok(())
-            }
-            Err(CoreError::RequestTimeout) if attempts < MAX_ATTEMPTS => {
-                attempts += 1;
-                Ok(())
-            }
-            other => {
-                done_trying = true;
-                other
-            }
-        }
-    }
-
-    response
-}
 
 #[cfg(test)]
 mod tests {
