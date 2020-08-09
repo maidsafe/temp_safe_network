@@ -169,7 +169,7 @@ impl ConnectionManager {
 
         trace!("Sending handshake request to bootstrapped node...");
         let public_id = self.full_id.public_id();
-        let handshake = HandshakeRequest::Bootstrap(PublicId::Client(*public_id));
+        let handshake = HandshakeRequest::Bootstrap(PublicId::Client(public_id.clone()));
         let msg = Bytes::from(serialize(&handshake)?);
         let response = node_connection.send(msg).await?;
 

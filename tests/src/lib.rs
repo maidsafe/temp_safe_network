@@ -33,7 +33,8 @@ use unwrap::unwrap;
 async fn unregistered_client() -> Result<(), AppError> {
     let orig_data = PubImmutableData::new(utils::generate_random_vector(30));
 
-    let client = random_client()?;
+    let mut client = Client::new(None).await?;
+?;
     // Registered Client PUTs something onto the network.
     {
         let orig_data = orig_data.clone();

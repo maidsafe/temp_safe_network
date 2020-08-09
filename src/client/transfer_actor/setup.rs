@@ -1,21 +1,15 @@
-use safe_nd::{ClientFullId, Money, PublicKey, Query, QueryResponse, TransferQuery};
-use safe_transfers::TransferActor as SafeTransferActor;
+use safe_nd::{ClientFullId, Query, QueryResponse, TransferQuery};
 
-use std::str::FromStr;
-
+use crate::client::Client;
 use crate::client::ConnectionManager;
-use crate::client::{create_query_message, ClientTransferValidator, TransferActor};
 use crate::errors::CoreError;
-use crdts::Dot;
 
-use futures::lock::Mutex;
-use log::{info, trace};
+use log::trace;
 
-use std::sync::Arc;
-use threshold_crypto::{PublicKeySet, SecretKey};
+use threshold_crypto::PublicKeySet;
 
 /// Handle all Money transfers and Write API requests for a given ClientId.
-impl TransferActor {
+impl Client {
     /// Get our replica instance PK set
     pub async fn get_replica_keys(
         full_id: ClientFullId,
@@ -25,7 +19,7 @@ impl TransferActor {
 
         let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(*full_id.public_key()));
 
-        let message = create_query_message(keys_query_msg);
+        let message = Self::create_query_message(keys_query_msg);
 
         cm.bootstrap().await?;
         let res = cm.send_query(&message).await?;
@@ -39,83 +33,48 @@ impl TransferActor {
         }
     }
 
-    /// Create a new Transfer Actor for a previously unused public key
-    pub async fn new(
-        full_id: &ClientFullId,
-        mut connection_manager: ConnectionManager,
-    ) -> Result<Self, CoreError> {
-        info!(
-            "Initiating Safe Transfer Actor for PK {:?}",
-            full_id.public_key()
-        );
-        let simulated_farming_payout_dot =
-            Dot::new(PublicKey::from(SecretKey::random().public_key()), 0);
+    // /// Create a new Transfer Actor for a previously unused public key
+    // pub async fn new(
+    //     full_id: &ClientFullId,
+    //     // mut connection_manager: ConnectionManager,
+    // ) -> Result<Self, CoreError> {
+    //     info!(
+    //         "Initiating Safe Transfer Actor for PK {:?}",
+    //         full_id.public_key()
+    //     );
+    //     let simulated_farming_payout_dot =
+    //         Dot::new(PublicKey::from(SecretKey::random().public_key()), 0);
 
-        let replicas_pk_set =
-            TransferActor::get_replica_keys(full_id.clone(), &mut connection_manager).await?;
+    //     let replicas_pk_set =
+    //         TransferActor::get_replica_keys(full_id.clone(), &mut connection_manager).await?;
 
-        let validator = ClientTransferValidator {};
+    //     let validator = ClientTransferValidator {};
 
-        let transfer_actor = Arc::new(Mutex::new(SafeTransferActor::new(
-            full_id.keypair().clone(),
-            replicas_pk_set.clone(),
-            validator,
-        )));
+    //     let transfer_actor = Arc::new(Mutex::new(SafeTransferActor::new(
+    //         full_id.keypair().clone(),
+    //         replicas_pk_set.clone(),
+    //         validator,
+    //     )));
 
-        let actor = Self {
-            full_id: full_id.clone(),
-            transfer_actor,
-            connection_manager,
-            replicas_pk_set,
-            simulated_farming_payout_dot, // replicas_sk_set
-        };
+    //     let actor = Self {
+    //         full_id: full_id.clone(),
+    //         transfer_actor,
+    //         connection_manager,
+    //         replicas_pk_set,
+    //         simulated_farming_payout_dot, // replicas_sk_set
+    //     };
 
-        #[cfg(feature = "simulated-payouts")]
-        {
-            // we're testing, and currently a lot of tests expect 10 money to start
-            let _ = actor
-                .trigger_simulated_farming_payout(full_id.public_key(), Money::from_str("10")?)
-                .await?;
-        }
-        Ok(actor)
-    }
+    //     #[cfg(feature = "simulated-payouts")]
+    //     {
+    //         // we're testing, and currently a lot of tests expect 10 money to start
+    //         let _ = actor
+    //             .trigger_simulated_farming_payout(full_id.public_key(), Money::from_str("10")?)
+    //             .await?;
+    //     }
+    //     Ok(actor)
+    // }
 
-    /// Create a Transfer Actor from an existing public key with an account history
-    pub async fn for_existing_account(
-        full_id: ClientFullId,
-        // history: History,
-        mut connection_manager: ConnectionManager,
-    ) -> Result<Self, CoreError> {
-        info!(
-            "Setting up SafeTransferActor for existing PK : {:?}",
-            full_id.public_key()
-        );
-        let simulated_farming_payout_dot =
-            Dot::new(PublicKey::from(SecretKey::random().public_key()), 0);
 
-        let replicas_pk_set =
-            TransferActor::get_replica_keys(full_id.clone(), &mut connection_manager).await?;
-
-        let validator = ClientTransferValidator {};
-
-        let transfer_actor = SafeTransferActor::new(
-            full_id.keypair().clone(),
-            replicas_pk_set.clone(),
-            validator,
-        );
-
-        let mut full_actor = Self {
-            full_id,
-            transfer_actor: Arc::new(Mutex::new(transfer_actor)),
-            connection_manager,
-            replicas_pk_set,
-            simulated_farming_payout_dot, // replicas_sk_set
-        };
-
-        full_actor.get_history().await?;
-
-        Ok(full_actor)
-    }
 }
 
 // --------------------------------
@@ -127,12 +86,14 @@ impl TransferActor {
 mod tests {
 
     use super::*;
-    use crate::client::transfer_actor::test_utils::get_keys_and_connection_manager;
+    use crate::crypto::shared_box;
+    use safe_nd::Money;
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn transfer_actor_creation__() -> Result<(), CoreError> {
-        let (full_id, cm) = get_keys_and_connection_manager().await;
-        let _transfer_actor = TransferActor::new(full_id, cm.clone()).await?;
+        let (sk, pk) = shared_box::gen_bls_keypair();
+        let _transfer_actor = Client::new(Some(sk)).await?;
 
         assert!(true);
 
@@ -141,9 +102,9 @@ mod tests {
 
     #[tokio::test]
     async fn transfer_actor_creation_hydration_for_nonexistant_balance() -> Result<(), CoreError> {
-        let (full_id, cm) = get_keys_and_connection_manager().await;
+        let (sk, pk) = shared_box::gen_bls_keypair();
 
-        match TransferActor::for_existing_account(full_id, cm.clone()).await {
+        match Client::new(Some(sk)).await {
             Ok(actor) => {
                 assert_eq!(actor.get_local_balance().await, Money::from_str("0").unwrap() );
                 Ok(())
@@ -156,22 +117,22 @@ mod tests {
     #[tokio::test]
     #[cfg(not(feature = "mock-network"))]
     async fn transfer_actor_creation_hydration_for_existing_balance() -> Result<(), CoreError> {
-        let (full_id, _cm) = get_keys_and_connection_manager().await;
-        let (full_id_two, cm) = get_keys_and_connection_manager().await;
+        let (sk, pk) = shared_box::gen_bls_keypair();
+        let (sk2, pk2)  = shared_box::gen_bls_keypair();
 
-        let mut initial_actor = TransferActor::new(full_id.clone(), cm.clone()).await?;
+        let mut initial_actor = Client::new(Some(sk)).await?;
 
         let _ = initial_actor
-            .trigger_simulated_farming_payout(full_id_two.public_key(), Money::from_str("100")?)
+            .trigger_simulated_farming_payout(Money::from_str("100")?)
             .await?;
 
-        match TransferActor::for_existing_account(full_id_two, cm.clone()).await {
-            Ok(actor) => {
+        match Client::new(Some(sk2)).await {
+            Ok(mut client) => {
                 assert_eq!(
-                    actor.get_balance_from_network(None).await?,
+                    client.get_balance_from_network(None).await?,
                     Money::from_str("100")?
                 );
-                assert_eq!(actor.get_local_balance().await, Money::from_str("100")?);
+                assert_eq!(client.get_local_balance().await, Money::from_str("100")?);
 
                 Ok(())
             }

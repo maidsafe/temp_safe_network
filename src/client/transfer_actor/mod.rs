@@ -1,22 +1,15 @@
 use safe_nd::{
-    ClientFullId, Cmd, DebitAgreementProof, Message, PublicId, PublicKey, Query, QueryResponse,
+    ClientFullId, Cmd, DebitAgreementProof, Message, Money, PublicKey, Query, QueryResponse,
     TransferCmd, TransferQuery,
 };
 
-use safe_transfers::{
-    ActorEvent, ReplicaValidator, TransferActor as SafeTransferActor, TransferInitiated,
-};
+use safe_transfers::{ActorEvent, ReplicaValidator, TransferInitiated};
 
-use crate::client::ConnectionManager;
-use crate::client::{create_cmd_message, create_query_message, COST_OF_PUT};
+use crate::client::{Client, COST_OF_PUT};
 use crate::errors::CoreError;
-use crdts::Dot;
-use futures::lock::Mutex;
+pub use safe_transfers::TransferActor as SafeTransferActor;
 
 use log::{debug, info, trace, warn};
-
-use std::sync::Arc;
-use threshold_crypto::PublicKeySet;
 
 /// Module for Money balance management
 pub mod balance_management;
@@ -27,17 +20,14 @@ pub mod simulated_payouts;
 /// Module containing all PUT apis
 pub mod write_apis;
 
-#[cfg(test)]
-pub mod test_utils;
-
 /// Handle Money Transfers, requests and locally stores a balance
-pub struct TransferActor {
-    transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator>>>,
-    full_id: ClientFullId,
-    replicas_pk_set: PublicKeySet,
-    simulated_farming_payout_dot: Dot<PublicKey>,
-    connection_manager: ConnectionManager,
-}
+// pub struct TransferActor {
+//     transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator>>>,
+//     full_id: ClientFullId,
+//     replicas_pk_set: PublicKeySet,
+//     simulated_farming_payout_dot: Dot<PublicKey>,
+//     connection_manager: ConnectionManager,
+// }
 
 /// Simple client side validations
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,10 +39,20 @@ impl ReplicaValidator for ClientTransferValidator {
     }
 }
 
-impl TransferActor {
-    // fn wrap_money_request(req: MoneyRequest) -> ClientRequest {
-    //     ClientRequest::System(SystemOp::Transfers(req))
-    // }
+impl Client {
+    /// Get the current coin balance via TransferActor for this client.
+    pub async fn get_balance(
+        &mut self,
+        client_id: Option<&ClientFullId>,
+    ) -> Result<Money, CoreError>
+    where
+        Self: Sized,
+    {
+        trace!("Get balance for {:?}", client_id);
+
+        // we're a standard client grabbing our own key's balance
+        self.get_balance_from_network(None).await
+    }
 
     /// Get a payment proof
     pub async fn get_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
@@ -72,7 +72,7 @@ impl TransferActor {
             since_version: 0,
         });
 
-        let message = create_query_message(msg_contents);
+        let message = Self::create_query_message(msg_contents);
 
         let _bootstrapped = self.connection_manager.bootstrap().await;
 
@@ -116,11 +116,13 @@ impl TransferActor {
     }
 
     /// Validates a tranction for paying store_cost
-    async fn create_write_payment_proof(&mut self) -> Result<DebitAgreementProof, CoreError> {
+    pub(crate) async fn create_write_payment_proof(
+        &mut self,
+    ) -> Result<DebitAgreementProof, CoreError> {
         info!("Sending requests for payment for write operation");
 
         //set up message
-        let safe_key = self.full_id.clone();
+        let _full_id = self.full_id.clone();
 
         self.get_history().await?;
 
@@ -139,7 +141,7 @@ impl TransferActor {
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
-        let transfer_message = create_cmd_message(command);
+        let transfer_message = Self::create_cmd_message(command);
 
         self.transfer_actor
             .lock()
@@ -151,9 +153,7 @@ impl TransferActor {
         // setup connection manager
         let _bootstrapped = self.connection_manager.bootstrap().await;
 
-        let payment_proof: DebitAgreementProof = self
-            .await_validation(&safe_key.public_id(), &transfer_message)
-            .await?;
+        let payment_proof: DebitAgreementProof = self.await_validation(&transfer_message).await?;
 
         debug!("payment proof retrieved");
         Ok(payment_proof)
@@ -162,8 +162,7 @@ impl TransferActor {
     /// Send message and await validation and constructin of DebitAgreementProof
     async fn await_validation(
         &mut self,
-        pub_id: &PublicId,
-        message: &Message,
+        _message: &Message,
     ) -> Result<DebitAgreementProof, CoreError> {
         info!("Awaiting transfer validation");
         //let mut cm = self.connection_manager();
@@ -173,15 +172,6 @@ impl TransferActor {
         //Ok(proof)
         unimplemented!()
     }
-
-    async fn send_query(&mut self, query: Query) -> Result<QueryResponse, CoreError> {
-        // `sign` should be false for GETs on published data, true otherwise.
-
-        println!("-->>Request going out: {:?}", query);
-
-        let message = create_query_message(query);
-        self.connection_manager.send_query(&message).await
-    }
 }
 
 // TODO: Do we need "new" to actually instantiate with a transfer?...
@@ -189,12 +179,12 @@ impl TransferActor {
 mod tests {
 
     use super::*;
-    use test_utils::get_keys_and_connection_manager;
+    use crate::crypto::shared_box;
 
     #[tokio::test]
-    async fn transfer_actor_creation__() {
-        let (safe_key, cm) = get_keys_and_connection_manager().await;
-        let _transfer_actor = TransferActor::new(safe_key, self.connection_manager.clone())
+    async fn client_creation() {
+        let (sk, pk) = shared_box::gen_bls_keypair();
+        let _transfer_actor = Client::new(Some(sk))
             .await
             .unwrap();
 

@@ -441,7 +441,8 @@ mod tests_with_mock_routing {
     // Test putting map and recovering from errors
     #[tokio::test]
     async fn put_map_with_recovery() -> Result<(), CoreError> {
-        let client = random_client()?;
+        let mut client = Client::new(None).await?;
+?;
 
         let name = rand::random();
         let tag = 10_000;
@@ -528,7 +529,8 @@ mod tests_with_mock_routing {
     // Test mutating map entries and recovering from errors
     #[tokio::test]
     async fn mutate_map_entries_with_recovery() -> Result<(), CoreError> {
-        let client = random_client()?;
+        let mut client = Client::new(None).await?;
+?;
 
         let name: XorName = rand::random();
         let tag = 10_000;
@@ -618,7 +620,8 @@ mod tests_with_mock_routing {
     // Test setting and deleting user permissions and recovering from errors
     #[tokio::test]
     async fn set_and_del_map_user_permissions_with_recovery() -> Result<(), CoreError> {
-        let client = random_client()?;
+        let mut client = Client::new(None).await?;
+?;
 
         let name: XorName = rand::random();
         let tag = 10_000;

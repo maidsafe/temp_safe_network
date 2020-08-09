@@ -4,13 +4,13 @@ use safe_nd::{
 };
 use safe_transfers::{ActorEvent, TransferInitiated};
 
-use crate::client::{create_cmd_message, create_query_message, TransferActor};
+use crate::client::Client;
 use crate::errors::CoreError;
 
 use log::{debug, info, trace};
 
 /// Handle all Money transfers and Write API requests for a given ClientId.
-impl TransferActor {
+impl Client {
     /// Get the account balance without querying the network
     pub async fn get_local_balance(&self) -> Money {
         info!("Retrieving actor's local balance.");
@@ -62,14 +62,14 @@ impl TransferActor {
         pk: Option<PublicKey>,
     ) -> Result<Money, CoreError> {
         info!("Getting balance for {:?} or self", pk);
-        let identity = self.safe_key.clone();
-        let public_key = pk.unwrap_or(identity.public_key());
+        let identity = self.full_id().await;
+        let public_key = pk.unwrap_or(*identity.public_key());
 
         // let request = Self::wrap_money_request(Query::GetBalance(public_key));
 
         let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let message = create_query_message(msg_contents);
+        let message = Self::create_query_message(msg_contents);
         self.connection_manager.bootstrap().await?;
 
         match self.connection_manager.send_query(&message).await? {
@@ -81,9 +81,6 @@ impl TransferActor {
     /// Send money
     pub async fn send_money(&mut self, to: PublicKey, amount: Money) -> Result<(), CoreError> {
         info!("Sending money");
-
-        //set up message
-        let safe_key = self.safe_key.clone();
 
         // first make sure our balance  history is up to date
         self.get_history().await?;
@@ -109,7 +106,7 @@ impl TransferActor {
         );
         let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
-        let message = create_cmd_message(msg_contents);
+        let message = Self::create_cmd_message(msg_contents);
 
         self.transfer_actor
             .lock()
@@ -118,14 +115,12 @@ impl TransferActor {
                 signed_transfer,
             }))?;
 
-        let debit_proof: DebitAgreementProof = self
-            .await_validation(&safe_key.public_id(), &message)
-            .await?;
+        let debit_proof: DebitAgreementProof = self.await_validation(&message).await?;
 
         // Register the transfer on the network.
         let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(debit_proof.clone()));
 
-        let message = create_cmd_message(msg_contents);
+        let message = Self::create_cmd_message(msg_contents);
         trace!(
             "Debit proof received and to be sent in RegisterTransfer req: {:?}",
             debit_proof
@@ -154,20 +149,23 @@ impl TransferActor {
 mod tests {
 
     use super::*;
-    use crate::client::transfer_actor::test_utils::get_keys_and_connection_manager;
+    use crate::crypto::shared_box;
     use std::str::FromStr;
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
     async fn transfer_actor_can_send_money_and_thats_reflected_locally() -> Result<(), CoreError> {
-        let (safe_key, cm) = get_keys_and_connection_manager().await;
-        let (safe_key2, _cm) = get_keys_and_connection_manager().await;
+        let (sk, pk) = shared_box::gen_bls_keypair();
+        let (sk2, pk2) = shared_box::gen_bls_keypair();
+
+        let pk = PublicKey::Bls(pk);
+        let pk2 = PublicKey::Bls(pk2);
 
         let mut initial_actor =
-            TransferActor::new(safe_key.clone(), self.connection_manager.clone()).await?;
+            Client::new(Some(sk.clone())).await?;
 
         let _ = initial_actor
-            .send_money(safe_key2.public_key(), Money::from_str("1")?)
+            .send_money(pk2, Money::from_str("1")?)
             .await?;
 
         // initial 10 on creation from farming simulation minus 1
@@ -188,36 +186,39 @@ mod tests {
     #[cfg(feature = "simulated-payouts")]
     async fn transfer_actor_can_send_several_transfers_and_thats_reflected_locally(
     ) -> Result<(), CoreError> {
-        let (safe_key, cm) = get_keys_and_connection_manager().await;
-        let (safe_key2, _cm) = get_keys_and_connection_manager().await;
+        let (sk, pk) = shared_box::gen_bls_keypair();
+        let (sk2, pk2) = shared_box::gen_bls_keypair();
 
-        let mut initial_actor = TransferActor::new(safe_key.clone(), cm.clone()).await?;
+        let pk = PublicKey::Bls(pk);
+        let pk2 = PublicKey::Bls(pk2);
+
+        let mut client = Client::new(Some(sk.clone())).await?;
 
         println!("starting.....");
-        let _ = initial_actor
-            .send_money(safe_key2.public_key(), Money::from_str("1")?)
+        let _ = client
+            .send_money(pk2, Money::from_str("1")?)
             .await?;
 
         // initial 10 on creation from farming simulation minus 1
         assert_eq!(
-            initial_actor.get_local_balance().await,
+            client.get_local_balance().await,
             Money::from_str("9")?
         );
 
         assert_eq!(
-            initial_actor.get_balance_from_network(None).await?,
+            client.get_balance_from_network(None).await?,
             Money::from_str("9")?
         );
 
         println!("FIRST DONE!!!!!!!!!!!!!!");
 
-        let _ = initial_actor
-            .send_money(safe_key2.public_key(), Money::from_str("2")?)
+        let _ = client
+            .send_money(pk2, Money::from_str("2")?)
             .await?;
 
         // initial 10 on creation from farming simulation minus 3
         Ok(assert_eq!(
-            initial_actor.get_local_balance().await,
+            client.get_local_balance().await,
             Money::from_str("7")?
         ))
     }
@@ -226,13 +227,13 @@ mod tests {
     // #[tokio::test]
     // #[cfg(feature = "simulated-payouts")]
     // async fn transfer_actor_cannot_send_0_money_req() -> Result<(), CoreError> {
-    //     let (safe_key, cm) = get_keys_and_connection_manager().await;
-    //     let (safe_key2, _cm) = get_keys_and_connection_manager().await;
+    //     let (sk, cm) = shared_box::gen_bls_keypair();
+    //     let (sk2, _cm) = shared_box::gen_bls_keypair();
 
-    //     let mut initial_actor = TransferActor::new(safe_key.clone(), cm.clone()).await?;
+    //     let mut initial_actor = TransferActor::new(sk.clone(), cm.clone()).await?;
 
     //     let res = initial_actor
-    //         .send_money(safe_key2.public_key(), Money::from_str("0")?)
+    //         .send_money(sk2.public_key(), Money::from_str("0")?)
     //         .await?;
 
     //     println!("res to send 0: {:?}", res);

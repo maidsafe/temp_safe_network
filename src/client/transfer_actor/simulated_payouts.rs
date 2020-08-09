@@ -1,15 +1,15 @@
 use safe_nd::{Cmd, Money, PublicKey, Transfer, TransferCmd};
 
-use crate::client::{create_cmd_message, TransferActor};
+use crate::client::Client;
 use crate::errors::CoreError;
 use log::info;
+
 /// Handle all Money transfers and Write API requests for a given ClientId.
-impl TransferActor {
+impl Client {
     #[cfg(not(feature = "simulated-payouts"))]
     /// Simulate a farming payout
     pub async fn trigger_simulated_farming_payout(
         &mut self,
-        _to: PublicKey,
         _amount: Money,
     ) -> Result<(), CoreError> {
         Err(CoreError::from(
@@ -21,16 +21,14 @@ impl TransferActor {
     /// Simulate a farming payout
     pub async fn trigger_simulated_farming_payout(
         &mut self,
-        to: PublicKey,
         amount: Money,
     ) -> Result<(), CoreError> {
-        info!("Triggering a simulated farming payout to: {:?}", &to);
-        let mut cm = self.connection_manager();
-        let safe_key = self.safe_key.clone();
+        let pk = self.full_id().await.public_key().clone();
+        info!("Triggering a simulated farming payout to: {:?}", pk);
         self.simulated_farming_payout_dot.apply_inc();
 
         let simulated_transfer = Transfer {
-            to,
+            to: pk,
             amount,
             id: self.simulated_farming_payout_dot,
         };
@@ -38,22 +36,22 @@ impl TransferActor {
         let simluated_farming_cmd =
             Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
-        let message = create_cmd_message(simluated_farming_cmd);
+        let message = Self::create_cmd_message(simluated_farming_cmd);
 
-        let pub_id = safe_key.public_id();
+        let pub_id = self.full_id.public_id();
 
-        let _bootstrapped = cm.bootstrap(safe_key.clone()).await;
-        let _ = cm.send_cmd(&pub_id, &message).await?;
+        let _bootstrapped = self.connection_manager.bootstrap().await;
+        let _ = self.connection_manager.send_cmd(&message).await?;
 
         // If we're getting the payout for our own actor, update it here
-        if to == self.safe_key.public_key() {
+        // if to == self.full_id().await.public_key() {
             info!("Applying simulated payout locally, via query for history...");
 
             // std::thread::sleep(std::time::Duration::from_millis(15500));
 
             // get full history from network and apply locally
             self.get_history().await?;
-        }
+        // }
         Ok(())
     }
 }
@@ -68,18 +66,18 @@ mod tests {
 
     use super::*;
 
-    use crate::client::transfer_actor::test_utils::get_keys_and_connection_manager;
+    use crate::crypto::shared_box;
     use std::str::FromStr;
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
     async fn transfer_actor_can_receive_simulated_farming_payout() -> Result<(), CoreError> {
-        let (safe_key, cm) = get_keys_and_connection_manager().await;
+        let (sk, pk) = shared_box::gen_bls_keypair();
         let mut initial_actor =
-            TransferActor::new_no_initial_balance(safe_key.clone(), cm.clone()).await?;
+            Client::new_no_initial_balance(Some(sk.clone())).await?;
 
         let _ = initial_actor
-            .trigger_simulated_farming_payout(safe_key.public_key(), Money::from_str("100")?)
+            .trigger_simulated_farming_payout(Money::from_str("100")?)
             .await?;
 
         // 100 sent
