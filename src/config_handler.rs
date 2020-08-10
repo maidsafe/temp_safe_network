@@ -213,7 +213,7 @@ impl Config {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
-    fn set_value(&mut self, arg: &str, value: &str) {
+    pub(crate) fn set_value(&mut self, arg: &str, value: &str) {
         if arg == ARGS[0] {
             self.wallet_address = Some(value.parse().unwrap());
         } else if arg == ARGS[1] {
@@ -255,7 +255,7 @@ impl Config {
         }
     }
 
-    fn set_flag(&mut self, arg: &str, occurrences: u64) {
+    pub(crate) fn set_flag(&mut self, arg: &str, occurrences: u64) {
         if arg == ARGS[3] {
             self.verbose = occurrences;
         } else if arg == ARGS[11] {

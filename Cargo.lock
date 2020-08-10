@@ -2010,6 +2010,7 @@ dependencies = [
  "maplit",
  "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p?branch=igd-err)",
  "pickledb",
+ "quic-p2p",
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",

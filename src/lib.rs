@@ -37,6 +37,9 @@ mod node;
 mod to_db_key;
 mod utils;
 
+#[cfg(test)]
+mod tests;
+
 pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
