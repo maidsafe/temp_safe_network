@@ -9,20 +9,21 @@
 use crate::{client::SafeKey, CoreError};
 use bincode::{deserialize, serialize};
 use bytes::Bytes;
+use futures::{future::join_all, lock::Mutex};
 use log::{error, info, trace};
 use quic_p2p::{self, Config as QuicP2pConfig, Connection, QuicP2pAsync};
 use safe_nd::{
     BlsProof, HandshakeRequest, HandshakeResponse, Message, MsgEnvelope, MsgSender, Proof,
     PublicId, QueryResponse,
 };
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Initialises `QuicP2p` instance which can bootstrap to the network, establish
 /// connections and send messages to several nodes, as well as await responses from them.
 pub struct ConnectionManager {
     full_id: SafeKey,
     quic_p2p: QuicP2pAsync,
-    elders: Vec<Connection>,
+    elders: Vec<Arc<Mutex<Connection>>>,
 }
 
 impl ConnectionManager {
@@ -55,57 +56,109 @@ impl ConnectionManager {
 
     /// Send a `Message` to the network without awaiting for a response.
     pub async fn send_cmd(&mut self, msg: &Message) -> Result<(), CoreError> {
-        info!("Sending command message {:?} w/ id: {:?}", &msg, &msg.id());
-        let envelope = self.get_envelope_for_message(msg.clone())?;
-        let msg_bytes = Bytes::from(serialize(&envelope)?);
+        info!("Sending command message {:?} w/ id: {:?}", msg, msg.id());
+        let msg_bytes = self.serialise_in_envelope(msg)?;
 
-        trace!("Sending command to Elders...");
-        // TODO: send to all elders in parallel and find majority on responses
-        self.elders[0]
-            .send_only(msg_bytes)
-            .await
-            .map_err(|err| CoreError::from(err))
+        // Send message to all Elders concurrently
+        trace!("Sending command to all Elders...");
+        let mut tasks = Vec::default();
+        for elder_conn in &self.elders {
+            let msg_bytes_clone = msg_bytes.clone();
+            let conn = Arc::clone(elder_conn);
+            let task_handle =
+                tokio::spawn(async move { conn.lock().await.send_only(msg_bytes_clone).await });
+            tasks.push(task_handle);
+        }
+
+        // Let's await for all messages to be sent
+        let _results = join_all(tasks).await;
+
+        // TODO: return an error if we didn't successfully
+        // sent it to at least a majority of Elders??
+
+        Ok(())
     }
 
     /// Send a `Message` to the network awaiting for the response.
     pub async fn send_query(&mut self, msg: &Message) -> Result<QueryResponse, CoreError> {
-        info!("Sending query message {:?} w/ id: {:?}", &msg, &msg.id());
-        let envelope = self.get_envelope_for_message(msg.clone())?;
-        let msg_bytes = Bytes::from(serialize(&envelope)?);
+        info!("Sending query message {:?} w/ id: {:?}", msg, msg.id());
+        let msg_bytes = self.serialise_in_envelope(msg)?;
 
-        trace!("Sending message to Elders...");
-        // TODO: send to all elders in parallel and find majority on responses
-        let response = self.elders[0].send(msg_bytes).await?;
+        // We send the same message to all Elders concurrently,
+        // and we try to find a majority on the responses
+        let mut tasks = Vec::default();
+        for elder_conn in &self.elders {
+            let msg_bytes_clone = msg_bytes.clone();
+            let conn = Arc::clone(elder_conn);
+            let task_handle = tokio::spawn(async move {
+                let response = conn.lock().await.send(msg_bytes_clone).await?;
+                match deserialize(&response) {
+                    Ok(res) => {
+                        trace!("Query response received");
+                        Ok(res)
+                    }
+                    Err(e) => {
+                        let err_msg = format!("Unexpected error: {:?}", e);
+                        error!("{}", err_msg);
+                        Err(CoreError::Unexpected(err_msg))
+                    }
+                }
+            });
+            tasks.push(task_handle);
+        }
 
-        match deserialize(&response) {
-            Ok(res) => {
-                trace!("Query response received");
-                Ok(res)
-            }
-            Err(e) => {
-                let err_msg = format!("Unexpected error: {:?}", e);
-                error!("{}", err_msg);
-                Err(CoreError::Unexpected(err_msg))
+        // Let's await for all responses
+        // TODO: await only for a majority
+        let responses = join_all(tasks).await;
+
+        // Let's figure out what's the value which is in the majority of responses obtained
+        let mut votes_map = HashMap::<QueryResponse, usize>::default();
+        let mut winner: (Option<QueryResponse>, usize) = (None, 0);
+        for join_result in responses.into_iter() {
+            if let Ok(response_result) = join_result {
+                let response: QueryResponse = response_result.map_err(|err| {
+                    CoreError::from(format!(
+                        "Failed to obtain a response from the network: {}",
+                        err
+                    ))
+                })?;
+
+                let counter = votes_map.entry(response.clone()).or_insert(0);
+                *counter += 1;
+                if *counter > winner.1 {
+                    winner = (Some(response), *counter);
+                }
             }
         }
+
+        // TODO: return an error if we didn't successfully got enough number
+        // of responses to represent a majority of Elders
+
+        trace!("Response obtained from majority {} of nodes: {:?}", winner.1, winner.0);
+        winner.0.ok_or_else(|| {
+            CoreError::from(format!("Failed to obtain a response from the network."))
+        })
     }
 
     // Private helpers
 
     // Put a `Message` in an envelope so it can be sent to the network
-    fn get_envelope_for_message(&self, message: Message) -> Result<MsgEnvelope, CoreError> {
+    fn serialise_in_envelope(&self, message: &Message) -> Result<Bytes, CoreError> {
         trace!("Putting message in envelope: {:?}", message);
-        let sign = self.full_id.sign(&serialize(&message)?);
+        let sign = self.full_id.sign(&serialize(message)?);
         let msg_proof = BlsProof {
             public_key: self.full_id.public_key().bls().unwrap(),
             signature: sign.into_bls().unwrap(),
         };
 
-        Ok(MsgEnvelope {
-            message,
+        let envelope = MsgEnvelope {
+            message: message.clone(),
             origin: MsgSender::Client(Proof::Bls(msg_proof)),
             proxies: Default::default(),
-        })
+        };
+
+        let bytes = Bytes::from(serialize(&envelope)?);
+        Ok(bytes)
     }
 
     // Bootstrap to the network to obtaining the list of
@@ -143,31 +196,53 @@ impl ConnectionManager {
     // Connect to a set of Elders nodes which will be
     // the receipients of our messages on the network.
     async fn connect_to_elders(&mut self, elders_addrs: Vec<SocketAddr>) -> Result<(), CoreError> {
-        // TODO: connect to all Elders in parallel
-        let peer_addr = elders_addrs[0];
-
-        let mut conn = self.quic_p2p.connect_to(peer_addr).await?;
-
-        let handshake = HandshakeRequest::Join(self.full_id.public_id());
-        let msg = Bytes::from(serialize(&handshake)?);
-        let join_response = conn.send(msg).await?;
-        match deserialize(&join_response) {
-            Ok(HandshakeResponse::Challenge(PublicId::Node(node_public_id), challenge)) => {
-                trace!(
-                    "Got the challenge from {:?}, public id: {}",
-                    peer_addr,
-                    node_public_id
-                );
-                let response = HandshakeRequest::ChallengeResult(self.full_id.sign(&challenge));
-                let msg = Bytes::from(serialize(&response)?);
-                conn.send_only(msg).await?;
-                self.elders = vec![conn];
-                Ok(())
-            }
-            Ok(_) => Err(CoreError::from(format!(
-                "Unexpected message type while expeccting challenge from Elder."
-            ))),
-            Err(e) => Err(CoreError::from(format!("Unexpected error {:?}", e))),
+        // Connect to all Elders concurrently
+        // We spawn a task per each node to connect to
+        let mut tasks = Vec::default();
+        for peer_addr in elders_addrs {
+            let mut quic_p2p = self.quic_p2p.clone();
+            let full_id = self.full_id.clone();
+            let task_handle = tokio::spawn(async move {
+                let mut conn = quic_p2p.connect_to(peer_addr).await?;
+                let handshake = HandshakeRequest::Join(full_id.public_id());
+                let msg = Bytes::from(serialize(&handshake)?);
+                let join_response = conn.send(msg).await?;
+                match deserialize(&join_response) {
+                    Ok(HandshakeResponse::Challenge(PublicId::Node(node_public_id), challenge)) => {
+                        trace!(
+                            "Got the challenge from {:?}, public id: {}",
+                            peer_addr,
+                            node_public_id
+                        );
+                        let response = HandshakeRequest::ChallengeResult(full_id.sign(&challenge));
+                        let msg = Bytes::from(serialize(&response)?);
+                        conn.send_only(msg).await?;
+                        Ok(Arc::new(Mutex::new(conn)))
+                    }
+                    Ok(_) => Err(CoreError::from(format!(
+                        "Unexpected message type while expeccting challenge from Elder."
+                    ))),
+                    Err(e) => Err(CoreError::from(format!("Unexpected error {:?}", e))),
+                }
+            });
+            tasks.push(task_handle);
         }
+
+        // Let's await for them to all successfully connect, or fail if at least one failed
+        let conn_results = join_all(tasks).await;
+
+        // We can now keep each of the connections in our instance
+        for join_result in conn_results.into_iter() {
+            if let Ok(conn_result) = join_result {
+                let conn = conn_result.map_err(|err| {
+                    CoreError::from(format!("Failed to connect to an Elder: {}", err))
+                })?;
+
+                self.elders.push(conn);
+            }
+        }
+
+        trace!("Connected to {} Elders.", self.elders.len());
+        Ok(())
     }
 }
