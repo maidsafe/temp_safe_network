@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::thread::{self, JoinHandle};
 
+mod client;
+
 struct InProcNetwork {
     vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
@@ -57,6 +59,7 @@ impl InProcNetwork {
             let path = path.join("genesis-vault");
             genesis_config.set_log_dir(&path);
             genesis_config.set_root_dir(&path);
+            genesis_config.listen_on_loopback();
 
             let mut routing_config = RoutingConfig::default();
             routing_config.first = genesis_config.is_first();
@@ -77,7 +80,7 @@ impl InProcNetwork {
         });
         vaults.push((command_tx, handle));
         for i in 1..no_of_vaults {
-            thread::sleep(std::time::Duration::from_secs(5));
+            thread::sleep(std::time::Duration::from_secs(30));
             let (command_tx, command_rx) = crossbeam_channel::bounded(1);
             let mut vault_config = node_config.clone();
             let handle = thread::spawn(move || {
@@ -85,18 +88,18 @@ impl InProcNetwork {
                 println!("Starting new vault: {:?}", &vault_path);
                 vault_config.set_log_dir(&vault_path);
                 vault_config.set_root_dir(&vault_path);
-                vault_config.listen_on_loopback();
-
+                
                 let mut network_config = NetworkConfig::default();
-                println!("{:?}", &genesis_info);
+                // println!("{:?}", &genesis_info);
                 let _ = network_config
                     .hard_coded_contacts
                     .insert(genesis_info.clone());
                 vault_config.set_network_config(network_config);
+                vault_config.listen_on_loopback();
 
                 let mut routing_config = RoutingConfig::default();
                 routing_config.transport_config = vault_config.network_config().clone();
-                print!("{:?}", &routing_config.transport_config);
+                // print!("{:?}", &routing_config.transport_config);
 
                 let (routing, routing_rx, client_rx) = Routing::new(routing_config);
                 let routing_layer = Rc::new(RefCell::new(routing));
@@ -111,11 +114,16 @@ impl InProcNetwork {
         }
         Self { vaults }
     }
-}
-use safe_core::client::tests::pub_blob_test;
 
-#[tokio::test]
-async fn start_network() {
+    pub fn size(&self) -> usize {
+        self.vaults.len()
+    }
+}
+
+#[test]
+fn start_network() {
     let network = Network::new(7);
-    pub_blob_test().await;
+    loop {
+        
+    }
 }

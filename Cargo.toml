@@ -57,6 +57,7 @@ maplit = "1.0.1"
 tempdir = "~0.3.7"
 safe_core = { path = "../safe-client-libs", features = ["testing"] }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util"] }
+lazy_static = "1.4.0"
 
 [[bin]]
 name = "safe_vault"
