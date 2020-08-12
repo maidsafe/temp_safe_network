@@ -1,48 +1,46 @@
-use crate::{Command, Config, Node};
+use crate::{Command, Config, Node, network::Network};
 use crossbeam_channel::Sender;
+use flexi_logger::{DeferredNow, Logger};
+use log::{self, Record};
 use quic_p2p::Config as NetworkConfig;
 use routing::{Node as Routing, NodeConfig as RoutingConfig};
 use std::cell::RefCell;
+use std::io::Write;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::thread::{self, JoinHandle};
-use flexi_logger::{DeferredNow, Logger};
-use log::{self, Record};
-use std::io::Write;
-use std::path::PathBuf;
 
-struct Network {
+struct InProcNetwork {
     vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
 
 fn init_logging(log_dir: Option<&PathBuf>) {
-        // Custom formatter for logs
-        let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
-            write!(
-                writer,
-                "{} {} [{}:{}] {}",
-                record.level(),
-                clock.now().to_rfc3339(),
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                record.args()
-            )
-        };
-    
-        let logger = Logger::with_env()
-            .format(do_format)
-            .suppress_timestamp();
-    
-        let _ = if let Some(log_dir) = log_dir {
-            logger.log_to_file().directory(log_dir)
-        } else {
-            logger
-        }
-        .start()
-        .expect("Error when initialising logger");
+    // Custom formatter for logs
+    let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
+        write!(
+            writer,
+            "{} {} [{}:{}] {}",
+            record.level(),
+            clock.now().to_rfc3339(),
+            record.file().unwrap_or_default(),
+            record.line().unwrap_or_default(),
+            record.args()
+        )
+    };
+
+    let logger = Logger::with_env().format(do_format).suppress_timestamp();
+
+    let _ = if let Some(log_dir) = log_dir {
+        logger.log_to_file().directory(log_dir)
+    } else {
+        logger
+    }
+    .start()
+    .expect("Error when initialising logger");
 }
 
-impl Network {
+impl InProcNetwork {
     pub fn new(no_of_vaults: usize) -> Self {
         let path = std::path::Path::new("vaults");
         std::fs::create_dir_all(&path).expect("Cannot create vaults directory");
@@ -65,10 +63,16 @@ impl Network {
             routing_config.transport_config = genesis_config.network_config().clone();
 
             let (routing, routing_rx, client_rx) = Routing::new(routing_config);
-            let routing = Rc::new(RefCell::new(routing));
-            let receiver = crate::Receiver::new(routing_rx, client_rx, command_rx, routing.clone());
-            let mut node = Node::new(receiver, routing.clone(), &genesis_config, rand::thread_rng())
-                .expect("Unable to start vault Node");
+            let routing_layer = Rc::new(RefCell::new(routing));
+            let routing = Network::new(routing_layer.clone());
+            let receiver = crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer.clone());
+            let mut node = Node::new(
+                receiver,
+                routing.clone(),
+                &genesis_config,
+                rand::thread_rng(),
+            )
+            .expect("Unable to start vault Node");
             node.run();
         });
         vaults.push((command_tx, handle));
@@ -95,9 +99,10 @@ impl Network {
                 print!("{:?}", &routing_config.transport_config);
 
                 let (routing, routing_rx, client_rx) = Routing::new(routing_config);
-                let routing = Rc::new(RefCell::new(routing));
+                let routing_layer = Rc::new(RefCell::new(routing));
+                let routing = Network::new(routing_layer.clone());
                 let receiver =
-                    crate::Receiver::new(routing_rx, client_rx, command_rx, routing.clone());
+                    crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer.clone());
                 let mut node = Node::new(receiver, routing, &vault_config, rand::thread_rng())
                     .expect("Unable to start vault Node");
                 node.run();
@@ -107,11 +112,10 @@ impl Network {
         Self { vaults }
     }
 }
+use safe_core::client::tests::pub_blob_test;
 
-#[test]
-fn start_network() {
+#[tokio::test]
+async fn start_network() {
     let network = Network::new(7);
-    loop {
-
-    }
+    pub_blob_test().await;
 }

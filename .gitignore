@@ -24,3 +24,4 @@ packages/
 installer/docker/safe_vault
 installer/docker/safe_vault.*.config
 installer/docker/.env
+vaults

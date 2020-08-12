@@ -36,7 +36,6 @@ quic-p2p = { version = "~0.7.0" }
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
 routing = { git = "https://github.com/joshuef/routing.git", branch = "RandoXor" }
-
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
@@ -56,6 +55,8 @@ xor_name = "1.1.0"
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
+safe_core = { path = "../safe-client-libs", features = ["testing"] }
+tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util"] }
 
 [[bin]]
 name = "safe_vault"
@@ -64,4 +65,4 @@ doc = false
 [features]
 mock_base = ["routing/mock_base", "fxhash", "mock-quic-p2p"]
 mock_parsec = ["routing/mock", "mock_base"]
-simulated-payouts = ["safe-nd/simulated-payouts", "safe-transfers/simulated-payouts"]
+simulated-payouts = ["safe-nd/simulated-payouts", "safe-transfers/simulated-payouts", "safe_core/simulated-payouts"]
