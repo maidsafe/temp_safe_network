@@ -1,4 +1,6 @@
-use crate::{Command, Config, Node, network::Network};
+use crate::config_handler::write_connection_info;
+use crate::{network::Network as NetworkLayer, Command, Config, Node};
+use crate::{Command, Config, Node};
 use crossbeam_channel::Sender;
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, Record};
@@ -42,13 +44,14 @@ fn init_logging(log_dir: Option<&PathBuf>) {
     .expect("Error when initialising logger");
 }
 
-impl InProcNetwork {
-    pub fn new(no_of_vaults: usize) -> Self {
+impl Network {
+    pub async fn new(no_of_vaults: usize) -> Self {
         let path = std::path::Path::new("vaults");
+        std::fs::remove_dir_all(&path).unwrap_or(()); // Delete vaults directory if it exists;
         std::fs::create_dir_all(&path).expect("Cannot create vaults directory");
         init_logging(Some(&path.into()));
         let mut vaults = Vec::new();
-        let mut genesis_info: SocketAddr = "127.0.0.1:12000".parse().unwrap();
+        let genesis_info: SocketAddr = "127.0.0.1:12000".parse().unwrap();
         let mut node_config = Config::default();
         node_config.set_flag("local", 1);
         node_config.listen_on_loopback();
@@ -57,7 +60,6 @@ impl InProcNetwork {
         let handle = thread::spawn(move || {
             genesis_config.set_flag("first", 1);
             let path = path.join("genesis-vault");
-            genesis_config.set_log_dir(&path);
             genesis_config.set_root_dir(&path);
             genesis_config.listen_on_loopback();
 
@@ -67,8 +69,9 @@ impl InProcNetwork {
 
             let (routing, routing_rx, client_rx) = Routing::new(routing_config);
             let routing_layer = Rc::new(RefCell::new(routing));
-            let routing = Network::new(routing_layer.clone());
-            let receiver = crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer.clone());
+            let routing = NetworkLayer::new(routing_layer.clone());
+            let receiver =
+                crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer.clone());
             let mut node = Node::new(
                 receiver,
                 routing.clone(),
@@ -76,6 +79,10 @@ impl InProcNetwork {
                 rand::thread_rng(),
             )
             .expect("Unable to start vault Node");
+            let our_conn_info = node
+                .our_connection_info()
+                .expect("Could not get genesis info");
+            let _ = write_connection_info(&our_conn_info).unwrap();
             node.run();
         });
         vaults.push((command_tx, handle));
@@ -86,11 +93,9 @@ impl InProcNetwork {
             let handle = thread::spawn(move || {
                 let vault_path = path.join(format!("vault-{}", i));
                 println!("Starting new vault: {:?}", &vault_path);
-                vault_config.set_log_dir(&vault_path);
                 vault_config.set_root_dir(&vault_path);
-                
+
                 let mut network_config = NetworkConfig::default();
-                // println!("{:?}", &genesis_info);
                 let _ = network_config
                     .hard_coded_contacts
                     .insert(genesis_info.clone());
@@ -99,7 +104,6 @@ impl InProcNetwork {
 
                 let mut routing_config = RoutingConfig::default();
                 routing_config.transport_config = vault_config.network_config().clone();
-                // print!("{:?}", &routing_config.transport_config);
 
                 let (routing, routing_rx, client_rx) = Routing::new(routing_config);
                 let routing_layer = Rc::new(RefCell::new(routing));
@@ -120,10 +124,10 @@ impl InProcNetwork {
     }
 }
 
-#[test]
-fn start_network() {
-    let network = Network::new(7);
-    loop {
-        
-    }
-}
+// #[test]
+// fn start_network() {
+//     let network = Network::new(7);
+//     loop {
+
+//     }
+// }

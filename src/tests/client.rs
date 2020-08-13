@@ -1,11 +1,9 @@
-use safe_core::client::tests;
-use lazy_static::lazy_static;
 use super::Network;
-
+use safe_core::client::tests;
 
 #[tokio::test]
 pub async fn pub_blob_test() {
-    let network = Network::new(7);
+    let _network = Network::new(7).await;
     assert!(tests::pub_blob_test().await.is_ok());
 }
 
@@ -18,7 +16,6 @@ async fn unpub_blob_test() {
 pub async fn unseq_map_test() {
     assert!(tests::unseq_map_test().await.is_ok())
 }
-
 
 #[tokio::test]
 pub async fn seq_map_test() {
@@ -57,9 +54,12 @@ pub async fn del_unseq_map_permission_test() {
 }
 
 #[tokio::test]
-pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client(
-) {
-    assert!(tests::map_cannot_initially_put_data_with_another_owner_than_current_client().await.is_ok());
+pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client() {
+    assert!(
+        tests::map_cannot_initially_put_data_with_another_owner_than_current_client()
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
@@ -84,7 +84,9 @@ pub async fn map_deletions_should_cost_put_price() {
 
 #[tokio::test]
 async fn sequence_deletions_should_cost_put_price() {
-    assert!(tests::sequence_deletions_should_cost_put_price().await.is_ok());
+    assert!(tests::sequence_deletions_should_cost_put_price()
+        .await
+        .is_ok());
 }
 
 /// Sequence data tests ///
