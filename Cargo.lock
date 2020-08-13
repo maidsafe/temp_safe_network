@@ -58,15 +58,6 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "0.6.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81ce3d38065e618af2d7b77e10c5ad9a069859b4be3c2250f674af3840d9c8a5"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "aho-corasick"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "043164d8ba5c4c3035fec9bbee8647c0261d788f3474306f93bb65901cae0e86"
@@ -452,7 +443,7 @@ dependencies = [
  "encode_unicode",
  "lazy_static",
  "libc",
- "regex 1.3.9",
+ "regex",
  "terminal_size",
  "termios",
  "unicode-width",
@@ -704,7 +695,7 @@ dependencies = [
  "atty",
  "humantime",
  "log 0.4.11",
- "regex 1.3.9",
+ "regex",
  "termcolor",
 ]
 
@@ -717,7 +708,7 @@ dependencies = [
  "atty",
  "humantime",
  "log 0.4.11",
- "regex 1.3.9",
+ "regex",
  "termcolor",
 ]
 
@@ -795,21 +786,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ffi_utils"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "245e34abfc6aedb678ae03b18bce30983f6c6b68dc6813a29d8f39d7e8a218ee"
-dependencies = [
- "base64 0.9.3",
- "log 0.4.11",
- "regex 0.2.11",
- "serde",
- "serde_derive",
- "unwrap",
- "walkdir",
-]
-
-[[package]]
 name = "file-per-thread-logger"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -852,7 +828,7 @@ dependencies = [
  "chrono",
  "glob",
  "log 0.4.11",
- "regex 1.3.9",
+ "regex",
  "yansi",
 ]
 
@@ -1266,7 +1242,7 @@ dependencies = [
  "console",
  "lazy_static",
  "number_prefix",
- "regex 1.3.9",
+ "regex",
 ]
 
 [[package]]
@@ -1733,7 +1709,7 @@ dependencies = [
  "base64 0.10.1",
  "failure",
  "lazy_static",
- "regex 1.3.9",
+ "regex",
 ]
 
 [[package]]
@@ -2201,36 +2177,14 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9329abc99e39129fcceabd24cf5d85b4671ef7c29c50e972bc5afe32438ec384"
-dependencies = [
- "aho-corasick 0.6.10",
- "memchr",
- "regex-syntax 0.5.6",
- "thread_local 0.3.6",
- "utf8-ranges",
-]
-
-[[package]]
-name = "regex"
 version = "1.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c3780fcf44b193bc4d09f36d2a3c87b251da4a046c87795a0d35f4f927ad8e6"
 dependencies = [
- "aho-corasick 0.7.13",
+ "aho-corasick",
  "memchr",
- "regex-syntax 0.6.18",
- "thread_local 1.0.1",
-]
-
-[[package]]
-name = "regex-syntax"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d707a4fa2637f2dca2ef9fd02225ec7661fe01a53623c1e6515b6916511f7a7"
-dependencies = [
- "ucd-util",
+ "regex-syntax",
+ "thread_local",
 ]
 
 [[package]]
@@ -2417,27 +2371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "safe-nd"
-version = "0.10.1"
-source = "git+https://github.com/maidsafe/safe-nd.git?rev=d722f38#d722f38651e805994e35dec0826703a021f3df24"
-dependencies = [
- "bincode",
- "crdts",
- "ed25519",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.7.3",
- "serde",
- "sha3",
- "signature",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "unwrap",
- "xor_name",
-]
-
-[[package]]
 name = "safe-network-signature-aggregator"
 version = "0.1.0"
 source = "git+https://github.com/maidsafe/safe-network-signature-aggregator#72f216fa4deeebb68a9ab4589c42f68172343d0c"
@@ -2462,7 +2395,7 @@ dependencies = [
  "itertools 0.9.0",
  "log 0.4.11",
  "rand 0.7.3",
- "safe-nd 0.10.1 (git+https://github.com/maidsafe/safe-nd.git?branch=farming)",
+ "safe-nd",
  "serde",
  "threshold_crypto",
  "xor_name",
@@ -2471,7 +2404,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/lionel1704/safe_client_libs?branch=test-farming#d5cd9592ebcdd76e72dcc64be79aa40fed355a41"
+source = "git+https://github.com/oetyng/safe_client_libs?branch=farming#d31121f4007460e8af612646d3541ca730dbcc34"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2482,7 +2415,6 @@ dependencies = [
  "data-encoding",
  "directories 2.0.2",
  "env_logger 0.6.2",
- "ffi_utils",
  "fs2",
  "futures",
  "futures-util",
@@ -2495,9 +2427,9 @@ dependencies = [
  "pbkdf2",
  "quic-p2p",
  "rand 0.7.3",
- "regex 1.3.9",
- "safe-nd 0.10.1 (git+https://github.com/maidsafe/safe-nd.git?rev=d722f38)",
- "safe-transfers 0.1.0 (git+https://github.com/lionel1704/safe-transfers.git?branch=test-farming)",
+ "regex",
+ "safe-nd",
+ "safe-transfers",
  "self_encryption",
  "serde",
  "serde-value",
@@ -2541,8 +2473,8 @@ dependencies = [
  "rand 0.7.3",
  "rand_chacha 0.2.2",
  "routing",
- "safe-nd 0.10.1 (git+https://github.com/maidsafe/safe-nd.git?branch=farming)",
- "safe-transfers 0.1.0 (git+https://github.com/maidsafe/safe-transfers.git)",
+ "safe-nd",
+ "safe-transfers",
  "safe_core",
  "self_update",
  "serde",
@@ -2563,15 +2495,6 @@ name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
-
-[[package]]
-name = "same-file"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
-dependencies = [
- "winapi-util",
-]
 
 [[package]]
 name = "sct"
@@ -2616,7 +2539,7 @@ dependencies = [
  "indicatif",
  "log 0.4.11",
  "quick-xml",
- "regex 1.3.9",
+ "regex",
  "reqwest",
  "semver",
  "serde_json",
@@ -2951,15 +2874,6 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
-dependencies = [
- "lazy_static",
-]
-
-[[package]]
-name = "thread_local"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d40c6d1b69745a6ec6fb1ca717914848da4b44ae29d9b3080cbee91d72a69b14"
@@ -3165,12 +3079,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
 
 [[package]]
-name = "ucd-util"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c85f514e095d348c279b1e5cd76795082cf15bd59b93207832abe0b1d8fed236"
-
-[[package]]
 name = "unicase"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3254,12 +3162,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "utf8-ranges"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ae116fef2b7fea257ed6440d3cfcff7f190865f170cdad00bb6465bf18ecba"
-
-[[package]]
 name = "vec_map"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3276,17 +3178,6 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-
-[[package]]
-name = "walkdir"
-version = "2.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "777182bc735b6424e1a57516d35ed72cb8019d85c8c9bf536dccb3445c1a2f7d"
-dependencies = [
- "same-file",
- "winapi 0.3.9",
- "winapi-util",
-]
 
 [[package]]
 name = "want"
