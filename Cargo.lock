@@ -788,8 +788,7 @@ dependencies = [
 [[package]]
 name = "file-per-thread-logger"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b3937f028664bd0e13df401ba49a4567ccda587420365823242977f06609ed1"
+source = "git+https://github.com/lionel1704/file-per-thread-logger?branch=custom-log-format#1b719a0ea28950c2be2ea468f22c316897c6fc6e"
 dependencies = [
  "env_logger 0.7.1",
  "log 0.4.11",
@@ -2404,7 +2403,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/oetyng/safe_client_libs?branch=farming#d31121f4007460e8af612646d3541ca730dbcc34"
+source = "git+https://github.com/lionel1704/safe_client_libs?branch=farming#4220587bac5c451c64a3100cceb29b5e023b717c"
 dependencies = [
  "async-trait",
  "bincode",

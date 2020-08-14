@@ -18,39 +18,26 @@ use routing::{Node as Routing, NodeConfig as RoutingConfig};
 use std::cell::RefCell;
 use std::io::Write;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::thread::{self, JoinHandle};
+use file_per_thread_logger::{self as logger, FormatFn};
 
 struct Network {
     vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
 
-fn init_logging(log_dir: Option<&PathBuf>) {
-    // Custom formatter for logs
-    let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
-        let thread = std::thread::current();
-        write!(
+fn init_logging() {
+    let formatter: FormatFn = |writer, record| {
+        writeln!(
             writer,
-            "{} {} {} [{}:{}] {}",
-            thread.name().unwrap_or("Untitled"),
+            "{} [{}:{}] {}",
             record.level(),
-            clock.now().to_rfc3339(),
             record.file().unwrap_or_default(),
             record.line().unwrap_or_default(),
             record.args()
         )
     };
-
-    let logger = Logger::with_env().format(do_format).suppress_timestamp();
-
-    let _ = if let Some(log_dir) = log_dir {
-        logger.log_to_file().directory(log_dir)
-    } else {
-        logger
-    }
-    .start()
-    .expect("Error when initialising logger");
+    logger::initialize("", Some(formatter));
 }
 
 impl Network {
@@ -58,7 +45,7 @@ impl Network {
         let path = std::path::Path::new("vaults");
         std::fs::remove_dir_all(&path).unwrap_or(()); // Delete vaults directory if it exists;
         std::fs::create_dir_all(&path).expect("Cannot create vaults directory");
-        init_logging(Some(&path.into()));
+        init_logging();
         let mut vaults = Vec::new();
         let genesis_info: SocketAddr = "127.0.0.1:12000".parse().unwrap();
         let mut node_config = Config::default();
@@ -69,6 +56,7 @@ impl Network {
         let handle = std::thread::Builder::new()
             .name("vault-genesis".to_string())
             .spawn(move || {
+                init_logging();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-vault");
                 genesis_config.set_root_dir(&path);
@@ -103,8 +91,9 @@ impl Network {
             let (command_tx, command_rx) = crossbeam_channel::bounded(1);
             let mut vault_config = node_config.clone();
             let handle = std::thread::Builder::new()
-                .name(format!("Vault-{}", i))
+                .name(format!("vault-{}", i))
                 .spawn(move || {
+                    init_logging();
                     let vault_path = path.join(format!("vault-{}", i));
                     println!("Starting new vault: {:?}", &vault_path);
                     vault_config.set_root_dir(&vault_path);
@@ -136,9 +125,5 @@ impl Network {
             vaults.push((command_tx, handle));
         }
         Self { vaults }
-    }
-
-    pub fn size(&self) -> usize {
-        self.vaults.len()
     }
 }
