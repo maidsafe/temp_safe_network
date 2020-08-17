@@ -58,9 +58,9 @@ testing = ["simulated-payouts"]
 
 
 [patch.crates-io]
-safe-nd = { path = "../safe-nd"}
-# safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "farming" }
-# safe-transfers = { git = "https://github.com/maidsafe/safe-transfers.git" }
-safe-transfers = { path="../safe-transfers" }
+# safe-nd = { path = "../safe-nd"} 
+safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "farming" }
+safe-transfers = { git = "https://github.com/maidsafe/safe-transfers.git" }
+# safe-transfers = { path="../safe-transfers" }
 
 xor_name = { git="https://github.com/joshuef/xor-name.git", branch="AddRandom"}

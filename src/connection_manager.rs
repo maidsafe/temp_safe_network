@@ -170,7 +170,7 @@ impl ConnectionManager {
 
         trace!("Sending handshake request to bootstrapped node...");
         let public_id = self.full_id.public_id();
-        let handshake = HandshakeRequest::Bootstrap(PublicId::Client(public_id.clone()));
+        let handshake = HandshakeRequest::Bootstrap(*public_id.public_key());
         let msg = Bytes::from(serialize(&handshake)?);
         let response = node_connection.send(msg).await?;
 
@@ -205,15 +205,15 @@ impl ConnectionManager {
             let full_id = self.full_id.clone();
             let task_handle = tokio::spawn(async move {
                 let mut conn = quic_p2p.connect_to(peer_addr).await?;
-                let handshake = HandshakeRequest::Join(PublicId::Client(full_id.public_id().clone()));
+                let handshake = HandshakeRequest::Join(*full_id.public_id().public_key());
                 let msg = Bytes::from(serialize(&handshake)?);
                 let join_response = conn.send(msg).await?;
                 match deserialize(&join_response) {
-                    Ok(HandshakeResponse::Challenge(PublicId::Node(node_public_id), challenge)) => {
+                    Ok(HandshakeResponse::Challenge(node_public_key, challenge)) => {
                         trace!(
                             "Got the challenge from {:?}, public id: {}",
                             peer_addr,
-                            node_public_id
+                            node_public_key
                         );
                         let response = HandshakeRequest::ChallengeResult(full_id.sign(&challenge));
                         let msg = Bytes::from(serialize(&response)?);
