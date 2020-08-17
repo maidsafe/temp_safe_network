@@ -184,9 +184,7 @@ mod tests {
     #[tokio::test]
     async fn client_creation() {
         let (sk, pk) = shared_box::gen_bls_keypair();
-        let _transfer_actor = Client::new(Some(sk))
-            .await
-            .unwrap();
+        let _transfer_actor = Client::new(Some(sk)).await.unwrap();
 
         assert!(true);
     }

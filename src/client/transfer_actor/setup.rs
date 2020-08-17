@@ -73,8 +73,6 @@ impl Client {
     //     }
     //     Ok(actor)
     // }
-
-
 }
 
 // --------------------------------
@@ -118,7 +116,7 @@ mod tests {
     #[cfg(not(feature = "mock-network"))]
     async fn transfer_actor_creation_hydration_for_existing_balance() -> Result<(), CoreError> {
         let (sk, pk) = shared_box::gen_bls_keypair();
-        let (sk2, pk2)  = shared_box::gen_bls_keypair();
+        let (sk2, pk2) = shared_box::gen_bls_keypair();
 
         let mut initial_actor = Client::new(Some(sk)).await?;
 

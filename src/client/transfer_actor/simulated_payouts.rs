@@ -45,12 +45,12 @@ impl Client {
 
         // If we're getting the payout for our own actor, update it here
         // if to == self.full_id().await.public_key() {
-            info!("Applying simulated payout locally, via query for history...");
+        info!("Applying simulated payout locally, via query for history...");
 
-            // std::thread::sleep(std::time::Duration::from_millis(15500));
+        // std::thread::sleep(std::time::Duration::from_millis(15500));
 
-            // get full history from network and apply locally
-            self.get_history().await?;
+        // get full history from network and apply locally
+        self.get_history().await?;
         // }
         Ok(())
     }
@@ -73,8 +73,7 @@ mod tests {
     #[cfg(feature = "simulated-payouts")]
     async fn transfer_actor_can_receive_simulated_farming_payout() -> Result<(), CoreError> {
         let (sk, pk) = shared_box::gen_bls_keypair();
-        let mut initial_actor =
-            Client::new_no_initial_balance(Some(sk.clone())).await?;
+        let mut initial_actor = Client::new_no_initial_balance(Some(sk.clone())).await?;
 
         let _ = initial_actor
             .trigger_simulated_farming_payout(Money::from_str("100")?)

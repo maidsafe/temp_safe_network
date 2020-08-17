@@ -6,16 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{CoreError};
+use crate::CoreError;
 use bincode::{deserialize, serialize};
 use bytes::Bytes;
 use futures::{future::join_all, lock::Mutex};
 use log::{error, info, trace};
 use quic_p2p::{self, Config as QuicP2pConfig, Connection, QuicP2pAsync};
 use safe_nd::{
-    ClientFullId,
-    BlsProof, HandshakeRequest, HandshakeResponse, Message, MsgEnvelope, MsgSender, Proof,
-    PublicId, QueryResponse,
+    BlsProof, ClientFullId, HandshakeRequest, HandshakeResponse, Message, MsgEnvelope, MsgSender,
+    Proof, PublicId, QueryResponse,
 };
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -135,7 +134,11 @@ impl ConnectionManager {
         // TODO: return an error if we didn't successfully got enough number
         // of responses to represent a majority of Elders
 
-        trace!("Response obtained from majority {} of nodes: {:?}", winner.1, winner.0);
+        trace!(
+            "Response obtained from majority {} of nodes: {:?}",
+            winner.1,
+            winner.0
+        );
         winner.0.ok_or_else(|| {
             CoreError::from(format!("Failed to obtain a response from the network."))
         })

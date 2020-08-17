@@ -212,7 +212,10 @@ mod tests {
     pub async fn blob_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
-        let blob = Blob::Private(PrivateBlob::new(generate_random_vector::<u8>(10), client.public_key().await));
+        let blob = Blob::Private(PrivateBlob::new(
+            generate_random_vector::<u8>(10),
+            client.public_key().await,
+        ));
         let blob_address = *blob.address();
         client.store_blob(blob).await?;
 

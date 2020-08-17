@@ -9,7 +9,6 @@ use safe_transfers::ActorEvent;
 use crate::client::Client;
 use crate::errors::CoreError;
 
-
 /// Handle Write API msg_contents for a given Client.
 impl Client {
     pub(crate) async fn apply_write_locally(
@@ -44,8 +43,7 @@ mod tests {
 
         let data = Sequence::new_pub(pk, XorName::random(), 33323);
 
-        let mut initial_actor =
-            Client::new_no_initial_balance(Some(sk.clone())).await?;
+        let mut initial_actor = Client::new_no_initial_balance(Some(sk.clone())).await?;
 
         match initial_actor.new_sequence(data).await {
             Err(CoreError::DataError(e)) => {

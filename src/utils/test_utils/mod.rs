@@ -6,14 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::{COST_OF_PUT};
-
-
-
+use crate::client::COST_OF_PUT;
 
 use safe_nd::{ClientFullId, Keypair, Money};
-
-
 
 use unwrap::unwrap;
 

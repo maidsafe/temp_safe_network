@@ -161,12 +161,9 @@ mod tests {
         let pk = PublicKey::Bls(pk);
         let pk2 = PublicKey::Bls(pk2);
 
-        let mut initial_actor =
-            Client::new(Some(sk.clone())).await?;
+        let mut initial_actor = Client::new(Some(sk.clone())).await?;
 
-        let _ = initial_actor
-            .send_money(pk2, Money::from_str("1")?)
-            .await?;
+        let _ = initial_actor.send_money(pk2, Money::from_str("1")?).await?;
 
         // initial 10 on creation from farming simulation minus 1
         assert_eq!(
@@ -195,15 +192,10 @@ mod tests {
         let mut client = Client::new(Some(sk.clone())).await?;
 
         println!("starting.....");
-        let _ = client
-            .send_money(pk2, Money::from_str("1")?)
-            .await?;
+        let _ = client.send_money(pk2, Money::from_str("1")?).await?;
 
         // initial 10 on creation from farming simulation minus 1
-        assert_eq!(
-            client.get_local_balance().await,
-            Money::from_str("9")?
-        );
+        assert_eq!(client.get_local_balance().await, Money::from_str("9")?);
 
         assert_eq!(
             client.get_balance_from_network(None).await?,
@@ -212,9 +204,7 @@ mod tests {
 
         println!("FIRST DONE!!!!!!!!!!!!!!");
 
-        let _ = client
-            .send_money(pk2, Money::from_str("2")?)
-            .await?;
+        let _ = client.send_money(pk2, Money::from_str("2")?).await?;
 
         // initial 10 on creation from farming simulation minus 3
         Ok(assert_eq!(

@@ -34,10 +34,10 @@ use log::trace;
 use lru::LruCache;
 use quic_p2p::Config as QuicP2pConfig;
 use safe_nd::{
-    AppPermissions, AuthQuery, Blob, PublicBlob,BlobAddress, BlobRead, ClientFullId, Cmd, Data, DataQuery,
+    AppPermissions, AuthQuery, Blob, BlobAddress, BlobRead, ClientFullId, Cmd, Data, DataQuery,
     Map, MapAddress, MapEntries, MapEntryActions, MapPermissionSet, MapRead, MapSeqEntries,
     MapSeqEntryActions, MapSeqValue, MapUnseqEntryActions, MapValue, MapValues, Message, MessageId,
-    Money, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence, SequenceAction,
+    Money, PublicBlob, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence, SequenceAction,
     SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex, SequenceOwner,
     SequencePrivUserPermissions, SequencePrivatePermissions, SequencePubUserPermissions,
     SequencePublicPermissions, SequenceRead, SequenceUser, SequenceUserPermissions, UnseqMap,
@@ -137,11 +137,8 @@ impl Client {
         Ok(full_client)
     }
 
-
     #[cfg(feature = "simulated-payouts")]
-    pub async fn new_no_initial_balance(
-        sk: Option<SecretKey>,
-    ) -> Result<Self, CoreError> {
+    pub async fn new_no_initial_balance(sk: Option<SecretKey>) -> Result<Self, CoreError> {
         let full_id = match sk {
             Some(sk) => ClientFullId::from(sk),
             None => {
@@ -192,7 +189,6 @@ impl Client {
 
         Ok(full_client)
     }
-
 
     async fn full_id(&mut self) -> ClientFullId {
         self.full_id.clone()
@@ -283,9 +279,7 @@ impl Client {
             amount,
         );
 
-        self
-            .trigger_simulated_farming_payout( amount)
-            .await
+        self.trigger_simulated_farming_payout(amount).await
     }
 }
 
@@ -358,17 +352,13 @@ pub async fn attempt_bootstrap(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::{
-        generate_random_vector,
-        test_utils::{calculate_new_balance},
-    };
+    use crate::utils::{generate_random_vector, test_utils::calculate_new_balance};
     use safe_nd::{
         Error as SndError, MapAction, MapKind, Money, PrivateBlob, PublicBlob,
         SequencePrivUserPermissions,
     };
     use std::str::FromStr;
     use unwrap::unwrap;
-    
 
     // TODO: Wallet only client doesn't currently exist.
     // 1. Create 2 accounts and create a wallet only for account A.
@@ -424,7 +414,7 @@ mod tests {
     // 2. Transfer some safecoin from the anonymous wallet to the client.
     // 3. Fetch the balances of both the wallets and verify them.
     // 5. Try to create a balance using an inexistent wallet. This should fail.
-    
+
     // TODO: evaluate if test still valid
     // #[tokio::test]
     // async fn random_clients() -> Result<(),CoreError> {
@@ -553,7 +543,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let data = Blob::Public(PublicBlob::new( generate_random_vector::<u8>(10 ) ) );
+        let data = Blob::Public(PublicBlob::new(generate_random_vector::<u8>(10)));
         let res = client.store_blob(data).await;
         match res {
             Err(CoreError::DataError(SndError::InsufficientBalance)) => (),
