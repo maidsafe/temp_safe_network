@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{client::SafeKey, CoreError};
+use crate::{CoreError};
 use bincode::{deserialize, serialize};
 use bytes::Bytes;
 use futures::{future::join_all, lock::Mutex};
 use log::{error, info, trace};
 use quic_p2p::{self, Config as QuicP2pConfig, Connection, QuicP2pAsync};
 use safe_nd::{
+    ClientFullId,
     BlsProof, HandshakeRequest, HandshakeResponse, Message, MsgEnvelope, MsgSender, Proof,
     PublicId, QueryResponse,
 };
@@ -21,14 +22,14 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 /// Initialises `QuicP2p` instance which can bootstrap to the network, establish
 /// connections and send messages to several nodes, as well as await responses from them.
 pub struct ConnectionManager {
-    full_id: SafeKey,
+    full_id: ClientFullId,
     quic_p2p: QuicP2pAsync,
     elders: Vec<Arc<Mutex<Connection>>>,
 }
 
 impl ConnectionManager {
     /// Create a new connection manager.
-    pub fn new(mut config: QuicP2pConfig, full_id: SafeKey) -> Result<Self, CoreError> {
+    pub fn new(mut config: QuicP2pConfig, full_id: ClientFullId) -> Result<Self, CoreError> {
         config.port = Some(0); // Make sure we always use a random port for client connections.
         let quic_p2p = QuicP2pAsync::with_config(Some(config), Default::default(), false)?;
 
@@ -169,7 +170,7 @@ impl ConnectionManager {
 
         trace!("Sending handshake request to bootstrapped node...");
         let public_id = self.full_id.public_id();
-        let handshake = HandshakeRequest::Bootstrap(public_id);
+        let handshake = HandshakeRequest::Bootstrap(PublicId::Client(public_id.clone()));
         let msg = Bytes::from(serialize(&handshake)?);
         let response = node_connection.send(msg).await?;
 
@@ -204,7 +205,7 @@ impl ConnectionManager {
             let full_id = self.full_id.clone();
             let task_handle = tokio::spawn(async move {
                 let mut conn = quic_p2p.connect_to(peer_addr).await?;
-                let handshake = HandshakeRequest::Join(full_id.public_id());
+                let handshake = HandshakeRequest::Join(PublicId::Client(full_id.public_id().clone()));
                 let msg = Bytes::from(serialize(&handshake)?);
                 let join_response = conn.send(msg).await?;
                 match deserialize(&join_response) {
