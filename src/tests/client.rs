@@ -8,30 +8,45 @@
 
 use super::Network;
 use safe_core::client::exported_tests;
+use std::sync::Once;
+
+static mut NETWORK: Network = Network { vaults: Vec::new() };
+static START: Once = Once::new();
+
+#[allow(unsafe_code)]
+fn start_network() {
+    START.call_once(|| unsafe {
+        NETWORK = futures::executor::block_on(Network::new(7));
+    });
+}
 
 #[tokio::test]
 pub async fn pub_blob_test() {
-    let _network = Network::new(7).await;
+    start_network();
     assert!(exported_tests::pub_blob_test().await.is_ok());
 }
 
 #[tokio::test]
 async fn unpub_blob_test() {
+    start_network();
     assert!(exported_tests::unpub_blob_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn unseq_map_test() {
+    start_network();
     assert!(exported_tests::unseq_map_test().await.is_ok())
 }
 
 #[tokio::test]
 pub async fn seq_map_test() {
+    start_network();
     assert!(exported_tests::seq_map_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn del_seq_map_test() {
+    start_network();
     assert!(exported_tests::del_seq_map_test().await.is_ok());
 }
 

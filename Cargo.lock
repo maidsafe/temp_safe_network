@@ -2459,6 +2459,7 @@ dependencies = [
  "fake_clock",
  "file-per-thread-logger",
  "flexi_logger",
+ "futures",
  "fxhash",
  "hex",
  "hex_fmt",

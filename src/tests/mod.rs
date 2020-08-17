@@ -11,6 +11,7 @@ mod client;
 use crate::config_handler::write_connection_info;
 use crate::{network::Network as NetworkLayer, Command, Config, Node};
 use crossbeam_channel::Sender;
+use file_per_thread_logger::{self as logger, FormatFn};
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, Record};
 use quic_p2p::Config as NetworkConfig;
@@ -20,8 +21,8 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::rc::Rc;
 use std::thread::{self, JoinHandle};
-use file_per_thread_logger::{self as logger, FormatFn};
 
+#[derive(Default)]
 struct Network {
     vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
