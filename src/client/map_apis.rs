@@ -464,7 +464,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Delete mutable data user permission
@@ -496,7 +496,7 @@ impl Client {
 
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Set mutable data user permissions
@@ -531,7 +531,7 @@ impl Client {
         // TODO what will be the correct reponse here?... We have it validated, so registered?
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Mutate mutable data user entries
@@ -555,7 +555,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Store a new public mutable data object
@@ -573,7 +573,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 }
 

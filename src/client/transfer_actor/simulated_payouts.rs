@@ -2,6 +2,8 @@ use safe_nd::{Cmd, Money, PublicKey, Transfer, TransferCmd};
 
 use crate::client::Client;
 use crate::errors::CoreError;
+
+#[cfg(feature = "simulated-payouts")]
 use log::info;
 
 /// Handle all Money transfers and Write API requests for a given ClientId.

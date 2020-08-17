@@ -11,7 +11,7 @@ use crate::errors::CoreError;
 
 /// Handle Write API msg_contents for a given Client.
 impl Client {
-    pub(crate) async fn apply_write_locally(
+    pub(crate) async fn apply_write_payment_to_local_actor(
         &mut self,
         debit_proof: DebitAgreementProof,
     ) -> Result<(), CoreError> {

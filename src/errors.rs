@@ -11,6 +11,7 @@ use bincode::Error as SerialisationError;
 use futures::channel::mpsc::SendError;
 use quic_p2p::QuicP2pError;
 use safe_nd::Error as SndError;
+
 use std::error::Error as StdError;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io;
@@ -71,6 +72,12 @@ impl From<String> for CoreError {
         Self::Unexpected(error)
     }
 }
+
+// impl From<SelfEncryptionError<E>> for CoreError {
+//     fn from(error: SelfEncryptionError<E> ) -> Self {
+//         Self::from(format!("Self encryption error: {}",error))
+//     }
+// }
 
 impl From<SendError> for CoreError {
     fn from(error: SendError) -> Self {

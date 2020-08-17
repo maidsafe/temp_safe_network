@@ -14,12 +14,13 @@ use log::{error, info, trace};
 use quic_p2p::{self, Config as QuicP2pConfig, Connection, QuicP2pAsync};
 use safe_nd::{
     BlsProof, ClientFullId, HandshakeRequest, HandshakeResponse, Message, MsgEnvelope, MsgSender,
-    Proof, PublicId, QueryResponse,
+    Proof, QueryResponse,
 };
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Initialises `QuicP2p` instance which can bootstrap to the network, establish
 /// connections and send messages to several nodes, as well as await responses from them.
+#[derive(Clone)]
 pub struct ConnectionManager {
     full_id: ClientFullId,
     quic_p2p: QuicP2pAsync,

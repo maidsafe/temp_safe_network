@@ -50,7 +50,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Mutate sequenced data private permissions
@@ -74,7 +74,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Mutate sequenced data public permissions
@@ -98,7 +98,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Append data to a sequenced data object
@@ -119,7 +119,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Store a new public sequenced data object
@@ -137,7 +137,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Delete sequence
@@ -154,7 +154,7 @@ impl Client {
         let message = Self::create_cmd_message(msg_contents);
         let _ = self.connection_manager.send_cmd(&message).await?;
 
-        self.apply_write_locally(payment_proof).await
+        self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     // ======= Sequence Data =======
@@ -176,7 +176,7 @@ impl Client {
         self.new_sequence(data.clone()).await?;
 
         // Store in local Sequence CRDT replica
-        let _ = self.sequence_cache.put(*data.address(), data);
+        let _ = self.sequence_cache.lock().await.put(*data.address(), data);
 
         Ok(address)
     }
@@ -198,7 +198,7 @@ impl Client {
         self.new_sequence(data.clone()).await?;
 
         // Store in local Sequence CRDT replica
-        let _ = self.sequence_cache.put(*data.address(), data);
+        let _ = self.sequence_cache.lock().await.put(*data.address(), data);
 
         Ok(address)
     }
@@ -210,7 +210,7 @@ impl Client {
         // TODO: implement some logic to refresh data from the network if local replica
         // is too old, to mitigate the risk of successfully apply mutations locally but which
         // can fail on other replicas, e.g. due to being out of sync with permissions/owner
-        if let Some(sequence) = self.sequence_cache.get(&address) {
+        if let Some(sequence) = self.sequence_cache.lock().await.get(&address) {
             trace!("Sequence found in local CRDT replica");
             return Ok(sequence.clone());
         }
@@ -229,6 +229,8 @@ impl Client {
         // Store in local Sequence CRDT replica
         let _ = self
             .sequence_cache
+            .lock()
+            .await
             .put(*sequence.address(), sequence.clone());
 
         Ok(sequence)
@@ -289,6 +291,8 @@ impl Client {
         // Update the local Sequence CRDT replica
         let _ = self
             .sequence_cache
+            .lock()
+            .await
             .put(*sequence.address(), sequence.clone());
         // Finally we can send the mutation to the network's replicas
         self.append_to_sequence(op).await
@@ -376,6 +380,8 @@ impl Client {
         // Update the local Sequence CRDT replica
         let _ = self
             .sequence_cache
+            .lock()
+            .await
             .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas
@@ -406,6 +412,8 @@ impl Client {
         // Update the local Sequence CRDT replica
         let _ = self
             .sequence_cache
+            .lock()
+            .await
             .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas
@@ -451,6 +459,8 @@ impl Client {
         // Update the local Sequence CRDT replica
         let _ = self
             .sequence_cache
+            .lock()
+            .await
             .put(*sequence.address(), sequence.clone());
 
         // Finally we can send the mutation to the network's replicas

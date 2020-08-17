@@ -18,6 +18,8 @@ pub mod transfer_actor;
 
 pub mod sequence_apis;
 
+mod blob_storage;
+
 // safe-transfers wrapper
 pub use self::transfer_actor::{ClientTransferValidator, SafeTransferActor};
 
@@ -66,12 +68,12 @@ pub fn bootstrap_config() -> Result<HashSet<SocketAddr>, CoreError> {
 }
 
 /// Client object
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct Client {
     full_id: ClientFullId,
-    blob_cache: LruCache<BlobAddress, Blob>,
+    blob_cache: Arc<Mutex<LruCache<BlobAddress, Blob>>>,
     /// Sequence CRDT replica
-    sequence_cache: LruCache<SequenceAddress, Sequence>,
+    sequence_cache: Arc<Mutex<LruCache<SequenceAddress, Sequence>>>,
 
     transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator>>>,
     replicas_pk_set: PublicKeySet,
@@ -100,6 +102,7 @@ impl Client {
         let mut connection_manager =
             attempt_bootstrap(&Config::new().quic_p2p, full_id.clone()).await?;
 
+        // let cm = connection_manager.clone();
         // let mut the_actor = TransferActor::new(full_id.clone(), connection_manager).await?;
         // let transfer_actor = the_self.clone();
 
@@ -128,8 +131,8 @@ impl Client {
             transfer_actor,
             replicas_pk_set,
             simulated_farming_payout_dot,
-            blob_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            sequence_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
+            blob_cache: Arc::new(Mutex::new(LruCache::new(IMMUT_DATA_CACHE_SIZE))),
+            sequence_cache: Arc::new(Mutex::new(LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE))),
         };
 
         full_client.get_history();
@@ -181,8 +184,8 @@ impl Client {
             transfer_actor,
             replicas_pk_set,
             simulated_farming_payout_dot,
-            blob_cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            sequence_cache: LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE),
+            blob_cache: Arc::new(Mutex::new(LruCache::new(IMMUT_DATA_CACHE_SIZE))),
+            sequence_cache: Arc::new(Mutex::new(LruCache::new(SEQUENCE_CRDT_REPLICA_SIZE))),
         };
 
         full_client.get_history();
@@ -190,7 +193,7 @@ impl Client {
         Ok(full_client)
     }
 
-    async fn full_id(&mut self) -> ClientFullId {
+    async fn full_id(&self) -> ClientFullId {
         self.full_id.clone()
     }
 
@@ -207,7 +210,7 @@ impl Client {
     // }
 
     /// Return the client's public ID.
-    pub async fn public_id(&mut self) -> PublicId {
+    pub async fn public_id(&self) -> PublicId {
         let id = self.full_id().await;
         let pub_id = PublicId::Client(id.public_id().clone());
 
@@ -215,7 +218,7 @@ impl Client {
     }
 
     /// Returns the client's public key.
-    pub async fn public_key(&mut self) -> PublicKey {
+    pub async fn public_key(&self) -> PublicKey {
         let id = self.full_id().await;
 
         *id.public_key()
@@ -534,7 +537,7 @@ mod tests {
             calculate_new_balance(init_bal, Some(1), Some(unwrap!(Money::from_str("5"))));
         assert_eq!(balance, expected);
 
-        let mut client_to_get_all_money = Client::new(None).await?;
+        let client_to_get_all_money = Client::new(None).await?;
         // send all our money elsewhere to make sure we fail the next put
         let _ = client
             .send_money(
