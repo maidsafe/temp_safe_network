@@ -1937,8 +1937,8 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.10.1"
-source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#6c0a0a1dd859db44c84934e24ecd86ba3195fcca"
+version = "0.11.2"
+source = "git+https://github.com/maidsafe/safe-nd.git#59e96f2d797d6149af747d70247a1b37d8dbf586"
 dependencies = [
  "bincode",
  "crdts",
@@ -1974,7 +1974,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-transfers.git#89c6b746ec71dd15ff8e6714d08a79c6bd580384"
+source = "git+https://github.com/maidsafe/safe-transfers.git#5960b53ac23278552b9c30911021233c770895f3"
 dependencies = [
  "bincode",
  "crdts",

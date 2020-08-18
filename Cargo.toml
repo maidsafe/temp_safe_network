@@ -11,7 +11,7 @@ repository = "https://github.com/maidsafe/safe_vault"
 version = "0.24.0"
 
 [patch.crates-io]
-safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "farming" }
+safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "master" }
 safe-transfers = { git = "https://github.com/maidsafe/safe-transfers.git" }
 
 [dependencies]
@@ -46,7 +46,7 @@ unwrap = "1.2.1"
 crdts = "4.1.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-safe-nd = "~0.10.1"
+safe-nd = "~0.11.2"
 safe-transfers = "~0.1.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
