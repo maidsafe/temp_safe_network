@@ -1611,8 +1611,9 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.10.1"
-source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#6c0a0a1dd859db44c84934e24ecd86ba3195fcca"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee22006ee89d6f33f811bbe6e07e99cca299af343b8691e9bb80877b23d527a9"
 dependencies = [
  "bincode",
  "crdts",
@@ -1633,7 +1634,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-transfers.git#89c6b746ec71dd15ff8e6714d08a79c6bd580384"
+source = "git+https://github.com/maidsafe/safe-transfers.git#5960b53ac23278552b9c30911021233c770895f3"
 dependencies = [
  "bincode",
  "crdts",
@@ -2343,8 +2344,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "1.0.0"
-source = "git+https://github.com/joshuef/xor-name.git?branch=AddRandom#8749265d4fbb18d9505607036cba8b4dccd983ce"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fa8a0b42a4cb692a96d21a3a028c759d763392f11ea4056504c9f6cb7e599c0"
 dependencies = [
  "log",
  "rand",
