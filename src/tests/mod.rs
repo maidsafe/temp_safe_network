@@ -38,7 +38,8 @@ fn init_logging() {
             record.args()
         )
     };
-    logger::initialize("", Some(formatter));
+    logger::initialize_with_formatter("", formatter);
+    // logger::allow_uninitialized();
 }
 
 impl Network {
@@ -47,6 +48,7 @@ impl Network {
         std::fs::remove_dir_all(&path).unwrap_or(()); // Delete vaults directory if it exists;
         std::fs::create_dir_all(&path).expect("Cannot create vaults directory");
         init_logging();
+        logger::allow_uninitialized();
         let mut vaults = Vec::new();
         let genesis_info: SocketAddr = "127.0.0.1:12000".parse().unwrap();
         let mut node_config = Config::default();
@@ -57,7 +59,7 @@ impl Network {
         let handle = std::thread::Builder::new()
             .name("vault-genesis".to_string())
             .spawn(move || {
-                init_logging();
+                // init_logging();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-vault");
                 genesis_config.set_root_dir(&path);
@@ -94,7 +96,7 @@ impl Network {
             let handle = std::thread::Builder::new()
                 .name(format!("vault-{}", i))
                 .spawn(move || {
-                    init_logging();
+                    // init_logging();
                     let vault_path = path.join(format!("vault-{}", i));
                     println!("Starting new vault: {:?}", &vault_path);
                     vault_config.set_root_dir(&vault_path);

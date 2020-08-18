@@ -59,7 +59,7 @@ tempdir = "~0.3.7"
 safe_core = { git = "https://github.com/lionel1704/safe_client_libs", branch = "farming", features = ["testing"] }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util"] }
 futures = "~0.3.5"
-file-per-thread-logger = { git = "https://github.com/lionel1704/file-per-thread-logger", branch = "custom-log-format" }
+file-per-thread-logger = { git = "https://github.com/lionel1704/file-per-thread-logger", branch = "allow-uninitialized" }
 
 [[bin]]
 name = "safe_vault"
