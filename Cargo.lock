@@ -1343,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "git+https://github.com/bochaco/quic-p2p.git?branch=async-api#9bc817dd8f7422a994703f8949d24c53a4040782"
+source = "git+https://github.com/yoga07/quic-p2p.git?branch=old-async#9bc817dd8f7422a994703f8949d24c53a4040782"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -1612,8 +1612,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee22006ee89d6f33f811bbe6e07e99cca299af343b8691e9bb80877b23d527a9"
+source = "git+https://github.com/maidsafe/safe-nd.git#59e96f2d797d6149af747d70247a1b37d8dbf586"
 dependencies = [
  "bincode",
  "crdts",

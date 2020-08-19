@@ -27,17 +27,14 @@ impl Client {
     }
 }
 
-// TODO: Do we need "new" to actually instantiate with a transfer?...
-#[cfg(all(test, feature = "simulated-payouts"))]
-mod tests {
-
+#[cfg(any(test, feature = "simulated-payouts"))]
+pub mod exported_tests {
     use super::*;
     use crate::crypto::shared_box;
     use xor_name::XorName;
 
-    #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
-    async fn transfer_actor_with_no_balance_cannot_store_data() -> Result<(), CoreError> {
+    pub async fn transfer_actor_with_no_balance_cannot_store_data() -> Result<(), CoreError> {
         let (sk, pk) = shared_box::gen_bls_keypair();
         let pk = PublicKey::Bls(pk);
 
@@ -56,5 +53,18 @@ mod tests {
         }
 
         Ok(())
+    }
+}
+
+// TODO: Do we need "new" to actually instantiate with a transfer?...
+#[cfg(any(test, feature = "simulated-payouts"))]
+mod tests {
+    use super::exported_tests;
+    use super::CoreError;
+
+    #[tokio::test]
+    #[cfg(feature = "simulated-payouts")]
+    async fn transfer_actor_with_no_balance_cannot_store_data() -> Result<(), CoreError> {
+        exported_tests::transfer_actor_with_no_balance_cannot_store_data().await
     }
 }

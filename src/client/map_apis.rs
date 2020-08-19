@@ -1,25 +1,27 @@
+// Copyright 2020 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use crate::errors::CoreError;
 use crate::Client;
 use log::trace;
 
 use safe_nd::{
-    AppPermissions, AuthQuery, Blob, BlobAddress, BlobRead, ClientFullId, Cmd, DataCmd, DataQuery,
-    DebitAgreementProof, Map, MapAddress, MapEntries, MapEntryActions, MapPermissionSet, MapRead,
-    MapSeqEntries, MapSeqEntryActions, MapSeqValue, MapUnseqEntryActions, MapValue, MapValues,
-    Message, MessageId, Money, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence,
-    SequenceAction, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex, SequenceOwner,
-    SequencePrivUserPermissions, SequencePrivatePermissions, SequencePubUserPermissions,
-    SequencePublicPermissions, SequenceRead, SequenceUser, SequenceUserPermissions, UnseqMap,
+    Cmd, DataCmd, DataQuery, DebitAgreementProof, Map, MapAddress, MapEntries, MapEntryActions,
+    MapPermissionSet, MapRead, MapSeqEntries, MapSeqEntryActions, MapSeqValue,
+    MapUnseqEntryActions, MapValue, MapValues, PublicKey, Query, QueryResponse, SeqMap, UnseqMap,
 };
 
 use safe_nd::MapWrite;
 
 use xor_name::XorName;
 
-use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
-    net::SocketAddr,
-};
+use std::collections::{BTreeMap, BTreeSet};
+
 fn wrap_map_read(read: MapRead) -> Query {
     Query::Data(DataQuery::Map(read))
 }
@@ -577,24 +579,18 @@ impl Client {
     }
 }
 
-#[cfg(all(test, feature = "simulated-payouts"))]
-mod tests {
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "simulated-payouts"))]
+pub mod exported_tests {
     use super::*;
-    use crate::utils::{
-        generate_random_vector,
-        test_utils::{calculate_new_balance, gen_bls_keypair},
-    };
-    use safe_nd::{
-        Error as SndError, MapAction, MapKind, Money, PrivateBlob, PublicBlob,
-        SequencePrivUserPermissions,
-    };
+    use crate::utils::test_utils::gen_bls_keypair;
+    use safe_nd::{Error as SndError, MapAction, MapKind, Money};
     use std::str::FromStr;
-    use unwrap::unwrap;
     use xor_name::XorName;
+
     // 1. Create unseq. map with some entries and perms and put it on the network
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
-    #[tokio::test]
     pub async fn unseq_map_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -639,7 +635,6 @@ mod tests {
     // 1. Create an put seq. map on the network with some entries and permissions.
     // 2. Fetch the shell version, entries, keys, values anv verify them
     // 3. Fetch the entire. data object and verify
-    #[tokio::test]
     pub async fn seq_map_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -688,7 +683,6 @@ mod tests {
 
     // 1. Put seq. map on the network and then delete it
     // 2. Try getting the data object. It should panic
-    #[tokio::test]
     pub async fn del_seq_map_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
         let name = XorName(rand::random());
@@ -714,7 +708,6 @@ mod tests {
 
     // 1. Put unseq. map on the network and then delete it
     // 2. Try getting the data object. It should panic
-    #[tokio::test]
     pub async fn del_unseq_map_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
         let name = XorName(rand::random());
@@ -742,7 +735,6 @@ mod tests {
 
     // 1. Create a client that PUTs some map on the network
     // 2. Create a different client that tries to delete the data. It should panic.
-    #[tokio::test]
     pub async fn del_unseq_map_permission_test() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 15001;
@@ -769,7 +761,6 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client(
     ) -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
@@ -818,7 +809,6 @@ mod tests {
     // 2. Modify the permissions of a user in the permission set.
     // 3. Fetch the list of permissions and verify the edit.
     // 4. Delete a user's permissions from the permission set and verify the deletion.
-    #[tokio::test]
     pub async fn map_can_modify_permissions_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
         let name = XorName(rand::random());
@@ -877,7 +867,6 @@ mod tests {
     // 2. Create some entry actions and mutate the data on the network.
     // 3. List the entries and verify that the mutation was applied.
     // 4. Fetch a value for a particular key and verify
-    #[tokio::test]
     pub async fn map_mutations_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -1020,7 +1009,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
     pub async fn map_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
@@ -1040,5 +1028,58 @@ mod tests {
         assert_ne!(balance_before_delete, new_balance);
 
         Ok(())
+    }
+}
+
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "simulated-payouts"))]
+mod tests {
+    use super::exported_tests;
+    use super::CoreError;
+
+    #[tokio::test]
+    pub async fn unseq_map_test() -> Result<(), CoreError> {
+        exported_tests::unseq_map_test().await
+    }
+
+    #[tokio::test]
+    pub async fn seq_map_test() -> Result<(), CoreError> {
+        exported_tests::seq_map_test().await
+    }
+
+    #[tokio::test]
+    pub async fn del_seq_map_test() -> Result<(), CoreError> {
+        exported_tests::del_seq_map_test().await
+    }
+
+    #[tokio::test]
+    pub async fn del_unseq_map_test() -> Result<(), CoreError> {
+        exported_tests::del_unseq_map_test().await
+    }
+
+    #[tokio::test]
+    pub async fn del_unseq_map_permission_test() -> Result<(), CoreError> {
+        exported_tests::del_unseq_map_permission_test().await
+    }
+
+    #[tokio::test]
+    pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client(
+    ) -> Result<(), CoreError> {
+        exported_tests::map_cannot_initially_put_data_with_another_owner_than_current_client().await
+    }
+
+    #[tokio::test]
+    pub async fn map_can_modify_permissions_test() -> Result<(), CoreError> {
+        exported_tests::map_can_modify_permissions_test().await
+    }
+
+    #[tokio::test]
+    pub async fn map_mutations_test() -> Result<(), CoreError> {
+        exported_tests::map_mutations_test().await
+    }
+
+    #[tokio::test]
+    pub async fn map_deletions_should_cost_put_price() -> Result<(), CoreError> {
+        exported_tests::map_deletions_should_cost_put_price().await
     }
 }

@@ -38,7 +38,7 @@ pub fn calculate_new_balance(
         balance = unwrap!(balance.checked_sub(coins));
     }
 
-    // #[cfg(feature = "testing")]
+    // #[cfg(feature = "simulated-payouts")]
     // {
     //     // add on our 10 coin starter balance in testing
     //     balance = unwrap!(balance.checked_add(Money::from_str("10").unwrap()))

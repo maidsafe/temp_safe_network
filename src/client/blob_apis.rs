@@ -1,3 +1,11 @@
+// Copyright 2020 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use crate::errors::CoreError;
 use crate::Client;
 use bincode::{deserialize, serialize};
@@ -7,16 +15,10 @@ use serde::{Deserialize, Serialize};
 use crate::client::blob_storage::{BlobStorage, BlobStorageDryRun};
 
 use safe_nd::{
-    AppPermissions, AuthQuery, Blob, BlobAddress, BlobRead, BlobWrite, ClientFullId, Cmd, DataCmd,
-    DataQuery, DebitAgreementProof, Map, MapAddress, MapEntries, MapEntryActions, MapPermissionSet,
-    MapRead, MapSeqEntries, MapSeqEntryActions, MapSeqValue, MapUnseqEntryActions, MapValue,
-    MapValues, Message, MessageId, Money, PrivateBlob, PublicBlob, PublicId, PublicKey, Query,
-    QueryResponse, SeqMap, Sequence, SequenceAction, SequenceAddress, SequenceEntries,
-    SequenceEntry, SequenceIndex, SequenceOwner, SequencePrivUserPermissions,
-    SequencePrivatePermissions, SequencePubUserPermissions, SequencePublicPermissions,
-    SequenceRead, SequenceUser, SequenceUserPermissions, UnseqMap,
+    Blob, BlobAddress, BlobRead, BlobWrite, Cmd, DataCmd, DataQuery, DebitAgreementProof,
+    PrivateBlob, PublicBlob, PublicKey, Query, QueryResponse,
 };
-use self_encryption::{DataMap, SelfEncryptor, Storage};
+use self_encryption::{DataMap, SelfEncryptor};
 
 #[derive(Serialize, Deserialize)]
 enum DataTypeEncoding {
@@ -241,25 +243,20 @@ impl Client {
     }
 }
 
-#[cfg(all(test, feature = "simulated-payouts"))]
-mod tests {
-
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "simulated-payouts"))]
+pub mod exported_tests {
     use super::*;
     use crate::utils::{
         generate_random_vector,
         test_utils::{calculate_new_balance, gen_bls_keypair},
     };
-    use safe_nd::{
-        Error as SndError, MapAction, MapKind, Money, PrivateBlob, PublicBlob,
-        SequencePrivUserPermissions,
-    };
+    use safe_nd::{Error as SndError, Money, PrivateBlob, PublicBlob};
     use std::str::FromStr;
     use unwrap::unwrap;
-    use xor_name::XorName;
 
     // Test putting and getting pub blob.
-    #[tokio::test]
-    async fn pub_blob_test() -> Result<(), CoreError> {
+    pub async fn pub_blob_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
         // The `Client::new(None)` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
@@ -298,8 +295,7 @@ mod tests {
     }
 
     // Test putting, getting, and deleting unpub blob.
-    #[tokio::test]
-    async fn unpub_blob_test() -> Result<(), CoreError> {
+    pub async fn unpub_blob_test() -> Result<(), CoreError> {
         println!("blob_Test________");
         // The `Client::new(None)` initializes the client with 10 money.
         let start_bal = unwrap!(Money::from_str("10"));
@@ -364,7 +360,6 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     pub async fn blob_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -387,8 +382,7 @@ mod tests {
     }
 
     // Test creating and retrieving a 1kb blob.
-    #[tokio::test]
-    async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<(), CoreError> {
         let size = 1024;
 
         gen_data_then_create_and_retrieve(size, true).await?;
@@ -396,16 +390,14 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_1kb_private_unencrypted() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_1kb_private_unencrypted() -> Result<(), CoreError> {
         let size = 1024;
 
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<(), CoreError> {
         let size = 1024;
         let value = Blob::Public(PublicBlob::new(generate_random_vector(size)));
 
@@ -421,8 +413,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<(), CoreError> {
         let size = 1024;
 
         let value = Blob::Public(PublicBlob::new(generate_random_vector(size)));
@@ -445,8 +436,7 @@ mod tests {
     // ----------------------------------------------------------------
 
     // Test creating and retrieving a 1kb blob.
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_pub_unencrypted() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_10mb_pub_unencrypted() -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
 
         gen_data_then_create_and_retrieve(size, true).await?;
@@ -454,32 +444,28 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_private_unencrypted() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_10mb_private_unencrypted() -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
 
         gen_data_then_create_and_retrieve(size, false).await?;
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_private_encrypted() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_10mb_private_encrypted() -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
         gen_data_then_create_and_retrieve(size, false).await?;
 
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_pub_encrypted() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_10mb_pub_encrypted() -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
         gen_data_then_create_and_retrieve(size, true).await?;
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_unencrypted_put_retrieve_encrypted() -> Result<(), CoreError>
-    {
+    pub async fn create_and_retrieve_10mb_unencrypted_put_retrieve_encrypted(
+    ) -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
         let value = Blob::Public(PublicBlob::new(generate_random_vector(size)));
 
@@ -496,9 +482,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_encrypted_put_retrieve_unencrypted() -> Result<(), CoreError>
-    {
+    pub async fn create_and_retrieve_10mb_encrypted_put_retrieve_unencrypted(
+    ) -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
         let value = Blob::Public(PublicBlob::new(generate_random_vector(size)));
 
@@ -516,9 +501,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_encrypted_put_pub_retrieve_private() -> Result<(), CoreError>
-    {
+    pub async fn create_and_retrieve_10mb_encrypted_put_pub_retrieve_private(
+    ) -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
         let value = Blob::Public(PublicBlob::new(generate_random_vector(size)));
 
@@ -535,9 +519,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_10mb_encrypted_put_private_retrieve_pub() -> Result<(), CoreError>
-    {
+    pub async fn create_and_retrieve_10mb_encrypted_put_private_retrieve_pub(
+    ) -> Result<(), CoreError> {
         let size = 1024 * 1024 * 10;
 
         let mut client = Client::new(None).await?;
@@ -556,10 +539,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn create_and_retrieve_index_based() -> Result<(), CoreError> {
+    pub async fn create_and_retrieve_index_based() -> Result<(), CoreError> {
         create_and_index_based_retrieve(1024).await
     }
+
     async fn create_and_index_based_retrieve(size: usize) -> Result<(), CoreError> {
         let blob = Blob::Public(PublicBlob::new(generate_random_vector(size)));
         {
@@ -644,5 +627,98 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(5500));
 
         Ok(())
+    }
+}
+
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "simulated-payouts"))]
+mod tests {
+    use super::exported_tests;
+    use super::CoreError;
+
+    // Test putting and getting pub blob.
+    #[tokio::test]
+    async fn pub_blob_test() -> Result<(), CoreError> {
+        exported_tests::pub_blob_test().await
+    }
+
+    // Test putting, getting, and deleting unpub blob.
+    #[tokio::test]
+    async fn unpub_blob_test() -> Result<(), CoreError> {
+        exported_tests::unpub_blob_test().await
+    }
+
+    #[tokio::test]
+    async fn blob_deletions_should_cost_put_price() -> Result<(), CoreError> {
+        exported_tests::blob_deletions_should_cost_put_price().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_pub_unencrypted() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_1kb_pub_unencrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_private_unencrypted() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_1kb_private_unencrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_put_pub_retrieve_private() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_1kb_put_pub_retrieve_private().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_1kb_put_private_retrieve_pub() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_1kb_put_private_retrieve_pub().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_private_encrypted() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_10mb_private_encrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_pub_encrypted() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_10mb_pub_encrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_private_unencrypted() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_10mb_private_unencrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_pub_unencrypted() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_10mb_pub_unencrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_unencrypted_put_retrieve_encrypted() -> Result<(), CoreError>
+    {
+        exported_tests::create_and_retrieve_10mb_unencrypted_put_retrieve_encrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_encrypted_put_retrieve_unencrypted() -> Result<(), CoreError>
+    {
+        exported_tests::create_and_retrieve_10mb_encrypted_put_retrieve_unencrypted().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_encrypted_put_pub_retrieve_private() -> Result<(), CoreError>
+    {
+        exported_tests::create_and_retrieve_10mb_encrypted_put_pub_retrieve_private().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_10mb_encrypted_put_private_retrieve_pub() -> Result<(), CoreError>
+    {
+        exported_tests::create_and_retrieve_10mb_encrypted_put_private_retrieve_pub().await
+    }
+
+    #[tokio::test]
+    async fn create_and_retrieve_index_based() -> Result<(), CoreError> {
+        exported_tests::create_and_retrieve_index_based().await
     }
 }

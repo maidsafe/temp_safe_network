@@ -1,24 +1,22 @@
-use crate::Client;
+// Copyright 2020 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::errors::CoreError;
-
+use crate::Client;
 use log::trace;
-
 use safe_nd::{
-    AppPermissions, AuthQuery, Blob, BlobAddress, BlobRead, ClientFullId, Cmd, DataCmd, DataQuery,
-    DebitAgreementProof, Map, MapAddress, MapEntries, MapEntryActions, MapPermissionSet, MapRead,
-    MapSeqEntries, MapSeqEntryActions, MapSeqValue, MapUnseqEntryActions, MapValue, MapValues,
-    Message, MessageId, Money, PublicId, PublicKey, Query, QueryResponse, SeqMap, Sequence,
+    Cmd, DataCmd, DataQuery, DebitAgreementProof, PublicKey, Query, QueryResponse, Sequence,
     SequenceAction, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex, SequenceOwner,
     SequencePrivUserPermissions, SequencePrivatePermissions, SequencePubUserPermissions,
     SequencePublicPermissions, SequenceRead, SequenceUser, SequenceUserPermissions, SequenceWrite,
-    SequenceWriteOp, UnseqMap,
+    SequenceWriteOp,
 };
-
-use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
-    net::SocketAddr,
-};
+use std::collections::BTreeMap;
 use xor_name::XorName;
 
 fn wrap_seq_read(read: SequenceRead) -> Query {
@@ -470,22 +468,16 @@ impl Client {
     // ========== END of Sequence Data functions =========
 }
 
-#[cfg(all(test, feature = "simulated-payouts"))]
-mod tests {
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "simulated-payouts"))]
+pub mod exported_tests {
     use super::*;
-    use crate::utils::{
-        generate_random_vector,
-        test_utils::{calculate_new_balance, gen_bls_keypair},
-    };
-    use safe_nd::{
-        Error as SndError, MapAction, MapKind, Money, PrivateBlob, PublicBlob,
-        SequencePrivUserPermissions,
-    };
+    use crate::utils::test_utils::gen_bls_keypair;
+    use safe_nd::{Error as SndError, Money, SequencePrivUserPermissions};
     use std::str::FromStr;
     use unwrap::unwrap;
     use xor_name::XorName;
 
-    #[tokio::test]
     pub async fn sequence_deletions_should_cost_put_price() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
@@ -509,7 +501,6 @@ mod tests {
 
     /// Sequence data tests ///
 
-    #[tokio::test]
     pub async fn sequence_basics_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -549,7 +540,6 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     pub async fn sequence_private_permissions_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -627,7 +617,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
     pub async fn sequence_pub_permissions_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -716,7 +705,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
     pub async fn sequence_append_test() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
@@ -754,7 +742,6 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     pub async fn sequence_owner_test() -> Result<(), CoreError> {
         let name = XorName(rand::random());
         let tag = 10;
@@ -787,7 +774,6 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     pub async fn sequence_can_delete_private_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -822,7 +808,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
     pub async fn sequence_cannot_delete_public_test() -> Result<(), CoreError> {
         let mut client = Client::new(None).await?;
 
@@ -853,5 +838,52 @@ mod tests {
             }
             Ok(_data) => Ok(()),
         }
+    }
+}
+
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "simulated-payouts"))]
+mod tests {
+    use super::exported_tests;
+    use super::CoreError;
+
+    #[tokio::test]
+    async fn sequence_deletions_should_cost_put_price() -> Result<(), CoreError> {
+        exported_tests::sequence_deletions_should_cost_put_price().await
+    }
+
+    #[tokio::test]
+    async fn sequence_basics_test() -> Result<(), CoreError> {
+        exported_tests::sequence_basics_test().await
+    }
+
+    #[tokio::test]
+    async fn sequence_private_permissions_test() -> Result<(), CoreError> {
+        exported_tests::sequence_private_permissions_test().await
+    }
+
+    #[tokio::test]
+    async fn sequence_pub_permissions_test() -> Result<(), CoreError> {
+        exported_tests::sequence_pub_permissions_test().await
+    }
+
+    #[tokio::test]
+    async fn sequence_append_test() -> Result<(), CoreError> {
+        exported_tests::sequence_append_test().await
+    }
+
+    #[tokio::test]
+    async fn sequence_owner_test() -> Result<(), CoreError> {
+        exported_tests::sequence_owner_test().await
+    }
+
+    #[tokio::test]
+    async fn sequence_can_delete_private_test() -> Result<(), CoreError> {
+        exported_tests::sequence_can_delete_private_test().await
+    }
+
+    #[tokio::test]
+    async fn sequence_cannot_delete_public_test() -> Result<(), CoreError> {
+        exported_tests::sequence_cannot_delete_public_test().await
     }
 }
