@@ -54,6 +54,7 @@ tempfile = "3.1.0"
 
 [features]
 simulated-payouts = ["safe-nd/simulated-payouts", "safe-transfers/simulated-payouts"]
+testing = []
 
 [patch.crates-io]
 safe-nd = { git = "https://github.com/maidsafe/safe-nd.git" }

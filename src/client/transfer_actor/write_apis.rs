@@ -27,7 +27,7 @@ impl Client {
     }
 }
 
-#[cfg(any(test, feature = "simulated-payouts"))]
+#[cfg(any(test, feature = "simulated-payouts", feature = "testing"))]
 pub mod exported_tests {
     use super::*;
     use crate::crypto::shared_box;

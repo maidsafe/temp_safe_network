@@ -9,7 +9,7 @@
 /// Logging utilities.
 pub mod logging;
 /// Common utility functions for writing test cases.
-#[cfg(any(test, feature = "simulated-payouts"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 use crate::errors::CoreError;
