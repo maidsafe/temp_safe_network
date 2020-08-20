@@ -12,8 +12,6 @@ use crate::config_handler::write_connection_info;
 use crate::{network::Network as NetworkLayer, Command, Config, Node};
 use crossbeam_channel::Sender;
 use file_per_thread_logger::{self as logger, FormatFn};
-use flexi_logger::{DeferredNow, Logger};
-use log::{self, Record};
 use quic_p2p::Config as NetworkConfig;
 use routing::{Node as Routing, NodeConfig as RoutingConfig};
 use std::cell::RefCell;
