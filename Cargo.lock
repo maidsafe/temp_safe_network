@@ -854,6 +854,28 @@ dependencies = [
 name = "dbl"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de6489dde5128f5ab2f71f88f8807a237cecf08d96dc7ca4be64e0730dc7d961"
+dependencies = [
+ "data-encoding",
+ "data-encoding-macro-internal",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "data-encoding-macro-internal"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d2d6daefd5f1d4b74a891a5d2ab7dccba028d423107c074232a0c5dc0d40a9e"
+dependencies = [
+ "data-encoding",
+ "proc-macro-hack",
+ "syn 1.0.33",
+]
+
+[[package]]
+name = "dbl"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dc203b75decc900220c4d9838e738d08413e663c26826ba92b669bed1d0795"
 dependencies = [
  "generic-array",
@@ -3032,6 +3054,295 @@ name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
+
+[[package]]
+name = "safe-api"
+version = "0.15.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "bincode",
+ "cargo-husky",
+ "chrono",
+ "directories 2.0.2",
+ "env_logger 0.6.2",
+ "futures 0.3.5",
+ "jsonrpc-quic",
+ "lazy_static",
+ "log 0.4.8",
+ "mime_guess",
+ "multibase 0.8.0",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "relative-path",
+ "safe-nd",
+ "safe_app",
+ "safe_authenticator",
+ "safe_core",
+ "serde",
+ "serde_json",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "uhttp_uri",
+ "url 2.1.1",
+ "urlencoding",
+ "walkdir",
+ "xor_name",
+]
+
+[[package]]
+name = "safe-authd"
+version = "0.0.11"
+dependencies = [
+ "cargo-husky",
+ "cluFlock",
+ "directories 2.0.2",
+ "flexi_logger",
+ "futures 0.3.5",
+ "human-panic",
+ "jsonrpc-quic",
+ "log 0.4.8",
+ "quinn",
+ "rcgen",
+ "safe-api",
+ "self_update",
+ "serde",
+ "serde_json",
+ "structopt 0.2.18",
+ "tokio 0.2.21",
+ "unwrap",
+ "url 2.1.1",
+ "urlencoding",
+]
+
+[[package]]
+name = "safe-cli"
+version = "0.15.0"
+dependencies = [
+ "ansi_term 0.9.0",
+ "assert_cmd",
+ "async-std",
+ "cargo-husky",
+ "console 0.10.3",
+ "criterion",
+ "crossbeam",
+ "directories 2.0.2",
+ "duct",
+ "env_logger 0.6.2",
+ "envy",
+ "human-panic",
+ "indicatif 0.14.0",
+ "isatty",
+ "log 0.4.8",
+ "multibase 0.6.0",
+ "num-traits",
+ "percent-encoding 2.1.0",
+ "predicates",
+ "pretty-hex",
+ "pretty_assertions",
+ "prettytable-rs",
+ "rand 0.7.3",
+ "relative-path",
+ "reqwest 0.9.24",
+ "rpassword",
+ "safe-api",
+ "safe-cmd-test-utilities",
+ "safe-nd",
+ "safe-nlt",
+ "self_update",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "shrust",
+ "structopt 0.3.15",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "unwrap",
+ "walkdir",
+ "xor_name",
+]
+
+[[package]]
+name = "safe-cmd-test-utilities"
+version = "1.0.0"
+dependencies = [
+ "duct",
+ "multibase 0.6.0",
+ "rand 0.7.3",
+ "safe-api",
+ "safe-nd",
+ "serde",
+ "serde_json",
+ "tiny-keccak 1.5.0",
+ "unwrap",
+ "walkdir",
+]
+
+[[package]]
+name = "safe-ffi"
+version = "0.15.0"
+dependencies = [
+ "bincode",
+ "ffi_utils",
+ "log 0.4.8",
+ "safe-api",
+ "safe-nd",
+ "safe_authenticator",
+ "safe_bindgen",
+ "safe_core",
+ "serde",
+ "serde_json",
+ "tokio 0.2.21",
+ "unwrap",
+ "xor_name",
+]
+
+[[package]]
+name = "safe-nd"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4da5e2b186a63820af34a48a590535e7448d039998501632f0fee066d90af77a"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase 0.6.0",
+ "rand 0.7.3",
+ "serde",
+ "sha3",
+ "signature",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "unwrap",
+ "xor_name",
+]
+
+[[package]]
+name = "safe-nlt"
+version = "0.0.1"
+source = "git+https://github.com/maidsafe/safe-network-launch-tool.git#ff4e258a0ef6a2e0fe5b16eba95537f06f00d6ce"
+dependencies = [
+ "directories 2.0.2",
+ "env_logger 0.7.1",
+ "log 0.4.8",
+ "regex 1.3.9",
+ "structopt 0.3.15",
+]
+
+[[package]]
+name = "safe_app"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "022c2031fbb6ac9a1fe64047f1815f3ce8558046adc96b9fbcfd35dbe4a69787"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "ffi_utils",
+ "futures 0.3.5",
+ "jni",
+ "log 0.4.8",
+ "lru-cache",
+ "miscreant",
+ "rand 0.7.3",
+ "safe-nd",
+ "safe_core",
+ "self_encryption",
+ "serde",
+ "serde_derive",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "unwrap",
+ "xor_name",
+]
+
+[[package]]
+name = "safe_authenticator"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec589761a940720900cfb07e480899f611e860e1d7b8130d63a6d769d961f3c7"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "futures 0.3.5",
+ "futures-util",
+ "log 0.4.8",
+ "lru-cache",
+ "rand 0.7.3",
+ "safe-nd",
+ "safe_core",
+ "serde",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "unwrap",
+ "xor_name",
+]
+
+[[package]]
+name = "safe_bindgen"
+version = "0.13.2"
+source = "git+https://github.com/maidsafe/safe_bindgen#874dc388151399b96f2330e3a0c6d4c2a2d3de09"
+dependencies = [
+ "Inflector",
+ "clap",
+ "jni",
+ "petgraph",
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "rustfmt",
+ "syn 0.15.44",
+ "toml 0.5.6",
+ "unwrap",
+]
+
+[[package]]
+name = "safe_core"
+version = "0.43.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c92366c8dc76257c880d135074611057326ca135c046fd318a6f356fdd0cd265"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bytes 0.5.5",
+ "chrono",
+ "crossbeam-channel",
+ "data-encoding",
+ "directories 2.0.2",
+ "env_logger 0.6.2",
+ "ffi_utils",
+ "fs2",
+ "futures 0.3.5",
+ "futures-util",
+ "hmac",
+ "lazy_static",
+ "log 0.4.8",
+ "log4rs",
+ "lru",
+ "miscreant",
+ "pbkdf2",
+ "quic-p2p",
+ "rand 0.7.3",
+ "regex 1.3.9",
+ "safe-nd",
+ "self_encryption",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "sha3",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "unwrap",
+ "url 2.1.1",
+ "ws",
+ "xor_name",
+]
 
 [[package]]
 name = "safemem"

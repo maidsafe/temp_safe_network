@@ -1010,8 +1010,8 @@ impl SafeUrl {
         cid_vec.extend_from_slice(&self.type_tag.to_be_bytes()[start_byte..]);
 
         let base_encoding = match base {
-            XorUrlBase::Base32z => Base::Base32z,
-            XorUrlBase::Base32 => Base::Base32,
+            XorUrlBase::Base32z => Base::Base32Z,
+            XorUrlBase::Base32 => Base::Base32Lower,
             XorUrlBase::Base64 => Base::Base64,
         };
         let top_name = encode(base_encoding, cid_vec);
