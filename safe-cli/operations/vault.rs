@@ -12,7 +12,7 @@ use directories::BaseDirs;
 use log::debug;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_nlt::{join_with, run_with};
+use sn_launch_tool::{join_with, run_with};
 use std::{
     collections::HashMap,
     fs::create_dir_all,
@@ -101,8 +101,8 @@ pub fn vault_run(
     println!("Storing vaults' generated data at {}", arg_vaults_dir);
 
     // Let's create an args array to pass to the network launcher tool
-    let mut nlt_args = vec![
-        "safe-nlt",
+    let mut sn_launch_tool_args = vec![
+        "sn_launch_tool",
         "-v",
         "--vault-path",
         &arg_vault_path,
@@ -120,19 +120,22 @@ pub fn vault_run(
         let v = "y".repeat(verbosity as usize);
         println!("V: {}", v);
         verbosity_arg.push_str(&v);
-        nlt_args.push(&verbosity_arg);
+        sn_launch_tool_args.push(&verbosity_arg);
     }
 
     if let Some(ref launch_ip) = ip {
-        nlt_args.push("--ip");
-        nlt_args.push(launch_ip);
+        sn_launch_tool_args.push("--ip");
+        sn_launch_tool_args.push(launch_ip);
     };
 
-    debug!("Running network launch tool with args: {:?}", nlt_args);
+    debug!(
+        "Running network launch tool with args: {:?}",
+        sn_launch_tool_args
+    );
 
     // We can now call the tool with the args
     println!("Launching local SAFE network...");
-    run_with(Some(&nlt_args))?;
+    run_with(Some(&sn_launch_tool_args))?;
 
     let interval_duration = Duration::from_secs(interval_as_int * 15);
     thread::sleep(interval_duration);
@@ -209,8 +212,8 @@ pub fn vault_join(
     println!("Storing vaults' generated data at {}", arg_vaults_dir);
 
     // Let's create an args array to pass to the network launcher tool
-    let mut nlt_args = vec![
-        "safe-nlt-join",
+    let mut sn_launch_tool_args = vec![
+        "sn_launch_tool-join",
         "-v",
         "--vault-path",
         &arg_vault_path,
@@ -223,17 +226,20 @@ pub fn vault_join(
         let v = "y".repeat(verbosity as usize);
         println!("V: {}", v);
         verbosity_arg.push_str(&v);
-        nlt_args.push(&verbosity_arg);
+        sn_launch_tool_args.push(&verbosity_arg);
     }
 
-    nlt_args.push("--hard-coded-contacts");
-    nlt_args.push(contacts);
+    sn_launch_tool_args.push("--hard-coded-contacts");
+    sn_launch_tool_args.push(contacts);
 
-    debug!("Running network launch tool with args: {:?}", nlt_args);
+    debug!(
+        "Running network launch tool with args: {:?}",
+        sn_launch_tool_args
+    );
 
     // We can now call the tool with the args
     println!("Starting a vault to join a SAFE network...");
-    join_with(Some(&nlt_args))?;
+    join_with(Some(&sn_launch_tool_args))?;
     Ok(())
 }
 
