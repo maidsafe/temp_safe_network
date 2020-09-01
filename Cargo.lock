@@ -3344,10 +3344,10 @@ dependencies = [
  "safe-api",
  "safe-nd",
  "safe_authenticator",
- "safe_bindgen",
  "safe_core",
  "serde",
  "serde_json",
+ "sn_bindgen",
  "tokio 0.2.21",
  "unwrap",
  "xor_name",
@@ -3425,23 +3425,6 @@ dependencies = [
  "tokio 0.2.21",
  "unwrap",
  "xor_name",
-]
-
-[[package]]
-name = "safe_bindgen"
-version = "0.13.2"
-source = "git+https://github.com/maidsafe/safe_bindgen#874dc388151399b96f2330e3a0c6d4c2a2d3de09"
-dependencies = [
- "Inflector",
- "clap",
- "jni",
- "petgraph",
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "rustfmt",
- "syn 0.15.44",
- "toml 0.5.6",
- "unwrap",
 ]
 
 [[package]]
@@ -3793,6 +3776,23 @@ dependencies = [
  "socket2",
  "wepoll-sys-stjepang",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "sn_bindgen"
+version = "0.13.3"
+source = "git+https://github.com/maidsafe/sn_bindgen#5a70011c79e5efd7f3a6903af610384282101ef9"
+dependencies = [
+ "Inflector",
+ "clap",
+ "jni",
+ "petgraph",
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "rustfmt",
+ "syn 0.15.44",
+ "toml 0.5.6",
+ "unwrap",
 ]
 
 [[package]]

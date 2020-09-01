@@ -36,10 +36,10 @@ features = ["app", "authenticator"]
 unwrap = "1.2.1"
 
 [build-dependencies]
-safe_bindgen = { git = "https://github.com/maidsafe/safe_bindgen", optional = true }
+sn_bindgen = { git = "https://github.com/maidsafe/sn_bindgen", optional = true }
 xor_name = "1"
 unwrap = "1.2.1"
 
 [features]
-bindings = ["safe_bindgen"]
+bindings = ["sn_bindgen"]
 scl-mock = ["safe-api/scl-mock", "safe_authenticator/mock-network", "safe_core/mock-network"]

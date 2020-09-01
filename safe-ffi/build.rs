@@ -17,7 +17,7 @@ fn main() {
 
 #[cfg(feature = "bindings")]
 mod bindings {
-    use safe_bindgen::{Bindgen, FilterMode, LangC, LangCSharp};
+    use sn_bindgen::{Bindgen, FilterMode, LangC, LangCSharp};
     use std::collections::HashMap;
     use std::env;
     use std::path::Path;
