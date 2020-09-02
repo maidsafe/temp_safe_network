@@ -8,7 +8,7 @@
 // Software.
 
 use super::errors::{Error, Result};
-use ffi_utils::{catch_unwind_cb, FfiResult, ReprC, FFI_RESULT_OK};
+use sn_ffi_utils::{catch_unwind_cb, FfiResult, ReprC, FFI_RESULT_OK};
 use safe_api::Error as NativeError;
 use safe_core::{config_handler, utils::logging};
 use std::ffi::{CString, OsStr};
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn config_dir_path(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::test_utils::{call_0, call_1};
+    use sn_ffi_utils::test_utils::{call_0, call_1};
     use log::{debug, error};
     use safe_core::config_dir;
     use std::env;

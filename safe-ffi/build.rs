@@ -36,7 +36,7 @@ mod bindings {
          // specific language governing permissions and limitations relating to use\n\
          // of the SAFE Network Software.";
 
-    const FFI_UTILS_CODE: &str =
+    const SN_FFI_UTILS_CODE: &str =
         "#[repr(C)] pub struct FfiResult { error_code: i32, description: *const c_char }";
 
     pub fn main() {
@@ -51,8 +51,8 @@ mod bindings {
         let mut bindgen = unwrap!(Bindgen::new());
         let mut lang = LangC::new();
 
-        lang.set_lib_name("ffi_utils");
-        bindgen.source_code("ffi_utils/src/lib.rs", FFI_UTILS_CODE);
+        lang.set_lib_name("sn_ffi_utils");
+        bindgen.source_code("sn_ffi_utils/src/lib.rs", SN_FFI_UTILS_CODE);
         bindgen.compile_or_panic(&mut lang, &mut outputs, false);
 
         lang.add_custom_code("typedef void* Safe;\n");

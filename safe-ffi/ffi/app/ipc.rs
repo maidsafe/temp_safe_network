@@ -9,8 +9,8 @@
 
 use super::common::errors::{Error, Result};
 use bincode::serialize;
-use ffi_utils::ffi_error;
-use ffi_utils::{
+use sn_ffi_utils::ffi_error;
+use sn_ffi_utils::{
     catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, NativeResult, ReprC, FFI_RESULT_OK,
 };
 use safe_core::ffi::ipc::req::{AuthReq, ContainersReq, ShareMDataRequest};

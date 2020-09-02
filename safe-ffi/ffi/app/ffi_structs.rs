@@ -8,7 +8,7 @@
 // Software.
 
 use super::{common::errors::Result, common::helpers::string_vec_to_c_str_str};
-use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
+use sn_ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
 use safe_api::{
     files::{
         FileItem as NativeFileItem, FilesMap as NativeFilesMap,

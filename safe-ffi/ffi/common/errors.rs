@@ -8,7 +8,7 @@
 // Software.
 
 use bincode::Error as SerialisationError;
-use ffi_utils::{ErrorCode, StringError};
+use sn_ffi_utils::{ErrorCode, StringError};
 use safe_api::Error as NativeError;
 use safe_core::{ipc::IpcError, CoreError};
 use std::{ffi::NulError, fmt};

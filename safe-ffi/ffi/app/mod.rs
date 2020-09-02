@@ -23,7 +23,7 @@ pub mod xorurl;
 
 use super::common::{errors::Result, helpers::from_c_str_to_str_option};
 use ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
-use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
+use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::Safe;
 use safe_api::{
     fetch::{XorUrlBase, XorUrlEncoder as NativeXorUrlEncoder},

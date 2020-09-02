@@ -11,7 +11,7 @@ use super::{
     common::{errors::Result, helpers::from_c_str_to_str_option},
     ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair},
 };
-use ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
+use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use safe_api::{BlsKeyPair as NativeBlsKeyPair, Safe};
 use std::ffi::CString;
 use std::{

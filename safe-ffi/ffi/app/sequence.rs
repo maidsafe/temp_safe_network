@@ -8,7 +8,7 @@
 // Software.
 
 use super::{common::errors::Result, ffi_structs::XorNameArray};
-use ffi_utils::{
+use sn_ffi_utils::{
     catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
 use safe_api::Safe;

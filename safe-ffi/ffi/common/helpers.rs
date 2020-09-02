@@ -8,7 +8,7 @@
 // Software.
 
 use super::errors::Result;
-use ffi_utils::ReprC;
+use sn_ffi_utils::ReprC;
 use std::{
     ffi::{CStr, CString},
     os::raw::c_char,
@@ -55,7 +55,7 @@ pub unsafe fn c_str_str_to_string_vec(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
+    use sn_ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
     use unwrap::unwrap;
 
     #[test]

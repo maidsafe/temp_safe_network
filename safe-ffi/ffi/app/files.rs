@@ -12,7 +12,7 @@ use super::{
     constants::{FILE_READ_FROM_START, FILE_READ_TO_END},
     ffi_structs::{files_map_into_repr_c, processed_files_into_repr_c, FilesMap, ProcessedFiles},
 };
-use ffi_utils::{
+use sn_ffi_utils::{
     catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
 use safe_api::Safe;

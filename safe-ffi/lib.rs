@@ -10,7 +10,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 #[macro_use]
-extern crate ffi_utils;
+extern crate sn_ffi_utils;
 
 pub mod ffi;
 

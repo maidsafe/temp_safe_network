@@ -15,7 +15,7 @@ use super::{
         NrsMapContainer, PublicImmutableData, SafeKey, SequenceData, Wallet,
     },
 };
-use ffi_utils::{
+use sn_ffi_utils::{
     catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
 use safe_api::{fetch::SafeData, Safe};

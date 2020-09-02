@@ -8,7 +8,7 @@
 // Software.
 
 use super::common::errors::Result;
-use ffi_utils::vec_into_raw_parts;
+use sn_ffi_utils::vec_into_raw_parts;
 use safe_api::AuthedAppsList as NativeAuthedAppsList;
 use safe_core::{ffi::ipc::req::ContainerPermissions, ipc::req::containers_into_vec};
 use std::ffi::CString;
