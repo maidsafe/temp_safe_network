@@ -18,13 +18,13 @@ use super::{
 use ansi_term::Colour;
 use log::debug;
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::{
+use serde::Serialize;
+use sn_api::{
     fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
     xorurl::{XorUrl, XorUrlEncoder},
     Safe,
 };
-use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Component, Path};
 use structopt::StructOpt;

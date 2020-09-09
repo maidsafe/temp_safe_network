@@ -3211,42 +3211,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
-name = "safe-api"
-version = "0.15.0"
-dependencies = [
- "async-std",
- "async-trait",
- "bincode",
- "cargo-husky",
- "chrono",
- "directories 2.0.2",
- "env_logger 0.6.2",
- "futures 0.3.5",
- "jsonrpc-quic",
- "lazy_static",
- "log 0.4.8",
- "mime_guess",
- "multibase",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "relative-path",
- "safe-nd",
- "safe_app",
- "safe_authenticator",
- "safe_core",
- "serde",
- "serde_json",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "tokio 0.2.21",
- "uhttp_uri",
- "url 2.1.1",
- "urlencoding",
- "walkdir",
- "xor_name",
-]
-
-[[package]]
 name = "safe-authd"
 version = "0.0.11"
 dependencies = [
@@ -3260,10 +3224,10 @@ dependencies = [
  "log 0.4.8",
  "quinn",
  "rcgen",
- "safe-api",
  "self_update",
  "serde",
  "serde_json",
+ "sn_api",
  "structopt 0.2.18",
  "tokio 0.2.21",
  "unwrap",
@@ -3301,7 +3265,6 @@ dependencies = [
  "relative-path",
  "reqwest 0.9.24",
  "rpassword",
- "safe-api",
  "safe-cmd-test-utilities",
  "safe-nd",
  "self_update",
@@ -3309,6 +3272,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shrust",
+ "sn_api",
  "sn_launch_tool",
  "structopt 0.3.15",
  "tiny-keccak 1.5.0",
@@ -3325,10 +3289,10 @@ dependencies = [
  "duct",
  "multibase",
  "rand 0.7.3",
- "safe-api",
  "safe-nd",
  "serde",
  "serde_json",
+ "sn_api",
  "tiny-keccak 1.5.0",
  "unwrap",
  "walkdir",
@@ -3340,12 +3304,12 @@ version = "0.15.0"
 dependencies = [
  "bincode",
  "log 0.4.8",
- "safe-api",
  "safe-nd",
  "safe_authenticator",
  "safe_core",
  "serde",
  "serde_json",
+ "sn_api",
  "sn_bindgen",
  "sn_ffi_utils",
  "tokio 0.2.21",
@@ -3776,6 +3740,42 @@ dependencies = [
  "socket2",
  "wepoll-sys-stjepang",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "sn_api"
+version = "0.15.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "bincode",
+ "cargo-husky",
+ "chrono",
+ "directories 2.0.2",
+ "env_logger 0.6.2",
+ "futures 0.3.5",
+ "jsonrpc-quic",
+ "lazy_static",
+ "log 0.4.8",
+ "mime_guess",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "relative-path",
+ "safe-nd",
+ "safe_app",
+ "safe_authenticator",
+ "safe_core",
+ "serde",
+ "serde_json",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "uhttp_uri",
+ "url 2.1.1",
+ "urlencoding",
+ "walkdir",
+ "xor_name",
 ]
 
 [[package]]

@@ -8,10 +8,10 @@
 // Software.
 
 use super::{common::errors::Result, ffi_structs::XorNameArray};
+use sn_api::Safe;
 use sn_ffi_utils::{
     catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
-use safe_api::Safe;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},

@@ -20,7 +20,6 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use safe_api::{xorurl::XorUrlEncoder, Safe};
 use safe_cmd_test_utilities::{
     can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
     create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
@@ -28,6 +27,7 @@ use safe_cmd_test_utilities::{
     upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
     upload_testfolder_trailing_slash, TEST_FOLDER,
 };
+use sn_api::{xorurl::XorUrlEncoder, Safe};
 
 use std::env;
 use std::fs;

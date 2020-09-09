@@ -15,7 +15,7 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use safe_api::{BlsKeyPair, Safe};
+use sn_api::{BlsKeyPair, Safe};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {

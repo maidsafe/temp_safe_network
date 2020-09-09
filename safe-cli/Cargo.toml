@@ -1,12 +1,12 @@
 [package]
 name = "safe-cli"
 version = "0.15.0"
-description = "SAFE CLI"
+description = "Safe CLI"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 publish = false
 license = "MIT OR BSD-3-Clause"
 default-run = "safe"
-repository = "https://github.com/maidsafe/safe-api"
+repository = "https://github.com/maidsafe/sn_api"
 edition = "2018"
 
 [[bin]]
@@ -43,10 +43,10 @@ percent-encoding = "2.1.0"
 xor_name = "1"
 
 [features]
-scl-mock = ["safe-api/scl-mock"]
+scl-mock = ["sn_api/scl-mock"]
 
-[dependencies.safe-api]
-path = "../safe-api"
+[dependencies.sn_api]
+path = "../sn_api"
 default-features = false
 features = ["app", "authd_client"]
 

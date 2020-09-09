@@ -16,8 +16,8 @@ use crate::{
     },
 };
 use async_std::task;
-use safe_api::{AuthReq, Safe, SafeAuthdClient};
 use shrust::{Shell, ShellIO};
+use sn_api::{AuthReq, Safe, SafeAuthdClient};
 use std::io::{stdout, Write};
 use structopt::StructOpt;
 
@@ -37,7 +37,7 @@ pub fn shell_run() -> Result<(), String> {
     });
     shell.new_command(
         "auth",
-        "Authorise the SAFE CLI and interact with a remote Authenticator daemon",
+        "Authorise the Safe CLI and interact with a remote Authenticator daemon",
         0,
         |io, (safe, safe_authd_client), args| {
             // Let's create an args array to mimic the one we'd receive commands were passed from outside shell
@@ -85,7 +85,7 @@ pub fn shell_run() -> Result<(), String> {
     );
     shell.new_command(
         "cat",
-        "Read data on the SAFE Network",
+        "Read data on the Safe Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("cat", args, safe, io),
     );
@@ -97,19 +97,19 @@ pub fn shell_run() -> Result<(), String> {
     );
     shell.new_command(
         "dog",
-        "Inspect data on the SAFE Network providing only metadata information about the content",
+        "Inspect data on the Safe Network providing only metadata information about the content",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("dog", args, safe, io),
     );
     shell.new_command(
         "files",
-        "Manage files on the SAFE Network",
+        "Manage files on the Safe Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("files", args, safe, io),
     );
     shell.new_command(
         "seq",
-        "Manage Sequences on the SAFE Network",
+        "Manage Sequences on the Safe Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("seq", args, safe, io),
     );
@@ -121,19 +121,19 @@ pub fn shell_run() -> Result<(), String> {
     );
     shell.new_command(
         "keys",
-        "Manage keys on the SAFE Network",
+        "Manage keys on the Safe Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("keys", args, safe, io),
     );
     shell.new_command(
         "networks",
-        "Switch between SAFE networks",
+        "Switch between Safe networks",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("networks", args, safe, io),
     );
     shell.new_command(
         "nrs",
-        "Manage public names on the SAFE Network",
+        "Manage public names on the Safe Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("nrs", args, safe, io),
     );
@@ -151,13 +151,13 @@ pub fn shell_run() -> Result<(), String> {
     );
     shell.new_command(
         "vault",
-        "Commands to manage SAFE vaults",
+        "Commands to manage Safe vaults",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("vault", args, safe, io),
     );
     shell.new_command(
         "wallet",
-        "Manage wallets on the SAFE Network",
+        "Manage wallets on the Safe Network",
         0,
         |io, (safe, _safe_authd_client), args| call_cli("wallet", args, safe, io),
     );
@@ -169,7 +169,7 @@ pub fn shell_run() -> Result<(), String> {
     );
 
     println!();
-    println!("Welcome to SAFE CLI interactive shell!");
+    println!("Welcome to Safe CLI interactive shell!");
     println!("Type 'help' for a list of supported commands");
     println!("Pass '--help' flag to any top level command for a complete list of supported subcommands and arguments");
     println!("Type 'quit' to exit this shell. Enjoy it!");

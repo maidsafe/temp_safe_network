@@ -14,12 +14,12 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use safe_api::{
-    fetch::{SafeContentType, SafeDataType},
-    xorurl::{XorUrlBase, XorUrlEncoder},
-};
 use safe_cmd_test_utilities::{
     get_random_nrs_string, parse_nrs_create_output, upload_test_folder, CLI, SAFE_PROTOCOL,
+};
+use sn_api::{
+    fetch::{SafeContentType, SafeDataType},
+    xorurl::{XorUrlBase, XorUrlEncoder},
 };
 use std::process::Command;
 use unwrap::unwrap;

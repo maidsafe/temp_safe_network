@@ -161,7 +161,7 @@ impl Safe {
     ///
     /// ## Example
     /// ```
-    /// # use safe_api::Safe;
+    /// # use sn_api::Safe;
     /// let mut safe = Safe::default();
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();

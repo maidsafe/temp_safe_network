@@ -12,11 +12,11 @@ extern crate safe_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
-use safe_api::{fetch::SafeData, Safe};
 use safe_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_dog_output,
     parse_files_put_or_sync_output,
 };
+use sn_api::{fetch::SafeData, Safe};
 
 const TEST_FILE: &str = "../testdata/test.md";
 

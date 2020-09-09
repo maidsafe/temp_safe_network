@@ -12,7 +12,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::env::var;
 
-// Environment variable where to read auth credentials to be used for all safe-api tests
+// Environment variable where to read auth credentials to be used for all sn_api tests
 const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 
 // Instantiate a Safe instance

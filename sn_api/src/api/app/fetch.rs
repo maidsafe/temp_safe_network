@@ -122,7 +122,7 @@ impl Safe {
     ///
     /// ### Fetch FilesContainer relative path file
     /// ```rust
-    /// # use safe_api::{Safe, fetch::SafeData};
+    /// # use sn_api::{Safe, fetch::SafeData};
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
     /// # async_std::task::block_on(async {
@@ -168,7 +168,7 @@ impl Safe {
     ///
     /// ### Inspect FilesContainer relative path file
     /// ```rust
-    /// # use safe_api::{Safe, fetch::SafeData};
+    /// # use sn_api::{Safe, fetch::SafeData};
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
     /// # async_std::task::block_on(async {

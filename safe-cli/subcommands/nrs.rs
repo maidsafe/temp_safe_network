@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::{xorurl::XorUrl, Safe};
+use sn_api::{xorurl::XorUrl, Safe};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 

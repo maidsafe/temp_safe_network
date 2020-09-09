@@ -12,8 +12,8 @@ use super::{
     common::helpers::{c_str_str_to_string_vec, from_c_str_to_str_option},
     ffi_structs::{safe_url_into_repr_c, SafeUrl, XorNameArray},
 };
+use sn_api::xorurl::{SafeContentType, SafeDataType, SafeUrl as NativeSafeUrl, XorUrlBase};
 use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
-use safe_api::xorurl::{SafeContentType, SafeDataType, SafeUrl as NativeSafeUrl, XorUrlBase};
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},

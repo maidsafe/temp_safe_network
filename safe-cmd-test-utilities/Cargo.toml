@@ -1,11 +1,11 @@
 [package]
 name = "safe-cmd-test-utilities"
 version = "1.0.0"
-description = "SAFE CLI Test Utilities"
+description = "Safe CLI Test Utilities"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 publish = false
 license = "MIT OR BSD-3-Clause"
-repository = "https://github.com/maidsafe/safe-api"
+repository = "https://github.com/maidsafe/sn_api"
 edition = "2018"
 
 [dependencies]
@@ -20,7 +20,7 @@ tiny-keccak = "1.5.0"
 multibase = "~0.6.0"
 
 
-[dependencies.safe-api]
-path = "../safe-api"
+[dependencies.sn_api]
+path = "../sn_api"
 default-features = false
 features = ["app", "authd_client"]

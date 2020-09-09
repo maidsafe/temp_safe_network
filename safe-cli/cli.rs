@@ -21,10 +21,10 @@ use crate::{
         SubCommands,
     },
 };
-use safe_api::{xorurl::XorUrlBase, Safe};
+use sn_api::{xorurl::XorUrlBase, Safe};
 
 #[derive(StructOpt, Debug)]
-/// Interact with the SAFE Network
+/// Interact with the Safe Network
 #[structopt(global_settings(&[structopt::clap::AppSettings::ColoredHelp]))]
 pub struct CmdArgs {
     /// subcommands

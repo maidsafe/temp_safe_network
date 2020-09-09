@@ -13,7 +13,7 @@ use super::{
 use futures::{lock::Mutex, TryFutureExt};
 use jsonrpc_quic::{Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponseStream};
 use log::{error, info};
-use safe_api::SafeAuthenticator;
+use sn_api::SafeAuthenticator;
 use std::{collections::BTreeMap, str, sync::Arc};
 use url::Url;
 

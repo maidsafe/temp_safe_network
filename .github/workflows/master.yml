@@ -462,7 +462,7 @@ jobs:
       - shell: bash
         id: versioning
         run: |
-          api_version=$(grep "^version" < safe-api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           cli_version=$(grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           authd_version=$(grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           ffi_version=$(grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
@@ -572,13 +572,13 @@ jobs:
         id: versioning
         run: |
           jsonrpc_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          api_version=$(grep "^version" < safe-api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           old_jsonrpc_version=$(cargo search jsonrpc-quic --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          old_api_version=$(cargo search safe-api --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          old_api_version=$(cargo search sn_api --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           echo "Current jsonrpc-quic version: $jsonrpc_version"
-          echo "Current safe-api version: $api_version"
+          echo "Current sn_api version: $api_version"
           echo "Old jsonrpc-quic version: $old_jsonrpc_version"
-          echo "Old safe-api version: $old_api_version"
+          echo "Old sn_api version: $old_api_version"
           echo "::set-output name=jsonrpc_version::$jsonrpc_version"
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=old_jsonrpc_version::$old_jsonrpc_version"
@@ -608,5 +608,5 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: publish
-          args: --manifest-path=safe-api/Cargo.toml
+          args: --manifest-path=sn_api/Cargo.toml
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change') && steps.versioning.outputs.api_version != steps.versioning.outputs.old_api_version

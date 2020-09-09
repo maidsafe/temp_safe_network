@@ -29,7 +29,7 @@ jobs:
       - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
       - name: Build
         run: cargo build --release
-      - name: Setup SAFE Cli and PATH etc
+      - name: Setup Safe Cli and PATH etc
         run: |
           mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
@@ -73,9 +73,9 @@ jobs:
       - name: Build safe-vault
         run: cargo build --release --manifest-path=$HOME/.safe/vault/Cargo.toml
       - run: cp $HOME/.safe/vault/target/release/safe_vault $HOME/.safe/vault/
-      - name: Build SAFE CLI and safe-authd
+      - name: Build Safe CLI and safe-authd
         run: cargo build --release
-      - name: Setup SAFE CLI and PATH etc
+      - name: Setup Safe CLI and PATH etc
         run: |
           mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
@@ -94,7 +94,7 @@ jobs:
       - name: Run CLI Tests
         run: ./resources/test-scripts/cli-network-tests
         shell: bash
-      - name: Run safe-api Tests
+      - name: Run sn_api Tests
         run: ./resources/test-scripts/api-network-tests
         shell: bash
 

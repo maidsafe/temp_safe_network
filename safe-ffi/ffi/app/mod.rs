@@ -23,14 +23,14 @@ pub mod xorurl;
 
 use super::common::{errors::Result, helpers::from_c_str_to_str_option};
 use ffi_structs::{bls_key_pair_into_repr_c, BlsKeyPair};
-use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
-use safe_api::Safe;
-use safe_api::{
+use safe_core::test_create_balance;
+use safe_nd::ClientFullId;
+use sn_api::Safe;
+use sn_api::{
     fetch::{XorUrlBase, XorUrlEncoder as NativeXorUrlEncoder},
     parse_coins_amount, xorname_from_pk, BlsKeyPair as NativeBlsKeyPair, KeyPair as NativeKeyPair,
 };
-use safe_core::test_create_balance;
-use safe_nd::ClientFullId;
+use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},

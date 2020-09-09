@@ -8,7 +8,7 @@
 // Software.
 
 use futures::lock::Mutex;
-use safe_api::{AuthReq, SafeAuthenticator};
+use sn_api::{AuthReq, SafeAuthenticator};
 use std::{collections::BTreeMap, sync::Arc, time::SystemTime};
 use tokio::sync::mpsc;
 

@@ -15,7 +15,7 @@ safe_cli_install_dir() {
 }
 
 safe_cli_latest_version() {
-  curl -s https://api.github.com/repos/maidsafe/safe-api/releases/latest | grep -oP 'tag_name\": \"\K.*(?=\")'
+  curl -s https://api.github.com/repos/maidsafe/sn_api/releases/latest | grep -oP 'tag_name\": \"\K.*(?=\")'
 }
 
 safe_cli_download() {
@@ -50,7 +50,7 @@ safe_cli_try_profile() {
 #
 safe_cli_detect_profile() {
   if [ "${PROFILE-}" = '/dev/null' ]; then
-    # the user has specifically requested NOT to have SAFE CLI set in their profile
+    # the user has specifically requested NOT to have Safe CLI set in their profile
     return
   fi
 
@@ -112,7 +112,7 @@ safe_cli_install() {
           safe_cli_exec="safe.exe"
           ;;
       *)
-          echo "Platform not supported by the SAFE CLI installation script."
+          echo "Platform not supported by the Safe CLI installation script."
           exit 1
   esac
 
@@ -121,11 +121,11 @@ safe_cli_install() {
   tmp_dir=$(mktemp -d)
   tmp_dir_package=$tmp_dir/$cli_package
 
-  echo "=> Downloading SAFE CLI package from '$cli_package_url'..."
+  echo "=> Downloading Safe CLI package from '$cli_package_url'..."
   safe_cli_download "$cli_package_url" -o "$tmp_dir_package"
 
   install_dir="$(safe_cli_install_dir)"
-  echo "=> Unpacking SAFE CLI to '$install_dir'..."
+  echo "=> Unpacking Safe CLI to '$install_dir'..."
   mkdir -p "$install_dir"
   tar -xzf $tmp_dir_package -C $install_dir
 
@@ -146,23 +146,23 @@ safe_cli_install() {
             command printf "${safe_cli_in_path_str}"
             echo
           else
-            echo "=> Adding statement to '$safe_cli_profile' profile to have SAFE CLI binary path in the \$PATH"
+            echo "=> Adding statement to '$safe_cli_profile' profile to have Safe CLI binary path in the \$PATH"
             if ! command grep -qc "$install_dir" "$safe_cli_profile"; then
               command printf "${safe_cli_in_path_str}" >> "$safe_cli_profile"
               echo "=> Statement appended to '$safe_cli_profile' profile"
-              echo "=> Close and reopen your terminal to start using SAFE CLI"
+              echo "=> Close and reopen your terminal to start using Safe CLI"
             else
-              echo "=> Profile '${safe_cli_profile}' already contains a statement to set SAFE CLI in the \$PATH"
+              echo "=> Profile '${safe_cli_profile}' already contains a statement to set Safe CLI in the \$PATH"
             fi
           fi
           ;;
       MSYS_NT* | MINGW*)
           if ! command grep -qc "$install_dir" <<< $PATH; then
-            echo "=> Adding SAFE CLI binary path to the PATH in the system for all users"
+            echo "=> Adding Safe CLI binary path to the PATH in the system for all users"
             setx PATH "$PATH:$install_dir" -m
-            echo "=> Close and reopen your terminal to start using SAFE CLI"
+            echo "=> Close and reopen your terminal to start using Safe CLI"
           else
-            echo "=> SAFE CLI binary path was already set in the PATH"
+            echo "=> Safe CLI binary path was already set in the PATH"
           fi
           ;;
   esac

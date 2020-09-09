@@ -1,11 +1,11 @@
 [package]
 name = "safe-authd"
 version = "0.0.11"
-description = "SAFE Authenticator (daemon)"
+description = "Safe Authenticator (daemon)"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 publish = false
 license = "MIT OR BSD-3-Clause"
-repository = "https://github.com/maidsafe/safe-api"
+repository = "https://github.com/maidsafe/sn_api"
 edition = "2018"
 
 [[bin]]
@@ -29,8 +29,8 @@ url = "2.1.1"
 urlencoding = "1.0.0"
 quinn = {version = "~0.6.1", features=["tls-rustls"], default-features = false}
 
-[dependencies.safe-api]
-path = "../safe-api"
+[dependencies.sn_api]
+path = "../sn_api"
 default-features = false
 features = ["authenticator", "authd_client"]
 

@@ -13,10 +13,10 @@ use directories::BaseDirs;
 use envy::from_env;
 use log::info;
 use prettytable::Table;
-use safe_api::{
+use serde::Deserialize;
+use sn_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
-use serde::Deserialize;
 use std::{fs::File, path::PathBuf};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
@@ -298,13 +298,13 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: Option<&str
 
 pub fn pretty_print_status_report(status_report: AuthdStatus) {
     let mut table = Table::new();
-    table.add_row(row![bFg->"SAFE Authenticator status"]);
+    table.add_row(row![bFg->"Safe Authenticator status"]);
     table.add_row(row![
         "Authenticator daemon version",
         status_report.authd_version
     ]);
     table.add_row(row![
-        "Logged in to a SAFE account?",
+        "Logged in to a Safe account?",
         boolean_to_string(status_report.logged_in),
     ]);
     table.add_row(row![
@@ -361,7 +361,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
     }
 
     if the_passphrase.is_empty() ^ the_password.is_empty() {
-        return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for SAFE account creation/login.".to_string());
+        return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for Safe account creation/login.".to_string());
     }
 
     if the_passphrase.is_empty() || the_password.is_empty() {
@@ -394,7 +394,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
                 the_password = json.password;
             }
         } else {
-            // Prompt the user for the SAFE account credentials
+            // Prompt the user for the Safe account credentials
             the_passphrase = prompt_sensitive(None, "Passphrase: ")
                 .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
             the_password = prompt_sensitive(None, "Password: ")

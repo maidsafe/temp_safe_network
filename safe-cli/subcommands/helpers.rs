@@ -12,8 +12,8 @@ use ansi_term::Style;
 use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
-use safe_api::nrs_map::NrsMap;
 use serde::ser::Serialize;
+use sn_api::nrs_map::NrsMap;
 use std::{
     collections::BTreeMap,
     io::{stdin, stdout, Read, Write},

@@ -45,7 +45,7 @@ mod bindings {
     }
 
     fn gen_bindings_c() {
-        let target_dir = Path::new("bindings/c/safe-api");
+        let target_dir = Path::new("bindings/c/sn_api");
         let mut outputs = HashMap::new();
 
         let mut bindgen = unwrap!(Bindgen::new());
@@ -65,7 +65,7 @@ mod bindings {
     }
 
     fn gen_bindings_csharp() {
-        let target_dir = Path::new("bindings/csharp/safe-api");
+        let target_dir = Path::new("bindings/csharp/sn_api");
 
         let mut bindgen = unwrap!(Bindgen::new());
         let mut lang = LangCSharp::new();

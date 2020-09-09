@@ -1,6 +1,6 @@
-# SAFE API/CLI support for symlinks
+# Safe API/CLI support for symlinks
 
-| [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
+| [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 # For users of safe-cli
@@ -23,9 +23,9 @@ symlink's path.
 For more information, see the [wikipedia
 entry](https://en.wikipedia.org/wiki/Symbolic_link).
 
-## SAFE Network support for symlinks
+## Safe Network support for symlinks
 
-The SAFE Network File API permits storing, retrieving, and resolving symlinks
+The Safe Network File API permits storing, retrieving, and resolving symlinks
 within a FileContainer. This is necessary for faithful storage and retrieval of
 a local directory tree that contains symlinks.
 
@@ -37,7 +37,7 @@ work once again, provided the target still exists.
 Relative symlinks may be stored and retrieved, and will resolve only if the
 target is within the FileContainer. In other words, if you upload a directory
 tree with relative symlinks that reference targets within the uploaded
-directory, then those links will work in the SAFE Network. But if the link
+directory, then those links will work in the Safe Network. But if the link
 targets a path outside the uploaded directory, then it will not work, because
 the target has not been uploaded.
 
@@ -45,11 +45,11 @@ For public data it is considered good etiquette to only include relative
 symlinks with targets inside the uploaded directory.
 
 Finally, symlinks may optionally be [disabled](#disabling-symlinks) when
-uploading content to the SAFE Network.
+uploading content to the Safe Network.
 
 ### Can I make a symlink to another file container on the network?
 
-No. Symlinks in SAFE Network are simply a mechanism for supporting the symlinks
+No. Symlinks in Safe Network are simply a mechanism for supporting the symlinks
 that may already exist in your local filesystem.
 
 Links from one FileContainer to another may happen at some point, but introduce
@@ -188,7 +188,7 @@ because rust-url normalizes '../' away.
 ## Path Resolution
 
 If a SafeUrl contains a path component, the path will be resolved by
-FilesMap::realpath(), which is a SAFE Network adaptation of the standard Unix
+FilesMap::realpath(), which is a Safe Network adaptation of the standard Unix
 realpath() function. This function checks each component of the path from the
 beginning, and if it finds a relative symlink with a valid target, then it
 substitutes the target path and continues processing path components. Each
@@ -232,7 +232,7 @@ For this reason, it was decided to commit a test directory tree for the relative
 tests to operate on, while absolute symlink tests generate a tree dynamically
 for each test within the system temp directory.
 
-The relative symlinks test directory resides at path safe-api/test_symlinks.
+The relative symlinks test directory resides at path sn_api/test_symlinks.
 
 See [Integration Testing on Windows](#integration-testing-on-windows)
 

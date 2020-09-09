@@ -11,8 +11,8 @@ use crate::shared::{
     SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle,
 };
 use log::info;
-use safe_api::AuthdStatus;
 use serde_json::{json, Value};
+use sn_api::AuthdStatus;
 
 pub async fn process_req(
     params: Value,

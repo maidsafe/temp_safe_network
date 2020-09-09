@@ -9,7 +9,7 @@
 
 use crate::APP_ID;
 use log::debug;
-use safe_api::Safe;
+use sn_api::Safe;
 
 pub async fn authorise_cli(
     _safe: &mut Safe,

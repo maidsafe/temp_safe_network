@@ -1,22 +1,27 @@
-# SAFE Authenticator daemon
+# Safe Authenticator daemon
 
-| [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
+| [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 ## Table of contents
 
-1. [Description](#description)
-2. [Download](#download)
-3. [Build](#build)
-4. [Launching the safe-authd](#launching-the-safe-authd)
-5. [License](#license)
-6. [Contributing](#contributing)
+- [Safe Authenticator daemon](#safe-authenticator-daemon)
+  - [Table of contents](#table-of-contents)
+  - [Description](#description)
+  - [Download](#download)
+  - [Build](#build)
+  - [Launching the safe-authd](#launching-the-safe-authd)
+    - [Start](#start)
+    - [Stop](#stop)
+    - [Restart](#restart)
+  - [License](#license)
+  - [Contributing](#contributing)
 
 ## Description
 
-This crate implements a SAFE Authenticator service which runs as a daemon (or as a service in Windows platforms).
+This crate implements a Safe Authenticator service which runs as a daemon (or as a service in Windows platforms).
 
-The `safe-authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
+The `safe-authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
 
 It keeps in memory a list of authorisation requests pending of approval/denial, as well as the list of the registered subscribers that the notifications shall be sent to.
 
@@ -90,9 +95,9 @@ When `safe-authd` sends a notification to each of the subscribers it also uses J
 
 ## Download
 
-The latest version of the SAFE Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/safe-api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.
+The latest version of the Safe Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/sn_api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.
 
-If otherwise you prefer to build the SAFE Authenticator daemon from source code, please follow the instructions in the next two section below.
+If otherwise you prefer to build the Safe Authenticator daemon from source code, please follow the instructions in the next two section below.
 
 ## Build
 
@@ -100,8 +105,8 @@ In order to build this application from source code you need to make sure you ha
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-authd` (the build process may take several minutes the first time you run it on this crate):
 ```shell
-$ git clone https://github.com/maidsafe/safe-api.git
-$ cd safe-api/safe-authd
+$ git clone https://github.com/maidsafe/sn_api.git
+$ cd sn_api/safe-authd
 $ cargo build
 ```
 
@@ -122,34 +127,34 @@ This application supports only a few commands which are required to start it as 
 
 ### Start
 
-In order to start the SAFE Authenticator daemon (`safe-authd`) we simply need to run the following command:
+In order to start the Safe Authenticator daemon (`safe-authd`) we simply need to run the following command:
 ```shell
 $ safe-authd start
-Starting SAFE Authenticator daemon (safe-authd)...
+Starting Safe Authenticator daemon (safe-authd)...
 safe-authd started (PID: <pid>)
 ```
 
 ### Stop
 
-To stop the SAFE Authenticator daemon (`safe-authd`) we just run the following command (on Windows make sure you use the `safe-authd.exe` executable):
+To stop the Safe Authenticator daemon (`safe-authd`) we just run the following command (on Windows make sure you use the `safe-authd.exe` executable):
 ```shell
 $ safe-authd stop
-Stopping SAFE Authenticator daemon (safe-authd)...
+Stopping Safe Authenticator daemon (safe-authd)...
 Success, safe-authd (PID: <pid>) stopped!
 ```
 
 ### Restart
 
-We can also restart the SAFE Authenticator daemon (`safe-authd`) if it's already running, with the following command (on Windows make sure you use the `safe-authd.exe` executable):
+We can also restart the Safe Authenticator daemon (`safe-authd`) if it's already running, with the following command (on Windows make sure you use the `safe-authd.exe` executable):
 ```shell
 $ safe-authd restart
-Stopping SAFE Authenticator daemon (safe-authd)...
+Stopping Safe Authenticator daemon (safe-authd)...
 Success, safe-authd (PID: <pid>) stopped!
-Starting SAFE Authenticator daemon (safe-authd)...
+Starting Safe Authenticator daemon (safe-authd)...
 ```
 
 ## License
-This SAFE Network library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
+This Safe Network library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
 
 ## Contributing
 

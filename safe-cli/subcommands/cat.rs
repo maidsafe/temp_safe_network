@@ -13,7 +13,7 @@ use super::{
 };
 use log::debug;
 use prettytable::Table;
-use safe_api::{fetch::SafeData, Safe};
+use sn_api::{fetch::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
 

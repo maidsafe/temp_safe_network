@@ -13,7 +13,7 @@ use crate::{
 };
 use directories::ProjectDirs;
 use log::{debug, info, warn};
-use safe_api::Safe;
+use sn_api::Safe;
 use std::{
     fs::{create_dir_all, File},
     io::{Read, Write},
@@ -45,7 +45,7 @@ pub async fn authorise_cli(
         )
     })?;
 
-    println!("SAFE CLI app was successfully authorised");
+    println!("Safe CLI app was successfully authorised");
     println!("Credentials were stored in {}", file_path.display());
     Ok(())
 }

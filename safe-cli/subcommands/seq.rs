@@ -13,7 +13,7 @@ use super::{
     },
     OutputFmt,
 };
-use safe_api::Safe;
+use sn_api::Safe;
 use structopt::StructOpt;
 
 // Default type tag to use for the Sequence
@@ -22,7 +22,7 @@ const DEFAULT_SEQUENCE_TYPE_TAG: u64 = 1_200;
 #[derive(StructOpt, Debug)]
 pub enum SeqSubCommands {
     #[structopt(name = "store")]
-    /// Stores a new Sequence on the SAFE Network
+    /// Stores a new Sequence on the Safe Network
     Store {
         /// The data to store in the new Sequence as first element.  Specify '-' to read from stdin
         data: String,

@@ -14,8 +14,8 @@ extern crate duct;
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use safe_api::xorurl::XorUrlEncoder;
 use safe_cmd_test_utilities::{parse_xorurl_output, CLI, SAFE_PROTOCOL};
+use sn_api::xorurl::XorUrlEncoder;
 use std::process::Command;
 use unwrap::unwrap;
 

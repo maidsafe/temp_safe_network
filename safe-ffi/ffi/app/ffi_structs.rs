@@ -8,8 +8,7 @@
 // Software.
 
 use super::{common::errors::Result, common::helpers::string_vec_to_c_str_str};
-use sn_ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
-use safe_api::{
+use sn_api::{
     files::{
         FileItem as NativeFileItem, FilesMap as NativeFilesMap,
         ProcessedFiles as NativeProcessedFiles,
@@ -22,6 +21,7 @@ use safe_api::{
     xorurl::SafeUrl as NativeSafeUrl,
     BlsKeyPair as NativeBlsKeyPair, ProcessedEntries as NativeProcessedEntries,
 };
+use sn_ffi_utils::{vec_from_raw_parts, vec_into_raw_parts};
 use std::ffi::CString;
 use std::os::raw::c_char;
 use xor_name::XOR_NAME_LEN;

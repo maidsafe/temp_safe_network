@@ -15,10 +15,10 @@ use super::{
         NrsMapContainer, PublicImmutableData, SafeKey, SequenceData, Wallet,
     },
 };
+use sn_api::{fetch::SafeData, Safe};
 use sn_ffi_utils::{
     catch_unwind_cb, vec_into_raw_parts, FfiResult, NativeResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
-use safe_api::{fetch::SafeData, Safe};
 use std::ffi::CString;
 use std::{
     os::raw::{c_char, c_void},
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn inspect(
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn invoke_callback(
-    content: safe_api::Result<SafeData>,
+    content: sn_api::Result<SafeData>,
     user_data: *mut c_void,
     public_immutable_cb: extern "C" fn(user_data: *mut c_void, data: *const PublicImmutableData),
     sequence_cb: extern "C" fn(user_data: *mut c_void, data: *const SequenceData),

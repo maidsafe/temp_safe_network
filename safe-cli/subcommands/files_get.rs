@@ -14,7 +14,7 @@ use super::{
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
 use log::{debug, info, trace, warn};
-use safe_api::{
+use sn_api::{
     fetch::Range,
     fetch::SafeData,
     files::{FilesMap, GetAttr, ProcessedFiles},

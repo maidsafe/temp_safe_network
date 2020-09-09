@@ -11,8 +11,8 @@ use super::{
     common::errors::Result,
     ffi_structs::{processed_entries_into_repr_c, safe_url_into_repr_c, ProcessedEntries, SafeUrl},
 };
+use sn_api::Safe;
 use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
-use safe_api::Safe;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},

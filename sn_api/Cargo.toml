@@ -1,10 +1,10 @@
 [package]
-name = "safe-api"
+name = "sn_api"
 version = "0.15.0"
-description = "SAFE API"
+description = "Safe API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 license = "MIT OR BSD-3-Clause"
-repository = "https://github.com/maidsafe/safe-api"
+repository = "https://github.com/maidsafe/sn_api"
 include = ["Cargo.toml", "src/api/*", "src/lib.rs"]
 edition = "2018"
 

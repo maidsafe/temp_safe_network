@@ -1,11 +1,11 @@
 [package]
 name = "safe-ffi"
 version = "0.15.0"
-description = "SAFE API FFI"
+description = "Safe API FFI"
 authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
 publish = false
 license = "MIT OR BSD-3-Clause"
-repository = "https://github.com/maidsafe/safe-api"
+repository = "https://github.com/maidsafe/sn_api"
 build = "build.rs"
 edition = "2018"
 
@@ -27,8 +27,8 @@ safe_authenticator = "~0.18.0"
 tokio = { version = "~0.2.21", features = ["rt-core"] }
 xor_name = "1"
 
-[dependencies.safe-api]
-path = "../safe-api"
+[dependencies.sn_api]
+path = "../sn_api"
 default-features = false
 features = ["app", "authenticator"]
 
@@ -42,4 +42,4 @@ unwrap = "1.2.1"
 
 [features]
 bindings = ["sn_bindgen"]
-scl-mock = ["safe-api/scl-mock", "safe_authenticator/mock-network", "safe_core/mock-network"]
+scl-mock = ["sn_api/scl-mock", "safe_authenticator/mock-network", "safe_core/mock-network"]

@@ -13,7 +13,7 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
-use safe_api::{BlsKeyPair, Safe};
+use sn_api::{BlsKeyPair, Safe};
 use structopt::StructOpt;
 
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";

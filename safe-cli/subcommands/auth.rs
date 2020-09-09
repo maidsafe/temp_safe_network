@@ -9,7 +9,7 @@
 
 use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID, APP_NAME, APP_VENDOR};
 use log::debug;
-use safe_api::{AuthReq, Safe, SafeAuthdClient};
+use sn_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
 
 const AUTH_REQ_NOTIFS_ENDPOINT: &str = "https://localhost:33002";
@@ -17,10 +17,10 @@ const AUTH_REQ_NOTIFS_ENDPOINT: &str = "https://localhost:33002";
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
     #[structopt(name = "clear")]
-    /// Clear SAFE CLI authorisation credentials from local file
+    /// Clear Safe CLI authorisation credentials from local file
     Clear {},
     #[structopt(name = "login")]
-    /// Send request to a remote Authenticator daemon to log in to a SAFE account
+    /// Send request to a remote Authenticator daemon to log in to a Safe account
     Login {
         /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]
@@ -30,18 +30,18 @@ pub enum AuthSubCommands {
         self_auth: bool,
     },
     #[structopt(name = "logout")]
-    /// Send request to a remote Authenticator daemon to logout from currently logged in SAFE account
+    /// Send request to a remote Authenticator daemon to logout from currently logged in Safe account
     Logout {},
     #[structopt(name = "status")]
     /// Send request to a remote Authenticator daemon to obtain a status report
     Status {},
     #[structopt(name = "create-acc")]
-    /// Send request to a remote Authenticator daemon to create a new SAFE account
+    /// Send request to a remote Authenticator daemon to create a new Safe account
     Create {
         /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]
         config_file_str: Option<String>,
-        /// The SafeKey's secret key to pay for the account creation, and to be set as the default spendable balance in the newly created SAFE account
+        /// The SafeKey's secret key to pay for the account creation, and to be set as the default spendable balance in the newly created Safe account
         #[structopt(long = "sk")]
         sk: Option<String>,
         /// Request the creation of a SafeKey with test-coins automatically to use it to pay for the account creation

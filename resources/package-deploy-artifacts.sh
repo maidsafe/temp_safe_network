@@ -5,7 +5,7 @@ set -e
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'safe-cli', 'safe-api', 'safe-authd' or 'safe-ffi'."
+    echo "Valid values are 'safe-cli', 'sn_api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 

@@ -9,8 +9,8 @@
 
 use crate::shared::SharedAuthReqsHandle;
 use log::info;
-use safe_api::PendingAuthReqs;
 use serde_json::{json, Value};
+use sn_api::PendingAuthReqs;
 
 pub async fn process_req(
     params: Value,

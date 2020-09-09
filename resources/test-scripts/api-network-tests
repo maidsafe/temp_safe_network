@@ -3,7 +3,7 @@
 set -e -x
 
 function run_api_tests() {
-    cd safe-api
+    cd sn_api
     TEST_AUTH_CREDENTIALS=$(cat ~/.local/share/safe-cli/credentials)
     cargo test --release --lib -- --test-threads=1
     cd -

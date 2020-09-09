@@ -9,15 +9,15 @@
 
 use super::common::errors::{Error, Result};
 use bincode::serialize;
-use sn_ffi_utils::ffi_error;
-use sn_ffi_utils::{
-    catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, NativeResult, ReprC, FFI_RESULT_OK,
-};
 use safe_core::ffi::ipc::req::{AuthReq, ContainersReq, ShareMDataRequest};
 use safe_core::ffi::ipc::resp::AuthGranted;
 use safe_core::ipc::{
     self, AuthReq as NativeAuthReq, ContainersReq as NativeContainersReq, IpcError, IpcMsg, IpcReq,
     IpcResp, ShareMDataReq as NativeShareMDataReq,
+};
+use sn_ffi_utils::ffi_error;
+use sn_ffi_utils::{
+    catch_unwind_cb, vec_clone_from_raw_parts, FfiResult, NativeResult, ReprC, FFI_RESULT_OK,
 };
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};

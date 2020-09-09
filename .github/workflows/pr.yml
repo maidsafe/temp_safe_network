@@ -43,10 +43,10 @@ jobs:
         run: cargo clippy --all-targets --all-features
 
       # Run cargo tarpaulin
-      - name: Code Coverage - safe-api
+      - name: Code Coverage - sn_api
         uses: actions-rs/tarpaulin@master
         with:
-          args: '-v --manifest-path=safe-api/Cargo.toml --features=scl-mock --exclude-files=safe-cli/*,jsonrpc-quic/*,safe-authd/*,safe-ffi/* --out Lcov -- --test-threads=1'
+          args: '-v --manifest-path=sn_api/Cargo.toml --features=scl-mock --exclude-files=safe-cli/*,jsonrpc-quic/*,safe-authd/*,safe-ffi/* --out Lcov -- --test-threads=1'
 
       # Push tarpaulin results to coveralls.io
       - name: Coveralls

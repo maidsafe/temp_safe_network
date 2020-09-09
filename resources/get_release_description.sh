@@ -2,7 +2,7 @@
 
 api_version=$1
 if [[ -z "$api_version" ]]; then
-    echo "You must supply a version number for safe-api."
+    echo "You must supply a version number for sn_api."
     exit 1
 fi
 cli_version=$2
@@ -23,7 +23,7 @@ fi
 
 # The single quotes around EOF is to stop attempted variable and backtick expansion.
 read -r -d '' release_description << 'EOF'
-Command line interface for the SAFE Network. Refer to [SAFE CLI User Guide](https://github.com/maidsafe/safe-api/blob/master/safe-cli/README.md) for detailed instructions.
+Command line interface for the Safe Network. Refer to [Safe CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/safe-cli/README.md) for detailed instructions.
 
 ## SHA-256 checksums for CLI binaries:
 ```
@@ -40,10 +40,10 @@ zip: ZIP_WIN_CHECKSUM
 tar.gz: TAR_WIN_CHECKSUM
 ```
 
-### SAFE Authenticator daemon
+### Safe Authenticator daemon
 
-The Authenticator daemon exposes services which allow applications and users to create SAFE Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
-The SAFE Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the SAFE CLI if the `safe-authd`/`safe-authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/safe-api/blob/master/safe-cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
+The Authenticator daemon exposes services which allow applications and users to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
+The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `safe-authd`/`safe-authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/safe-cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
 
 | OS | Download link | SHA-256 checksum |
 | --- | --- | --- |
@@ -53,7 +53,7 @@ The SAFE Authenticator, which runs as a daemon or as a service in Windows platfo
 
 ### FFI
 
-FFI is used to generate the native libraries which can be used by other high level languages to consume the Rust API. The development versions use a mocked version of the SAFE Network.
+FFI is used to generate the native libraries which can be used by other high level languages to consume the Rust API. The development versions use a mocked version of the Safe Network.
 
 | OS | Download link |
 | --- | --- |
@@ -65,9 +65,9 @@ FFI is used to generate the native libraries which can be used by other high lev
 | Android x86_64 | [Download](S3_FFI_ANDROID_X86_64_DEPLOY_URL) |
 
 ## Related Links
-* [SAFE CLI User Guide](https://github.com/maidsafe/safe-api/blob/master/safe-cli/README.md)
-* [SAFE Browser](https://github.com/maidsafe/safe_browser/releases/)
-* [SAFE Vault](https://github.com/maidsafe/safe_vault/releases/latest/)
+* [Safe CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/safe-cli/README.md)
+* [Safe Browser](https://github.com/maidsafe/safe_browser/releases/)
+* [Safe Vault](https://github.com/maidsafe/safe_vault/releases/latest/)
 EOF
 
 s3_authd_linux_deploy_url="https:\/\/safe-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-unknown-linux-gnu.zip"

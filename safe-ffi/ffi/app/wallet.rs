@@ -14,8 +14,8 @@ use super::{
         WalletSpendableBalance, WalletSpendableBalances,
     },
 };
+use sn_api::Safe;
 use sn_ffi_utils::{catch_unwind_cb, FfiResult, OpaqueCtx, ReprC, FFI_RESULT_OK};
-use safe_api::Safe;
 use std::{
     ffi::CString,
     os::raw::{c_char, c_void},

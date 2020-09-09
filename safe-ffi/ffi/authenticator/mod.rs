@@ -14,16 +14,16 @@ pub mod ffi_types;
 
 use super::common::errors::{Error, Result};
 use ffi_types::{authed_apps_into_repr_c, AuthedApp};
-use sn_ffi_utils::{
-    catch_unwind_cb, ffi_error, FfiResult, NativeResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
-};
-use safe_api::{Error as NativeError, SafeAuthReq, SafeAuthenticator};
 use safe_core::{
     client,
     ffi::ipc::req::{AuthReq, ContainersReq},
     ipc::req::IpcReq,
     ipc::resp::IpcResp,
     ipc::{decode_msg, IpcMsg},
+};
+use sn_api::{Error as NativeError, SafeAuthReq, SafeAuthenticator};
+use sn_ffi_utils::{
+    catch_unwind_cb, ffi_error, FfiResult, NativeResult, OpaqueCtx, ReprC, FFI_RESULT_OK,
 };
 use std::{
     ffi::CString,

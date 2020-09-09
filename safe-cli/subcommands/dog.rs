@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use safe_api::{
+use sn_api::{
     fetch::{SafeContentType, SafeData},
     xorurl::XorUrlEncoder,
     Safe,

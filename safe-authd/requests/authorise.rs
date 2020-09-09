@@ -9,8 +9,8 @@
 
 use crate::shared::{IncomingAuthReq, SharedAuthReqsHandle, SharedSafeAuthenticatorHandle};
 use log::{error, info};
-use safe_api::{AuthReq, SafeAuthReq};
 use serde_json::{json, Value};
+use sn_api::{AuthReq, SafeAuthReq};
 use std::time::SystemTime;
 use tokio::sync::mpsc;
 
