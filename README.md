@@ -10,7 +10,7 @@
   - [Description](#description)
   - [The Safe API (sn_api)](#the-safe-api-sn_api)
   - [The FFI layer (safe-ffi)](#the-ffi-layer-safe-ffi)
-  - [The Safe CLI](#the-safe-cli)
+  - [The Safe Network CLI](#the-safe-network-cli)
   - [The Authenticator daemon](#the-authenticator-daemon)
   - [JSON-RPC and QUIC](#json-rpc-and-quic)
   - [Further Help](#further-help)
@@ -25,7 +25,7 @@ A Rust Safe application can make use of the `sn_api` crate to be able to not onl
 
 ![Safe app authorisation flow](misc/auth-flow-diagram.png)
 
-In addition to the `sn_api` crate to be used by Rust applications, this repository contains the [safe-ffi](safe-ffi) library and a couple of applications ([safe-authd](safe-authd) and [safe-cli](safe-cli)) which are required depending on the type of Safe application you are developing, use case, and/or if you are just a user of the Safe Network willing to interact with it using a simple command line interface.
+In addition to the `sn_api` crate to be used by Rust applications, this repository contains the [safe-ffi](safe-ffi) library and a couple of applications ([safe-authd](safe-authd) and [sn_cli](sn_cli)) which are required depending on the type of Safe application you are developing, use case, and/or if you are just a user of the Safe Network willing to interact with it using a simple command line interface.
 
 The following diagram depicts how each of the artifacts of this repository fit in the Safe applications ecosystem. You can find more information about each of them further below in the next section of this document.
 
@@ -41,15 +41,15 @@ The [safe-ffi](safe-ffi) is a Rust crate exposing the same functions as the Safe
 
 Therefore, if you are developing a Safe application using a different programming language than Rust, this is the crate you need to access the Safe API. This crate also provides scripts to automatically generate the binding libraries for some languages like Java and C#.
 
-## The Safe CLI
+## The Safe Network CLI
 
-The [safe-cli](safe-cli) is a Rust application which implements a CLI (Command Line Interface) for the Safe Network.
+The [sn_cli](sn_cli) is a Rust application which implements a CLI (Command Line Interface) for the Safe Network.
 
 ![Safe CLI](misc/safe-cli-animation.svg)
 
 The Safe CLI provides all the tools necessary to interact with the Safe Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the Safe Network and the data stored on it.
 
-If you are just a Safe user, or a system engineer creating automated scripts, this application provides you with all you need to interact with the Safe Network. Please refer to [The Safe CLI User Guide](safe-cli/README.md) to learn how to start using it.
+If you are just a Safe user, or a system engineer creating automated scripts, this application provides you with all you need to interact with the Safe Network. Please refer to [The Safe CLI User Guide](sn_cli/README.md) to learn how to start using it.
 
 ## The Authenticator daemon
 

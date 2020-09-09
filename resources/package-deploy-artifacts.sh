@@ -5,7 +5,7 @@ set -e
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'safe-cli', 'sn_api', 'safe-authd' or 'safe-ffi'."
+    echo "Valid values are 'sn_cli', 'sn_api', 'safe-authd' or 'safe-ffi'."
     exit 1
 fi
 
@@ -30,7 +30,7 @@ function get_distributable_for_component() {
                 distributable="safe-authd"
             fi
             ;;
-        safe-cli)
+        sn_cli)
             if [[ "$target" == *"windows"* ]]; then
                 distributable="safe.exe"
             else
@@ -116,7 +116,7 @@ for type in "${types[@]}"; do
     if [[ "$component" == 'safe-authd' ]] && [[ "$type" == 'dev' ]]; then
       continue
     fi
-    if [[ ( "$component" = 'safe-cli' ) && ( "$type" = 'dev' ) ]]; then
+    if [[ ( "$component" = 'sn_cli' ) && ( "$type" = 'dev' ) ]]; then
       continue
     fi
     targets=($(ls -1 "artifacts/$component/$type"))

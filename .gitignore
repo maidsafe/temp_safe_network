@@ -42,4 +42,4 @@ fake_vault_data.json
 *.orig
 
 # test file creation
-safe-cli/test_file_random_content.txt
+sn_cli/test_file_random_content.txt

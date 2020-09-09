@@ -27,21 +27,21 @@ extern crate self_update;
 
 const APP_ID: &str = "net.maidsafe.cli";
 #[allow(dead_code)]
-const APP_NAME: &str = "SAFE CLI";
+const APP_NAME: &str = "Safe CLI";
 #[allow(dead_code)]
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
 const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
 const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
-const PROJECT_DATA_DIR_APPLICATION: &str = "safe-cli";
+const PROJECT_DATA_DIR_APPLICATION: &str = "safe_cli";
 
 #[tokio::main]
 async fn main() {
     setup_panic!();
     env_logger::init();
-    debug!("Starting SAFE CLI...");
+    debug!("Starting Safe CLI...");
 
     if let Err(e) = run().await {
-        error!("safe-cli error: {}", e);
+        error!("sn_cli error: {}", e);
         process::exit(1);
     }
 }

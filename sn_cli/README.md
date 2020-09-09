@@ -1,11 +1,11 @@
-# Safe CLI
+# Safe Network CLI
 
 | [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 ## Table of contents
 
-- [Safe CLI](#safe-cli)
+- [Safe Network CLI](#safe-network-cli)
   - [Table of contents](#table-of-contents)
   - [Description](#description)
   - [Download](#download)
@@ -129,14 +129,14 @@ If otherwise you prefer to build the Safe CLI from source code, please follow th
 
 In order to build this CLI from source code you need to make sure you have `rustc v1.44.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
-Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-cli` (the build process may take several minutes the first time you run it on this crate):
+Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `sn_cli` (the build process may take several minutes the first time you run it on this crate):
 ```shell
 $ git clone https://github.com/maidsafe/sn_api.git
 $ cd sn_api
 $ cargo build
 ```
 
-Since this project has a cargo workspace with the `safe-cli` as the default crate, when building from the root location it will build the Safe CLI. Once it's built, you can find the `safe` executable at `target/debug/` or `target/release` if you built it with the `--release` flag.
+Since this project has a cargo workspace with the `sn_cli` as the default crate, when building from the root location it will build the Safe CLI. Once it's built, you can find the `safe` executable at `target/debug/` or `target/release` if you built it with the `--release` flag.
 
 ## Using the CLI
 
@@ -668,7 +668,7 @@ Secret Key = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c
 
 In this case, the new `SafeKey` is preloaded with coins which are transferred from the `SafeKey` we pay the operation with. In the next section we'll see how to check the coin balance of them.
 
-If we omit the `--pay-with` argument from the command above, or from any other command which supports it, the CLI will make use of the default `SafeKey` which is linked from the account for paying the costs of the operation. Upon the creation of a Safe Account, a default `SafeKey` is linked to it and used for paying the costs incurred in any operations made by the applications that have been authorised by the owner of that account, like it's the case of the `safe-cli` application. Currently it's not possible to change the default `SafeKey` linked from an account, but it will be possible with the `safe-cli` in the near future.
+If we omit the `--pay-with` argument from the command above, or from any other command which supports it, the CLI will make use of the default `SafeKey` which is linked from the account for paying the costs of the operation. Upon the creation of a Safe Account, a default `SafeKey` is linked to it and used for paying the costs incurred in any operations made by the applications that have been authorised by the owner of that account, like it's the case of the `sn_cli` application. Currently it's not possible to change the default `SafeKey` linked from an account, but it will be possible with the `sn_cli` in the near future.
 
 Other optional args that can be used with the `keys create` sub-command are:
 ```
@@ -1438,7 +1438,7 @@ In both cases the NRS Map Container will be found (from above URLs) by decoding 
 
 #### Symlinks
 
-The safe-cli supports upload and retrieval of symlinks using the above commands. It can also resolve relative symlinks in a FileContainer provided that the target exists in the FileContainer.
+The sn_cli supports upload and retrieval of symlinks using the above commands. It can also resolve relative symlinks in a FileContainer provided that the target exists in the FileContainer.
 
 [More Details](README-symlinks.md)
 
@@ -1585,11 +1585,11 @@ SC=~/.bash_safe_cli CL="source $SC" RC=~/.bashrc; safe setup completions bash > 
 
 To enable completions in the current PowerShell session, use the following commands:
 ```shell
-safe setup completions bash > safe_cli.ps1
-safe_cli.ps1
+safe setup completions bash > sn_cli.ps1
+sn_cli.ps1
 ```
 
-To enable PowerShell completions permanently, generate the safe_cli.ps1 file as per above and then see this [stackoverflow answer](<https://stackoverflow.com/questions/20575257/how-do-i-run-a-powershell-script-when-the-computer-starts#32189430>).
+To enable PowerShell completions permanently, generate the sn_cli.ps1 file as per above and then see this [stackoverflow answer](<https://stackoverflow.com/questions/20575257/how-do-i-run-a-powershell-script-when-the-computer-starts#32189430>).
 
 ### Update
 

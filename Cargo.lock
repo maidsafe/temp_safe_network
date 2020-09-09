@@ -3236,53 +3236,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "safe-cli"
-version = "0.15.0"
-dependencies = [
- "ansi_term 0.9.0",
- "assert_cmd",
- "async-std",
- "cargo-husky",
- "console 0.10.3",
- "criterion",
- "crossbeam",
- "directories 2.0.2",
- "duct",
- "env_logger 0.6.2",
- "envy",
- "human-panic",
- "indicatif 0.14.0",
- "isatty",
- "log 0.4.8",
- "multibase",
- "num-traits",
- "percent-encoding 2.1.0",
- "predicates",
- "pretty-hex",
- "pretty_assertions",
- "prettytable-rs",
- "rand 0.7.3",
- "relative-path",
- "reqwest 0.9.24",
- "rpassword",
- "safe-cmd-test-utilities",
- "safe-nd",
- "self_update",
- "serde",
- "serde_json",
- "serde_yaml",
- "shrust",
- "sn_api",
- "sn_launch_tool",
- "structopt 0.3.15",
- "tiny-keccak 1.5.0",
- "tokio 0.2.21",
- "unwrap",
- "walkdir",
- "xor_name",
-]
-
-[[package]]
 name = "safe-cmd-test-utilities"
 version = "1.0.0"
 dependencies = [
@@ -3793,6 +3746,53 @@ dependencies = [
  "syn 0.15.44",
  "toml 0.5.6",
  "unwrap",
+]
+
+[[package]]
+name = "sn_cli"
+version = "0.15.0"
+dependencies = [
+ "ansi_term 0.9.0",
+ "assert_cmd",
+ "async-std",
+ "cargo-husky",
+ "console 0.10.3",
+ "criterion",
+ "crossbeam",
+ "directories 2.0.2",
+ "duct",
+ "env_logger 0.6.2",
+ "envy",
+ "human-panic",
+ "indicatif 0.14.0",
+ "isatty",
+ "log 0.4.8",
+ "multibase",
+ "num-traits",
+ "percent-encoding 2.1.0",
+ "predicates",
+ "pretty-hex",
+ "pretty_assertions",
+ "prettytable-rs",
+ "rand 0.7.3",
+ "relative-path",
+ "reqwest 0.9.24",
+ "rpassword",
+ "safe-cmd-test-utilities",
+ "safe-nd",
+ "self_update",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "shrust",
+ "sn_api",
+ "sn_launch_tool",
+ "structopt 0.3.15",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.21",
+ "unwrap",
+ "walkdir",
+ "xor_name",
 ]
 
 [[package]]

@@ -3,7 +3,7 @@
 set -e -x
 
 function run_cli_tests() {
-    cd safe-cli
+    cd sn_cli
     rm -f fake_vault_data.json
     cargo test --release --features=scl-mock --test cli_cat -- --test-threads=1
     rm -f fake_vault_data.json

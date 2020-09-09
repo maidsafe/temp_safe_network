@@ -17,10 +17,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        component: [safe-cli, safe-authd]
+        component: [sn_cli, safe-authd]
         include:
           - os: ubuntu-latest
-            component: safe-cli
+            component: sn_cli
             target: safe
             output: safe-x86_64-unknown-linux-gnu
           - os: ubuntu-latest
@@ -28,7 +28,7 @@ jobs:
             target: safe-authd
             output: safe-authd-x86_64-unknown-linux-gnu
           - os: windows-latest
-            component: safe-cli
+            component: sn_cli
             target: safe.exe
             output: safe-x86_64-pc-windows-msvc
           - os: windows-latest
@@ -463,7 +463,7 @@ jobs:
         id: versioning
         run: |
           api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          cli_version=$(grep "^version" < safe-cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           authd_version=$(grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           ffi_version=$(grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           jsonrpc_quic_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
@@ -503,7 +503,7 @@ jobs:
       - name: Upload dev to S3
         run: aws s3 sync deploy/dev s3://safe-api --acl public-read
 
-      # Create the release and attach safe-cli archives as assets.
+      # Create the release and attach sn_cli archives as assets.
       - uses: csexton/create-release@add-body
         id: create_release
         with:

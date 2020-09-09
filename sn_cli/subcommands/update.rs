@@ -13,7 +13,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     let target = self_update::get_target();
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
-        .repo_name("safe-cli")
+        .repo_name("sn_cli")
         .with_target(&target)
         .build()?
         .fetch()?;
@@ -30,7 +30,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         };
         let status = self_update::backends::github::Update::configure()
             .repo_owner("maidsafe")
-            .repo_name("safe-cli")
+            .repo_name("sn_cli")
             .target(&target)
             .bin_name(&bin_name)
             .show_download_progress(true)

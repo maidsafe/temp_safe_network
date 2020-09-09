@@ -3,7 +3,7 @@
 | [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
-# For users of safe-cli
+# For users of sn_cli
 
 ## What is a symlink?
 
@@ -64,7 +64,7 @@ be stored when recursively uploading a directory tree.
 
 ### Disabling symlinks
 
-All `safe-cli` commands for uploading files now have a flag `--follow-links`.
+All `sn_cli` commands for uploading files now have a flag `--follow-links`.
 When this flag is present, the symlink target file or directory will be
 uploaded instead of the symlink.  This occurs even if the target is outside
 of the original upload directory, so it can potentially result in larger
@@ -262,7 +262,7 @@ Git also supports symlinks and faces the same issue. When Git on windows fails
 to create a symlink, it falls back to creating a text file containing the target
 path instead. If the file gets changed/committed locally, git can translate that
 back into a symlink in the repository because it has metadata in the .git
-storage. safe-cli does not have this local metadata, so a download -> upload
+storage. sn_cli does not have this local metadata, so a download -> upload
 cycle would cause the original symlink to be uploaded (PUT) as a file instead of
 a symlink.  This alteration of the data seems undesirable, so it was judged better
 to skip the symlink entirely and warn the user so they can take corrective action.

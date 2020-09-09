@@ -168,7 +168,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<(), String> {
 //      -rw-rw-r-- 1 user user 0 Mar 31 14:38 b         (b still a file)
 //      -rw-rw-r-- 1 user user 0 Mar 31 14:38 file.txt  (other file written)
 //
-// note: cp returns exit code of 1 when this occurs, but safe-cli
+// note: cp returns exit code of 1 when this occurs, but sn_cli
 //       presently returns 0.
 //
 // ----------------
@@ -215,9 +215,9 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<(), String> {
     assert!(Path::new(&dest).join("test.md").is_file());
     assert!(Path::new(&dest).join("another.md").is_file());
 
-    // Disabled for now because the warning is disabled by safe-cli if TTY
+    // Disabled for now because the warning is disabled by sn_cli if TTY
     // not detected.  So it doesn't appear in our output.  Perhaps later
-    // safe-cli adds a flag to override TTY detection.
+    // sn_cli adds a flag to override TTY detection.
     // assert!(String::from_utf8_lossy(&cmd_output.stderr).into_owned().contains("Warning: cannot overwrite non-directory"));
 
     Ok(())
