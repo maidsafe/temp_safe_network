@@ -82,7 +82,7 @@ where
         method, dest_endpoint
     );
 
-    match directories::ProjectDirs::from("net", "maidsafe", "safe-authd") {
+    match directories::ProjectDirs::from("net", "maidsafe", "sn_authd") {
         None => Err(Error::AuthdClientError(
             "Failed to obtain local project directory where to read certificate from".to_string(),
         )),

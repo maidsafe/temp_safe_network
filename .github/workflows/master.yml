@@ -17,14 +17,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        component: [sn_cli, safe-authd]
+        component: [sn_cli, sn_authd]
         include:
           - os: ubuntu-latest
             component: sn_cli
             target: safe
             output: safe-x86_64-unknown-linux-gnu
           - os: ubuntu-latest
-            component: safe-authd
+            component: sn_authd
             target: safe-authd
             output: safe-authd-x86_64-unknown-linux-gnu
           - os: windows-latest
@@ -32,7 +32,7 @@ jobs:
             target: safe.exe
             output: safe-x86_64-pc-windows-msvc
           - os: windows-latest
-            component: safe-authd
+            component: sn_authd
             target: safe-authd.exe
             output: safe-authd-x86_64-pc-windows-msvc
     steps:
@@ -139,14 +139,14 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest]
-        component: [safe-cli, safe-authd]
+        component: [sn_cli, sn_authd]
         include:
           - os: macos-latest
-            component: safe-cli
+            component: sn_cli
             target: safe
             output: safe-x86_64-apple-darwin
           - os: macos-latest
-            component: safe-authd
+            component: sn_authd
             target: safe-authd
             output: safe-authd-x86_64-apple-darwin
     env:
@@ -464,7 +464,7 @@ jobs:
         run: |
           api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          authd_version=$(grep "^version" < safe-authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          authd_version=$(grep "^version" < sn_authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           ffi_version=$(grep "^version" < safe-ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           jsonrpc_quic_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           echo "::set-output name=api_version::$api_version"

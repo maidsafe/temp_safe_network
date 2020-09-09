@@ -17,7 +17,7 @@ if [[ -z "$ffi_version" ]]; then
 fi
 authd_version=$4
 if [[ -z "$authd_version" ]]; then
-    echo "You must supply a version number for safe-authd."
+    echo "You must supply a version number for sn_authd."
     exit 1
 fi
 
@@ -43,7 +43,7 @@ tar.gz: TAR_WIN_CHECKSUM
 ### Safe Authenticator daemon
 
 The Authenticator daemon exposes services which allow applications and users to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
-The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `safe-authd`/`safe-authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/sn_cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
+The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `sn_authd`/`safe-authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/sn_cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
 
 | OS | Download link | SHA-256 checksum |
 | --- | --- | --- |

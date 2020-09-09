@@ -72,7 +72,7 @@ pub type PendingAuthReqs = Vec<AuthReq>;
 // shall be allowed. All the relevant information about the authorisation request is passed as args to the callback.
 pub type AuthAllowPrompt = dyn Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync;
 
-// Authenticator method for getting a status report of the safe-authd
+// Authenticator method for getting a status report of the sn_authd
 const SAFE_AUTHD_METHOD_STATUS: &str = "status";
 
 // Authenticator method for logging into a SAFE account
@@ -512,14 +512,14 @@ fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
     } else {
         match output.status.code() {
             Some(10) => {
-                // safe-authd exit code 10 is safe-authd::errors::Error::AuthdAlreadyStarted
+                // sn_authd exit code 10 is sn_authd::errors::Error::AuthdAlreadyStarted
                 Err(Error::AuthdAlreadyStarted(format!(
-                       "Failed to start safe-authd daemon '{}' as an instance seems to be already running",
+                       "Failed to start sn_authd daemon '{}' as an instance seems to be already running",
                        path_str,
                    )))
             }
             Some(_) | None => Err(Error::AuthdError(format!(
-                "Failed when invoking safe-authd executable from '{}'",
+                "Failed when invoking sn_authd executable from '{}'",
                 path_str,
             ))),
         }

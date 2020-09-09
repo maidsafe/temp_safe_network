@@ -73,7 +73,7 @@ jobs:
       - name: Build safe-vault
         run: cargo build --release --manifest-path=$HOME/.safe/vault/Cargo.toml
       - run: cp $HOME/.safe/vault/target/release/safe_vault $HOME/.safe/vault/
-      - name: Build Safe CLI and safe-authd
+      - name: Build Safe CLI and sn_authd
         run: cargo build --release
       - name: Setup Safe CLI and PATH etc
         run: |
@@ -106,6 +106,6 @@ jobs:
         if: failure()
         run: tail $HOME/.safe/vault/baby-fleming-vaults/*/*.log
 
-      - name: Failure safe-authd logs.
+      - name: Failure sn_authd logs.
         if: failure()
         run: tail $HOME/.safe/authd/logs/safe-authd.log

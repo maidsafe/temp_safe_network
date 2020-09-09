@@ -5,7 +5,7 @@ set -e
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'sn_cli', 'sn_api', 'safe-authd' or 'safe-ffi'."
+    echo "Valid values are 'sn_cli', 'sn_api', 'sn_authd' or 'safe-ffi'."
     exit 1
 fi
 
@@ -23,7 +23,7 @@ function get_distributable_for_component() {
     component=$1
     target=$2
     case "$component" in
-        safe-authd)
+        sn_authd)
             if [[ "$target" == *"windows"* ]]; then
                 distributable="safe-authd.exe"
             else
@@ -113,7 +113,7 @@ function create_zip_archive() {
 
 declare -a types=("prod" "dev")
 for type in "${types[@]}"; do
-    if [[ "$component" == 'safe-authd' ]] && [[ "$type" == 'dev' ]]; then
+    if [[ "$component" == 'sn_authd' ]] && [[ "$type" == 'dev' ]]; then
       continue
     fi
     if [[ ( "$component" = 'sn_cli' ) && ( "$type" = 'dev' ) ]]; then

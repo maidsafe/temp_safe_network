@@ -85,38 +85,38 @@ pub enum AuthSubCommands {
         notifs_endpoint: Option<String>,
     },
     #[structopt(name = "install")]
-    /// Install latest safe-authd released version in the system
+    /// Install latest sn_authd released version in the system
     Install {
         #[structopt(long = "authd-path")]
-        /// Path where to install safe-authd executable (default ~/.safe/authd/)
+        /// Path where to install sn_authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "update")]
-    /// Update safe-authd binary to a new available released version
+    /// Update sn_authd binary to a new available released version
     Update {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable (default ~/.safe/authd/)
+        /// Path of sn_authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "start")]
     /// Starts the Authenticator daemon if it's not running already
     Start {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable (default ~/.safe/authd/)
+        /// Path of sn_authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "stop")]
     /// Stops the Authenticator daemon if it's running
     Stop {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable (default ~/.safe/authd/)
+        /// Path of sn_authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
     #[structopt(name = "restart")]
     /// Restarts the Authenticator daemon if it's running already
     Restart {
         #[structopt(long = "authd-path")]
-        /// Path of safe-authd executable (default ~/.safe/authd/)
+        /// Path of sn_authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
     },
 }
@@ -132,78 +132,78 @@ pub async fn auth_commander(
             sk,
             test_coins,
         }) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_create(safe, &safe_authd, config_file_str, sk, test_coins).await
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_create(safe, &sn_authd, config_file_str, sk, test_coins).await
         }
         Some(AuthSubCommands::Login {
             config_file_str,
             self_auth,
         }) => {
-            let mut safe_authd = SafeAuthdClient::new(endpoint.clone());
-            authd_login(&mut safe_authd, config_file_str).await?;
+            let mut sn_authd = SafeAuthdClient::new(endpoint.clone());
+            authd_login(&mut sn_authd, config_file_str).await?;
             if self_auth {
-                self_authorise(endpoint, safe, safe_authd).await?;
+                self_authorise(endpoint, safe, sn_authd).await?;
             }
             Ok(())
         }
         Some(AuthSubCommands::Logout {}) => {
-            let mut safe_authd = SafeAuthdClient::new(endpoint);
-            authd_logout(&mut safe_authd).await
+            let mut sn_authd = SafeAuthdClient::new(endpoint);
+            authd_logout(&mut sn_authd).await
         }
         Some(AuthSubCommands::Status {}) => {
-            let mut safe_authd = SafeAuthdClient::new(endpoint);
-            authd_status(&mut safe_authd).await
+            let mut sn_authd = SafeAuthdClient::new(endpoint);
+            authd_status(&mut sn_authd).await
         }
         Some(AuthSubCommands::Apps {}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_apps(&safe_authd).await
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_apps(&sn_authd).await
         }
         Some(AuthSubCommands::Clear {}) => clear_credentials(),
         Some(AuthSubCommands::Revoke { app_id }) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_revoke(&safe_authd, app_id).await
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_revoke(&sn_authd, app_id).await
         }
         Some(AuthSubCommands::Reqs {}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_auth_reqs(&safe_authd).await
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_auth_reqs(&sn_authd).await
         }
         Some(AuthSubCommands::Allow { req_id }) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_allow(&safe_authd, req_id).await
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_allow(&sn_authd, req_id).await
         }
         Some(AuthSubCommands::Deny { req_id }) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_deny(&safe_authd, req_id).await
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_deny(&sn_authd, req_id).await
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => match notifs_endpoint {
             None => Err("The endpoint URL needs to be provided. If you subscribe within the interactive shell the URL is then optional".to_string()),
             Some(notif_endpoint) => {
-                let safe_authd = SafeAuthdClient::new(endpoint);
-                authd_subscribe_url(&safe_authd, notif_endpoint).await
+                let sn_authd = SafeAuthdClient::new(endpoint);
+                authd_subscribe_url(&sn_authd, notif_endpoint).await
             }
         },
         Some(AuthSubCommands::Unsubscribe { notifs_endpoint }) => {
-            let mut safe_authd = SafeAuthdClient::new(endpoint);
-            authd_unsubscribe(&mut safe_authd, notifs_endpoint).await
+            let mut sn_authd = SafeAuthdClient::new(endpoint);
+            authd_unsubscribe(&mut sn_authd, notifs_endpoint).await
         }
         Some(AuthSubCommands::Install {authd_path}) => {
             authd_install(authd_path)
         }
         Some(AuthSubCommands::Update {authd_path}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_update(&safe_authd, authd_path)
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_update(&sn_authd, authd_path)
         }
         Some(AuthSubCommands::Start {authd_path}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_start(&safe_authd, authd_path)
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_start(&sn_authd, authd_path)
         }
         Some(AuthSubCommands::Stop {authd_path}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_stop(&safe_authd, authd_path)
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_stop(&sn_authd, authd_path)
         }
         Some(AuthSubCommands::Restart {authd_path}) => {
-            let safe_authd = SafeAuthdClient::new(endpoint);
-            authd_restart(&safe_authd, authd_path)
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_restart(&sn_authd, authd_path)
         }
         None => authorise_cli(safe, endpoint, false).await,
     }
@@ -212,10 +212,10 @@ pub async fn auth_commander(
 async fn self_authorise(
     endpoint: Option<String>,
     safe: &mut Safe,
-    mut safe_authd: SafeAuthdClient,
+    mut sn_authd: SafeAuthdClient,
 ) -> Result<(), String> {
     debug!("Let's subscribe so we can automatically allow our own auth request...");
-    safe_authd
+    sn_authd
         .subscribe(
             AUTH_REQ_NOTIFS_ENDPOINT,
             APP_ID,

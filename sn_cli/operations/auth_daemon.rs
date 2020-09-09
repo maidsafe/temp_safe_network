@@ -52,39 +52,33 @@ pub fn authd_install(authd_path: Option<String>) -> Result<(), String> {
     Ok(())
 }
 
-pub fn authd_update(
-    safe_authd: &SafeAuthdClient,
-    authd_path: Option<String>,
-) -> Result<(), String> {
-    safe_authd
+pub fn authd_update(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+    sn_authd
         .update(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
-pub fn authd_start(safe_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
-    safe_authd
+pub fn authd_start(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+    sn_authd
         .start(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
-pub fn authd_stop(safe_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
-    safe_authd
+pub fn authd_stop(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+    sn_authd
         .stop(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
-pub fn authd_restart(
-    safe_authd: &SafeAuthdClient,
-    authd_path: Option<String>,
-) -> Result<(), String> {
-    safe_authd
+pub fn authd_restart(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+    sn_authd
         .restart(authd_path.as_deref())
         .map_err(|err| err.to_string())
 }
 
 pub async fn authd_create(
     safe: &mut Safe,
-    safe_authd: &SafeAuthdClient,
+    sn_authd: &SafeAuthdClient,
     config_file_str: Option<String>,
     sk: Option<String>,
     test_coins: bool,
@@ -96,7 +90,7 @@ pub async fn authd_create(
         let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11").await?;
         let kp = key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
         println!("Sending account creation request to authd...");
-        safe_authd
+        sn_authd
             .create_acc(&kp.sk, &login_details.passphrase, &login_details.password)
             .await?;
         println!("Account was created successfully!");
@@ -106,7 +100,7 @@ pub async fn authd_create(
     } else {
         let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
         println!("Sending account creation request to authd...");
-        safe_authd
+        sn_authd
             .create_acc(&sk, &login_details.passphrase, &login_details.password)
             .await?;
         println!("Account was created successfully!");
@@ -115,77 +109,77 @@ pub async fn authd_create(
 }
 
 pub async fn authd_login(
-    safe_authd: &mut SafeAuthdClient,
+    sn_authd: &mut SafeAuthdClient,
     config_file_str: Option<String>,
 ) -> Result<(), String> {
     let login_details = get_login_details(config_file_str)?;
     println!("Sending login action request to authd...");
-    safe_authd
+    sn_authd
         .log_in(&login_details.passphrase, &login_details.password)
         .await?;
     println!("Logged in successfully");
     Ok(())
 }
 
-pub async fn authd_logout(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_logout(sn_authd: &mut SafeAuthdClient) -> Result<(), String> {
     println!("Sending logout action request to authd...");
-    safe_authd.log_out().await?;
+    sn_authd.log_out().await?;
     println!("Logged out successfully");
     Ok(())
 }
 
-pub async fn authd_status(safe_authd: &mut SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_status(sn_authd: &mut SafeAuthdClient) -> Result<(), String> {
     println!("Sending request to authd to obtain a status report...");
-    let status_report = safe_authd.status().await?;
+    let status_report = sn_authd.status().await?;
     pretty_print_status_report(status_report);
 
     Ok(())
 }
 
-pub async fn authd_apps(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_apps(sn_authd: &SafeAuthdClient) -> Result<(), String> {
     println!("Requesting list of authorised apps from authd...");
-    let authed_apps = safe_authd.authed_apps().await?;
+    let authed_apps = sn_authd.authed_apps().await?;
     pretty_print_authed_apps(authed_apps);
 
     Ok(())
 }
 
-pub async fn authd_revoke(safe_authd: &SafeAuthdClient, app_id: String) -> Result<(), String> {
+pub async fn authd_revoke(sn_authd: &SafeAuthdClient, app_id: String) -> Result<(), String> {
     println!("Sending application revocation request to authd...");
-    safe_authd.revoke_app(&app_id).await?;
+    sn_authd.revoke_app(&app_id).await?;
     println!("Application revoked successfully");
     Ok(())
 }
 
-pub async fn authd_auth_reqs(safe_authd: &SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_auth_reqs(sn_authd: &SafeAuthdClient) -> Result<(), String> {
     println!("Requesting list of pending authorisation requests from authd...");
-    let auth_reqs = safe_authd.auth_reqs().await?;
+    let auth_reqs = sn_authd.auth_reqs().await?;
     pretty_print_auth_reqs(auth_reqs, Some("Pending Authorisation requests"));
     Ok(())
 }
 
-pub async fn authd_allow(safe_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
+pub async fn authd_allow(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
     println!("Sending request to authd to allow an authorisation request...");
-    safe_authd.allow(req_id).await?;
+    sn_authd.allow(req_id).await?;
     println!("Authorisation request was allowed successfully");
     Ok(())
 }
 
-pub async fn authd_deny(safe_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
+pub async fn authd_deny(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
     println!("Sending request to authd to deny an authorisation request...");
-    safe_authd.deny(req_id).await?;
+    sn_authd.deny(req_id).await?;
     println!("Authorisation request was denied successfully");
     Ok(())
 }
 
 pub async fn authd_subscribe(
-    safe_authd: &mut SafeAuthdClient,
+    sn_authd: &mut SafeAuthdClient,
     notifs_endpoint: Option<String>,
     auth_allow_prompt: &'static AuthAllowPrompt,
 ) -> Result<(), String> {
     println!("Sending request to subscribe...");
     let endpoint = notifs_endpoint.unwrap_or_else(|| AUTH_REQS_NOTIFS_ENDPOINT.to_string());
-    safe_authd
+    sn_authd
         .subscribe(&endpoint, APP_ID, auth_allow_prompt)
         .await?;
     println!("Subscribed successfully");
@@ -194,22 +188,22 @@ pub async fn authd_subscribe(
 
 #[allow(dead_code)]
 pub async fn authd_subscribe_url(
-    safe_authd: &SafeAuthdClient,
+    sn_authd: &SafeAuthdClient,
     notifs_endpoint: String,
 ) -> Result<(), String> {
     println!("Sending request to subscribe URL...");
-    safe_authd.subscribe_url(&notifs_endpoint).await?;
+    sn_authd.subscribe_url(&notifs_endpoint).await?;
     println!("URL subscribed successfully");
     Ok(())
 }
 
 pub async fn authd_unsubscribe(
-    safe_authd: &mut SafeAuthdClient,
+    sn_authd: &mut SafeAuthdClient,
     notifs_endpoint: Option<String>,
 ) -> Result<(), String> {
     println!("Sending request to unsubscribe...");
     let endpoint = notifs_endpoint.unwrap_or_else(|| AUTH_REQS_NOTIFS_ENDPOINT.to_string());
-    safe_authd.unsubscribe(&endpoint).await?;
+    sn_authd.unsubscribe(&endpoint).await?;
     println!("Unsubscribed successfully");
     Ok(())
 }

@@ -1,7 +1,7 @@
 [package]
 name = "jsonrpc-quic"
 version = "0.0.8"
-description = "JSON-RPC over QUIC for safe-authd comm"
+description = "JSON-RPC over QUIC for sn_authd comm"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 license = "MIT OR BSD-3-Clause"
 repository = "https://github.com/maidsafe/sn_api"

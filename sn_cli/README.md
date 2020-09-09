@@ -331,7 +331,7 @@ This command will check if a newer safe-vault release is available on [GitHub](h
 
 The CLI is just another client Safe application, therefore it needs to be authorised by the user to gain access to the Safe Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the account owner (the user) via the Safe Authenticator.
 
-This command simply sends an authorisation request to the Authenticator available, e.g. the `safe-authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/safe-cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the Safe Network for the corresponding operation.
+This command simply sends an authorisation request to the Authenticator available, e.g. the `sn_authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/safe-cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the Safe Network for the corresponding operation.
 
 #### The Authenticator daemon (authd)
 
@@ -354,11 +354,11 @@ Done!
 
 #### Auth start
 
-In order to start the `Safe Authenticator daemon (safe-authd)` so it can start receiving requests we simply need to run the following command:
+In order to start the `Safe Authenticator daemon (sn_authd)` so it can start receiving requests we simply need to run the following command:
 ```shell
 $ safe auth start
-Starting Safe Authenticator daemon (safe-authd)...
-safe-authd started (PID: <pid>)
+Starting Safe Authenticator daemon (sn_authd)...
+sn_authd started (PID: <pid>)
 ```
 
 #### Auth status
@@ -555,11 +555,11 @@ It will check if a newer release is available on [Amazon S3](https://safe-api.s3
 After the safe-authd was updated, you'll need to restart it to start using new version:
 ```shell
 $ safe auth restart
-Stopping Safe Authenticator daemon (safe-authd)...
-Success, safe-authd (PID: <pid>) stopped!
-Starting Safe Authenticator daemon (safe-authd)...
-safe-authd started (PID: <new pid>)
-Success, safe-authd restarted!
+Stopping Safe Authenticator daemon (sn_authd)...
+Success, sn_authd (PID: <pid>) stopped!
+Starting Safe Authenticator daemon (sn_authd)...
+sn_authd started (PID: <new pid>)
+Success, sn_authd restarted!
 ```
 
 ### The interactive shell
