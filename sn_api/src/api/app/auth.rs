@@ -9,7 +9,7 @@
 
 use super::{
     common::send_authd_request,
-    constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
+    constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     helpers::decode_ipc_msg,
     Safe, SafeApp,
 };
@@ -21,7 +21,7 @@ use serde_json::json;
 use std::collections::HashMap;
 
 // Method for requesting application's authorisation
-const SAFE_AUTHD_METHOD_AUTHORISE: &str = "authorise";
+const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 
 impl Safe {
     // Generate an authorisation request string and send it to a SAFE Authenticator.
@@ -92,14 +92,14 @@ impl Safe {
 // It returns the credentials necessary to connect to the network, encoded in a single string.
 async fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<String> {
     let authd_service_url = match endpoint {
-        None => format!("{}:{}", SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT,),
+        None => format!("{}:{}", SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT,),
         Some(endpoint) => endpoint.to_string(),
     };
 
     info!("Sending authorisation request to SAFE Authenticator...");
     let authd_response = send_authd_request::<String>(
         &authd_service_url,
-        SAFE_AUTHD_METHOD_AUTHORISE,
+        SN_AUTHD_METHOD_AUTHORISE,
         json!(auth_req_str),
     )
     .await?;

@@ -24,7 +24,7 @@ use std::{
     time::Duration,
 };
 
-const SAFE_AUTHD_PID_FILE: &str = "sn_authd.pid";
+const SN_AUTHD_PID_FILE: &str = "sn_authd.pid";
 const DEFAULT_LOG_LEVEL: &str = "info";
 
 pub async fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
@@ -43,7 +43,7 @@ pub fn stop_authd(log_dir: Option<PathBuf>) -> Result<()> {
     if cfg!(windows) {
         // Since in Windows we cannot read the locked PID file,
         // we kill authd by using the binary name
-        let binary_file_name = "safe-authd.exe";
+        let binary_file_name = "sn_authd.exe";
         let current_pid = process::id();
         let output = Command::new("taskkill")
             .args(&[
@@ -72,7 +72,7 @@ pub fn stop_authd(log_dir: Option<PathBuf>) -> Result<()> {
         // For Linux and Mac we can read the locked PID file,
         // and then kill authd using its PID
         let mut pid_file_path: PathBuf = get_authd_log_path(log_dir)?;
-        pid_file_path.push(SAFE_AUTHD_PID_FILE);
+        pid_file_path.push(SN_AUTHD_PID_FILE);
 
         debug!("Retrieving authd PID from: {:?}", &pid_file_path);
         let mut file = File::open(&pid_file_path).map_err(|err| {
@@ -150,7 +150,7 @@ async fn run_in_foreground(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
     let pid = process::id();
     info!("authd instance starting (PID: {})...", pid);
     let mut pid_file_path = log_path.clone();
-    pid_file_path.push(SAFE_AUTHD_PID_FILE);
+    pid_file_path.push(SN_AUTHD_PID_FILE);
     debug!("PID file to be written at: {:?}", &pid_file_path);
 
     // Open/create PID file

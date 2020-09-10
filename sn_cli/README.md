@@ -229,7 +229,7 @@ You will need the network configuration containing the details of the hardcoded 
 ```shell
 $ safe networks check
 Checking current setup network connection information...
-Fetching 'my-network' network connection information from '~/.config/safe-cli/networks/my-network_vault_connection_info.config' ...
+Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_vault_connection_info.config' ...
 Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
 
 'shared-section' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-section' network as per current config
@@ -273,8 +273,8 @@ MaidSafe currently hosts a single-section network for those who don't want to ru
 The CLI allows you to set up a list of networks in its config settings for easily switching to connect to them. If you just launched a local network, you can keep current connection information as a configured network on CLI with the following command:
 ```shell
 $ safe networks add my-network
-Caching current network connection information into: ~/.config/safe-cli/networks/my-network_vault_connection_info.config
-Network 'my-network' was added to the list. Connection information is located at '~/.config/safe-cli/networks/my-network_vault_connection_info.config'
+Caching current network connection information into: ~/.config/sn_cli/networks/my-network_vault_connection_info.config
+Network 'my-network' was added to the list. Connection information is located at '~/.config/sn_cli/networks/my-network_vault_connection_info.config'
 ```
 
 If you also would like to connect to the MaidSafe hosted test network, you would need to set it up in CLI settings as another network, specifying the URL where to fetch latest connection information from:
@@ -291,7 +291,7 @@ $ safe networks
 +----------------+--------------------------------------------------------------------------------------------------+
 | Network name   | Connection info location                                                                         |
 +----------------+--------------------------------------------------------------------------------------------------+
-| my-network     | ~/.config/safe-cli/networks/my-network_vault_connection_info.config                              |
+| my-network     | ~/.config/sn_cli/networks/my-network_vault_connection_info.config                              |
 +----------------+--------------------------------------------------------------------------------------------------+
 | shared-section | https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config |
 +----------------+--------------------------------------------------------------------------------------------------+
@@ -310,7 +310,7 @@ Remember that every time you launch a local network the connection configuration
 ```shell
 $ safe networks check
 Checking current setup network connection information...
-Fetching 'my-network' network connection information from '~/.config/safe-cli/networks/my-network_vault_connection_info.config' ...
+Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_vault_connection_info.config' ...
 Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
 
 'shared-section' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-section' network as per current config
@@ -331,13 +331,13 @@ This command will check if a newer safe-vault release is available on [GitHub](h
 
 The CLI is just another client Safe application, therefore it needs to be authorised by the user to gain access to the Safe Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the account owner (the user) via the Safe Authenticator.
 
-This command simply sends an authorisation request to the Authenticator available, e.g. the `sn_authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/safe-cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the Safe Network for the corresponding operation.
+This command simply sends an authorisation request to the Authenticator available, e.g. the `sn_authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/sn_cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the Safe Network for the corresponding operation.
 
 #### The Authenticator daemon (authd)
 
 In order to be able to allow any Safe application to connect to the Network and have access to your data, we need to start the Safe Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)](https://en.wikipedia.org/wiki/QUIC) endpoint, which Safe applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the Safe CLI as we'll see in this guide.
 
-The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `safe-authd`/`safe-authd.exe` binary is properly installed in the system.
+The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `sn_authd`/`sn_authd.exe` binary is properly installed in the system.
 
 #### Auth install
 
@@ -345,10 +345,10 @@ Downloading and installing the Authenticator daemon is very simple:
 ```shell
 $ safe auth install
 Latest release found: sn_authd v0.0.3
-Downloading https://sn-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
+Downloading https://sn-api.s3.eu-west-2.amazonaws.com/sn_authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
 Installing sn_authd binary at ~/.safe/authd ...
-Setting execution permissions to installed binary '~/.safe/authd/safe-authd'...
+Setting execution permissions to installed binary '~/.safe/authd/sn_authd'...
 Done!
 ```
 
@@ -523,7 +523,7 @@ Note we could have otherwise decided to deny this authorisation request and invo
 If we now switch back to our previous console, the one where we sent the authorisation request with `$ safe auth` command from, we will see the Safe CLI receiving the response from `authd`. You should see in that console a message like the following:
 ```shell
 Safe CLI app was successfully authorised
-Credentials were stored in <home directory>/.local/share/safe-cli/credentials
+Credentials were stored in <home directory>/.local/share/sn_cli/credentials
 ```
 
 We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.
@@ -541,16 +541,16 @@ Sending login action request to authd...
 Logged in successfully
 Authorising CLI application...
 Safe CLI app was successfully authorised
-Credentials were stored in <home directory>/.local/share/safe-cli/credentials
+Credentials were stored in <home directory>/.local/share/sn_cli/credentials
 ```
 
 #### Auth update
 
-The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the latest available version using the CLI:
+The Authenticator binary (`sn_authd`/`sn_authd.exe`) can be updated to the latest available version using the CLI:
 ```shell
 $ safe auth update
 ```
-It will check if a newer release is available on [Amazon S3](https://sn-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
+It will check if a newer release is available on [Amazon S3](https://sn-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the sn_authd binary will be updated.
 
 After the sn_authd was updated, you'll need to restart it to start using new version:
 ```shell
@@ -1578,7 +1578,7 @@ SC=/tmp/safe.rc && safe setup completions bash > $SC && source $SC
 
 To enable bash completions always for the current user:
 ```shell
-SC=~/.bash_safe_cli CL="source $SC" RC=~/.bashrc; safe setup completions bash > $SC && grep -qxF "$CL" $RC || echo $CL >> $RC
+SC=~/.bash_sn_cli CL="source $SC" RC=~/.bashrc; safe setup completions bash > $SC && grep -qxF "$CL" $RC || echo $CL >> $RC
 ```
 
 #### Windows PowerShell Completions

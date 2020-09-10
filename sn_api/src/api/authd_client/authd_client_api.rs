@@ -9,7 +9,7 @@
 
 use super::{
     common::send_authd_request,
-    constants::{SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT},
+    constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     notifs_endpoint::jsonrpc_listen,
 };
 use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
@@ -31,12 +31,12 @@ use tokio::{
 };
 
 #[cfg(not(target_os = "windows"))]
-const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
+const SN_AUTHD_EXECUTABLE: &str = "sn_authd";
 
 #[cfg(target_os = "windows")]
-const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd.exe";
+const SN_AUTHD_EXECUTABLE: &str = "sn_authd.exe";
 
-const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
+const ENV_VAR_SN_AUTHD_PATH: &str = "SN_AUTHD_PATH";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthReq {
@@ -73,49 +73,49 @@ pub type PendingAuthReqs = Vec<AuthReq>;
 pub type AuthAllowPrompt = dyn Fn(AuthReq) -> Option<bool> + std::marker::Send + std::marker::Sync;
 
 // Authenticator method for getting a status report of the sn_authd
-const SAFE_AUTHD_METHOD_STATUS: &str = "status";
+const SN_AUTHD_METHOD_STATUS: &str = "status";
 
 // Authenticator method for logging into a SAFE account
-const SAFE_AUTHD_METHOD_LOGIN: &str = "login";
+const SN_AUTHD_METHOD_LOGIN: &str = "login";
 
 // Authenticator method for logging out from a SAFE account
-const SAFE_AUTHD_METHOD_LOGOUT: &str = "logout";
+const SN_AUTHD_METHOD_LOGOUT: &str = "logout";
 
 // Authenticator method for creating a new SAFE account
-const SAFE_AUTHD_METHOD_CREATE: &str = "create-acc";
+const SN_AUTHD_METHOD_CREATE: &str = "create-acc";
 
 // Authenticator method for fetching list of authorised apps
-const SAFE_AUTHD_METHOD_AUTHED_APPS: &str = "authed-apps";
+const SN_AUTHD_METHOD_AUTHED_APPS: &str = "authed-apps";
 
 // Authenticator method for revoking applications and/or permissions
-const SAFE_AUTHD_METHOD_REVOKE: &str = "revoke";
+const SN_AUTHD_METHOD_REVOKE: &str = "revoke";
 
 // Authenticator method for retrieving the list of pending authorisation requests
-const SAFE_AUTHD_METHOD_AUTH_REQS: &str = "auth-reqs";
+const SN_AUTHD_METHOD_AUTH_REQS: &str = "auth-reqs";
 
 // Authenticator method for allowing an authorisation request
-const SAFE_AUTHD_METHOD_ALLOW: &str = "allow";
+const SN_AUTHD_METHOD_ALLOW: &str = "allow";
 
 // Authenticator method for denying an authorisation request
-const SAFE_AUTHD_METHOD_DENY: &str = "deny";
+const SN_AUTHD_METHOD_DENY: &str = "deny";
 
 // Authenticator method for subscribing to authorisation requests notifications
-const SAFE_AUTHD_METHOD_SUBSCRIBE: &str = "subscribe";
+const SN_AUTHD_METHOD_SUBSCRIBE: &str = "subscribe";
 
 // Authenticator method for unsubscribing from authorisation requests notifications
-const SAFE_AUTHD_METHOD_UNSUBSCRIBE: &str = "unsubscribe";
+const SN_AUTHD_METHOD_UNSUBSCRIBE: &str = "unsubscribe";
 
 // authd subcommand to update the binary to new available released version
-const SAFE_AUTHD_CMD_UPDATE: &str = "update";
+const SN_AUTHD_CMD_UPDATE: &str = "update";
 
 // authd subcommand to start the daemon
-const SAFE_AUTHD_CMD_START: &str = "start";
+const SN_AUTHD_CMD_START: &str = "start";
 
 // authd subcommand to stop the daemon
-const SAFE_AUTHD_CMD_STOP: &str = "stop";
+const SN_AUTHD_CMD_STOP: &str = "stop";
 
 // authd subcommand to restart the daemon
-const SAFE_AUTHD_CMD_RESTART: &str = "restart";
+const SN_AUTHD_CMD_RESTART: &str = "restart";
 
 // Authd Client API
 pub struct SafeAuthdClient {
@@ -155,7 +155,7 @@ impl Drop for SafeAuthdClient {
 impl SafeAuthdClient {
     pub fn new(endpoint: Option<String>) -> Self {
         let endpoint = match endpoint {
-            None => format!("{}:{}", SAFE_AUTHD_ENDPOINT_HOST, SAFE_AUTHD_ENDPOINT_PORT),
+            None => format!("{}:{}", SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT),
             Some(endpoint) => endpoint,
         };
         debug!("Creating new authd client for endpoint {}", endpoint);
@@ -167,27 +167,27 @@ impl SafeAuthdClient {
 
     // Update the Authenticator binary to a new released version
     pub fn update(&self, authd_path: Option<&str>) -> Result<()> {
-        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_UPDATE])
+        authd_run_cmd(authd_path, &[SN_AUTHD_CMD_UPDATE])
     }
 
     // Start the Authenticator daemon
     pub fn start(&self, authd_path: Option<&str>) -> Result<()> {
         authd_run_cmd(
             authd_path,
-            &[SAFE_AUTHD_CMD_START, "--listen", &self.authd_endpoint],
+            &[SN_AUTHD_CMD_START, "--listen", &self.authd_endpoint],
         )
     }
 
     // Stop the Authenticator daemon
     pub fn stop(&self, authd_path: Option<&str>) -> Result<()> {
-        authd_run_cmd(authd_path, &[SAFE_AUTHD_CMD_STOP])
+        authd_run_cmd(authd_path, &[SN_AUTHD_CMD_STOP])
     }
 
     // Restart the Authenticator daemon
     pub fn restart(&self, authd_path: Option<&str>) -> Result<()> {
         authd_run_cmd(
             authd_path,
-            &[SAFE_AUTHD_CMD_RESTART, "--listen", &self.authd_endpoint],
+            &[SN_AUTHD_CMD_RESTART, "--listen", &self.authd_endpoint],
         )
     }
 
@@ -196,7 +196,7 @@ impl SafeAuthdClient {
         debug!("Attempting to retrieve status report from remote authd...");
         let status_report = send_authd_request::<AuthdStatus>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_STATUS,
+            SN_AUTHD_METHOD_STATUS,
             serde_json::Value::Null,
         )
         .await?;
@@ -213,7 +213,7 @@ impl SafeAuthdClient {
         debug!("Attempting to log in on remote authd...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_LOGIN,
+            SN_AUTHD_METHOD_LOGIN,
             json!(vec![passphrase, password]),
         )
         .await?;
@@ -230,7 +230,7 @@ impl SafeAuthdClient {
         debug!("Dropping logged in session and logging out in remote authd...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_LOGOUT,
+            SN_AUTHD_METHOD_LOGOUT,
             serde_json::Value::Null,
         )
         .await?;
@@ -248,7 +248,7 @@ impl SafeAuthdClient {
         debug!("Attempting to create a SAFE account on remote authd...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_CREATE,
+            SN_AUTHD_METHOD_CREATE,
             json!(vec![passphrase, password, sk]),
         )
         .await?;
@@ -265,7 +265,7 @@ impl SafeAuthdClient {
         debug!("Attempting to fetch list of authorised apps from remote authd...");
         let authed_apps_list = send_authd_request::<AuthedAppsList>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_AUTHED_APPS,
+            SN_AUTHD_METHOD_AUTHED_APPS,
             serde_json::Value::Null,
         )
         .await?;
@@ -285,7 +285,7 @@ impl SafeAuthdClient {
         );
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_REVOKE,
+            SN_AUTHD_METHOD_REVOKE,
             json!(app_id),
         )
         .await?;
@@ -302,7 +302,7 @@ impl SafeAuthdClient {
         debug!("Attempting to fetch list of pending authorisation requests from remote authd...");
         let auth_reqs_list = send_authd_request::<PendingAuthReqs>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_AUTH_REQS,
+            SN_AUTHD_METHOD_AUTH_REQS,
             serde_json::Value::Null,
         )
         .await?;
@@ -319,7 +319,7 @@ impl SafeAuthdClient {
         debug!("Requesting to allow authorisation request: {}", req_id);
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_ALLOW,
+            SN_AUTHD_METHOD_ALLOW,
             json!(req_id.to_string()),
         )
         .await?;
@@ -336,7 +336,7 @@ impl SafeAuthdClient {
         debug!("Requesting to deny authorisation request: {}", req_id);
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_DENY,
+            SN_AUTHD_METHOD_DENY,
             json!(req_id.to_string()),
         )
         .await?;
@@ -376,7 +376,7 @@ impl SafeAuthdClient {
 
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_SUBSCRIBE,
+            SN_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url, &cert_base_path.display().to_string()]),
         ).await.map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({}) to receive authorisation request for self-auth: {}", endpoint_url, err)))?;
 
@@ -444,7 +444,7 @@ impl SafeAuthdClient {
 
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SAFE_AUTHD_METHOD_SUBSCRIBE,
+            SN_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url]),
         )
         .await?;
@@ -480,7 +480,7 @@ impl SafeAuthdClient {
 async fn send_unsubscribe(endpoint_url: &str, authd_endpoint: &str) -> Result<String> {
     send_authd_request::<String>(
         authd_endpoint,
-        SAFE_AUTHD_METHOD_UNSUBSCRIBE,
+        SN_AUTHD_METHOD_UNSUBSCRIBE,
         json!(endpoint_url),
     )
     .await
@@ -488,7 +488,7 @@ async fn send_unsubscribe(endpoint_url: &str, authd_endpoint: &str) -> Result<St
 
 fn authd_run_cmd(authd_path: Option<&str>, args: &[&str]) -> Result<()> {
     let mut path = get_authd_bin_path(authd_path)?;
-    path.push(SAFE_AUTHD_EXECUTABLE);
+    path.push(SN_AUTHD_EXECUTABLE);
     let path_str = path.display().to_string();
     debug!("Attempting to {} authd from '{}' ...", args[0], path_str);
 
@@ -530,8 +530,8 @@ fn get_authd_bin_path(authd_path: Option<&str>) -> Result<PathBuf> {
     match authd_path {
         Some(p) => Ok(PathBuf::from(p)),
         None => {
-            // if SAFE_AUTHD_PATH is set it then overrides default
-            if let Ok(authd_path) = std::env::var(ENV_VAR_SAFE_AUTHD_PATH) {
+            // if SN_AUTHD_PATH is set it then overrides default
+            if let Ok(authd_path) = std::env::var(ENV_VAR_SN_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
                 let base_dirs = BaseDirs::new().ok_or_else(|| {

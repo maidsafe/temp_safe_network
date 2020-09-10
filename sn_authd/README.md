@@ -110,44 +110,44 @@ $ cd sn_api/sn_authd
 $ cargo build
 ```
 
-Once it's built you can find the `safe-authd` executable at `target/debug/`.
+Once it's built you can find the `sn_authd` executable at `target/debug/`.
 
 ## Launching the sn_authd
 
-The `safe-authd` can be launched with:
+The `sn_authd` can be launched with:
 1. `cargo run -- <list of arguments/options>`
-2. or directly with the executable generated: `./target/debug/safe-authd <list of arguments/options>`
+2. or directly with the executable generated: `./target/debug/sn_authd <list of arguments/options>`
 
-As any other shell application, the `safe-authd` supports the `--help` argument which outputs a help message with information on the supported arguments and options, you can get this help message with:
+As any other shell application, the `sn_authd` supports the `--help` argument which outputs a help message with information on the supported arguments and options, you can get this help message with:
 ```
-$ safe-authd --help
+$ sn_authd --help
 ```
 
 This application supports only a few commands which are required to start it as a daemon, stop and restart it.
 
 ### Start
 
-In order to start the Safe Authenticator daemon (`safe-authd`) we simply need to run the following command:
+In order to start the Safe Authenticator daemon (`sn_authd`) we simply need to run the following command:
 ```shell
-$ safe-authd start
-Starting Safe Authenticator daemon (safe-authd)...
-safe-authd started (PID: <pid>)
+$ sn_authd start
+Starting Safe Authenticator daemon (sn_authd)...
+sn_authd started (PID: <pid>)
 ```
 
 ### Stop
 
-To stop the Safe Authenticator daemon (`safe-authd`) we just run the following command (on Windows make sure you use the `safe-authd.exe` executable):
+To stop the Safe Authenticator daemon (`sn_authd`) we just run the following command (on Windows make sure you use the `sn_authd.exe` executable):
 ```shell
-$ safe-authd stop
-Stopping Safe Authenticator daemon (safe-authd)...
-Success, safe-authd (PID: <pid>) stopped!
+$ sn_authd stop
+Stopping Safe Authenticator daemon (sn_authd)...
+Success, sn_authd (PID: <pid>) stopped!
 ```
 
 ### Restart
 
-We can also restart the Safe Authenticator daemon (`safe-authd`) if it's already running, with the following command (on Windows make sure you use the `safe-authd.exe` executable):
+We can also restart the Safe Authenticator daemon (`sn_authd`) if it's already running, with the following command (on Windows make sure you use the `sn_authd.exe` executable):
 ```shell
-$ safe-authd restart
+$ sn_authd restart
 Stopping Safe Authenticator daemon (sn_authd)...
 Success, sn_authd (PID: <pid>) stopped!
 Starting Safe Authenticator daemon (sn_authd)...

@@ -14,7 +14,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 type Result<T> = std::result::Result<T, Error>;
 
 // Version of the JSON-RPC used in the requests
-const SAFE_AUTHD_JSONRPC_VERSION: &str = "2.0";
+const SN_AUTHD_JSONRPC_VERSION: &str = "2.0";
 
 // JSON-RPC error codes as defined at https://www.jsonrpc.org/specification#response_object
 const JSONRPC_PARSE_ERROR: isize = -32700;
@@ -31,7 +31,7 @@ pub struct JsonRpcRequest {
 impl JsonRpcRequest {
     pub fn new(method: &str, params: serde_json::Value) -> Self {
         Self {
-            jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+            jsonrpc: SN_AUTHD_JSONRPC_VERSION.to_string(),
             method: method.to_string(),
             params,
             id: rand::thread_rng().gen_range(0, std::u32::MAX) + 1,
@@ -58,7 +58,7 @@ impl JsonRpcResponse {
     // Construct a JsonRpcResponse containing a successfull response
     pub fn result(result: serde_json::Value, id: u32) -> Self {
         Self {
-            jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+            jsonrpc: SN_AUTHD_JSONRPC_VERSION.to_string(),
             result: Some(result),
             error: None,
             id: Some(id),
@@ -68,7 +68,7 @@ impl JsonRpcResponse {
     // Construct a JsonRpcResponse containing an error response
     pub fn error(message: String, code: isize, id: Option<u32>) -> Self {
         Self {
-            jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+            jsonrpc: SN_AUTHD_JSONRPC_VERSION.to_string(),
             result: None,
             error: Some(JsonRpcError {
                 code,
@@ -126,10 +126,10 @@ where
             result: Some(r),
             ..
         }) => {
-            if jsonrpc != SAFE_AUTHD_JSONRPC_VERSION {
+            if jsonrpc != SN_AUTHD_JSONRPC_VERSION {
                 Err(Error::ClientError(format!(
                     "JSON-RPC version {} not supported, only version {} is supported",
-                    jsonrpc, SAFE_AUTHD_JSONRPC_VERSION
+                    jsonrpc, SN_AUTHD_JSONRPC_VERSION
                 )))
             } else {
                 let result = serde_json::from_value(r).map_err(|err| {
@@ -164,7 +164,7 @@ fn serialised_jsonrpc_error(
     id: Option<u32>,
 ) -> std::result::Result<String, String> {
     let jsonrpc_err = JsonRpcResponse {
-        jsonrpc: SAFE_AUTHD_JSONRPC_VERSION.to_string(),
+        jsonrpc: SN_AUTHD_JSONRPC_VERSION.to_string(),
         result: None,
         error: Some(JsonRpcError {
             code,

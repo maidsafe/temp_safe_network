@@ -25,9 +25,9 @@ function get_distributable_for_component() {
     case "$component" in
         sn_authd)
             if [[ "$target" == *"windows"* ]]; then
-                distributable="safe-authd.exe"
+                distributable="sn_authd.exe"
             else
-                distributable="safe-authd"
+                distributable="sn_authd"
             fi
             ;;
         sn_cli)
@@ -39,13 +39,13 @@ function get_distributable_for_component() {
             ;;
         sn_ffi)
             if [[ "$target" == *"darwin"* ]]; then
-                distributable="libsafe_ffi.dylib"
+                distributable="libsn_ffi.dylib"
             elif [[ "$target" == *"windows"* ]]; then
-                distributable="safe_ffi.dll"
+                distributable="sn_ffi.dll"
             elif [[ "$target" == *"linux"* ]]; then
-                distributable="libsafe_ffi.so"
+                distributable="libsn_ffi.so"
             else
-                distributable="libsafe_ffi.a"
+                distributable="libsn_ffi.a"
             fi
             ;;
         *)

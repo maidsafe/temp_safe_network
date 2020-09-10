@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
+use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use log::info;
 use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
@@ -91,7 +91,7 @@ where
 
             let qjsonrpc_client = ClientEndpoint::new(
                 &cert_base_path,
-                Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
+                Some(SN_AUTHD_CONNECTION_IDLE_TIMEOUT),
                 false,
             )
             .map_err(|err| {

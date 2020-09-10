@@ -34,13 +34,13 @@ jobs:
           mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
           cp ./target/release/safe $HOME/.safe/cli/
-          cp ./target/release/safe-authd $HOME/.safe/authd/
+          cp ./target/release/sn_authd $HOME/.safe/authd/
           ls $HOME/.safe/cli
           ls $HOME/.safe/authd
           echo "::add-path::$HOME/.safe/cli"
           echo "::add-path::$HOME/.safe/authd"
           echo $PATH
-          chmod +x $HOME/.safe/authd/safe-authd
+          chmod +x $HOME/.safe/authd/sn_authd
           chmod +x $HOME/.safe/cli/safe
           chmod +x $HOME/.safe/vault/safe_vault
       - name: Setup The Baby
@@ -80,13 +80,13 @@ jobs:
           mkdir -p ~/.safe/cli
           mkdir -p ~/.safe/authd
           cp ./target/release/safe $HOME/.safe/cli/
-          cp ./target/release/safe-authd $HOME/.safe/authd/
+          cp ./target/release/sn_authd $HOME/.safe/authd/
           ls $HOME/.safe/cli
           ls $HOME/.safe/authd
           echo "::add-path::$HOME/.safe/cli"
           echo "::add-path::$HOME/.safe/authd"
           echo $PATH
-          chmod +x $HOME/.safe/authd/safe-authd
+          chmod +x $HOME/.safe/authd/sn_authd
           chmod +x $HOME/.safe/cli/safe
           chmod +x $HOME/.safe/vault/safe_vault
       - name: Setup The Baby
@@ -108,4 +108,4 @@ jobs:
 
       - name: Failure sn_authd logs.
         if: failure()
-        run: tail $HOME/.safe/authd/logs/safe-authd.log
+        run: tail $HOME/.safe/authd/logs/sn_authd.log

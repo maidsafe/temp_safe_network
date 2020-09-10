@@ -124,8 +124,8 @@ jobs:
       - name: Upload prod native lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-prod
-          path: target/${{ matrix.target }}/release/libsafe_ffi.so
+          name: sn_ffi-${{ matrix.target }}-prod
+          path: target/${{ matrix.target }}/release/libsn_ffi.so
 
       # Build dev native lib.
       - name: Build native lib - Dev
@@ -135,8 +135,8 @@ jobs:
       - name: Upload dev native lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-dev
-          path: target/${{ matrix.target }}/release/libsafe_ffi.so
+          name: sn_ffi-${{ matrix.target }}-dev
+          path: target/${{ matrix.target }}/release/libsn_ffi.so
 
   build-ffi-ios:
     name: Build FFI iOS
@@ -184,8 +184,8 @@ jobs:
       - name: Upload prod universal lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-apple-ios-prod
-          path: target/universal/release/libsafe_ffi.a
+          name: sn_ffi-apple-ios-prod
+          path: target/universal/release/libsn_ffi.a
 
       # Build dev universal library.
       - name: Build universal lib - Dev
@@ -196,8 +196,8 @@ jobs:
       - name: Upload dev universal lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-apple-ios-dev
-          path: target/universal/release/libsafe_ffi.a
+          name: sn_ffi-apple-ios-dev
+          path: target/universal/release/libsn_ffi.a
 
   test-component:
     name: Test Component

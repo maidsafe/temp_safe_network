@@ -20,13 +20,13 @@ use sn_api::{
 use std::{fs::File, path::PathBuf};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
-const ENV_VAR_SAFE_AUTHD_PATH: &str = "SAFE_AUTHD_PATH";
+const ENV_VAR_SN_AUTHD_PATH: &str = "SN_AUTHD_PATH";
 
 #[cfg(not(target_os = "windows"))]
-const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd";
+const SN_AUTHD_EXECUTABLE: &str = "sn_authd";
 
 #[cfg(target_os = "windows")]
-const SAFE_AUTHD_EXECUTABLE: &str = "safe-authd.exe";
+const SN_AUTHD_EXECUTABLE: &str = "sn_authd.exe";
 
 #[derive(Deserialize, Debug)]
 struct Environment {
@@ -42,13 +42,7 @@ struct LoginDetails {
 
 pub fn authd_install(authd_path: Option<String>) -> Result<(), String> {
     let target_path = get_authd_bin_path(authd_path)?;
-    download_from_s3_and_install_bin(
-        target_path,
-        "sn-api",
-        "safe-authd",
-        SAFE_AUTHD_EXECUTABLE,
-        None,
-    )?;
+    download_from_s3_and_install_bin(target_path, "sn-api", "sn_authd", SN_AUTHD_EXECUTABLE, None)?;
     Ok(())
 }
 
@@ -415,8 +409,8 @@ fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
     match authd_path {
         Some(p) => Ok(PathBuf::from(p)),
         None => {
-            // if SAFE_AUTHD_PATH is set it then overrides default
-            if let Ok(authd_path) = std::env::var(ENV_VAR_SAFE_AUTHD_PATH) {
+            // if SN_AUTHD_PATH is set it then overrides default
+            if let Ok(authd_path) = std::env::var(ENV_VAR_SN_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
                 let base_dirs = BaseDirs::new()

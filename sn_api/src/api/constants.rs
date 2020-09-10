@@ -8,9 +8,9 @@
 // Software.
 
 // Default host of the authenticator endpoint to send the requests to
-pub const SAFE_AUTHD_ENDPOINT_HOST: &str = "https://localhost";
+pub const SN_AUTHD_ENDPOINT_HOST: &str = "https://localhost";
 // Default authenticator port number where to send requests to
-pub const SAFE_AUTHD_ENDPOINT_PORT: u16 = 33000;
+pub const SN_AUTHD_ENDPOINT_PORT: u16 = 33000;
 
 // Number of milliseconds to allow an idle connection with authd before closing it
-pub const SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT: u64 = 120_000;
+pub const SN_AUTHD_CONNECTION_IDLE_TIMEOUT: u64 = 120_000;

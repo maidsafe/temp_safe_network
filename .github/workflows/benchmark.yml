@@ -34,7 +34,7 @@ jobs:
         uses: actions/upload-artifact@master
         with:
           name: sn_authd
-          path: target/release/safe-authd
+          path: target/release/sn_authd
 
 
 
@@ -73,14 +73,14 @@ jobs:
           path: ./dl
 
       - run: cp ./dl/safe $HOME/.safe/cli
-      - run: cp ./dl/safe-authd $HOME/.safe/authd
+      - run: cp ./dl/sn_authd $HOME/.safe/authd
 
       - run: ls $HOME/.safe/cli
       - run: ls $HOME/.safe/authd
       - run: echo "::add-path::$HOME/.safe/cli"
       - run: echo "::add-path::$HOME/.safe/authd"
       - run: echo $PATH
-      - run: chmod +x $HOME/.safe/authd/safe-authd
+      - run: chmod +x $HOME/.safe/authd/sn_authd
       - run: chmod +x $HOME/.safe/cli/safe
       - run: chmod +x $HOME/.safe/vault/safe_vault
 

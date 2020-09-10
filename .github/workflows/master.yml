@@ -25,16 +25,16 @@ jobs:
             output: safe-x86_64-unknown-linux-gnu
           - os: ubuntu-latest
             component: sn_authd
-            target: safe-authd
-            output: safe-authd-x86_64-unknown-linux-gnu
+            target: sn_authd
+            output: sn_authd-x86_64-unknown-linux-gnu
           - os: windows-latest
             component: sn_cli
             target: safe.exe
             output: safe-x86_64-pc-windows-msvc
           - os: windows-latest
             component: sn_authd
-            target: safe-authd.exe
-            output: safe-authd-x86_64-pc-windows-msvc
+            target: sn_authd.exe
+            output: sn_authd-x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust
@@ -74,13 +74,13 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            output: libsafe_ffi.so
+            output: libsn_ffi.so
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            output: safe_ffi.dll
+            output: sn_ffi.dll
           - os: macOS-latest
             target: x86_64-apple-darwin
-            output: libsafe_ffi.dylib
+            output: libsn_ffi.dylib
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust
@@ -147,8 +147,8 @@ jobs:
             output: safe-x86_64-apple-darwin
           - os: macos-latest
             component: sn_authd
-            target: safe-authd
-            output: safe-authd-x86_64-apple-darwin
+            target: sn_authd
+            output: sn_authd-x86_64-apple-darwin
     env:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_SIGN_ID: ${{ secrets.APPLE_SIGN_ID }}
@@ -265,8 +265,8 @@ jobs:
       - name: Upload prod native lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-prod
-          path: target/${{ matrix.target }}/release/libsafe_ffi.so
+          name: sn_ffi-${{ matrix.target }}-prod
+          path: target/${{ matrix.target }}/release/libsn_ffi.so
 
       # Build dev native lib.
       - name: Build native lib - Dev
@@ -276,8 +276,8 @@ jobs:
       - name: Upload dev native lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-${{ matrix.target }}-dev
-          path: target/${{ matrix.target }}/release/libsafe_ffi.so
+          name: sn_ffi-${{ matrix.target }}-dev
+          path: target/${{ matrix.target }}/release/libsn_ffi.so
 
   build-ffi-ios:
     name: Build FFI iOS
@@ -326,8 +326,8 @@ jobs:
       - name: Upload prod universal lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-apple-ios-prod
-          path: target/universal/release/libsafe_ffi.a
+          name: sn_ffi-apple-ios-prod
+          path: target/universal/release/libsn_ffi.a
 
       # Build dev universal library.
       - name: Build universal lib - Dev
@@ -338,8 +338,8 @@ jobs:
       - name: Upload dev universal lib
         uses: actions/upload-artifact@master
         with:
-          name: safe-ffi-apple-ios-dev
-          path: target/universal/release/libsafe_ffi.a
+          name: sn_ffi-apple-ios-dev
+          path: target/universal/release/libsn_ffi.a
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
@@ -362,96 +362,96 @@ jobs:
         uses: actions/download-artifact@master
         with:
           name: safe-x86_64-pc-windows-msvc
-          path: artifacts/safe-cli/prod/x86_64-pc-windows-msvc/release
+          path: artifacts/sn_cli/prod/x86_64-pc-windows-msvc/release
       - name: Download safe-x86_64-unknown-linux-gnu release
         uses: actions/download-artifact@master
         with:
           name: safe-x86_64-unknown-linux-gnu
-          path: artifacts/safe-cli/prod/x86_64-unknown-linux-gnu/release
+          path: artifacts/sn_cli/prod/x86_64-unknown-linux-gnu/release
       - name: Download safe-x86_64-apple-darwin release
         uses: actions/download-artifact@master
         with:
           name: safe-x86_64-apple-darwin
-          path: artifacts/safe-cli/prod/x86_64-apple-darwin/release
+          path: artifacts/sn_cli/prod/x86_64-apple-darwin/release
 
       # authd
-      - name: Download safe-authd-x86_64-pc-windows-msvc release
+      - name: Download sn_authd-x86_64-pc-windows-msvc release
         uses: actions/download-artifact@master
         with:
-          name: safe-authd-x86_64-pc-windows-msvc
-          path: artifacts/safe-authd/prod/x86_64-pc-windows-msvc/release
-      - name: Download safe-authd-x86_64-unknown-linux-gnu release
+          name: sn_authd-x86_64-pc-windows-msvc
+          path: artifacts/sn_authd/prod/x86_64-pc-windows-msvc/release
+      - name: Download sn_authd-x86_64-unknown-linux-gnu release
         uses: actions/download-artifact@master
         with:
-          name: safe-authd-x86_64-unknown-linux-gnu
-          path: artifacts/safe-authd/prod/x86_64-unknown-linux-gnu/release
-      - name: Download safe-authd-x86_64-apple-darwin release
+          name: sn_authd-x86_64-unknown-linux-gnu
+          path: artifacts/sn_authd/prod/x86_64-unknown-linux-gnu/release
+      - name: Download sn_authd-x86_64-apple-darwin release
         uses: actions/download-artifact@master
         with:
-          name: safe-authd-x86_64-apple-darwin
-          path: artifacts/safe-authd/prod/x86_64-apple-darwin/release
+          name: sn_authd-x86_64-apple-darwin
+          path: artifacts/sn_authd/prod/x86_64-apple-darwin/release
 
       # ffi
-      - name: Download safe-ffi-x86_64-pc-windows-msvc-prod release
+      - name: Download sn_ffi-x86_64-pc-windows-msvc-prod release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-pc-windows-msvc-prod
-          path: artifacts/safe-ffi/prod/x86_64-pc-windows-msvc/release
-      - name: Download safe-ffi-x86_64-pc-windows-msvc-dev release
+          name: sn_ffi-x86_64-pc-windows-msvc-prod
+          path: artifacts/sn_ffi/prod/x86_64-pc-windows-msvc/release
+      - name: Download sn_ffi-x86_64-pc-windows-msvc-dev release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-pc-windows-msvc-dev
-          path: artifacts/safe-ffi/dev/x86_64-pc-windows-msvc/release
-      - name: Download safe-ffi-x86_64-unknown-linux-gnu-prod release
+          name: sn_ffi-x86_64-pc-windows-msvc-dev
+          path: artifacts/sn_ffi/dev/x86_64-pc-windows-msvc/release
+      - name: Download sn_ffi-x86_64-unknown-linux-gnu-prod release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-unknown-linux-gnu-prod
-          path: artifacts/safe-ffi/prod/x86_64-unknown-linux-gnu/release
-      - name: Download safe-ffi-x86_64-unknown-linux-gnu-dev release
+          name: sn_ffi-x86_64-unknown-linux-gnu-prod
+          path: artifacts/sn_ffi/prod/x86_64-unknown-linux-gnu/release
+      - name: Download sn_ffi-x86_64-unknown-linux-gnu-dev release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-unknown-linux-gnu-dev
-          path: artifacts/safe-ffi/dev/x86_64-unknown-linux-gnu/release
-      - name: Download safe-ffi-x86_64-apple-darwin-prod release
+          name: sn_ffi-x86_64-unknown-linux-gnu-dev
+          path: artifacts/sn_ffi/dev/x86_64-unknown-linux-gnu/release
+      - name: Download sn_ffi-x86_64-apple-darwin-prod release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-apple-darwin-prod
-          path: artifacts/safe-ffi/prod/x86_64-apple-darwin/release
-      - name: Download safe-ffi-x86_64-apple-darwin-dev release
+          name: sn_ffi-x86_64-apple-darwin-prod
+          path: artifacts/sn_ffi/prod/x86_64-apple-darwin/release
+      - name: Download sn_ffi-x86_64-apple-darwin-dev release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-apple-darwin-dev
-          path: artifacts/safe-ffi/dev/x86_64-apple-darwin/release
-      - name: Download safe-ffi-armv7-linux-androideabi-prod release
+          name: sn_ffi-x86_64-apple-darwin-dev
+          path: artifacts/sn_ffi/dev/x86_64-apple-darwin/release
+      - name: Download sn_ffi-armv7-linux-androideabi-prod release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-armv7-linux-androideabi-prod
-          path: artifacts/safe-ffi/prod/armv7-linux-androideabi/release
-      - name: Download safe-ffi-armv7-linux-androideabi-dev release
+          name: sn_ffi-armv7-linux-androideabi-prod
+          path: artifacts/sn_ffi/prod/armv7-linux-androideabi/release
+      - name: Download sn_ffi-armv7-linux-androideabi-dev release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-armv7-linux-androideabi-dev
-          path: artifacts/safe-ffi/dev/armv7-linux-androideabi/release
-      - name: Download safe-ffi-x86_64-linux-android-prod release
+          name: sn_ffi-armv7-linux-androideabi-dev
+          path: artifacts/sn_ffi/dev/armv7-linux-androideabi/release
+      - name: Download sn_ffi-x86_64-linux-android-prod release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-linux-android-prod
-          path: artifacts/safe-ffi/prod/x86_64-linux-android/release
-      - name: Download safe-ffi-x86_64-linux-android-dev release
+          name: sn_ffi-x86_64-linux-android-prod
+          path: artifacts/sn_ffi/prod/x86_64-linux-android/release
+      - name: Download sn_ffi-x86_64-linux-android-dev release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-x86_64-linux-android-dev
-          path: artifacts/safe-ffi/dev/x86_64-linux-android/release
-      - name: Download safe-ffi-apple-ios-prod release
+          name: sn_ffi-x86_64-linux-android-dev
+          path: artifacts/sn_ffi/dev/x86_64-linux-android/release
+      - name: Download sn_ffi-apple-ios-prod release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-apple-ios-prod
-          path: artifacts/safe-ffi/prod/apple-ios/release
-      - name: Download safe-ffi-apple-ios-dev release
+          name: sn_ffi-apple-ios-prod
+          path: artifacts/sn_ffi/prod/apple-ios/release
+      - name: Download sn_ffi-apple-ios-dev release
         uses: actions/download-artifact@master
         with:
-          name: safe-ffi-apple-ios-dev
-          path: artifacts/safe-ffi/dev/apple-ios/release
+          name: sn_ffi-apple-ios-dev
+          path: artifacts/sn_ffi/dev/apple-ios/release
 
       # Get information for the release.
       - shell: bash
@@ -476,10 +476,10 @@ jobs:
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
       - name: chmod
         shell: bash
-        run: chmod -R +x artifacts/safe-authd
+        run: chmod -R +x artifacts/sn_authd
       - name: chmod
         shell: bash
-        run: chmod -R +x artifacts/safe-cli
+        run: chmod -R +x artifacts/sn_cli
       - shell: bash
         run: make package-commit_hash-artifacts-for-deploy
         if: "!startsWith(steps.commit_message.outputs.commit_message, 'Version change')"
@@ -508,7 +508,7 @@ jobs:
         id: create_release
         with:
           tag_name: ${{ steps.versioning.outputs.cli_version }}
-          release_name: safe-cli
+          release_name: sn_cli
           draft: false
           prerelease: false
           body: ${{ steps.release_description.outputs.description }}
@@ -516,43 +516,43 @@ jobs:
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.zip
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.zip
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.zip
+          asset_name: sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.zip
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.zip
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.zip
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.zip
+          asset_name: sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.zip
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
+          asset_name: sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.zip
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.tar.gz
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.tar.gz
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.tar.gz
+          asset_name: sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-unknown-linux-gnu.tar.gz
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.tar.gz
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.tar.gz
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.tar.gz
+          asset_name: sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-pc-windows-msvc.tar.gz
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
-          asset_name: safe-cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
+          asset_path: deploy/prod/sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
+          asset_name: sn_cli-${{ steps.versioning.outputs.cli_version }}-x86_64-apple-darwin.tar.gz
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 

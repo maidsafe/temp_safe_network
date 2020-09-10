@@ -32,7 +32,7 @@ const APP_NAME: &str = "Safe CLI";
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
 const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
 const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
-const PROJECT_DATA_DIR_APPLICATION: &str = "safe_cli";
+const PROJECT_DATA_DIR_APPLICATION: &str = "sn_cli";
 
 #[tokio::main]
 async fn main() {

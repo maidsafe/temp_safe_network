@@ -43,7 +43,7 @@ tar.gz: TAR_WIN_CHECKSUM
 ### Safe Authenticator daemon
 
 The Authenticator daemon exposes services which allow applications and users to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
-The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `sn_authd`/`safe-authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/sn_cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
+The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `sn_authd`/`sn_authd.exe` binary is properly installed in the system with execution permissions. Please refer to [Authenticator section in CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/sn_cli/README.md#the-authenticator-daemon-authd) for detailed instructions.
 
 | OS | Download link | SHA-256 checksum |
 | --- | --- | --- |
@@ -70,45 +70,45 @@ FFI is used to generate the native libraries which can be used by other high lev
 * [Safe Vault](https://github.com/maidsafe/safe_vault/releases/latest/)
 EOF
 
-s3_authd_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-unknown-linux-gnu.zip"
-s3_authd_win_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-pc-windows-msvc.zip"
-s3_authd_macos_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-authd-$authd_version-x86_64-apple-darwin.zip"
+s3_authd_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-unknown-linux-gnu.zip"
+s3_authd_win_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-pc-windows-msvc.zip"
+s3_authd_macos_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-apple-darwin.zip"
 
 zip_linux_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-unknown-linux-gnu.zip" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
 zip_macos_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-msvc.zip" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-unknown-linux-gnu.tar.gz" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-gnu.tar.gz" | \
     awk '{ print $1 }')
 tar_macos_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 tar_win_checksum=$(sha256sum \
-    "./deploy/prod/safe-cli-$cli_version-x86_64-pc-windows-msvc.tar.gz" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 
 zip_authd_linux_checksum=$(sha256sum \
-    "./deploy/prod/safe-authd-$authd_version-x86_64-unknown-linux-gnu.zip" | \
+    "./deploy/prod/sn_authd-$authd_version-x86_64-unknown-linux-gnu.zip" | \
     awk '{ print $1 }')
 zip_authd_macos_checksum=$(sha256sum \
-    "./deploy/prod/safe-authd-$authd_version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/sn_authd-$authd_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_authd_win_checksum=$(sha256sum \
-    "./deploy/prod/safe-authd-$authd_version-x86_64-pc-windows-msvc.zip" | \
+    "./deploy/prod/sn_authd-$authd_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 
-s3_ffi_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-unknown-linux-gnu.zip"
-s3_ffi_win_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-pc-windows-msvc.zip"
-s3_ffi_macos_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-apple-darwin.zip"
-s3_ffi_android_x86_64_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-ffi-$ffi_version-x86_64-linux-android.zip"
-s3_ffi_android_armv7_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-ffi-$ffi_version-armv7-linux-androideabi.zip"
-s3_ffi_ios_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/safe-ffi-$ffi_version-apple-ios.zip"
+s3_ffi_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_ffi-$ffi_version-x86_64-unknown-linux-gnu.zip"
+s3_ffi_win_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_ffi-$ffi_version-x86_64-pc-windows-msvc.zip"
+s3_ffi_macos_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_ffi-$ffi_version-x86_64-apple-darwin.zip"
+s3_ffi_android_x86_64_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_ffi-$ffi_version-x86_64-linux-android.zip"
+s3_ffi_android_armv7_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_ffi-$ffi_version-armv7-linux-androideabi.zip"
+s3_ffi_ios_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_ffi-$ffi_version-apple-ios.zip"
 
 release_description=$(sed "s/S3_AUTHD_LINUX_DEPLOY_URL/$s3_authd_linux_deploy_url/g" <<< "$release_description")
 release_description=$(sed "s/S3_AUTHD_MACOS_DEPLOY_URL/$s3_authd_macos_deploy_url/g" <<< "$release_description")

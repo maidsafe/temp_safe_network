@@ -17,7 +17,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     let releases = self_update::backends::s3::ReleaseList::configure()
         .bucket_name("sn-api")
         .with_target(&target)
-        .asset_prefix("safe-authd")
+        .asset_prefix("sn_authd")
         .region("eu-west-2")
         .build()?
         .fetch()?;
@@ -28,15 +28,15 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     } else {
         debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
-            "safe-authd.exe"
+            "sn_authd.exe"
         } else {
-            "safe-authd"
+            "sn_authd"
         };
 
         let release_updater = self_update::backends::s3::Update::configure()
             .bucket_name("sn-api")
             .target(&target)
-            .asset_prefix("safe-authd")
+            .asset_prefix("sn_authd")
             .region("eu-west-2")
             .bin_name(&bin_name)
             .show_download_progress(true)
