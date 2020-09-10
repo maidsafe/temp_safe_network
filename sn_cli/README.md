@@ -93,19 +93,19 @@ The Safe CLI provides all the tools necessary to interact with the Safe Network,
 
 ## Download
 
-The latest version of the Safe CLI can be downloaded and installed using the [install script](https://safe-api.s3.amazonaws.com/install.sh).
+The latest version of the Safe CLI can be downloaded and installed using the [install script](https://sn-api.s3.amazonaws.com/install.sh).
 
-The [install script](https://safe-api.s3.amazonaws.com/install.sh) will not only download latest Safe CLI, but it will also unpack CLI binary onto `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
+The [install script](https://sn-api.s3.amazonaws.com/install.sh) will not only download latest Safe CLI, but it will also unpack CLI binary onto `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
 
 ### Linux and Mac
 
 Open a new console and run any of the following `curl` or `wget` commands:
 ```
-$ curl -so- https://safe-api.s3.amazonaws.com/install.sh | bash
+$ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
 ```
 or
 ```
-$ wget -qO- https://safe-api.s3.amazonaws.com/install.sh | bash
+$ wget -qO- https://sn-api.s3.amazonaws.com/install.sh | bash
 ```
 
 ### Windows
@@ -116,7 +116,7 @@ Click the "Start" button and type "git-bash" in the search bar, then press the *
 
 Once you have a Git Bash console just run the above `curl` command:
 ```
-$ curl -so- https://safe-api.s3.amazonaws.com/install.sh | bash
+$ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
 ```
 
 Once Safe CLI is downloaded and installed in your system, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
@@ -345,7 +345,7 @@ Downloading and installing the Authenticator daemon is very simple:
 ```shell
 $ safe auth install
 Latest release found: sn_authd v0.0.3
-Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
+Downloading https://sn-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
 Installing sn_authd binary at ~/.safe/authd ...
 Setting execution permissions to installed binary '~/.safe/authd/safe-authd'...
@@ -550,7 +550,7 @@ The Authenticator binary (`safe-authd`/`safe-authd.exe`) can be updated to the l
 ```shell
 $ safe auth update
 ```
-It will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
+It will check if a newer release is available on [Amazon S3](https://sn-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
 
 After the sn_authd was updated, you'll need to restart it to start using new version:
 ```shell

@@ -117,7 +117,7 @@ safe_cli_install() {
   esac
 
   cli_package="safe-cli-$(safe_cli_latest_version)-x86_64-$platform.tar.gz"
-  cli_package_url="https://safe-api.s3.eu-west-2.amazonaws.com/$cli_package"
+  cli_package_url="https://sn-api.s3.eu-west-2.amazonaws.com/$cli_package"
   tmp_dir=$(mktemp -d)
   tmp_dir_package=$tmp_dir/$cli_package
 

@@ -44,7 +44,7 @@ pub fn authd_install(authd_path: Option<String>) -> Result<(), String> {
     let target_path = get_authd_bin_path(authd_path)?;
     download_from_s3_and_install_bin(
         target_path,
-        "safe-api",
+        "sn-api",
         "safe-authd",
         SAFE_AUTHD_EXECUTABLE,
         None,

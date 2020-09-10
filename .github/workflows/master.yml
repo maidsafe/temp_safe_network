@@ -499,9 +499,9 @@ jobs:
 
       # Upload all the release archives to S3; FFI links will be in the release description.
       - name: Upload prod to S3
-        run: aws s3 sync deploy/prod s3://safe-api --size-only --acl public-read
+        run: aws s3 sync deploy/prod s3://sn-api --size-only --acl public-read
       - name: Upload dev to S3
-        run: aws s3 sync deploy/dev s3://safe-api --acl public-read
+        run: aws s3 sync deploy/dev s3://sn-api --acl public-read
 
       # Create the release and attach sn_cli archives as assets.
       - uses: csexton/create-release@add-body

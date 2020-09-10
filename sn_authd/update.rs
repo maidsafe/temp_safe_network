@@ -15,7 +15,7 @@ use std::{fs::File, os::unix::fs::PermissionsExt};
 pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
     let target = self_update::get_target();
     let releases = self_update::backends::s3::ReleaseList::configure()
-        .bucket_name("safe-api")
+        .bucket_name("sn-api")
         .with_target(&target)
         .asset_prefix("safe-authd")
         .region("eu-west-2")
@@ -34,7 +34,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         };
 
         let release_updater = self_update::backends::s3::Update::configure()
-            .bucket_name("safe-api")
+            .bucket_name("sn-api")
             .target(&target)
             .asset_prefix("safe-authd")
             .region("eu-west-2")
