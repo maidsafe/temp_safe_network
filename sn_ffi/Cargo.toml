@@ -1,5 +1,5 @@
 [package]
-name = "safe-ffi"
+name = "sn_ffi"
 version = "0.15.0"
 description = "Safe API FFI"
 authors = ["Ravinder Jangra <ravinderjangra@live.com>"]
@@ -10,7 +10,7 @@ build = "build.rs"
 edition = "2018"
 
 [lib]
-name = "safe_ffi"
+name = "sn_ffi"
 crate_type = ["staticlib", "rlib", "cdylib"]
 path = "lib.rs"
 

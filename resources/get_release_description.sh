@@ -12,7 +12,7 @@ if [[ -z "$cli_version" ]]; then
 fi
 ffi_version=$3
 if [[ -z "$ffi_version" ]]; then
-    echo "You must supply a version number for safe-ffi."
+    echo "You must supply a version number for sn_ffi."
     exit 1
 fi
 authd_version=$4

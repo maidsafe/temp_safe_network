@@ -56,7 +56,7 @@ mod bindings {
         bindgen.compile_or_panic(&mut lang, &mut outputs, false);
 
         lang.add_custom_code("typedef void* Safe;\n");
-        lang.set_lib_name("safe_ffi");
+        lang.set_lib_name("sn_ffi");
         bindgen.source_file("lib.rs");
         bindgen.compile_or_panic(&mut lang, &mut outputs, true);
 

@@ -3252,25 +3252,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "safe-ffi"
-version = "0.15.0"
-dependencies = [
- "bincode",
- "log 0.4.8",
- "safe-nd",
- "safe_authenticator",
- "safe_core",
- "serde",
- "serde_json",
- "sn_api",
- "sn_bindgen",
- "sn_ffi_utils",
- "tokio 0.2.21",
- "unwrap",
- "xor_name",
-]
-
-[[package]]
 name = "safe-nd"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3792,6 +3773,25 @@ dependencies = [
  "tokio 0.2.21",
  "unwrap",
  "walkdir",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_ffi"
+version = "0.15.0"
+dependencies = [
+ "bincode",
+ "log 0.4.8",
+ "safe-nd",
+ "safe_authenticator",
+ "safe_core",
+ "serde",
+ "serde_json",
+ "sn_api",
+ "sn_bindgen",
+ "sn_ffi_utils",
+ "tokio 0.2.21",
+ "unwrap",
  "xor_name",
 ]
 

@@ -9,7 +9,7 @@ fi
 component=$2
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'sn_cli', 'sn_api', 'sn_authd' or 'safe-ffi'."
+    echo "Valid values are 'sn_cli', 'sn_api', 'sn_authd' or 'sn_ffi'."
     exit 1
 fi
 

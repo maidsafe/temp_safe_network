@@ -46,7 +46,7 @@ jobs:
       - name: Code Coverage - sn_api
         uses: actions-rs/tarpaulin@master
         with:
-          args: '-v --manifest-path=sn_api/Cargo.toml --features=scl-mock --exclude-files=sn_cli/*,jsonrpc-quic/*,sn_authd/*,safe-ffi/* --out Lcov -- --test-threads=1'
+          args: '-v --manifest-path=sn_api/Cargo.toml --features=scl-mock --exclude-files=sn_cli/*,jsonrpc-quic/*,sn_authd/*,sn_ffi/* --out Lcov -- --test-threads=1'
 
       # Push tarpaulin results to coveralls.io
       - name: Coveralls
@@ -61,7 +61,7 @@ jobs:
     strategy:
       matrix:
         target: [armv7-linux-androideabi, x86_64-linux-android]
-        component: [safe-ffi]
+        component: [sn_ffi]
     steps:
       - uses: actions/checkout@v1
       - name: Install Rust
@@ -178,7 +178,7 @@ jobs:
       # Build prod universal library.
       - name: Build universal lib - Prod
         shell: bash
-        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml
+        run: cargo lipo --release --manifest-path=sn_ffi/Cargo.toml
 
       # Upload prod universal library.
       - name: Upload prod universal lib
@@ -190,7 +190,7 @@ jobs:
       # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
-        run: cargo lipo --release --manifest-path=safe-ffi/Cargo.toml --features=scl-mock
+        run: cargo lipo --release --manifest-path=sn_ffi/Cargo.toml --features=scl-mock
 
       # Upload dev universal library.
       - name: Upload dev universal lib

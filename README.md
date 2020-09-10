@@ -9,7 +9,7 @@
   - [Table of contents](#table-of-contents)
   - [Description](#description)
   - [The Safe API (sn_api)](#the-safe-api-sn_api)
-  - [The FFI layer (safe-ffi)](#the-ffi-layer-safe-ffi)
+  - [The FFI layer (sn_ffi)](#the-ffi-layer-sn_ffi)
   - [The Safe Network CLI](#the-safe-network-cli)
   - [The Authenticator daemon](#the-authenticator-daemon)
   - [JSON-RPC and QUIC](#json-rpc-and-quic)
@@ -25,7 +25,7 @@ A Rust Safe application can make use of the `sn_api` crate to be able to not onl
 
 ![Safe app authorisation flow](misc/auth-flow-diagram.png)
 
-In addition to the `sn_api` crate to be used by Rust applications, this repository contains the [safe-ffi](safe-ffi) library and a couple of applications ([sn_authd](sn_authd) and [sn_cli](sn_cli)) which are required depending on the type of Safe application you are developing, use case, and/or if you are just a user of the Safe Network willing to interact with it using a simple command line interface.
+In addition to the `sn_api` crate to be used by Rust applications, this repository contains the [sn_ffi](sn_ffi) library and a couple of applications ([sn_authd](sn_authd) and [sn_cli](sn_cli)) which are required depending on the type of Safe application you are developing, use case, and/or if you are just a user of the Safe Network willing to interact with it using a simple command line interface.
 
 The following diagram depicts how each of the artifacts of this repository fit in the Safe applications ecosystem. You can find more information about each of them further below in the next section of this document.
 
@@ -35,9 +35,9 @@ The following diagram depicts how each of the artifacts of this repository fit i
 
 The [sn_api](sn_api) is a Rust crate which exposes the Safe API with all the functions needed to communicate with the Safe Network and the Safe Authenticator. If you are developing a Rust application for Safe, this is all you need as a dependency from your app.
 
-## The FFI layer ([safe-ffi](safe-ffi))
+## The FFI layer ([sn_ffi](sn_ffi))
 
-The [safe-ffi](safe-ffi) is a Rust crate exposing the same functions as the Safe API (`sn_api`) but in the form of an interface which can be consumed from other programming languages like C, this is achieved by the use of the [Rust FFI feature](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#using-extern-functions-to-call-external-code).
+The [sn_ffi](sn_ffi) is a Rust crate exposing the same functions as the Safe API (`sn_api`) but in the form of an interface which can be consumed from other programming languages like C, this is achieved by the use of the [Rust FFI feature](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#using-extern-functions-to-call-external-code).
 
 Therefore, if you are developing a Safe application using a different programming language than Rust, this is the crate you need to access the Safe API. This crate also provides scripts to automatically generate the binding libraries for some languages like Java and C#.
 
