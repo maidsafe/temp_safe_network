@@ -1,2 +1,2 @@
 [workspace]
-members = ["sn_cli", "sn_api", "sn_ffi", "sn_authd", "jsonrpc-quic"]
+members = ["sn_cli", "sn_api", "sn_ffi", "sn_authd", "qjsonrpc"]

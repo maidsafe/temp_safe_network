@@ -1849,21 +1849,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonrpc-quic"
-version = "0.0.8"
-dependencies = [
- "directories 2.0.2",
- "futures 0.3.5",
- "log 0.4.8",
- "quinn",
- "rand 0.7.3",
- "rcgen",
- "serde",
- "serde_json",
- "url 2.1.1",
-]
-
-[[package]]
 name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2627,6 +2612,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "qjsonrpc"
+version = "0.0.8"
+dependencies = [
+ "directories 2.0.2",
+ "futures 0.3.5",
+ "log 0.4.8",
+ "quinn",
+ "rand 0.7.3",
+ "rcgen",
+ "serde",
+ "serde_json",
+ "url 2.1.1",
+]
+
+[[package]]
 name = "quic-p2p"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3220,8 +3220,8 @@ dependencies = [
  "flexi_logger",
  "futures 0.3.5",
  "human-panic",
- "jsonrpc-quic",
  "log 0.4.8",
+ "qjsonrpc",
  "quinn",
  "rcgen",
  "self_update",
@@ -3688,11 +3688,11 @@ dependencies = [
  "directories 2.0.2",
  "env_logger 0.6.2",
  "futures 0.3.5",
- "jsonrpc-quic",
  "lazy_static",
  "log 0.4.8",
  "mime_guess",
  "multibase",
+ "qjsonrpc",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "relative-path",

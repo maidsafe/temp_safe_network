@@ -11,8 +11,8 @@ use super::{
     notifs::monitor_pending_auth_reqs, requests::process_jsonrpc_request, shared::*, Error, Result,
 };
 use futures::{lock::Mutex, TryFutureExt};
-use jsonrpc_quic::{Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponseStream};
 use log::{error, info};
+use qjsonrpc::{Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponseStream};
 use sn_api::SafeAuthenticator;
 use std::{collections::BTreeMap, str, sync::Arc};
 use url::Url;
@@ -71,10 +71,10 @@ async fn start_listening(
         .socket_addrs(|| None)
         .map_err(|_| Error::GeneralError("Invalid endpoint address".to_string()))?[0];
 
-    let jsonrpc_quic_endpoint = Endpoint::new(cert_base_path, idle_timeout)
+    let qjsonrpc_endpoint = Endpoint::new(cert_base_path, idle_timeout)
         .map_err(|err| Error::GeneralError(format!("Failed to create endpoint: {}", err)))?;
 
-    let mut incoming_conn = jsonrpc_quic_endpoint
+    let mut incoming_conn = qjsonrpc_endpoint
         .bind(&listen_socket_addr)
         .map_err(|err| Error::GeneralError(format!("Failed to bind endpoint: {}", err)))?;
     info!("Listening on {}", listen_socket_addr);

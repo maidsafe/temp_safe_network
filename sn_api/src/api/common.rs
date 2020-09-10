@@ -8,8 +8,8 @@
 // Software.
 
 use super::{constants::SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
-use jsonrpc_quic::ClientEndpoint;
 use log::info;
+use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
 use threshold_crypto::SecretKey;
 use tokio::runtime;
@@ -89,7 +89,7 @@ where
         Some(dirs) => {
             let cert_base_path = dirs.config_dir().display().to_string();
 
-            let jsonrpc_quic_client = ClientEndpoint::new(
+            let qjsonrpc_client = ClientEndpoint::new(
                 &cert_base_path,
                 Some(SAFE_AUTHD_CONNECTION_IDLE_TIMEOUT),
                 false,
@@ -110,11 +110,9 @@ where
             };
 
             let mut outgoing_conn = {
-                runtime
-                    .enter(|| jsonrpc_quic_client.bind())
-                    .map_err(|err| {
-                        Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
-                    })?
+                runtime.enter(|| qjsonrpc_client.bind()).map_err(|err| {
+                    Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
+                })?
             };
 
             // Establish a new connection
@@ -131,7 +129,7 @@ where
                 .send(method, params)
                 .await
                 .map_err(|err| match err {
-                    jsonrpc_quic::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
+                    qjsonrpc::Error::RemoteEndpointError(msg) => Error::AuthdError(msg),
                     other => Error::AuthdClientError(other.to_string()),
                 })
         }

@@ -466,12 +466,12 @@ jobs:
           cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           authd_version=$(grep "^version" < sn_authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           ffi_version=$(grep "^version" < sn_ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          jsonrpc_quic_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          qjsonrpc_version=$(grep "^version" < qjsonrpc/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=cli_version::$cli_version"
           echo "::set-output name=authd_version::$authd_version"
           echo "::set-output name=ffi_version::$ffi_version"
-          echo "::set-output name=jsonrpc_quic_version::$jsonrpc_quic_version"
+          echo "::set-output name=qjsonrpc_version::$qjsonrpc_version"
 
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
       - name: chmod
@@ -571,13 +571,13 @@ jobs:
       - shell: bash
         id: versioning
         run: |
-          jsonrpc_version=$(grep "^version" < jsonrpc-quic/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          jsonrpc_version=$(grep "^version" < qjsonrpc/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          old_jsonrpc_version=$(cargo search jsonrpc-quic --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          old_jsonrpc_version=$(cargo search qjsonrpc --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           old_api_version=$(cargo search sn_api --limit 1 | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          echo "Current jsonrpc-quic version: $jsonrpc_version"
+          echo "Current qjsonrpc version: $jsonrpc_version"
           echo "Current sn_api version: $api_version"
-          echo "Old jsonrpc-quic version: $old_jsonrpc_version"
+          echo "Old qjsonrpc version: $old_jsonrpc_version"
           echo "Old sn_api version: $old_api_version"
           echo "::set-output name=jsonrpc_version::$jsonrpc_version"
           echo "::set-output name=api_version::$api_version"
@@ -598,7 +598,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: publish
-          args: --manifest-path=jsonrpc-quic/Cargo.toml
+          args: --manifest-path=qjsonrpc/Cargo.toml
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change') && steps.versioning.outputs.jsonrpc_version != steps.versioning.outputs.old_jsonrpc_version
       # Sleep between publishes, crates.io needs some time after publishing a new version before it reports its existence.
       - shell: bash

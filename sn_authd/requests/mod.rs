@@ -24,8 +24,8 @@ use crate::{
     errors::Error,
     shared::{SharedAuthReqsHandle, SharedNotifEndpointsHandle, SharedSafeAuthenticatorHandle},
 };
-use jsonrpc_quic::{JsonRpcRequest, JsonRpcResponse};
 use log::{error, info};
+use qjsonrpc::{JsonRpcRequest, JsonRpcResponse};
 
 // Error code in JSON-RPC response when failed to process a request
 // TODO: have different error codes for each error case

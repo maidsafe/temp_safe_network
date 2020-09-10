@@ -8,8 +8,8 @@
 // Software.
 
 use super::shared::*;
-use jsonrpc_quic::ClientEndpoint;
 use log::info;
+use qjsonrpc::ClientEndpoint;
 use serde_json::json;
 use std::{collections::BTreeMap, time::Duration};
 use tokio::time::delay_for;
@@ -174,11 +174,11 @@ async fn jsonrpc_send(
     cert_base_path: &str,
     idle_timeout: Option<u64>,
 ) -> Result<Option<bool>, String> {
-    let jsonrpc_quic_client = ClientEndpoint::new(cert_base_path, idle_timeout, false)
+    let qjsonrpc_client = ClientEndpoint::new(cert_base_path, idle_timeout, false)
         .map_err(|err| format!("Failed to create client endpoint: {}", err))?;
 
     let mut outgoing_conn = {
-        jsonrpc_quic_client
+        qjsonrpc_client
             .bind()
             .map_err(|err| format!("Failed to bind endpoint: {}", err))?
     };
@@ -195,7 +195,7 @@ async fn jsonrpc_send(
     match response {
         Ok(r) => Ok(r),
         Err(err) => match err {
-            jsonrpc_quic::Error::RemoteEndpointError(msg) => {
+            qjsonrpc::Error::RemoteEndpointError(msg) => {
                 // Subscriber responded but with an error, we won't unsubscribe it, but will
                 // consider this response as a "no decision" for the auth req
                 info!(

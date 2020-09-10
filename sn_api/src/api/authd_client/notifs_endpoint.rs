@@ -8,10 +8,10 @@
 // Software.
 
 use super::AuthReq;
-use jsonrpc_quic::{
+use log::{debug, info};
+use qjsonrpc::{
     Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseStream,
 };
-use log::{debug, info};
 use serde_json::json;
 use tokio::{
     runtime,
@@ -35,7 +35,7 @@ pub async fn jsonrpc_listen(
         .socket_addrs(|| None)
         .map_err(|_| "Invalid endpoint address".to_string())?[0];
 
-    let jsonrpc_quic_endpoint = Endpoint::new(cert_base_path, None)
+    let qjsonrpc_endpoint = Endpoint::new(cert_base_path, None)
         .map_err(|err| format!("Failed to create endpoint: {}", err))?;
 
     // We try to obtain current runtime or create a new one if there is none
@@ -48,7 +48,7 @@ pub async fn jsonrpc_listen(
     };
 
     let mut incoming_conn = runtime
-        .enter(|| jsonrpc_quic_endpoint.bind(&listen_socket_addr))
+        .enter(|| qjsonrpc_endpoint.bind(&listen_socket_addr))
         .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
 
     while let Some(conn) = incoming_conn.get_next().await {
