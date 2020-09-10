@@ -3211,47 +3211,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
-name = "safe-authd"
-version = "0.0.11"
-dependencies = [
- "cargo-husky",
- "cluFlock",
- "directories 2.0.2",
- "flexi_logger",
- "futures 0.3.5",
- "human-panic",
- "log 0.4.8",
- "qjsonrpc",
- "quinn",
- "rcgen",
- "self_update",
- "serde",
- "serde_json",
- "sn_api",
- "structopt 0.2.18",
- "tokio 0.2.21",
- "unwrap",
- "url 2.1.1",
- "urlencoding",
-]
-
-[[package]]
-name = "safe-cmd-test-utilities"
-version = "1.0.0"
-dependencies = [
- "duct",
- "multibase",
- "rand 0.7.3",
- "safe-nd",
- "serde",
- "serde_json",
- "sn_api",
- "tiny-keccak 1.5.0",
- "unwrap",
- "walkdir",
-]
-
-[[package]]
 name = "safe-nd"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3713,6 +3672,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "sn_authd"
+version = "0.0.11"
+dependencies = [
+ "cargo-husky",
+ "cluFlock",
+ "directories 2.0.2",
+ "flexi_logger",
+ "futures 0.3.5",
+ "human-panic",
+ "log 0.4.8",
+ "qjsonrpc",
+ "quinn",
+ "rcgen",
+ "self_update",
+ "serde",
+ "serde_json",
+ "sn_api",
+ "structopt 0.2.18",
+ "tokio 0.2.21",
+ "unwrap",
+ "url 2.1.1",
+ "urlencoding",
+]
+
+[[package]]
 name = "sn_bindgen"
 version = "0.13.3"
 source = "git+https://github.com/maidsafe/sn_bindgen#5a70011c79e5efd7f3a6903af610384282101ef9"
@@ -3759,7 +3743,6 @@ dependencies = [
  "relative-path",
  "reqwest 0.9.24",
  "rpassword",
- "safe-cmd-test-utilities",
  "safe-nd",
  "self_update",
  "serde",
@@ -3767,6 +3750,7 @@ dependencies = [
  "serde_yaml",
  "shrust",
  "sn_api",
+ "sn_cmd_test_utilities",
  "sn_launch_tool",
  "structopt 0.3.15",
  "tiny-keccak 1.5.0",
@@ -3774,6 +3758,22 @@ dependencies = [
  "unwrap",
  "walkdir",
  "xor_name",
+]
+
+[[package]]
+name = "sn_cmd_test_utilities"
+version = "1.0.0"
+dependencies = [
+ "duct",
+ "multibase",
+ "rand 0.7.3",
+ "safe-nd",
+ "serde",
+ "serde_json",
+ "sn_api",
+ "tiny-keccak 1.5.0",
+ "unwrap",
+ "walkdir",
 ]
 
 [[package]]

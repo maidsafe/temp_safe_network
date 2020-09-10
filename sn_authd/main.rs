@@ -35,7 +35,7 @@ use operations::{restart_authd, start_authd, stop_authd};
 /// SAFE Authenticator daemon subcommands
 #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
 enum CmdArgs {
-    /// Start the safe-authd daemon
+    /// Start the sn_authd daemon
     #[structopt(name = "start")]
     Start {
         /// File to log TLS keys to for debugging
@@ -60,14 +60,14 @@ enum CmdArgs {
         #[structopt(long = "fg")]
         fg: bool,
     },
-    /// Stop a running safe-authd
+    /// Stop a running sn_authd
     #[structopt(name = "stop")]
     Stop {
         /// Path where to store authd log files (default ~/.safe/authd/logs/)
         #[structopt(long)]
         log_dir: Option<PathBuf>,
     },
-    /// Restart a running safe-authd
+    /// Restart a running sn_authd
     #[structopt(name = "restart")]
     Restart {
         /// Address to listen on
@@ -94,7 +94,7 @@ async fn main() {
     debug!("Running authd with options: {:?}", opt);
 
     if let Err(err) = process_command(opt).await {
-        error!("safe-authd error: {}", err);
+        error!("sn_authd error: {}", err);
         process::exit(err.error_code());
     }
 }

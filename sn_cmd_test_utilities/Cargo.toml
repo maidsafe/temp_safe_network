@@ -1,5 +1,5 @@
 [package]
-name = "safe-cmd-test-utilities"
+name = "sn_cmd_test_utilities"
 version = "1.0.0"
 description = "Safe CLI Test Utilities"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]

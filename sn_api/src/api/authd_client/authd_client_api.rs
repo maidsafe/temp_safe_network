@@ -362,7 +362,7 @@ impl SafeAuthdClient {
 
         // Generate a path which is where we will store the endpoint certificates that authd will
         // need to read to be able to create a secure channel to send us the notifications with
-        let dirs = directories::ProjectDirs::from("net", "maidsafe", "safe-authd-client")
+        let dirs = directories::ProjectDirs::from("net", "maidsafe", "sn_authd-client")
             .ok_or_else(|| {
                 Error::AuthdClientError(
                     "Failed to obtain local home directory where to store endpoint certificates to"

@@ -23,8 +23,8 @@ use structopt::StructOpt;
 
 pub fn shell_run() -> Result<(), String> {
     let safe = Safe::default();
-    let safe_authd_client = SafeAuthdClient::new(None);
-    let mut shell = Shell::new((safe, safe_authd_client));
+    let sn_authd_client = SafeAuthdClient::new(None);
+    let mut shell = Shell::new((safe, sn_authd_client));
     shell.set_default(|io, _, cmd| {
         writeln!(
             io,
@@ -39,7 +39,7 @@ pub fn shell_run() -> Result<(), String> {
         "auth",
         "Authorise the Safe CLI and interact with a remote Authenticator daemon",
         0,
-        |io, (safe, safe_authd_client), args| {
+        |io, (safe, sn_authd_client), args| {
             // Let's create an args array to mimic the one we'd receive commands were passed from outside shell
             let mut mimic_cli_args = vec!["safe", "auth"];
             mimic_cli_args.extend(args.iter());
@@ -50,7 +50,7 @@ pub fn shell_run() -> Result<(), String> {
                     match cmd_args.cmd {
                         Some(SubCommands::Auth { cmd }) => {
                             if let Some(AuthSubCommands::Subscribe { notifs_endpoint }) = cmd {
-                                match task::block_on(authd_subscribe(safe_authd_client, notifs_endpoint, &prompt_to_allow_auth)) {
+                                match task::block_on(authd_subscribe(sn_authd_client, notifs_endpoint, &prompt_to_allow_auth)) {
                                     Ok(()) => {
                                         writeln!(io, "Keep this shell session open to receive the notifications")?;
                                         Ok(())
@@ -87,85 +87,85 @@ pub fn shell_run() -> Result<(), String> {
         "cat",
         "Read data on the Safe Network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("cat", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("cat", args, safe, io),
     );
     shell.new_command(
         "config",
         "CLI config settings",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("config", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("config", args, safe, io),
     );
     shell.new_command(
         "dog",
         "Inspect data on the Safe Network providing only metadata information about the content",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("dog", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("dog", args, safe, io),
     );
     shell.new_command(
         "files",
         "Manage files on the Safe Network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("files", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("files", args, safe, io),
     );
     shell.new_command(
         "seq",
         "Manage Sequences on the Safe Network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("seq", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("seq", args, safe, io),
     );
     shell.new_command(
         "keypair",
         "Generate a key pair without creating and/or storing a SafeKey on the network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("keypair", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("keypair", args, safe, io),
     );
     shell.new_command(
         "keys",
         "Manage keys on the Safe Network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("keys", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("keys", args, safe, io),
     );
     shell.new_command(
         "networks",
         "Switch between Safe networks",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("networks", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("networks", args, safe, io),
     );
     shell.new_command(
         "nrs",
         "Manage public names on the Safe Network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("nrs", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("nrs", args, safe, io),
     );
     shell.new_command(
         "setup",
         "Perform setup tasks",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("setup", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("setup", args, safe, io),
     );
     shell.new_command(
         "update",
         "Update the application to the latest available version",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("update", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("update", args, safe, io),
     );
     shell.new_command(
         "vault",
         "Commands to manage Safe vaults",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("vault", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("vault", args, safe, io),
     );
     shell.new_command(
         "wallet",
         "Manage wallets on the Safe Network",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("wallet", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("wallet", args, safe, io),
     );
     shell.new_command(
         "xorurl",
         "Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs",
         0,
-        |io, (safe, _safe_authd_client), args| call_cli("xorurl", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("xorurl", args, safe, io),
     );
 
     println!();

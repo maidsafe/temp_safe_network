@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate safe_cmd_test_utilities;
+extern crate sn_cmd_test_utilities;
 
 #[macro_use]
 extern crate duct;
@@ -20,14 +20,14 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use safe_cmd_test_utilities::{
+use sn_api::{xorurl::XorUrlEncoder, Safe};
+use sn_cmd_test_utilities::{
     can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
     create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
     safe_cmd_stdout, str_to_sha3_256, sum_tree, test_symlinks_are_valid,
     upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
     upload_testfolder_trailing_slash, TEST_FOLDER,
 };
-use sn_api::{xorurl::XorUrlEncoder, Safe};
 
 use std::env;
 use std::fs;

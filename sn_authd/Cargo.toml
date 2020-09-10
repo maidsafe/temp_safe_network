@@ -1,5 +1,5 @@
 [package]
-name = "safe-authd"
+name = "sn_authd"
 version = "0.0.11"
 description = "Safe Authenticator (daemon)"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
@@ -9,7 +9,7 @@ repository = "https://github.com/maidsafe/sn_api"
 edition = "2018"
 
 [[bin]]
-name = "safe-authd"
+name = "sn_authd"
 path = "main.rs"
 
 [dependencies]

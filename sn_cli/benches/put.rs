@@ -26,7 +26,7 @@ const SIZE_250KB: usize = 250_000;
 const SIZE_100KB: usize = 100_000;
 const TINY_FILE: usize = 10;
 
-use safe_cmd_test_utilities::get_bin_location;
+use sn_cmd_test_utilities::get_bin_location;
 
 fn custom_criterion() -> Criterion {
     Criterion::default().sample_size(SAMPLE_SIZE)

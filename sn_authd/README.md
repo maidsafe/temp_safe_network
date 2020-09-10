@@ -10,7 +10,7 @@
   - [Description](#description)
   - [Download](#download)
   - [Build](#build)
-  - [Launching the safe-authd](#launching-the-safe-authd)
+  - [Launching the sn_authd](#launching-the-sn_authd)
     - [Start](#start)
     - [Stop](#stop)
     - [Restart](#restart)
@@ -21,13 +21,13 @@
 
 This crate implements a Safe Authenticator service which runs as a daemon (or as a service in Windows platforms).
 
-The `safe-authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
+The `sn_authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
 
 It keeps in memory a list of authorisation requests pending of approval/denial, as well as the list of the registered subscribers that the notifications shall be sent to.
 
 ![authd software architecture](/misc/authd-software.png)
 
-The following are few examples of JSON-RPC requests/responses exchanged with `safe-authd` over QUIC:
+The following are few examples of JSON-RPC requests/responses exchanged with `sn_authd` over QUIC:
 JSON-RPC call to log in:
 ```
 Request: {
@@ -71,7 +71,7 @@ Response: {
 }
 ```
 
-When `safe-authd` sends a notification to each of the subscribers it also uses JSON-RPC over QUIC. The following is an example of a JSON-RPC message corresponding to an authorisation request notification sent from the `safe-authd` to a subscriber:
+When `sn_authd` sends a notification to each of the subscribers it also uses JSON-RPC over QUIC. The following is an example of a JSON-RPC message corresponding to an authorisation request notification sent from the `sn_authd` to a subscriber:
 ```
 {
   jsonrpc: "2.0",
@@ -95,7 +95,7 @@ When `safe-authd` sends a notification to each of the subscribers it also uses J
 
 ## Download
 
-The latest version of the Safe Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/sn_api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the safe-authd](#launching-the-safe-authd) section further down in this document.
+The latest version of the Safe Authenticator daemon can be downloaded from the [releases page](https://github.com/maidsafe/sn_api/releases/latest). Once it's downloaded and unpacked, you can follow the steps in this guide by starting from the [Launching the sn_authd](#launching-the-sn_authd) section further down in this document.
 
 If otherwise you prefer to build the Safe Authenticator daemon from source code, please follow the instructions in the next two section below.
 
@@ -103,16 +103,16 @@ If otherwise you prefer to build the Safe Authenticator daemon from source code,
 
 In order to build this application from source code you need to make sure you have `rustc v1.44.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
-Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `safe-authd` (the build process may take several minutes the first time you run it on this crate):
+Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `sn_authd` (the build process may take several minutes the first time you run it on this crate):
 ```shell
 $ git clone https://github.com/maidsafe/sn_api.git
-$ cd sn_api/safe-authd
+$ cd sn_api/sn_authd
 $ cargo build
 ```
 
 Once it's built you can find the `safe-authd` executable at `target/debug/`.
 
-## Launching the safe-authd
+## Launching the sn_authd
 
 The `safe-authd` can be launched with:
 1. `cargo run -- <list of arguments/options>`
@@ -148,9 +148,9 @@ Success, safe-authd (PID: <pid>) stopped!
 We can also restart the Safe Authenticator daemon (`safe-authd`) if it's already running, with the following command (on Windows make sure you use the `safe-authd.exe` executable):
 ```shell
 $ safe-authd restart
-Stopping Safe Authenticator daemon (safe-authd)...
-Success, safe-authd (PID: <pid>) stopped!
-Starting Safe Authenticator daemon (safe-authd)...
+Stopping Safe Authenticator daemon (sn_authd)...
+Success, sn_authd (PID: <pid>) stopped!
+Starting Safe Authenticator daemon (sn_authd)...
 ```
 
 ## License

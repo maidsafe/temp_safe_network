@@ -11,7 +11,7 @@
 extern crate duct;
 use criterion::Criterion;
 
-use safe_cmd_test_utilities::get_bin_location;
+use sn_cmd_test_utilities::get_bin_location;
 use std::time::Duration;
 
 // sample size is _NOT_ the number of times the command is run...

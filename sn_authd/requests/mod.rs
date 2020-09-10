@@ -34,7 +34,7 @@ const JSONRPC_AUTH_ERROR: isize = -1;
 // Method for requesting application's authorisation
 const METHOD_AUTHORISE: &str = "authorise";
 
-// Method for getting a status report of the safe-authd
+// Method for getting a status report of the sn_authd
 const METHOD_STATUS: &str = "status";
 
 // Method for logging into a SAFE account

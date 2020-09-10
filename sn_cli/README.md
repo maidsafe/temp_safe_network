@@ -344,10 +344,10 @@ The Safe Authenticator, which runs as a daemon or as a service in Windows platfo
 Downloading and installing the Authenticator daemon is very simple:
 ```shell
 $ safe auth install
-Latest release found: safe-authd v0.0.3
+Latest release found: sn_authd v0.0.3
 Downloading https://safe-api.s3.eu-west-2.amazonaws.com/safe-authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
-Installing safe-authd binary at ~/.safe/authd ...
+Installing sn_authd binary at ~/.safe/authd ...
 Setting execution permissions to installed binary '~/.safe/authd/safe-authd'...
 Done!
 ```
@@ -552,7 +552,7 @@ $ safe auth update
 ```
 It will check if a newer release is available on [Amazon S3](https://safe-api.s3.eu-west-2.amazonaws.com). After prompting to confirm if you want to take the latest version, it will be downloaded and the safe-authd binary will be updated.
 
-After the safe-authd was updated, you'll need to restart it to start using new version:
+After the sn_authd was updated, you'll need to restart it to start using new version:
 ```shell
 $ safe auth restart
 Stopping Safe Authenticator daemon (sn_authd)...

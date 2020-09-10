@@ -24,7 +24,7 @@ use std::{
     time::Duration,
 };
 
-const SAFE_AUTHD_PID_FILE: &str = "safe-authd.pid";
+const SAFE_AUTHD_PID_FILE: &str = "sn_authd.pid";
 const DEFAULT_LOG_LEVEL: &str = "info";
 
 pub async fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: bool) -> Result<()> {
@@ -38,7 +38,7 @@ pub async fn start_authd(listen: &str, log_dir: Option<PathBuf>, foreground: boo
 }
 
 pub fn stop_authd(log_dir: Option<PathBuf>) -> Result<()> {
-    println!("Stopping SAFE Authenticator daemon (safe-authd)...");
+    println!("Stopping SAFE Authenticator daemon (sn_authd)...");
 
     if cfg!(windows) {
         // Since in Windows we cannot read the locked PID file,
@@ -77,7 +77,7 @@ pub fn stop_authd(log_dir: Option<PathBuf>) -> Result<()> {
         debug!("Retrieving authd PID from: {:?}", &pid_file_path);
         let mut file = File::open(&pid_file_path).map_err(|err| {
             Error::GeneralError(format!(
-                "Failed to open safe-authd daemon PID file ('{}') to stop daemon: {}",
+                "Failed to open sn_authd daemon PID file ('{}') to stop daemon: {}",
                 pid_file_path.display(),
                 err
             ))
@@ -87,9 +87,9 @@ pub fn stop_authd(log_dir: Option<PathBuf>) -> Result<()> {
 
         let output = Command::new("kill").arg("-9").arg(&pid).output()?;
         if output.status.success() {
-            println!("Success, safe-authd (PID: {}) stopped!", pid);
+            println!("Success, sn_authd (PID: {}) stopped!", pid);
         } else {
-            println!("No running safe-authd process (with PID {}) was found", pid);
+            println!("No running sn_authd process (with PID {}) was found", pid);
         }
         Ok(())
     }
@@ -104,7 +104,7 @@ pub async fn restart_authd(listen: &str, log_dir: Option<PathBuf>, foreground: b
         Err(err) => println!("{}", err),
     }
     start_authd(listen, log_dir, foreground).await?;
-    println!("Success, safe-authd restarted!");
+    println!("Success, sn_authd restarted!");
     Ok(())
 }
 
@@ -170,7 +170,7 @@ async fn run_in_foreground(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
             pid_file.set_len(0)?;
             write!(pid_file, "{}", pid).map_err(|err| {
                 Error::GeneralError(format!(
-                    "Failed to start safe-authd daemon ({}): {}",
+                    "Failed to start sn_authd daemon ({}): {}",
                     authd_exec.display(),
                     err.to_string()
                 ))
@@ -208,7 +208,7 @@ async fn run_in_foreground(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
                 // A daemon has been already started keeping the lock on the PID file,
                 // although we don't know its status
                 Error::AuthdAlreadyStarted(format!(
-                    "Failed to start safe-authd daemon ({})",
+                    "Failed to start sn_authd daemon ({})",
                     authd_exec.display(),
                 ))
             } else {
@@ -228,7 +228,7 @@ fn launch_detached_process(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
     let log_path = get_authd_log_path(log_dir)?;
     let authd_exec = std::env::current_exe()?;
 
-    println!("Starting SAFE Authenticator daemon (safe-authd)...");
+    println!("Starting SAFE Authenticator daemon (sn_authd)...");
     // We execute this same binary but requesting to run in the foreground,
     // and since we spawn it, it will be a detached process running in the background
     let args = [
@@ -267,7 +267,7 @@ fn launch_detached_process(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
         let error = Error::from_code(
             exit_code,
             format!(
-                "Failed to start safe-authd daemon '{}' (exit code: {})",
+                "Failed to start sn_authd daemon '{}' (exit code: {})",
                 authd_exec.display(),
                 exit_code
             ),
@@ -275,7 +275,7 @@ fn launch_detached_process(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
         println!("{}", error);
         Err(error)
     } else {
-        println!("safe-authd started (PID: {})", child.id());
+        println!("sn_authd started (PID: {})", child.id());
         Ok(())
     }
 }
