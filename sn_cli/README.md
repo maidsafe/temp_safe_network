@@ -476,7 +476,7 @@ Please note, that both the passphrase and password environment variables must be
 
 Now that the Authenticator is running and ready to authorise applications, we can try to authorise the CLI application.
 
-In a normal scenario, an Authenticator GUI would be using `authd` as its backend process, e.g. the [Safe Network Application](https://github.com/maidsafe/safe-network-app) provides such a GUI to review authorisation requests and allow the permissions requested to be granted.
+In a normal scenario, an Authenticator GUI would be using `authd` as its backend process, e.g. the [Safe Network Application](https://github.com/maidsafe/sn_app) provides such a GUI to review authorisation requests and allow the permissions requested to be granted.
 
 For the purpose of making this guide self-contained with the Safe CLI application, we will now use also the CLI on a second console to review and allow/deny authorisation requests.
 
