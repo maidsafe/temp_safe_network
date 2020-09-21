@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use log::{debug, info, warn};
 
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
-use safe_nd::{
+use sn_data_types::{
     ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
     MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
     SDataPrivUserPermissions, SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction,

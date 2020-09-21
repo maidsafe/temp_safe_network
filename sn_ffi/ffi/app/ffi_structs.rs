@@ -27,7 +27,7 @@ use std::os::raw::c_char;
 use xor_name::XOR_NAME_LEN;
 
 /// Array containing `XorName` bytes.
-/// Adding this here because bindgen not picking this correctly from the safe-nd.
+/// Adding this here because bindgen not picking this correctly from the sn_data_types.
 pub type XorNameArray = [u8; XOR_NAME_LEN];
 
 #[repr(C)]

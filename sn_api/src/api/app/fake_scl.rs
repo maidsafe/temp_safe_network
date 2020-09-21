@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
 use log::{debug, trace};
-use safe_nd::{
+use sn_data_types::{
     Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
 };
 use serde::{Deserialize, Serialize};

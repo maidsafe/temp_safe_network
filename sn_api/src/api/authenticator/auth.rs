@@ -29,7 +29,7 @@ use safe_core::{
     utils::symmetric_decrypt,
     CoreError,
 };
-use safe_nd::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
+use sn_data_types::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
 use std::collections::HashMap;
 
 // Authenticator API
@@ -617,7 +617,7 @@ async fn gen_cont_auth_response(
 
             // Adding a new access container entry
             Ok((_, None))
-            | Err(AuthError::CoreError(CoreError::DataError(safe_nd::Error::NoSuchEntry))) => 0,
+            | Err(AuthError::CoreError(CoreError::DataError(sn_data_types::Error::NoSuchEntry))) => 0,
 
             // Error has occurred while trying to get an
             // existing entry

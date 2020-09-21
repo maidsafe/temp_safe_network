@@ -16,7 +16,7 @@ use super::{
 use crate::{Error, Result};
 use log::{debug, info};
 use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
-use safe_nd::AppPermissions;
+use sn_data_types::AppPermissions;
 use serde_json::json;
 use std::collections::HashMap;
 

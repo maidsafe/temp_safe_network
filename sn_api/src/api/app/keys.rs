@@ -18,7 +18,7 @@ use crate::{
     Error, Result,
 };
 use rand_core::RngCore;
-use safe_nd::Coins;
+use sn_data_types::Coins;
 use serde::{Deserialize, Serialize};
 use threshold_crypto::{PublicKey, SecretKey};
 use xor_name::XorName;

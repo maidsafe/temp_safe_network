@@ -16,7 +16,7 @@ use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use safe_core::ipc::req::ContainerPermissions;
-use safe_nd::AppPermissions;
+use sn_data_types::AppPermissions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{

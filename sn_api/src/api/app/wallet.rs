@@ -19,7 +19,7 @@ use crate::{
 };
 use log::debug;
 use rand_core::RngCore;
-use safe_nd::Coins;
+use sn_data_types::Coins;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use xor_name::XorName;

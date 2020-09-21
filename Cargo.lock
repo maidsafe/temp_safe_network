@@ -683,9 +683,9 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "4.1.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbe3a81de7c6d486b5087559d310092b053e7e9fddefe5257b745a233b2a66a7"
+checksum = "71539d73d24504c101d5eaf61902a7888e4ec13fa21ec294858b81d22e818563"
 dependencies = [
  "bitvec",
  "num-bigint",
@@ -877,6 +877,28 @@ name = "data-encoding"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72aa14c04dfae8dd7d8a2b1cb7ca2152618cd01336dbfe704b8dcbf8d41dbd69"
+
+[[package]]
+name = "data-encoding-macro"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de6489dde5128f5ab2f71f88f8807a237cecf08d96dc7ca4be64e0730dc7d961"
+dependencies = [
+ "data-encoding",
+ "data-encoding-macro-internal",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "data-encoding-macro-internal"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d2d6daefd5f1d4b74a891a5d2ab7dccba028d423107c074232a0c5dc0d40a9e"
+dependencies = [
+ "data-encoding",
+ "proc-macro-hack",
+ "syn 1.0.33",
+]
 
 [[package]]
 name = "dbl"
@@ -2127,6 +2149,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "multibase"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b78c60039650ff12e140ae867ef5299a58e19dded4d334c849dc7177083667e2"
+dependencies = [
+ "base-x",
+ "data-encoding",
+ "data-encoding-macro",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3212,16 +3245,16 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.11.1"
+version = "0.11.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4da5e2b186a63820af34a48a590535e7448d039998501632f0fee066d90af77a"
+checksum = "f4bcd91fa9038cc2e2861a5298d872ab54dd1932900b32482ef13cf61e4078d9"
 dependencies = [
  "bincode",
  "crdts",
  "ed25519",
  "ed25519-dalek",
  "hex_fmt",
- "multibase",
+ "multibase 0.8.0",
  "rand 0.7.3",
  "serde",
  "sha3",
@@ -3623,16 +3656,16 @@ dependencies = [
  "lazy_static",
  "log 0.4.8",
  "mime_guess",
- "multibase",
+ "multibase 0.6.0",
  "qjsonrpc",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "relative-path",
- "safe-nd",
  "safe_authenticator",
  "safe_core",
  "serde",
  "serde_json",
+ "sn_data_types",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "tokio 0.2.21",
@@ -3704,7 +3737,7 @@ dependencies = [
  "indicatif 0.14.0",
  "isatty",
  "log 0.4.8",
- "multibase",
+ "multibase 0.6.0",
  "num-traits",
  "percent-encoding 2.1.0",
  "predicates",
@@ -3715,7 +3748,6 @@ dependencies = [
  "relative-path",
  "reqwest 0.9.24",
  "rpassword",
- "safe-nd",
  "self_update",
  "serde",
  "serde_json",
@@ -3723,6 +3755,7 @@ dependencies = [
  "shrust",
  "sn_api",
  "sn_cmd_test_utilities",
+ "sn_data_types",
  "sn_launch_tool",
  "structopt 0.3.15",
  "tiny-keccak 1.5.0",
@@ -3737,15 +3770,37 @@ name = "sn_cmd_test_utilities"
 version = "1.0.0"
 dependencies = [
  "duct",
- "multibase",
+ "multibase 0.6.0",
  "rand 0.7.3",
- "safe-nd",
  "serde",
  "serde_json",
  "sn_api",
+ "sn_data_types",
  "tiny-keccak 1.5.0",
  "unwrap",
  "walkdir",
+]
+
+[[package]]
+name = "sn_data_types"
+version = "0.11.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d22020946ec31c1a0093db9c17200dabed416a1b12ac03aabc588eba8d6235e7"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase 0.8.0",
+ "rand 0.7.3",
+ "serde",
+ "sha3",
+ "signature",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "unwrap",
+ "xor_name",
 ]
 
 [[package]]
@@ -3754,13 +3809,13 @@ version = "0.15.0"
 dependencies = [
  "bincode",
  "log 0.4.8",
- "safe-nd",
  "safe_authenticator",
  "safe_core",
  "serde",
  "serde_json",
  "sn_api",
  "sn_bindgen",
+ "sn_data_types",
  "sn_ffi_utils",
  "tokio 0.2.21",
  "unwrap",
@@ -4901,12 +4956,13 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca9b4049dd2e7b14b0f7bc18d52a759d60c829998862557caf2983c25cddaf7f"
+checksum = "6fa8a0b42a4cb692a96d21a3a028c759d763392f11ea4056504c9f6cb7e599c0"
 dependencies = [
  "log 0.4.8",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde",
 ]
 

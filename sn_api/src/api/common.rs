@@ -16,7 +16,7 @@ use tokio::runtime;
 
 pub mod auth_types {
     use safe_core::ipc::req::{ContainerPermissions, IpcReq};
-    use safe_nd::AppPermissions;
+    use sn_data_types::AppPermissions;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     pub type SafeAuthReq = IpcReq;

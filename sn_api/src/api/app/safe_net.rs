@@ -10,7 +10,7 @@
 use crate::api::fetch::Range;
 use crate::Result;
 use async_trait::async_trait;
-use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId};
+use sn_data_types::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 use xor_name::XorName;

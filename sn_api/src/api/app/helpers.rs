@@ -11,7 +11,7 @@ use super::common::{parse_hex, sk_from_hex};
 use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
-use safe_nd::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey};
+use sn_data_types::{Coins, Error as SafeNdError, PublicKey as SafeNdPublicKey};
 use std::str::{self, FromStr};
 use std::time;
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
