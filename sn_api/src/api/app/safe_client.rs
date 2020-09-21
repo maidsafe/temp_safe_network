@@ -16,7 +16,7 @@ use super::{
 use crate::{Error, Result};
 use async_trait::async_trait;
 use log::{debug, info, warn};
-use safe_app::App;
+
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
     ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
@@ -33,7 +33,7 @@ const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
 #[derive(Default)]
 pub struct SafeAppScl {
-    safe_conn: Option<App>,
+    safe_conn: Option<Client>,
 }
 
 impl SafeAppScl {
@@ -86,14 +86,16 @@ impl SafeApp for SafeAppScl {
                 let auth_granted = decode_ipc_msg(auth_credentials)?;
                 match auth_granted {
                     AuthResponseType::Registered(authgranted) => {
-                        App::registered(app_id.to_string(), authgranted, disconnect_cb).await
+                        // TODO: This needs an existing SK now.
+                        Client::new(app_id.to_string(), authgranted, disconnect_cb).await
                     }
                     AuthResponseType::Unregistered(config) => {
-                        App::unregistered(disconnect_cb, Some(config)).await
+                        // TODO: what to do with config...
+                        Client::new(None).await
                     }
                 }
             }
-            None => App::unregistered(disconnect_cb, None).await,
+            None => Client::new(None).await,
         }
         .map_err(|err| {
             Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))

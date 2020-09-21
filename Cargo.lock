@@ -3233,33 +3233,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "safe_app"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "022c2031fbb6ac9a1fe64047f1815f3ce8558046adc96b9fbcfd35dbe4a69787"
-dependencies = [
- "async-trait",
- "bincode",
- "ffi_utils",
- "futures 0.3.5",
- "jni",
- "log 0.4.8",
- "lru-cache",
- "miscreant",
- "rand 0.7.3",
- "safe-nd",
- "safe_core",
- "self_encryption",
- "serde",
- "serde_derive",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "tokio 0.2.21",
- "unwrap",
- "xor_name",
-]
-
-[[package]]
 name = "safe_authenticator"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3656,7 +3629,6 @@ dependencies = [
  "rand_core 0.5.1",
  "relative-path",
  "safe-nd",
- "safe_app",
  "safe_authenticator",
  "safe_core",
  "serde",
