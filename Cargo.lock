@@ -1853,16 +1853,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
-name = "memmap"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
-dependencies = [
- "libc",
- "winapi 0.3.8",
-]
-
-[[package]]
 name = "memoffset"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3128,23 +3118,22 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.19.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54e24a8301349703da75c5f7547a27e3c1642812ca99c620cbd8b92ba36820a"
+checksum = "9da2a8a8d59e4d0a09af72e91d3a2a4fa4b3d3dd6d063cafeb0f2485525fd78d"
 dependencies = [
  "aes",
  "async-trait",
  "bincode",
  "block-modes",
  "brotli",
+ "err-derive",
  "futures 0.3.5",
- "memmap",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
  "serde",
  "tiny-keccak 1.5.0",
  "tokio 0.2.21",
- "unwrap",
 ]
 
 [[package]]
