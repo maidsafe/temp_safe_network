@@ -8,10 +8,12 @@
 // Software.
 
 use super::common::{parse_hex, sk_from_hex};
+#[cfg(feature = "app")]
+use crate::api::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
-use safe_core::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
-use sn_data_types::{Moneys, Error as SafeNdError, PublicKey as SafeNdPublicKey};
+
+use sn_data_types::{Error as SafeNdError, Money, PublicKey as SafeNdPublicKey};
 use std::str::{self, FromStr};
 use std::time;
 use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
@@ -19,7 +21,7 @@ use xor_name::XorName;
 
 /// The conversion from coin to raw value
 const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
-// The maximum amount of safecoin that can be represented by a single `Moneys`
+// The maximum amount of safecoin that can be represented by a single `Money`
 const MAX_COINS_VALUE: u64 = (u32::max_value() as u64 + 1) * COIN_TO_RAW_CONVERSION - 1;
 
 // Out internal key pair structure to manage BLS keys
@@ -78,12 +80,12 @@ pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
         .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
 }
 
-pub fn parse_coins_amount(amount_str: &str) -> Result<Moneys> {
-    Moneys::from_str(amount_str).map_err(|err| {
+pub fn parse_coins_amount(amount_str: &str) -> Result<Money> {
+    Money::from_str(amount_str).map_err(|err| {
         match err {
             SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
                 "Invalid safecoins amount '{}', it exceeds the maximum possible value '{}'",
-                amount_str, Moneys::from_nano(MAX_COINS_VALUE)
+                amount_str, Money::from_nano(MAX_COINS_VALUE)
             )),
             SafeNdError::LossOfPrecision => {
                 Error::InvalidAmount(format!("Invalid safecoins amount '{}', the minimum possible amount is one nano coin (0.000000001)", amount_str))

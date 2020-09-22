@@ -9,15 +9,15 @@
 
 mod auth;
 mod consts;
-#[cfg(feature = "scl-mock")]
-mod fake_scl;
+#[cfg(feature = "client-mock")]
+mod fake_client;
 mod helpers;
 mod keys;
 mod nrs;
 mod realpath;
-#[cfg(not(feature = "scl-mock"))]
+#[cfg(not(feature = "client-mock"))]
 mod safe_client;
-mod safe_net;
+// mod safe_net;
 mod sequence;
 #[cfg(test)]
 mod test_helpers;
@@ -25,11 +25,11 @@ mod xorurl_media_types;
 
 use super::common;
 use super::constants;
-#[cfg(feature = "scl-mock")]
-use fake_scl::SafeAppFake as SafeAppImpl;
-#[cfg(not(feature = "scl-mock"))]
-use safe_client::SafeAppScl as SafeAppImpl;
-use safe_net::SafeApp;
+#[cfg(feature = "client-mock")]
+use fake_client::SafeAppFakeClient as SafeAppImpl;
+#[cfg(not(feature = "client-mock"))]
+use safe_client::SafeAppClient;
+// use safe_net::SafeApp;
 use xorurl::XorUrlBase;
 
 // The following is what's meant to be the public API
@@ -46,7 +46,7 @@ pub use nrs::ProcessedEntries;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 pub struct Safe {
-    safe_app: SafeAppImpl,
+    safe_client: SafeAppClient,
     pub xorurl_base: XorUrlBase,
 }
 
@@ -59,7 +59,7 @@ impl Default for Safe {
 impl Safe {
     pub fn new(xorurl_base: Option<XorUrlBase>) -> Self {
         Self {
-            safe_app: SafeApp::new(),
+            safe_client: SafeAppClient::new(),
             xorurl_base: xorurl_base.unwrap_or_else(|| DEFAULT_XORURL_BASE),
         }
     }

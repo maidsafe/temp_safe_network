@@ -781,7 +781,7 @@ async fn download_file_from_net(
         };
         let range = Some((Some(start), Some(end)));
         // gets public or private, based on xorurl type
-        let filedata = files_get_immutable(&safe, &xorurl, range).await?;
+        let filedata = files_get_blob(&safe, &xorurl, range).await?;
         bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
         rcvd += filedata.len() as u64;
         trace!(
@@ -873,7 +873,7 @@ fn create_dir_all(dir_path: &Path) -> ApiResult<()> {
 /// # Get Private ImmutableData
 /// Get private immutable data blobs from the network.
 ///
-async fn files_get_private_immutable(
+async fn files_get_private_blob(
     _safe: &Safe,
     _url: &str,
     _range: Range,
@@ -884,10 +884,10 @@ async fn files_get_private_immutable(
 /// # Get Public or Private ImmutableData
 /// Get immutable data blobs from the network.
 ///
-pub async fn files_get_immutable(safe: &Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
+pub async fn files_get_blob(safe: &Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
     match XorUrlEncoder::from_url(&url)?.data_type() {
-        SafeDataType::PublicImmutableData => safe.files_get_public_immutable(&url, range).await,
-        SafeDataType::PrivateImmutableData => files_get_private_immutable(&safe, &url, range).await,
+        SafeDataType::PublicImmutableData => safe.files_get_public_blob(&url, range).await,
+        SafeDataType::PrivateImmutableData => files_get_private_blob(&safe, &url, range).await,
         _ => Err(Error::InvalidInput(
             "URL target is not immutable data.".to_string(),
         )),

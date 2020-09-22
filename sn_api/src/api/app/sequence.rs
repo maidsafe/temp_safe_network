@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{xorurl::SafeContentType, Safe, SafeApp};
+use super::{xorurl::SafeContentType, Safe};
 use crate::{
     xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result,
@@ -38,8 +38,8 @@ impl Safe {
         private: bool,
     ) -> Result<XorUrl> {
         let xorname = self
-            .safe_app
-            .store_sequence_data(data, name, type_tag, None, private)
+            .safe_client
+            .store_sequence(data, name, type_tag, None, private)
             .await?;
 
         XorUrlEncoder::encode_sequence_data(
@@ -65,7 +65,7 @@ impl Safe {
     ///     assert_eq!(received_data, (0, data.to_vec()));
     /// # });
     /// ```
-    pub async fn sequence_get(&self, url: &str) -> Result<(u64, Vec<u8>)> {
+    pub async fn sequence_get(&mut self, url: &str) -> Result<(u64, Vec<u8>)> {
         debug!("Getting Public Sequence data from: {:?}", url);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
 
@@ -74,7 +74,7 @@ impl Safe {
 
     /// Fetch a Sequence from a XorUrlEncoder without performing any type of URL resolution
     pub(crate) async fn fetch_sequence(
-        &self,
+        &mut self,
         xorurl_encoder: &XorUrlEncoder,
     ) -> Result<(u64, Vec<u8>)> {
         let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
@@ -82,7 +82,7 @@ impl Safe {
             Some(version) => {
                 // We fetch a specific entry since the URL specifies a specific version
                 let data = self
-                    .safe_app
+                    .safe_client
                     .sequence_get_entry(
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
@@ -104,7 +104,7 @@ impl Safe {
             }
             None => {
                 // ...then get last entry in the Sequence
-                self.safe_app
+                self.safe_client
                     .sequence_get_last_entry(
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
@@ -141,12 +141,12 @@ impl Safe {
     ///     let data1 = b"First in the sequence";
     ///     let xorurl = safe.sequence_create(data1, None, 20_000, false).await.unwrap();
     ///     let data2 = b"Second in the sequence";
-    ///     safe.sequence_append(&xorurl, data2).await.unwrap();
+    ///     safe.append_to_sequence(&xorurl, data2).await.unwrap();
     ///     let received_data = safe.sequence_get(&xorurl).await.unwrap();
     ///     assert_eq!(received_data, (1, data2.to_vec()));
     /// # });
     /// ```
-    pub async fn sequence_append(&mut self, url: &str, data: &[u8]) -> Result<()> {
+    pub async fn append_to_sequence(&mut self, url: &str, data: &[u8]) -> Result<()> {
         let xorurl_encoder = Safe::parse_url(url)?;
         if xorurl_encoder.content_version().is_some() {
             return Err(Error::InvalidInput(format!(
@@ -160,8 +160,8 @@ impl Safe {
         let xorname = xorurl_encoder.xorname();
         let type_tag = xorurl_encoder.type_tag();
         let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
-        self.safe_app
-            .sequence_append(data, xorname, type_tag, is_private)
+        self.safe_client
+            .append_to_sequence(data, xorname, type_tag, is_private)
             .await
     }
 }
@@ -191,16 +191,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sequence_append() -> Result<()> {
+    async fn test_append_to_sequence() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data_v0 = b"First in the sequence";
         let data_v1 = b"Second in the sequence";
 
         let xorurl = safe.sequence_create(data_v0, None, 25_000, false).await?;
-        safe.sequence_append(&xorurl, data_v1).await?;
+        safe.append_to_sequence(&xorurl, data_v1).await?;
 
         let xorurl_priv = safe.sequence_create(data_v0, None, 25_000, true).await?;
-        safe.sequence_append(&xorurl_priv, data_v1).await?;
+        safe.append_to_sequence(&xorurl_priv, data_v1).await?;
 
         let received_data_v0 = safe.sequence_get(&format!("{}?v=0", xorurl)).await?;
         let received_data_v1 = safe.sequence_get(&xorurl).await?;
@@ -223,7 +223,7 @@ mod tests {
         let xorurl = client1
             .sequence_create(data_v0, None, 25_000, false)
             .await?;
-        client1.sequence_append(&xorurl, data_v1).await?;
+        client1.append_to_sequence(&xorurl, data_v1).await?;
 
         let client2 = new_safe_instance().await?;
         let received_data_v0 = client2.sequence_get(&format!("{}?v=0", xorurl)).await?;
@@ -234,8 +234,8 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(feature = "scl-mock"))]
-    async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
+    #[cfg(not(feature = "client-mock"))]
+    async fn test_append_to_sequence_concurrently_from_second_client() -> Result<()> {
         let mut client1 = new_safe_instance().await?;
         let mut client2 = new_safe_instance().await?;
         let data_v0 = b"First from client1";
@@ -244,7 +244,7 @@ mod tests {
         let xorurl = client1
             .sequence_create(data_v0, None, 25_000, false)
             .await?;
-        client2.sequence_append(&xorurl, data_v1).await?;
+        client2.append_to_sequence(&xorurl, data_v1).await?;
 
         let received_client1 = client1.sequence_get(&xorurl).await?;
         let received_client2 = client2.sequence_get(&xorurl).await?;

@@ -11,14 +11,15 @@ use super::{
     common::send_authd_request,
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     helpers::decode_ipc_msg,
-    Safe, SafeApp,
+    Safe,
+    // SafeApp,
 };
+use crate::api::ipc::{encode_msg, gen_req_id, req::AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use crate::{Error, Result};
 use log::{debug, info};
-use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
-use sn_data_types::AppPermissions;
+// use sn_data_types::AppPermissions;
 use serde_json::json;
-use std::collections::HashMap;
+
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
@@ -41,13 +42,13 @@ impl Safe {
                 name: app_name.to_string(),
                 vendor: app_vendor.to_string(),
             },
-            app_container: false,
-            app_permissions: AppPermissions {
-                get_balance: true,
-                perform_mutations: true,
-                transfer_coins: true,
-            },
-            containers: HashMap::new(),
+            // app_container: false,
+            // app_permissions: AppPermissions {
+            //     read_balance: true,
+            //     perform_mutations: true,
+            //     transfer_money: true,
+            // },
+            // containers: HashMap::new(),
         });
 
         let req_id: u32 = gen_req_id();
@@ -84,7 +85,7 @@ impl Safe {
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     pub async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
-        self.safe_app.connect(app_id, auth_credentials).await
+        self.safe_client.connect(app_id, auth_credentials).await
     }
 }
 

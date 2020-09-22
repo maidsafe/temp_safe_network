@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use sn_client::ClientError;
 use std::fmt;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -22,6 +23,7 @@ pub enum Error {
     NetDataError(String),
     ContentNotFound(String),
     ContentError(String),
+    ClientError(String),
     EmptyContent(String),
     AccessDenied(String),
     VersionNotFound(String),
@@ -43,6 +45,12 @@ impl From<Error> for String {
     }
 }
 
+impl From<ClientError> for Error {
+    fn from(error: ClientError) -> Error {
+        Error::ClientError(error.to_string())
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Error::*;
@@ -55,6 +63,7 @@ impl fmt::Display for Error {
             AuthenticatorError(info) => ("AuthenticatorError", info),
             ConnectionError(info) => ("ConnectionError", info),
             NetDataError(info) => ("NetDataError", info),
+            ClientError(info) => ("ClientError", info),
             ContentNotFound(info) => ("ContentNotFound", info),
             VersionNotFound(info) => ("VersionNotFound", info),
             ContentError(info) => ("ContentError", info),

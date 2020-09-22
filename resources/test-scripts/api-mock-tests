@@ -4,7 +4,7 @@ set -e -x
 
 cd sn_api
 rm -f fake_vault_data.json
-cargo test --lib --release --features=scl-mock -- --test-threads=1
+cargo test --lib --release --features=client-mock -- --test-threads=1
 rm -f fake_vault_data.json
-cargo test --doc --release --features=scl-mock -- --test-threads=1
+cargo test --doc --release --features=client-mock -- --test-threads=1
 cd -

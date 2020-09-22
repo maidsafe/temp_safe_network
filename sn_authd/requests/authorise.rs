@@ -112,9 +112,9 @@ async fn handle_authorisation(
                                 .to_string(),
                         )
                     }
-                    SafeAuthReq::ShareMap(share_mdata_req) => {
+                    SafeAuthReq::ShareMap(share_map_req) => {
                         info!("The following authorisation request to share a MutableData was received:");
-                        info!("{:?}", share_mdata_req);
+                        info!("{:?}", share_map_req);
                         Err(
                             "Authorisation request for Share MutableData is not yet supported by authd"
                                 .to_string(),

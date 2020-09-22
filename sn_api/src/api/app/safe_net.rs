@@ -10,116 +10,118 @@
 use crate::api::fetch::Range;
 use crate::Result;
 use async_trait::async_trait;
-use sn_data_types::{Moneys, MapSeqValue, SeqMutableData, Transfer, TransferId};
+use sn_data_types::{Money, MapSeqValue, 
+    // SeqMap,
+     Transfer, TransferId};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 use xor_name::XorName;
 
-#[async_trait]
-pub trait SafeApp {
-    fn new() -> Self;
+// #[async_trait]
+// pub trait SafeApp {
+//     fn new() -> Self;
 
-    async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
+//     async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
 
-    // === Moneys operations ===
-    async fn create_balance(
-        &mut self,
-        from_sk: Option<SecretKey>,
-        new_balance_owner: PublicKey,
-        amount: Moneys,
-    ) -> Result<XorName>;
+//     // === Money operations ===
+//     async fn create_balance(
+//         &mut self,
+//         from_sk: Option<SecretKey>,
+//         new_balance_owner: PublicKey,
+//         amount: Money,
+//     ) -> Result<XorName>;
 
-    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Moneys) -> Result<XorName>;
+//     async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Money) -> Result<XorName>;
 
-    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Moneys>;
+//     async fn read_balance_from_sk(&self, sk: SecretKey) -> Result<Money>;
 
-    async fn safecoin_transfer_to_xorname(
-        &mut self,
-        from_sk: Option<SecretKey>,
-        to_xorname: XorName,
-        tx_id: TransferId,
-        amount: Moneys,
-    ) -> Result<Transfer>;
+//     async fn safecoin_transfer_to_xorname(
+//         &mut self,
+//         from_sk: Option<SecretKey>,
+//         to_xorname: XorName,
+//         tx_id: TransferId,
+//         amount: Money,
+//     ) -> Result<Transfer>;
 
-    async fn safecoin_transfer_to_pk(
-        &mut self,
-        from_sk: Option<SecretKey>,
-        to_pk: PublicKey,
-        tx_id: TransferId,
-        amount: Moneys,
-    ) -> Result<Transfer>;
+//     async fn safecoin_transfer_to_pk(
+//         &mut self,
+//         from_sk: Option<SecretKey>,
+//         to_pk: PublicKey,
+//         tx_id: TransferId,
+//         amount: Money,
+//     ) -> Result<Transfer>;
 
-    // === ImmutableData operations ===
-    async fn put_public_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
+//     // === Blob operations ===
+//     async fn store_public_blob(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
 
-    async fn get_public_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>>;
+//     async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Vec<u8>>;
 
-    // === MutableData operations ===
-    async fn put_mdata(
-        &mut self,
-        name: Option<XorName>,
-        tag: u64,
-        // data: Option<String>,
-        permissions: Option<String>,
-    ) -> Result<XorName>;
+//     // === Map operations ===
+//     async fn store_map(
+//         &mut self,
+//         name: Option<XorName>,
+//         tag: u64,
+//         // data: Option<String>,
+//         permissions: Option<String>,
+//     ) -> Result<XorName>;
 
-    async fn get_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData>;
+//     async fn get_map(&self, name: XorName, tag: u64) -> Result<SeqMap>;
 
-    async fn mdata_insert(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-    ) -> Result<()>;
+//     async fn map_insert(
+//         &mut self,
+//         name: XorName,
+//         tag: u64,
+//         key: &[u8],
+//         value: &[u8],
+//     ) -> Result<()>;
 
-    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue>;
+//     async fn map_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue>;
 
-    async fn mdata_list_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>>;
+//     async fn map_list_entries(
+//         &self,
+//         name: XorName,
+//         tag: u64,
+//     ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>>;
 
-    async fn mdata_update(
-        &mut self,
-        name: XorName,
-        tag: u64,
-        key: &[u8],
-        value: &[u8],
-        version: u64,
-    ) -> Result<()>;
+//     async fn map_update(
+//         &mut self,
+//         name: XorName,
+//         tag: u64,
+//         key: &[u8],
+//         value: &[u8],
+//         version: u64,
+//     ) -> Result<()>;
 
-    // === Sequence data operations ===
-    async fn store_sequence_data(
-        &mut self,
-        data: &[u8],
-        name: Option<XorName>,
-        tag: u64,
-        permissions: Option<String>,
-        private: bool,
-    ) -> Result<XorName>;
+//     // === Sequence data operations ===
+//     async fn store_sequence(
+//         &mut self,
+//         data: &[u8],
+//         name: Option<XorName>,
+//         tag: u64,
+//         permissions: Option<String>,
+//         private: bool,
+//     ) -> Result<XorName>;
 
-    async fn sequence_get_last_entry(
-        &self,
-        name: XorName,
-        tag: u64,
-        private: bool,
-    ) -> Result<(u64, Vec<u8>)>;
+//     async fn sequence_get_last_entry(
+//         &self,
+//         name: XorName,
+//         tag: u64,
+//         private: bool,
+//     ) -> Result<(u64, Vec<u8>)>;
 
-    async fn sequence_get_entry(
-        &self,
-        name: XorName,
-        tag: u64,
-        index: u64,
-        private: bool,
-    ) -> Result<Vec<u8>>;
+//     async fn sequence_get_entry(
+//         &self,
+//         name: XorName,
+//         tag: u64,
+//         index: u64,
+//         private: bool,
+//     ) -> Result<Vec<u8>>;
 
-    async fn sequence_append(
-        &mut self,
-        data: &[u8],
-        name: XorName,
-        tag: u64,
-        private: bool,
-    ) -> Result<()>;
-}
+//     async fn append_to_sequence(
+//         &mut self,
+//         data: &[u8],
+//         name: XorName,
+//         tag: u64,
+//         private: bool,
+//     ) -> Result<()>;
+// }

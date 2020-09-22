@@ -46,7 +46,7 @@ jobs:
       - name: Code Coverage - sn_api
         uses: actions-rs/tarpaulin@master
         with:
-          args: '-v --manifest-path=sn_api/Cargo.toml --features=scl-mock --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/*,sn_ffi/* --out Lcov -- --test-threads=1'
+          args: '-v --manifest-path=sn_api/Cargo.toml --features=client-mock --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/*,sn_ffi/* --out Lcov -- --test-threads=1'
 
       # Push tarpaulin results to coveralls.io
       - name: Coveralls
@@ -129,7 +129,7 @@ jobs:
 
       # Build dev native lib.
       - name: Build native lib - Dev
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=scl-mock
+        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=client-mock
 
       # Upload dev native lib.
       - name: Upload dev native lib
@@ -190,7 +190,7 @@ jobs:
       # Build dev universal library.
       - name: Build universal lib - Dev
         shell: bash
-        run: cargo lipo --release --manifest-path=sn_ffi/Cargo.toml --features=scl-mock
+        run: cargo lipo --release --manifest-path=sn_ffi/Cargo.toml --features=client-mock
 
       # Upload dev universal library.
       - name: Upload dev universal lib

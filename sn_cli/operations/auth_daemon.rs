@@ -218,9 +218,9 @@ pub fn pretty_print_authed_apps(authed_apps: AuthedAppsList) {
 
         let app_permissions = format!(
             "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-            boolean_to_string(authed_app.app_permissions.transfer_coins),
+            boolean_to_string(authed_app.app_permissions.transfer_money),
             boolean_to_string(authed_app.app_permissions.perform_mutations),
-            boolean_to_string(authed_app.app_permissions.get_balance)
+            boolean_to_string(authed_app.app_permissions.read_balance)
         );
         let permissions_report = format!(
             "Own container: {}\n{}\nContainers: {}",
@@ -261,9 +261,9 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: Option<&str
 
             let app_permissions = format!(
                 "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-                boolean_to_string(auth_req.app_permissions.transfer_coins),
+                boolean_to_string(auth_req.app_permissions.transfer_money),
                 boolean_to_string(auth_req.app_permissions.perform_mutations),
-                boolean_to_string(auth_req.app_permissions.get_balance)
+                boolean_to_string(auth_req.app_permissions.read_balance)
             );
             let permissions_report = format!(
                 "Own container: {}\n{}\nContainers: {}",

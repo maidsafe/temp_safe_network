@@ -15,12 +15,10 @@ use super::{
 use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
-use safe_core::ipc::req::ContainerPermissions;
-use sn_data_types::AppPermissions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
 use std::{
-    collections::HashMap,
     io::{self, Write},
     path::PathBuf,
     process::{Command, Stdio},
@@ -48,13 +46,13 @@ pub struct AuthReq {
     pub app_name: String,
     /// The application provider/vendor (e.g. MaidSafe)
     pub app_vendor: String,
-    /// Permissions requested, e.g. allowing to work with the user's coin balance.
-    pub app_permissions: AppPermissions,
-    /// The permissions requested by the app for named containers
-    // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
-    pub containers: HashMap<String, ContainerPermissions>,
-    /// If the app requested a dedicated named container for itself
-    pub own_container: bool,
+    // /// Permissions requested, e.g. allowing to work with the user's coin balance.
+    // pub app_permissions: AppPermissions,
+    // /// The permissions requested by the app for named containers
+    // // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
+    // pub containers: HashMap<String, ContainerPermissions>,
+    // /// If the app requested a dedicated named container for itself
+    // pub own_container: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

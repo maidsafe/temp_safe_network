@@ -12,7 +12,7 @@ use super::{
     fetch::Range,
     helpers::{gen_timestamp_secs, systemtime_to_rfc3339},
     xorurl::{SafeContentType, SafeDataType},
-    Safe, SafeApp,
+    Safe,
 };
 use crate::{
     xorurl::{XorUrl, XorUrlEncoder},
@@ -26,7 +26,7 @@ use walkdir::{DirEntry, WalkDir};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-// Each FileItem contains file metadata and the link to the file's ImmutableData XOR-URL
+// Each FileItem contains file metadata and the link to the file's Blob XOR-URL
 pub type FileItem = BTreeMap<String, String>;
 
 // A trait to get an key attr and return an API Result
@@ -313,8 +313,8 @@ impl Safe {
 
             // Store the FilesContainer in a Public Sequence
             let xorname = self
-                .safe_app
-                .store_sequence_data(
+                .safe_client
+                .store_sequence(
                     serialised_files_map.as_bytes(),
                     None,
                     FILES_CONTAINER_TYPE_TAG,
@@ -350,7 +350,7 @@ impl Safe {
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
     /// # });
     /// ```
-    pub async fn files_container_get(&self, url: &str) -> Result<(u64, FilesMap)> {
+    pub async fn files_container_get(&mut self, url: &str) -> Result<(u64, FilesMap)> {
         debug!("Getting files container from: {:?}", url);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
 
@@ -359,7 +359,7 @@ impl Safe {
 
     /// Fetch a FilesContainer from a XorUrlEncoder without performing any type of URL resolution
     pub(crate) async fn fetch_files_container(
-        &self,
+        &mut self,
         xorurl_encoder: &XorUrlEncoder,
     ) -> Result<(u64, FilesMap)> {
         // Check if the URL specifies a specific version of the content or simply the latest available
@@ -588,7 +588,7 @@ impl Safe {
             validate_files_add_params(self, "", url, update_nrs).await?;
 
         let dest_path = xorurl_encoder.path();
-        let new_file_xorurl = self.files_put_public_immutable(data, None, false).await?;
+        let new_file_xorurl = self.files_store_public_blob(data, None, false).await?;
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
@@ -710,8 +710,8 @@ impl Safe {
 
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
-            self.safe_app
-                .sequence_append(serialised_files_map.as_bytes(), xorname, type_tag, false)
+            self.safe_client
+                .append_to_sequence(serialised_files_map.as_bytes(), xorname, type_tag, false)
                 .await?;
 
             let new_version = current_version + 1;
@@ -732,7 +732,7 @@ impl Safe {
         Ok(version)
     }
 
-    /// # Put a Public ImmutableData
+    /// # Put a Public Blob
     /// Put data blobs onto the network.
     ///
     /// ## Example
@@ -742,12 +742,12 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_put_public_immutable(data, Some("text/plain"), false).await.unwrap();
-    ///     let received_data = safe.files_get_public_immutable(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_store_public_blob(data, Some("text/plain"), false).await.unwrap();
+    ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_put_public_immutable(
+    pub async fn files_store_public_blob(
         &mut self,
         data: &[u8],
         media_type: Option<&str>,
@@ -768,12 +768,12 @@ impl Safe {
         )?;
 
         // TODO: do we want ownership from other PKs yet?
-        let xorname = self.safe_app.put_public_immutable(&data, dry_run).await?;
+        let xorname = self.safe_client.store_public_blob(&data, dry_run).await?;
 
-        XorUrlEncoder::encode_immutable_data(xorname, content_type, self.xorurl_base)
+        XorUrlEncoder::encode_blob(xorname, content_type, self.xorurl_base)
     }
 
-    /// # Get a Public ImmutableData
+    /// # Get a Public Blob
     /// Put data blobs onto the network.
     ///
     /// ## Example
@@ -783,26 +783,25 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_put_public_immutable(data, None, false).await.unwrap();
-    ///     let received_data = safe.files_get_public_immutable(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_store_public_blob(data, None, false).await.unwrap();
+    ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public_immutable(&self, url: &str, range: Range) -> Result<Vec<u8>> {
+    pub async fn files_get_public_blob(&mut self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-        self.fetch_public_immutable_data(&xorurl_encoder, range)
-            .await
+        self.fetch_public_blob(&xorurl_encoder, range).await
     }
 
-    /// Fetch an ImmutableData from a XorUrlEncoder without performing any type of URL resolution
-    pub(crate) async fn fetch_public_immutable_data(
-        &self,
+    /// Fetch an Blob from a XorUrlEncoder without performing any type of URL resolution
+    pub(crate) async fn fetch_public_blob(
+        &mut self,
         xorurl_encoder: &XorUrlEncoder,
         range: Range,
     ) -> Result<Vec<u8>> {
-        self.safe_app
-            .get_public_immutable(xorurl_encoder.xorname(), range)
+        self.safe_client
+            .get_public_blob(xorurl_encoder.xorname(), range)
             .await
     }
 }
@@ -845,10 +844,10 @@ async fn validate_files_add_params(
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
         let source_xorurl_encoder = Safe::parse_url(source_file)?;
-        if source_xorurl_encoder.data_type() != SafeDataType::PublicImmutableData {
+        if source_xorurl_encoder.data_type() != SafeDataType::PublicBlob {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
-                SafeDataType::PublicImmutableData,
+                SafeDataType::PublicBlob,
                 source_xorurl_encoder.content_type()
             )));
         }
@@ -1377,7 +1376,7 @@ fn files_map_remove_path(
     Ok((processed_files, new_files_map, success_count))
 }
 
-// Upload a files to the Network as a Public ImmutableData
+// Upload a files to the Network as a Public Blob
 async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
@@ -1385,14 +1384,14 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_put_public_immutable(&data, mime_type.first_raw(), dry_run)
+        .files_store_public_blob(&data, mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_put_public_immutable(&data, None, dry_run).await
+                safe.files_store_public_blob(&data, None, dry_run).await
             } else {
                 Err(err)
             }
@@ -3011,7 +3010,7 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let data = b"0123456789";
-        let file_xorurl = safe.files_put_public_immutable(data, None, false).await?;
+        let file_xorurl = safe.files_store_public_blob(data, None, false).await?;
         let new_filename = "/new_filename_test.md";
 
         let (version, new_processed_files, new_files_map) = safe
@@ -3055,7 +3054,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let other_file_xorurl = safe.files_put_public_immutable(data, None, false).await?;
+        let other_file_xorurl = safe.files_store_public_blob(data, None, false).await?;
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
                 &other_file_xorurl,
