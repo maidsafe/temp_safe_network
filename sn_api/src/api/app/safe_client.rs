@@ -19,10 +19,10 @@ use log::{debug, info, warn};
 
 use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use sn_data_types::{
-    ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
-    MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
-    SDataPrivUserPermissions, SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction,
-    TransactionId,
+    ClientFullId, Moneys, Error as SafeNdError, BlobAddress, MapAction, MapPermissionSet,
+    MapSeqEntryActions, MapSeqValue, PublicKey as SafeNdPublicKey, SequenceAddress, SequenceIndex,
+    SequencePrivUserPermissions, SequencePubUserPermissions, SequenceUser, SeqMutableData, Transfer,
+    TransferId,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -49,7 +49,7 @@ impl SafeAppScl {
         &self,
         name: XorName,
         tag: u64,
-        entry_actions: MDataSeqEntryActions,
+        entry_actions: MapSeqEntryActions,
         error_msg: &str,
     ) -> Result<()> {
         let client = &self.get_safe_app()?.client;
@@ -87,7 +87,8 @@ impl SafeApp for SafeAppScl {
                 match auth_granted {
                     AuthResponseType::Registered(authgranted) => {
                         // TODO: This needs an existing SK now.
-                        Client::new(app_id.to_string(), authgranted, disconnect_cb).await
+                        Client::new(None).await
+                        // Client::new(app_id.to_string(), authgranted, disconnect_cb).await
                     }
                     AuthResponseType::Unregistered(config) => {
                         // TODO: what to do with config...
@@ -106,12 +107,12 @@ impl SafeApp for SafeAppScl {
         Ok(())
     }
 
-    // === Coins operations ===
+    // === Moneys operations ===
     async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
-        amount: Coins,
+        amount: Moneys,
     ) -> Result<XorName> {
         let client = &self.get_safe_app()?.client;
         let from_fullid = from_sk.map(ClientFullId::from);
@@ -135,7 +136,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
+    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Moneys) -> Result<XorName> {
         info!("Creating test SafeKey with {} test coins", amount);
         let xorname = xorname_from_pk(owner_sk.public_key());
         test_create_balance(&ClientFullId::from(owner_sk), amount)
@@ -145,7 +146,7 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
+    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Moneys> {
         let client = &self.get_safe_app()?.client;
         let coins = client
             .get_balance(Some(&ClientFullId::from(sk)))
@@ -159,9 +160,9 @@ impl SafeApp for SafeAppScl {
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction> {
+        tx_id: TransferId,
+        amount: Moneys,
+    ) -> Result<Transfer> {
         let client = &self.get_safe_app()?.client;
         let from_fullid = from_sk.map(ClientFullId::from);
         let tx = client
@@ -185,9 +186,9 @@ impl SafeApp for SafeAppScl {
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction> {
+        tx_id: TransferId,
+        amount: Moneys,
+    ) -> Result<Transfer> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
             .await
@@ -232,7 +233,7 @@ impl SafeApp for SafeAppScl {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let client = &self.get_safe_app()?.client;
-        let immd_data_addr = IDataAddress::Pub(xorname);
+        let immd_data_addr = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = if let Some(end_index) = end {
                 Some(end_index - start.unwrap_or_else(|| 0))
@@ -289,12 +290,12 @@ impl SafeApp for SafeAppScl {
 
         let xorname = name.unwrap_or_else(rand::random);
 
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::Update)
-            .allow(MDataAction::Delete)
-            .allow(MDataAction::ManagePermissions);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete)
+            .allow(MapAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
         let sign_pk = get_public_bls_key(safe_app).await?;
@@ -332,13 +333,13 @@ impl SafeApp for SafeAppScl {
         key: &[u8],
         value: &[u8],
     ) -> Result<()> {
-        let entry_actions = MDataSeqEntryActions::new();
+        let entry_actions = MapSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
             .await
     }
 
-    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue> {
+    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue> {
         let client = &self.get_safe_app()?.client;
         let key_vec = key.to_vec();
         client
@@ -368,7 +369,7 @@ impl SafeApp for SafeAppScl {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
+    ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>> {
         let client = &self.get_safe_app()?.client;
         client
             .list_seq_mdata_entries(name, tag)
@@ -408,7 +409,7 @@ impl SafeApp for SafeAppScl {
         value: &[u8],
         version: u64,
     ) -> Result<()> {
-        let entry_actions = MDataSeqEntryActions::new();
+        let entry_actions = MapSeqEntryActions::new();
         let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
         self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
             .await
@@ -445,7 +446,7 @@ impl SafeApp for SafeAppScl {
             let mut perms = BTreeMap::default();
             let _ = perms.insert(
                 SafeNdPublicKey::Bls(app_public_key),
-                SDataPrivUserPermissions::new(true, true, true),
+                SequencePrivUserPermissions::new(true, true, true),
             );
 
             safe_app
@@ -457,9 +458,9 @@ impl SafeApp for SafeAppScl {
                 })?
         } else {
             // Set permissions for append and manage perms to this application
-            let user_app = SDataUser::Key(SafeNdPublicKey::Bls(app_public_key));
+            let user_app = SequenceUser::Key(SafeNdPublicKey::Bls(app_public_key));
             let mut perms = BTreeMap::default();
-            let _ = perms.insert(user_app, SDataPubUserPermissions::new(true, true));
+            let _ = perms.insert(user_app, SequencePubUserPermissions::new(true, true));
 
             safe_app
                 .client
@@ -497,9 +498,9 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
 
         let sequence_address = if private {
-            SDataAddress::Private { name, tag }
+            SequenceAddress::Private { name, tag }
         } else {
-            SDataAddress::Public { name, tag }
+            SequenceAddress::Public { name, tag }
         };
         safe_app
             .client
@@ -534,12 +535,12 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
 
         let sequence_address = if private {
-            SDataAddress::Private { name, tag }
+            SequenceAddress::Private { name, tag }
         } else {
-            SDataAddress::Public { name, tag }
+            SequenceAddress::Public { name, tag }
         };
-        let start = SDataIndex::FromStart(index);
-        let end = SDataIndex::FromStart(index + 1);
+        let start = SequenceIndex::FromStart(index);
+        let end = SequenceIndex::FromStart(index + 1);
         let res = safe_app
             .client
             .get_sdata_range(sequence_address, (start, end))
@@ -585,9 +586,9 @@ impl SafeApp for SafeAppScl {
         let safe_app: &App = self.get_safe_app()?;
 
         let sequence_address = if private {
-            SDataAddress::Private { name, tag }
+            SequenceAddress::Private { name, tag }
         } else {
-            SDataAddress::Public { name, tag }
+            SequenceAddress::Public { name, tag }
         };
         safe_app
             .client

@@ -22,7 +22,7 @@ use safe_core::{
     core_structs::{access_container_enc_key, AccessContainerEntry},
     ipc::{
         decode_msg, encode_msg,
-        req::{AuthReq, ContainersReq, IpcReq, ShareMDataReq},
+        req::{AuthReq, ContainersReq, IpcReq, ShareMapReq},
         resp::IpcResp,
         IpcMsg,
     },
@@ -119,6 +119,8 @@ impl SafeAuthenticator {
         //         Err(Error::AuthError(format!("Failed to log in: {}", msg)))
         //     }
         // }
+
+        Ok(())
     }
 
     pub fn log_out(&mut self) -> Result<()> {
@@ -162,7 +164,7 @@ impl SafeAuthenticator {
 
     // /// Generates User's Identity for the network using supplied credentials in
     // /// a deterministic way.  This is similar to the username in various places.
-    pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName, CoreError> {
+    pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
         let mut id = XorName([0; XOR_NAME_LEN]);
 
         const ITERATIONS: usize = 10000;
@@ -182,9 +184,9 @@ impl SafeAuthenticator {
         /// The User Account Keys.
         pub maid_keys: ClientKeys,
         /// The user's access container.
-        pub access_container: MDataInfo,
+        pub access_container: MapInfo,
         /// The user's configuration directory.
-        pub config_root: MDataInfo,
+        pub config_root: MapInfo,
         /// Set to `true` when all root and standard containers
         /// have been created successfully. `false` signifies that
         /// previous attempt might have failed - check on login.

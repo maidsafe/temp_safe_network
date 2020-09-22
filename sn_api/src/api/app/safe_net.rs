@@ -10,7 +10,7 @@
 use crate::api::fetch::Range;
 use crate::Result;
 use async_trait::async_trait;
-use sn_data_types::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId};
+use sn_data_types::{Moneys, MapSeqValue, SeqMutableData, Transfer, TransferId};
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 use xor_name::XorName;
@@ -21,33 +21,33 @@ pub trait SafeApp {
 
     async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()>;
 
-    // === Coins operations ===
+    // === Moneys operations ===
     async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
-        amount: Coins,
+        amount: Moneys,
     ) -> Result<XorName>;
 
-    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName>;
+    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Moneys) -> Result<XorName>;
 
-    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins>;
+    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Moneys>;
 
     async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction>;
+        tx_id: TransferId,
+        amount: Moneys,
+    ) -> Result<Transfer>;
 
     async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction>;
+        tx_id: TransferId,
+        amount: Moneys,
+    ) -> Result<Transfer>;
 
     // === ImmutableData operations ===
     async fn put_public_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName>;
@@ -73,13 +73,13 @@ pub trait SafeApp {
         value: &[u8],
     ) -> Result<()>;
 
-    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue>;
+    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue>;
 
     async fn mdata_list_entries(
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>>;
+    ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>>;
 
     async fn mdata_update(
         &mut self,

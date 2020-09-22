@@ -485,7 +485,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **filesmap:** draft code to generate a serialised FilesMap ([5a3814b](https://github.com/maidsafe/safe-api/commit/5a3814bbbbe5fbcf4f9f3f9fbb302212bdc17265))
 * **Init:** Initial code setup ([#4](https://github.com/maidsafe/safe-api/issues/4)) ([60c810a](https://github.com/maidsafe/safe-api/commit/60c810aefda01238814c35d67eb1d6e89e939caa))
 * **keypair:** implement 'keys keypair' sub-command which generates a key-pair without creating a Key on the network ([f5e4cc5](https://github.com/maidsafe/safe-api/commit/f5e4cc581997abf3ef4904e0b2e65977d04036c8))
-* **keys:** first draft implementation for the integration with SCL CoinBalance API ([e73041c](https://github.com/maidsafe/safe-api/commit/e73041c58feb7bdcdd666a141410968132a754d4))
+* **keys:** first draft implementation for the integration with SCL MoneyBalance API ([e73041c](https://github.com/maidsafe/safe-api/commit/e73041c58feb7bdcdd666a141410968132a754d4))
 * **keys:** making the 'source' arg for 'keys create' optional and to be a SecretKey ([60317da](https://github.com/maidsafe/safe-api/commit/60317da29cd42ce0b94e2618412fe925c799ebb8))
 * **keys:** making the 'target' arg totally optional for 'keys create' and make changes to have all keys unit tests to pass ([9d8e979](https://github.com/maidsafe/safe-api/commit/9d8e97954ae7f173de189bdbd1697fe2b86be9b6))
 * **lib:** add function to create a Key and allocate test coins into it ([dc60d55](https://github.com/maidsafe/safe-api/commit/dc60d550a33aec6ce712d61451409889be8090a1))

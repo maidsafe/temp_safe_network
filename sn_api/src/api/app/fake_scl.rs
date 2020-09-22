@@ -19,7 +19,7 @@ use futures::lock::Mutex;
 use lazy_static::lazy_static;
 use log::{debug, trace};
 use sn_data_types::{
-    Coins, MDataSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transaction, TransactionId,
+    Moneys, MapSeqValue, PublicKey as SafeNdPublicKey, SeqMutableData, Transfer, TransferId,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io::Write, str, sync::Arc};
@@ -36,7 +36,7 @@ struct SafeKey {
 }
 
 type XorNameStr = String;
-type SeqMutableDataFake = BTreeMap<String, MDataSeqValue>;
+type SeqMutableDataFake = BTreeMap<String, MapSeqValue>;
 type SequenceDataFake = Vec<Vec<u8>>;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -92,7 +92,7 @@ impl Drop for SafeAppFake {
 
 impl SafeAppFake {
     // private helpers
-    async fn get_balance_from_xorname(&self, xorname: &XorName) -> Result<Coins> {
+    async fn get_balance_from_xorname(&self, xorname: &XorName) -> Result<Moneys> {
         match self
             .fake_vault
             .lock()
@@ -118,7 +118,7 @@ impl SafeAppFake {
         }
     }
 
-    async fn substract_coins(&mut self, sk: SecretKey, amount: Coins) -> Result<()> {
+    async fn substract_coins(&mut self, sk: SecretKey, amount: Moneys) -> Result<()> {
         let from_balance = self.get_balance_from_sk(sk.clone()).await?;
         match from_balance.checked_sub(amount) {
             None => Err(Error::NotEnoughBalance(from_balance.to_string())),
@@ -150,16 +150,16 @@ impl SafeApp for SafeAppFake {
         Ok(())
     }
 
-    // === Coins operations ===
+    // === Moneys operations ===
     async fn create_balance(
         &mut self,
         from_sk: Option<SecretKey>,
         new_balance_owner: PublicKey,
-        amount: Coins,
+        amount: Moneys,
     ) -> Result<XorName> {
         if let Some(sk) = from_sk {
             // 1 nano is the creation cost
-            let amount_with_cost = Coins::from_nano(amount.as_nano() + 1);
+            let amount_with_cost = Moneys::from_nano(amount.as_nano() + 1);
             self.substract_coins(sk, amount_with_cost).await?;
         };
 
@@ -175,7 +175,7 @@ impl SafeApp for SafeAppFake {
         Ok(to_xorname)
     }
 
-    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
+    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Moneys) -> Result<XorName> {
         let to_pk = owner_sk.public_key();
         let xorname = xorname_from_pk(to_pk);
         self.fake_vault.lock().await.coin_balances.insert(
@@ -189,7 +189,7 @@ impl SafeApp for SafeAppFake {
         Ok(xorname)
     }
 
-    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
+    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Moneys> {
         let pk = sk.public_key();
         let xorname = xorname_from_pk(pk);
         self.get_balance_from_xorname(&xorname).await
@@ -199,9 +199,9 @@ impl SafeApp for SafeAppFake {
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction> {
+        tx_id: TransferId,
+        amount: Moneys,
+    ) -> Result<Transfer> {
         if amount.as_nano() == 0 {
             return Err(Error::InvalidAmount(amount.to_string()));
         }
@@ -229,7 +229,7 @@ impl SafeApp for SafeAppFake {
                     .await
                     .coin_balances
                     .insert(xorname_to_hex(&to_xorname), safekey);
-                Ok(Transaction { id: tx_id, amount })
+                Ok(Transfer { id: tx_id, amount })
             }
         }
     }
@@ -238,9 +238,9 @@ impl SafeApp for SafeAppFake {
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction> {
+        tx_id: TransferId,
+        amount: Moneys,
+    ) -> Result<Transfer> {
         let to_xorname = xorname_from_pk(to_pk);
         self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
             .await
@@ -325,7 +325,7 @@ impl SafeApp for SafeAppFake {
 
         match self.fake_vault.lock().await.mutable_data.get(&xorname_hex) {
             Some(seq_md) => {
-                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataSeqValue> = BTreeMap::new();
+                let mut seq_md_with_vec: BTreeMap<Vec<u8>, MapSeqValue> = BTreeMap::new();
                 seq_md.iter().for_each(|(k, v)| {
                     seq_md_with_vec.insert(parse_hex(k), v.clone());
                 });
@@ -357,13 +357,13 @@ impl SafeApp for SafeAppFake {
 
         data.insert(
             key.to_vec(),
-            MDataSeqValue {
+            MapSeqValue {
                 data: value.to_vec(),
                 version: 0,
             },
         );
 
-        let mut seq_md_with_str: BTreeMap<String, MDataSeqValue> = BTreeMap::new();
+        let mut seq_md_with_str: BTreeMap<String, MapSeqValue> = BTreeMap::new();
         data.iter().for_each(|(k, v)| {
             seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
         });
@@ -376,7 +376,7 @@ impl SafeApp for SafeAppFake {
         Ok(())
     }
 
-    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue> {
+    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue> {
         let seq_md = self.get_mdata(name, tag).await?;
         match seq_md.get(&key.to_vec()) {
             Some(value) => Ok(value.clone()),
@@ -391,7 +391,7 @@ impl SafeApp for SafeAppFake {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
+    ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>> {
         debug!("Listing seq_mdata_entries for: {}", name);
         let seq_md = self.get_mdata(name, tag).await?;
         let mut res = BTreeMap::new();
@@ -549,11 +549,11 @@ mod tests {
     use super::*;
     use std::str::FromStr;
 
-    // Helper function to instantiate Coins form a string and handle any error
-    fn coins_from_str(str: &str) -> Result<Coins> {
-        Coins::from_str(str).map_err(|err| {
+    // Helper function to instantiate Moneys form a string and handle any error
+    fn coins_from_str(str: &str) -> Result<Moneys> {
+        Moneys::from_str(str).map_err(|err| {
             Error::Unexpected(format!(
-                "Failed to instantiate Coins from str '{}': {}",
+                "Failed to instantiate Moneys from str '{}': {}",
                 str, err
             ))
         })

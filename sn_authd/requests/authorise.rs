@@ -112,7 +112,7 @@ async fn handle_authorisation(
                                 .to_string(),
                         )
                     }
-                    SafeAuthReq::ShareMData(share_mdata_req) => {
+                    SafeAuthReq::ShareMap(share_mdata_req) => {
                         info!("The following authorisation request to share a MutableData was received:");
                         info!("{:?}", share_mdata_req);
                         Err(

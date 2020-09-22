@@ -47,7 +47,7 @@ pub enum WalletSubCommands {
         target: Option<String>,
     },
     /*#[structopt(name = "check-tx")]
-    /// Check the status of a given transaction
+    /// Check the status of a given transfer
     CheckTx {},*/
     #[structopt(name = "create")]
     /// Create a new Wallet
@@ -85,7 +85,7 @@ pub enum WalletSubCommands {
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
-        /// The transaction ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
+        /// The transfer ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
         #[structopt(long = "tx-id", parse(try_from_str = parse_tx_id))]
         tx_id: Option<u64>,
     },

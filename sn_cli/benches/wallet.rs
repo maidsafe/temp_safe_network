@@ -34,7 +34,7 @@ fn main() {
 fn bench_cli_wallet(c: &mut Criterion) {
     let (wallet_from, _pk, _sk) = create_wallet_with_balance("1600.000000001", None); // we need 1 nano to pay for the costs of creation
     let (wallet_to, _pk, _sk) = create_wallet_with_balance("5.000000001", None); // we need 1 nano to pay for the costs of creation
-    c.bench_function("performing transactions", |b| {
+    c.bench_function("performing transfers", |b| {
         b.iter(|| {
             let result = cmd!(
                 get_bin_location(),
