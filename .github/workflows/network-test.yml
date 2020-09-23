@@ -6,7 +6,7 @@ env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  SAFE_VAULT_VERSION: "0.24.0"
+  SN_NODE_VERSION: "0.24.0"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
@@ -23,10 +23,10 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - run: mkdir -p ~/.safe/vault
-      - name: dl vault
-        run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
-      - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
+      - run: mkdir -p ~/.safe/node
+      - name: dl node
+        run: wget https://github.com/maidsafe/sn_node/releases/download/${{env.SN_NODE_VERSION}}/sn_node-${{env.SN_NODE_VERSION}}-x86_64-unknown-linux-musl.zip
+      - run: unzip sn_node-${{env.SN_NODE_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/node
       - name: Build
         run: cargo build --release
       - name: Setup Safe Cli and PATH etc
@@ -42,23 +42,23 @@ jobs:
           echo $PATH
           chmod +x $HOME/.safe/authd/sn_authd
           chmod +x $HOME/.safe/cli/safe
-          chmod +x $HOME/.safe/vault/safe_vault
+          chmod +x $HOME/.safe/node/sn_node
       - name: Setup The Baby
-        run : safe vault run-baby-fleming -t
+        run : safe node run-baby-fleming -t
       - name: Run Tests
         run: ./resources/test-scripts/cli-network-tests
         shell: bash
 
       - name: Stop the network.
         if: failure()
-        run: safe vault killall || true && safe auth stop || true
+        run: safe node killall || true && safe auth stop || true
 
       - name: Failure logs.
         if: failure()
-        run: tail $HOME/.safe/vault/baby-fleming-vaults/*/*.log
+        run: tail $HOME/.safe/node/baby-fleming-nodes/*/*.log
 
-  network-latest-vault-test:
-    name: E2E against real baby with latest non-released vault
+  network-latest-node-test:
+    name: E2E against real baby with latest non-released node
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -68,11 +68,11 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Clone safe-vault
-        run: git clone https://github.com/maidsafe/safe-vault.git $HOME/.safe/vault
-      - name: Build safe-vault
-        run: cargo build --release --manifest-path=$HOME/.safe/vault/Cargo.toml
-      - run: cp $HOME/.safe/vault/target/release/safe_vault $HOME/.safe/vault/
+      - name: Clone sn_node
+        run: git clone https://github.com/maidsafe/sn_node.git $HOME/.safe/node
+      - name: Build sn_node
+        run: cargo build --release --manifest-path=$HOME/.safe/node/Cargo.toml
+      - run: cp $HOME/.safe/node/target/release/sn_node $HOME/.safe/node/
       - name: Build Safe CLI and sn_authd
         run: cargo build --release
       - name: Setup Safe CLI and PATH etc
@@ -88,9 +88,9 @@ jobs:
           echo $PATH
           chmod +x $HOME/.safe/authd/sn_authd
           chmod +x $HOME/.safe/cli/safe
-          chmod +x $HOME/.safe/vault/safe_vault
+          chmod +x $HOME/.safe/node/sn_node
       - name: Setup The Baby
-        run : safe vault run-baby-fleming -t
+        run : safe node run-baby-fleming -t
       - name: Run CLI Tests
         run: ./resources/test-scripts/cli-network-tests
         shell: bash
@@ -100,11 +100,11 @@ jobs:
 
       - name: Stop the network.
         if: failure()
-        run: safe vault killall || true && safe auth stop || true
+        run: safe node killall || true && safe auth stop || true
 
-      - name: Failure safe-vault logs.
+      - name: Failure sn_node logs.
         if: failure()
-        run: tail $HOME/.safe/vault/baby-fleming-vaults/*/*.log
+        run: tail $HOME/.safe/node/baby-fleming-nodes/*/*.log
 
       - name: Failure sn_authd logs.
         if: failure()

@@ -211,7 +211,7 @@ pub fn cache_conn_info(network_name: &str, conn_info: &[u8]) -> Result<PathBuf, 
         })?;
     }
 
-    file_path.push(format!("{}_vault_connection_info.config", network_name));
+    file_path.push(format!("{}_node_connection_info.config", network_name));
     fs::write(&file_path, conn_info).map_err(|err| {
         format!(
             "Unable to cache connection information in {}: {}",
@@ -278,10 +278,10 @@ fn is_remote_location(location: &str) -> bool {
 }
 
 fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf), String> {
-    match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
+    match directories::ProjectDirs::from("net", "maidsafe", "sn_node") {
         Some(dirs) => Ok((
             dirs.config_dir().to_path_buf(),
-            dirs.config_dir().join("vault_connection_info.config"),
+            dirs.config_dir().join("node_connection_info.config"),
         )),
         None => Err(
             "Failed to obtain local home directory where to set network connection info"

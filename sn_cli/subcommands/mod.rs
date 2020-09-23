@@ -16,12 +16,12 @@ mod files_get;
 mod helpers;
 pub mod keys;
 pub mod networks;
+pub mod node;
 pub mod nrs;
 pub mod safe_id;
 pub mod seq;
 pub mod setup;
 pub mod update;
-pub mod vault;
 pub mod wallet;
 pub mod xorurl;
 
@@ -115,19 +115,19 @@ pub enum SubCommands {
         follow_links: bool,
     },
     #[structopt(name = "seq")]
-    /// Manage Sequences on the SAFE Network
+    /// Manage Sequences on the Safe Network
     Seq(seq::SeqSubCommands),
     // #[structopt(name = "safe-id")]
-    // /// Manage identities on the SAFE Network
+    // /// Manage identities on the Safe Network
     // SafeId(safe_id::SafeIdSubCommands),
     #[structopt(name = "update")]
     /// Update the application to the latest available version
     Update {},
-    #[structopt(name = "vault")]
-    /// Commands to manage SAFE vaults
-    Vault {
+    #[structopt(name = "node")]
+    /// Commands to manage Safe Network Nodes
+    Node {
         /// subcommands
         #[structopt(subcommand)]
-        cmd: Option<vault::VaultSubCommands>,
+        cmd: Option<node::NodeSubCommands>,
     },
 }

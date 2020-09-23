@@ -14,7 +14,7 @@ pub mod config;
 #[cfg(feature = "scl-mock")]
 mod fake_auth;
 mod helpers;
-pub mod vault;
+pub mod node;
 
 #[cfg(not(feature = "scl-mock"))]
 pub mod safe_net {

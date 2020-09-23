@@ -15,12 +15,12 @@
   - [Using the CLI](#using-the-cli)
       - [`--help`](#--help)
     - [Networks](#networks)
-      - [Vault install](#vault-install)
+      - [Node install](#node-install)
       - [Run a local network](#run-a-local-network)
         - [Run a local network for testing: `--test`](#run-a-local-network-for-testing---test)
       - [Connect to a shared network](#connect-to-a-shared-network)
       - [Switch networks](#switch-networks)
-      - [Vault update](#vault-update)
+      - [Node update](#node-update)
     - [Auth](#auth)
       - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
       - [Auth install](#auth-install)
@@ -167,77 +167,77 @@ All commands have a `--help` function which lists args, options and subcommands.
 The CLI, like any other Safe application, can connect to different Safe networks that may be available. As the project advances several networks may coexist with the main Safe Network, there could be Safe networks available for testing upcoming features, or networks that are local to the user in their own computer or WAN/LAN.
 
 The way Safe applications currently connect to a Safe network is by reading the connection information from a specific location in the system:
-- Linux: from `~/.config/safe_vault/`
-- macOS: from `/Users/<USERNAME>/Library/Preferences/net.MaidSafe.safe_vault/`
-- Windows: from `C:\Users\<USERNAME>\AppData\Roaming\MaidSafe\safe_vault\config\`
+- Linux: from `~/.config/sn_node/`
+- macOS: from `/Users/<USERNAME>/Library/Preferences/net.MaidSafe.sn_node/`
+- Windows: from `C:\Users\<USERNAME>\AppData\Roaming\MaidSafe\sn_node\config\`
 
-Currently, there is a public test network accessible to anyone. Users may also have local vaults running in their own environment creating a local network. The CLI allows users to easily create a list of different Safe networks in its config settings, to then be able to switch between them with just a simple command.
+Currently, there is a public test network accessible to anyone. Users may also have local nodes running in their own environment creating a local network. The CLI allows users to easily create a list of different Safe networks in its config settings, to then be able to switch between them with just a simple command.
 
-#### Vault install
+#### Node install
 
-Let's first look at how to run a local Safe network using the CLI. A local network is bootstrapped by running several Safe vaults which automatically interconnect forming a network. We therefore first need to install the Safe vault in our system:
+Let's first look at how to run a local Safe network using the CLI. A local network is bootstrapped by running several Safe Network nodes which automatically interconnect forming a network. We therefore first need to install the Safe Network node in our system:
 ```shell
-$ safe vault install
-Latest release found: safe_vault v0.21.0
-Downloading https://safe-vault.s3.eu-west-2.amazonaws.com/safe_vault-0.21.0-x86_64-unknown-linux-musl.zip...
+$ safe node install
+Latest release found: sn_node v0.21.0
+Downloading https://sn-node.s3.eu-west-2.amazonaws.com/sn_node-0.21.0-x86_64-unknown-linux-musl.zip...
 [00:00:36] [========================================] 6.28MB/6.28MB (0s) Done
-Installing safe_vault binary at ~/.safe/vault ...
-Setting execution permissions to installed binary '~/.safe/vault/safe_vault'...
+Installing sn_node binary at ~/.safe/node ...
+Setting execution permissions to installed binary '~/.safe/node/sn_node'...
 Done!
 ```
 
 #### Run a local network
 
-At the current state of the Safe project, a single-section Safe network can be launched locally in our system. If the Safe vault was installed in the system using the CLI as described in the previous section we can then launch it with a simple command:
+At the current state of the Safe project, a single-section Safe network can be launched locally in our system. If the Safe Network node was installed in the system using the CLI as described in the previous section we can then launch it with a simple command:
 ```shell
-$ safe vault run-baby-fleming
-Storing vaults' generated data at ~/.safe/vault/baby-fleming-vaults
+$ safe node run-baby-fleming
+Storing nodes' generated data at ~/.safe/node/baby-fleming-nodes
 Launching local Safe network...
-Launching with vault executable from: ~/.safe/vault/safe_vault
-Network size: 8 vaults
-Launching genesis vault (#1)...
-Genesis vault contact info: ["127.0.0.1:55851"]
-Launching vault #2...
-Launching vault #3...
-Launching vault #4...
-Launching vault #5...
-Launching vault #6...
-Launching vault #7...
-Launching vault #8...
+Launching with node executable from: ~/.safe/node/sn_node
+Network size: 8 nodes
+Launching genesis node (#1)...
+Genesis node contact info: ["127.0.0.1:55851"]
+Launching node #2...
+Launching node #3...
+Launching node #4...
+Launching node #5...
+Launching node #6...
+Launching node #7...
+Launching node #8...
 Done!
 ```
 
 Once the local network is running, the connection configuration file will be already in the correct place for your applications (including the CLI) to connect to it. Thus from this point on, you can simply use the CLI or any application to connect to your local network. Note that depending on the application, you may need to restart it so it uses the new connection information for your local network.
 
-In order to shutdown a running local network, the following CLI command can be invoked to kill all running safe_vault processes:
+In order to shutdown a running local network, the following CLI command can be invoked to kill all running sn_node processes:
 ```shell
-$ safe vault killall
-Success, all processes instances of safe_vault were stopped!
+$ safe node killall
+Success, all processes instances of sn_node were stopped!
 ```
 
 ##### Run a local network for testing: `--test`
 
-The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new account and log in the CLI for test purposes. This requires that the `vault`, `authd` and `cli` themselves be installed in the correct locations on the system
+The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new account and log in the CLI for test purposes. This requires that the `node`, `authd` and `cli` themselves be installed in the correct locations on the system
 
 #### Connect to a shared network
 
-Ready to play your part in a shared network by adding your vault from home to a single section with other people's vaults? Keep reading...
+Ready to play your part in a shared network by adding your node from home to a single section with other people's nodes? Keep reading...
 
-MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your vault joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create an account on this network, log in, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
+MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your node joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create an account on this network, log in, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
 
 You will need the network configuration containing the details of the hardcoded contacts that will bootstrap you to the shared section. If you have connected to this or previous iterations of the MaidSafe shared section then you may already have a `shared-section` network profile saved on your machine. You can confirm this and update it to the latest configuration using `safe networks check`:
 ```shell
 $ safe networks check
 Checking current setup network connection information...
-Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_vault_connection_info.config' ...
-Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
+Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
 
-'shared-section' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-section' network as per current config
+'shared-section' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'shared-section' network as per current config
 ```
 
-If you don't have a configuration in your results which points to the exact [S3 location](https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config) listed in the results above, you can add using `safe networks add`:
+If you don't have a configuration in your results which points to the exact [S3 location](https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config) listed in the results above, you can add using `safe networks add`:
 ```shell
-$ safe networks add shared-section https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config
+$ safe networks add shared-section https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config
 Network 'shared-section' was added to the list
 ```
 
@@ -245,26 +245,26 @@ Now you need to ensure you are set to use this `shared-section` configuration th
 ```shell
 $ safe networks switch shared-section
 Switching to 'shared-section' network...
-Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
 Successfully switched to 'shared-section' network in your system!
 If you need write access to the 'shared-section' network, you'll need to restart authd, log in and re-authorise the CLI again
 ```
 
-We're now ready to launch our vault and add it as a node. This is achieved using `safe vault join` as follows:
+We're now ready to launch our node and add it as a node. This is achieved using `safe node join` as follows:
 ```shell
-$ safe vault join
-Creating '/Users/maidsafe/.safe/vault/local-vault' folder
-Storing vaults' generated data at /Users/maidsafe/.safe/vault/local-vault
-Starting a vault to join a Safe network...
-Launching with vault executable from: /Users/maidsafe/.safe/vault/safe_vault
+$ safe node join
+Creating '/Users/maidsafe/.safe/node/local-node' folder
+Storing nodes' generated data at /Users/maidsafe/.safe/node/local-node
+Starting a node to join a Safe network...
+Launching with node executable from: /Users/maidsafe/.safe/node/sn_node
 Node started with hardcoded contact: 161.35.36.185:12000
-Launching vault...
-Vault logs are being stored at: /Users/maidsafe/.safe/vault/local-vault/safe_vault.log
+Launching node...
+Node logs are being stored at: /Users/maidsafe/.safe/node/local-node/sn_node.log
 ```
 
-Your vault will now launch and attempt to connect to the shared network. You can keep an eye on its progress via its logs, which can be found at `~/.safe/vault/local-vault/safe_vault.log`.
+Your node will now launch and attempt to connect to the shared network. You can keep an eye on its progress via its logs, which can be found at `~/.safe/node/local-node/sn_node.log`.
 
-Note that at the time of writing vaults from home is being restricted to those with home routers which correctly implement [IGD](https://en.wikipedia.org/wiki/Internet_Gateway_Device_Protocol). This will be expanded imminently to include those with routers which don't support IGD, with instructions added here for manual port forwarding at that point. If your log file states `Automatic Port forwarding Failed` then be on stand by for the next iteration.
+Note that at the time of writing nodes from home is being restricted to those with home routers which correctly implement [IGD](https://en.wikipedia.org/wiki/Internet_Gateway_Device_Protocol). This will be expanded imminently to include those with routers which don't support IGD, with instructions added here for manual port forwarding at that point. If your log file states `Automatic Port forwarding Failed` then be on stand by for the next iteration.
 
 #### Switch networks
 
@@ -273,13 +273,13 @@ MaidSafe currently hosts a single-section network for those who don't want to ru
 The CLI allows you to set up a list of networks in its config settings for easily switching to connect to them. If you just launched a local network, you can keep current connection information as a configured network on CLI with the following command:
 ```shell
 $ safe networks add my-network
-Caching current network connection information into: ~/.config/sn_cli/networks/my-network_vault_connection_info.config
-Network 'my-network' was added to the list. Connection information is located at '~/.config/sn_cli/networks/my-network_vault_connection_info.config'
+Caching current network connection information into: ~/.config/sn_cli/networks/my-network_node_connection_info.config
+Network 'my-network' was added to the list. Connection information is located at '~/.config/sn_cli/networks/my-network_node_connection_info.config'
 ```
 
 If you also would like to connect to the MaidSafe hosted test network, you would need to set it up in CLI settings as another network, specifying the URL where to fetch latest connection information from:
 ```shell
-$ safe networks add shared-section https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config
+$ safe networks add shared-section https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config
 Network 'shared-section' was added to the list
 ```
 
@@ -291,9 +291,9 @@ $ safe networks
 +----------------+--------------------------------------------------------------------------------------------------+
 | Network name   | Connection info location                                                                         |
 +----------------+--------------------------------------------------------------------------------------------------+
-| my-network     | ~/.config/sn_cli/networks/my-network_vault_connection_info.config                              |
+| my-network     | ~/.config/sn_cli/networks/my-network_node_connection_info.config                              |
 +----------------+--------------------------------------------------------------------------------------------------+
-| shared-section | https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config |
+| shared-section | https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config |
 +----------------+--------------------------------------------------------------------------------------------------+
 ```
 
@@ -301,7 +301,7 @@ Once we have them in the CLI settings, we can use the CLI to automatically fetch
 ```shell
 $ safe networks switch shared-section
 Switching to 'shared-section' network...
-Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
 Successfully switched to 'shared-section' network in your system!
 If you need write access to the 'shared-section' network, you'll need to restart authd, log in and re-authorise the CLI again
 ```
@@ -310,22 +310,22 @@ Remember that every time you launch a local network the connection configuration
 ```shell
 $ safe networks check
 Checking current setup network connection information...
-Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_vault_connection_info.config' ...
-Fetching 'shared-section' network connection information from 'https://safe-vault-config.s3.eu-west-2.amazonaws.com/shared-section/vault_connection_info.config' ...
+Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
+Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
 
-'shared-section' network matched. Current set network connection information at '~/.config/safe_vault/vault_connection_info.config' matches 'shared-section' network as per current config
+'shared-section' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'shared-section' network as per current config
 ```
 
 Note that in the scenario that your current network is set to be the MaidSafe shared network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
 
-#### Vault update
+#### Node update
 
-The vault binary can be updated to the latest available version:
+The node binary can be updated to the latest available version:
 ```shell
-$ safe vault update
+$ safe node update
 ```
 
-This command will check if a newer safe-vault release is available on [GitHub](https://github.com/maidsafe/safe_vault/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated. By default it will assume the safe-vault binary is at `~/.safe/vault/`, but you can override that path by providing `--vault-path <path>` argument to the above command.
+This command will check if a newer sn_node release is available on [GitHub](https://github.com/maidsafe/sn_node/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated. By default it will assume the sn_node binary is at `~/.safe/node/`, but you can override that path by providing `--node-path <path>` argument to the above command.
 
 ### Auth
 

@@ -66,8 +66,8 @@ FFI is used to generate the native libraries which can be used by other high lev
 
 ## Related Links
 * [Safe CLI User Guide](https://github.com/maidsafe/sn_api/blob/master/sn_cli/README.md)
-* [Safe Browser](https://github.com/maidsafe/safe_browser/releases/)
-* [Safe Vault](https://github.com/maidsafe/safe_vault/releases/latest/)
+* [Safe Network Browser](https://github.com/maidsafe/sn_browser/releases/)
+* [Safe Network Node](https://github.com/maidsafe/sn_node/releases/latest/)
 EOF
 
 s3_authd_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-unknown-linux-gnu.zip"

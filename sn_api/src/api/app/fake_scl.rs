@@ -27,7 +27,7 @@ use threshold_crypto::{PublicKey, SecretKey};
 use tiny_keccak::sha3_256;
 use xor_name::XorName;
 
-const FAKE_VAULT_FILE: &str = "./fake_vault_data.json";
+const FAKE_NODE_FILE: &str = "./fake_node_data.json";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SafeKey {
@@ -50,10 +50,10 @@ struct FakeData {
 
 lazy_static! {
     static ref FAKE_DATA_SINGLETON: Arc<Mutex<FakeData>> = {
-        let fake_data = match fs::File::open(&FAKE_VAULT_FILE) {
+        let fake_data = match fs::File::open(&FAKE_NODE_FILE) {
             Ok(file) => {
                 let deserialised: FakeData =
-                    serde_json::from_reader(&file).expect("Failed to read fake vault DB file");
+                    serde_json::from_reader(&file).expect("Failed to read fake node DB file");
                 deserialised
             }
             Err(error) => {
@@ -67,25 +67,25 @@ lazy_static! {
 
 #[derive(Default)]
 pub struct SafeAppFake {
-    fake_vault: Arc<Mutex<FakeData>>,
+    fake_node: Arc<Mutex<FakeData>>,
 }
 
-/// Writes the fake Vault data onto the file
+/// Writes the fake node data onto the file
 impl Drop for SafeAppFake {
     fn drop(&mut self) {
-        if Arc::strong_count(&self.fake_vault) <= 2 {
+        if Arc::strong_count(&self.fake_node) <= 2 {
             // we are the last SafeAppFake instance going out of scope then,
             // the other ref is from FAKE_DATA_SINGLETON
-            let fake_data: &FakeData = &futures::executor::block_on(self.fake_vault.lock());
+            let fake_data: &FakeData = &futures::executor::block_on(self.fake_node.lock());
             let serialised = serde_json::to_string(fake_data)
-                .expect("Failed to serialised fake vault data to write on file");
-            trace!("Writing serialised fake vault data = {}", serialised);
+                .expect("Failed to serialised fake node data to write on file");
+            trace!("Writing serialised fake node data = {}", serialised);
 
             let mut file =
-                fs::File::create(&FAKE_VAULT_FILE).expect("Failed to create fake vault DB file");
+                fs::File::create(&FAKE_NODE_FILE).expect("Failed to create fake node DB file");
             let _ = file
                 .write(serialised.as_bytes())
-                .expect("Failed to write fake vault DB file");
+                .expect("Failed to write fake node DB file");
         }
     }
 }
@@ -94,7 +94,7 @@ impl SafeAppFake {
     // private helpers
     async fn get_balance_from_xorname(&self, xorname: &XorName) -> Result<Coins> {
         match self
-            .fake_vault
+            .fake_node
             .lock()
             .await
             .coin_balances
@@ -107,7 +107,7 @@ impl SafeAppFake {
 
     async fn fetch_pk_from_xorname(&self, xorname: &XorName) -> Result<PublicKey> {
         match self
-            .fake_vault
+            .fake_node
             .lock()
             .await
             .coin_balances
@@ -124,7 +124,7 @@ impl SafeAppFake {
             None => Err(Error::NotEnoughBalance(from_balance.to_string())),
             Some(new_balance_coins) => {
                 let from_pk = sk.public_key();
-                self.fake_vault.lock().await.coin_balances.insert(
+                self.fake_node.lock().await.coin_balances.insert(
                     xorname_to_hex(&xorname_from_pk(from_pk)),
                     SafeKey {
                         owner: from_pk,
@@ -141,7 +141,7 @@ impl SafeAppFake {
 impl SafeApp for SafeAppFake {
     fn new() -> Self {
         Self {
-            fake_vault: Arc::clone(&FAKE_DATA_SINGLETON),
+            fake_node: Arc::clone(&FAKE_DATA_SINGLETON),
         }
     }
 
@@ -164,7 +164,7 @@ impl SafeApp for SafeAppFake {
         };
 
         let to_xorname = xorname_from_pk(new_balance_owner);
-        self.fake_vault.lock().await.coin_balances.insert(
+        self.fake_node.lock().await.coin_balances.insert(
             xorname_to_hex(&to_xorname),
             SafeKey {
                 owner: new_balance_owner,
@@ -178,7 +178,7 @@ impl SafeApp for SafeAppFake {
     async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
         let to_pk = owner_sk.public_key();
         let xorname = xorname_from_pk(to_pk);
-        self.fake_vault.lock().await.coin_balances.insert(
+        self.fake_node.lock().await.coin_balances.insert(
             xorname_to_hex(&xorname),
             SafeKey {
                 owner: (to_pk),
@@ -224,7 +224,7 @@ impl SafeApp for SafeAppFake {
                     value: new_balance_coins.to_string(),
                 };
 
-                self.fake_vault
+                self.fake_node
                     .lock()
                     .await
                     .coin_balances
@@ -254,7 +254,7 @@ impl SafeApp for SafeAppFake {
         let xorname = XorName(vec_hash);
 
         if !dry_run {
-            self.fake_vault
+            self.fake_node
                 .lock()
                 .await
                 .public_immutable_data
@@ -266,7 +266,7 @@ impl SafeApp for SafeAppFake {
 
     async fn get_public_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         let data = match self
-            .fake_vault
+            .fake_node
             .lock()
             .await
             .public_immutable_data
@@ -300,7 +300,7 @@ impl SafeApp for SafeAppFake {
     ) -> Result<XorName> {
         let xorname = name.unwrap_or_else(rand::random);
         let seq_md = match self
-            .fake_vault
+            .fake_node
             .lock()
             .await
             .mutable_data
@@ -310,7 +310,7 @@ impl SafeApp for SafeAppFake {
             None => BTreeMap::new(),
         };
 
-        self.fake_vault
+        self.fake_node
             .lock()
             .await
             .mutable_data
@@ -323,7 +323,7 @@ impl SafeApp for SafeAppFake {
         let xorname_hex = xorname_to_hex(&name);
         debug!("attempting to locate scl mock mdata: {}", xorname_hex);
 
-        match self.fake_vault.lock().await.mutable_data.get(&xorname_hex) {
+        match self.fake_node.lock().await.mutable_data.get(&xorname_hex) {
             Some(seq_md) => {
                 let mut seq_md_with_vec: BTreeMap<Vec<u8>, MDataSeqValue> = BTreeMap::new();
                 seq_md.iter().for_each(|(k, v)| {
@@ -367,7 +367,7 @@ impl SafeApp for SafeAppFake {
         data.iter().for_each(|(k, v)| {
             seq_md_with_str.insert(vec_to_hex(k.to_vec()), v.clone());
         });
-        self.fake_vault
+        self.fake_node
             .lock()
             .await
             .mutable_data
@@ -427,13 +427,13 @@ impl SafeApp for SafeAppFake {
         let xorname_hex = xorname_to_hex(&xorname);
         let initial_data = vec![data.to_vec()];
         if private {
-            self.fake_vault
+            self.fake_node
                 .lock()
                 .await
                 .private_sequence
                 .insert(xorname_hex, initial_data);
         } else {
-            self.fake_vault
+            self.fake_node
                 .lock()
                 .await
                 .public_sequence
@@ -452,7 +452,7 @@ impl SafeApp for SafeAppFake {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate Sequence in scl mock: {}", xorname_hex);
 
-        let mutex = self.fake_vault.lock().await;
+        let mutex = self.fake_node.lock().await;
         let seq = if private {
             mutex.private_sequence.get(&xorname_hex)
         } else {
@@ -489,7 +489,7 @@ impl SafeApp for SafeAppFake {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate Sequence in scl mock: {}", xorname_hex);
 
-        let mutex = self.fake_vault.lock().await;
+        let mutex = self.fake_node.lock().await;
         let seq = if private {
             mutex.private_sequence.get(&xorname_hex)
         } else {
@@ -528,7 +528,7 @@ impl SafeApp for SafeAppFake {
             xorname_hex
         );
 
-        let mut mutex = self.fake_vault.lock().await;
+        let mut mutex = self.fake_node.lock().await;
 
         let seq = if private {
             mutex.private_sequence.get_mut(&xorname_hex)

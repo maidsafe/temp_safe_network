@@ -150,10 +150,10 @@ pub fn shell_run() -> Result<(), String> {
         |io, (safe, _sn_authd_client), args| call_cli("update", args, safe, io),
     );
     shell.new_command(
-        "vault",
-        "Commands to manage Safe vaults",
+        "node",
+        "Commands to manage Safe Network Nodes",
         0,
-        |io, (safe, _sn_authd_client), args| call_cli("vault", args, safe, io),
+        |io, (safe, _sn_authd_client), args| call_cli("node", args, safe, io),
     );
     shell.new_command(
         "wallet",

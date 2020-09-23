@@ -6,7 +6,7 @@ env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
-  SAFE_VAULT_VERSION: "0.24.0"
+  SN_NODE_VERSION: "0.24.0"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
@@ -49,10 +49,10 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - run: mkdir -p ~/.safe/vault
-      - name: dl vault
-        run: wget https://github.com/maidsafe/safe_vault/releases/download/${{env.SAFE_VAULT_VERSION}}/safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip
-      - run: unzip safe_vault-${{env.SAFE_VAULT_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/vault
+      - run: mkdir -p ~/.safe/node
+      - name: dl node
+        run: wget https://github.com/maidsafe/sn_node/releases/download/${{env.SN_NODE_VERSION}}/sn_node-${{env.SN_NODE_VERSION}}-x86_64-unknown-linux-musl.zip
+      - run: unzip sn_node-${{env.SN_NODE_VERSION}}-x86_64-unknown-linux-musl.zip -d $HOME/.safe/node
 
       - name: Setup Safe Cli and Authd dirs
         run: |
@@ -82,10 +82,10 @@ jobs:
       - run: echo $PATH
       - run: chmod +x $HOME/.safe/authd/sn_authd
       - run: chmod +x $HOME/.safe/cli/safe
-      - run: chmod +x $HOME/.safe/vault/safe_vault
+      - run: chmod +x $HOME/.safe/node/sn_node
 
       - name: Setup The Baby
-        run : safe vault run-baby-fleming -t
+        run : safe node run-baby-fleming -t
 
       - name: Benchmark
         run: cargo bench --bench ${{ matrix.benchmark }}
@@ -93,8 +93,8 @@ jobs:
 
       - name: Stop the network.
         if: failure()
-        run: safe vault killall || true && safe auth stop || true
+        run: safe node killall || true && safe auth stop || true
 
       - name: Failure logs.
         if: failure()
-        run: tail $HOME/.safe/vault/baby-fleming-vaults/*/*.log
+        run: tail $HOME/.safe/node/baby-fleming-nodes/*/*.log
