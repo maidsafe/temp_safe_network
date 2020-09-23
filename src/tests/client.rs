@@ -10,7 +10,7 @@ use super::Network;
 use safe_core::client::exported_tests as client_tests;
 use std::sync::Once;
 
-static mut NETWORK: Network = Network { vaults: Vec::new() };
+static mut NETWORK: Network = Network { nodes: Vec::new() };
 static START: Once = Once::new();
 
 #[allow(unsafe_code)]
