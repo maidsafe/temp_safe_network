@@ -16,10 +16,11 @@ use safe_authenticator::{
     errors::AuthError, ipc::decode_ipc_msg,
     revocation::revoke_app as safe_authenticator_revoke_app, Authenticator,
 };
-use safe_core::{
-    client as safe_core_client,
+use safe_nd::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
+use sn_client::{
+    client as sn_client,
     client::Client,
-    core_structs::{access_container_enc_key, AccessContainerEntry},
+    client_structs::{access_container_enc_key, AccessContainerEntry},
     ipc::{
         decode_msg, encode_msg,
         req::{AuthReq, ContainersReq, IpcReq, ShareMDataReq},
@@ -27,9 +28,8 @@ use safe_core::{
         IpcMsg,
     },
     utils::symmetric_decrypt,
-    CoreError,
+    ClientError,
 };
-use safe_nd::{AppPermissions, ClientFullId, Error as SndError, MDataAddress};
 use std::collections::HashMap;
 
 // Authenticator API
@@ -41,7 +41,7 @@ pub struct SafeAuthenticator {
 impl SafeAuthenticator {
     pub fn new(config_dir_path: Option<&str>) -> Self {
         if let Some(path) = config_dir_path {
-            safe_core::config_handler::set_config_dir_path(path);
+            sn_client::config_handler::set_config_dir_path(path);
         }
 
         Self {
@@ -106,7 +106,7 @@ impl SafeAuthenticator {
                     AuthError::SndError(SndError::NoSuchLoginPacket) => {
                         "no SAFE account found with the passphrase provided".to_string()
                     }
-                    AuthError::CoreError(CoreError::SymmetricDecipherFailure) => {
+                    AuthError::ClientError(ClientError::SymmetricDecipherFailure) => {
                         "unable to log in with the password provided".to_string()
                     }
                     other => other.to_string(),
@@ -617,7 +617,7 @@ async fn gen_cont_auth_response(
 
             // Adding a new access container entry
             Ok((_, None))
-            | Err(AuthError::CoreError(CoreError::DataError(safe_nd::Error::NoSuchEntry))) => 0,
+            | Err(AuthError::ClientError(ClientError::DataError(safe_nd::Error::NoSuchEntry))) => 0,
 
             // Error has occurred while trying to get an
             // existing entry
@@ -646,7 +646,7 @@ async fn gen_cont_auth_response(
 
 // Helper function to generate an unregistered authorisation response
 fn gen_unreg_auth_response(req_id: SafeAuthReqId) -> Result<String> {
-    let bootstrap_cfg = safe_core_client::bootstrap_config().map_err(|err| {
+    let bootstrap_cfg = sn_client::bootstrap_config().map_err(|err| {
         Error::AuthenticatorError(format!(
             "Failed to obtain bootstrap info for response: {}",
             err

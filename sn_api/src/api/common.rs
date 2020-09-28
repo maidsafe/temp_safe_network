@@ -15,9 +15,9 @@ use threshold_crypto::SecretKey;
 use tokio::runtime;
 
 pub mod auth_types {
-    use safe_core::ipc::req::{ContainerPermissions, IpcReq};
     use safe_nd::AppPermissions;
     use serde::{Deserialize, Serialize};
+    use sn_client::ipc::req::{ContainerPermissions, IpcReq};
     use std::collections::HashMap;
     pub type SafeAuthReq = IpcReq;
     pub type SafeAuthReqId = u32;

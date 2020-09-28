@@ -17,12 +17,14 @@ use crate::{Error, Result};
 use async_trait::async_trait;
 use log::{debug, info, warn};
 use safe_app::App;
-use safe_core::{client::test_create_balance, immutable_data, Client, CoreError as SafeCoreError};
 use safe_nd::{
     ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
     MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
     SDataPrivUserPermissions, SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction,
     TransactionId,
+};
+use sn_client::{
+    client::test_create_balance, immutable_data, Client, ClientError as SafeClientError,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -58,7 +60,7 @@ impl SafeAppScl {
             .mutate_seq_mdata_entries(name, tag, entry_actions)
             .await
             .map_err(|err| {
-                if let SafeCoreError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
+                if let SafeClientError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
                     Error::EntryExists(format!("{}: {}", message, err))
                 } else {
                     Error::NetDataError(format!("{}: {}", message, err))
@@ -122,7 +124,7 @@ impl SafeApp for SafeAppScl {
             )
             .await
             .map_err(|err| {
-                if let SafeCoreError::DataError(SafeNdError::InsufficientBalance) = err {
+                if let SafeClientError::DataError(SafeNdError::InsufficientBalance) = err {
                     Error::NotEnoughBalance(amount.to_string())
                 } else {
                     Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
@@ -166,11 +168,11 @@ impl SafeApp for SafeAppScl {
             .transfer_coins(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
             .await
             .map_err(|err| match err {
-                SafeCoreError::DataError(SafeNdError::ExcessiveValue)
-                | SafeCoreError::DataError(SafeNdError::InsufficientBalance) => {
+                SafeClientError::DataError(SafeNdError::ExcessiveValue)
+                | SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
                     Error::NotEnoughBalance(amount.to_string())
                 }
-                SafeCoreError::DataError(SafeNdError::InvalidOperation) => {
+                SafeClientError::DataError(SafeNdError::InvalidOperation) => {
                     Error::InvalidAmount(amount.to_string())
                 }
                 other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
@@ -343,16 +345,16 @@ impl SafeApp for SafeAppScl {
             .get_seq_mdata_value(name, tag, key_vec)
             .await
             .map_err(|err| match err {
-                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
+                SafeClientError::DataError(SafeNdError::AccessDenied) => {
                     Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
                 }
-                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
+                SafeClientError::DataError(SafeNdError::NoSuchData) => {
                     Error::ContentNotFound(format!(
                         "Sequenced MutableData not found at Xor name: {}",
                         xorname_to_hex(&name)
                     ))
                 }
-                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
+                SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
                         "Entry not found in Sequenced MutableData found at Xor name: {}",
                         xorname_to_hex(&name)
@@ -372,20 +374,20 @@ impl SafeApp for SafeAppScl {
             .list_seq_mdata_entries(name, tag)
             .await
             .map_err(|err| match err {
-                SafeCoreError::DataError(SafeNdError::AccessDenied) => {
+                SafeClientError::DataError(SafeNdError::AccessDenied) => {
                     Error::AccessDenied(format!(
                         "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
                         name, tag
                     ))
                 }
-                SafeCoreError::DataError(SafeNdError::NoSuchData) => {
+                SafeClientError::DataError(SafeNdError::NoSuchData) => {
                     Error::ContentNotFound(format!(
                         "Sequenced MutableData not found at Xor name: {} (type tag: {})",
                         xorname_to_hex(&name),
                         tag
                     ))
                 }
-                SafeCoreError::DataError(SafeNdError::NoSuchEntry) => {
+                SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
                     "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
                     xorname_to_hex(&name),
@@ -504,7 +506,7 @@ impl SafeApp for SafeAppScl {
             .get_sdata_last_entry(sequence_address)
             .await
             .map_err(|err| {
-                if let SafeCoreError::DataError(SafeNdError::NoSuchEntry) = err {
+                if let SafeClientError::DataError(SafeNdError::NoSuchEntry) = err {
                     Error::EmptyContent(format!("Empty Sequence found at XoR name {}", name))
                 } else {
                     Error::NetDataError(format!(
@@ -543,7 +545,7 @@ impl SafeApp for SafeAppScl {
             .get_sdata_range(sequence_address, (start, end))
             .await
             .map_err(|err| {
-                if let SafeCoreError::DataError(SafeNdError::NoSuchEntry) = err {
+                if let SafeClientError::DataError(SafeNdError::NoSuchEntry) = err {
                     Error::VersionNotFound(format!(
                         "Invalid version ({}) for Sequence found at XoR name {}",
                         index, name

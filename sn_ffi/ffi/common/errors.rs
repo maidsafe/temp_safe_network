@@ -8,8 +8,8 @@
 // Software.
 
 use bincode::Error as SerialisationError;
-use safe_core::{ipc::IpcError, CoreError};
 use sn_api::Error as NativeError;
+use sn_client::{ipc::IpcError, ClientError};
 use sn_ffi_utils::{ErrorCode, StringError};
 use std::{ffi::NulError, fmt};
 
@@ -102,8 +102,8 @@ impl From<IpcError> for Error {
     }
 }
 
-impl From<CoreError> for Error {
-    fn from(err: CoreError) -> Self {
+impl From<ClientError> for Error {
+    fn from(err: ClientError) -> Self {
         Self(NativeError::Unexpected(format!("{:?}", err)))
     }
 }

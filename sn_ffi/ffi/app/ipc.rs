@@ -9,9 +9,9 @@
 
 use super::common::errors::{Error, Result};
 use bincode::serialize;
-use safe_core::ffi::ipc::req::{AuthReq, ContainersReq, ShareMDataRequest};
-use safe_core::ffi::ipc::resp::AuthGranted;
-use safe_core::ipc::{
+use sn_client::ffi::ipc::req::{AuthReq, ContainersReq, ShareMDataRequest};
+use sn_client::ffi::ipc::resp::AuthGranted;
+use sn_client::ipc::{
     self, AuthReq as NativeAuthReq, ContainersReq as NativeContainersReq, IpcError, IpcMsg, IpcReq,
     IpcResp, ShareMDataReq as NativeShareMDataReq,
 };

@@ -21,7 +21,7 @@ log = "~0.4.8"
 safe-nd = "~0.11.0"
 serde = "1.0.91"
 serde_json = "1.0.39"
-safe_core = "~0.43.0"
+sn_client = "~0.43.0"
 bincode = "1.2.1"
 safe_authenticator = "~0.18.0"
 tokio = { version = "~0.2.21", features = ["rt-core"] }
@@ -42,4 +42,4 @@ unwrap = "1.2.1"
 
 [features]
 bindings = ["sn_bindgen"]
-scl-mock = ["sn_api/scl-mock", "safe_authenticator/mock-network", "safe_core/mock-network"]
+scl-mock = ["sn_api/scl-mock", "safe_authenticator/mock-network", "sn_client/mock-network"]

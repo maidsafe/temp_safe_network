@@ -15,10 +15,10 @@ use super::{
 use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
-use safe_core::ipc::req::ContainerPermissions;
 use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sn_client::ipc::req::ContainerPermissions;
 use std::{
     collections::HashMap,
     io::{self, Write},

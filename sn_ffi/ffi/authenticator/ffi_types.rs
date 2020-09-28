@@ -8,8 +8,8 @@
 // Software.
 
 use super::common::errors::Result;
-use safe_core::{ffi::ipc::req::ContainerPermissions, ipc::req::containers_into_vec};
 use sn_api::AuthedAppsList as NativeAuthedAppsList;
+use sn_client::{ffi::ipc::req::ContainerPermissions, ipc::req::containers_into_vec};
 use sn_ffi_utils::vec_into_raw_parts;
 use std::ffi::CString;
 use std::os::raw::c_char;

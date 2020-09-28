@@ -15,9 +15,9 @@ use super::{
 };
 use crate::{Error, Result};
 use log::{debug, info};
-use safe_core::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use safe_nd::AppPermissions;
 use serde_json::json;
+use sn_client::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
 use std::collections::HashMap;
 
 // Method for requesting application's authorisation

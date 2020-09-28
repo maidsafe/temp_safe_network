@@ -8,13 +8,13 @@
 // Software.
 
 use super::errors::{Error, Result};
-use safe_core::{config_handler, utils::logging};
 use sn_api::Error as NativeError;
+use sn_client::{config_handler, utils::logging};
 use sn_ffi_utils::{catch_unwind_cb, FfiResult, ReprC, FFI_RESULT_OK};
 use std::ffi::{CString, OsStr};
 use std::os::raw::{c_char, c_void};
 
-/// Sets the path from which the `safe_core.config` file will be read.
+/// Sets the path from which the `sn_client.config` file will be read.
 #[no_mangle]
 pub unsafe extern "C" fn set_config_dir_path(
     new_path: *const c_char,
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn config_dir_path(
     o_cb: extern "C" fn(user_data: *mut c_void, result: *const FfiResult, log_path: *const c_char),
 ) {
     catch_unwind_cb(user_data, o_cb, || -> Result<()> {
-        let config_dir = safe_core::config_dir()
+        let config_dir = sn_client::config_dir()
             .map_err(|err| Error::from(NativeError::Unexpected(err.to_string())))?;
         let config_dir_path = CString::new(
             config_dir
@@ -81,7 +81,7 @@ pub unsafe extern "C" fn config_dir_path(
 mod tests {
     use super::*;
     use log::{debug, error};
-    use safe_core::config_dir;
+    use sn_client::config_dir;
     use sn_ffi_utils::test_utils::{call_0, call_1};
     use std::env;
     use std::fs::{self, File};
