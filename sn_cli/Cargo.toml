@@ -42,8 +42,8 @@ console = "~0.10.0"
 percent-encoding = "2.1.0"
 xor_name = "1"
 
-[features]
-client-mock = ["sn_api/client-mock"]
+# [features]
+# client-mock = ["sn_api/client-mock"]
 
 [dependencies.sn_api]
 path = "../sn_api"

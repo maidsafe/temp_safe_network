@@ -9,8 +9,8 @@
 
 use super::{
     common::sk_from_hex,
-    helpers::{parse_coins_amount, pk_from_hex, pk_to_hex, xorname_from_pk, KeyPair},
-    xorurl::{SafeContentType, SafeDataType},
+    helpers::{parse_coins_amount, pk_to_hex, xorname_from_pk, KeyPair},
+    // xorurl::{SafeContentType, SafeDataType},
     Safe,
 };
 use crate::{

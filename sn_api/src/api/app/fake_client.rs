@@ -151,29 +151,29 @@ impl SafeAppFakeClient {
     }
 
     // === Money operations ===
-    pub async fn create_balance(
-        &mut self,
-        from_sk: Option<SecretKey>,
-        new_balance_owner: PublicKey,
-        amount: Money,
-    ) -> Result<XorName> {
-        if let Some(sk) = from_sk {
-            // 1 nano is the creation cost
-            let amount_with_cost = Money::from_nano(amount.as_nano() + 1);
-            self.substract_coins(sk, amount_with_cost).await?;
-        };
+    // pub async fn create_balance(
+    //     &mut self,
+    //     from_sk: Option<SecretKey>,
+    //     new_balance_owner: PublicKey,
+    //     amount: Money,
+    // ) -> Result<XorName> {
+    //     if let Some(sk) = from_sk {
+    //         // 1 nano is the creation cost
+    //         let amount_with_cost = Money::from_nano(amount.as_nano() + 1);
+    //         self.substract_coins(sk, amount_with_cost).await?;
+    //     };
 
-        let to_xorname = xorname_from_pk(new_balance_owner);
-        self.fake_vault.lock().await.coin_balances.insert(
-            xorname_to_hex(&to_xorname),
-            SafeKey {
-                owner: new_balance_owner,
-                value: amount.to_string(),
-            },
-        );
+    //     let to_xorname = xorname_from_pk(new_balance_owner);
+    //     self.fake_vault.lock().await.coin_balances.insert(
+    //         xorname_to_hex(&to_xorname),
+    //         SafeKey {
+    //             owner: new_balance_owner,
+    //             value: amount.to_string(),
+    //         },
+    //     );
 
-        Ok(to_xorname)
-    }
+    //     Ok(to_xorname)
+    // }
 
     pub async fn allocate_test_coins(
         &mut self,
@@ -199,44 +199,44 @@ impl SafeAppFakeClient {
         self.read_balance_from_xorname(&xorname).await
     }
 
-    pub async fn safecoin_transfer_to_xorname(
-        &mut self,
-        from_sk: Option<SecretKey>,
-        to_xorname: XorName,
-        tx_id: TransferId,
-        amount: Money,
-    ) -> Result<Transfer> {
-        if amount.as_nano() == 0 {
-            return Err(Error::InvalidAmount(amount.to_string()));
-        }
+    // pub async fn safecoin_transfer_to_xorname(
+    //     &mut self,
+    //     from_sk: Option<SecretKey>,
+    //     to_xorname: XorName,
+    //     tx_id: TransferId,
+    //     amount: Money,
+    // ) -> Result<Transfer> {
+    //     if amount.as_nano() == 0 {
+    //         return Err(Error::InvalidAmount(amount.to_string()));
+    //     }
 
-        if let Some(sk) = from_sk {
-            // reduce balance from safecoin_transferer
-            self.substract_coins(sk, amount).await?;
-        }
+    //     if let Some(sk) = from_sk {
+    //         // reduce balance from safecoin_transferer
+    //         self.substract_coins(sk, amount).await?;
+    //     }
 
-        // credit destination
-        let to_balance = self.read_balance_from_xorname(&to_xorname).await?;
-        match to_balance.checked_add(amount) {
-            None => Err(Error::Unexpected(
-                "Failed to credit destination due to overflow...maybe a millionaire's problem?!"
-                    .to_string(),
-            )),
-            Some(new_balance_coins) => {
-                let safekey = SafeKey {
-                    owner: self.fetch_pk_from_xorname(&to_xorname).await?,
-                    value: new_balance_coins.to_string(),
-                };
+    //     // credit destination
+    //     let to_balance = self.read_balance_from_xorname(&to_xorname).await?;
+    //     match to_balance.checked_add(amount) {
+    //         None => Err(Error::Unexpected(
+    //             "Failed to credit destination due to overflow...maybe a millionaire's problem?!"
+    //                 .to_string(),
+    //         )),
+    //         Some(new_balance_coins) => {
+    //             let safekey = SafeKey {
+    //                 owner: self.fetch_pk_from_xorname(&to_xorname).await?,
+    //                 value: new_balance_coins.to_string(),
+    //             };
 
-                self.fake_vault
-                    .lock()
-                    .await
-                    .coin_balances
-                    .insert(xorname_to_hex(&to_xorname), safekey);
-                Ok(Transfer { id: tx_id, amount })
-            }
-        }
-    }
+    //             self.fake_vault
+    //                 .lock()
+    //                 .await
+    //                 .coin_balances
+    //                 .insert(xorname_to_hex(&to_xorname), safekey);
+    //             Ok(Transfer { id: tx_id, amount })
+    //         }
+    //     }
+    // }
 
     pub async fn safecoin_transfer_to_pk(
         &mut self,

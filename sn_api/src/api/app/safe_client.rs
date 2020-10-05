@@ -24,12 +24,12 @@ use sn_client::{
 use sn_data_types::{
     Blob,
     BlobAddress,
-    ClientFullId,
+    // ClientFullId,
     Error as SafeNdError,
-    MapAction,
-    MapPermissionSet,
-    MapSeqEntryActions,
-    MapSeqValue,
+    // MapAction,
+    // MapPermissionSet,
+    // MapSeqEntryActions,
+    // MapSeqValue,
     Money,
     PublicBlob,
     PublicKey as SafeNdPublicKey,
@@ -137,7 +137,7 @@ impl SafeAppClient {
     //     amount: Money,
     // ) -> Result<XorName> {
     //     let mut client = self.get_safe_client()?;
-    //     let from_fullid = from_sk.map(ClientFullId::from);
+    //    let from_fullid = from_sk.map(ClientFullId::from);
     //     client
     //         .create_balance(
     //             from_fullid.as_ref(),
@@ -160,35 +160,35 @@ impl SafeAppClient {
 
     // pub async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Money) -> Result<XorName> {
     //     info!("Creating test SafeKey with {} test coins", amount);
-    //     let xorname = xorname_from_pk(owner_sk.public_key());
-    //     test_create_balance(&ClientFullId::from(owner_sk), amount)
+    //     // let xorname = xorname_from_pk(owner_sk.public_key());
+    //    test_create_balance(&ClientFullId::from(owner_sk), amount)
     //         .await
     //         .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
 
     //     Ok(xorname)
     // }
 
-    // pub async fn read_balance_from_sk(&self, sk: SecretKey) -> Result<Money> {
-    //     let mut client = self.get_safe_client()?;
-    //     let coins = client
-    //         .read_balance(Some(&ClientFullId::from(sk)))
-    //         .await
-    //         .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
+    pub async fn read_balance_from_sk(&mut self, sk: SecretKey) -> Result<Money> {
+        let mut temp_client = Client::new(Some(sk)).await?;
+        let coins = temp_client
+           .get_balance()
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
 
-    //     Ok(coins)
-    // }
+        Ok(coins)
+    }
 
     // pub async fn safecoin_transfer_to_xorname(
     //     &mut self,
-    //     from_sk: Option<SecretKey>,
+    //     // from_sk: Option<SecretKey>,
     //     to_xorname: XorName,
-    //     tx_id: TransferId,
+    //     // tx_id: TransferId,
     //     amount: Money,
-    // ) -> Result<Transfer> {
+    // ) -> Result<()> {
     //     let mut client = self.get_safe_client()?;
     //     let from_fullid = from_sk.map(ClientFullId::from);
     //     let tx = client
-    //         .transfer_money(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
+    //         .send_money( to_xorname, amount)
     //         .await
     //         .map_err(|err| match err {
     //             SafeClientError::DataError(SafeNdError::ExcessiveValue)
@@ -201,18 +201,20 @@ impl SafeAppClient {
     //             other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
     //         })?;
 
-    //     Ok(tx)
+    //     // TODO: reenable receipt of the transfer itself here
+    //     // Ok(tx)
+    //     Ok(())
     // }
 
     // pub async fn safecoin_transfer_to_pk(
     //     &mut self,
-    //     from_sk: Option<SecretKey>,
+    //     // from_sk: Option<SecretKey>,
     //     to_pk: PublicKey,
-    //     tx_id: TransferId,
+    //     // tx_id: TransferId,
     //     amount: Money,
-    // ) -> Result<Transfer> {
+    // ) -> Result<()> {
     //     let to_xorname = xorname_from_pk(to_pk);
-    //     self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
+    //     self.safecoin_transfer_to_xorname( to_xorname, amount)
     //         .await
     // }
 
