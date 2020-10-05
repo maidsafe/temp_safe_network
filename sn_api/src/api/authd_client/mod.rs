@@ -15,5 +15,5 @@ use super::constants;
 
 // Expose what's meant to be the public API
 pub use authd_client_api::{
-    AuthAllowPrompt, AuthReq, AuthdStatus, PendingAuthReqs, SafeAuthdClient,
+    AuthAllowPrompt, AuthdStatus, PendingAuthReqs, SafeAuthdClient,
 };

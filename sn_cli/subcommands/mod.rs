@@ -22,7 +22,7 @@ pub mod seq;
 pub mod setup;
 pub mod update;
 pub mod vault;
-pub mod wallet;
+// pub mod wallet;
 pub mod xorurl;
 
 use structopt::StructOpt;
@@ -97,8 +97,8 @@ pub enum SubCommands {
     /// Manage keys on the SAFE Network
     Keys(keys::KeysSubCommands),
     #[structopt(name = "wallet")]
-    /// Manage wallets on the SAFE Network
-    Wallet(wallet::WalletSubCommands),
+    // /// Manage wallets on the SAFE Network
+    // Wallet(wallet::WalletSubCommands),
     #[structopt(name = "xorurl")]
     /// Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs
     Xorurl {

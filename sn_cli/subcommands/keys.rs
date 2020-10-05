@@ -84,9 +84,9 @@ pub async fn key_commander(
                 connect(safe).await?;
             }
 
-            let (xorurl, key_pair, amount) =
+            let (key_pair, amount) =
                 create_new_key(safe, test_coins, pay_with, preload, pk).await?;
-            print_new_key_output(output_fmt, xorurl, key_pair, amount);
+            print_new_key_output(output_fmt, key_pair, amount);
             Ok(())
         }
         KeysSubCommands::Balance { keyurl, secret } => {
@@ -121,29 +121,31 @@ pub async fn key_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe
+            let _tx_id = safe
                 .keys_transfer(&amount, from.as_deref(), &destination, tx_id)
                 .await?;
 
-            if OutputFmt::Pretty == output_fmt {
-                println!("Success. TX_ID: {}", &tx_id);
-            } else {
-                println!("{}", &tx_id)
-            }
+            // if OutputFmt::Pretty == output_fmt {
+            println!("Successful transfer");
+            // println!("Successful. TX_ID: {}", &tx_id);
+            // } else {
+            // println!("{}", &tx_id)
+            // }
 
             Ok(())
         }
     }
 }
 
+#[cfg(feature = "simulated-payouts")]
 pub async fn create_new_key(
     safe: &mut Safe,
     test_coins: bool,
     pay_with: Option<String>,
     preload: Option<String>,
-    pk: Option<String>,
-) -> Result<(String, Option<BlsKeyPair>, Option<String>), String> {
-    let (xorurl, key_pair, amount) = if test_coins {
+    _pk: Option<String>,
+) -> Result<(Option<BlsKeyPair>, Option<String>), String> {
+    let (key_pair, amount) = if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
@@ -153,32 +155,45 @@ pub async fn create_new_key(
             );
         }
 
-        let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
-        (xorurl, key_pair, Some(amount))
+        let key_pair = safe.keys_create_preload_test_coins(&amount).await?;
+        (key_pair, Some(amount))
     } else {
+        let key_pair;
+        // let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
+
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
         // If the --pay-with is not provided the API will use the account's default wallet/sk
         if pay_with.is_none() {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
+
+            let payee = safe.keypair()?.sk;
+            key_pair = safe
+                .keys_create_and_preload_from_sk(&payee, preload.as_deref())
+                .await?;
+        // key_pair = safe
+        // .keys_create_preload_test_coins( &amount )
+        // .await?;
+        } else {
+            key_pair = safe
+                .keys_create_and_preload_from_sk(&pay_with.unwrap(), preload.as_deref())
+                .await?;
         }
-        let (xorurl, key_pair) = safe
-            .keys_create(pay_with.as_deref(), preload.as_deref(), pk.as_deref())
-            .await?;
-        (xorurl, key_pair, preload)
+
+        (key_pair, preload)
     };
 
-    Ok((xorurl, key_pair, amount))
+    Ok((key_pair, amount))
 }
 
 pub fn print_new_key_output(
     output_fmt: OutputFmt,
-    xorurl: String,
+    // xorurl: String,
     key_pair: Option<BlsKeyPair>,
     amount: Option<String>,
 ) {
     if OutputFmt::Pretty == output_fmt {
-        println!("New SafeKey created at: \"{}\"", xorurl);
+        // println!("New SafeKey created at: \"{}\"", xorurl);
         if let Some(n) = amount {
             println!("Preloaded with {} coins", n);
         }
@@ -188,8 +203,6 @@ pub fn print_new_key_output(
             println!("Secret Key = {}", pair.sk);
         }
     } else if let Some(pair) = &key_pair {
-        println!("{}", serialise_output(&(&xorurl, pair), output_fmt));
-    } else {
-        println!("{}", serialise_output(&xorurl, output_fmt));
+        println!("{}", serialise_output(&(pair), output_fmt));
     }
 }

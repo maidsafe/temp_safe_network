@@ -104,7 +104,7 @@ pub enum WalletSubCommands {
 pub async fn wallet_commander(
     cmd: WalletSubCommands,
     output_fmt: OutputFmt,
-    safe: &mut Safe,
+    mut safe: Safe,
 ) -> Result<(), String> {
     match cmd {
         WalletSubCommands::Create {

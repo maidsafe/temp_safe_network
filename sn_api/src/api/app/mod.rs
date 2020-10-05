@@ -45,6 +45,8 @@ pub use keys::BlsKeyPair;
 pub use nrs::ProcessedEntries;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
+// TODO: should we be cloning this?
+#[derive(Clone)]
 pub struct Safe {
     safe_client: SafeAppClient,
     pub xorurl_base: XorUrlBase,

@@ -70,6 +70,7 @@ pub async fn xorurl_commander(
             }
         }
         None => {
+            // let safe =
             connect(safe).await?;
             let location =
                 get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;

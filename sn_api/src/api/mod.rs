@@ -9,7 +9,7 @@
 
 #[cfg(feature = "app")]
 mod app;
-#[cfg(feature = "app")]
+#[cfg(any(feature = "app", feature = "authd_client"))]
 mod ipc;
 
 #[cfg(feature = "authd_client")]
@@ -22,7 +22,7 @@ mod errors;
 
 #[cfg(feature = "app")]
 pub use app::*;
-#[cfg(feature = "app")]
+#[cfg(any(feature = "app", feature = "authd_client"))]
 pub use ipc::*;
 
 #[cfg(feature = "app")]

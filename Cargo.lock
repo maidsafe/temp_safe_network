@@ -3339,6 +3339,8 @@ dependencies = [
  "chrono",
  "data-encoding",
  "directories 3.0.1",
+ "ed25519",
+ "ed25519-dalek",
  "env_logger 0.6.2",
  "futures 0.3.5",
  "hmac",

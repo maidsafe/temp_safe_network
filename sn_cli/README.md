@@ -873,7 +873,7 @@ Success. TX_ID: 277748716389078887
 
 Uploading files and folders onto the network is also possible with the CLI application, and as we'll see here it's extremely simple to not just upload them but also keep them in sync with any modifications made locally to the folders and files.
 
-Files are uploaded on the Network and stored as `Public ImmutableData` files, and the folders and sub-folders hierarchy is flattened out and stored in a container mapping each file's path with the corresponding `ImmutableData` XOR-URL. This map is maintained on the Network in a special container called `FilesContainer`, which is stored as `Public Sequence` data. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and the corresponding `FilesContainer` RFC will be submitted, but at this stage this is being done only using a simple serialised structure.
+Files are uploaded on the Network and stored as `Public Blob` files, and the folders and sub-folders hierarchy is flattened out and stored in a container mapping each file's path with the corresponding `Blob` XOR-URL. This map is maintained on the Network in a special container called `FilesContainer`, which is stored as `Public Sequence` data. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and the corresponding `FilesContainer` RFC will be submitted, but at this stage this is being done only using a simple serialised structure.
 
 #### Files Put
 
@@ -905,7 +905,7 @@ We can additionally pass a destination path argument to set a base path for each
 
 #### Files Sync
 
-Once a set of files, folders and subfolders, have been uploaded to the Network onto a `FilesContainer` using the `files put` command, local changes made to those files and folders can be easily synced up using the `files sync` command. This command takes care of finding the differences/changes on the local files and folders, creating new `Public ImmutableData` files as necessary, and updating the `FilesContainer` by publishing a new version of it at the same location on the Network.
+Once a set of files, folders and subfolders, have been uploaded to the Network onto a `FilesContainer` using the `files put` command, local changes made to those files and folders can be easily synced up using the `files sync` command. This command takes care of finding the differences/changes on the local files and folders, creating new `Public Blob` files as necessary, and updating the `FilesContainer` by publishing a new version of it at the same location on the Network.
 
 The `files sync` command follows a very similar logic to the well known `rsync` command, supporting a subset of its functionality. This subset will gradually be expanded with more supported features. Users knowing how to use `rsync` can easily start using the Safe CLI and the Safe Network for uploading files and folders, making it also easy to integrate existing automated systems which are currently making use of `rsync`.
 
@@ -1172,7 +1172,7 @@ FilesContainer updated (version 6): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7
 
 ### Xorurl
 
-As we've seen, when uploading files to the network, each file is uploaded as an `ImmutableData` using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
+As we've seen, when uploading files to the network, each file is uploaded as an `Blob` using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
 
 The file's XOR-URL is deterministic based on its content, i.e. the location where each of its chunks are stored is determined based on the file's content, and performed at the client before uploading the chunks to the network. Therefore the XOR-URL is always the same if the content of a file doesn't change. All this means is we can know what the file's XOR-URL will be without uploading it to the network.
 
@@ -1269,7 +1269,7 @@ Spendable balances of Wallet at "safe://hnyybyqbp8d4u79f9sqhcxtdczgb76iif74cdsji
 +---------+-------------------------+-------------------------------------------------------------------+
 ```
 
-As seen above, the `safe cat` command can be used to fetch any type of content from the Safe Network. At this point it only supports files (`ImmutableData`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
+As seen above, the `safe cat` command can be used to fetch any type of content from the Safe Network. At this point it only supports files (`Blob`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
 #### Retrieving binary files with --hexdump
 
@@ -1460,10 +1460,10 @@ XOR-URL: safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
 
 In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native Safe Network data type where this data is being held on (`PublicSequence`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
 
-Of course the `safe dog` command can be used also with other type of content like files (`ImmutableData`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
+Of course the `safe dog` command can be used also with other type of content like files (`Blob`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
 ```shell
 $ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc/subfolder/index.html
-Native data type: PublicImmutableData
+Native data type: PublicBlob
 XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
 XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
 Media type: text/html
@@ -1472,7 +1472,7 @@ Media type: text/html
 But how about using the `dog` command with an NRS URL, as we now know it's resolved using the NRS rules and following the links found in the NRS Map Container:
 ```shell
 $ safe dog safe://mywebsite/contact/form.html
-Native data type: PublicImmutableData
+Native data type: PublicBlob
 XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
 XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
 Media type: text/html

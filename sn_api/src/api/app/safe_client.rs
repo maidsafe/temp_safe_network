@@ -49,7 +49,7 @@ pub use threshold_crypto::{PublicKey, SecretKey};
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SafeAppClient {
     safe_client: Option<Client>,
 }
@@ -178,45 +178,73 @@ impl SafeAppClient {
         Ok(coins)
     }
 
-    // pub async fn safecoin_transfer_to_xorname(
-    //     &mut self,
-    //     // from_sk: Option<SecretKey>,
-    //     to_xorname: XorName,
-    //     // tx_id: TransferId,
-    //     amount: Money,
-    // ) -> Result<()> {
-    //     let mut client = self.get_safe_client()?;
-    //     let from_fullid = from_sk.map(ClientFullId::from);
-    //     let tx = client
-    //         .send_money( to_xorname, amount)
-    //         .await
-    //         .map_err(|err| match err {
-    //             SafeClientError::DataError(SafeNdError::ExcessiveValue)
-    //             | SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
-    //                 Error::NotEnoughBalance(amount.to_string())
-    //             }
-    //             SafeClientError::DataError(SafeNdError::InvalidOperation) => {
-    //                 Error::InvalidAmount(amount.to_string())
-    //             }
-    //             other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
-    //         })?;
+    #[cfg(feature = "simulated-payouts")]
+    pub async fn trigger_simulated_farming_payout(&mut self, amount: Money) -> Result<()> {
+        let mut client = self.get_safe_client()?;
 
-    //     // TODO: reenable receipt of the transfer itself here
-    //     // Ok(tx)
-    //     Ok(())
-    // }
+        client.trigger_simulated_farming_payout(amount).await?;
 
-    // pub async fn safecoin_transfer_to_pk(
-    //     &mut self,
-    //     // from_sk: Option<SecretKey>,
-    //     to_pk: PublicKey,
-    //     // tx_id: TransferId,
-    //     amount: Money,
-    // ) -> Result<()> {
-    //     let to_xorname = xorname_from_pk(to_pk);
-    //     self.safecoin_transfer_to_xorname( to_xorname, amount)
-    //         .await
-    // }
+        Ok(())
+    }
+
+    pub async fn safecoin_transfer_to_xorname(
+        &mut self,
+        from_sk: Option<SecretKey>,
+        to_xorname: XorName,
+        // tx_id: TransferId,
+        amount: Money,
+    ) -> Result<()> {
+        let mut client = match from_sk 
+        {
+            Some(sk) => Client::new(Some(sk)).await?,
+            None => self.get_safe_client()?
+        };
+
+        // TODO: attempt to get wallet pk from xorname
+
+        unimplemented!()
+
+        // let from_fullid = from_sk.map(ClientFullId::from);
+        // let _tx = client
+        //     .send_money( to_xorname, amount)
+        //     .await
+        //     .map_err(|err| match err {
+        //         SafeClientError::DataError(SafeNdError::ExcessiveValue)
+        //         | SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
+        //             Error::NotEnoughBalance(amount.to_string())
+        //         }
+        //         SafeClientError::DataError(SafeNdError::InvalidOperation) => {
+        //             Error::InvalidAmount(amount.to_string())
+        //         }
+        //         other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
+        //     })?;
+
+        // // TODO: reenable receipt of the transfer itself here
+        // // Ok(tx)
+        // Ok(())
+    }
+
+    pub async fn safecoin_transfer_to_pk(
+        &mut self,
+        from_sk: Option<SecretKey>,
+        to_pk: PublicKey,
+        // tx_id: TransferId,
+        amount: Money,
+    ) -> Result<()> {
+        let mut client = match from_sk 
+        {
+            Some(sk) => Client::new(Some(sk)).await?,
+            None => self.get_safe_client()?
+        };
+
+
+        Ok(client.send_money(SafeNdPublicKey::Bls(to_pk), amount).await?)
+
+
+        // let to_xorname = xorname_from_pk(to_pk);
+        // self.safecoin_transfer_to_xorname( to_xorname, amount)
+        //     .await
+    }
 
     // // === Blob operations ===
     pub async fn store_public_blob(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
@@ -228,7 +256,7 @@ impl SafeAppClient {
         let xorname = blob_for_storage.address().name().clone();
 
         let _data_map = client
-            .self_encrypt_blob(&blob_for_storage)
+            .generate_data_map(&blob_for_storage)
             .await
             .map_err(|e| {
                 Error::NetDataError(format!(

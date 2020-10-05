@@ -14,10 +14,21 @@ use crate::{
     operations::safe_net::connect,
     shell,
     subcommands::{
-        auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
-        files::files_commander, keys::key_commander, networks::networks_commander,
-        nrs::nrs_commander, seq::seq_commander, setup::setup_commander, update::update_commander,
-        vault::vault_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
+        auth::auth_commander,
+        cat::cat_commander,
+        config::config_commander,
+        dog::dog_commander,
+        files::files_commander,
+        keys::key_commander,
+        networks::networks_commander,
+        nrs::nrs_commander,
+        seq::seq_commander,
+        setup::setup_commander,
+        update::update_commander,
+        vault::vault_commander,
+        // wallet::wallet_commander,
+        xorurl::xorurl_commander,
+        OutputFmt,
         SubCommands,
     },
 };
@@ -55,7 +66,7 @@ pub async fn run() -> Result<(), String> {
     run_with(None, &mut safe).await
 }
 
-pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<(), String> {
+pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), String> {
     // Let's first get all the arguments passed in, either as function's args, or CLI args
     let args = match cmd_args {
         None => CmdArgs::from_args(),
@@ -81,7 +92,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<
     let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd),
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
-        Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, &mut safe).await,
+        Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, safe).await,
         Some(SubCommands::Keypair {}) => {
             let key_pair = safe.keypair()?;
             if OutputFmt::Pretty == output_fmt {
@@ -101,39 +112,27 @@ pub async fn run_with(cmd_args: Option<&[&str]>, mut safe: &mut Safe) -> Result<
                 .join()
                 .map_err(|err| format!("Failed to run self update: {:?}", err))?
         }
-        Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, &mut safe).await,
+        Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, safe).await,
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
         Some(SubCommands::Xorurl {
             cmd,
             location,
             recursive,
             follow_links,
-        }) => {
-            xorurl_commander(
-                cmd,
-                location,
-                recursive,
-                follow_links,
-                output_fmt,
-                &mut safe,
-            )
-            .await
-        }
+        }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
         Some(SubCommands::Vault { cmd }) => vault_commander(cmd),
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to
             // connect to the network with them, otherwise the connection created will be with
             // read-only access and some of these commands will fail if they require write access
-            connect(&mut safe).await?;
+            connect(safe).await?;
             match other {
-                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Files(cmd) => {
-                    files_commander(cmd, output_fmt, args.dry, &mut safe).await
-                }
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, &mut safe).await,
-                SubCommands::Seq(cmd) => seq_commander(cmd, output_fmt, &mut safe).await,
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
+                // SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, safe).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, safe).await,
+                SubCommands::Seq(cmd) => seq_commander(cmd, output_fmt, safe).await,
                 _ => Err("Unknown safe subcommand".to_string()),
             }
         }

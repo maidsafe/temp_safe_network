@@ -1084,21 +1084,21 @@ impl SafeUrl {
     }
 
     // A non-member SafeKey encoder function for convenience
-    pub fn encode_safekey(xor_name: XorName, base: XorUrlBase) -> Result<String> {
-        SafeUrl::encode(
-            xor_name,
-            None,
-            0,
-            SafeDataType::SafeKey,
-            SafeContentType::Raw,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
-        )
-    }
+    // pub fn encode_safekey(xor_name: XorName, base: XorUrlBase) -> Result<String> {
+    //     SafeUrl::encode(
+    //         xor_name,
+    //         None,
+    //         0,
+    //         SafeDataType::SafeKey,
+    //         SafeContentType::Raw,
+    //         None,
+    //         None,
+    //         None,
+    //         None,
+    //         None,
+    //         base,
+    //     )
+    // }
 
     // A non-member Blob encoder function for convenience
     pub fn encode_blob(

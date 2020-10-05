@@ -11,20 +11,27 @@ use super::AppExchangeInfo;
 
 // use ffi_utils::{vec_into_raw_parts, ReprC, StringError};
 use serde::{Deserialize, Serialize};
-
+use crate::api::common::auth_types::SafeAuthReqId;
 
 
 /// Represents an authorisation request.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AuthReq {
-    /// The application identifier for this request
-    pub app: AppExchangeInfo,
-    // /// `true` if the app wants dedicated container for itself. `false` otherwise.
-    // pub app_container: bool,
-    // /// Stores app permissions, e.g. allowing to work with the user's coin balance.
+    /// The authorisation request ID
+    pub req_id: SafeAuthReqId,
+    /// The App ID. It must be unique.
+    pub app_id: String,
+    /// The application friendly-name.
+    pub app_name: String,
+    /// The application provider/vendor (e.g. MaidSafe)
+    pub app_vendor: String,
+    // /// Permissions requested, e.g. allowing to work with the user's coin balance.
     // pub app_permissions: AppPermissions,
-    // /// The list of containers the app wishes to access (and desired permissions).
+    // /// The permissions requested by the app for named containers
+    // // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
     // pub containers: HashMap<String, ContainerPermissions>,
+    // /// If the app requested a dedicated named container for itself
+    // pub own_container: bool,
 }
 
 // impl AuthReq {

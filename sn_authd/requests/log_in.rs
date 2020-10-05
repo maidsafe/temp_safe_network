@@ -10,6 +10,7 @@
 use crate::shared::SharedSafeAuthenticatorHandle;
 use log::{error, info};
 use serde_json::{json, Value};
+use sn_api::get_sk_from_input;
 
 pub async fn process_req(
     params: Value,
@@ -37,7 +38,9 @@ pub async fn process_req(
             })?;
 
             let mut safe_authenticator = safe_auth_handle.lock().await;
-            match safe_authenticator.log_in(passphrase, password).await {
+            let sk = get_sk_from_input(passphrase, password);
+
+            match safe_authenticator.log_in(sk).await {
                 Ok(_) => {
                     let msg = "Logged in successfully!";
                     info!("{}", msg);

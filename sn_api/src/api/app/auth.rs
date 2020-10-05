@@ -20,7 +20,6 @@ use log::{debug, info};
 // use sn_data_types::AppPermissions;
 use serde_json::json;
 
-
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 
@@ -35,13 +34,15 @@ impl Safe {
     ) -> Result<String> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
+        let req_id: u32 = gen_req_id();
         let request = IpcReq::Auth(AuthReq {
-            app: AppExchangeInfo {
-                id: app_id.to_string(),
-                scope: None,
-                name: app_name.to_string(),
-                vendor: app_vendor.to_string(),
-            },
+            req_id,
+            // app: AppExchangeInfo {
+                app_id: app_id.to_string(),
+                // scope: None,
+                app_name: app_name.to_string(),
+                app_vendor: app_vendor.to_string(),
+            // },
             // app_container: false,
             // app_permissions: AppPermissions {
             //     read_balance: true,
@@ -51,7 +52,6 @@ impl Safe {
             // containers: HashMap::new(),
         });
 
-        let req_id: u32 = gen_req_id();
         let auth_req_str = encode_msg(&IpcMsg::Req { req_id, request }).map_err(|err| {
             Error::AuthError(format!(
                 "Failed encoding the authorisation request: {:?}",
