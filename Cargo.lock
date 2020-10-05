@@ -3459,6 +3459,7 @@ dependencies = [
  "miscreant",
  "qp2p",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "regex",
  "self_encryption",
  "serde",
