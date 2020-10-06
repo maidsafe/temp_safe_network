@@ -18,7 +18,7 @@ pub mod auth_types {
     use crate::api::ipc::req::IpcReq;
     // use sn_data_types::AppPermissions;
     use serde::{Deserialize, Serialize};
-    
+
     pub type SafeAuthReq = IpcReq;
     pub type SafeAuthReqId = u32;
 

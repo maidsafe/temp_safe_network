@@ -10,8 +10,8 @@
 use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use sn_data_types::Money;
 use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
+use sn_data_types::Money;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::{env, fs, process, str::FromStr};

@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::AppExchangeInfo;
+// use super::AppExchangeInfo;
 // use crate::ffi::ipc::req as ffi;
 
 // use ffi_utils::{vec_into_raw_parts, ReprC, StringError};
-use serde::{Deserialize, Serialize};
 use crate::api::common::auth_types::SafeAuthReqId;
-
+use serde::{Deserialize, Serialize};
 
 /// Represents an authorisation request.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

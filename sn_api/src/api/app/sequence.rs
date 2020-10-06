@@ -225,7 +225,7 @@ mod tests {
             .await?;
         client1.append_to_sequence(&xorurl, data_v1).await?;
 
-        let client2 = new_safe_instance().await?;
+        let mut client2 = new_safe_instance().await?;
         let received_data_v0 = client2.sequence_get(&format!("{}?v=0", xorurl)).await?;
         let received_data_v1 = client2.sequence_get(&xorurl).await?;
         assert_eq!(received_data_v0, (0, data_v0.to_vec()));
@@ -258,7 +258,7 @@ mod tests {
 
         // a third client should see all versions now since it'll fetch from the
         // replicas on the network which have merged all appends from client1 and client2,
-        let client3 = new_safe_instance().await?;
+        let mut client3 = new_safe_instance().await?;
         let received_v0 = client3.sequence_get(&format!("{}?v=0", xorurl)).await?;
         assert_eq!((0, data_v0.to_vec()), received_v0);
 

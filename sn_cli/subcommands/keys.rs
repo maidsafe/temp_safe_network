@@ -96,7 +96,9 @@ pub async fn key_commander(
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(&sk).await
             } else {
-                safe.keys_balance_from_url(&target, &sk).await
+                unimplemented!();
+                // TODO: reenable once we have wallet url parsing going again
+                // safe.keys_balance_from_url(&target, &sk).await
             }?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -107,23 +109,25 @@ pub async fn key_commander(
             Ok(())
         }
         KeysSubCommands::Transfer {
-            amount,
-            from,
+            amount: _,
+            from: _,
             to,
-            tx_id,
+            tx_id: _,
         } => {
             // TODO: don't connect if --from sk was passed
             connect(safe).await?;
 
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
-            let destination = get_from_arg_or_stdin(
+            let _destination = get_from_arg_or_stdin(
                 to,
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
+            unimplemented!();
+            // TODO: reenable once we have wallets going
 
-            let _tx_id = safe
-                .keys_transfer(&amount, from.as_deref(), &destination, tx_id)
-                .await?;
+            // let _tx_id = safe
+            //     .keys_transfer(&amount, from.as_deref(), &destination, tx_id)
+            //     .await?;
 
             // if OutputFmt::Pretty == output_fmt {
             println!("Successful transfer");

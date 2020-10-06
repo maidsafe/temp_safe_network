@@ -14,7 +14,7 @@ use super::{
     Safe,
     // SafeApp,
 };
-use crate::api::ipc::{encode_msg, gen_req_id, req::AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
+use crate::api::ipc::{encode_msg, gen_req_id, AuthReq, IpcMsg, IpcReq};
 use crate::{Error, Result};
 use log::{debug, info};
 // use sn_data_types::AppPermissions;
@@ -38,10 +38,10 @@ impl Safe {
         let request = IpcReq::Auth(AuthReq {
             req_id,
             // app: AppExchangeInfo {
-                app_id: app_id.to_string(),
-                // scope: None,
-                app_name: app_name.to_string(),
-                app_vendor: app_vendor.to_string(),
+            app_id: app_id.to_string(),
+            // scope: None,
+            app_name: app_name.to_string(),
+            app_vendor: app_vendor.to_string(),
             // },
             // app_container: false,
             // app_permissions: AppPermissions {

@@ -12,7 +12,7 @@ use super::{
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     notifs_endpoint::jsonrpc_listen,
 };
-use crate::{AuthedAppsList, Error, Result, SafeAuthReqId, api::AuthReq};
+use crate::{api::AuthReq, AuthedAppsList, Error, Result, SafeAuthReqId};
 use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};

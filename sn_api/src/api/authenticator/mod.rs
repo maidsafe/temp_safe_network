@@ -7,10 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-
 use crate::{Error, Result, SafeAuthReq, SafeAuthReqId};
 
-use log::{debug, trace, info};
+use log::{debug, info, trace};
 // use safe_authenticator::{
 //     access_container, access_container::update_container_perms, app_auth::authenticate, config,
 //     errors::AuthError, ipc::decode_ipc_msg,
@@ -38,12 +37,11 @@ use sn_client::{
     utils::symmetric_decrypt,
     ClientError,
 };
-use sn_data_types::{ClientFullId};
+use sn_data_types::ClientFullId;
 // extern crate ed25519_dalek;
 
 use ed25519_dalek::{Keypair as Ed25519Keypair, SecretKey as Ed25519SecretKey};
 // use ed25519_dalek::Signature;
-
 
 use xor_name::{XorName, XOR_NAME_LEN};
 
@@ -82,25 +80,24 @@ fn create_ed25519_sk_from_seed(seeder: &[u8]) -> Ed25519SecretKey {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
 
-    let sk= Ed25519Keypair::generate(&mut rng);
+    let sk = Ed25519Keypair::generate(&mut rng);
 
     sk.secret
 }
 
 pub fn get_sk_from_input(passphrase: &str, password: &str) -> threshold_crypto::SecretKey {
+    // TODO: Q what is the need for this third secret?
+    let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
-     // TODO: Q what is the need for this third secret?
-     let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
+    // TODO properly derive an Map location
+    let _map_data_location = generate_network_address(&keyword, &salt);
 
-     // TODO properly derive an Map location
-     let _map_data_location = generate_network_address(&keyword, &salt);     
+    // TODO: use a combo of derived inputs for seed here.
+    let mut seed = password.clone();
+    seed.extend(salt.iter());
+    let sk = create_bls_sk_from_seed(&seed);
 
-     // TODO: use a combo of derived inputs for seed here.
-     let mut seed = password.clone();
-     seed.extend(salt.iter());
-     let sk = create_bls_sk_from_seed(&seed);
-
-     sk
+    sk
 }
 
 // /// use password based crypto
@@ -157,8 +154,6 @@ impl SafeAuthenticator {
             authenticator_client: None,
         }
     }
-
-    
 
     /// # Create Account
     /// Creates a new account on the SAFE Network.
@@ -219,14 +214,13 @@ impl SafeAuthenticator {
 
         // TODO derive SK from passphrase etc. Put data storage blob on network.
 
-     
         trace!("Creating an account...");
 
         // TODO: Q what is the need for this third secret?
         // let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
         // TODO properly derive an Map location
-        // let _map_data_location = generate_network_address(&keyword, &salt);     
+        // let _map_data_location = generate_network_address(&keyword, &salt);
 
         // TODO: use a combo of derived inputs for seed here.
         // let mut seed = password.clone();
@@ -284,9 +278,8 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn log_in(&mut self, sk: threshold_crypto::SecretKey) -> Result<()> {
+    pub async fn log_in(&mut self, _sk: threshold_crypto::SecretKey) -> Result<()> {
         debug!("Attempting to log in...");
-
 
         // // TODO: Q what is the need for this third secret?
         // let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
@@ -294,14 +287,12 @@ impl SafeAuthenticator {
         // // TODO properly derive an Map location
         // let _map_data_location = generate_network_address(&keyword, &salt);
 
-
         // // TODO: use a combo of derived inputs for seed here.
         // let mut seed = password.clone();
         // seed.extend(salt.iter());
 
         // // unimplemented!();
         // let sk = create_bls_sk_from_seed(&seed);
-
 
         // let auth_client = Client::new(Some(sk)).await?;
         // self.authenticator_client = Some(auth_client);
@@ -351,14 +342,14 @@ impl SafeAuthenticator {
                 other
             ))),
         }
-    }   
+    }
 
     // TODO: update terminology around apps auth here
-    pub async fn revoke_app(&self, y: &String) -> Result<()> {
+    pub async fn revoke_app(&self, _y: &String) -> Result<()> {
         unimplemented!()
     }
 
-    pub async fn authorise_app(&self, x: &str) -> Result<String> {
+    pub async fn authorise_app(&self, _x: &str) -> Result<String> {
         unimplemented!()
     }
 

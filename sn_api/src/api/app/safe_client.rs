@@ -7,20 +7,16 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-
 use super::{
     fetch::Range,
-    helpers::{xorname_to_hex},
+    helpers::xorname_to_hex,
     // SafeApp,
 };
 use crate::{Error, Result};
 
 use log::{debug, info, warn};
 
-use sn_client::{
-    Client,
-    ClientError as SafeClientError,
-};
+use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
     Blob,
     BlobAddress,
@@ -38,9 +34,6 @@ use sn_data_types::{
     SequencePrivatePermissions,
     SequencePublicPermissions,
     SequenceUser,
-    // SeqMap,
-    Transfer,
-    TransferId,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -171,7 +164,7 @@ impl SafeAppClient {
     pub async fn read_balance_from_sk(&mut self, sk: SecretKey) -> Result<Money> {
         let mut temp_client = Client::new(Some(sk)).await?;
         let coins = temp_client
-           .get_balance()
+            .get_balance()
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
 
@@ -190,14 +183,13 @@ impl SafeAppClient {
     pub async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
-        to_xorname: XorName,
+        _to_xorname: XorName,
         // tx_id: TransferId,
-        amount: Money,
+        _amount: Money,
     ) -> Result<()> {
-        let mut client = match from_sk 
-        {
+        let _client = match from_sk {
             Some(sk) => Client::new(Some(sk)).await?,
-            None => self.get_safe_client()?
+            None => self.get_safe_client()?,
         };
 
         // TODO: attempt to get wallet pk from xorname
@@ -231,15 +223,14 @@ impl SafeAppClient {
         // tx_id: TransferId,
         amount: Money,
     ) -> Result<()> {
-        let mut client = match from_sk 
-        {
+        let mut client = match from_sk {
             Some(sk) => Client::new(Some(sk)).await?,
-            None => self.get_safe_client()?
+            None => self.get_safe_client()?,
         };
 
-
-        Ok(client.send_money(SafeNdPublicKey::Bls(to_pk), amount).await?)
-
+        Ok(client
+            .send_money(SafeNdPublicKey::Bls(to_pk), amount)
+            .await?)
 
         // let to_xorname = xorname_from_pk(to_pk);
         // self.safecoin_transfer_to_xorname( to_xorname, amount)

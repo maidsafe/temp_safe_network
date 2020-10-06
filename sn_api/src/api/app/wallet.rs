@@ -7,17 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-
 use crate::{
     xorurl::{XorUrl, XorUrlEncoder},
-    Error, Result,Safe
+    Error, Result, Safe,
 };
-
 
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
-
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
@@ -34,107 +31,107 @@ pub struct WalletSpendableBalance {
 pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalance)>;
 
 // impl Safe {
-    // // Create an empty Wallet and return its XOR-URL
-    // pub async fn wallet_create(&mut self) -> Result<XorUrl> {
-    //     let xorname = self.safe_client.store_map(None, WALLET_TYPE_TAG, None).await?;
+// // Create an empty Wallet and return its XOR-URL
+// pub async fn wallet_create(&mut self) -> Result<XorUrl> {
+//     let xorname = self.safe_client.store_map(None, WALLET_TYPE_TAG, None).await?;
 
-    //     XorUrlEncoder::encode_mutable_data(
-    //         xorname,
-    //         WALLET_TYPE_TAG,
-    //         SafeContentType::Wallet,
-    //         self.xorurl_base,
-    //     )
-    // }
+//     XorUrlEncoder::encode_mutable_data(
+//         xorname,
+//         WALLET_TYPE_TAG,
+//         SafeContentType::Wallet,
+//         self.xorurl_base,
+//     )
+// }
 
-    // // Add a SafeKey to a Wallet to make it spendable, and returns the friendly name set for it
-    // pub async fn wallet_insert(
-    //     &mut self,
-    //     url: &str,
-    //     name: Option<&str>,
-    //     default: bool,
-    //     sk: &str,
-    // ) -> Result<String> {
-    //     let key_pair = KeyPair::from_hex_sk(sk)?;
-    //     let xorname = xorname_from_pk(key_pair.pk);
-    //     let xorurl = XorUrlEncoder::encode(
-    //         xorname,
-    //         None,
-    //         0,
-    //         SafeDataType::SafeKey,
-    //         SafeContentType::Raw,
-    //         None,
-    //         None,
-    //         None,
-    //         None,
-    //         None,
-    //         self.xorurl_base,
-    //     )?;
-    //     let value = WalletSpendableBalance {
-    //         xorurl: xorurl.clone(),
-    //         sk: sk.to_string(),
-    //     };
+// // Add a SafeKey to a Wallet to make it spendable, and returns the friendly name set for it
+// pub async fn wallet_insert(
+//     &mut self,
+//     url: &str,
+//     name: Option<&str>,
+//     default: bool,
+//     sk: &str,
+// ) -> Result<String> {
+//     let key_pair = KeyPair::from_hex_sk(sk)?;
+//     let xorname = xorname_from_pk(key_pair.pk);
+//     let xorurl = XorUrlEncoder::encode(
+//         xorname,
+//         None,
+//         0,
+//         SafeDataType::SafeKey,
+//         SafeContentType::Raw,
+//         None,
+//         None,
+//         None,
+//         None,
+//         None,
+//         self.xorurl_base,
+//     )?;
+//     let value = WalletSpendableBalance {
+//         xorurl: xorurl.clone(),
+//         sk: sk.to_string(),
+//     };
 
-    //     let serialised_value = serde_json::to_string(&value).map_err(|err| {
-    //         Error::Unexpected(format!(
-    //             "Failed to serialise data to insert in Wallet container: {:?}",
-    //             err
-    //         ))
-    //     })?;
+//     let serialised_value = serde_json::to_string(&value).map_err(|err| {
+//         Error::Unexpected(format!(
+//             "Failed to serialise data to insert in Wallet container: {:?}",
+//             err
+//         ))
+//     })?;
 
-    //     let md_key = name.unwrap_or_else(|| &xorurl);
-    //     let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-    //     self.safe_client
-    //         .map_insert(
-    //             xorurl_encoder.xorname(),
-    //             WALLET_TYPE_TAG,
-    //             &md_key.to_string().into_bytes(),
-    //             &serialised_value.into_bytes(),
-    //         )
-    //         .await
-    //         .map_err(|err| match err {
-    //             Error::EntryExists(_) => Error::EntryExists(format!(
-    //                 "A spendable balance already exists in the Wallet with the same name: '{}'",
-    //                 md_key
-    //             )),
-    //             other => other,
-    //         })?;
+//     let md_key = name.unwrap_or_else(|| &xorurl);
+//     let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+//     self.safe_client
+//         .map_insert(
+//             xorurl_encoder.xorname(),
+//             WALLET_TYPE_TAG,
+//             &md_key.to_string().into_bytes(),
+//             &serialised_value.into_bytes(),
+//         )
+//         .await
+//         .map_err(|err| match err {
+//             Error::EntryExists(_) => Error::EntryExists(format!(
+//                 "A spendable balance already exists in the Wallet with the same name: '{}'",
+//                 md_key
+//             )),
+//             other => other,
+//         })?;
 
-    //     debug!(
-    //         "Wallet at {} had a spendable balance added with name: {}.",
-    //         &url, md_key
-    //     );
+//     debug!(
+//         "Wallet at {} had a spendable balance added with name: {}.",
+//         &url, md_key
+//     );
 
-    //     if default {
-    //         match self
-    //             .safe_client
-    //             .map_insert(
-    //                 xorurl_encoder.xorname(),
-    //                 WALLET_TYPE_TAG,
-    //                 WALLET_DEFAULT_BYTES,
-    //                 &md_key.to_string().into_bytes(),
-    //             )
-    //             .await
-    //         {
-    //             Err(Error::EntryExists(_)) => {
-    //                 let (_, version) = self.wallet_get_default_balance(url).await?;
-    //                 self.safe_client
-    //                     .map_update(
-    //                         xorurl_encoder.xorname(),
-    //                         WALLET_TYPE_TAG,
-    //                         WALLET_DEFAULT_BYTES,
-    //                         &md_key.to_string().into_bytes(),
-    //                         version + 1,
-    //                     )
-    //                     .await
-    //             }
-    //             other => other,
-    //         }?;
+//     if default {
+//         match self
+//             .safe_client
+//             .map_insert(
+//                 xorurl_encoder.xorname(),
+//                 WALLET_TYPE_TAG,
+//                 WALLET_DEFAULT_BYTES,
+//                 &md_key.to_string().into_bytes(),
+//             )
+//             .await
+//         {
+//             Err(Error::EntryExists(_)) => {
+//                 let (_, version) = self.wallet_get_default_balance(url).await?;
+//                 self.safe_client
+//                     .map_update(
+//                         xorurl_encoder.xorname(),
+//                         WALLET_TYPE_TAG,
+//                         WALLET_DEFAULT_BYTES,
+//                         &md_key.to_string().into_bytes(),
+//                         version + 1,
+//                     )
+//                     .await
+//             }
+//             other => other,
+//         }?;
 
-    //         debug!("Default wallet set.");
-    //     }
+//         debug!("Default wallet set.");
+//     }
 
-    //     Ok(md_key.to_string())
-    // }
+//     Ok(md_key.to_string())
+// }
 
 //     // Check the total balance of a Wallet found at a given XOR-URL
 //     pub async fn wallet_balance(&mut self, url: &str) -> Result<String> {

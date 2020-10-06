@@ -22,7 +22,6 @@ use super::{BootstrapConfig, IpcError};
 
 use serde::{Deserialize, Serialize};
 
-
 /// IPC response.
 // TODO: `TransOwnership` variant
 #[allow(clippy::large_enum_variant)]
