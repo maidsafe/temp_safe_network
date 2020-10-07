@@ -82,12 +82,15 @@ where
         method, dest_endpoint
     );
 
-    match directories::ProjectDirs::from("net", "maidsafe", "sn_authd") {
+    match dirs_next::home_dir() {
         None => Err(Error::AuthdClientError(
             "Failed to obtain local project directory where to read certificate from".to_string(),
         )),
-        Some(dirs) => {
-            let cert_base_path = dirs.config_dir().display().to_string();
+        Some(mut paths) => {
+            paths.push(".safe");
+            paths.push("authd");
+
+            let cert_base_path = paths.display().to_string();
 
             let qjsonrpc_client = ClientEndpoint::new(
                 &cert_base_path,

@@ -13,7 +13,6 @@ use super::{
     notifs_endpoint::jsonrpc_listen,
 };
 use crate::{api::AuthReq, AuthedAppsList, Error, Result, SafeAuthReqId};
-use directories::BaseDirs;
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -360,17 +359,18 @@ impl SafeAuthdClient {
 
         // Generate a path which is where we will store the endpoint certificates that authd will
         // need to read to be able to create a secure channel to send us the notifications with
-        let dirs = directories::ProjectDirs::from("net", "maidsafe", "sn_authd-client")
-            .ok_or_else(|| {
-                Error::AuthdClientError(
-                    "Failed to obtain local home directory where to store endpoint certificates to"
-                        .to_string(),
-                )
-            })?;
+        let dirs = dirs_next::home_dir().ok_or_else(|| {
+            Error::AuthdClientError(
+                "Failed to obtain local home directory where to store endpoint certificates to"
+                    .to_string(),
+            )
+        })?;
 
         // Let's postfix the path with the app id so we avoid clashes with other
         // endpoints subscribed from within the same local box
-        let cert_base_path = dirs.config_dir().join(app_id.to_string());
+        let mut cert_base_path = dirs;
+        cert_base_path.push(".safe");
+        cert_base_path.push("authd");
 
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
@@ -532,11 +532,10 @@ fn get_authd_bin_path(authd_path: Option<&str>) -> Result<PathBuf> {
             if let Ok(authd_path) = std::env::var(ENV_VAR_SN_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
-                let base_dirs = BaseDirs::new().ok_or_else(|| {
+                let mut path = dirs_next::home_dir().ok_or_else(|| {
                     Error::AuthdClientError("Failed to obtain user's home path".to_string())
                 })?;
 
-                let mut path = PathBuf::from(base_dirs.home_dir());
                 path.push(".safe");
                 path.push("authd");
                 Ok(path)

@@ -7,10 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{
-    PROJECT_DATA_DIR_APPLICATION, PROJECT_DATA_DIR_ORGANISATION, PROJECT_DATA_DIR_QUALIFIER,
-};
-use directories::ProjectDirs;
 use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
@@ -19,7 +15,6 @@ use std::{
     fs::{self, create_dir_all, remove_file},
     path::PathBuf,
 };
-
 const CONFIG_FILENAME: &str = "config.json";
 const CONFIG_NETWORKS_DIRNAME: &str = "networks";
 
@@ -278,25 +273,23 @@ fn is_remote_location(location: &str) -> bool {
 }
 
 fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf), String> {
-    match directories::ProjectDirs::from("net", "maidsafe", "safe_vault") {
-        Some(dirs) => Ok((
-            dirs.config_dir().to_path_buf(),
-            dirs.config_dir().join("vault_connection_info.config"),
-        )),
-        None => Err(
-            "Failed to obtain local home directory where to set network connection info"
-                .to_string(),
-        ),
-    }
+    let mut node_data_path =
+        dirs_next::home_dir().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+
+    node_data_path.push(".safe");
+    node_data_path.push("node");
+
+    Ok((
+        node_data_path.clone(),
+        node_data_path.join("node_connection_info.config"),
+    ))
 }
 
 fn get_cli_config_path() -> Result<PathBuf, String> {
-    let project_data_path = ProjectDirs::from(
-        PROJECT_DATA_DIR_QUALIFIER,
-        PROJECT_DATA_DIR_ORGANISATION,
-        PROJECT_DATA_DIR_APPLICATION,
-    )
-    .ok_or_else(|| "Couldn't find user's home directory".to_string())?;
+    let mut project_data_path =
+        dirs_next::home_dir().ok_or_else(|| "Couldn't find user's home directory".to_string())?;
+    project_data_path.push(".safe");
+    project_data_path.push("cli");
 
-    Ok(project_data_path.config_dir().to_path_buf())
+    Ok(project_data_path)
 }

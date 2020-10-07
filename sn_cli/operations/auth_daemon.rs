@@ -9,7 +9,6 @@
 
 use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
-use directories::BaseDirs;
 use envy::from_env;
 use log::info;
 use prettytable::Table;
@@ -418,10 +417,9 @@ fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
             if let Ok(authd_path) = std::env::var(ENV_VAR_SN_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
-                let base_dirs = BaseDirs::new()
+                let mut path = dirs_next::home_dir()
                     .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
 
-                let mut path = PathBuf::from(base_dirs.home_dir());
                 path.push(".safe");
                 path.push("authd");
                 Ok(path)

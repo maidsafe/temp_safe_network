@@ -15,7 +15,7 @@ ed25519 = "1.0.1"
 ed25519-dalek = { version = "1.0.0-pre.4", features = [ "serde" ]}
 bincode = "1.2.1"
 chrono = "~0.4.6"
-directories = "3.0.1"
+dirs-next = "1.0.1"
 data-encoding = "2.1.1"
 env_logger = "~0.6.0"
 futures = "~0.3.5"

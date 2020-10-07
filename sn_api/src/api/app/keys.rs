@@ -12,9 +12,7 @@ use super::{
     helpers::{parse_coins_amount, pk_to_hex, xorname_from_pk, KeyPair},
     Safe,
 };
-use crate::{
-    Error, Result,
-};
+use crate::{Error, Result};
 
 use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;

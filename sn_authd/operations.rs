@@ -12,7 +12,6 @@ use super::{
     errors::{Error, Result},
 };
 use cluFlock::ExclusiveFlock;
-use directories::BaseDirs;
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, debug, info, Record};
 use std::{
@@ -284,11 +283,11 @@ fn get_authd_log_path(log_dir: Option<PathBuf>) -> Result<PathBuf> {
     match log_dir {
         Some(p) => Ok(p),
         None => {
-            let base_dirs = BaseDirs::new().ok_or_else(|| {
+            let mut path = dirs_next::home_dir().ok_or_else(|| {
                 Error::GeneralError("Failed to obtain user's home path".to_string())
             })?;
 
-            let mut path = PathBuf::from(base_dirs.home_dir());
+            // let mut path = PathBuf::from(base_dirs);
             path.push(".safe");
             path.push("authd");
             path.push("logs");
