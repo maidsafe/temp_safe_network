@@ -20,10 +20,15 @@ use rand::Rng;
 use rand_core::SeedableRng;
 
 use crate::api::ipc::{
-    decode_msg, encode_msg,
-    req::{AuthReq, IpcReq},
-    resp::IpcResp,
-    IpcError, IpcMsg,
+    decode_msg, 
+    // encode_msg,
+    req::{
+        // AuthReq, 
+        IpcReq
+    },
+    // resp::IpcResp,
+    // IpcError, 
+    IpcMsg,
 };
 use tiny_keccak::{sha3_256, sha3_512};
 
@@ -31,11 +36,11 @@ use hmac::Hmac;
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use sn_client::{
-    client as sn_client_client,
+    // client as sn_client_client,
     client::Client,
     // core_structs::{access_container_enc_key, AccessContainerEntry},
-    utils::symmetric_decrypt,
-    ClientError,
+    // utils::symmetric_decrypt,
+    // ClientError,
 };
 use sn_data_types::ClientFullId;
 // extern crate ed25519_dalek;
