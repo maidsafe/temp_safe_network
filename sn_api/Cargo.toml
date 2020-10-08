@@ -40,7 +40,7 @@ url = "2.1.1"
 urlencoding = "1.0.0"
 walkdir = "2.3.1" #ffi utils needs this version
 uhttp_uri = "~0.5.1"
-xor_name = "1"
+xor_name = "1.1.1"
 pbkdf2 = { version = "~0.3.0", default-features = false }
 hmac = "~0.7.1"
 sha3 = "~0.8.2"

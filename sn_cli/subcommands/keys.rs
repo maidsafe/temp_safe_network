@@ -84,9 +84,9 @@ pub async fn key_commander(
                 connect(safe).await?;
             }
 
-            let (key_pair, amount) =
+            let (xorurl, key_pair, amount) =
                 create_new_key(safe, test_coins, pay_with, preload, pk).await?;
-            print_new_key_output(output_fmt, key_pair, amount);
+            print_new_key_output(output_fmt, xorurl, key_pair, amount);
             Ok(())
         }
         KeysSubCommands::Balance { keyurl, secret } => {
@@ -148,8 +148,8 @@ pub async fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     _pk: Option<String>,
-) -> Result<(Option<BlsKeyPair>, Option<String>), String> {
-    let (key_pair, amount) = if test_coins {
+) -> Result<(String, Option<BlsKeyPair>, Option<String>), String> {
+    let (xorurl, key_pair, amount) = if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
@@ -159,10 +159,11 @@ pub async fn create_new_key(
             );
         }
 
-        let key_pair = safe.keys_create_preload_test_coins(&amount).await?;
-        (key_pair, Some(amount))
+        let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
+        (xorurl, key_pair, Some(amount))
     } else {
         let key_pair;
+        let mut xorurl;
         // let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
@@ -172,32 +173,35 @@ pub async fn create_new_key(
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
 
             let payee = safe.keypair()?.sk;
-            key_pair = safe
+            let keys_info = safe
                 .keys_create_and_preload_from_sk(&payee, preload.as_deref())
                 .await?;
-        // key_pair = safe
-        // .keys_create_preload_test_coins( &amount )
-        // .await?;
+
+            xorurl = keys_info.0;
+            key_pair = keys_info.1;
         } else {
-            key_pair = safe
+            let keys_info = safe
                 .keys_create_and_preload_from_sk(&pay_with.unwrap(), preload.as_deref())
                 .await?;
+
+            xorurl = keys_info.0;
+            key_pair = keys_info.1;
         }
 
-        (key_pair, preload)
+        (xorurl, key_pair, preload)
     };
 
-    Ok((key_pair, amount))
+    Ok((xorurl, key_pair, amount))
 }
 
 pub fn print_new_key_output(
     output_fmt: OutputFmt,
-    // xorurl: String,
+    xorurl: String,
     key_pair: Option<BlsKeyPair>,
     amount: Option<String>,
 ) {
     if OutputFmt::Pretty == output_fmt {
-        // println!("New SafeKey created at: \"{}\"", xorurl);
+        println!("New SafeKey created at: \"{}\"", xorurl);
         if let Some(n) = amount {
             println!("Preloaded with {} coins", n);
         }

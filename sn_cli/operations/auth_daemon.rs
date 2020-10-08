@@ -83,7 +83,7 @@ pub async fn authd_create(
         {
             // We then generate a SafeKey with test-coins to use it for the account creation
             println!("Creating a SafeKey with test-coins...");
-            let key_pair = safe.keys_create_preload_test_coins("1000.11").await?;
+            let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11").await?;
             let kp =
                 key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
             println!("Sending account creation request to authd...");

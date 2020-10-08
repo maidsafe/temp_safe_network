@@ -10,15 +10,16 @@
 use super::{
     common::sk_from_hex,
     helpers::{parse_coins_amount, pk_to_hex, xorname_from_pk, KeyPair},
+    xorurl::XorUrlEncoder,
     Safe,
 };
 use crate::{Error, Result};
 
 use serde::{Deserialize, Serialize};
+use sn_client::Client;
 use sn_data_types::PublicKey;
 use threshold_crypto::SecretKey;
-
-use sn_client::Client;
+use xor_name::XorName;
 
 // We expose a BLS key pair as two hex encoded strings
 // TODO: consider supporting other encodings like base32 or just expose Vec<u8>
@@ -65,7 +66,7 @@ impl Safe {
         &mut self,
         from: &str,
         preload_amount: Option<&str>,
-    ) -> Result<Option<BlsKeyPair>> {
+    ) -> Result<(String, Option<BlsKeyPair>)> {
         let from_sk = match sk_from_hex(&from) {
             Ok(sk) => Some(sk),
             Err(_) => return Err(Error::InvalidInput(
@@ -76,7 +77,7 @@ impl Safe {
 
         let amount = parse_coins_amount(&preload_amount.unwrap_or_else(|| "0.0"))?;
 
-        let (_xorname, key_pair) = {
+        let (xorname, key_pair) = {
             let key_pair = KeyPair::random();
             let (pk, sk) = key_pair.to_hex_key_pair()?;
 
@@ -89,8 +90,8 @@ impl Safe {
             (xorname, Some(BlsKeyPair { pk, sk }))
         };
 
-        // let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
-        Ok(key_pair)
+        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+        Ok((xorurl, key_pair))
     }
 
     #[cfg(feature = "simulated-payouts")]
@@ -98,58 +99,54 @@ impl Safe {
     pub async fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: &str,
-    ) -> Result<Option<BlsKeyPair>> {
+    ) -> Result<(String, Option<BlsKeyPair>)> {
         let amount = parse_coins_amount(preload_amount)?;
         let key_pair = KeyPair::random();
-        let _xorname = self
-            .safe_client
+        self.safe_client
             .trigger_simulated_farming_payout(amount)
             .await?;
         let (pk, sk) = key_pair.to_hex_key_pair()?;
+        let xorname = XorName::from(PublicKey::Bls(key_pair.pk));
         let key_pair = Some(BlsKeyPair { pk, sk });
 
-        // let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
-        Ok(key_pair)
+        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+        Ok((xorurl, key_pair))
     }
 
     // Check SafeKey's balance from the network from a given SecretKey string
     pub async fn keys_balance_from_sk(&self, sk: &str) -> Result<String> {
-        let _secret_key = sk_from_hex(sk)?;
-        unimplemented!();
-        // let coins = self
-        //     .safe_client
-        //     .read_balance_from_sk(secret_key)
-        //     .await
-        //     .map_err(|_| {
-        //         Error::ContentNotFound("No SafeKey found at specified location".to_string())
-        //     })?;
-        // Ok(coins.to_string())
+        let secret_key = sk_from_hex(sk)?;
+
+        let mut temp_client = Client::new(Some(secret_key)).await?;
+        let balance = temp_client.get_balance().await?;
+
+        Ok(balance.to_string())
     }
 
-    // // Check SafeKey's balance from the network from a given XOR/NRS-URL and secret key string.
-    // // The difference between this and 'keys_balance_from_sk' function is that this will additionally
-    // // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
-    // pub async fn keys_balance_from_url(&mut self, url: &str, sk: &str) -> Result<String> {
-    //     self.validate_sk_for_url(sk, url).await?;
-    //     self.keys_balance_from_sk(sk).await
-    // }
+    // Check SafeKey's balance from the network from a given XOR/NRS-URL and secret key string.
+    // The difference between this and 'keys_balance_from_sk' function is that this will additionally
+    // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
+    pub async fn keys_balance_from_url(&mut self, url: &str, sk: &str) -> Result<String> {
+        self.validate_sk_for_url(sk, url).await?;
+        self.keys_balance_from_sk(sk).await
+    }
 
-    // // Check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
-    // pub async fn validate_sk_for_url(&mut self, sk: &str, url: &str) -> Result<String> {
-    //     let secret_key: SecretKey = sk_from_hex(sk)
-    //         .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
-    //     let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-    //     let public_key = secret_key.public_key();
-    //     let derived_xorname = xorname_from_pk(public_key);
-    //     if xorurl_encoder.xorname() != derived_xorname {
-    //         Err(Error::InvalidInput(
-    //             "The URL doesn't correspond to the public key derived from the provided secret key"
-    //                 .to_string(),
-    //         ))
-    //     } else {
-    //         Ok(pk_to_hex(&public_key))
-    //     }
-    // }
+    // Check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
+    pub async fn validate_sk_for_url(&mut self, sk: &str, url: &str) -> Result<String> {
+        let secret_key: SecretKey = sk_from_hex(sk)
+            .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
+        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        let public_key = secret_key.public_key();
+        let derived_xorname = xorname_from_pk(public_key);
+        if xorurl_encoder.xorname() != derived_xorname {
+            Err(Error::InvalidInput(
+                "The URL doesn't correspond to the public key derived from the provided secret key"
+                    .to_string(),
+            ))
+        } else {
+            Ok(pk_to_hex(&public_key))
+        }
+    }
 
     // /// # Transfer safecoins from one SafeKey to another, or to a Wallet
     // ///

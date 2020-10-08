@@ -104,7 +104,7 @@ pub enum WalletSubCommands {
 pub async fn wallet_commander(
     cmd: WalletSubCommands,
     output_fmt: OutputFmt,
-    mut safe: Safe,
+    safe: &mut Safe,
 ) -> Result<(), String> {
     match cmd {
         WalletSubCommands::Create {
@@ -245,16 +245,24 @@ pub async fn wallet_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            let tx_id = safe
-                .wallet_transfer(&amount, from.as_deref(), &destination, tx_id)
+            // let tx_id = safe
+            //     .wallet_transfer(&amount, from.as_deref(), &destination, tx_id)
+            //     .await?;
+
+            // if OutputFmt::Pretty == output_fmt {
+            //     println!("Success. TX_ID: {}", &tx_id);
+            // } else {
+            //     println!("{}", &tx_id)
+            // }
+
+            safe.wallet_transfer(&amount, from.as_deref(), &destination)
                 .await?;
 
-            if OutputFmt::Pretty == output_fmt {
-                println!("Success. TX_ID: {}", &tx_id);
-            } else {
-                println!("{}", &tx_id)
-            }
-
+            // if OutputFmt::Pretty == output_fmt {
+            println!("Transfer Success.");
+            // } else {
+            //     println!("{}", &tx_id)
+            // }
             Ok(())
         }
     }
