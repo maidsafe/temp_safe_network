@@ -115,7 +115,7 @@ pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalanc
 //             Err(Error::EntryExists(_)) => {
 //                 let (_, version) = self.wallet_get_default_balance(url).await?;
 //                 self.safe_client
-//                     .map_update(
+//                     .update_map(
 //                         xorurl_encoder.xorname(),
 //                         WALLET_TYPE_TAG,
 //                         WALLET_DEFAULT_BYTES,
@@ -402,7 +402,7 @@ pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalanc
 //     type_tag: u64,
 //     url: &str,
 // ) -> Result<WalletSpendableBalances> {
-//     let entries = match safe.safe_client.map_list_entries(xorname, type_tag).await {
+//     let entries = match safe.safe_client.list_map_entries(xorname, type_tag).await {
 //         Ok(entries) => entries,
 //         Err(Error::AccessDenied(_)) => {
 //             return Err(Error::AccessDenied(format!(

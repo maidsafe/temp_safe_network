@@ -93,7 +93,7 @@ impl Safe {
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl).await?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let link = nrs_map.nrs_map_update_or_create_data(name, link, default, hard_link)?;
+        let link = nrs_map.nrs_update_map_or_create_data(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
@@ -148,7 +148,7 @@ impl Safe {
             ))
         } else {
             let mut nrs_map = NrsMap::default();
-            let link = nrs_map.nrs_map_update_or_create_data(&name, link, default, hard_link)?;
+            let link = nrs_map.nrs_update_map_or_create_data(&name, link, default, hard_link)?;
             let mut processed_entries = ProcessedEntries::new();
             processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 

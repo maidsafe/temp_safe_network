@@ -391,7 +391,7 @@ impl SafeAppFakeClient {
         }
     }
 
-    pub async fn map_list_entries(
+    pub async fn list_map_entries(
         &self,
         name: XorName,
         tag: u64,
@@ -406,7 +406,7 @@ impl SafeAppFakeClient {
         Ok(res)
     }
 
-    pub async fn map_update(
+    pub async fn update_map(
         &mut self,
         name: XorName,
         tag: u64,

@@ -22,13 +22,18 @@ use sn_data_types::{
     BlobAddress,
     // ClientFullId,
     Error as SafeNdError,
-    // MapAction,
-    // MapPermissionSet,
-    // MapSeqEntryActions,
-    // MapSeqValue,
+    Map,
+    MapAction,
+    MapAddress,
+    MapEntryActions,
+    MapPermissionSet,
+    MapSeqEntryActions,
+    MapSeqValue,
+    MapValue,
     Money,
     PublicBlob,
     PublicKey as SafeNdPublicKey,
+    SeqMap,
     SequenceAddress,
     SequenceIndex,
     SequencePrivatePermissions,
@@ -56,26 +61,6 @@ impl SafeAppClient {
         }
     }
 
-    // async fn mutate_seq_map_entries(
-    //     &self,
-    //     name: XorName,
-    //     tag: u64,
-    //     entry_actions: MapSeqEntryActions,
-    //     error_msg: &str,
-    // ) -> Result<()> {
-    //     let client = self.get_safe_client()?;
-    //     let message = error_msg.to_string();
-    //     client
-    //         .mutate_seq_map_entries(name, tag, entry_actions)
-    //         .await
-    //         .map_err(|err| {
-    //             if let SafeClientError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
-    //                 Error::EntryExists(format!("{}: {}", message, err))
-    //             } else {
-    //                 Error::NetDataError(format!("{}: {}", message, err))
-    //             }
-    //         })
-    // }
     // }
 
     // #[async_trait]
@@ -292,150 +277,174 @@ impl SafeAppClient {
     }
 
     // === Map operations ===
-    //     pub async fn store_map(
-    //         &mut self,
-    //         name: Option<XorName>,
-    //         tag: u64,
-    //         // _data: Option<String>,
-    //         _permissions: Option<String>,
-    //     ) -> Result<XorName> {
-    // mut         let safe_client = self.get_safe_client()?;
-    //         let client = &safe_client;
-    //         let owner_key_option = client.owner_key().await;
-    //         let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
-    //             owners
-    //         } else {
-    //             return Err(Error::Unexpected(
-    //                 "Failed to retrieve public key.".to_string(),
-    //             ));
-    //         };
+    pub async fn store_map(
+        &mut self,
+        name: Option<XorName>,
+        tag: u64,
+        // _data: Option<String>,
+        _permissions: Option<String>,
+    ) -> Result<XorName> {
+        let mut safe_client = self.get_safe_client()?;
+        let client = &safe_client;
+        let owner_key_option = client.public_key().await;
+        let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
+            owners
+        } else {
+            return Err(Error::Unexpected(
+                "Failed to retrieve public key.".to_string(),
+            ));
+        };
 
-    //         let xorname = name.unwrap_or_else(rand::random);
+        let xorname = name.unwrap_or_else(rand::random);
 
-    //         let permission_set = MapPermissionSet::new()
-    //             .allow(MapAction::Read)
-    //             .allow(MapAction::Insert)
-    //             .allow(MapAction::Update)
-    //             .allow(MapAction::Delete)
-    //             .allow(MapAction::ManagePermissions);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete)
+            .allow(MapAction::ManagePermissions);
 
-    //         let mut permission_map = BTreeMap::new();
-    //         let sign_pk = get_public_bls_key(safe_client).await?;
-    //         let app_pk = SafeNdPublicKey::Bls(sign_pk);
-    //         permission_map.insert(app_pk, permission_set);
+        let mut permission_map = BTreeMap::new();
+        let sign_pk = get_public_bls_key(&safe_client).await?;
+        let app_pk = SafeNdPublicKey::Bls(sign_pk);
+        permission_map.insert(app_pk, permission_set);
 
-    //         let mdata = SeqMap::new_with_data(
-    //             xorname,
-    //             tag,
-    //             BTreeMap::new(),
-    //             permission_map,
-    //             SafeNdPublicKey::Bls(owners),
-    //         );
+        let map = Map::Seq(SeqMap::new_with_data(
+            xorname,
+            tag,
+            BTreeMap::new(),
+            permission_map,
+            SafeNdPublicKey::Bls(owners),
+        ));
 
-    //         client
-    //             .store_seq_mutable_data(mdata)
-    //             .await
-    //             .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
+        safe_client
+            .store_map(map)
+            .await
+            .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
 
-    //         Ok(xorname)
-    //     }
+        Ok(xorname)
+    }
 
-    //     pub async fn get_map(&self, name: XorName, tag: u64) -> Result<SeqMap> {
-    //         let mut client = self.get_safe_client()?;
-    //         client
-    //             .get_seq_map(name, tag)
-    //             .await
-    //             .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
-    //     }
+    pub async fn get_map(&mut self, name: XorName, tag: u64) -> Result<Map> {
+        let mut client = self.get_safe_client()?;
+        let address = MapAddress::Seq { name, tag };
 
-    //     pub async fn map_insert(
-    //         &mut self,
-    //         name: XorName,
-    //         tag: u64,
-    //         key: &[u8],
-    //         value: &[u8],
-    //     ) -> Result<()> {
-    //         let entry_actions = MapSeqEntryActions::new();
-    //         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-    //         self.mutate_seq_map_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
-    //             .await
-    //     }
+        client
+            .get_map(address)
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
+    }
 
-    //     pub async fn map_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue> {
-    //         let mut client = self.get_safe_client()?;
-    //         let key_vec = key.to_vec();
-    //         client
-    //             .get_seq_map_value(name, tag, key_vec)
-    //             .await
-    //             .map_err(|err| match err {
-    //                 SafeClientError::DataError(SafeNdError::AccessDenied) => {
-    //                     Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
-    //                 }
-    //                 SafeClientError::DataError(SafeNdError::NoSuchData) => {
-    //                     Error::ContentNotFound(format!(
-    //                         "Sequenced Map not found at Xor name: {}",
-    //                         xorname_to_hex(&name)
-    //                     ))
-    //                 }
-    //                 SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
-    //                     Error::EntryNotFound(format!(
-    //                         "Entry not found in Sequenced Map found at Xor name: {}",
-    //                         xorname_to_hex(&name)
-    //                     ))
-    //                 }
-    //                 err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
-    //             })
-    //     }
+    pub async fn map_insert(
+        &mut self,
+        name: XorName,
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<()> {
+        let entry_actions = MapSeqEntryActions::new();
+        let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
+        self.edit_map_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
+            .await
+    }
 
-    //     pub async fn map_list_entries(
-    //         &self,
-    //         name: XorName,
-    //         tag: u64,
-    //     ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>> {
-    //         let mut client = self.get_safe_client()?;
-    //         client
-    //             .list_seq_map_entries(name, tag)
-    //             .await
-    //             .map_err(|err| match err {
-    //                 SafeClientError::DataError(SafeNdError::AccessDenied) => {
-    //                     Error::AccessDenied(format!(
-    //                         "Failed to get Sequenced Map at: {:?} (type tag: {})",
-    //                         name, tag
-    //                     ))
-    //                 }
-    //                 SafeClientError::DataError(SafeNdError::NoSuchData) => {
-    //                     Error::ContentNotFound(format!(
-    //                         "Sequenced Map not found at Xor name: {} (type tag: {})",
-    //                         xorname_to_hex(&name),
-    //                         tag
-    //                     ))
-    //                 }
-    //                 SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
-    //                     Error::EntryNotFound(format!(
-    //                     "Entry not found in Sequenced Map found at Xor name: {} (type tag: {})",
-    //                     xorname_to_hex(&name),
-    //                     tag
-    //                 ))
-    //                 }
-    //                 err => {
-    //                     Error::NetDataError(format!("Failed to get Sequenced Map. {:?}", err))
-    //                 }
-    //             })
-    //     }
+    pub async fn map_get_value(&mut self, name: XorName, tag: u64, key: &[u8]) -> Result<MapValue> {
+        let mut client = self.get_safe_client()?;
+        let key_vec = key.to_vec();
+        let address = MapAddress::Seq { name, tag };
 
-    //     pub async fn map_update(
-    //         &mut self,
-    //         name: XorName,
-    //         tag: u64,
-    //         key: &[u8],
-    //         value: &[u8],
-    //         version: u64,
-    //     ) -> Result<()> {
-    //         let entry_actions = MapSeqEntryActions::new();
-    //         let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
-    //         self.mutate_seq_map_entries(name, tag, entry_actions, "Failed to update SeqMD")
-    //             .await
-    //     }
+        client
+            .get_map_value(address, key_vec)
+            .await
+            .map_err(|err| match err {
+                SafeClientError::DataError(SafeNdError::AccessDenied) => {
+                    Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
+                }
+                SafeClientError::DataError(SafeNdError::NoSuchData) => {
+                    Error::ContentNotFound(format!(
+                        "Sequenced Map not found at Xor name: {}",
+                        xorname_to_hex(&name)
+                    ))
+                }
+                SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
+                    Error::EntryNotFound(format!(
+                        "Entry not found in Sequenced Map found at Xor name: {}",
+                        xorname_to_hex(&name)
+                    ))
+                }
+                err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
+            })
+    }
+
+    pub async fn list_map_entries(
+        &mut self,
+        name: XorName,
+        tag: u64,
+    ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>> {
+        let mut client = self.get_safe_client()?;
+        client
+            .list_seq_map_entries(name, tag)
+            .await
+            .map_err(|err| match err {
+                SafeClientError::DataError(SafeNdError::AccessDenied) => {
+                    Error::AccessDenied(format!(
+                        "Failed to get Sequenced Map at: {:?} (type tag: {})",
+                        name, tag
+                    ))
+                }
+                SafeClientError::DataError(SafeNdError::NoSuchData) => {
+                    Error::ContentNotFound(format!(
+                        "Sequenced Map not found at Xor name: {} (type tag: {})",
+                        xorname_to_hex(&name),
+                        tag
+                    ))
+                }
+                SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
+                    Error::EntryNotFound(format!(
+                        "Entry not found in Sequenced Map found at Xor name: {} (type tag: {})",
+                        xorname_to_hex(&name),
+                        tag
+                    ))
+                }
+                err => Error::NetDataError(format!("Failed to get Sequenced Map. {:?}", err)),
+            })
+    }
+
+    async fn edit_map_entries(
+        &mut self,
+        name: XorName,
+        tag: u64,
+        entry_actions: MapSeqEntryActions,
+        error_msg: &str,
+    ) -> Result<()> {
+        let mut client = self.get_safe_client()?;
+        let message = error_msg.to_string();
+        let address = MapAddress::Seq { name, tag };
+        client
+            .edit_map_entries(address, MapEntryActions::Seq(entry_actions))
+            .await
+            .map_err(|err| {
+                if let SafeClientError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
+                    Error::EntryExists(format!("{}: {}", message, err))
+                } else {
+                    Error::NetDataError(format!("{}: {}", message, err))
+                }
+            })
+    }
+
+    pub async fn update_map(
+        &mut self,
+        name: XorName,
+        tag: u64,
+        key: &[u8],
+        value: &[u8],
+        version: u64,
+    ) -> Result<()> {
+        let entry_actions = MapSeqEntryActions::new();
+        let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
+        self.edit_map_entries(name, tag, entry_actions, "Failed to update SeqMD")
+            .await
+    }
 
     // === Sequence data operations ===
     pub async fn store_sequence(

@@ -77,13 +77,13 @@ use xor_name::XorName;
 
 //     async fn map_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapSeqValue>;
 
-//     async fn map_list_entries(
+//     async fn list_map_entries(
 //         &self,
 //         name: XorName,
 //         tag: u64,
 //     ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>>;
 
-//     async fn map_update(
+//     async fn update_map(
 //         &mut self,
 //         name: XorName,
 //         tag: u64,
