@@ -885,15 +885,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "directories"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8fed639d60b58d0f53498ab13d26f621fd77569cc6edb031f4cc36a2ad9da0f"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
 name = "dirs"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2504,7 +2495,7 @@ dependencies = [
  "bincode",
  "bytes 0.5.5",
  "crossbeam-channel",
- "directories 2.0.2",
+ "directories",
  "err-derive",
  "futures 0.3.5",
  "log",
@@ -3464,6 +3455,7 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
+source = "git+https://github.com/maidsafe/sn_client#a9662a951875e9a54f4885196a4b508233684593"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3471,7 +3463,7 @@ dependencies = [
  "chrono",
  "crdts",
  "crossbeam-channel",
- "directories 3.0.1",
+ "dirs-next",
  "env_logger 0.6.2",
  "futures 0.3.5",
  "futures-util",
@@ -3482,7 +3474,6 @@ dependencies = [
  "miscreant",
  "qp2p",
  "rand 0.7.3",
- "rand_core 0.5.1",
  "regex",
  "self_encryption",
  "serde",
@@ -3543,7 +3534,7 @@ name = "sn_launch_tool"
 version = "0.0.1"
 source = "git+https://github.com/maidsafe/sn_launch_tool.git#6953cc64e8659d93db54338ebf748b2f2a5e54e5"
 dependencies = [
- "directories 2.0.2",
+ "directories",
  "env_logger 0.7.1",
  "log",
  "regex",
