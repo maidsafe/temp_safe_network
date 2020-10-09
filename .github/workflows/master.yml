@@ -65,75 +65,7 @@ jobs:
           name: ${{ matrix.output }}
           path: target/release/${{ matrix.target }}
 
-  build-ffi:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        component: [sn_ffi]
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            output: libsn_ffi.so
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            output: sn_ffi.dll
-          - os: macOS-latest
-            target: x86_64-apple-darwin
-            output: libsn_ffi.dylib
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      # Cache.
-      - name: Cargo cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Build prod FFI lib
-      - name: Build FFI lib - Prod
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml
-
-      # Notarize FFI lib
-      - name: Sign & Notarize
-        shell: bash
-        run: ./resources/notarize.sh ${{ matrix.output }}
-        if: matrix.target == 'macOS-latest'
-
-      # Upload prod FFI lib
-      - name: Upload prod FFI lib
-        uses: actions/upload-artifact@master
-        with:
-          name: ${{ matrix.component }}-${{ matrix.target }}-prod
-          path: target/release/${{ matrix.output }}
-
-      # Build dev FFI lib
-      - name: Build FFI lib - Dev
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --features=client-mock
-
-      # Notarize FFI lib
-      - name: Sign & Notarize
-        shell: bash
-        run: ./resources/notarize.sh ${{ matrix.output }}
-        if: matrix.target == 'macOS-latest'
-
-      # Upload dev FFI lib
-      - name: Upload dev FFI lib
-        uses: actions/upload-artifact@master
-        with:
-          name: ${{ matrix.component }}-${{ matrix.target }}-dev
-          path: target/release/${{ matrix.output }}
-
+  
   build-mac-cli-authd:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -196,150 +128,6 @@ jobs:
           name: ${{ matrix.output }}
           path: target/release/${{ matrix.target }}
 
-  build-ffi-android:
-    name: Build FFI Android
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [armv7-linux-androideabi, x86_64-linux-android]
-        component: [sn_ffi]
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: ${{ matrix.target }}
-
-      # Cache.
-      - name: Cargo cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Check if NDK bundle is installed and list files.
-      - name: Check Android NDK bundle
-        shell: bash
-        run: ls /usr/local/lib/android/sdk/ndk-bundle
-
-      # Setup NDK build toolchain for arm.
-      - if: matrix.target == 'armv7-linux-androideabi'
-        name: Setup NDK toolchain for armv7
-        shell: bash
-        run: |
-          mkdir toolchains
-          /usr/local/lib/android/sdk/ndk-bundle/build/tools/make_standalone_toolchain.py --arch arm --api 21 --install-dir toolchains --force
-          echo "::set-env name=CC_armv7_linux_androideabi::arm-linux-androideabi-clang"
-          echo "::set-env name=CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER::arm-linux-androideabi-clang"
-          echo "::add-path::$PWD/toolchains/bin"
-
-      # Setup NDK build toolchain for x86_64.
-      - if: matrix.target == 'x86_64-linux-android'
-        name: Setup NDK toolchain for x86_64
-        shell: bash
-        run: |
-          mkdir toolchains
-          /usr/local/lib/android/sdk/ndk-bundle/build/tools/make_standalone_toolchain.py --arch x86_64 --api 21 --install-dir toolchains --force
-          echo "::set-env name=CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER::x86_64-linux-android-gcc"
-          echo "::add-path::$PWD/toolchains/bin"
-
-      # Verify installed NDK toolchain for the target.
-      - name: Check Android NDK toolchain Files
-        shell: bash
-        run: ls toolchains
-      - name: Download Android Build Toolchain
-        shell: bash
-        run:  rustup target add ${{matrix.target}}
-
-      # Build prod native lib.
-      - name: Build native lib - Prod
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }}
-
-      # Upload prod native lib.
-      - name: Upload prod native lib
-        uses: actions/upload-artifact@master
-        with:
-          name: sn_ffi-${{ matrix.target }}-prod
-          path: target/${{ matrix.target }}/release/libsn_ffi.so
-
-      # Build dev native lib.
-      - name: Build native lib - Dev
-        run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml --target=${{ matrix.target }} --features=client-mock
-
-      # Upload dev native lib.
-      - name: Upload dev native lib
-        uses: actions/upload-artifact@master
-        with:
-          name: sn_ffi-${{ matrix.target }}-dev
-          path: target/${{ matrix.target }}/release/libsn_ffi.so
-
-  build-ffi-ios:
-    name: Build FFI iOS
-    runs-on: macos-latest
-    env:
-      PKG_CONFIG_ALLOW_CROSS: 1
-      DEVELOPER_DIR: /Applications/Xcode_11.2.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust aarch64-apple-ios target
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: aarch64-apple-ios
-
-      - name: Install Rust x86_64-apple-ios target
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: x86_64-apple-ios
-
-      # Cache.
-      - name: Cargo cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-     # Install cargo-lipo to generate universal libs.
-      - name: Install cargo-lipo
-        run: cargo install cargo-lipo
-
-      # Build prod universal library.
-      - name: Build universal lib - Prod
-        shell: bash
-        run: cargo lipo --release --manifest-path=sn_ffi/Cargo.toml
-
-      # Upload prod universal library.
-      - name: Upload prod universal lib
-        uses: actions/upload-artifact@master
-        with:
-          name: sn_ffi-apple-ios-prod
-          path: target/universal/release/libsn_ffi.a
-
-      # Build dev universal library.
-      - name: Build universal lib - Dev
-        shell: bash
-        run: cargo lipo --release --manifest-path=sn_ffi/Cargo.toml --features=client-mock
-
-      # Upload dev universal library.
-      - name: Upload dev universal lib
-        uses: actions/upload-artifact@master
-        with:
-          name: sn_ffi-apple-ios-dev
-          path: target/universal/release/libsn_ffi.a
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
@@ -391,67 +179,7 @@ jobs:
           name: sn_authd-x86_64-apple-darwin
           path: artifacts/sn_authd/prod/x86_64-apple-darwin/release
 
-      # ffi
-      - name: Download sn_ffi-x86_64-pc-windows-msvc-prod release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-pc-windows-msvc-prod
-          path: artifacts/sn_ffi/prod/x86_64-pc-windows-msvc/release
-      - name: Download sn_ffi-x86_64-pc-windows-msvc-dev release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-pc-windows-msvc-dev
-          path: artifacts/sn_ffi/dev/x86_64-pc-windows-msvc/release
-      - name: Download sn_ffi-x86_64-unknown-linux-gnu-prod release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-unknown-linux-gnu-prod
-          path: artifacts/sn_ffi/prod/x86_64-unknown-linux-gnu/release
-      - name: Download sn_ffi-x86_64-unknown-linux-gnu-dev release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-unknown-linux-gnu-dev
-          path: artifacts/sn_ffi/dev/x86_64-unknown-linux-gnu/release
-      - name: Download sn_ffi-x86_64-apple-darwin-prod release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-apple-darwin-prod
-          path: artifacts/sn_ffi/prod/x86_64-apple-darwin/release
-      - name: Download sn_ffi-x86_64-apple-darwin-dev release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-apple-darwin-dev
-          path: artifacts/sn_ffi/dev/x86_64-apple-darwin/release
-      - name: Download sn_ffi-armv7-linux-androideabi-prod release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-armv7-linux-androideabi-prod
-          path: artifacts/sn_ffi/prod/armv7-linux-androideabi/release
-      - name: Download sn_ffi-armv7-linux-androideabi-dev release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-armv7-linux-androideabi-dev
-          path: artifacts/sn_ffi/dev/armv7-linux-androideabi/release
-      - name: Download sn_ffi-x86_64-linux-android-prod release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-linux-android-prod
-          path: artifacts/sn_ffi/prod/x86_64-linux-android/release
-      - name: Download sn_ffi-x86_64-linux-android-dev release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-x86_64-linux-android-dev
-          path: artifacts/sn_ffi/dev/x86_64-linux-android/release
-      - name: Download sn_ffi-apple-ios-prod release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-apple-ios-prod
-          path: artifacts/sn_ffi/prod/apple-ios/release
-      - name: Download sn_ffi-apple-ios-dev release
-        uses: actions/download-artifact@master
-        with:
-          name: sn_ffi-apple-ios-dev
-          path: artifacts/sn_ffi/dev/apple-ios/release
+
 
       # Get information for the release.
       - shell: bash
@@ -465,12 +193,10 @@ jobs:
           api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           authd_version=$(grep "^version" < sn_authd/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-          ffi_version=$(grep "^version" < sn_ffi/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           qjsonrpc_version=$(grep "^version" < qjsonrpc/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           echo "::set-output name=api_version::$api_version"
           echo "::set-output name=cli_version::$cli_version"
           echo "::set-output name=authd_version::$authd_version"
-          echo "::set-output name=ffi_version::$ffi_version"
           echo "::set-output name=qjsonrpc_version::$qjsonrpc_version"
 
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
@@ -490,7 +216,7 @@ jobs:
       - shell: bash
         id: release_description
         run: |
-          description=$(./resources/get_release_description.sh ${{ steps.versioning.outputs.api_version }} ${{ steps.versioning.outputs.cli_version }} ${{ steps.versioning.outputs.ffi_version }} ${{ steps.versioning.outputs.authd_version }})
+          description=$(./resources/get_release_description.sh ${{ steps.versioning.outputs.api_version }} ${{ steps.versioning.outputs.cli_version }}  ${{ steps.versioning.outputs.authd_version }})
           description="${description//'%'/'%25'}"
           description="${description//$'\n'/'%0A'}"
           description="${description//$'\r'/'%0D'}"
@@ -500,9 +226,7 @@ jobs:
       # Upload all the release archives to S3; FFI links will be in the release description.
       - name: Upload prod to S3
         run: aws s3 sync deploy/prod s3://sn-api --size-only --acl public-read
-      - name: Upload dev to S3
-        run: aws s3 sync deploy/dev s3://sn-api --acl public-read
-
+     
       # Create the release and attach sn_cli archives as assets.
       - uses: csexton/create-release@add-body
         id: create_release

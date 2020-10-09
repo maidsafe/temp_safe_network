@@ -66,17 +66,9 @@ pub enum IpcMsg {
 pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
     // We also add a multicodec compatible prefix. For more details please follow
     // https://github.com/multiformats/multicodec/blob/master/table.csv
-    let msg = (msg, cfg!(feature = "mock-network"));
     Ok(format!("b{}", BASE32_NOPAD.encode(&serialize(&msg)?)))
 }
 
-/// Encode `IpcMsg` into string, using base64 encoding.
-///
-/// For testing purposes only.
-// #[cfg(any(test, feature = "testing"))]
-// pub fn encode_msg_64(msg: &IpcMsg) -> Result<String, IpcError> {
-//     Ok(ffi_utils::base64_encode(&serialize(msg)?))
-// }
 
 /// Decode `IpcMsg` encoded with base32 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
@@ -88,23 +80,11 @@ pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
         _ => return Err(IpcError::EncodeDecodeError),
     };
 
-    let (msg, _mock): (IpcMsg, bool) = deserialize(&decoded)?;
-    // if mock ^ cfg!(feature = "mock-network") {
-    //     return Err(IpcError::IncompatibleMockStatus);
-    // }
+    let msg: IpcMsg = deserialize(&decoded)?;
 
     Ok(msg)
 }
 
-/// Decode `IpcMsg` encoded with base64 encoding.
-///
-/// For testing purposes only.
-// #[cfg(any(test, feature = "testing"))]
-// pub fn decode_msg_64(encoded: &str) -> Result<IpcMsg, IpcError> {
-//     Ok(deserialize(
-//         &ffi_utils::base64_decode(encoded).map_err(|_| IpcError::EncodeDecodeError)?,
-//     )?)
-// }
 
 /// Generate unique request ID.
 pub fn gen_req_id() -> u32 {

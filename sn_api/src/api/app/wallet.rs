@@ -1305,7 +1305,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(feature = "client-mock"))]
     async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let account1_wallet_xorurl = safe.wallet_create().await?;

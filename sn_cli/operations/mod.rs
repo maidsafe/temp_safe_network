@@ -7,20 +7,12 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-// #[cfg(not(feature = "client-mock"))]
 mod auth_and_connect;
 pub mod auth_daemon;
 pub mod config;
-// #[cfg(feature = "client-mock")]
-// mod fake_auth;
 mod helpers;
 pub mod vault;
 
-// #[cfg(not(feature = "client-mock"))]
 pub mod safe_net {
     pub use super::auth_and_connect::*;
 }
-// #[cfg(feature = "client-mock")]
-// pub mod safe_net {
-//     pub use super::fake_auth::*;
-// }

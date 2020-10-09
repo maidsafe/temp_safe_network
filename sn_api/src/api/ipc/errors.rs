@@ -38,8 +38,6 @@ pub enum IpcError {
     // ShareMapDenied,
     /// Requested shared access to non-owned MD.
     InvalidOwner(Vec<(XorName, u64)>),
-    // /// Message sent between mock and non-mock versions.
-    // IncompatibleMockStatus,
     /// Unexpected error.
     Unexpected(String),
 }
