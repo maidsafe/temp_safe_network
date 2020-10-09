@@ -249,7 +249,7 @@ mod tests {
     #[tokio::test]
     async fn test_keys_create_preload_test_coins() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let key_pair = safe.keys_create_preload_test_coins("12.23").await?;
+        let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("12.23").await?;
         assert!(key_pair.is_some());
         Ok(())
     }
@@ -257,9 +257,9 @@ mod tests {
     #[tokio::test]
     async fn test_keys_create_and_preload_from_sk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let from_key_pair = safe.keys_create_preload_test_coins("23.23").await?;
+        let (_xorurl, from_key_pair) = safe.keys_create_preload_test_coins("23.23").await?;
 
-        let key_pair = safe
+        let (_xorurl, key_pair) = safe
             .keys_create_and_preload_from_sk(&unwrap_key_pair(from_key_pair)?.sk, None)
             .await?;
         assert!(key_pair.is_some());
@@ -269,10 +269,10 @@ mod tests {
     #[tokio::test]
     async fn test_keys_create_preload() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let from_key_pair = safe.keys_create_preload_test_coins("543.2312").await?;
+        let (_xorurl, from_key_pair) = safe.keys_create_preload_test_coins("543.2312").await?;
 
         let preload_amount = "1.800000000";
-        let key_pair = safe
+        let (_xorurl, key_pair) = safe
             .keys_create_and_preload_from_sk(
                 &unwrap_key_pair(from_key_pair)?.sk,
                 Some(preload_amount),
@@ -307,7 +307,7 @@ mod tests {
             }
         };
 
-        let kp = safe.keys_create_preload_test_coins("12").await?;
+        let (_xorurl, kp) = safe.keys_create_preload_test_coins("12").await?;
         let mut key_pair = unwrap_key_pair(kp.clone())?;
         match safe
             .keys_create_and_preload_from_sk(&key_pair.sk, Some(".003"))
@@ -368,9 +368,9 @@ mod tests {
     #[tokio::test]
     async fn test_keys_create_pk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let from_key_pair = safe.keys_create_preload_test_coins("1.1").await?;
+        let (_xorurl, from_key_pair) = safe.keys_create_preload_test_coins("1.1").await?;
         let _pk = pk_to_hex(&SecretKey::random().public_key());
-        let key_pair = safe
+        let (_xorurl, key_pair) = safe
             .keys_create_and_preload_from_sk(&unwrap_key_pair(from_key_pair)?.sk, None)
             .await?;
         assert!(key_pair.is_none());
@@ -381,7 +381,7 @@ mod tests {
     async fn test_keys_test_coins_balance_pk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let preload_amount = "1.154200000";
-        let key_pair = safe.keys_create_preload_test_coins(preload_amount).await?;
+        let (_xorurl, key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
         let current_balance = safe
             .keys_balance_from_sk(&unwrap_key_pair(key_pair)?.sk)
             .await?;
@@ -462,7 +462,7 @@ mod tests {
     #[tokio::test]
     async fn test_keys_test_coins_balance_wrong_sk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let kp = safe.keys_create_preload_test_coins("0").await?;
+        let (_xorurl, kp) = safe.keys_create_preload_test_coins("0").await?;
         let mut sk = unwrap_key_pair(kp)?.sk;
         sk.replace_range(..6, "ababab");
         let current_balance = safe.keys_balance_from_sk(&sk).await;
@@ -486,11 +486,11 @@ mod tests {
     async fn test_keys_balance_pk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let preload_amount = "1743.234";
-        let from_kp = safe.keys_create_preload_test_coins(preload_amount).await?;
+        let (_xorurl, from_kp) = safe.keys_create_preload_test_coins(preload_amount).await?;
         let from_key_pair = unwrap_key_pair(from_kp)?;
 
         let amount = "1740.000000000";
-        let to_key_pair = safe
+        let (_xorurl, to_key_pair) = safe
             .keys_create_and_preload_from_sk(&from_key_pair.sk, Some(amount))
             .await?;
 

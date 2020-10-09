@@ -694,7 +694,7 @@ mod tests {
 
         // test no default balance at wallet in <from> argument
         match safe
-            .wallet_transfer("10", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("10", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::ContentError(msg)) => assert_eq!(
@@ -719,7 +719,7 @@ mod tests {
 
         // invert wallets and test no default balance at wallet in <to> argument
         match safe
-            .wallet_transfer("10", Some(&to_wallet_xorurl), &from_wallet_xorurl, None)
+            .wallet_transfer("10", Some(&to_wallet_xorurl), &from_wallet_xorurl)
             .await
         {
             Err(Error::ContentError(msg)) => {
@@ -759,7 +759,7 @@ mod tests {
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
-            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl, None)
+            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl)
             .await
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
@@ -791,7 +791,7 @@ mod tests {
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
-            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::InvalidAmount(msg)) => {
@@ -836,7 +836,7 @@ mod tests {
 
         // test fail to transfer more than current balance at wallet in <from> argument
         match safe
-            .wallet_transfer("100.6", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("100.6", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::NotEnoughBalance(msg)) => assert_eq!(
@@ -861,7 +861,7 @@ mod tests {
 
         // test fail to transfer as it's a invalid/non-numeric amount
         match safe
-            .wallet_transfer(".06", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer(".06", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
@@ -883,7 +883,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -927,7 +927,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl, None)
+            .wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -956,7 +956,7 @@ mod tests {
         let (safekey_xorurl2, _) = safe.keys_create_preload_test_coins("0").await?;
 
         match safe
-            .wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2, None)
+            .wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2)
             .await
         {
             Ok(_) => Err(Error::Unexpected(
@@ -1012,7 +1012,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl, None)
+            .wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -1068,12 +1068,7 @@ mod tests {
         from_wallet_spendable_balance.set_path("from-second-balance");
         let from_spendable_balance = from_wallet_spendable_balance.to_string();
         match safe
-            .wallet_transfer(
-                "200.6",
-                Some(&from_spendable_balance),
-                &to_wallet_xorurl,
-                None,
-            )
+            .wallet_transfer("200.6", Some(&from_spendable_balance), &to_wallet_xorurl)
             .await
         {
             Err(Error::NotEnoughBalance(msg)) => assert_eq!(
@@ -1098,12 +1093,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer(
-                "100.3",
-                Some(&from_spendable_balance),
-                &to_wallet_xorurl,
-                None,
-            )
+            .wallet_transfer("100.3", Some(&from_spendable_balance), &to_wallet_xorurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -1167,12 +1157,7 @@ mod tests {
         to_wallet_spendable_balance.set_path("to-second-balance");
         let to_spendable_balance = to_wallet_spendable_balance.to_string();
         match safe
-            .wallet_transfer(
-                "100.5",
-                Some(&from_wallet_xorurl),
-                &to_spendable_balance,
-                None,
-            )
+            .wallet_transfer("100.5", Some(&from_wallet_xorurl), &to_spendable_balance)
             .await
         {
             Err(msg) => {
@@ -1276,12 +1261,7 @@ mod tests {
         let from_spendable_balance = format!("{}/from-second-balance", from_nrsurl);
         let to_spendable_balance = format!("{}/to-second-balance", to_nrsurl);
         match safe
-            .wallet_transfer(
-                "5.8",
-                Some(&from_spendable_balance),
-                &to_spendable_balance,
-                None,
-            )
+            .wallet_transfer("5.8", Some(&from_spendable_balance), &to_spendable_balance)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -1343,7 +1323,7 @@ mod tests {
 
         // test fail to transfer from a not owned wallet in <from> argument
         match another_safe
-            .wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl, None)
+            .wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl)
             .await
         {
             Err(Error::AccessDenied(msg)) => {
