@@ -9,41 +9,11 @@
 #![allow(unsafe_code)]
 
 mod auth;
-// mod containers;
-// mod share_map;
 
 pub use self::auth::AuthReq;
-// pub use self::containers::ContainersReq;
-// pub use self::share_map::{ShareMap, ShareMapReq};
 
-// use crate::ffi::ipc::req::{
-//     AppExchangeInfo as FfiAppExchangeInfo, ContainerPermissions as FfiContainerPermissions,
-//     PermissionSet as FfiPermissionSet,
-// };
-
-// use ffi_utils::{ReprC, StringError};
 use serde::{Deserialize, Serialize};
 
-// use std::ffi::{CString, NulError};
-
-/// Permission enum - use for internal storage only.
-// #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-// pub enum Permission {
-//     /// Read.
-//     Read,
-//     /// Insert.
-//     Insert,
-//     /// Update.
-//     Update,
-//     /// Delete.
-//     Delete,
-//     /// Modify permissions.
-//     ManagePermissions,
-// }
-
-/// Permissions stored internally in the access container.
-/// In FFI represented as `ffi::PermissionSet`
-// pub type ContainerPermissions = BTreeSet<Permission>;
 
 /// IPC request.
 // TODO: `TransOwnership` variant
@@ -51,11 +21,7 @@ use serde::{Deserialize, Serialize};
 pub enum IpcReq {
     /// Authentication request.
     Auth(AuthReq),
-    // /// Containers request.
-    // Containers(ContainersReq),
     // /// Unregistered client authenticator request.
     /// Takes arbitrary user data as `Vec<u8>`, returns bootstrap config.
     Unregistered(Vec<u8>),
-    // /// Share mutable data.
-    // ShareMap(ShareMapReq),
 }

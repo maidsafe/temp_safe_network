@@ -8,11 +8,9 @@
 
 use bincode::Error as SerialisationError;
 use data_encoding::DecodeError;
-// use ffi_utils::StringError;
 use futures::channel::mpsc::SendError;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
-// use std::ffi::NulError;
 
 use std::str::Utf8Error;
 use threshold_crypto::error::FromBytesError;
@@ -28,14 +26,10 @@ pub enum IpcError {
     InvalidMsg,
     /// Generic encoding / decoding failure.
     EncodeDecodeError,
-    // /// String conversion error.
-    // StringError(StringError),
     /// App is already authorised.
     AlreadyAuthorised,
     /// App is not registered.
     UnknownApp,
-    // /// User denied request for shared access to MD.
-    // ShareMapDenied,
     /// Requested shared access to non-owned MD.
     InvalidOwner(Vec<(XorName, u64)>),
     /// Unexpected error.

@@ -417,39 +417,7 @@ impl SafeAuthenticator {
     // }
 }
 
-// Helper to unwrap the Authenticator if it's logged in
-// fn get_authenticator_client(authenticator_client: &Option<Authenticator>) -> Result<&SafeAuthenticator> {
-//     authenticator_client.as_ref().ok_or_else(|| {
-//         Error::AuthError("You need to log in to a SAFE Network account first".to_string())
-//     })
-// }
 
-// Helper function to generate an app authorisation response
-// async fn gen_auth_response(
-//     authenticator: &Client,
-//     req_id: SafeAuthReqId,
-//     auth_req: AuthReq,
-// ) -> Result<String> {
-//     let auth_granted = authenticate(&authenticator, auth_req)
-//         .await
-//         .map_err(|err| {
-//             Error::AuthenticatorError(format!(
-//                 "Failed to authorise application on the network: {}",
-//                 err
-//             ))
-//         })?;
-
-//     debug!("Encoding response with auth credentials auth granted...");
-//     let resp = encode_msg(&IpcMsg::Resp {
-//         req_id,
-//         response: IpcResp::Auth(Ok(auth_granted)),
-//     })
-//     .map_err(|err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)))?;
-
-//     debug!("Returning auth response generated");
-
-//     Ok(resp)
-// }
 
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
@@ -477,52 +445,8 @@ pub async fn decode_ipc_msg(
             req_id,
             request: IpcReq::Unregistered(extra_data),
         })),
-        // IpcMsg::Req {
-        //     request: IpcReq::ShareMap(share_map_req),
-        //     req_id,
-        // } => Ok(Ok(IpcMsg::Req {
-        //     req_id,
-        //     request: IpcReq::ShareMap(share_map_req),
-        // })),
-        // IpcMsg::Req {
-        //     request: IpcReq::Containers(cont_req),
-        //     req_id,
-        // } => {
-        //     trace!("Handling IpcReq::Containers({:?})", cont_req);
-
-        //     let app_id = cont_req.app.id.clone();
-        //     let c2 = client.clone();
-
-        //     let (_config_version, config) = config::list_apps(client).await?;
-        //     let app_state = app_state(&c2, &config, &app_id).await?;
-        //     match app_state {
-        //         AppState::Authenticated => Ok(Ok(IpcMsg::Req {
-        //             req_id,
-        //             request: IpcReq::Containers(cont_req),
-        //         })),
-        //         AppState::Revoked | AppState::NotAuthenticated => {
-        //             // App is not authenticated
-        //             let error_code = sn_client::ffi::error_codes::ERR_UNKNOWN_APP;
-        //             let description = AuthError::from(IpcError::UnknownApp).to_string();
-
-        //             let response = IpcMsg::Resp {
-        //                 response: IpcResp::Auth(Err(IpcError::UnknownApp)),
-        //                 req_id,
-        //             };
-        //             let encoded_response = encode_response(&response)?;
-
-        //             Ok(Err((error_code, description, encoded_response)))
-        //         }
-        //     }
-        // }
         IpcMsg::Resp { .. } | IpcMsg::Revoked { .. } | IpcMsg::Err(..) => Err(Error::AuthError(
             "Invalid Authenticator IPC Message".to_string(),
         )),
     }
 }
-
-// /// Encode `IpcMsg` into a `CString`, using base32 encoding.
-// pub fn encode_response(msg: &IpcMsg) -> Result<CString, IpcError> {
-//     let response = ipc::encode_msg(msg)?;
-//     Ok(CString::new(response).map_err(StringError::from)?)
-// }

@@ -5,7 +5,7 @@ set -e
 component=$1
 if [[ -z "$component" ]]; then
     echo "You must supply the component to build."
-    echo "Valid values are 'sn_cli', 'sn_api', 'sn_authd' or 'sn_ffi'."
+    echo "Valid values are 'sn_cli', 'sn_api' or 'sn_authd'."
     exit 1
 fi
 
@@ -35,17 +35,6 @@ function get_distributable_for_component() {
                 distributable="safe.exe"
             else
                 distributable="safe"
-            fi
-            ;;
-        sn_ffi)
-            if [[ "$target" == *"darwin"* ]]; then
-                distributable="libsn_ffi.dylib"
-            elif [[ "$target" == *"windows"* ]]; then
-                distributable="sn_ffi.dll"
-            elif [[ "$target" == *"linux"* ]]; then
-                distributable="libsn_ffi.so"
-            else
-                distributable="libsn_ffi.a"
             fi
             ;;
         *)

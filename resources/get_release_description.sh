@@ -10,12 +10,8 @@ if [[ -z "$cli_version" ]]; then
     echo "You must supply a version number for sn_cli."
     exit 1
 fi
-ffi_version=$3
-if [[ -z "$ffi_version" ]]; then
-    echo "You must supply a version number for sn_ffi."
-    exit 1
-fi
-authd_version=$4
+
+authd_version=$3
 if [[ -z "$authd_version" ]]; then
     echo "You must supply a version number for sn_authd."
     exit 1
