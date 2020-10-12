@@ -108,17 +108,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
             location,
             recursive,
             follow_links,
-        }) => {
-            xorurl_commander(
-                cmd,
-                location,
-                recursive,
-                follow_links,
-                output_fmt,
-                &mut safe,
-            )
-            .await
-        }
+        }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
         Some(SubCommands::Node { cmd }) => node_commander(cmd),
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to

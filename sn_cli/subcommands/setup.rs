@@ -109,6 +109,18 @@ fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>, String> {
     let exe_path =
         std::env::current_exe().map_err(|err| format!("Can't get the exec path: {}", err))?;
 
+    // get filename without preceding path as std::ffi::OsStr (C string)
+    let exec_name_ffi = match exe_path.file_name() {
+        Some(v) => v,
+        None => return Err("Can't extract file_name of executable".to_string()),
+    };
+
+    // Convert OsStr to string.  Can fail if OsStr contains any invalid unicode.
+    let exec_name = match exec_name_ffi.to_str() {
+        Some(v) => v.to_string(),
+        None => return Err("Can't decode unicode in executable name".to_string()),
+    };
+
     // Generates shell completions for <shell> and prints to stdout
     let mut buf: Vec<u8> = vec![];
     CmdArgs::clap().gen_completions_to(exec_name, shell, &mut buf);
