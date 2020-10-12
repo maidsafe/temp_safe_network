@@ -69,7 +69,6 @@ pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
     Ok(format!("b{}", BASE32_NOPAD.encode(&serialize(&msg)?)))
 }
 
-
 /// Decode `IpcMsg` encoded with base32 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
     let mut chars = encoded.chars();
@@ -84,7 +83,6 @@ pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
 
     Ok(msg)
 }
-
 
 /// Generate unique request ID.
 pub fn gen_req_id() -> u32 {

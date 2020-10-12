@@ -10,7 +10,7 @@
 use super::{
     fetch::Range,
     helpers::xorname_to_hex,
-    // SafeApp,
+    xorurl, // SafeApp,
 };
 use crate::{Error, Result};
 
@@ -18,27 +18,10 @@ use log::{debug, info, warn};
 
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
-    Blob,
-    BlobAddress,
-    // ClientFullId,
-    Error as SafeNdError,
-    Map,
-    MapAction,
-    MapAddress,
-    MapEntryActions,
-    MapPermissionSet,
-    MapSeqEntryActions,
-    MapSeqValue,
-    MapValue,
-    Money,
-    PublicBlob,
-    PublicKey as SafeNdPublicKey,
-    SeqMap,
-    SequenceAddress,
-    SequenceIndex,
-    SequencePrivatePermissions,
-    SequencePublicPermissions,
-    SequenceUser,
+    Blob, BlobAddress, ClientFullId, Error as SafeNdError, Map, MapAction, MapAddress,
+    MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money,
+    PublicBlob, PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
+    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -168,21 +151,24 @@ impl SafeAppClient {
     pub async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
-        _to_xorname: XorName,
+        to_xorname: XorName,
         // tx_id: TransferId,
-        _amount: Money,
+        amount: Money,
     ) -> Result<()> {
-        let _client = match from_sk {
+        let client = match from_sk {
             Some(sk) => Client::new(Some(sk)).await?,
             None => self.get_safe_client()?,
         };
 
+        unimplemented!();
+
         // TODO: attempt to get wallet pk from xorname
 
-        unimplemented!()
+        // let to_pk = self.fetch(format!("safe://{:?}", to_xorname));
+        // let to_url  = xorurl::SafeUrl::from::<XorName>(to_xorname);
 
         // let from_fullid = from_sk.map(ClientFullId::from);
-        // let _tx = client
+        // let transfer_id = client
         //     .send_money( to_xorname, amount)
         //     .await
         //     .map_err(|err| match err {
@@ -196,30 +182,25 @@ impl SafeAppClient {
         //         other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
         //     })?;
 
-        // // TODO: reenable receipt of the transfer itself here
-        // // Ok(tx)
-        // Ok(())
+        // Ok(transfer_id)
     }
 
     pub async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        // tx_id: TransferId,
         amount: Money,
-    ) -> Result<()> {
+    ) -> Result<(u64, SafeNdPublicKey)> {
         let mut client = match from_sk {
             Some(sk) => Client::new(Some(sk)).await?,
             None => self.get_safe_client()?,
         };
 
-        Ok(client
+        let transfer_id = client
             .send_money(SafeNdPublicKey::Bls(to_pk), amount)
-            .await?)
+            .await?;
 
-        // let to_xorname = xorname_from_pk(to_pk);
-        // self.safecoin_transfer_to_xorname( to_xorname, amount)
-        //     .await
+        Ok(transfer_id)
     }
 
     // // === Blob operations ===

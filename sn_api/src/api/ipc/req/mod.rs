@@ -14,7 +14,6 @@ pub use self::auth::AuthReq;
 
 use serde::{Deserialize, Serialize};
 
-
 /// IPC request.
 // TODO: `TransOwnership` variant
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

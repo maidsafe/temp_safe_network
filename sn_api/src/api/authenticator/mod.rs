@@ -417,8 +417,6 @@ impl SafeAuthenticator {
     // }
 }
 
-
-
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
 #[allow(clippy::type_complexity)]

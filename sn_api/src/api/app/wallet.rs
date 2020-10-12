@@ -12,6 +12,7 @@ use super::helpers::{
     parse_coins_amount, xorname_from_pk, xorname_to_hex, KeyPair as KeypairHelpers,
 };
 use crate::{
+    fetch::SafeData,
     xorurl::{SafeContentType, SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result, Safe,
 };
@@ -21,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use sn_data_types::{MapValue, Money};
 use std::collections::BTreeMap;
 use xor_name::XorName;
+
+pub use threshold_crypto::{PublicKey, SecretKey};
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;

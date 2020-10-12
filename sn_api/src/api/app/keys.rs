@@ -11,6 +11,7 @@ use super::{
     common::sk_from_hex,
     helpers::{parse_coins_amount, pk_to_hex, xorname_from_pk, KeyPair},
     xorurl::XorUrlEncoder,
+    xorurl::{SafeContentType, SafeDataType},
     Safe,
 };
 use crate::{Error, Result};
@@ -148,97 +149,95 @@ impl Safe {
         }
     }
 
-    // /// # Transfer safecoins from one SafeKey to another, or to a Wallet
-    // ///
-    // /// Using a secret key you can send safecoins to a Wallet or to a SafeKey.
-    // ///
-    // /// ## Example
-    // /// ```
-    // /// # use sn_api::Safe;
-    // /// let mut safe = Safe::default();
-    // /// # async_std::task::block_on(async {
-    // /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
-    // ///     let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("14").await.unwrap();
-    // ///     let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1").await.unwrap();
-    // ///     let current_balance = safe.keys_balance_from_sk(&key_pair1.clone().unwrap().sk).await.unwrap();
-    // ///     assert_eq!("14.000000000", current_balance);
-    // ///
-    // ///     safe.keys_transfer( "10", Some(&key_pair1.clone().unwrap().sk), &key2_xorurl, None ).await.unwrap();
-    // ///     let from_balance = safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ).await.unwrap();
-    // ///     assert_eq!("4.000000000", from_balance);
-    // ///     let to_balance = safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ).await.unwrap();
-    // ///     assert_eq!("11.000000000", to_balance);
-    // /// # });
-    // /// ```
-    // pub async fn keys_transfer(
-    //     &mut self,
-    //     amount: &str,
-    //     from_sk: Option<&str>,
-    //     to_url: &str,
-    //     tx_id: Option<u64>,
-    // ) -> Result<()> {
-    //     // Parse and validate the amount is a valid
-    //     let amount_coins = parse_coins_amount(amount)?;
+    /// # Transfer safecoins from one SafeKey to another, or to a Wallet
+    ///
+    /// Using a secret key you can send safecoins to a Wallet or to a SafeKey.
+    ///
+    /// ## Example
+    /// ```
+    /// # use sn_api::Safe;
+    /// let mut safe = Safe::default();
+    /// # async_std::task::block_on(async {
+    /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
+    ///     let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("14").await.unwrap();
+    ///     let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1").await.unwrap();
+    ///     let current_balance = safe.keys_balance_from_sk(&key_pair1.clone().unwrap().sk).await.unwrap();
+    ///     assert_eq!("14.000000000", current_balance);
+    ///
+    ///     safe.keys_transfer( "10", Some(&key_pair1.clone().unwrap().sk), &key2_xorurl, None ).await.unwrap();
+    ///     let from_balance = safe.keys_balance_from_url( &key1_xorurl, &key_pair1.unwrap().sk ).await.unwrap();
+    ///     assert_eq!("4.000000000", from_balance);
+    ///     let to_balance = safe.keys_balance_from_url( &key2_xorurl, &key_pair2.unwrap().sk ).await.unwrap();
+    ///     assert_eq!("11.000000000", to_balance);
+    /// # });
+    /// ```
+    pub async fn keys_transfer(
+        &mut self,
+        amount: &str,
+        from_sk: Option<&str>,
+        to_url: &str,
+        tx_id: Option<u64>,
+    ) -> Result<()> {
+        // Parse and validate the amount is a valid
+        let amount_coins = parse_coins_amount(amount)?;
 
-    //     // Let's check if the 'to_url' is a valid Wallet or a SafeKey URL
-    //     let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url).await?;
-    //     let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
-    //         unimplemented!();
-    //         // let (to_balance, _) = self
-    //         //     .wallet_get_default_balance(&to_xorurl_encoder.to_string())
-    //         //     .await?;
+        // Let's check if the 'to_url' is a valid Wallet or a SafeKey URL
+        let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to_url).await?;
+        let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
+            let (to_balance, _) = self
+                .wallet_get_default_balance(&to_xorurl_encoder.to_string())
+                .await?;
 
-    //         // XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
-    //     } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
-    //         && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
-    //     {
-    //         // TODO, retrieve the key
-    //         unimplemented!()
-    //         // to_xorurl_encoder.xorname()
-    //     } else {
-    //         return Err(Error::InvalidInput(format!(
-    //             "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
-    //             to_xorurl_encoder.content_type(),
-    //             to_xorurl_encoder.data_type()
-    //         )));
-    //     };
+            XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
+        } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
+            && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
+        {
+            // TODO, retrieve the key
+            to_xorurl_encoder.xorname()
+        } else {
+            return Err(Error::InvalidInput(format!(
+                "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
+                to_xorurl_encoder.content_type(),
+                to_xorurl_encoder.data_type()
+            )));
+        };
 
-    //     // Generate a random transfer TX ID
-    //     // let tx_id = tx_id.unwrap_or_else(|| rand::thread_rng().next_u64());
+        // Generate a random transfer TX ID
+        // let tx_id = tx_id.unwrap_or_else(|| rand::thread_rng().next_u64());
 
-    //     let from = match &from_sk {
-    //         Some(sk) => Some(sk_from_hex(sk)?),
-    //         None => None,
-    //     };
+        let from = match &from_sk {
+            Some(sk) => Some(sk_from_hex(sk)?),
+            None => None,
+        };
 
-    //     // Finally, let's make the transfer
-    //     match self
-    //         .safe_client
-    //         .safecoin_transfer_to_xorname(from, to_xorname, amount_coins)
-    //         .await
-    //     {
-    //         Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
-    //             "The amount '{}' specified for the transfer is invalid",
-    //             amount
-    //         ))),
-    //         Err(Error::NotEnoughBalance(_)) => {
-    //             let msg = if from_sk.is_some() {
-    //                 "Not enough balance for the transfer at provided source SafeKey".to_string()
-    //             } else {
-    //                 "Not enough balance for the transfer at Account's default SafeKey".to_string()
-    //             };
+        // Finally, let's make the transfer
+        match self
+            .safe_client
+            .safecoin_transfer_to_xorname(from, to_xorname, amount_coins)
+            .await
+        {
+            Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
+                "The amount '{}' specified for the transfer is invalid",
+                amount
+            ))),
+            Err(Error::NotEnoughBalance(_)) => {
+                let msg = if from_sk.is_some() {
+                    "Not enough balance for the transfer at provided source SafeKey".to_string()
+                } else {
+                    "Not enough balance for the transfer at Account's default SafeKey".to_string()
+                };
 
-    //             Err(Error::NotEnoughBalance(msg))
-    //         }
-    //         Err(other_error) => Err(Error::Unexpected(format!(
-    //             "Unexpected error when attempting to transfer: {}",
-    //             other_error
-    //         ))),
-    //         // TODO: return transfer id...?
-    //         Ok(tx) => Ok(()),
-    //         // Ok(tx) => Ok(tx.id),
-    //     }
-    // }
+                Err(Error::NotEnoughBalance(msg))
+            }
+            Err(other_error) => Err(Error::Unexpected(format!(
+                "Unexpected error when attempting to transfer: {}",
+                other_error
+            ))),
+            // TODO: return transfer id...?
+            Ok(tx) => Ok(()),
+            // Ok(tx) => Ok(tx.id),
+        }
+    }
 }
 
 #[cfg(all(test, feature = "simulated-payouts"))]

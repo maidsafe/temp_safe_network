@@ -495,12 +495,12 @@ impl Safe {
                 }
 
                 // TODO: do the _actual_fetch
-                let balances = WalletSpendableBalances::new();
-                // let balances = if retrieve_data {
-                //     safe.fetch_wallet(&the_xor).await?
-                // } else {
-                //     WalletSpendableBalances::new()
-                // };
+                // let balances = WalletSpendableBalances::new();
+                let balances = if retrieve_data {
+                    self.fetch_wallet(&the_xor).await?
+                } else {
+                    WalletSpendableBalances::new()
+                };
 
                 let safe_data = SafeData::Wallet {
                     xorurl,
@@ -589,55 +589,55 @@ mod tests {
     use rand::{thread_rng, Rng};
     use std::io::Read;
 
-    // #[tokio::test]
-    // async fn test_fetch_key() -> Result<()> {
-    //     let mut safe = new_safe_instance().await?;
-    //     let preload_amount = "1324.12";
-    //     let (xorurl, _key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
+    #[tokio::test]
+    async fn test_fetch_key() -> Result<()> {
+        let mut safe = new_safe_instance().await?;
+        let preload_amount = "1324.12";
+        let (xorurl, _key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
 
-    //     let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-    //     let content = safe.fetch(&xorurl, None).await?;
-    //     assert!(
-    //         content
-    //             == SafeData::SafeKey {
-    //                 xorurl: xorurl.clone(),
-    //                 xorname: xorurl_encoder.xorname(),
-    //                 resolved_from: xorurl.clone(),
-    //             }
-    //     );
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
+        assert!(
+            content
+                == SafeData::SafeKey {
+                    xorurl: xorurl.clone(),
+                    xorname: xorurl_encoder.xorname(),
+                    resolved_from: xorurl.clone(),
+                }
+        );
 
-    //     // let's also compare it with the result from inspecting the URL
-    //     let inspected_content = safe.inspect(&xorurl).await?;
-    //     assert_eq!(inspected_content.len(), 1);
-    //     assert_eq!(content, inspected_content[0]);
-    //     Ok(())
-    // }
+        // let's also compare it with the result from inspecting the URL
+        let inspected_content = safe.inspect(&xorurl).await?;
+        assert_eq!(inspected_content.len(), 1);
+        assert_eq!(content, inspected_content[0]);
+        Ok(())
+    }
 
-    // #[tokio::test]
-    // async fn test_fetch_wallet() -> Result<()> {
-    //     let mut safe = new_safe_instance().await?;
-    //     let xorurl = safe.wallet_create().await?;
+    #[tokio::test]
+    async fn test_fetch_wallet() -> Result<()> {
+        let mut safe = new_safe_instance().await?;
+        let xorurl = safe.wallet_create().await?;
 
-    //     let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-    //     let content = safe.fetch(&xorurl, None).await?;
-    //     assert!(
-    //         content
-    //             == SafeData::Wallet {
-    //                 xorurl: xorurl.clone(),
-    //                 xorname: xorurl_encoder.xorname(),
-    //                 type_tag: 1_000,
-    //                 balances: WalletSpendableBalances::default(),
-    //                 data_type: SafeDataType::SeqMap,
-    //                 resolved_from: xorurl.clone(),
-    //             }
-    //     );
+        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let content = safe.fetch(&xorurl, None).await?;
+        assert!(
+            content
+                == SafeData::Wallet {
+                    xorurl: xorurl.clone(),
+                    xorname: xorurl_encoder.xorname(),
+                    type_tag: 1_000,
+                    balances: WalletSpendableBalances::default(),
+                    data_type: SafeDataType::SeqMap,
+                    resolved_from: xorurl.clone(),
+                }
+        );
 
-    //     // let's also compare it with the result from inspecting the URL
-    //     let inspected_content = safe.inspect(&xorurl).await?;
-    //     assert_eq!(inspected_content.len(), 1);
-    //     assert_eq!(content, inspected_content[0]);
-    //     Ok(())
-    // }
+        // let's also compare it with the result from inspecting the URL
+        let inspected_content = safe.inspect(&xorurl).await?;
+        assert_eq!(inspected_content.len(), 1);
+        assert_eq!(content, inspected_content[0]);
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_fetch_files_container() -> Result<()> {
