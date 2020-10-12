@@ -206,7 +206,7 @@ pub fn cache_conn_info(network_name: &str, conn_info: &[u8]) -> Result<PathBuf, 
         })?;
     }
 
-    file_path.push(format!("{}_vault_connection_info.config", network_name));
+    file_path.push(format!("{}_node_connection_info.config", network_name));
     fs::write(&file_path, conn_info).map_err(|err| {
         format!(
             "Unable to cache connection information in {}: {}",

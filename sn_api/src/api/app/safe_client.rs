@@ -16,12 +16,14 @@ use crate::{Error, Result};
 
 use log::{debug, info, warn};
 
-use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
     Blob, BlobAddress, ClientFullId, Error as SafeNdError, Map, MapAction, MapAddress,
     MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money,
     PublicBlob, PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
+};
+use sn_client::{
+    client::test_create_balance, immutable_data, Client, ClientError as SafeClientError,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;

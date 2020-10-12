@@ -16,8 +16,8 @@ use crate::{
     subcommands::{
         auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
         files::files_commander, keys::key_commander, networks::networks_commander,
-        nrs::nrs_commander, seq::seq_commander, setup::setup_commander, update::update_commander,
-        vault::vault_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
+        node::node_commander, nrs::nrs_commander, seq::seq_commander, setup::setup_commander,
+        update::update_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
         SubCommands,
     },
 };
@@ -108,8 +108,18 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
             location,
             recursive,
             follow_links,
-        }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
-        Some(SubCommands::Vault { cmd }) => vault_commander(cmd),
+        }) => {
+            xorurl_commander(
+                cmd,
+                location,
+                recursive,
+                follow_links,
+                output_fmt,
+                &mut safe,
+            )
+            .await
+        }
+        Some(SubCommands::Node { cmd }) => node_commander(cmd),
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to
             // connect to the network with them, otherwise the connection created will be with

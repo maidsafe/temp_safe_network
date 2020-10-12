@@ -38,7 +38,7 @@ deploy/
 cargo-all.sh
 bindings
 tmp
-fake_vault_data.json
+fake_node_data.json
 *.orig
 
 # test file creation

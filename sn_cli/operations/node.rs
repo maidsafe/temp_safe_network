@@ -23,10 +23,10 @@ use std::{
 };
 
 #[cfg(not(target_os = "windows"))]
-const SAFE_VAULT_EXECUTABLE: &str = "safe_vault";
+const SN_NODE_EXECUTABLE: &str = "sn_node";
 
 #[cfg(target_os = "windows")]
-const SAFE_VAULT_EXECUTABLE: &str = "safe_vault.exe";
+const SN_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 fn run_safe_cmd(
     args: &[&str],
@@ -57,13 +57,13 @@ fn run_safe_cmd(
     Ok(())
 }
 
-pub fn vault_install(vault_path: Option<PathBuf>) -> Result<(), String> {
-    let target_path = get_vault_bin_path(vault_path)?;
+pub fn node_install(node_path: Option<PathBuf>) -> Result<(), String> {
+    let target_path = get_node_bin_path(node_path)?;
     let _ = download_from_s3_and_install_bin(
         target_path,
-        "safe-vault",
-        "safe_vault",
-        SAFE_VAULT_EXECUTABLE,
+        "sn-node",
+        "sn_node",
+        SN_NODE_EXECUTABLE,
         if cfg!(target_os = "linux") {
             Some("x86_64-unknown-linux-musl")
         } else {
@@ -73,40 +73,40 @@ pub fn vault_install(vault_path: Option<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
-pub fn vault_run(
-    vault_path: Option<PathBuf>,
-    vaults_dir: &str,
+pub fn node_run(
+    node_path: Option<PathBuf>,
+    nodes_dir: &str,
     verbosity: u8,
     interval: &str,
     ip: Option<String>,
     test: bool,
 ) -> Result<(), String> {
-    let vault_path = get_vault_bin_path(vault_path)?;
+    let node_path = get_node_bin_path(node_path)?;
 
-    let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
-    debug!("Running vault from {}", arg_vault_path);
+    let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
+    debug!("Running node from {}", arg_node_path);
 
-    let vaults_dir = vault_path.join(vaults_dir);
-    if !vaults_dir.exists() {
-        println!("Creating '{}' folder", vaults_dir.display());
-        create_dir_all(vaults_dir.clone()).map_err(|err| {
+    let nodes_dir = node_path.join(nodes_dir);
+    if !nodes_dir.exists() {
+        println!("Creating '{}' folder", nodes_dir.display());
+        create_dir_all(nodes_dir.clone()).map_err(|err| {
             format!(
-                "Couldn't create target path to store vaults' generated data: {}",
+                "Couldn't create target path to store nodes' generated data: {}",
                 err
             )
         })?;
     }
-    let arg_vaults_dir = vaults_dir.display().to_string();
-    println!("Storing vaults' generated data at {}", arg_vaults_dir);
+    let arg_nodes_dir = nodes_dir.display().to_string();
+    println!("Storing nodes' generated data at {}", arg_nodes_dir);
 
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
         "-v",
-        "--vault-path",
-        &arg_vault_path,
-        "--vaults-dir",
-        &arg_vaults_dir,
+        "--node-path",
+        &arg_node_path,
+        "--nodes-dir",
+        &arg_nodes_dir,
         "--interval",
         &interval,
         "--local",
@@ -133,7 +133,7 @@ pub fn vault_run(
     );
 
     // We can now call the tool with the args
-    println!("Launching local SAFE network...");
+    println!("Launching local Safe network...");
     run_with(Some(&sn_launch_tool_args))?;
 
     let interval_duration = Duration::from_secs(interval_as_int * 15);
@@ -143,7 +143,7 @@ pub fn vault_run(
     let report_errors = false;
 
     if test {
-        println!("Setting up authenticator against local SAFE network...");
+        println!("Setting up authenticator against local Safe network...");
 
         if cfg!(windows) {
             // On Windows authd must be installed as a service
@@ -186,38 +186,38 @@ pub fn vault_run(
     Ok(())
 }
 
-pub fn vault_join(
-    vault_path: Option<PathBuf>,
-    vault_data_dir: &str,
+pub fn node_join(
+    node_path: Option<PathBuf>,
+    node_data_dir: &str,
     verbosity: u8,
     contacts: &str,
 ) -> Result<(), String> {
-    let vault_path = get_vault_bin_path(vault_path)?;
+    let node_path = get_node_bin_path(node_path)?;
 
-    let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
-    debug!("Running vault from {}", arg_vault_path);
+    let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
+    debug!("Running node from {}", arg_node_path);
 
-    let vault_data_dir = vault_path.join(vault_data_dir);
-    if !vault_data_dir.exists() {
-        println!("Creating '{}' folder", vault_data_dir.display());
-        create_dir_all(vault_data_dir.clone()).map_err(|err| {
+    let node_data_dir = node_path.join(node_data_dir);
+    if !node_data_dir.exists() {
+        println!("Creating '{}' folder", node_data_dir.display());
+        create_dir_all(node_data_dir.clone()).map_err(|err| {
             format!(
-                "Couldn't create target path to store vaults' generated data: {}",
+                "Couldn't create target path to store nodes' generated data: {}",
                 err
             )
         })?;
     }
-    let arg_vaults_dir = vault_data_dir.display().to_string();
-    println!("Storing vaults' generated data at {}", arg_vaults_dir);
+    let arg_nodes_dir = node_data_dir.display().to_string();
+    println!("Storing nodes' generated data at {}", arg_nodes_dir);
 
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool-join",
         "-v",
-        "--vault-path",
-        &arg_vault_path,
-        "--vaults-dir",
-        &arg_vaults_dir,
+        "--node-path",
+        &arg_node_path,
+        "--nodes-dir",
+        &arg_nodes_dir,
     ];
 
     let mut verbosity_arg = String::from("-");
@@ -237,39 +237,39 @@ pub fn vault_join(
     );
 
     // We can now call the tool with the args
-    println!("Starting a vault to join a SAFE network...");
+    println!("Starting a node to join a Safe network...");
     join_with(Some(&sn_launch_tool_args))?;
     Ok(())
 }
 
-pub fn vault_shutdown(vault_path: Option<PathBuf>) -> Result<(), String> {
-    let vault_exec_name = match vault_path {
+pub fn node_shutdown(node_path: Option<PathBuf>) -> Result<(), String> {
+    let node_exec_name = match node_path {
         Some(ref path) => {
             let filepath = path.as_path();
             if filepath.is_file() {
                 match filepath.file_name() {
                     Some(filename) => match filename.to_str() {
                         Some(name) => Ok(name),
-                        None => Err(format!("Vault path provided ({}) contains invalid unicode chars", filepath.display())),
+                        None => Err(format!("Node path provided ({}) contains invalid unicode chars", filepath.display())),
                     }
-                    None => Err(format!("Vault path provided ({}) is invalid as it doens't include the executable filename", filepath.display())),
+                    None => Err(format!("Node path provided ({}) is invalid as it doens't include the executable filename", filepath.display())),
                 }
             } else {
-                Err(format!("Vault path provided ({}) is invalid as it doens't include the executable filename", filepath.display()))
+                Err(format!("Node path provided ({}) is invalid as it doens't include the executable filename", filepath.display()))
             }
         }
-        None => Ok(SAFE_VAULT_EXECUTABLE),
+        None => Ok(SN_NODE_EXECUTABLE),
     }?;
 
     debug!(
-        "Killing all running vaults launched with {}...",
-        vault_exec_name
+        "Killing all running nodes launched with {}...",
+        node_exec_name
     );
-    kill_vaults(vault_exec_name)
+    kill_nodes(node_exec_name)
 }
 
-fn get_vault_bin_path(vault_path: Option<PathBuf>) -> Result<PathBuf, String> {
-    match vault_path {
+fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
+    match node_path {
         Some(p) => Ok(p),
         None => {
             let mut path = dirs_next::home_dir()
@@ -283,13 +283,13 @@ fn get_vault_bin_path(vault_path: Option<PathBuf>) -> Result<PathBuf, String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn kill_vaults(exec_name: &str) -> Result<(), String> {
+fn kill_nodes(exec_name: &str) -> Result<(), String> {
     let output = Command::new("killall")
         .arg(exec_name)
         .output()
         .map_err(|err| {
             format!(
-                "Error when atempting to stop vaults ({}) processes: {}",
+                "Error when atempting to stop nodes ({}) processes: {}",
                 exec_name, err
             )
         })?;
@@ -302,7 +302,7 @@ fn kill_vaults(exec_name: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "Failed to stop vaults ({}) processes: {}",
+            "Failed to stop nodes ({}) processes: {}",
             exec_name,
             String::from_utf8_lossy(&output.stderr)
         ))
@@ -310,13 +310,13 @@ fn kill_vaults(exec_name: &str) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn kill_vaults(exec_name: &str) -> Result<(), String> {
+fn kill_nodes(exec_name: &str) -> Result<(), String> {
     let output = Command::new("taskkill")
         .args(&["/F", "/IM", exec_name])
         .output()
         .map_err(|err| {
             format!(
-                "Error when atempting to stop vaults ({}) processes: {}",
+                "Error when atempting to stop nodes ({}) processes: {}",
                 exec_name, err
             )
         })?;
@@ -329,27 +329,27 @@ fn kill_vaults(exec_name: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "Failed to stop vaults ({}) processes: {}",
+            "Failed to stop nodes ({}) processes: {}",
             exec_name,
             String::from_utf8_lossy(&output.stderr)
         ))
     }
 }
 
-pub fn vault_update(vault_path: Option<PathBuf>) -> Result<(), String> {
-    let vault_path = get_vault_bin_path(vault_path)?;
+pub fn node_update(node_path: Option<PathBuf>) -> Result<(), String> {
+    let node_path = get_node_bin_path(node_path)?;
 
-    let arg_vault_path = vault_path.join(SAFE_VAULT_EXECUTABLE).display().to_string();
-    debug!("Updating vault at {}", arg_vault_path);
+    let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
+    debug!("Updating node at {}", arg_node_path);
 
-    let child = Command::new(&arg_vault_path)
+    let child = Command::new(&arg_node_path)
         .args(vec!["--update-only"])
         .spawn()
-        .map_err(|err| format!("Failed to update vault at '{}': {}", arg_vault_path, err))?;
+        .map_err(|err| format!("Failed to update node at '{}': {}", arg_node_path, err))?;
 
     let output = child
         .wait_with_output()
-        .map_err(|err| format!("Failed to update vault at '{}': {}", arg_vault_path, err))?;
+        .map_err(|err| format!("Failed to update node at '{}': {}", arg_node_path, err))?;
 
     if output.status.success() {
         io::stdout()
@@ -358,8 +358,8 @@ pub fn vault_update(vault_path: Option<PathBuf>) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "Failed when invoking vault executable from '{}':\n{}",
-            arg_vault_path,
+            "Failed when invoking node executable from '{}':\n{}",
+            arg_node_path,
             String::from_utf8_lossy(&output.stderr)
         ))
     }

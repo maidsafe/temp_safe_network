@@ -11,7 +11,7 @@ mod auth_and_connect;
 pub mod auth_daemon;
 pub mod config;
 mod helpers;
-pub mod vault;
+pub mod node;
 
 pub mod safe_net {
     pub use super::auth_and_connect::*;
