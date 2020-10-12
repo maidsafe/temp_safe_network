@@ -7,20 +7,16 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    fetch::Range,
-    helpers::xorname_to_hex,
-    xorurl, // SafeApp,
-};
+use super::{fetch::Range, helpers::xorname_to_hex};
 use crate::{Error, Result};
 
 use log::{debug, info, warn};
 
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
-    Blob, BlobAddress, ClientFullId, Error as SafeNdError, Map, MapAction, MapAddress,
-    MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money,
-    PublicBlob, PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
+    Blob, BlobAddress, Error as SafeNdError, Map, MapAction, MapAddress, MapEntryActions,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob,
+    PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 use std::collections::BTreeMap;

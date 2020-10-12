@@ -12,7 +12,6 @@ use super::helpers::{
     parse_coins_amount, xorname_from_pk, xorname_to_hex, KeyPair as KeypairHelpers,
 };
 use crate::{
-    fetch::SafeData,
     xorurl::{SafeContentType, SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result, Safe,
 };
