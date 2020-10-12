@@ -104,22 +104,7 @@ async fn handle_authorisation(
                             )))
                         }
                     }
-                    // SafeAuthReq::Containers(cont_req) => {
-                    //     info!("The following authorisation request for containers was received:");
-                    //     info!("{:?}", cont_req);
-                    //     Err(
-                    //         "Authorisation request for Containers is not yet supported by authd"
-                    //             .to_string(),
-                    //     )
-                    // }
-                    // SafeAuthReq::ShareMap(share_map_req) => {
-                    //     info!("The following authorisation request to share a MutableData was received:");
-                    //     info!("{:?}", share_map_req);
-                    //     Err(
-                    //         "Authorisation request for Share MutableData is not yet supported by authd"
-                    //             .to_string(),
-                    //     )
-                    // }
+
                     SafeAuthReq::Unregistered(_) => {
                         // We simply allow unregistered authorisation requests
                         match safe_authenticator.authorise_app(&auth_req_str).await {

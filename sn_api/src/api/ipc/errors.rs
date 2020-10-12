@@ -20,8 +20,6 @@ use threshold_crypto::error::FromBytesError;
 pub enum IpcError {
     /// Authentication denied.
     AuthDenied,
-    // /// Containers denied.
-    // ContainersDenied,
     /// Invalid IPC message.
     InvalidMsg,
     /// Generic encoding / decoding failure.
@@ -59,18 +57,6 @@ impl From<SerialisationError> for IpcError {
         Self::EncodeDecodeError
     }
 }
-
-// impl From<StringError> for IpcError {
-//     fn from(err: StringError) -> Self {
-//         Self::StringError(err)
-//     }
-// }
-
-// impl From<NulError> for IpcError {
-//     fn from(error: NulError) -> Self {
-//         Self::from(error.to_string())
-//     }
-// }
 
 impl<'a> From<&'a str> for IpcError {
     fn from(s: &'a str) -> Self {

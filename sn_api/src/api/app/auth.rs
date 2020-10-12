@@ -12,12 +12,10 @@ use super::{
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     helpers::decode_ipc_msg,
     Safe,
-    // SafeApp,
 };
 use crate::api::ipc::{encode_msg, gen_req_id, AuthReq, IpcMsg, IpcReq};
 use crate::{Error, Result};
 use log::{debug, info};
-// use sn_data_types::AppPermissions;
 use serde_json::json;
 
 // Method for requesting application's authorisation
@@ -37,19 +35,9 @@ impl Safe {
         let req_id: u32 = gen_req_id();
         let request = IpcReq::Auth(AuthReq {
             req_id,
-            // app: AppExchangeInfo {
             app_id: app_id.to_string(),
-            // scope: None,
             app_name: app_name.to_string(),
             app_vendor: app_vendor.to_string(),
-            // },
-            // app_container: false,
-            // app_permissions: AppPermissions {
-            //     read_balance: true,
-            //     perform_mutations: true,
-            //     transfer_money: true,
-            // },
-            // containers: HashMap::new(),
         });
 
         let auth_req_str = encode_msg(&IpcMsg::Req { req_id, request }).map_err(|err| {

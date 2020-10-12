@@ -57,9 +57,6 @@ pub enum KeysSubCommands {
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
-        /// The transfer ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
-        #[structopt(long = "tx-id", parse(try_from_str = parse_tx_id))]
-        tx_id: Option<u64>,
     },
 }
 
@@ -108,33 +105,25 @@ pub async fn key_commander(
             }
             Ok(())
         }
-        KeysSubCommands::Transfer {
-            amount: _,
-            from: _,
-            to,
-            tx_id: _,
-        } => {
+        KeysSubCommands::Transfer { amount, from, to } => {
             // TODO: don't connect if --from sk was passed
             connect(safe).await?;
 
             //TODO: if to starts without safe://, i.e. if it's a PK hex string.
-            let _destination = get_from_arg_or_stdin(
+            let destination = get_from_arg_or_stdin(
                 to,
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
-            unimplemented!();
-            // TODO: reenable once we have wallets going
 
-            // let _tx_id = safe
-            //     .keys_transfer(&amount, from.as_deref(), &destination, tx_id)
-            //     .await?;
+            let tx_id = safe
+                .keys_transfer(&amount, from.as_deref(), &destination)
+                .await?;
 
-            // if OutputFmt::Pretty == output_fmt {
-            println!("Successful transfer");
-            // println!("Successful. TX_ID: {}", &tx_id);
-            // } else {
-            // println!("{}", &tx_id)
-            // }
+            if OutputFmt::Pretty == output_fmt {
+                println!("Successful. TX_ID: {:?}", &tx_id);
+            } else {
+                println!("{:?}", &tx_id)
+            }
 
             Ok(())
         }
@@ -164,7 +153,6 @@ pub async fn create_new_key(
     } else {
         let key_pair;
         let mut xorurl;
-        // let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
 
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key

@@ -212,33 +212,7 @@ pub fn pretty_print_authed_apps(authed_apps: AuthedAppsList) {
     table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
     let all_app_iterator = authed_apps.iter();
     for authed_app in all_app_iterator {
-        let _containers_perms = String::default();
-        // for (cont, perms) in authed_app.containers.iter() {
-        //     containers_perms += &format!("{}: {:?}\n", cont, perms);
-        // }
-        // if containers_perms.is_empty() {
-        //     containers_perms = "None".to_string();
-        // }
-
-        // let app_permissions = format!(
-        //     "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-        //     boolean_to_string(authed_app.app_permissions.transfer_money),
-        //     boolean_to_string(authed_app.app_permissions.perform_mutations),
-        //     boolean_to_string(authed_app.app_permissions.read_balance)
-        // );
-        // let permissions_report = format!(
-        //     "Own container: {}\n{}\nContainers: {}",
-        //     boolean_to_string(authed_app.own_container),
-        //     app_permissions,
-        //     containers_perms
-        // );
-
-        table.add_row(row![
-            authed_app.id,
-            authed_app.name,
-            authed_app.vendor,
-            // permissions_report
-        ]);
+        table.add_row(row![authed_app.id, authed_app.name, authed_app.vendor,]);
     }
     table.printstd();
 }
@@ -255,33 +229,11 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: Option<&str
             row![bFg->"Request Id", bFg->"App Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"],
         );
         for auth_req in auth_reqs.iter() {
-            let _containers_perms = String::default();
-            // for (cont, perms) in auth_req.containers.iter() {
-            //     containers_perms += &format!("{}: {:?}\n", cont, perms);
-            // }
-            // if containers_perms.is_empty() {
-            //     containers_perms = "None".to_string();
-            // }
-
-            // let app_permissions = format!(
-            //     "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-            //     boolean_to_string(auth_req.app_permissions.transfer_money),
-            //     boolean_to_string(auth_req.app_permissions.perform_mutations),
-            //     boolean_to_string(auth_req.app_permissions.read_balance)
-            // );
-            // let permissions_report = format!(
-            //     "Own container: {}\n{}\nContainers: {}",
-            //     boolean_to_string(auth_req.own_container),
-            //     app_permissions,
-            //     containers_perms
-            // );
-
             table.add_row(row![
                 auth_req.req_id,
                 auth_req.app_id,
                 auth_req.app_name,
                 auth_req.app_vendor,
-                // permissions_report,
             ]);
         }
         table.printstd();

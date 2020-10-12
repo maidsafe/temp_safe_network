@@ -95,8 +95,6 @@ pub async fn connect(safe: &mut Safe) -> Result<(), String> {
         other => other,
     }
     .map_err(|err| format!("Failed to connect: {}", err))
-
-    // Ok(safe)
 }
 
 // Private helpers

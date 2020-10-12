@@ -122,10 +122,6 @@ pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
 /// "Account...."
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Account {
-    /// The User Account Keys.
-    // pub maid_keys: ClientKeys,
-    /// The user's access container.
-    // pub access_container: MapInfo,
     /// The user's configuration directory.
     // pub config_root: MapInfo,
     /// Set to `true` when all root and standard containers

@@ -44,10 +44,6 @@ impl SafeAppClient {
         }
     }
 
-    // }
-
-    // #[async_trait]
-    // impl SafeApp for SafeAppClient {
     pub fn new() -> Self {
         Self { safe_client: None }
     }
@@ -91,44 +87,6 @@ impl SafeAppClient {
     }
 
     // === Money operations ===
-    // pub async fn create_balance(
-    //     &mut self,
-    //     from_sk: Option<SecretKey>,
-    //     new_balance_owner: PublicKey,
-    //     amount: Money,
-    // ) -> Result<XorName> {
-    //     let mut client = self.get_safe_client()?;
-    //    let from_fullid = from_sk.map(ClientFullId::from);
-    //     client
-    //         .create_balance(
-    //             from_fullid.as_ref(),
-    //             SafeNdPublicKey::Bls(new_balance_owner),
-    //             amount,
-    //             None,
-    //         )
-    //         .await
-    //         .map_err(|err| {
-    //             if let SafeClientError::DataError(SafeNdError::InsufficientBalance) = err {
-    //                 Error::NotEnoughBalance(amount.to_string())
-    //             } else {
-    //                 Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
-    //             }
-    //         })?;
-
-    //     let xorname = xorname_from_pk(new_balance_owner);
-    //     Ok(xorname)
-    // }
-
-    // pub async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Money) -> Result<XorName> {
-    //     info!("Creating test SafeKey with {} test coins", amount);
-    //     // let xorname = xorname_from_pk(owner_sk.public_key());
-    //    test_create_balance(&ClientFullId::from(owner_sk), amount)
-    //         .await
-    //         .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
-
-    //     Ok(xorname)
-    // }
-
     pub async fn read_balance_from_sk(&mut self, sk: SecretKey) -> Result<Money> {
         let mut temp_client = Client::new(Some(sk)).await?;
         let coins = temp_client
@@ -152,7 +110,6 @@ impl SafeAppClient {
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        // tx_id: TransferId,
         amount: Money,
     ) -> Result<()> {
         let client = match from_sk {
