@@ -3,7 +3,5 @@
 set -e -x
 
 cargo fmt -- --check
-source ./resources/test-scripts/api-mock-tests
-source ./resources/test-scripts/cli-mock-tests
 source ./resources/test-scripts/api-network-tests
 source ./resources/test-scripts/cli-network-tests

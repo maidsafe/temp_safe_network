@@ -57,9 +57,6 @@ pub enum KeysSubCommands {
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
-        /// The transaction ID, a random one will be generated if not provided. A valid TX Id is a number between 0 and 2^64
-        #[structopt(long = "tx-id", parse(try_from_str = parse_tx_id))]
-        tx_id: Option<u64>,
     },
 }
 
@@ -96,7 +93,9 @@ pub async fn key_commander(
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(&sk).await
             } else {
-                safe.keys_balance_from_url(&target, &sk).await
+                unimplemented!();
+                // TODO: reenable once we have wallet url parsing going again
+                // safe.keys_balance_from_url(&target, &sk).await
             }?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -106,12 +105,7 @@ pub async fn key_commander(
             }
             Ok(())
         }
-        KeysSubCommands::Transfer {
-            amount,
-            from,
-            to,
-            tx_id,
-        } => {
+        KeysSubCommands::Transfer { amount, from, to } => {
             // TODO: don't connect if --from sk was passed
             connect(safe).await?;
 
@@ -122,13 +116,13 @@ pub async fn key_commander(
             )?;
 
             let tx_id = safe
-                .keys_transfer(&amount, from.as_deref(), &destination, tx_id)
+                .keys_transfer(&amount, from.as_deref(), &destination)
                 .await?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Success. TX_ID: {}", &tx_id);
+                println!("Successful. TX_ID: {:?}", &tx_id);
             } else {
-                println!("{}", &tx_id)
+                println!("{:?}", &tx_id)
             }
 
             Ok(())
@@ -136,12 +130,13 @@ pub async fn key_commander(
     }
 }
 
+#[cfg(feature = "simulated-payouts")]
 pub async fn create_new_key(
     safe: &mut Safe,
     test_coins: bool,
     pay_with: Option<String>,
     preload: Option<String>,
-    pk: Option<String>,
+    _pk: Option<String>,
 ) -> Result<(String, Option<BlsKeyPair>, Option<String>), String> {
     let (xorurl, key_pair, amount) = if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
@@ -156,15 +151,31 @@ pub async fn create_new_key(
         let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
         (xorurl, key_pair, Some(amount))
     } else {
+        let key_pair;
+        let mut xorurl;
+
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
         // If the --pay-with is not provided the API will use the account's default wallet/sk
         if pay_with.is_none() {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
+
+            let payee = safe.keypair()?.sk;
+            let keys_info = safe
+                .keys_create_and_preload_from_sk(&payee, preload.as_deref())
+                .await?;
+
+            xorurl = keys_info.0;
+            key_pair = keys_info.1;
+        } else {
+            let keys_info = safe
+                .keys_create_and_preload_from_sk(&pay_with.unwrap(), preload.as_deref())
+                .await?;
+
+            xorurl = keys_info.0;
+            key_pair = keys_info.1;
         }
-        let (xorurl, key_pair) = safe
-            .keys_create(pay_with.as_deref(), preload.as_deref(), pk.as_deref())
-            .await?;
+
         (xorurl, key_pair, preload)
     };
 
@@ -188,8 +199,6 @@ pub fn print_new_key_output(
             println!("Secret Key = {}", pair.sk);
         }
     } else if let Some(pair) = &key_pair {
-        println!("{}", serialise_output(&(&xorurl, pair), output_fmt));
-    } else {
-        println!("{}", serialise_output(&xorurl, output_fmt));
+        println!("{}", serialise_output(&(pair), output_fmt));
     }
 }

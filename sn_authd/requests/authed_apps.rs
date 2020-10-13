@@ -8,30 +8,31 @@
 // Software.
 
 use crate::shared::SharedSafeAuthenticatorHandle;
-use log::{error, info};
-use serde_json::{json, Value};
+
+use serde_json::Value;
 
 pub async fn process_req(
-    params: Value,
-    safe_auth_handle: SharedSafeAuthenticatorHandle,
+    _params: Value,
+    _safe_auth_handle: SharedSafeAuthenticatorHandle,
 ) -> Result<Value, String> {
-    if Value::Null != params {
-        Err(format!(
-            "Unexpected param for 'authed-apps' method: {:?}",
-            params
-        ))
-    } else {
-        info!("Obtaining list of authorised applications...");
-        let safe_authenticator = safe_auth_handle.lock().await;
-        match safe_authenticator.authed_apps().await {
-            Ok(authed_apps_list) => {
-                info!("List of authorised apps sent: {:?}", authed_apps_list);
-                Ok(json!(authed_apps_list))
-            }
-            Err(err) => {
-                error!("Failed to get list of authorised apps: {}", err);
-                Err(err.to_string())
-            }
-        }
-    }
+    // if Value::Null != params {
+    // Err(format!(
+    //     "Unexpected param for 'authed-apps' method: {:?}",
+    //     params
+    // ))
+    // } else {
+    //     info!("Obtaining list of authorised applications...");
+    //     let safe_authenticator = safe_auth_handle.lock().await;
+    //     // match safe_authenticator.authed_apps().await {
+    //         // Ok(authed_apps_list) => {
+    //         //     info!("List of authorised apps sent: {:?}", authed_apps_list);
+    //         //     Ok(json!(authed_apps_list))
+    //         // }
+    //         // Err(err) => {
+    //         //     error!("Failed to get list of authorised apps: {}", err);
+    //         //     Err(err.to_string())
+    //         // }
+    //     }
+    // }
+    unimplemented!();
 }

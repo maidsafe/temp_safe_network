@@ -103,7 +103,7 @@ pub async fn seq_commander(
             };
 
             // Append item to the Sequence on the Network
-            safe.sequence_append(&target_url, &item).await?;
+            safe.append_to_sequence(&target_url, &item).await?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Data appended to the Sequence: \"{}\"", target_url);

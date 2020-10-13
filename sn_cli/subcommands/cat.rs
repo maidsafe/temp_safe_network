@@ -64,12 +64,12 @@ pub async fn cat_commander(
                 println!("{}", serialise_output(&(url, files_map), output_fmt));
             }
         }
-        SafeData::PublicImmutableData { data, .. } => {
+        SafeData::PublicBlob { data, .. } => {
             if cmd.hexdump {
-                // Render hex representation of ImmutableData file
+                // Render hex representation of Blob file
                 println!("{}", pretty_hex::pretty_hex(data));
             } else {
-                // Render ImmutableData file
+                // Render Blob file
                 io::stdout().write_all(data).map_err(|err| {
                     format!("Failed to print out the content of the file: {}", err)
                 })?

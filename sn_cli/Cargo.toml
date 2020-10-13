@@ -17,7 +17,7 @@ path = "main.rs"
 ansi_term = "~0.9.0"
 async-std = "1.6.0"
 crossbeam = "~0.7.3"
-directories = "2.0.1"
+dirs-next = "1.0.1"
 env_logger = "~0.6.0"
 envy = "~0.4.0"
 human-panic = "1.0.1"
@@ -43,12 +43,14 @@ percent-encoding = "2.1.0"
 xor_name = "1"
 
 [features]
-scl-mock = ["sn_api/scl-mock"]
+default = ["simulated-payouts"]
+simulated-payouts = ["sn_api/simulated-payouts"]
+
 
 [dependencies.sn_api]
 path = "../sn_api"
 default-features = false
-features = ["app", "authd_client"]
+features = ["app", "authd_client", "simulated-payouts"]
 
 [dependencies.self_update]
 version = "~0.15.0"
@@ -60,7 +62,7 @@ assert_cmd = "~0.11.1"
 duct = "~0.12.0"
 predicates = "1.0.0"
 pretty_assertions = "~0.6.1"
-safe-nd = "~0.11.0"
+sn_data_types = "~0.11.0"
 unwrap = "1.2.1"
 criterion = "~0.3"
 walkdir = "2.3.1"

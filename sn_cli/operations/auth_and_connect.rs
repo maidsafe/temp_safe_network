@@ -7,11 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{
-    APP_ID, APP_NAME, APP_VENDOR, PROJECT_DATA_DIR_APPLICATION, PROJECT_DATA_DIR_ORGANISATION,
-    PROJECT_DATA_DIR_QUALIFIER,
-};
-use directories::ProjectDirs;
+use crate::{APP_ID, APP_NAME, APP_VENDOR};
 use log::{debug, info, warn};
 use sn_api::Safe;
 use std::{
@@ -104,14 +100,13 @@ pub async fn connect(safe: &mut Safe) -> Result<(), String> {
 // Private helpers
 
 fn get_credentials_file_path() -> Result<(PathBuf, PathBuf), String> {
-    let project_data_path = ProjectDirs::from(
-        PROJECT_DATA_DIR_QUALIFIER,
-        PROJECT_DATA_DIR_ORGANISATION,
-        PROJECT_DATA_DIR_APPLICATION,
-    )
-    .ok_or_else(|| "Couldn't find user's home directory".to_string())?;
+    let mut project_data_path =
+        dirs_next::home_dir().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
 
-    let credentials_folder = project_data_path.data_local_dir();
+    project_data_path.push(".safe");
+    project_data_path.push("cli");
+
+    let credentials_folder = project_data_path;
 
     let file_path = credentials_folder.join(AUTH_CREDENTIALS_FILENAME);
     Ok((credentials_folder.to_path_buf(), file_path))

@@ -9,7 +9,6 @@
 
 use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
-use directories::BaseDirs;
 use envy::from_env;
 use log::info;
 use prettytable::Table;
@@ -78,19 +77,24 @@ pub async fn authd_create(
     test_coins: bool,
 ) -> Result<(), String> {
     let login_details = get_login_details(config_file_str)?;
-    if test_coins {
-        // We then generate a SafeKey with test-coins to use it for the account creation
-        println!("Creating a SafeKey with test-coins...");
-        let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11").await?;
-        let kp = key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
-        println!("Sending account creation request to authd...");
-        sn_authd
-            .create_acc(&kp.sk, &login_details.passphrase, &login_details.password)
-            .await?;
-        println!("Account was created successfully!");
-        println!("SafeKey created and preloaded with test-coins. Owner key pair generated:");
-        println!("Public Key = {}", kp.pk);
-        println!("Secret Key = {}", kp.sk);
+
+    if test_coins && cfg!(feature = "simulated-payouts") {
+        #[cfg(feature = "simulated-payouts")]
+        {
+            // We then generate a SafeKey with test-coins to use it for the account creation
+            println!("Creating a SafeKey with test-coins...");
+            let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11").await?;
+            let kp =
+                key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
+            println!("Sending account creation request to authd...");
+            sn_authd
+                .create_acc(&kp.sk, &login_details.passphrase, &login_details.password)
+                .await?;
+            println!("Account was created successfully!");
+            println!("SafeKey created and preloaded with test-coins. Owner key pair generated:");
+            println!("Public Key = {}", kp.pk);
+            println!("Secret Key = {}", kp.sk);
+        }
     } else {
         let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
         println!("Sending account creation request to authd...");
@@ -208,33 +212,7 @@ pub fn pretty_print_authed_apps(authed_apps: AuthedAppsList) {
     table.add_row(row![bFg->"Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions"]);
     let all_app_iterator = authed_apps.iter();
     for authed_app in all_app_iterator {
-        let mut containers_perms = String::default();
-        for (cont, perms) in authed_app.containers.iter() {
-            containers_perms += &format!("{}: {:?}\n", cont, perms);
-        }
-        if containers_perms.is_empty() {
-            containers_perms = "None".to_string();
-        }
-
-        let app_permissions = format!(
-            "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-            boolean_to_string(authed_app.app_permissions.transfer_coins),
-            boolean_to_string(authed_app.app_permissions.perform_mutations),
-            boolean_to_string(authed_app.app_permissions.get_balance)
-        );
-        let permissions_report = format!(
-            "Own container: {}\n{}\nContainers: {}",
-            boolean_to_string(authed_app.own_container),
-            app_permissions,
-            containers_perms
-        );
-
-        table.add_row(row![
-            authed_app.id,
-            authed_app.name,
-            authed_app.vendor,
-            permissions_report
-        ]);
+        table.add_row(row![authed_app.id, authed_app.name, authed_app.vendor,]);
     }
     table.printstd();
 }
@@ -251,33 +229,11 @@ pub fn pretty_print_auth_reqs(auth_reqs: PendingAuthReqs, title_msg: Option<&str
             row![bFg->"Request Id", bFg->"App Id", bFg->"Name", bFg->"Vendor", bFg->"Permissions requested"],
         );
         for auth_req in auth_reqs.iter() {
-            let mut containers_perms = String::default();
-            for (cont, perms) in auth_req.containers.iter() {
-                containers_perms += &format!("{}: {:?}\n", cont, perms);
-            }
-            if containers_perms.is_empty() {
-                containers_perms = "None".to_string();
-            }
-
-            let app_permissions = format!(
-                "Transfer coins: {}\nMutations: {}\nRead coin balance: {}",
-                boolean_to_string(auth_req.app_permissions.transfer_coins),
-                boolean_to_string(auth_req.app_permissions.perform_mutations),
-                boolean_to_string(auth_req.app_permissions.get_balance)
-            );
-            let permissions_report = format!(
-                "Own container: {}\n{}\nContainers: {}",
-                boolean_to_string(auth_req.own_container),
-                app_permissions,
-                containers_perms
-            );
-
             table.add_row(row![
                 auth_req.req_id,
                 auth_req.app_id,
                 auth_req.app_name,
                 auth_req.app_vendor,
-                permissions_report,
             ]);
         }
         table.printstd();
@@ -413,10 +369,9 @@ fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
             if let Ok(authd_path) = std::env::var(ENV_VAR_SN_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
-                let base_dirs = BaseDirs::new()
+                let mut path = dirs_next::home_dir()
                     .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
 
-                let mut path = PathBuf::from(base_dirs.home_dir());
                 path.push(".safe");
                 path.push("authd");
                 Ok(path)

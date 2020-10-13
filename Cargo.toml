@@ -1,2 +1,8 @@
 [workspace]
-members = ["sn_cli", "sn_api", "sn_ffi", "sn_authd", "qjsonrpc"]
+members = ["sn_cli", "sn_api", "sn_authd", "qjsonrpc"]
+
+
+[patch.crates-io]
+# sn_data_types = { git = "https://github.com/maidsafe/sn_data_types.git", branch = "master" }
+# self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "master" }
+sn_transfers= { git = "https://github.com/maidsafe/sn_transfers.git", branch = "master" }

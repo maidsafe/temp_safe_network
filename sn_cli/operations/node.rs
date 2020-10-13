@@ -8,7 +8,6 @@
 // Software.
 
 use super::helpers::download_from_s3_and_install_bin;
-use directories::BaseDirs;
 use log::debug;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -273,10 +272,9 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
     match node_path {
         Some(p) => Ok(p),
         None => {
-            let base_dirs =
-                BaseDirs::new().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+            let mut path = dirs_next::home_dir()
+                .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
 
-            let mut path = PathBuf::from(base_dirs.home_dir());
             path.push(".safe");
             path.push("node");
             Ok(path)

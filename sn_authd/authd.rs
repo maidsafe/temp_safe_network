@@ -35,8 +35,12 @@ pub async fn run(
     let notif_endpoints_handle = Arc::new(Mutex::new(BTreeMap::new()));
 
     let base_path = cert_base_path.map_or_else(
-        || match directories::ProjectDirs::from("net", "maidsafe", "sn_authd") {
-            Some(dirs) => Ok(dirs.config_dir().display().to_string()),
+        || match dirs_next::home_dir() {
+            Some(mut path) => {
+                path.push(".safe");
+                path.push("authd");
+                Ok(path.display().to_string())
+            }
             None => Err(Error::GeneralError(
                 "Failed to obtain local project directory where to write certificate from"
                     .to_string(),

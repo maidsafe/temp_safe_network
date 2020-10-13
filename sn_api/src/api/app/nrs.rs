@@ -11,7 +11,7 @@ use super::{
     consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
     nrs_map::NrsMap,
     xorurl::SafeContentType,
-    Safe, SafeApp,
+    Safe,
 };
 use crate::{
     xorurl::{XorUrl, XorUrlEncoder},
@@ -38,7 +38,7 @@ impl Safe {
     // this second XorUrlEncoder instance contains the information of the parsed NRS-URL.
     // *Note* this is not part of the public API, but an internal helper function used by API impl.
     pub(crate) async fn parse_and_resolve_url(
-        &self,
+        &mut self,
         url: &str,
     ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {
         let xorurl_encoder = Safe::parse_url(url)?;
@@ -93,7 +93,7 @@ impl Safe {
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl).await?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let link = nrs_map.nrs_map_update_or_create_data(name, link, default, hard_link)?;
+        let link = nrs_map.nrs_update_map_or_create_data(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
@@ -101,8 +101,8 @@ impl Safe {
         if !dry_run {
             // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
             let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
-            self.safe_app
-                .sequence_append(
+            self.safe_client
+                .append_to_sequence(
                     &nrs_map_raw_data,
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
@@ -126,7 +126,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    ///     let file_xorurl = safe.files_put_public_immutable(&vec![], None, false).await.unwrap();
+    ///     let file_xorurl = safe.files_store_public_blob(&vec![], None, false).await.unwrap();
     ///     let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
@@ -148,7 +148,7 @@ impl Safe {
             ))
         } else {
             let mut nrs_map = NrsMap::default();
-            let link = nrs_map.nrs_map_update_or_create_data(&name, link, default, hard_link)?;
+            let link = nrs_map.nrs_update_map_or_create_data(&name, link, default, hard_link)?;
             let mut processed_entries = ProcessedEntries::new();
             processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
@@ -162,8 +162,8 @@ impl Safe {
                 // Store the NrsMapContainer in a Public Sequence
                 let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
                 let xorname = self
-                    .safe_app
-                    .store_sequence_data(
+                    .safe_client
+                    .store_sequence(
                         &nrs_map_raw_data,
                         Some(nrs_xorname),
                         NRS_MAP_TYPE_TAG,
@@ -208,8 +208,8 @@ impl Safe {
         if !dry_run {
             // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
             let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
-            self.safe_app
-                .sequence_append(
+            self.safe_client
+                .append_to_sequence(
                     &nrs_map_raw_data,
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
@@ -233,27 +233,27 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    ///     let file_xorurl = safe.files_put_public_immutable(&vec![], Some("text/plain"), false).await.unwrap();
+    ///     let file_xorurl = safe.files_store_public_blob(&vec![], Some("text/plain"), false).await.unwrap();
     ///     let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
     ///     let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).await.unwrap();
     ///     assert_eq!(version, 0);
     ///     assert_eq!(nrs_map_container.get_default_link().unwrap(), file_xorurl);
     /// # });
     /// ```
-    pub async fn nrs_map_container_get(&self, url: &str) -> Result<(u64, NrsMap)> {
+    pub async fn nrs_map_container_get(&mut self, url: &str) -> Result<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
         let xorurl_encoder = Safe::parse_url(url)?;
 
         // Check if the URL specified a specific version of the content or simply the latest available
         let data = match xorurl_encoder.content_version() {
             None => {
-                self.safe_app
+                self.safe_client
                     .sequence_get_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, false)
                     .await
             }
             Some(content_version) => {
                 let serialised_nrs_map = self
-                    .safe_app
+                    .safe_client
                     .sequence_get_entry(
                         xorurl_encoder.xorname(),
                         NRS_MAP_TYPE_TAG,

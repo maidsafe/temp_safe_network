@@ -85,12 +85,12 @@ async fn handle_authorisation(
                                 timestamp: SystemTime::now(),
                                 auth_req: AuthReq {
                                     req_id,
-                                    app_id: app_auth_req.app.id.clone(),
-                                    app_name: app_auth_req.app.name.clone(),
-                                    app_vendor: app_auth_req.app.vendor.clone(),
-                                    app_permissions: app_auth_req.app_permissions,
-                                    containers: app_auth_req.containers.clone(),
-                                    own_container: app_auth_req.app_container,
+                                    app_id: app_auth_req.app_id.clone(),
+                                    app_name: app_auth_req.app_name.clone(),
+                                    app_vendor: app_auth_req.app_vendor.clone(),
+                                    // app_permissions: app_auth_req.app_permissions,
+                                    // containers: app_auth_req.containers.clone(),
+                                    // own_container: app_auth_req.app_container,
                                 },
                                 tx,
                                 notified: false,
@@ -104,22 +104,7 @@ async fn handle_authorisation(
                             )))
                         }
                     }
-                    SafeAuthReq::Containers(cont_req) => {
-                        info!("The following authorisation request for containers was received:");
-                        info!("{:?}", cont_req);
-                        Err(
-                            "Authorisation request for Containers is not yet supported by authd"
-                                .to_string(),
-                        )
-                    }
-                    SafeAuthReq::ShareMData(share_mdata_req) => {
-                        info!("The following authorisation request to share a MutableData was received:");
-                        info!("{:?}", share_mdata_req);
-                        Err(
-                            "Authorisation request for Share MutableData is not yet supported by authd"
-                                .to_string(),
-                        )
-                    }
+
                     SafeAuthReq::Unregistered(_) => {
                         // We simply allow unregistered authorisation requests
                         match safe_authenticator.authorise_app(&auth_req_str).await {

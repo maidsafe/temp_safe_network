@@ -58,10 +58,7 @@ fn calling_safe_cat() {
         xorurl_encoder.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(
-        xorurl_encoder.data_type(),
-        SafeDataType::PublicImmutableData
-    );
+    assert_eq!(xorurl_encoder.data_type(), SafeDataType::PublicBlob);
 }
 
 #[test]
@@ -142,10 +139,7 @@ fn calling_safe_cat_hexdump() {
         xorurl_encoder.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(
-        xorurl_encoder.data_type(),
-        SafeDataType::PublicImmutableData
-    );
+    assert_eq!(xorurl_encoder.data_type(), SafeDataType::PublicBlob);
 }
 
 #[test]

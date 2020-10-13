@@ -10,8 +10,8 @@
 use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use safe_nd::Coins;
 use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
+use sn_data_types::Money;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::{env, fs, process, str::FromStr};
@@ -78,8 +78,8 @@ pub fn create_wallet_with_balance(
     let (_pk, sk) = create_preload_and_get_keys(&preload);
     // we spent 1 nano for creating the SafeKey, so we now preload it
     // with 1 nano less than amount request provided
-    let preload_nanos = Coins::from_str(preload).unwrap().as_nano();
-    let preload_minus_costs = Coins::from_nano(preload_nanos - 1).to_string();
+    let preload_nanos = Money::from_str(preload).unwrap().as_nano();
+    let preload_minus_costs = Money::from_nano(preload_nanos - 1).to_string();
 
     let wallet_create_result = cmd!(
         get_bin_location(),

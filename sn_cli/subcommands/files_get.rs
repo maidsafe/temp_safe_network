@@ -138,7 +138,7 @@ pub async fn process_get_command(
     let mut preserves: u64 = 0;
 
     let (_version, processed_files) =
-        files_container_get_files(&safe, &source, &str_path, |status| {
+        files_container_get_files(safe, &source, &str_path, |status| {
             let mut overwrite = true;
             let mut mystatus = status.clone();
 
@@ -419,7 +419,7 @@ fn prompt_yes_no(prompt_msg: &str, default: &str) -> bool {
 /// TODO: In the future, this will have options for preserving symlinks and
 /// file attributes.
 async fn files_container_get_files(
-    safe: &Safe,
+    safe: &mut Safe,
     url: &str,
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
@@ -429,7 +429,7 @@ async fn files_container_get_files(
         SafeData::FilesContainer {
             version, files_map, ..
         } => (version, files_map),
-        SafeData::PublicImmutableData { metadata, .. } => {
+        SafeData::PublicBlob { metadata, .. } => {
             if let Some(file_item) = metadata {
                 let mut files_map = FilesMap::new();
                 files_map.insert("".to_string(), file_item);
@@ -464,7 +464,7 @@ async fn files_container_get_files(
     // surprising users.
     ensure_parent_dir_exists(&root)?;
 
-    let processed_files = files_map_get_files(&safe, &files_map, &root, callback).await?;
+    let processed_files = files_map_get_files(safe, &files_map, &root, callback).await?;
     Ok((version, processed_files))
 }
 
@@ -562,7 +562,7 @@ fn ensure_parent_dir_exists(path: &str) -> ApiResult<()> {
 ///
 /// TODO: In the future, this will have options for preserving file attributes.
 async fn files_map_get_files(
-    safe: &Safe,
+    safe: &mut Safe,
     files_map: &FilesMap,
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
@@ -655,7 +655,7 @@ async fn files_map_get_files(
         // Download file.  We handle callback from download_file_from_net()
         // and our handler calls a callback supplied by our caller.
         match download_file_from_net(
-            &safe,
+            safe.clone(),
             xorurl,
             abspath.as_path(),
             size,
@@ -752,7 +752,7 @@ fn denormalize_slashes(p: &str) -> String {
 // size (in bytes) must be provided
 // A callback/closure is called after each chunk is downloaded.
 async fn download_file_from_net(
-    safe: &Safe,
+    safe: Safe,
     xorurl: &str,
     path: &Path,
     size: u64,
@@ -781,7 +781,7 @@ async fn download_file_from_net(
         };
         let range = Some((Some(start), Some(end)));
         // gets public or private, based on xorurl type
-        let filedata = files_get_immutable(&safe, &xorurl, range).await?;
+        let filedata = files_get_blob(safe.clone(), &xorurl, range).await?;
         bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
         rcvd += filedata.len() as u64;
         trace!(
@@ -870,24 +870,20 @@ fn create_dir_all(dir_path: &Path) -> ApiResult<()> {
     })
 }
 
-/// # Get Private ImmutableData
+/// # Get Private Blob
 /// Get private immutable data blobs from the network.
 ///
-async fn files_get_private_immutable(
-    _safe: &Safe,
-    _url: &str,
-    _range: Range,
-) -> ApiResult<Vec<u8>> {
+async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> ApiResult<Vec<u8>> {
     unimplemented!();
 }
 
-/// # Get Public or Private ImmutableData
+/// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
 ///
-pub async fn files_get_immutable(safe: &Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
+pub async fn files_get_blob(mut safe: Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
     match XorUrlEncoder::from_url(&url)?.data_type() {
-        SafeDataType::PublicImmutableData => safe.files_get_public_immutable(&url, range).await,
-        SafeDataType::PrivateImmutableData => files_get_private_immutable(&safe, &url, range).await,
+        SafeDataType::PublicBlob => safe.files_get_public_blob(&url, range).await,
+        SafeDataType::PrivateBlob => files_get_private_blob(&safe, &url, range).await,
         _ => Err(Error::InvalidInput(
             "URL target is not immutable data.".to_string(),
         )),

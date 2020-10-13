@@ -12,7 +12,7 @@ use log::debug;
 use sn_api::Safe;
 
 pub async fn authorise_cli(
-    _safe: &mut Safe,
+    _mut safe: Safe,
     _endpoint: Option<String>,
     _is_self_authing: bool,
 ) -> Result<(), String> {
@@ -25,7 +25,7 @@ pub fn clear_credentials() -> Result<(), String> {
     Ok(())
 }
 
-pub async fn connect(safe: &mut Safe) -> Result<(), String> {
+pub async fn connect(mut safe: Safe) -> Result<(), String> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file");
 
     safe.connect(APP_ID, Some("fake-auth-credentials"))

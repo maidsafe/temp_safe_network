@@ -10,6 +10,7 @@
 use crate::shared::SharedSafeAuthenticatorHandle;
 use log::{error, info};
 use serde_json::{json, Value};
+use sn_api::get_sk_from_input;
 
 pub async fn process_req(
     params: Value,
@@ -35,7 +36,7 @@ pub async fn process_req(
                     args[1]
                 )
             })?;
-            let sk = args[2].as_str().ok_or_else(|| {
+            let _sk = args[2].as_str().ok_or_else(|| {
                 format!(
                     "Invalid type for secret key param for 'create-acc' method: {:?}",
                     args[2]
@@ -43,8 +44,11 @@ pub async fn process_req(
             })?;
 
             let mut safe_authenticator = safe_auth_handle.lock().await;
+
+            let sk = get_sk_from_input(passphrase, password);
             match safe_authenticator
-                .create_acc(sk, passphrase, password)
+                .create_acc(sk)
+                // .create_acc(sk, passphrase, password)
                 .await
             {
                 Ok(_) => {

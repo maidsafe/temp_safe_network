@@ -12,7 +12,7 @@ edition = "2018"
 path = "lib.rs"
 
 [dependencies]
-directories = "2.0.2"
+dirs-next = "1.0.1"
 futures = "~0.3.5"
 log = "~0.4.8"
 rand = "~0.7.3"

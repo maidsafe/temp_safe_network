@@ -57,9 +57,9 @@ Response: {
   "jsonrpc": "2.0",
   "result": [{
       "app_permissions": {
-          "get_balance": true,
+          "read_balance": true,
           "perform_mutations": true,
-          "transfer_coins": true
+          "transfer_money": true
       },
       "containers": {},
       "id": "net.maidsafe.cli",
@@ -80,9 +80,9 @@ When `sn_authd` sends a notification to each of the subscribers it also uses JSO
       "app_id": "net.maidsafe.cli",
       "app_name": "SAFE CLI",
       "app_permissions": {
-          "get_balance": true,
+          "read_balance": true,
           "perform_mutations": true,
-          "transfer_coins": true
+          "transfer_money": true
       },
       "app_vendor": "MaidSafe.net Ltd",
       "containers": {},

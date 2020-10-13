@@ -7,24 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::helpers::{decode_ipc_msg, AuthResponseType};
-use super::{
-    fetch::Range,
-    helpers::{xorname_from_pk, xorname_to_hex},
-    SafeApp,
-};
+use super::{fetch::Range, helpers::xorname_to_hex};
 use crate::{Error, Result};
-use async_trait::async_trait;
+
 use log::{debug, info, warn};
-use safe_app::App;
-use safe_nd::{
-    ClientFullId, Coins, Error as SafeNdError, IDataAddress, MDataAction, MDataPermissionSet,
-    MDataSeqEntryActions, MDataSeqValue, PublicKey as SafeNdPublicKey, SDataAddress, SDataIndex,
-    SDataPrivUserPermissions, SDataPubUserPermissions, SDataUser, SeqMutableData, Transaction,
-    TransactionId,
-};
-use sn_client::{
-    client::test_create_balance, immutable_data, Client, ClientError as SafeClientError,
+
+use sn_client::{Client, ClientError as SafeClientError};
+use sn_data_types::{
+    Blob, BlobAddress, Error as SafeNdError, Map, MapAction, MapAddress, MapEntryActions,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob,
+    PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
+    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -33,252 +26,201 @@ pub use threshold_crypto::{PublicKey, SecretKey};
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
-#[derive(Default)]
-pub struct SafeAppScl {
-    safe_conn: Option<App>,
+#[derive(Default, Clone)]
+pub struct SafeAppClient {
+    safe_client: Option<Client>,
 }
 
-impl SafeAppScl {
+impl SafeAppClient {
     // Private helper to obtain the App instance
-    fn get_safe_app(&self) -> Result<&App> {
-        match &self.safe_conn {
-            Some(app) => Ok(app),
+    fn get_safe_client(&mut self) -> Result<Client> {
+        match &self.safe_client {
+            Some(app) => Ok(app.clone()),
             None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         }
     }
 
-    async fn mutate_seq_mdata_entries(
-        &self,
-        name: XorName,
-        tag: u64,
-        entry_actions: MDataSeqEntryActions,
-        error_msg: &str,
-    ) -> Result<()> {
-        let client = &self.get_safe_app()?.client;
-        let message = error_msg.to_string();
-        client
-            .mutate_seq_mdata_entries(name, tag, entry_actions)
-            .await
-            .map_err(|err| {
-                if let SafeClientError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
-                    Error::EntryExists(format!("{}: {}", message, err))
-                } else {
-                    Error::NetDataError(format!("{}: {}", message, err))
-                }
-            })
-    }
-}
-
-#[async_trait]
-impl SafeApp for SafeAppScl {
-    fn new() -> Self {
-        Self { safe_conn: None }
+    pub fn new() -> Self {
+        Self { safe_client: None }
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
-    async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
+    pub async fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
-        let disconnect_cb = || {
+        let _disconnect_cb = || {
             warn!("Connection with the SAFE Network was lost");
         };
 
-        let app = match auth_credentials {
-            Some(auth_credentials) => {
-                let auth_granted = decode_ipc_msg(auth_credentials)?;
-                match auth_granted {
-                    AuthResponseType::Registered(authgranted) => {
-                        App::registered(app_id.to_string(), authgranted, disconnect_cb).await
-                    }
-                    AuthResponseType::Unregistered(config) => {
-                        App::unregistered(disconnect_cb, Some(config)).await
-                    }
-                }
-            }
-            None => App::unregistered(disconnect_cb, None).await,
-        }
-        .map_err(|err| {
-            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-        })?;
+        let app = Client::new(None).await?;
 
-        self.safe_conn = Some(app);
+        // let app = match auth_credentials {
+        //     Some(auth_credentials) => {
+        //         let auth_granted = decode_ipc_msg(auth_credentials)?;
+        //         match auth_granted {
+        //             AuthResponseType::Registered(authgranted) => {
+        //                 // TODO: This needs an existing SK now.
+        //                 Client::new(None).await
+        //                 // Client::new(app_id.to_string(), authgranted, disconnect_cb).await
+        //             }
+        //             // unregistered type used for returning bootstrap config for client
+        //             // TODO: rename?
+        //             AuthResponseType::Unregistered(config) => {
+        //                 // TODO: what to do with config...
+        //                 Client::new(None).await
+        //             }
+        //         }
+        //     }
+        //     None => Client::new(None).await,
+        // }
+        // .map_err(|err| {
+        //     Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+        // })?;
+
+        self.safe_client = Some(app);
         debug!("Successfully connected to the Network!!!");
         Ok(())
     }
 
-    // === Coins operations ===
-    async fn create_balance(
-        &mut self,
-        from_sk: Option<SecretKey>,
-        new_balance_owner: PublicKey,
-        amount: Coins,
-    ) -> Result<XorName> {
-        let client = &self.get_safe_app()?.client;
-        let from_fullid = from_sk.map(ClientFullId::from);
-        client
-            .create_balance(
-                from_fullid.as_ref(),
-                SafeNdPublicKey::Bls(new_balance_owner),
-                amount,
-                None,
-            )
-            .await
-            .map_err(|err| {
-                if let SafeClientError::DataError(SafeNdError::InsufficientBalance) = err {
-                    Error::NotEnoughBalance(amount.to_string())
-                } else {
-                    Error::NetDataError(format!("Failed to create a SafeKey: {:?}", err))
-                }
-            })?;
-
-        let xorname = xorname_from_pk(new_balance_owner);
-        Ok(xorname)
-    }
-
-    async fn allocate_test_coins(&mut self, owner_sk: SecretKey, amount: Coins) -> Result<XorName> {
-        info!("Creating test SafeKey with {} test coins", amount);
-        let xorname = xorname_from_pk(owner_sk.public_key());
-        test_create_balance(&ClientFullId::from(owner_sk), amount)
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to allocate test coins: {:?}", e)))?;
-
-        Ok(xorname)
-    }
-
-    async fn get_balance_from_sk(&self, sk: SecretKey) -> Result<Coins> {
-        let client = &self.get_safe_app()?.client;
-        let coins = client
-            .get_balance(Some(&ClientFullId::from(sk)))
+    // === Money operations ===
+    pub async fn read_balance_from_sk(&mut self, sk: SecretKey) -> Result<Money> {
+        let mut temp_client = Client::new(Some(sk)).await?;
+        let coins = temp_client
+            .get_balance()
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
 
         Ok(coins)
     }
 
-    async fn safecoin_transfer_to_xorname(
+    #[cfg(feature = "simulated-payouts")]
+    pub async fn trigger_simulated_farming_payout(&mut self, amount: Money) -> Result<()> {
+        let mut client = self.get_safe_client()?;
+
+        client.trigger_simulated_farming_payout(amount).await?;
+
+        Ok(())
+    }
+
+    pub async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
         to_xorname: XorName,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction> {
-        let client = &self.get_safe_app()?.client;
-        let from_fullid = from_sk.map(ClientFullId::from);
-        let tx = client
-            .transfer_coins(from_fullid.as_ref(), to_xorname, amount, Some(tx_id))
-            .await
-            .map_err(|err| match err {
-                SafeClientError::DataError(SafeNdError::ExcessiveValue)
-                | SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
-                    Error::NotEnoughBalance(amount.to_string())
-                }
-                SafeClientError::DataError(SafeNdError::InvalidOperation) => {
-                    Error::InvalidAmount(amount.to_string())
-                }
-                other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
-            })?;
+        amount: Money,
+    ) -> Result<()> {
+        let client = match from_sk {
+            Some(sk) => Client::new(Some(sk)).await?,
+            None => self.get_safe_client()?,
+        };
 
-        Ok(tx)
+        unimplemented!();
+
+        // TODO: attempt to get wallet pk from xorname
+
+        // let to_pk = self.fetch(format!("safe://{:?}", to_xorname));
+        // let to_url  = xorurl::SafeUrl::from::<XorName>(to_xorname);
+
+        // let from_fullid = from_sk.map(ClientFullId::from);
+        // let transfer_id = client
+        //     .send_money( to_xorname, amount)
+        //     .await
+        //     .map_err(|err| match err {
+        //         SafeClientError::DataError(SafeNdError::ExcessiveValue)
+        //         | SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
+        //             Error::NotEnoughBalance(amount.to_string())
+        //         }
+        //         SafeClientError::DataError(SafeNdError::InvalidOperation) => {
+        //             Error::InvalidAmount(amount.to_string())
+        //         }
+        //         other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
+        //     })?;
+
+        // Ok(transfer_id)
     }
 
-    async fn safecoin_transfer_to_pk(
+    pub async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
         to_pk: PublicKey,
-        tx_id: TransactionId,
-        amount: Coins,
-    ) -> Result<Transaction> {
-        let to_xorname = xorname_from_pk(to_pk);
-        self.safecoin_transfer_to_xorname(from_sk, to_xorname, tx_id, amount)
-            .await
+        amount: Money,
+    ) -> Result<(u64, SafeNdPublicKey)> {
+        let mut client = match from_sk {
+            Some(sk) => Client::new(Some(sk)).await?,
+            None => self.get_safe_client()?,
+        };
+
+        let transfer_id = client
+            .send_money(SafeNdPublicKey::Bls(to_pk), amount)
+            .await?;
+
+        Ok(transfer_id)
     }
 
-    // === ImmutableData operations ===
-    async fn put_public_immutable(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    // // === Blob operations ===
+    pub async fn store_public_blob(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
-        let client = &self.get_safe_app()?.client;
+        let mut client = self.get_safe_client()?;
 
         let data_vec = data.to_vec();
-        let data_map = if dry_run {
-            immutable_data::gen_data_map(
-                client, &data_vec, /*public:*/ true, /*encryption_key:*/ None,
-            )
-            .await
-        } else {
-            immutable_data::create(
-                client, &data_vec, /*public:*/ true, /*encryption_key:*/ None,
-            )
-            .await
-        }
-        .map_err(|e| {
-            Error::NetDataError(format!(
-                "Failed to create data map for Public ImmutableData: {:?}",
-                e
-            ))
-        })?;
+        let blob_for_storage = Blob::Public(PublicBlob::new(data_vec));
+        let xorname = blob_for_storage.address().name().clone();
 
-        let xorname = *data_map.address().name();
+        let _data_map = client
+            .generate_data_map(&blob_for_storage)
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!(
+                    "Failed to create data map for Public Blob: {:?}",
+                    e
+                ))
+            })?;
 
         if !dry_run {
-            client.put_idata(data_map).await.map_err(|e| {
-                Error::NetDataError(format!("Failed to PUT Public ImmutableData: {:?}", e))
-            })?;
+            client
+                .store_blob(blob_for_storage)
+                .await
+                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
         }
 
         Ok(xorname)
     }
 
-    async fn get_public_immutable(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    pub async fn get_public_blob(&mut self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
-        let client = &self.get_safe_app()?.client;
-        let immd_data_addr = IDataAddress::Pub(xorname);
+        let mut client = self.get_safe_client()?;
+        let blob_address = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = if let Some(end_index) = end {
                 Some(end_index - start.unwrap_or_else(|| 0))
             } else {
                 None
             };
-
-            immutable_data::get_value(
-                client,
-                immd_data_addr,
-                start,
-                len,
-                /*decryption_key:*/ None,
-            )
-            .await
+            client.get_blob(blob_address, start, len).await
         } else {
-            immutable_data::get_value(
-                client,
-                immd_data_addr,
-                None,
-                None,
-                /*decryption_key:*/ None,
-            )
-            .await
+            client.get_blob(blob_address, None, None).await
         }
-        .map_err(|e| Error::NetDataError(format!("Failed to GET Public ImmutableData: {:?}", e)))?;
+        .map_err(|e| Error::NetDataError(format!("Failed to GET Public Blob: {:?}", e)))?;
 
         debug!(
-            "Public ImmutableData data successfully retrieved from: {:?}",
+            "Public Blob data successfully retrieved from: {:?}",
             &xorname
         );
 
-        Ok(data)
+        Ok(data.value().clone())
     }
 
-    // === MutableData operations ===
-    async fn put_mdata(
+    // === Map operations ===
+    pub async fn store_map(
         &mut self,
         name: Option<XorName>,
         tag: u64,
         // _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let safe_app = self.get_safe_app()?;
-        let client = &safe_app.client;
-        let owner_key_option = client.owner_key().await;
+        let mut safe_client = self.get_safe_client()?;
+        let client = &safe_client;
+        let owner_key_option = client.public_key().await;
         let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
             owners
         } else {
@@ -289,60 +231,64 @@ impl SafeApp for SafeAppScl {
 
         let xorname = name.unwrap_or_else(rand::random);
 
-        let permission_set = MDataPermissionSet::new()
-            .allow(MDataAction::Read)
-            .allow(MDataAction::Insert)
-            .allow(MDataAction::Update)
-            .allow(MDataAction::Delete)
-            .allow(MDataAction::ManagePermissions);
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete)
+            .allow(MapAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
-        let sign_pk = get_public_bls_key(safe_app).await?;
+        let sign_pk = get_public_bls_key(&safe_client).await?;
         let app_pk = SafeNdPublicKey::Bls(sign_pk);
         permission_map.insert(app_pk, permission_set);
 
-        let mdata = SeqMutableData::new_with_data(
+        let map = Map::Seq(SeqMap::new_with_data(
             xorname,
             tag,
             BTreeMap::new(),
             permission_map,
             SafeNdPublicKey::Bls(owners),
-        );
+        ));
 
-        client
-            .put_seq_mutable_data(mdata)
+        safe_client
+            .store_map(map)
             .await
             .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
 
         Ok(xorname)
     }
 
-    async fn get_mdata(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
-        let client = &self.get_safe_app()?.client;
+    pub async fn get_map(&mut self, name: XorName, tag: u64) -> Result<Map> {
+        let mut client = self.get_safe_client()?;
+        let address = MapAddress::Seq { name, tag };
+
         client
-            .get_seq_mdata(name, tag)
+            .get_map(address)
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
     }
 
-    async fn mdata_insert(
+    pub async fn map_insert(
         &mut self,
         name: XorName,
         tag: u64,
         key: &[u8],
         value: &[u8],
     ) -> Result<()> {
-        let entry_actions = MDataSeqEntryActions::new();
+        let entry_actions = MapSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
+        self.edit_map_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
             .await
     }
 
-    async fn mdata_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MDataSeqValue> {
-        let client = &self.get_safe_app()?.client;
+    pub async fn map_get_value(&mut self, name: XorName, tag: u64, key: &[u8]) -> Result<MapValue> {
+        let mut client = self.get_safe_client()?;
         let key_vec = key.to_vec();
+        let address = MapAddress::Seq { name, tag };
+
         client
-            .get_seq_mdata_value(name, tag, key_vec)
+            .get_map_value(address, key_vec)
             .await
             .map_err(|err| match err {
                 SafeClientError::DataError(SafeNdError::AccessDenied) => {
@@ -350,13 +296,13 @@ impl SafeApp for SafeAppScl {
                 }
                 SafeClientError::DataError(SafeNdError::NoSuchData) => {
                     Error::ContentNotFound(format!(
-                        "Sequenced MutableData not found at Xor name: {}",
+                        "Sequenced Map not found at Xor name: {}",
                         xorname_to_hex(&name)
                     ))
                 }
                 SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
-                        "Entry not found in Sequenced MutableData found at Xor name: {}",
+                        "Entry not found in Sequenced Map found at Xor name: {}",
                         xorname_to_hex(&name)
                     ))
                 }
@@ -364,43 +310,63 @@ impl SafeApp for SafeAppScl {
             })
     }
 
-    async fn mdata_list_entries(
-        &self,
+    pub async fn list_map_entries(
+        &mut self,
         name: XorName,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, MDataSeqValue>> {
-        let client = &self.get_safe_app()?.client;
+    ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>> {
+        let mut client = self.get_safe_client()?;
         client
-            .list_seq_mdata_entries(name, tag)
+            .list_seq_map_entries(name, tag)
             .await
             .map_err(|err| match err {
                 SafeClientError::DataError(SafeNdError::AccessDenied) => {
                     Error::AccessDenied(format!(
-                        "Failed to get Sequenced MutableData at: {:?} (type tag: {})",
+                        "Failed to get Sequenced Map at: {:?} (type tag: {})",
                         name, tag
                     ))
                 }
                 SafeClientError::DataError(SafeNdError::NoSuchData) => {
                     Error::ContentNotFound(format!(
-                        "Sequenced MutableData not found at Xor name: {} (type tag: {})",
+                        "Sequenced Map not found at Xor name: {} (type tag: {})",
                         xorname_to_hex(&name),
                         tag
                     ))
                 }
                 SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
-                    "Entry not found in Sequenced MutableData found at Xor name: {} (type tag: {})",
-                    xorname_to_hex(&name),
-                    tag
-                ))
+                        "Entry not found in Sequenced Map found at Xor name: {} (type tag: {})",
+                        xorname_to_hex(&name),
+                        tag
+                    ))
                 }
-                err => {
-                    Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err))
+                err => Error::NetDataError(format!("Failed to get Sequenced Map. {:?}", err)),
+            })
+    }
+
+    async fn edit_map_entries(
+        &mut self,
+        name: XorName,
+        tag: u64,
+        entry_actions: MapSeqEntryActions,
+        error_msg: &str,
+    ) -> Result<()> {
+        let mut client = self.get_safe_client()?;
+        let message = error_msg.to_string();
+        let address = MapAddress::Seq { name, tag };
+        client
+            .edit_map_entries(address, MapEntryActions::Seq(entry_actions))
+            .await
+            .map_err(|err| {
+                if let SafeClientError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
+                    Error::EntryExists(format!("{}: {}", message, err))
+                } else {
+                    Error::NetDataError(format!("{}: {}", message, err))
                 }
             })
     }
 
-    async fn mdata_update(
+    pub async fn update_map(
         &mut self,
         name: XorName,
         tag: u64,
@@ -408,14 +374,14 @@ impl SafeApp for SafeAppScl {
         value: &[u8],
         version: u64,
     ) -> Result<()> {
-        let entry_actions = MDataSeqEntryActions::new();
+        let entry_actions = MapSeqEntryActions::new();
         let entry_actions = entry_actions.update(key.to_vec(), value.to_vec(), version);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to update SeqMD")
+        self.edit_map_entries(name, tag, entry_actions, "Failed to update SeqMD")
             .await
     }
 
     // === Sequence data operations ===
-    async fn store_sequence_data(
+    pub async fn store_sequence(
         &mut self,
         data: &[u8],
         name: Option<XorName>,
@@ -430,14 +396,14 @@ impl SafeApp for SafeAppScl {
             name
         );
 
-        let safe_app: &App = self.get_safe_app()?;
+        let mut safe_client = self.get_safe_client()?;
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
-        let app_public_key = get_public_bls_key(safe_app).await?;
+        let app_public_key = get_public_bls_key(&safe_client).await?;
 
         // The Sequence's owner will be the user
-        let user_acc_owner = safe_app.client.owner_key().await;
+        let user_acc_owner = safe_client.public_key().await;
 
         // Store the Sequence on the network
         let address = if private {
@@ -445,34 +411,43 @@ impl SafeApp for SafeAppScl {
             let mut perms = BTreeMap::default();
             let _ = perms.insert(
                 SafeNdPublicKey::Bls(app_public_key),
-                SDataPrivUserPermissions::new(true, true, true),
+                SequencePrivatePermissions::new(true, true, true),
             );
 
-            safe_app
-                .client
-                .store_priv_sdata(xorname, tag, user_acc_owner, perms)
+            safe_client
+                .store_private_sequence(
+                    Some(vec![data.to_vec()]),
+                    xorname,
+                    tag,
+                    user_acc_owner,
+                    perms,
+                )
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!("Failed to store Private Sequence data: {:?}", e))
                 })?
         } else {
             // Set permissions for append and manage perms to this application
-            let user_app = SDataUser::Key(SafeNdPublicKey::Bls(app_public_key));
+            let user_app = SequenceUser::Key(SafeNdPublicKey::Bls(app_public_key));
             let mut perms = BTreeMap::default();
-            let _ = perms.insert(user_app, SDataPubUserPermissions::new(true, true));
+            let _ = perms.insert(user_app, SequencePublicPermissions::new(true, true));
 
-            safe_app
-                .client
-                .store_pub_sdata(xorname, tag, user_acc_owner, perms)
+            safe_client
+                .store_public_sequence(
+                    Some(vec![data.to_vec()]),
+                    xorname,
+                    tag,
+                    user_acc_owner,
+                    perms,
+                )
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!("Failed to store Public Sequence data: {:?}", e))
                 })?
         };
 
-        let _op = safe_app
-            .client
-            .sdata_append(address, data.to_vec())
+        let _op = safe_client
+            .append_to_sequence(address, data.to_vec())
             .await
             .map_err(|e| {
                 Error::NetDataError(format!("Failed to append data to the Sequence: {:?}", e))
@@ -481,8 +456,8 @@ impl SafeApp for SafeAppScl {
         Ok(xorname)
     }
 
-    async fn sequence_get_last_entry(
-        &self,
+    pub async fn sequence_get_last_entry(
+        &mut self,
         name: XorName,
         tag: u64,
         private: bool,
@@ -494,16 +469,15 @@ impl SafeApp for SafeAppScl {
             name
         );
 
-        let safe_app: &App = self.get_safe_app()?;
+        let mut safe_client = self.get_safe_client()?;
 
         let sequence_address = if private {
-            SDataAddress::Private { name, tag }
+            SequenceAddress::Private { name, tag }
         } else {
-            SDataAddress::Public { name, tag }
+            SequenceAddress::Public { name, tag }
         };
-        safe_app
-            .client
-            .get_sdata_last_entry(sequence_address)
+        safe_client
+            .get_sequence_last_entry(sequence_address)
             .await
             .map_err(|err| {
                 if let SafeClientError::DataError(SafeNdError::NoSuchEntry) = err {
@@ -517,8 +491,8 @@ impl SafeApp for SafeAppScl {
             })
     }
 
-    async fn sequence_get_entry(
-        &self,
+    pub async fn sequence_get_entry(
+        &mut self,
         name: XorName,
         tag: u64,
         index: u64,
@@ -531,18 +505,17 @@ impl SafeApp for SafeAppScl {
             name
         );
 
-        let safe_app: &App = self.get_safe_app()?;
+        let mut safe_client = self.get_safe_client()?;
 
         let sequence_address = if private {
-            SDataAddress::Private { name, tag }
+            SequenceAddress::Private { name, tag }
         } else {
-            SDataAddress::Public { name, tag }
+            SequenceAddress::Public { name, tag }
         };
-        let start = SDataIndex::FromStart(index);
-        let end = SDataIndex::FromStart(index + 1);
-        let res = safe_app
-            .client
-            .get_sdata_range(sequence_address, (start, end))
+        let start = SequenceIndex::FromStart(index);
+        let end = SequenceIndex::FromStart(index + 1);
+        let res = safe_client
+            .get_sequence_range(sequence_address, (start, end))
             .await
             .map_err(|err| {
                 if let SafeClientError::DataError(SafeNdError::NoSuchEntry) = err {
@@ -568,7 +541,7 @@ impl SafeApp for SafeAppScl {
         Ok(entry.to_vec())
     }
 
-    async fn sequence_append(
+    pub async fn append_to_sequence(
         &mut self,
         data: &[u8],
         name: XorName,
@@ -582,16 +555,15 @@ impl SafeApp for SafeAppScl {
             name
         );
 
-        let safe_app: &App = self.get_safe_app()?;
+        let mut safe_client = self.get_safe_client()?;
 
         let sequence_address = if private {
-            SDataAddress::Private { name, tag }
+            SequenceAddress::Private { name, tag }
         } else {
-            SDataAddress::Public { name, tag }
+            SequenceAddress::Public { name, tag }
         };
-        safe_app
-            .client
-            .sdata_append(sequence_address, data.to_vec())
+        safe_client
+            .append_to_sequence(sequence_address, data.to_vec())
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
     }
@@ -599,9 +571,8 @@ impl SafeApp for SafeAppScl {
 
 // Helpers
 
-async fn get_public_bls_key(safe_app: &App) -> Result<PublicKey> {
-    let pk = safe_app
-        .client
+async fn get_public_bls_key(safe_client: &Client) -> Result<PublicKey> {
+    let pk = safe_client
         .public_key()
         .await
         .bls()

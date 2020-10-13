@@ -196,7 +196,7 @@ impl NrsMap {
         Ok(removed_link)
     }
 
-    pub fn nrs_map_update_or_create_data(
+    pub fn nrs_update_map_or_create_data(
         &mut self,
         name: &str,
         link: &str,

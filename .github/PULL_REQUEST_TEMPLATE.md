@@ -41,8 +41,8 @@ For example:
 fix(auth): proper values returned on auth_decode_ipc_msg errors
 
   - Test case for authenticator error -208 IncompatibleMockStatus
-  - Test case for authenticator error -103 when decoding share MData
-    request for non-existent MData
+  - Test case for authenticator error -103 when decoding share Map
+    request for non-existent Map
 
 ```
 

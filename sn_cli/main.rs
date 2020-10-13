@@ -30,9 +30,6 @@ const APP_ID: &str = "net.maidsafe.cli";
 const APP_NAME: &str = "Safe CLI";
 #[allow(dead_code)]
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
-const PROJECT_DATA_DIR_QUALIFIER: &str = "net";
-const PROJECT_DATA_DIR_ORGANISATION: &str = "MaidSafe";
-const PROJECT_DATA_DIR_APPLICATION: &str = "sn_cli";
 
 #[tokio::main]
 async fn main() {

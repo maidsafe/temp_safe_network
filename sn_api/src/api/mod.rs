@@ -9,6 +9,9 @@
 
 #[cfg(feature = "app")]
 mod app;
+#[cfg(any(feature = "app", feature = "authd_client"))]
+mod ipc;
+
 #[cfg(feature = "authd_client")]
 mod authd_client;
 #[cfg(feature = "authenticator")]
@@ -19,6 +22,9 @@ mod errors;
 
 #[cfg(feature = "app")]
 pub use app::*;
+#[cfg(any(feature = "app", feature = "authd_client"))]
+pub use ipc::*;
+
 #[cfg(feature = "app")]
 pub use xor_name::XorName;
 

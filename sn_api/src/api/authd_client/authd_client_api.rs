@@ -12,15 +12,12 @@ use super::{
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     notifs_endpoint::jsonrpc_listen,
 };
-use crate::{AuthedAppsList, Error, Result, SafeAuthReqId};
-use directories::BaseDirs;
+use crate::{api::AuthReq, AuthedAppsList, Error, Result, SafeAuthReqId};
 use log::{debug, error, info, trace};
-use safe_nd::AppPermissions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sn_client::ipc::req::ContainerPermissions;
+
 use std::{
-    collections::HashMap,
     io::{self, Write},
     path::PathBuf,
     process::{Command, Stdio},
@@ -37,25 +34,6 @@ const SN_AUTHD_EXECUTABLE: &str = "sn_authd";
 const SN_AUTHD_EXECUTABLE: &str = "sn_authd.exe";
 
 const ENV_VAR_SN_AUTHD_PATH: &str = "SN_AUTHD_PATH";
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AuthReq {
-    /// The authorisation request ID
-    pub req_id: SafeAuthReqId,
-    /// The App ID. It must be unique.
-    pub app_id: String,
-    /// The application friendly-name.
-    pub app_name: String,
-    /// The application provider/vendor (e.g. MaidSafe)
-    pub app_vendor: String,
-    /// Permissions requested, e.g. allowing to work with the user's coin balance.
-    pub app_permissions: AppPermissions,
-    /// The permissions requested by the app for named containers
-    // TODO: ContainerPermissions will/shall be refactored to expose a struct defined in this crate
-    pub containers: HashMap<String, ContainerPermissions>,
-    /// If the app requested a dedicated named container for itself
-    pub own_container: bool,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthdStatus {
@@ -362,17 +340,18 @@ impl SafeAuthdClient {
 
         // Generate a path which is where we will store the endpoint certificates that authd will
         // need to read to be able to create a secure channel to send us the notifications with
-        let dirs = directories::ProjectDirs::from("net", "maidsafe", "sn_authd-client")
-            .ok_or_else(|| {
-                Error::AuthdClientError(
-                    "Failed to obtain local home directory where to store endpoint certificates to"
-                        .to_string(),
-                )
-            })?;
+        let dirs = dirs_next::home_dir().ok_or_else(|| {
+            Error::AuthdClientError(
+                "Failed to obtain local home directory where to store endpoint certificates to"
+                    .to_string(),
+            )
+        })?;
 
         // Let's postfix the path with the app id so we avoid clashes with other
         // endpoints subscribed from within the same local box
-        let cert_base_path = dirs.config_dir().join(app_id.to_string());
+        let mut cert_base_path = dirs;
+        cert_base_path.push(".safe");
+        cert_base_path.push("authd");
 
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
@@ -534,11 +513,10 @@ fn get_authd_bin_path(authd_path: Option<&str>) -> Result<PathBuf> {
             if let Ok(authd_path) = std::env::var(ENV_VAR_SN_AUTHD_PATH) {
                 Ok(PathBuf::from(authd_path))
             } else {
-                let base_dirs = BaseDirs::new().ok_or_else(|| {
+                let mut path = dirs_next::home_dir().ok_or_else(|| {
                     Error::AuthdClientError("Failed to obtain user's home path".to_string())
                 })?;
 
-                let mut path = PathBuf::from(base_dirs.home_dir());
                 path.push(".safe");
                 path.push("authd");
                 Ok(path)

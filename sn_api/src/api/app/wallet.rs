@@ -7,22 +7,22 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    common::sk_from_hex,
-    helpers::{parse_coins_amount, xorname_from_pk, xorname_to_hex, KeyPair},
-    xorurl::{SafeContentType, SafeDataType},
-    Safe, SafeApp,
+use super::common::sk_from_hex;
+use super::helpers::{
+    parse_coins_amount, xorname_from_pk, xorname_to_hex, KeyPair as KeypairHelpers,
 };
 use crate::{
-    xorurl::{XorUrl, XorUrlEncoder},
-    Error, Result,
+    xorurl::{SafeContentType, SafeDataType, XorUrl, XorUrlEncoder},
+    Error, Result, Safe,
 };
+
 use log::debug;
-use rand_core::RngCore;
-use safe_nd::Coins;
 use serde::{Deserialize, Serialize};
+use sn_data_types::{MapValue, Money};
 use std::collections::BTreeMap;
 use xor_name::XorName;
+
+pub use threshold_crypto::{PublicKey, SecretKey};
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
@@ -41,7 +41,10 @@ pub type WalletSpendableBalances = BTreeMap<String, (bool, WalletSpendableBalanc
 impl Safe {
     // Create an empty Wallet and return its XOR-URL
     pub async fn wallet_create(&mut self) -> Result<XorUrl> {
-        let xorname = self.safe_app.put_mdata(None, WALLET_TYPE_TAG, None).await?;
+        let xorname = self
+            .safe_client
+            .store_map(None, WALLET_TYPE_TAG, None)
+            .await?;
 
         XorUrlEncoder::encode_mutable_data(
             xorname,
@@ -59,7 +62,7 @@ impl Safe {
         default: bool,
         sk: &str,
     ) -> Result<String> {
-        let key_pair = KeyPair::from_hex_sk(sk)?;
+        let key_pair = KeypairHelpers::from_hex_sk(sk)?;
         let xorname = xorname_from_pk(key_pair.pk);
         let xorurl = XorUrlEncoder::encode(
             xorname,
@@ -88,8 +91,8 @@ impl Safe {
 
         let md_key = name.unwrap_or_else(|| &xorurl);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-        self.safe_app
-            .mdata_insert(
+        self.safe_client
+            .map_insert(
                 xorurl_encoder.xorname(),
                 WALLET_TYPE_TAG,
                 &md_key.to_string().into_bytes(),
@@ -111,8 +114,8 @@ impl Safe {
 
         if default {
             match self
-                .safe_app
-                .mdata_insert(
+                .safe_client
+                .map_insert(
                     xorurl_encoder.xorname(),
                     WALLET_TYPE_TAG,
                     WALLET_DEFAULT_BYTES,
@@ -122,8 +125,8 @@ impl Safe {
             {
                 Err(Error::EntryExists(_)) => {
                     let (_, version) = self.wallet_get_default_balance(url).await?;
-                    self.safe_app
-                        .mdata_update(
+                    self.safe_client
+                        .update_map(
                             xorurl_encoder.xorname(),
                             WALLET_TYPE_TAG,
                             WALLET_DEFAULT_BYTES,
@@ -144,7 +147,7 @@ impl Safe {
     // Check the total balance of a Wallet found at a given XOR-URL
     pub async fn wallet_balance(&mut self, url: &str) -> Result<String> {
         debug!("Finding total wallet balance for: {:?}", url);
-        let mut total_balance = Coins::from_nano(0);
+        let mut total_balance = Money::from_nano(0);
 
         // Let's get the list of balances from the Wallet
         let (xorurl_encoder, nrs_xorurl_encoder) = self.parse_and_resolve_url(url).await?;
@@ -161,7 +164,7 @@ impl Safe {
         let balances = if url_path.is_empty() {
             debug!("We'll check the total balance of the Wallet");
             gen_wallet_spendable_balances_list(
-                &self,
+                self,
                 xorurl_encoder.xorname(),
                 xorurl_encoder.type_tag(),
                 url,
@@ -174,7 +177,7 @@ impl Safe {
                 balance_name
             );
             let (spendable_balance, _) = wallet_get_spendable_balance(
-                &self,
+                self,
                 xorurl_encoder.xorname(),
                 xorurl_encoder.type_tag(),
                 balance_name.as_bytes(),
@@ -199,8 +202,8 @@ impl Safe {
             debug!("Checking wallet of name: {:?}", name);
             let secret_key = sk_from_hex(&balance.sk)?;
             let current_balance = self
-                .safe_app
-                .get_balance_from_sk(secret_key)
+                .safe_client
+                .read_balance_from_sk(secret_key)
                 .await
                 .map_err(|_| {
                     Error::ContentNotFound("One of the SafeKey's was not found".to_string())
@@ -221,13 +224,13 @@ impl Safe {
     }
 
     pub async fn wallet_get_default_balance(
-        &self,
+        &mut self,
         url: &str,
     ) -> Result<(WalletSpendableBalance, u64)> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
         let default = self
-            .safe_app
-            .mdata_get_value(
+            .safe_client
+            .map_get_value(
                 xorurl_encoder.xorname(),
                 xorurl_encoder.type_tag(),
                 WALLET_DEFAULT_BYTES,
@@ -246,11 +249,20 @@ impl Safe {
                 }
             })?;
 
+        let default_data = match default {
+            MapValue::Seq(value) => value.data,
+            MapValue::Unseq(_) => {
+                return Err(Error::ClientError(
+                    "Wallet could not be parsed as wallet map is unsequenced.".to_string(),
+                ))
+            }
+        };
+
         wallet_get_spendable_balance(
-            &self,
+            self,
             xorurl_encoder.xorname(),
             xorurl_encoder.type_tag(),
-            &default.data,
+            &default_data,
         )
         .await
     }
@@ -298,9 +310,10 @@ impl Safe {
         amount: &str,
         from_url: Option<&str>,
         to_url: &str,
-        tx_id: Option<u64>,
-    ) -> Result<u64> {
-        // Parse and validate the amount is a valid
+        // tx_id: Option<u64>,
+        // TODO: return tx id if that stillmakes sense
+    ) -> Result<()> {
+        // Parse and validate the amount is valid
         let amount_coins = parse_coins_amount(amount)?;
 
         // 'from_url' is not optional until we know the account's default Wallet
@@ -335,7 +348,7 @@ impl Safe {
 
         let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
             let to_wallet_balance =
-                resolve_wallet_url(&self, to_url, to_xorurl_encoder, to_nrs_xorurl_encoder).await?;
+                resolve_wallet_url(self, to_url, to_xorurl_encoder, to_nrs_xorurl_encoder).await?;
             XorUrlEncoder::from_url(&to_wallet_balance.xorurl)?.xorname()
         } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
             && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
@@ -350,10 +363,10 @@ impl Safe {
         };
 
         // Generate a random transfer TX ID
-        let tx_id = tx_id.unwrap_or_else(|| rand::thread_rng().next_u64());
+        // let tx_id = tx_id.unwrap_or_else(|| rand::thread_rng().next_u64());
 
         let from_wallet_balance = resolve_wallet_url(
-            &self,
+            self,
             from_wallet_url,
             from_xorurl_encoder,
             from_nrs_xorurl_encoder,
@@ -363,8 +376,8 @@ impl Safe {
 
         // Finally, let's make the transfer
         match self
-            .safe_app
-            .safecoin_transfer_to_xorname(Some(from_sk), to_xorname, tx_id, amount_coins)
+            .safe_client
+            .safecoin_transfer_to_xorname(Some(from_sk), to_xorname, amount_coins)
             .await
         {
             Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
@@ -379,22 +392,24 @@ impl Safe {
                 "Unexpected error when attempting to transfer: {}",
                 other_error
             ))),
-            Ok(tx) => Ok(tx.id),
+            // TODO: return tx id...
+            Ok(tx) => Ok(()),
+            // Ok(tx) => Ok(tx.id),
         }
     }
 
-    pub async fn wallet_get(&self, url: &str) -> Result<WalletSpendableBalances> {
+    pub async fn wallet_get(&mut self, url: &str) -> Result<WalletSpendableBalances> {
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
         self.fetch_wallet(&xorurl_encoder).await
     }
 
     /// Fetch a Wallet from a XorUrlEncoder without performing any type of URL resolution
     pub(crate) async fn fetch_wallet(
-        &self,
+        &mut self,
         xorurl_encoder: &XorUrlEncoder,
     ) -> Result<WalletSpendableBalances> {
         gen_wallet_spendable_balances_list(
-            &self,
+            self,
             xorurl_encoder.xorname(),
             xorurl_encoder.type_tag(),
             &xorurl_encoder.to_string(),
@@ -405,12 +420,12 @@ impl Safe {
 
 // Private helper to generate the list of SpendableBalances which is used for different purposes
 async fn gen_wallet_spendable_balances_list(
-    safe: &Safe,
+    safe: &mut Safe,
     xorname: XorName,
     type_tag: u64,
     url: &str,
 ) -> Result<WalletSpendableBalances> {
-    let entries = match safe.safe_app.mdata_list_entries(xorname, type_tag).await {
+    let entries = match safe.safe_client.list_map_entries(xorname, type_tag).await {
         Ok(entries) => entries,
         Err(Error::AccessDenied(_)) => {
             return Err(Error::AccessDenied(format!(
@@ -465,22 +480,29 @@ async fn gen_wallet_spendable_balances_list(
 // Private helper to fetch a specific spendable balance from a Wallet usng its assigned frienly name
 // TODO: move this out to a WalletRdf API
 async fn wallet_get_spendable_balance(
-    safe: &Safe,
+    safe: &mut Safe,
     xorname: XorName,
     type_tag: u64,
     balance_name: &[u8],
 ) -> Result<(WalletSpendableBalance, u64)> {
     let the_balance: (WalletSpendableBalance, u64) = {
-        let default_balance_vec = safe
-            .safe_app
-            .mdata_get_value(xorname, type_tag, balance_name)
+        let default_balance_vec = match safe
+            .safe_client
+            .map_get_value(xorname, type_tag, balance_name)
             .await
             .map_err(|_| {
                 Error::ContentError(format!(
                     "Default balance set but not found at Wallet \"{}\"",
                     xorname_to_hex(&xorname)
                 ))
-            })?;
+            })? {
+            MapValue::Seq(data) => data,
+            MapValue::Unseq(_) => {
+                return Err(Error::ClientError(
+                    "Wallet could not be parsed as wallet map is unsequenced.".to_string(),
+                ))
+            }
+        };
 
         let default_balance = String::from_utf8_lossy(&default_balance_vec.data).to_string();
         let spendable_balance: WalletSpendableBalance = serde_json::from_str(&default_balance)
@@ -495,7 +517,7 @@ async fn wallet_get_spendable_balance(
 
 // Get a specific spendable balance if the URL has a path, or the default
 async fn resolve_wallet_url(
-    safe: &Safe,
+    safe: &mut Safe,
     wallet_url: &str,
     xorurl_encoder: XorUrlEncoder,
     nrs_xorurl_encoder: Option<XorUrlEncoder>,
@@ -674,7 +696,7 @@ mod tests {
 
         // test no default balance at wallet in <from> argument
         match safe
-            .wallet_transfer("10", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("10", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::ContentError(msg)) => assert_eq!(
@@ -699,7 +721,7 @@ mod tests {
 
         // invert wallets and test no default balance at wallet in <to> argument
         match safe
-            .wallet_transfer("10", Some(&to_wallet_xorurl), &from_wallet_xorurl, None)
+            .wallet_transfer("10", Some(&to_wallet_xorurl), &from_wallet_xorurl)
             .await
         {
             Err(Error::ContentError(msg)) => {
@@ -739,7 +761,7 @@ mod tests {
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
-            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl, None)
+            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl)
             .await
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
@@ -771,7 +793,7 @@ mod tests {
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
-            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::InvalidAmount(msg)) => {
@@ -816,7 +838,7 @@ mod tests {
 
         // test fail to transfer more than current balance at wallet in <from> argument
         match safe
-            .wallet_transfer("100.6", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("100.6", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::NotEnoughBalance(msg)) => assert_eq!(
@@ -841,7 +863,7 @@ mod tests {
 
         // test fail to transfer as it's a invalid/non-numeric amount
         match safe
-            .wallet_transfer(".06", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer(".06", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
@@ -863,7 +885,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl, None)
+            .wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -907,7 +929,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl, None)
+            .wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -936,7 +958,7 @@ mod tests {
         let (safekey_xorurl2, _) = safe.keys_create_preload_test_coins("0").await?;
 
         match safe
-            .wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2, None)
+            .wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2)
             .await
         {
             Ok(_) => Err(Error::Unexpected(
@@ -992,7 +1014,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl, None)
+            .wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -1048,12 +1070,7 @@ mod tests {
         from_wallet_spendable_balance.set_path("from-second-balance");
         let from_spendable_balance = from_wallet_spendable_balance.to_string();
         match safe
-            .wallet_transfer(
-                "200.6",
-                Some(&from_spendable_balance),
-                &to_wallet_xorurl,
-                None,
-            )
+            .wallet_transfer("200.6", Some(&from_spendable_balance), &to_wallet_xorurl)
             .await
         {
             Err(Error::NotEnoughBalance(msg)) => assert_eq!(
@@ -1078,12 +1095,7 @@ mod tests {
 
         // test successful transfer
         match safe
-            .wallet_transfer(
-                "100.3",
-                Some(&from_spendable_balance),
-                &to_wallet_xorurl,
-                None,
-            )
+            .wallet_transfer("100.3", Some(&from_spendable_balance), &to_wallet_xorurl)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -1147,12 +1159,7 @@ mod tests {
         to_wallet_spendable_balance.set_path("to-second-balance");
         let to_spendable_balance = to_wallet_spendable_balance.to_string();
         match safe
-            .wallet_transfer(
-                "100.5",
-                Some(&from_wallet_xorurl),
-                &to_spendable_balance,
-                None,
-            )
+            .wallet_transfer("100.5", Some(&from_wallet_xorurl), &to_spendable_balance)
             .await
         {
             Err(msg) => {
@@ -1256,12 +1263,7 @@ mod tests {
         let from_spendable_balance = format!("{}/from-second-balance", from_nrsurl);
         let to_spendable_balance = format!("{}/to-second-balance", to_nrsurl);
         match safe
-            .wallet_transfer(
-                "5.8",
-                Some(&from_spendable_balance),
-                &to_spendable_balance,
-                None,
-            )
+            .wallet_transfer("5.8", Some(&from_spendable_balance), &to_spendable_balance)
             .await
         {
             Err(msg) => Err(Error::Unexpected(format!(
@@ -1305,7 +1307,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(feature = "scl-mock"))]
     async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let account1_wallet_xorurl = safe.wallet_create().await?;
@@ -1323,7 +1324,7 @@ mod tests {
 
         // test fail to transfer from a not owned wallet in <from> argument
         match another_safe
-            .wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl, None)
+            .wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl)
             .await
         {
             Err(Error::AccessDenied(msg)) => {

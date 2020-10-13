@@ -11,14 +11,12 @@ use super::{
     common::send_authd_request,
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
     helpers::decode_ipc_msg,
-    Safe, SafeApp,
+    Safe,
 };
+use crate::api::ipc::{encode_msg, gen_req_id, AuthReq, IpcMsg, IpcReq};
 use crate::{Error, Result};
 use log::{debug, info};
-use safe_nd::AppPermissions;
 use serde_json::json;
-use sn_client::ipc::{encode_msg, gen_req_id, AppExchangeInfo, AuthReq, IpcMsg, IpcReq};
-use std::collections::HashMap;
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
@@ -34,23 +32,14 @@ impl Safe {
     ) -> Result<String> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
+        let req_id: u32 = gen_req_id();
         let request = IpcReq::Auth(AuthReq {
-            app: AppExchangeInfo {
-                id: app_id.to_string(),
-                scope: None,
-                name: app_name.to_string(),
-                vendor: app_vendor.to_string(),
-            },
-            app_container: false,
-            app_permissions: AppPermissions {
-                get_balance: true,
-                perform_mutations: true,
-                transfer_coins: true,
-            },
-            containers: HashMap::new(),
+            req_id,
+            app_id: app_id.to_string(),
+            app_name: app_name.to_string(),
+            app_vendor: app_vendor.to_string(),
         });
 
-        let req_id: u32 = gen_req_id();
         let auth_req_str = encode_msg(&IpcMsg::Req { req_id, request }).map_err(|err| {
             Error::AuthError(format!(
                 "Failed encoding the authorisation request: {:?}",
@@ -84,7 +73,7 @@ impl Safe {
 
     // Connect to the SAFE Network using the provided app id and auth credentials
     pub async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
-        self.safe_app.connect(app_id, auth_credentials).await
+        self.safe_client.connect(app_id, auth_credentials).await
     }
 }
 
