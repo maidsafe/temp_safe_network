@@ -159,7 +159,7 @@ pub async fn authd_auth_reqs(sn_authd: &SafeAuthdClient) -> Result<(), String> {
 pub async fn authd_allow(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
     println!("Sending request to authd to allow an authorisation request...");
     sn_authd.allow(req_id).await?;
-    println!("Authorisation request was allowed successfully");
+    println!("Authorisation request was allowed");
     Ok(())
 }
 

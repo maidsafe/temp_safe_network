@@ -10,7 +10,7 @@
 use super::{
     common::send_authd_request,
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
-    helpers::decode_ipc_msg,
+    helpers::decode_auth_response_ipc_msg,
     Safe,
 };
 use crate::api::ipc::{encode_msg, gen_req_id, AuthReq, IpcMsg, IpcReq};
@@ -56,7 +56,7 @@ impl Safe {
         let auth_res = send_app_auth_req(&auth_req_str, endpoint).await?;
 
         // Check if the app has been authorised
-        match decode_ipc_msg(&auth_res) {
+        match decode_auth_response_ipc_msg(&auth_res) {
             Ok(_) => {
                 info!("Application was authorised");
                 Ok(auth_res)

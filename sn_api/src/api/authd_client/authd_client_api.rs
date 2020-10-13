@@ -333,7 +333,7 @@ impl SafeAuthdClient {
     >(
         &mut self,
         endpoint_url: &str,
-        app_id: &str,
+        _app_id: &str,
         allow_cb: CB,
     ) -> Result<()> {
         debug!("Subscribing to receive authorisation requests notifications...",);

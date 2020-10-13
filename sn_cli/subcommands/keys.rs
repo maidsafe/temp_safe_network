@@ -8,7 +8,7 @@
 // Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output},
+    helpers::{get_from_arg_or_stdin, get_secret_key, serialise_output},
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
@@ -152,7 +152,7 @@ pub async fn create_new_key(
         (xorurl, key_pair, Some(amount))
     } else {
         let key_pair;
-        let mut xorurl;
+        let xorurl;
 
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key

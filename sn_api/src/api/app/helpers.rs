@@ -72,6 +72,7 @@ pub fn pk_to_hex(pk: &PublicKey) -> String {
     vec_to_hex(pk_as_bytes.to_vec())
 }
 
+#[allow(dead_code)]
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     let pk_bytes = parse_hex(&hex_str);
     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
@@ -104,7 +105,7 @@ pub enum AuthResponseType {
     Unregistered(BootstrapConfig),
 }
 
-pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
+pub fn decode_auth_response_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
     let msg = decode_msg(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
@@ -117,9 +118,6 @@ pub fn decode_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
                 Ok(config) => Ok(AuthResponseType::Unregistered(config)),
                 Err(e) => Err(Error::AuthError(format!("{:?}", e))),
             },
-            _ => Err(Error::AuthError(
-                "Doesn't support other request.".to_string(),
-            )),
         },
         IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),

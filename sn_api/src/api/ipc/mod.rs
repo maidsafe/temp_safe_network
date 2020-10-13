@@ -32,6 +32,8 @@ use data_encoding::BASE32_NOPAD;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr, u32};
 
+use log::{debug, info};
+
 /// `QuicP2P` bootstrap info, shared from Authenticator to apps.
 pub type BootstrapConfig = HashSet<SocketAddr>;
 
@@ -71,12 +73,16 @@ pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
 
 /// Decode `IpcMsg` encoded with base32 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
+    info!("ENCODED MSG STRING: {:?}", encoded);
     let mut chars = encoded.chars();
     let decoded = match chars.next().ok_or(IpcError::InvalidMsg)? {
         // Encoded as base32
         'b' | 'B' => BASE32_NOPAD.decode(chars.as_str().as_bytes())?,
         // Fail if not encoded as base32
-        _ => return Err(IpcError::EncodeDecodeError),
+        _ => {
+            debug!("This didn't start with B, wth...");
+            return Err(IpcError::EncodeDecodeError);
+        }
     };
 
     let msg: IpcMsg = deserialize(&decoded)?;

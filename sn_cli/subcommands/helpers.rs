@@ -129,11 +129,6 @@ pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result
     Ok(sk)
 }
 
-pub fn parse_tx_id(src: &str) -> Result<u64, String> {
-    src.parse::<u64>()
-        .map_err(|err| format!("{}. A valid TX Id is a number between 0 and 2^64", err))
-}
-
 pub fn gen_processed_files_table(
     processed_files: &BTreeMap<String, (String, String)>,
     show_change_sign: bool,

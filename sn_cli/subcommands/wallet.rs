@@ -10,7 +10,7 @@
 use structopt::StructOpt;
 
 use super::{
-    helpers::{get_from_arg_or_stdin, get_secret_key, parse_tx_id, serialise_output},
+    helpers::{get_from_arg_or_stdin, get_secret_key, serialise_output},
     keys::{create_new_key, print_new_key_output},
     OutputFmt,
 };

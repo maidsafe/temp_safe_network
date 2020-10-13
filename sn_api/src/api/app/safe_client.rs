@@ -105,10 +105,10 @@ impl SafeAppClient {
     pub async fn safecoin_transfer_to_xorname(
         &mut self,
         from_sk: Option<SecretKey>,
-        to_xorname: XorName,
-        amount: Money,
+        _to_xorname: XorName,
+        _amount: Money,
     ) -> Result<()> {
-        let client = match from_sk {
+        let _client = match from_sk {
             Some(sk) => Client::new(Some(sk)).await?,
             None => self.get_safe_client()?,
         };
@@ -138,6 +138,7 @@ impl SafeAppClient {
         // Ok(transfer_id)
     }
 
+    #[allow(dead_code)]
     pub async fn safecoin_transfer_to_pk(
         &mut self,
         from_sk: Option<SecretKey>,
@@ -259,6 +260,7 @@ impl SafeAppClient {
         Ok(xorname)
     }
 
+    #[allow(dead_code)]
     pub async fn get_map(&mut self, name: XorName, tag: u64) -> Result<Map> {
         let mut client = self.get_safe_client()?;
         let address = MapAddress::Seq { name, tag };

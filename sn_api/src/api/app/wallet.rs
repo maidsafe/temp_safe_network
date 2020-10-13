@@ -393,7 +393,7 @@ impl Safe {
                 other_error
             ))),
             // TODO: return tx id...
-            Ok(tx) => Ok(()),
+            Ok(_tx) => Ok(()),
             // Ok(tx) => Ok(tx.id),
         }
     }

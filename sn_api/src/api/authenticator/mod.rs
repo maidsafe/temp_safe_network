@@ -10,31 +10,24 @@
 use crate::{Error, Result, SafeAuthReq, SafeAuthReqId};
 
 use log::{debug, info, trace};
-// use safe_authenticator::{
-//     access_container, access_container::update_container_perms, app_auth::authenticate, config,
-//     errors::AuthError, ipc::decode_ipc_msg,
-//     revocation::revoke_app as safe_authenticator_revoke_app, Authenticator,
-// };
-use rand::rngs::StdRng;
+use rand::rngs::{OsRng, StdRng};
 use rand::Rng;
 use rand_core::SeedableRng;
 
 use crate::api::ipc::{
-    decode_msg,
-    // encode_msg,
-    req::IpcReq,
-    // resp::IpcResp,
-    // IpcError,
-    IpcMsg,
+    decode_msg, encode_msg,
+    req::{AuthReq, IpcReq},
+    resp::{AuthGranted, IpcResp},
+    BootstrapConfig, IpcMsg,
 };
+
 use tiny_keccak::{sha3_256, sha3_512};
 
 use hmac::Hmac;
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
-use sn_client::client::Client;
+use sn_client::client::{bootstrap_config, Client};
 use sn_data_types::ClientFullId;
-// extern crate ed25519_dalek;
 
 use ed25519_dalek::{Keypair as Ed25519Keypair, SecretKey as Ed25519SecretKey};
 // use ed25519_dalek::Signature;
@@ -56,6 +49,7 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
 }
 
 /// Create a new full id from seed
+#[allow(dead_code)]
 fn create_full_id_from_seed(seeder: &[u8]) -> ClientFullId {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
@@ -72,6 +66,7 @@ fn create_bls_sk_from_seed(seeder: &[u8]) -> threshold_crypto::SecretKey {
     bls_secret_key
 }
 
+#[allow(dead_code)]
 fn create_ed25519_sk_from_seed(seeder: &[u8]) -> Ed25519SecretKey {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
@@ -341,76 +336,152 @@ impl SafeAuthenticator {
         unimplemented!()
     }
 
-    pub async fn authorise_app(&self, _x: &str) -> Result<String> {
-        unimplemented!()
+    /// Decode requests and trigger application authorisation against the current client
+    pub async fn authorise_app(&self, req: &str) -> Result<String> {
+        let req_msg = match decode_msg(req) {
+            Ok(msg) => msg,
+            Err(err) => {
+                return Err(Error::AuthError(format!(
+                    "Failed to decode the auth request string: {:?}",
+                    err
+                )));
+            }
+        };
+
+        debug!("Auth request string decoded: {:?}", req_msg);
+
+        let ipc_req = decode_ipc_msg(req_msg).await.map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to decode request: {}", err))
+        })?;
+
+        match ipc_req {
+            Ok(IpcMsg::Req {
+                request: IpcReq::Auth(app_auth_req),
+                req_id,
+            }) => {
+                info!("Request was recognised as a general app auth request");
+                debug!("Decoded request (req_id={:?}): {:?}", req_id, app_auth_req);
+                self.gen_auth_response(req_id, app_auth_req).await
+            }
+
+            Ok(IpcMsg::Req {
+                request: IpcReq::Unregistered(user_data),
+                req_id,
+            }) => {
+                info!("Request was recognised as an unregistered auth request");
+                debug!("Decoded request (req_id={:?}): {:?}", req_id, user_data);
+
+                self.gen_unreg_auth_response(req_id)
+            }
+
+            Err(error) => Err(Error::AuthError(format!(
+                "Failed decoding the auth request: {:?}",
+                error
+            ))),
+            Ok(IpcMsg::Resp { .. }) | Ok(IpcMsg::Revoked { .. }) | Ok(IpcMsg::Err(..)) => {
+                Err(Error::AuthError(
+                    "The request was not recognised as a valid auth request".to_string(),
+                ))
+            }
+        }
     }
 
-    // /// Authenticate an app request.
-    // ///
-    // /// First, this function searches for an app info in the access container.
-    // /// If the app is found, then the `AuthGranted` struct is returned based on that information.
-    // /// If the app is not found in the access container, then it will be authenticated.
-    // pub async fn authenticate(
-    //     // client: &AuthClient,
-    //     auth_req: AuthReq,
-    // ) -> Result<AuthGranted, AuthError> {
-    //     let app_id = auth_req.app.id.clone();
-    //     let permissions = auth_req.containers.clone();
-    //     let AuthReq {
-    //         app_container,
-    //         app_permissions,
-    //         ..
-    //     } = auth_req;
+    /// Authenticate an app request.
+    ///
+    /// First, this function searches for an app info in the access container.
+    /// If the app is found, then the `AuthGranted` struct is returned based on that information.
+    /// If the app is not found in the access container, then it will be authenticated.
+    pub async fn authenticate(
+        &self,
+        // client: &AuthClient,
+        auth_req: AuthReq,
+    ) -> Result<AuthGranted> {
+        let _app_id = auth_req.app_id.clone();
 
-    //     // let (apps_version, mut apps) = config::list_apps(client).await?;
-    //     // check_revocation(client, app_id.clone()).await?;
+        // TODO: 1) check if we already know this app
+        // 1.2) check if app is revoked
+        // 2 ) if not, make a new app, and store it
 
-    //     // let app_state = app_state(&client, &apps, &app_id).await?;
+        let mut rng = OsRng;
 
-    //     // Determine an app state. If it's revoked we can reuse existing
-    //     // keys stored in the config. And if it is authorised, we just
-    //     // return the app info from the config.
-    //     // let (app, app_state, app_id) = match app_state {
-    //     //     AppState::NotAuthenticated => {
-    //             let public_id = client.public_id().await;
-    //             // Safe to unwrap as the auth client will have a client public id.
-    //             let keys = AppKeys::new(unwrap!(public_id.client_public_id()).clone());
-    //             let app = AppInfo {
-    //                 info: auth_req.app,
-    //                 keys,
-    //             };
-    //             let _ = config::insert_app(
-    //                 &client,
-    //                 apps,
-    //                 config::next_version(apps_version),
-    //                 app.clone(),
-    //             )
-    //             .await?;
-    //             // (app, app_state, app_id)
-    //     //     }
-    //     //     AppState::Authenticated | AppState::Revoked => {
-    //     //         let app_entry_name = sha3_256(app_id.as_bytes());
-    //     //         if let Some(app) = apps.remove(&app_entry_name) {
-    //     //             (app, app_state, app_id)
-    //     //         } else {
-    //     //             return Err(AuthError::from(
-    //     //                 "Logical error - couldn't find a revoked app in config",
-    //     //             ));
-    //     //         }
-    //     //     }
-    //     // };
+        Ok(AuthGranted {
+            app_full_id: ClientFullId::new_ed25519(&mut rng),
+            bootstrap_config: bootstrap_config()?,
+        })
+    }
 
-    //     match app_state {
-    //         AppState::Authenticated => {
-    //             // Return info of the already registered app
-    //             authenticated_app(&client, app, app_id, app_container, app_permissions).await
-    //         }
-    //         AppState::NotAuthenticated | AppState::Revoked => {
-    //             // Register a new app or restore a previously registered app
-    //             authenticate_new_app(&client, app, app_container, app_permissions, permissions).await
-    //         }
-    //     }
-    // }
+    // Helper function to generate an app authorisation response
+    async fn gen_auth_response(&self, req_id: SafeAuthReqId, auth_req: AuthReq) -> Result<String> {
+        let auth_granted = self.authenticate(auth_req).await.map_err(|err| {
+            Error::AuthenticatorError(format!(
+                "Failed to authorise application on the network: {}",
+                err
+            ))
+        })?;
+
+        debug!("Encoding response with auth credentials auth granted...");
+        let resp = encode_msg(&IpcMsg::Resp {
+            req_id,
+            response: IpcResp::Auth(Ok(auth_granted)),
+        })
+        .map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
+        })?;
+
+        debug!("Returning auth response generated");
+
+        Ok(resp)
+    }
+
+    // Helper function to generate an unregistered authorisation response
+    fn gen_unreg_auth_response(&self, req_id: SafeAuthReqId) -> Result<String> {
+        let bootstrap_cfg = bootstrap_config().map_err(|err| {
+            Error::AuthenticatorError(format!(
+                "Failed to obtain bootstrap info for response: {}",
+                err
+            ))
+        })?;
+
+        debug!("Encoding response... {:?}", bootstrap_cfg);
+        let resp = encode_msg(&IpcMsg::Resp {
+            req_id,
+            response: IpcResp::Unregistered(Ok(bootstrap_cfg)),
+        })
+        .map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
+        })?;
+
+        debug!("Returning unregistered auth response generated: {:?}", resp);
+        Ok(resp)
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
+pub enum AuthResponseType {
+    Registered(AuthGranted),
+    Unregistered(BootstrapConfig),
+}
+
+pub fn decode_auth_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
+    let msg = decode_msg(&ipc_msg)
+        .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
+    match msg {
+        IpcMsg::Resp { response, .. } => match response {
+            IpcResp::Auth(res) => match res {
+                Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
+                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
+            },
+            IpcResp::Unregistered(res) => match res {
+                Ok(config) => Ok(AuthResponseType::Unregistered(config)),
+                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
+            },
+            // _ => Err(Error::AuthError(
+            //     "Doesn't support other request.".to_string(),
+            // )),
+        },
+        IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
+        other => Err(Error::AuthError(format!("{:?}", other))),
+    }
 }
 
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or

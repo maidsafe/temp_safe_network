@@ -515,7 +515,7 @@ In order to allow any pending authorisation request we use its request ID (e.g. 
 ```shell
 $ safe auth allow 584798987
 Sending request to authd to allow an authorisation request...
-Authorisation request was allowed successfully
+Authorisation request was allowed.
 ```
 
 Note we could have otherwise decided to deny this authorisation request and invoke `$ safe auth deny 584798987` instead, but let's allow it so we can continue with the next steps of this guide.
@@ -624,7 +624,7 @@ The notification message contains the same information we can obtain with `safe 
 ```shell
 > auth allow 754801191
 Sending request to authd to allow an authorisation request...
-Authorisation request was allowed successfully
+Authorisation request was allowed
 ```
 
 The interactive shell will be expanded to support many more operations, and especially to cover the use cases which are not possible to cover with the non-interactive shell, like the use case we've seen of receiving notifications from `authd`.
