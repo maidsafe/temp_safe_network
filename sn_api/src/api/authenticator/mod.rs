@@ -84,11 +84,9 @@ pub fn get_sk_from_input(passphrase: &str, password: &str) -> threshold_crypto::
     let _map_data_location = generate_network_address(&keyword, &salt);
 
     // TODO: use a combo of derived inputs for seed here.
-    let mut seed = password.clone();
+    let mut seed = password;
     seed.extend(salt.iter());
-    let sk = create_bls_sk_from_seed(&seed);
-
-    sk
+    create_bls_sk_from_seed(&seed)
 }
 
 // /// use password based crypto
@@ -332,7 +330,7 @@ impl SafeAuthenticator {
     }
 
     // TODO: update terminology around apps auth here
-    pub async fn revoke_app(&self, _y: &String) -> Result<()> {
+    pub async fn revoke_app(&self, _y: &str) -> Result<()> {
         unimplemented!()
     }
 
@@ -396,7 +394,7 @@ impl SafeAuthenticator {
         // client: &AuthClient,
         auth_req: AuthReq,
     ) -> Result<AuthGranted> {
-        let _app_id = auth_req.app_id.clone();
+        let _app_id = auth_req.app_id;
 
         // TODO: 1) check if we already know this app
         // 1.2) check if app is revoked

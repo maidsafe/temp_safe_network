@@ -64,7 +64,7 @@ fn setup_completions_dumpone(shell: clap::Shell, output_fmt: OutputFmt) -> Resul
 fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<(), String> {
     // get names of available shells and sort them.
     let mut shellnames = clap::Shell::variants();
-    shellnames.sort();
+    shellnames.sort_unstable();
 
     if OutputFmt::Pretty == output_fmt {
         // Pretty format outputs shell completions with header --- <shellname> --- above each

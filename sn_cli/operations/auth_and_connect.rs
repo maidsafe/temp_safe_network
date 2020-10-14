@@ -109,7 +109,7 @@ fn get_credentials_file_path() -> Result<(PathBuf, PathBuf), String> {
     let credentials_folder = project_data_path;
 
     let file_path = credentials_folder.join(AUTH_CREDENTIALS_FILENAME);
-    Ok((credentials_folder.to_path_buf(), file_path))
+    Ok((credentials_folder, file_path))
 }
 
 fn create_credentials_file() -> Result<(File, PathBuf), String> {

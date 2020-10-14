@@ -164,7 +164,7 @@ impl SafeAppClient {
 
         let data_vec = data.to_vec();
         let blob_for_storage = Blob::Public(PublicBlob::new(data_vec));
-        let xorname = blob_for_storage.address().name().clone();
+        let xorname = *blob_for_storage.address().name();
 
         let _data_map = client
             .generate_data_map(&blob_for_storage)
