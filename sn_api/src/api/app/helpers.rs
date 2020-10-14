@@ -7,16 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::common::{parse_hex, sk_from_hex};
 #[cfg(feature = "app")]
 use crate::api::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
 use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
-use sn_data_types::{Error as SafeNdError, Money, PublicKey as SafeNdPublicKey};
+use sn_data_types::{Error as SafeNdError, Money, PublicKey};
 use std::str::{self, FromStr};
 use std::time;
-use threshold_crypto::{serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use xor_name::XorName;
 
 /// The conversion from coin to raw value
@@ -24,41 +22,7 @@ const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
 // The maximum amount of safecoin that can be represented by a single `Money`
 const MAX_COINS_VALUE: u64 = (u32::max_value() as u64 + 1) * COIN_TO_RAW_CONVERSION - 1;
 
-// Out internal key pair structure to manage BLS keys
-#[derive(Debug)]
-pub struct KeyPair {
-    pub pk: PublicKey,
-    pub sk: SecretKey,
-}
-
-impl KeyPair {
-    pub fn random() -> Self {
-        let sk = SecretKey::random();
-        let pk = sk.public_key();
-        KeyPair { pk, sk }
-    }
-
-    pub fn from_hex_sk(sk_hex_str: &str) -> Result<Self> {
-        let sk = sk_from_hex(sk_hex_str)?;
-        let pk = sk.public_key();
-        Ok(KeyPair { pk, sk })
-    }
-
-    pub fn to_hex_key_pair(&self) -> Result<(String, String)> {
-        let pk: String = pk_to_hex(&self.pk);
-
-        let sk_serialised = bincode::serialize(&SerdeSecret(&self.sk))
-            .expect("Failed to serialise the generated secret key");
-        let sk: String = vec_to_hex(sk_serialised);
-
-        Ok((pk, sk))
-    }
-}
-
-pub fn xorname_from_pk(pk: PublicKey) -> XorName {
-    XorName::from(SafeNdPublicKey::from(pk))
-}
-
+#[allow(dead_code)]
 pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
@@ -68,18 +32,18 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
 }
 
 pub fn pk_to_hex(pk: &PublicKey) -> String {
-    let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
-    vec_to_hex(pk_as_bytes.to_vec())
+    let xorname = XorName::from(*pk);
+    xorname_to_hex(&xorname)
 }
 
-#[allow(dead_code)]
-pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
-    let pk_bytes = parse_hex(&hex_str);
-    let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
-    pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
-    PublicKey::from_bytes(pk_bytes_array)
-        .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
-}
+// #[allow(dead_code)]
+// pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
+//     let pk_bytes = parse_hex(&hex_str);
+//     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
+//     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
+//     PublicKey::from_bytes(pk_bytes_array)
+//         .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
+// }
 
 pub fn parse_coins_amount(amount_str: &str) -> Result<Money> {
     Money::from_str(amount_str).map_err(|err| {

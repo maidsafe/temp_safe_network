@@ -8,34 +8,25 @@
 // Software.
 
 use super::{
-    common::sk_from_hex,
-    helpers::{parse_coins_amount, pk_to_hex, xorname_from_pk, KeyPair},
+    common::ed_sk_from_hex,
+    helpers::{parse_coins_amount, pk_to_hex},
     xorurl::XorUrlEncoder,
     xorurl::{SafeContentType, SafeDataType},
     Safe,
 };
 use crate::{Error, Result};
 
-use serde::{Deserialize, Serialize};
+use rand::rngs::OsRng;
 use sn_client::Client;
-use sn_data_types::PublicKey;
-use threshold_crypto::SecretKey;
+use sn_data_types::{ClientFullId, Keypair};
 use xor_name::XorName;
-
-// We expose a BLS key pair as two hex encoded strings
-// TODO: consider supporting other encodings like base32 or just expose Vec<u8>
-#[derive(Clone, Serialize, Deserialize)]
-pub struct BlsKeyPair {
-    pub pk: String,
-    pub sk: String,
-}
 
 impl Safe {
     // Generate a key pair without creating and/or storing a SafeKey on the network
-    pub fn keypair(&self) -> Result<BlsKeyPair> {
-        let key_pair = KeyPair::random();
-        let (pk, sk) = key_pair.to_hex_key_pair()?;
-        Ok(BlsKeyPair { pk, sk })
+    pub fn generate_random_keypair(&self) -> Result<Keypair> {
+        let mut rng = OsRng;
+        let key_pair = Keypair::new_ed25519(&mut rng);
+        Ok(key_pair)
     }
 
     // Create a SafeKey on the network, preloaded from another key and return its XOR-URL.
@@ -43,28 +34,29 @@ impl Safe {
         &mut self,
         from: &str,
         preload_amount: Option<&str>,
-    ) -> Result<(String, Option<BlsKeyPair>)> {
-        let from_sk = match sk_from_hex(&from) {
-            Ok(sk) => Some(sk),
+    ) -> Result<(String, Keypair)> {
+        let from_sk = match ed_sk_from_hex(&from) {
+            Ok(sk) => sk,
             Err(_) => return Err(Error::InvalidInput(
                 "The source of funds needs to be a secret key. The secret key provided is invalid"
                     .to_string(),
             )),
         };
 
+        let client_id = ClientFullId::from(from_sk);
+        let key_pair = client_id.keypair().clone();
         let amount = parse_coins_amount(&preload_amount.unwrap_or_else(|| "0.0"))?;
 
-        let (xorname, key_pair) = {
-            let key_pair = KeyPair::random();
-            let (pk, sk) = key_pair.to_hex_key_pair()?;
+        let xorname = {
+            // let key_pair = KeyPair::random();
+            // let (pk, sk) = key_pair.to_hex_key_pair()?;
 
-            let mut paying_client = Client::new(from_sk).await?;
+            let mut paying_client = Client::new(Some(client_id.clone())).await?;
             paying_client
-                .send_money(PublicKey::from(key_pair.pk), amount)
+                .send_money(*client_id.public_key(), amount)
                 .await?;
-
-            let xorname = xorname_from_pk(key_pair.pk);
-            (xorname, Some(BlsKeyPair { pk, sk }))
+            // let keypair = client_id.keypair();
+            XorName::from(*client_id.public_key())
         };
 
         let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
@@ -76,15 +68,14 @@ impl Safe {
     pub async fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: &str,
-    ) -> Result<(String, Option<BlsKeyPair>)> {
+    ) -> Result<(String, Keypair)> {
         let amount = parse_coins_amount(preload_amount)?;
-        let key_pair = KeyPair::random();
+        let mut rng = OsRng;
+        let key_pair = Keypair::new_ed25519(&mut rng);
         self.safe_client
             .trigger_simulated_farming_payout(amount)
             .await?;
-        let (pk, sk) = key_pair.to_hex_key_pair()?;
-        let xorname = XorName::from(PublicKey::Bls(key_pair.pk));
-        let key_pair = Some(BlsKeyPair { pk, sk });
+        let xorname = XorName::from(key_pair.public_key());
 
         let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
         Ok((xorurl, key_pair))
@@ -92,9 +83,10 @@ impl Safe {
 
     // Check SafeKey's balance from the network from a given SecretKey string
     pub async fn keys_balance_from_sk(&self, sk: &str) -> Result<String> {
-        let secret_key = sk_from_hex(sk)?;
-
-        let mut temp_client = Client::new(Some(secret_key)).await?;
+        // TODO: we need to definre SK type in hex code somewhere
+        let secret_key = ed_sk_from_hex(sk)?;
+        let id = ClientFullId::from(secret_key);
+        let mut temp_client = Client::new(Some(id)).await?;
         let balance = temp_client.get_balance().await?;
 
         Ok(balance.to_string())
@@ -108,13 +100,14 @@ impl Safe {
         self.keys_balance_from_sk(sk).await
     }
 
-    // Check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
+    // Check that the XOR/NRS-URL corresponds to the public key derived from the provided client id
     pub async fn validate_sk_for_url(&mut self, sk: &str, url: &str) -> Result<String> {
-        let secret_key: SecretKey = sk_from_hex(sk)
+        let secret_key = ed_sk_from_hex(sk)
             .map_err(|_| Error::InvalidInput("Invalid secret key provided".to_string()))?;
+        let keypair = Keypair::from(secret_key);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-        let public_key = secret_key.public_key();
-        let derived_xorname = xorname_from_pk(public_key);
+        let public_key = keypair.public_key();
+        let derived_xorname = XorName::from(public_key);
         if xorurl_encoder.xorname() != derived_xorname {
             Err(Error::InvalidInput(
                 "The URL doesn't correspond to the public key derived from the provided secret key"
@@ -178,7 +171,7 @@ impl Safe {
         };
 
         let from = match &from_sk {
-            Some(sk) => Some(sk_from_hex(sk)?),
+            Some(sk) => Some(ClientFullId::from(ed_sk_from_hex(sk)?)),
             None => None,
         };
 

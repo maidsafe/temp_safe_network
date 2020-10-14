@@ -16,6 +16,7 @@ use serde::Deserialize;
 use sn_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
+use std::convert::From;
 use std::{fs::File, path::PathBuf};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
@@ -83,17 +84,19 @@ pub async fn authd_create(
         {
             // We then generate a SafeKey with test-coins to use it for the account creation
             println!("Creating a SafeKey with test-coins...");
-            let (_xorurl, key_pair) = safe.keys_create_preload_test_coins("1000.11").await?;
-            let kp =
-                key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
+            let (_xorurl, kp) = safe.keys_create_preload_test_coins("1000.11").await?;
+            // let kp =
+            // key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
             println!("Sending account creation request to authd...");
+            let sk = kp.secret_key().map_err(|e| format!("{:?}", e))?.to_string();
             sn_authd
-                .create_acc(&kp.sk, &login_details.passphrase, &login_details.password)
+                .create_acc(&sk, &login_details.passphrase, &login_details.password)
                 .await?;
+
             println!("Account was created successfully!");
             println!("SafeKey created and preloaded with test-coins. Owner key pair generated:");
-            println!("Public Key = {}", kp.pk);
-            println!("Secret Key = {}", kp.sk);
+            println!("Public Key = {}", kp.public_key());
+            println!("Secret Key = {}", sk);
         }
     } else {
         let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;

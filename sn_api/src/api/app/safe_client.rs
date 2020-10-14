@@ -14,9 +14,9 @@ use log::{debug, info, warn};
 
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
-    Blob, BlobAddress, Error as SafeNdError, Map, MapAction, MapAddress, MapEntryActions,
-    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob,
-    PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
+    Blob, BlobAddress, ClientFullId, Error as SafeNdError, Keypair, Map, MapAction, MapAddress,
+    MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money,
+    PublicBlob, PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 use std::collections::BTreeMap;
@@ -42,6 +42,16 @@ impl SafeAppClient {
 
     pub fn new() -> Self {
         Self { safe_client: None }
+    }
+
+    pub async fn keypair(&self) -> Result<Keypair> {
+        if let Some(client) = &self.safe_client {
+            let kp = client.full_id().await.keypair().clone();
+
+            Ok(kp)
+        } else {
+            Err(Error::ConnectionError("Not yet connected".to_string()))
+        }
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
@@ -83,8 +93,8 @@ impl SafeAppClient {
     }
 
     // === Money operations ===
-    pub async fn read_balance_from_sk(&mut self, sk: SecretKey) -> Result<Money> {
-        let mut temp_client = Client::new(Some(sk)).await?;
+    pub async fn read_balance_from_full_id(&mut self, id: ClientFullId) -> Result<Money> {
+        let mut temp_client = Client::new(Some(id)).await?;
         let coins = temp_client
             .get_balance()
             .await
@@ -104,12 +114,12 @@ impl SafeAppClient {
 
     pub async fn safecoin_transfer_to_xorname(
         &mut self,
-        from_sk: Option<SecretKey>,
+        from_id: Option<ClientFullId>,
         _to_xorname: XorName,
         _amount: Money,
     ) -> Result<()> {
-        let _client = match from_sk {
-            Some(sk) => Client::new(Some(sk)).await?,
+        let _client = match from_id {
+            Some(id) => Client::new(Some(id)).await?,
             None => self.get_safe_client()?,
         };
 
@@ -141,12 +151,12 @@ impl SafeAppClient {
     #[allow(dead_code)]
     pub async fn safecoin_transfer_to_pk(
         &mut self,
-        from_sk: Option<SecretKey>,
+        from_id: Option<ClientFullId>,
         to_pk: PublicKey,
         amount: Money,
     ) -> Result<(u64, SafeNdPublicKey)> {
-        let mut client = match from_sk {
-            Some(sk) => Client::new(Some(sk)).await?,
+        let mut client = match from_id {
+            Some(id) => Client::new(Some(id)).await?,
             None => self.get_safe_client()?,
         };
 

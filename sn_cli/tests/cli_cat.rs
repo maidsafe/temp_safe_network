@@ -16,7 +16,7 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType, XorUrlEncoder},
-    BlsKeyPair,
+    Keypair,
 };
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
@@ -278,7 +278,7 @@ fn calling_safe_cat_wallet_xorurl() {
     )
     .read()
     .unwrap();
-    let (wallet_xorurl, key_xorurl, key_pair): (String, String, Option<BlsKeyPair>) =
+    let (wallet_xorurl, key_xorurl, key_pair): (String, String, Option<Keypair>) =
         serde_json::from_str(&wallet_create)
             .expect("Failed to parse output of `safe wallet create`");
 

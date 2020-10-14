@@ -11,7 +11,6 @@ use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use log::info;
 use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
-use threshold_crypto::SecretKey;
 use tokio::runtime;
 
 pub mod auth_types {
@@ -54,7 +53,14 @@ pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     bytes
 }
 
-pub fn sk_from_hex(hex_str: &str) -> Result<SecretKey> {
+#[allow(dead_code)]
+pub fn bls_sk_from_hex(hex_str: &str) -> Result<threshold_crypto::SecretKey> {
+    let sk_bytes = parse_hex(&hex_str);
+    bincode::deserialize(&sk_bytes)
+        .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))
+}
+
+pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
     let sk_bytes = parse_hex(&hex_str);
     bincode::deserialize(&sk_bytes)
         .map_err(|_| Error::InvalidInput("Failed to deserialize provided secret key".to_string()))

@@ -10,7 +10,7 @@
 use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, BlsKeyPair};
+use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Keypair};
 use sn_data_types::Money;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -65,9 +65,14 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
     .read()
     .unwrap();
 
-    let (xorurl, pair): (String, BlsKeyPair) = serde_json::from_str(&pk_command_result)
+    let (xorurl, pair): (String, Keypair) = serde_json::from_str(&pk_command_result)
         .expect("Failed to parse output of `safe files sync`");
-    (xorurl, pair.sk)
+    (
+        xorurl,
+        pair.secret_key()
+            .expect("Error extracting SecretKey from keypair")
+            .to_string(),
+    )
 }
 
 #[allow(dead_code)]
@@ -98,7 +103,14 @@ pub fn create_wallet_with_balance(
 
     let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
     let unwrapped_key_pair = unwrap!(key_pair);
-    (wallet_xor, unwrapped_key_pair.pk, unwrapped_key_pair.sk)
+    (
+        wallet_xor,
+        unwrapped_key_pair.public_key().to_string(),
+        unwrapped_key_pair
+            .secret_key()
+            .expect("Error extracting SecretKey from keypair")
+            .to_string(),
+    )
 }
 
 #[allow(dead_code)]
@@ -309,7 +321,7 @@ pub fn parse_nrs_create_output(output: &str) -> (String, ProcessedFiles) {
 }
 
 #[allow(dead_code)]
-pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<BlsKeyPair>) {
+pub fn parse_wallet_create_output(output: &str) -> (String, String, Option<Keypair>) {
     serde_json::from_str(&output).expect("Failed to parse output of `safe wallet create`")
 }
 

@@ -20,6 +20,9 @@ mod common;
 mod constants;
 mod errors;
 
+// re-export these useful types from sn_data_types
+pub use sn_data_types::{ClientFullId, Keypair};
+
 #[cfg(feature = "app")]
 pub use app::*;
 #[cfg(any(feature = "app", feature = "authd_client"))]

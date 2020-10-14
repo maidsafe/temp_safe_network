@@ -11,7 +11,6 @@ use crate::{Error, Result, SafeAuthReq, SafeAuthReqId};
 
 use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
-use rand::Rng;
 use rand_core::SeedableRng;
 
 use crate::api::ipc::{
@@ -27,10 +26,7 @@ use hmac::Hmac;
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::ClientFullId;
-
-use ed25519_dalek::{Keypair as Ed25519Keypair, SecretKey as Ed25519SecretKey};
-// use ed25519_dalek::Signature;
+use sn_data_types::{ClientFullId, Keypair};
 
 use xor_name::{XorName, XOR_NAME_LEN};
 
@@ -53,30 +49,27 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
 fn create_full_id_from_seed(seeder: &[u8]) -> ClientFullId {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
-    ClientFullId::new_bls(&mut rng)
+    ClientFullId::new_ed25519(&mut rng)
 }
 
 /// Create a new BLS sk from seed
-fn create_bls_sk_from_seed(seeder: &[u8]) -> threshold_crypto::SecretKey {
+#[allow(dead_code)]
+fn create_bls_keypair_from_seed(seeder: &[u8]) -> Keypair {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
 
-    let bls_secret_key: threshold_crypto::SecretKey = rng.gen();
-
-    bls_secret_key
+    Keypair::new_bls(&mut rng)
 }
 
 #[allow(dead_code)]
-fn create_ed25519_sk_from_seed(seeder: &[u8]) -> Ed25519SecretKey {
+fn create_ed25519_sk_from_seed(seeder: &[u8]) -> Keypair {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
 
-    let sk = Ed25519Keypair::generate(&mut rng);
-
-    sk.secret
+    Keypair::new_ed25519(&mut rng)
 }
 
-pub fn get_sk_from_input(passphrase: &str, password: &str) -> threshold_crypto::SecretKey {
+pub fn get_sk_from_input(passphrase: &str, password: &str) -> Keypair {
     // TODO: Q what is the need for this third secret?
     let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
@@ -86,7 +79,7 @@ pub fn get_sk_from_input(passphrase: &str, password: &str) -> threshold_crypto::
     // TODO: use a combo of derived inputs for seed here.
     let mut seed = password;
     seed.extend(salt.iter());
-    create_bls_sk_from_seed(&seed)
+    create_ed25519_sk_from_seed(&seed)
 }
 
 // /// use password based crypto
@@ -193,28 +186,29 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn create_acc(&mut self, sk: threshold_crypto::SecretKey) -> Result<()> {
+    pub async fn create_acc(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a Safe account from provided password and passphrase.");
-        // let secret_key = sk_from_hex(sk)?;
 
         // TODO derive SK from passphrase etc. Put data storage blob on network.
 
         trace!("Creating an account...");
 
         // TODO: Q what is the need for this third secret?
-        // let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
+        let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
         // TODO properly derive an Map location
-        // let _map_data_location = generate_network_address(&keyword, &salt);
+        let _map_data_location = generate_network_address(&keyword, &salt);
 
         // TODO: use a combo of derived inputs for seed here.
-        // let mut seed = password.clone();
+        let seed = password;
         // seed.extend(salt.iter());
-        // let sk = create_bls_sk_from_seed(&seed);
+        let id = create_full_id_from_seed(&seed);
 
-        let auth_client = Client::new(Some(sk)).await?;
+        let auth_client = Client::new(Some(id)).await?;
 
         self.authenticator_client = Some(auth_client);
+
+        debug!("Client instantiated properly!");
 
         // TODO: actually create and put Map data to be used in storage of apps.
 
@@ -263,26 +257,25 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn log_in(&mut self, _sk: threshold_crypto::SecretKey) -> Result<()> {
+    pub async fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to log in...");
 
-        // // TODO: Q what is the need for this third secret?
-        // let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
+        // TODO: Q what is the need for this third secret?
+        let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
-        // // TODO properly derive an Map location
-        // let _map_data_location = generate_network_address(&keyword, &salt);
+        // TODO properly derive an Map location
+        let _map_data_location = generate_network_address(&keyword, &salt);
 
-        // // TODO: use a combo of derived inputs for seed here.
-        // let mut seed = password.clone();
+        // TODO: use a combo of derived inputs for seed here.
+        let seed = password;
         // seed.extend(salt.iter());
+        let id = create_full_id_from_seed(&seed);
 
-        // // unimplemented!();
-        // let sk = create_bls_sk_from_seed(&seed);
+        let auth_client = Client::new(Some(id)).await?;
 
-        // let auth_client = Client::new(Some(sk)).await?;
-        // self.authenticator_client = Some(auth_client);
+        self.authenticator_client = Some(auth_client);
 
-        info!("secret key derived successfully, and Safe Client is connected");
+        debug!("Client instantiated properly!");
         // TODO: retrieve any data needed
         Ok(())
     }
@@ -389,11 +382,7 @@ impl SafeAuthenticator {
     /// First, this function searches for an app info in the access container.
     /// If the app is found, then the `AuthGranted` struct is returned based on that information.
     /// If the app is not found in the access container, then it will be authenticated.
-    pub async fn authenticate(
-        &self,
-        // client: &AuthClient,
-        auth_req: AuthReq,
-    ) -> Result<AuthGranted> {
+    pub async fn authenticate(&self, auth_req: AuthReq) -> Result<AuthGranted> {
         let _app_id = auth_req.app_id;
 
         // TODO: 1) check if we already know this app

@@ -15,7 +15,7 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use sn_api::{BlsKeyPair, Safe};
+use sn_api::{Keypair, Safe};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -115,7 +115,7 @@ pub async fn wallet_commander(
         } => {
             // create wallet
             let wallet_xorurl = safe.wallet_create().await?;
-            let mut key_generated_output: (String, Option<BlsKeyPair>, Option<String>) =
+            let mut key_generated_output: (String, Option<Keypair>, Option<String>) =
                 Default::default();
             if !no_balance {
                 // get or create keypair
@@ -134,7 +134,10 @@ pub async fn wallet_commander(
                                 .1
                                 .clone()
                                 .ok_or("Failed to read the generated key pair")?;
-                            unwrapped_key_pair.sk
+                            unwrapped_key_pair
+                                .secret_key()
+                                .map_err(|e| format!("{:?}", e))?
+                                .to_string()
                         }
                     },
                 };

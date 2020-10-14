@@ -31,12 +31,12 @@ pub mod files;
 pub mod nrs_map;
 pub mod wallet;
 pub mod xorurl;
+use super::Result;
 pub use consts::DEFAULT_XORURL_BASE;
-pub use helpers::{parse_coins_amount, xorname_from_pk, KeyPair};
-pub use keys::BlsKeyPair;
+pub use helpers::parse_coins_amount;
 pub use nrs::ProcessedEntries;
+use sn_data_types::Keypair;
 pub use xor_name::{XorName, XOR_NAME_LEN};
-
 // TODO: should we be cloning this?
 #[derive(Clone)]
 pub struct Safe {
@@ -56,5 +56,9 @@ impl Safe {
             safe_client: SafeAppClient::new(),
             xorurl_base: xorurl_base.unwrap_or_else(|| DEFAULT_XORURL_BASE),
         }
+    }
+
+    pub async fn keypair(&self) -> Result<Keypair> {
+        self.safe_client.keypair().await
     }
 }

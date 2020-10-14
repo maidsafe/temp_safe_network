@@ -3668,7 +3668,6 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client?branch=master#8abddfcc4204f406ef725970d8f74dfdacb3a667"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3722,9 +3721,7 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "193341fca93118ab8704958c2893fb6293233777a2a4f972526e11a4f9870f68"
+version = "0.11.23"
 dependencies = [
  "bincode",
  "crdts",
@@ -3733,6 +3730,7 @@ dependencies = [
  "hex_fmt",
  "multibase 0.8.0",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde",
  "sha3",
  "signature",

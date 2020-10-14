@@ -13,7 +13,7 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
-use sn_api::{BlsKeyPair, Safe};
+use sn_api::{Keypair, Safe};
 use structopt::StructOpt;
 
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
@@ -137,7 +137,7 @@ pub async fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     _pk: Option<String>,
-) -> Result<(String, Option<BlsKeyPair>, Option<String>), String> {
+) -> Result<(String, Option<Keypair>, Option<String>), String> {
     let (xorurl, key_pair, amount) = if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
@@ -160,9 +160,13 @@ pub async fn create_new_key(
         if pay_with.is_none() {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
 
-            let payee = safe.keypair()?.sk;
+            let payee = safe
+                .keypair()
+                .await?
+                .secret_key()
+                .map_err(|e| format!("Secret key error: {:?}", e))?;
             let keys_info = safe
-                .keys_create_and_preload_from_sk(&payee, preload.as_deref())
+                .keys_create_and_preload_from_sk(&payee.to_string(), preload.as_deref())
                 .await?;
 
             xorurl = keys_info.0;
@@ -179,13 +183,13 @@ pub async fn create_new_key(
         (xorurl, key_pair, preload)
     };
 
-    Ok((xorurl, key_pair, amount))
+    Ok((xorurl, Some(key_pair), amount))
 }
 
 pub fn print_new_key_output(
     output_fmt: OutputFmt,
     xorurl: String,
-    key_pair: Option<BlsKeyPair>,
+    key_pair: Option<Keypair>,
     amount: Option<String>,
 ) {
     if OutputFmt::Pretty == output_fmt {
@@ -195,8 +199,11 @@ pub fn print_new_key_output(
         }
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");
-            println!("Public Key = {}", pair.pk);
-            println!("Secret Key = {}", pair.sk);
+            println!("Public Key = {}", pair.public_key());
+            match pair.secret_key() {
+                Ok(sk) => println!("Secret Key = {}", sk),
+                Err(error) => println!("{:?}", error),
+            }
         }
     } else if let Some(pair) = &key_pair {
         println!("{}", serialise_output(&(pair), output_fmt));

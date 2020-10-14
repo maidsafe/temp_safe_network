@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{BlsKeyPair, Error, Result, Safe};
+use crate::{Error, Keypair, Result, Safe};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::env::var;
@@ -31,10 +31,10 @@ pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
 }
 
-// Try to unwrap an Option<BlsKeyPair> and throw error if it's None
-pub fn unwrap_key_pair(kp: Option<BlsKeyPair>) -> Result<BlsKeyPair> {
+// Try to unwrap an Option<Keypair> and throw error if it's None
+pub fn unwrap_key_pair(kp: Option<Keypair>) -> Result<Keypair> {
     let key_pair = kp.ok_or_else(|| {
-        Error::Unexpected("Unexpectedly there is no BlsKeyPair to unwrap".to_string())
+        Error::Unexpected("Unexpectedly there is no Keypair to unwrap".to_string())
     })?;
     Ok(key_pair)
 }

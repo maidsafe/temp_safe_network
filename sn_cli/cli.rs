@@ -83,12 +83,17 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
         Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, safe).await,
         Some(SubCommands::Keypair {}) => {
-            let key_pair = safe.keypair()?;
+            let key_pair = safe.keypair().await?;
             if OutputFmt::Pretty == output_fmt {
                 println!("Key pair generated:");
             }
-            println!("Public Key = {}", key_pair.pk);
-            println!("Secret Key = {}", key_pair.sk);
+            let sk = key_pair
+                .secret_key()
+                .map_err(|e| format!("{:?}", e))?
+                .to_string();
+
+            println!("Public Key = {}", key_pair.public_key());
+            println!("Secret Key = {}", sk);
             Ok(())
         }
         Some(SubCommands::Update {}) => {

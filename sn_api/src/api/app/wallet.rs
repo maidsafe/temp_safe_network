@@ -7,10 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::common::sk_from_hex;
-use super::helpers::{
-    parse_coins_amount, xorname_from_pk, xorname_to_hex, KeyPair as KeypairHelpers,
-};
+use super::common::ed_sk_from_hex;
+use super::helpers::{parse_coins_amount, xorname_to_hex};
 use crate::{
     xorurl::{SafeContentType, SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result, Safe,
@@ -18,11 +16,11 @@ use crate::{
 
 use log::debug;
 use serde::{Deserialize, Serialize};
-use sn_data_types::{MapValue, Money};
+use sn_data_types::{ClientFullId, Keypair, MapValue, Money};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 
-pub use threshold_crypto::{PublicKey, SecretKey};
+// pub use threshold_crypto::{PublicKey, SecretKey};
 
 // Type tag used for the Wallet container
 const WALLET_TYPE_TAG: u64 = 1_000;
@@ -62,8 +60,10 @@ impl Safe {
         default: bool,
         sk: &str,
     ) -> Result<String> {
-        let key_pair = KeypairHelpers::from_hex_sk(sk)?;
-        let xorname = xorname_from_pk(key_pair.pk);
+        // TODO: we need URLs / hex indication of which keytype this is....
+        let acutal_sk = ed_sk_from_hex(sk)?;
+        let keypair = Keypair::from(acutal_sk);
+        let xorname = XorName::from(keypair.public_key());
         let xorurl = XorUrlEncoder::encode(
             xorname,
             None,
@@ -200,10 +200,12 @@ impl Safe {
         for (name, (_, balance)) in balances.iter() {
             // Ignore the _default Wallet MD entry key
             debug!("Checking wallet of name: {:?}", name);
-            let secret_key = sk_from_hex(&balance.sk)?;
+            let secret_key = ed_sk_from_hex(&balance.sk)?;
+
+            let id = ClientFullId::from(secret_key);
             let current_balance = self
                 .safe_client
-                .read_balance_from_sk(secret_key)
+                .read_balance_from_full_id(id)
                 .await
                 .map_err(|_| {
                     Error::ContentNotFound("One of the SafeKey's was not found".to_string())
@@ -372,12 +374,12 @@ impl Safe {
             from_nrs_xorurl_encoder,
         )
         .await?;
-        let from_sk = sk_from_hex(&from_wallet_balance.sk)?;
-
+        let from_sk = ed_sk_from_hex(&from_wallet_balance.sk)?;
+        let full_id = ClientFullId::from(from_sk);
         // Finally, let's make the transfer
         match self
             .safe_client
-            .safecoin_transfer_to_xorname(Some(from_sk), to_xorname, amount_coins)
+            .safecoin_transfer_to_xorname(Some(full_id), to_xorname, amount_coins)
             .await
         {
             Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
