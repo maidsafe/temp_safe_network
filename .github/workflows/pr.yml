@@ -41,18 +41,40 @@ jobs:
       - name: Clippy checks
         run: cargo clippy --all-targets --all-features
 
-      # Run cargo tarpaulin
-      - name: Code Coverage - sn_api
-        uses: actions-rs/tarpaulin@master
-        with:
-          args: '-v --manifest-path=sn_api/Cargo.toml --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
+  coverage:
+      name: Code coverage checks
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v1
+        - name: Install Rust and required components
+          uses: actions-rs/toolchain@v1
+          with:
+            profile: minimal
+            toolchain: stable
+            override: true
 
-      # Push tarpaulin results to coveralls.io
-      - name: Coveralls
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./lcov.info
+        # Cache.
+        - name: Cargo cache
+          uses: actions/cache@v2
+          with:
+            path: |
+              ~/.cargo/registry
+              ~/.cargo/git
+              target
+            key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+        # Run cargo tarpaulin
+        - name: Code Coverage - sn_api
+          uses: actions-rs/tarpaulin@master
+          with:
+            args: '-v --manifest-path=sn_api/Cargo.toml --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
+
+        # Push tarpaulin results to coveralls.io
+        - name: Coveralls
+          uses: coverallsapp/github-action@master
+          with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            path-to-lcov: ./lcov.info
 
   test-component:
     name: Test Component
