@@ -14,25 +14,13 @@ pub mod resp;
 mod errors;
 
 pub use self::errors::IpcError;
-pub use self::req::{
-    // AppExchangeInfo,
-    AuthReq,
-    // ContainersReq,
-    IpcReq,
-    // Permission,
-    // ShareMap,
-    // ShareMapReq,
-};
+pub use self::req::{AuthReq, IpcReq};
 pub use self::resp::{AuthGranted, IpcResp};
 
 use bincode::{deserialize, serialize};
 use data_encoding::BASE32_NOPAD;
-// #[cfg(any(test, feature = "testing"))]
-// use rand::{self};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr, u32};
-
-use log::{debug, info};
 
 /// `QuicP2P` bootstrap info, shared from Authenticator to apps.
 pub type BootstrapConfig = HashSet<SocketAddr>;
@@ -73,14 +61,12 @@ pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
 
 /// Decode `IpcMsg` encoded with base32 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
-    info!("ENCODED MSG STRING: {:?}", encoded);
     let mut chars = encoded.chars();
     let decoded = match chars.next().ok_or(IpcError::InvalidMsg)? {
         // Encoded as base32
         'b' | 'B' => BASE32_NOPAD.decode(chars.as_str().as_bytes())?,
         // Fail if not encoded as base32
         _ => {
-            debug!("This didn't start with B, wth...");
             return Err(IpcError::EncodeDecodeError);
         }
     };
