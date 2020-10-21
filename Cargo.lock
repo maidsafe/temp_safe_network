@@ -3668,6 +3668,7 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
+source = "git+https://github.com/maidsafe/sn_client?branch=master#9bd835ab59e00848f569773d9d2ff4a5bf84c34f"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3722,6 +3723,7 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.11.23"
+source = "git+https://github.com/maidsafe/sn_data_types.git?branch=master#77e28d0e15d4e9d3d5ed3cebec509d0aa8af4f9f"
 dependencies = [
  "bincode",
  "crdts",
