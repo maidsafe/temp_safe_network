@@ -13,7 +13,7 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
-use sn_api::{Keypair, Safe};
+use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, Safe, SecretKey};
 use structopt::StructOpt;
 
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
@@ -45,6 +45,9 @@ pub enum KeysSubCommands {
         /// The secret key which corresponds to the target SafeKey. It will be prompted if not provided
         #[structopt(long = "sk")]
         secret: Option<String>,
+        /// The secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
+        #[structopt(long = "bls")]
+        is_bls: bool,
     },
     #[structopt(name = "transfer")]
     /// Transfer safecoins from one SafeKey to another, or to a Wallet
@@ -57,6 +60,13 @@ pub enum KeysSubCommands {
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
+        /// The from secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
+        #[structopt(long = "from-is-bls")]
+        from_is_bls: bool,
+        /// The target secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
+        #[structopt(long = "to-is-bls")]
+        to_is_bls: bool,
+        // TODO: BlsShare when we have multisig
     },
 }
 
@@ -86,16 +96,24 @@ pub async fn key_commander(
             print_new_key_output(output_fmt, xorurl, key_pair, amount);
             Ok(())
         }
-        KeysSubCommands::Balance { keyurl, secret } => {
+        KeysSubCommands::Balance {
+            keyurl,
+            secret,
+            is_bls,
+        } => {
             connect(safe).await?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
-            let current_balance = if target.is_empty() {
-                safe.keys_balance_from_sk(&sk).await
+            let sk = if is_bls {
+                SecretKey::from(bls_sk_from_hex(&sk)?)
             } else {
-                unimplemented!();
-                // TODO: reenable once we have wallet url parsing going again
-                // safe.keys_balance_from_url(&target, &sk).await
+                SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
+            };
+
+            let current_balance = if target.is_empty() {
+                safe.keys_balance_from_sk(sk).await
+            } else {
+                safe.keys_balance_from_url(&target, sk.clone()).await
             }?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -105,7 +123,13 @@ pub async fn key_commander(
             }
             Ok(())
         }
-        KeysSubCommands::Transfer { amount, from, to } => {
+        KeysSubCommands::Transfer {
+            amount,
+            from,
+            to,
+            to_is_bls: _,
+            from_is_bls: _,
+        } => {
             // TODO: don't connect if --from sk was passed
             connect(safe).await?;
 
@@ -166,14 +190,14 @@ pub async fn create_new_key(
                 .secret_key()
                 .map_err(|e| format!("Secret key error: {:?}", e))?;
             let keys_info = safe
-                .keys_create_and_preload_from_sk(&payee.to_string(), preload.as_deref())
+                .keys_create_and_preload_from_sk_string(&payee.to_string(), preload.as_deref())
                 .await?;
 
             xorurl = keys_info.0;
             key_pair = keys_info.1;
         } else {
             let keys_info = safe
-                .keys_create_and_preload_from_sk(&pay_with.unwrap(), preload.as_deref())
+                .keys_create_and_preload_from_sk_string(&pay_with.unwrap(), preload.as_deref())
                 .await?;
 
             xorurl = keys_info.0;

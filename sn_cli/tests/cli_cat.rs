@@ -306,7 +306,10 @@ fn calling_safe_cat_wallet_xorurl() {
 
     assert_eq!(balances[&key_xorurl].0, true);
     assert_eq!(balances[&key_xorurl].1.xorurl, key_xorurl);
-    assert_eq!(balances[&key_xorurl].1.sk, unwrap!(key_pair).sk);
+    assert_eq!(
+        balances[&key_xorurl].1.sk,
+        unwrap!(unwrap!(key_pair).secret_key()).to_string()
+    );
 
     assert_eq!(balances[&key_pk_xor].0, false);
     assert_eq!(balances[&key_pk_xor].1.xorurl, key_pk_xor);

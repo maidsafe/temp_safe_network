@@ -3723,7 +3723,6 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.11.23"
-source = "git+https://github.com/maidsafe/sn_data_types.git?branch=master#77e28d0e15d4e9d3d5ed3cebec509d0aa8af4f9f"
 dependencies = [
  "bincode",
  "crdts",

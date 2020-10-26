@@ -8,6 +8,7 @@
 // Software.
 
 use sn_client::ClientError;
+use sn_data_types::Error as DtError;
 use std::fmt;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -48,6 +49,12 @@ impl From<Error> for String {
 impl From<ClientError> for Error {
     fn from(error: ClientError) -> Error {
         Error::ClientError(error.to_string())
+    }
+}
+
+impl From<DtError> for Error {
+    fn from(error: DtError) -> Error {
+        Error::ContentError(error.to_string())
     }
 }
 

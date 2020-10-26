@@ -21,7 +21,7 @@ mod constants;
 mod errors;
 
 // re-export these useful types from sn_data_types
-pub use sn_data_types::{ClientFullId, Keypair};
+pub use sn_data_types::{ClientFullId, Keypair, SecretKey};
 
 #[cfg(feature = "app")]
 pub use app::*;
@@ -39,5 +39,7 @@ pub use authd_client::*;
 
 #[cfg(any(feature = "authenticator", feature = "authd_client"))]
 pub use common::auth_types::*;
+
+pub use common::{bls_sk_from_hex, ed_sk_from_hex};
 
 pub use errors::{Error, Result};
