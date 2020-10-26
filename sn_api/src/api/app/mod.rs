@@ -36,7 +36,9 @@ pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_coins_amount;
 pub use nrs::ProcessedEntries;
 use sn_data_types::Keypair;
+use std::sync::Arc;
 pub use xor_name::{XorName, XOR_NAME_LEN};
+
 // TODO: should we be cloning this?
 #[derive(Clone)]
 pub struct Safe {
@@ -58,7 +60,7 @@ impl Safe {
         }
     }
 
-    pub async fn keypair(&self) -> Result<Keypair> {
+    pub async fn keypair(&self) -> Result<Arc<Keypair>> {
         self.safe_client.keypair().await
     }
 }

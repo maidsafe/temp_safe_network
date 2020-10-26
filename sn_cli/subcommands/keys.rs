@@ -14,6 +14,7 @@ use super::{
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
 use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, Safe, SecretKey};
+use std::sync::Arc;
 use structopt::StructOpt;
 
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
@@ -109,7 +110,7 @@ pub async fn key_commander(
             } else {
                 SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
             };
-
+            let sk = Arc::new(sk);
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(sk).await
             } else {
@@ -161,7 +162,7 @@ pub async fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     _pk: Option<String>,
-) -> Result<(String, Option<Keypair>, Option<String>), String> {
+) -> Result<(String, Option<Arc<Keypair>>, Option<String>), String> {
     let (xorurl, key_pair, amount) = if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
@@ -207,13 +208,13 @@ pub async fn create_new_key(
         (xorurl, key_pair, preload)
     };
 
-    Ok((xorurl, Some(key_pair), amount))
+    Ok((xorurl, Some(Arc::new(key_pair)), amount))
 }
 
 pub fn print_new_key_output(
     output_fmt: OutputFmt,
     xorurl: String,
-    key_pair: Option<Keypair>,
+    key_pair: Option<Arc<Keypair>>,
     amount: Option<String>,
 ) {
     if OutputFmt::Pretty == output_fmt {

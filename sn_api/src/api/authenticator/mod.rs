@@ -26,7 +26,8 @@ use hmac::Hmac;
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::{ClientFullId, Keypair};
+use sn_data_types::Keypair;
+use std::sync::Arc;
 
 use xor_name::{XorName, XOR_NAME_LEN};
 
@@ -46,10 +47,10 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
 
 /// Create a new full id from seed
 #[allow(dead_code)]
-fn create_full_id_from_seed(seeder: &[u8]) -> ClientFullId {
+fn create_full_id_from_seed(seeder: &[u8]) -> Keypair {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
-    ClientFullId::new_ed25519(&mut rng)
+    Keypair::new_ed25519(&mut rng)
 }
 
 /// Create a new BLS sk from seed
@@ -392,7 +393,7 @@ impl SafeAuthenticator {
         let mut rng = OsRng;
 
         Ok(AuthGranted {
-            app_full_id: ClientFullId::new_ed25519(&mut rng),
+            app_keypair: Arc::new(Keypair::new_ed25519(&mut rng)),
             bootstrap_config: bootstrap_config()?,
         })
     }

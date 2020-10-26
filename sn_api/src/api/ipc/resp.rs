@@ -11,7 +11,8 @@
 use super::{BootstrapConfig, IpcError};
 
 use serde::{Deserialize, Serialize};
-use sn_data_types::ClientFullId;
+use sn_data_types::Keypair;
+use std::sync::Arc;
 
 /// IPC response.
 // TODO: `TransOwnership` variant
@@ -28,7 +29,7 @@ pub enum IpcResp {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct AuthGranted {
     /// The access keys.
-    pub app_full_id: ClientFullId,
+    pub app_keypair: Arc<Keypair>,
 
     /// The crust config.
     /// Useful to reuse bootstrap nodes and speed up access.

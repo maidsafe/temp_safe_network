@@ -39,7 +39,6 @@ pub async fn process_req(
             let mut safe_authenticator = safe_auth_handle.lock().await;
             // let key_pair = get_sk_from_input(passphrase, password);
             // let sk = key_pair.secret_key().map_err(|e| format!("{:?}", e))?;
-            // let full_id = ClientFullId::from(key_pair);
 
             match safe_authenticator.log_in(passphrase, password).await {
                 Ok(_) => {

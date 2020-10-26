@@ -21,7 +21,7 @@ mod constants;
 mod errors;
 
 // re-export these useful types from sn_data_types
-pub use sn_data_types::{ClientFullId, Keypair, SecretKey};
+pub use sn_data_types::{Keypair, SecretKey};
 
 #[cfg(feature = "app")]
 pub use app::*;

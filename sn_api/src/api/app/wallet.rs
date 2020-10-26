@@ -16,7 +16,7 @@ use crate::{
 
 use log::debug;
 use serde::{Deserialize, Serialize};
-use sn_data_types::{ClientFullId, Keypair, MapValue, Money};
+use sn_data_types::{Keypair, MapValue, Money};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 
@@ -202,7 +202,7 @@ impl Safe {
             debug!("Checking wallet of name: {:?}", name);
             let secret_key = ed_sk_from_hex(&balance.sk)?;
 
-            let id = ClientFullId::from(secret_key);
+            let id = Keypair::from(secret_key);
             let current_balance = self
                 .safe_client
                 .read_balance_from_full_id(id)
@@ -375,7 +375,7 @@ impl Safe {
         )
         .await?;
         let from_sk = ed_sk_from_hex(&from_wallet_balance.sk)?;
-        let full_id = ClientFullId::from(from_sk);
+        let full_id = Keypair::from(from_sk);
         // Finally, let's make the transfer
         match self
             .safe_client
@@ -558,6 +558,7 @@ async fn resolve_wallet_url(
 mod tests {
     use super::*;
     use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_wallet_create() -> Result<()> {
@@ -612,7 +613,7 @@ mod tests {
             &wallet_xorurl,
             Some("my-first-balance"),
             true,
-            &key_pair1.clone().secret_key()?.to_string(),
+            &key_pair1.secret_key()?.to_string(),
         )
         .await?;
 
@@ -620,7 +621,7 @@ mod tests {
             &wallet_xorurl,
             Some("my-second-balance"),
             false,
-            &key_pair2.clone().secret_key()?.to_string(),
+            &key_pair2.secret_key()?.to_string(),
         )
         .await?;
 
@@ -652,7 +653,7 @@ mod tests {
             &wallet_xorurl,
             Some("my-first-balance"),
             true,
-            &key_pair1.clone().secret_key()?.to_string(),
+            &key_pair1.secret_key()?.to_string(),
         )
         .await?;
 
@@ -660,7 +661,7 @@ mod tests {
             &wallet_xorurl,
             Some("my-second-balance"),
             true,
-            &key_pair2.clone().secret_key()?.to_string(),
+            &key_pair2.secret_key()?.to_string(),
         )
         .await?;
 
@@ -913,7 +914,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.clone().secret_key()?.to_string(),
+            &key_pair1.secret_key()?.to_string(),
         )
         .await?;
 
@@ -945,7 +946,7 @@ mod tests {
                     from_current_balance
                 );
                 let key_current_balance =
-                    safe.keys_balance_from_sk(key_pair2.secret_key()?).await?;
+                    safe.keys_balance_from_sk(Arc::new(key_pair2.secret_key()?)).await?;
                 assert_eq!("533.870000000", key_current_balance);
                 Ok(())
             }
@@ -988,7 +989,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.clone().secret_key()?.to_string(),
+            &key_pair1.secret_key()?.to_string(),
         )
         .await?;
 
@@ -1026,7 +1027,7 @@ mod tests {
                 let from_current_balance = safe.wallet_balance(&from_nrsurl).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
                 let key_current_balance =
-                    safe.keys_balance_from_sk(key_pair2.secret_key()?).await?;
+                    safe.keys_balance_from_sk(Arc::new(key_pair2.secret_key()?)).await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
                 Ok(())
             }
@@ -1051,7 +1052,7 @@ mod tests {
             &from_wallet_xorurl,
             Some("from-second-balance"),
             false,
-            &key_pair2.clone().secret_key()?.to_string(),
+            &key_pair2.secret_key()?.to_string(),
         )
         .await?;
 
@@ -1061,7 +1062,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &key_pair3.clone().secret_key()?.to_string(),
+            &key_pair3.secret_key()?.to_string(),
         )
         .await?;
 
@@ -1141,7 +1142,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &key_pair2.clone().secret_key()?.to_string(),
+            &key_pair2.secret_key()?.to_string(),
         )
         .await?;
 
@@ -1150,7 +1151,7 @@ mod tests {
             &to_wallet_xorurl,
             Some("to-second-balance"),
             false,
-            &key_pair3.clone().secret_key()?.to_string(),
+            &key_pair3.secret_key()?.to_string(),
         )
         .await?;
 
@@ -1212,7 +1213,7 @@ mod tests {
                 &from_wallet_xorurl,
                 Some("from-first-balance"),
                 true, // set --default
-                &key_pair1.clone().secret_key()?.to_string(),
+                &key_pair1.secret_key()?.to_string(),
             )
             .await?;
 
@@ -1221,7 +1222,7 @@ mod tests {
                 &from_wallet_xorurl,
                 Some("from-second-balance"),
                 false,
-                &key_pair2.clone().secret_key()?.to_string(),
+                &key_pair2.secret_key()?.to_string(),
             )
             .await?;
             from_wallet_xorurl
@@ -1234,7 +1235,7 @@ mod tests {
                 &to_wallet_xorurl,
                 Some("to-first-balance"),
                 true, // set --default
-                &key_pair3.clone().secret_key()?.to_string(),
+                &key_pair3.secret_key()?.to_string(),
             )
             .await?;
 
@@ -1243,7 +1244,7 @@ mod tests {
                 &to_wallet_xorurl,
                 Some("to-second-balance"),
                 false,
-                &key_pair4.clone().secret_key()?.to_string(),
+                &key_pair4.secret_key()?.to_string(),
             )
             .await?;
             to_wallet_xorurl

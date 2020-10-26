@@ -16,6 +16,7 @@ use super::{
 };
 use log::debug;
 use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, Safe, SecretKey};
+use std::sync::Arc;
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -129,7 +130,7 @@ pub async fn wallet_commander(
         } => {
             // create wallet
             let wallet_xorurl = safe.wallet_create().await?;
-            let mut key_generated_output: (String, Option<Keypair>, Option<String>) =
+            let mut key_generated_output: (String, Option<Arc<Keypair>>, Option<String>) =
                 Default::default();
             if !no_balance {
                 // get or create keypair
@@ -141,15 +142,16 @@ pub async fn wallet_commander(
                         } else {
                             SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
                         };
+                        let sk = Arc::new(sk);
                         let _pk = safe.validate_sk_for_url(sk.clone(), &linked_key).await?;
                         sk
                     }
                     None => match secret_key {
                         Some(sk) => {
                             if is_bls {
-                                SecretKey::from(bls_sk_from_hex(&sk)?)
+                                Arc::new(SecretKey::from(bls_sk_from_hex(&sk)?))
                             } else {
-                                SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
+                                Arc::new(SecretKey::Ed25519(ed_sk_from_hex(&sk)?))
                             }
                         }
                         None => {
@@ -159,9 +161,11 @@ pub async fn wallet_commander(
                                 .1
                                 .clone()
                                 .ok_or("Failed to read the generated key pair")?;
-                            unwrapped_key_pair
+                            let sk = unwrapped_key_pair
                                 .secret_key()
-                                .map_err(|e| format!("{:?}", e))?
+                                .map_err(|e| format!("{:?}", e))?;
+                            // sk
+                            Arc::new(sk)
                         }
                     },
                 };
@@ -245,6 +249,8 @@ pub async fn wallet_commander(
                         SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
                     };
 
+                    let sk = Arc::new(sk);
+
                     let _pk = safe.validate_sk_for_url(sk.clone(), &linked_key).await?;
                     sk
                 }
@@ -255,7 +261,7 @@ pub async fn wallet_commander(
                     } else {
                         SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
                     };
-                    sk
+                    Arc::new(sk)
                 }
             };
 

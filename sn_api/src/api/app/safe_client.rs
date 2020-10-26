@@ -14,12 +14,13 @@ use log::{debug, info, warn};
 
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
-    Blob, BlobAddress, ClientFullId, Error as SafeNdError, Keypair, Map, MapAction, MapAddress,
-    MapEntryActions, MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money,
-    PublicBlob, PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
+    Blob, BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob,
+    PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use xor_name::XorName;
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -44,9 +45,9 @@ impl SafeAppClient {
         Self { safe_client: None }
     }
 
-    pub async fn keypair(&self) -> Result<Keypair> {
+    pub async fn keypair(&self) -> Result<Arc<Keypair>> {
         if let Some(client) = &self.safe_client {
-            let kp = client.full_id().await.keypair().clone();
+            let kp = client.keypair().await.clone();
 
             Ok(kp)
         } else {
@@ -93,7 +94,7 @@ impl SafeAppClient {
     }
 
     // === Money operations ===
-    pub async fn read_balance_from_full_id(&mut self, id: ClientFullId) -> Result<Money> {
+    pub async fn read_balance_from_full_id(&mut self, id: Keypair) -> Result<Money> {
         let mut temp_client = Client::new(Some(id)).await?;
         let coins = temp_client
             .get_balance()
@@ -114,7 +115,7 @@ impl SafeAppClient {
 
     pub async fn safecoin_transfer_to_xorname(
         &mut self,
-        from_id: Option<ClientFullId>,
+        from_id: Option<Keypair>,
         _to_xorname: XorName,
         _amount: Money,
     ) -> Result<()> {
@@ -130,7 +131,7 @@ impl SafeAppClient {
         // let to_pk = self.fetch(format!("safe://{:?}", to_xorname));
         // let to_url  = xorurl::SafeUrl::from::<XorName>(to_xorname);
 
-        // let from_fullid = from_sk.map(ClientFullId::from);
+        // let from_fullid = from_sk.map(Keypair::from);
         // let transfer_id = client
         //     .send_money( to_xorname, amount)
         //     .await
@@ -151,7 +152,7 @@ impl SafeAppClient {
     #[allow(dead_code)]
     pub async fn safecoin_transfer_to_pk(
         &mut self,
-        from_id: Option<ClientFullId>,
+        from_id: Option<Keypair>,
         to_pk: PublicKey,
         amount: Money,
     ) -> Result<(u64, SafeNdPublicKey)> {
