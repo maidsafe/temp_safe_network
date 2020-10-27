@@ -9,7 +9,7 @@
 
 use crate::{Error, Result, SafeAuthReq, SafeAuthReqId};
 
-use log::{debug, info, trace};
+use log::{debug, info};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
 
