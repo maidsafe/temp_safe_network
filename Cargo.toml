@@ -3,10 +3,6 @@ members = ["sn_cli", "sn_api", "sn_authd", "qjsonrpc"]
 
 
 [patch.crates-io]
-sn_data_types = { git ="https://github.com/joshuef/sn_data_types", branch ="Feat-RemovePublicIds" }
-sn_transfers = { git ="https://github.com/joshuef/sn_transfers", branch ="Feat-RelyOnKeypairsInArc" }
 # sn_data_types =  { path="../safe-nd" }
 # sn_transfers =  { path="../safe-transfers" }
 
-# self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "master" }
-# sn_transfers= { git = "https://github.com/maidsafe/sn_transfers.git", branch = "master" }

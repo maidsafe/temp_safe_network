@@ -261,7 +261,9 @@ mod tests {
                 Some(preload_amount),
             )
             .await?;
-        let balance = safe.keys_balance_from_sk(Arc::new(keypair.secret_key()?)).await?;
+        let balance = safe
+            .keys_balance_from_sk(Arc::new(keypair.secret_key()?))
+            .await?;
         assert_eq!(balance, preload_amount);
         Ok(())
     }
@@ -359,7 +361,9 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let preload_amount = "1.154200000";
         let (_xorurl, keypair) = safe.keys_create_preload_test_coins(preload_amount).await?;
-        let current_balance = safe.keys_balance_from_sk(Arc::new(keypair.secret_key()?)).await?;
+        let current_balance = safe
+            .keys_balance_from_sk(Arc::new(keypair.secret_key()?))
+            .await?;
         assert_eq!(preload_amount, current_balance);
         Ok(())
     }
@@ -480,7 +484,9 @@ mod tests {
             from_current_balance
         );
 
-        let to_current_balance = safe.keys_balance_from_sk(Arc::new(to_keypair.secret_key()?)).await?;
+        let to_current_balance = safe
+            .keys_balance_from_sk(Arc::new(to_keypair.secret_key()?))
+            .await?;
         assert_eq!(amount, to_current_balance);
         Ok(())
     }
@@ -641,10 +647,13 @@ mod tests {
                 msg
             ))),
             Ok(_) => {
-                let from_current_balance =
-                    safe.keys_balance_from_sk(Arc::new(keypair2.secret_key()?)).await?;
+                let from_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(keypair2.secret_key()?))
+                    .await?;
                 assert_eq!("0.100000000", from_current_balance);
-                let to_current_balance = safe.keys_balance_from_sk(Arc::new(keypair1.secret_key()?)).await?;
+                let to_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(keypair1.secret_key()?))
+                    .await?;
                 assert_eq!("100.900000000", to_current_balance);
                 Ok(())
             }
@@ -680,8 +689,9 @@ mod tests {
                 msg
             ))),
             Ok(_) => {
-                let from_current_balance =
-                    safe.keys_balance_from_sk(Arc::new(keypair2.secret_key()?)).await?;
+                let from_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(keypair2.secret_key()?))
+                    .await?;
                 assert_eq!(
                     "4097.580000000", /* 4621.45 - 523.87 */
                     from_current_balance
@@ -714,10 +724,13 @@ mod tests {
                 msg
             ))),
             Ok(_) => {
-                let from_current_balance =
-                    safe.keys_balance_from_sk(Arc::new(keypair1.secret_key()?)).await?;
+                let from_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(keypair1.secret_key()?))
+                    .await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-                let to_current_balance = safe.keys_balance_from_sk(Arc::new(keypair2.secret_key()?)).await?;
+                let to_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(keypair2.secret_key()?))
+                    .await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, to_current_balance);
                 Ok(())
             }

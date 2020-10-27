@@ -29,7 +29,7 @@ rand_core = "~0.5.1"
 relative-path = "~0.4.0"
 sn_client = { path="../../scl" }
 # sn_client = { git = "https://github.com/maidsafe/sn_client", branch = "master" }
-sn_data_types = "~0.11.22"
+sn_data_types = "~0.11.24"
 serde = "1.0.91"
 serde_json = "1.0.41"
 threshold_crypto = "~0.4.0"

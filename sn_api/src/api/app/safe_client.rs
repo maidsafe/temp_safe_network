@@ -47,7 +47,7 @@ impl SafeAppClient {
 
     pub async fn keypair(&self) -> Result<Arc<Keypair>> {
         if let Some(client) = &self.safe_client {
-            let kp = client.keypair().await.clone();
+            let kp = client.keypair().await;
 
             Ok(kp)
         } else {

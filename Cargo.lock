@@ -3722,8 +3722,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.23"
-source = "git+https://github.com/joshuef/sn_data_types?branch=Feat-RemovePublicIds#6f43d400e5b4d6781892c50e30cb75ec1aca9662"
+version = "0.11.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c86571e80211b58999a1a4ef26387cf9237bb8384f7fbdaee1135e3f0de07435"
 dependencies = [
  "bincode",
  "crdts",
@@ -3756,8 +3757,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.2.1"
-source = "git+https://github.com/joshuef/sn_transfers?branch=Feat-RelyOnKeypairsInArc#39d44e245bb949e41a61827550b47232631e53f1"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95eb9402be53656d9b00fdb678f1579e759c6221661c80c0dd813267e96718e3"
 dependencies = [
  "bincode",
  "crdts",
@@ -4782,11 +4784,10 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "1.1.1"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b5e1c32f53acd1796cf9806824b96ba6b43e0d5fd9faeb7a7fc24581b1242d2"
+checksum = "c2c919e0880f952abb1de3b5794c4e186e15b78ed57d61e345b1dd731be96863"
 dependencies = [
- "log",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",

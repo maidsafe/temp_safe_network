@@ -945,8 +945,9 @@ mod tests {
                     "4097.580000000", /* 4621.45 - 523.87 */
                     from_current_balance
                 );
-                let key_current_balance =
-                    safe.keys_balance_from_sk(Arc::new(key_pair2.secret_key()?)).await?;
+                let key_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(key_pair2.secret_key()?))
+                    .await?;
                 assert_eq!("533.870000000", key_current_balance);
                 Ok(())
             }
@@ -1026,8 +1027,9 @@ mod tests {
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_nrsurl).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-                let key_current_balance =
-                    safe.keys_balance_from_sk(Arc::new(key_pair2.secret_key()?)).await?;
+                let key_current_balance = safe
+                    .keys_balance_from_sk(Arc::new(key_pair2.secret_key()?))
+                    .await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
                 Ok(())
             }
