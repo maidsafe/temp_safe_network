@@ -94,7 +94,7 @@ impl SafeAppClient {
     }
 
     // === Money operations ===
-    pub async fn read_balance_from_full_id(&mut self, id: Keypair) -> Result<Money> {
+    pub async fn read_balance_from_keypair(&mut self, id: Keypair) -> Result<Money> {
         let mut temp_client = Client::new(Some(id)).await?;
         let coins = temp_client
             .get_balance()

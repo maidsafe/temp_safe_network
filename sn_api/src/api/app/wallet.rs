@@ -205,7 +205,7 @@ impl Safe {
             let id = Keypair::from(secret_key);
             let current_balance = self
                 .safe_client
-                .read_balance_from_full_id(id)
+                .read_balance_from_keypair(id)
                 .await
                 .map_err(|_| {
                     Error::ContentNotFound("One of the SafeKey's was not found".to_string())
@@ -375,11 +375,11 @@ impl Safe {
         )
         .await?;
         let from_sk = ed_sk_from_hex(&from_wallet_balance.sk)?;
-        let full_id = Keypair::from(from_sk);
+        let keypair = Keypair::from(from_sk);
         // Finally, let's make the transfer
         match self
             .safe_client
-            .safecoin_transfer_to_xorname(Some(full_id), to_xorname, amount_coins)
+            .safecoin_transfer_to_xorname(Some(keypair), to_xorname, amount_coins)
             .await
         {
             Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(

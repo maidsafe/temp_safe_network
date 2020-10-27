@@ -47,7 +47,7 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
 
 /// Create a new full id from seed
 #[allow(dead_code)]
-fn create_full_id_from_seed(seeder: &[u8]) -> Keypair {
+fn create_keypair_from_seed(seeder: &[u8]) -> Keypair {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
     Keypair::new_ed25519(&mut rng)
@@ -200,16 +200,20 @@ impl SafeAuthenticator {
         // TODO properly derive an Map location
         let _map_data_location = generate_network_address(&keyword, &salt);
 
-        // TODO: use a combo of derived inputs for seed here.
-        let seed = password;
-        // seed.extend(salt.iter());
-        let id = create_full_id_from_seed(&seed);
+        let mut seed = password;
+        seed.extend(keyword);
+        seed.extend(salt);
 
-        let auth_client = Client::new(Some(id)).await?;
+        let keypair = create_keypair_from_seed(&seed);
+        
+        debug!("Creating account with PK: {:?}", &keypair.public_key() );
+
+        let auth_client = Client::new(Some(keypair)).await?;
 
         self.authenticator_client = Some(auth_client);
 
         debug!("Client instantiated properly!");
+
 
         // TODO: actually create and put Map data to be used in storage of apps.
 
@@ -267,12 +271,15 @@ impl SafeAuthenticator {
         // TODO properly derive an Map location
         let _map_data_location = generate_network_address(&keyword, &salt);
 
-        // TODO: use a combo of derived inputs for seed here.
-        let seed = password;
-        // seed.extend(salt.iter());
-        let id = create_full_id_from_seed(&seed);
+        
+        let mut seed = password;
+        seed.extend(keyword);
+        seed.extend(salt);
 
-        let auth_client = Client::new(Some(id)).await?;
+        let keypair = create_keypair_from_seed(&seed);
+        debug!("Logging in w/ pk: {:?}", keypair.public_key());
+
+        let auth_client = Client::new(Some(keypair)).await?;
 
         self.authenticator_client = Some(auth_client);
 
