@@ -46,7 +46,6 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
 }
 
 /// Create a new full id from seed
-#[allow(dead_code)]
 fn create_keypair_from_seed(seeder: &[u8]) -> Keypair {
     let seed = sha3_256(&seeder);
     let mut rng = StdRng::from_seed(seed);
@@ -70,17 +69,17 @@ fn create_ed25519_sk_from_seed(seeder: &[u8]) -> Keypair {
     Keypair::new_ed25519(&mut rng)
 }
 
-pub fn get_sk_from_input(passphrase: &str, password: &str) -> Keypair {
-    // TODO: Q what is the need for this third secret?
+/// Perform all derivations and seeding to deterministically obtain location and Keypair from input
+pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(XorName, Keypair)> {
     let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
-    // TODO properly derive an Map location
-    let _map_data_location = generate_network_address(&keyword, &salt);
+    let map_data_location = generate_network_address(&keyword, &salt)?;
 
-    // TODO: use a combo of derived inputs for seed here.
     let mut seed = password;
     seed.extend(salt.iter());
-    create_ed25519_sk_from_seed(&seed)
+    let keypair = create_keypair_from_seed(&seed);
+
+    Ok((map_data_location, keypair))
 }
 
 // /// use password based crypto
@@ -190,30 +189,15 @@ impl SafeAuthenticator {
     pub async fn create_acc(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a Safe account from provided password and passphrase.");
 
-        // TODO derive SK from passphrase etc. Put data storage blob on network.
+        let (_location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        trace!("Creating an account...");
-
-        // TODO: Q what is the need for this third secret?
-        let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
-
-        // TODO properly derive an Map location
-        let _map_data_location = generate_network_address(&keyword, &salt);
-
-        let mut seed = password;
-        seed.extend(keyword);
-        seed.extend(salt);
-
-        let keypair = create_keypair_from_seed(&seed);
-        
-        debug!("Creating account with PK: {:?}", &keypair.public_key() );
+        debug!("Creating account with PK: {:?}", &keypair.public_key());
 
         let auth_client = Client::new(Some(keypair)).await?;
 
         self.authenticator_client = Some(auth_client);
 
         debug!("Client instantiated properly!");
-
 
         // TODO: actually create and put Map data to be used in storage of apps.
 
@@ -265,18 +249,8 @@ impl SafeAuthenticator {
     pub async fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to log in...");
 
-        // TODO: Q what is the need for this third secret?
-        let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
+        let (_location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        // TODO properly derive an Map location
-        let _map_data_location = generate_network_address(&keyword, &salt);
-
-        
-        let mut seed = password;
-        seed.extend(keyword);
-        seed.extend(salt);
-
-        let keypair = create_keypair_from_seed(&seed);
         debug!("Logging in w/ pk: {:?}", keypair.public_key());
 
         let auth_client = Client::new(Some(keypair)).await?;
@@ -508,5 +482,42 @@ pub async fn decode_ipc_msg(
         IpcMsg::Resp { .. } | IpcMsg::Revoked { .. } | IpcMsg::Err(..) => Err(Error::AuthError(
             "Invalid Authenticator IPC Message".to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    use sn_data_types::PublicKey;
+
+    #[test]
+    fn get_deterministic_pk_from_known_seed() -> Result<()> {
+        let seed = b"bacon";
+        let pk = create_keypair_from_seed(seed).public_key();
+
+        let public_key_bytes: [u8; ed25519_dalek::PUBLIC_KEY_LENGTH] = [
+            239, 124, 31, 157, 76, 101, 124, 119, 164, 143, 80, 234, 249, 84, 0, 22, 91, 128, 67,
+            92, 39, 182, 197, 184, 83, 44, 41, 127, 78, 175, 205, 198,
+        ];
+
+        let ed_pk = ed25519_dalek::PublicKey::from_bytes(&public_key_bytes)
+            .map_err(|_| Error::Unexpected("Cannot deserialise expected key".to_string()))?;
+        let expected_pk = PublicKey::from(ed_pk);
+
+        assert_eq!(pk, expected_pk);
+
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn _pt_always_get_same_pk_from_seed(s in "\\PC*") {
+            let s = s.into_bytes();
+            let pk = create_keypair_from_seed(&s).public_key();
+            let pk_again = create_keypair_from_seed(&s).public_key();
+
+            prop_assert_eq!(pk, pk_again);
+        }
     }
 }

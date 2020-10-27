@@ -53,6 +53,7 @@ default = ["authenticator", "authd_client", "app"]
 
 [dev-dependencies]
 tokio = { version = "~0.2.21", features = ["macros"] }
+proptest = "0.10.1"
 
 [dev-dependencies.cargo-husky]
 version = "1"
