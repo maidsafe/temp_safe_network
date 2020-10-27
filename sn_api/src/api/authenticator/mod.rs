@@ -512,12 +512,11 @@ mod tests {
 
     proptest! {
         #[test]
-        fn _pt_always_get_same_pk_from_seed(s in "\\PC*") {
-            let s = s.into_bytes();
-            let pk = create_keypair_from_seed(&s).public_key();
-            let pk_again = create_keypair_from_seed(&s).public_key();
-
-            prop_assert_eq!(pk, pk_again);
+        fn proptest_always_get_same_info_from_from_phrase_and_pw(s in "\\PC*", p in "//PC*") {
+            let (location, keypair) = derive_location_and_keypair(&s, &p).expect("could not derive location/keypair");
+            let (location_again, keypair_again) = derive_location_and_keypair(&s, &p).expect("could not derive location/keypair");
+            prop_assert_eq!(location, location_again);
+            prop_assert_eq!(keypair, keypair_again);
         }
     }
 }
