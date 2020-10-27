@@ -1,8 +1,2 @@
 [workspace]
 members = ["sn_cli", "sn_api", "sn_authd", "qjsonrpc"]
-
-
-[patch.crates-io]
-# sn_data_types =  { path="../safe-nd" }
-# sn_transfers =  { path="../safe-transfers" }
-
