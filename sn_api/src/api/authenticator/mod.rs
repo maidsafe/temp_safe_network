@@ -512,7 +512,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn proptest_always_get_same_info_from_from_phrase_and_pw(s in "\\PC*", p in "//PC*") {
+        fn proptest_always_get_same_info_from_from_phrase_and_pw(s in "\\PC*", p in "\\PC*") {
             let (location, keypair) = derive_location_and_keypair(&s, &p).expect("could not derive location/keypair");
             let (location_again, keypair_again) = derive_location_and_keypair(&s, &p).expect("could not derive location/keypair");
             prop_assert_eq!(location, location_again);
