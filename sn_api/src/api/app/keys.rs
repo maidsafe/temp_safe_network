@@ -23,7 +23,7 @@ use xor_name::XorName;
 
 impl Safe {
     // Generate a key pair without creating and/or storing a SafeKey on the network
-    pub fn generate_random_keypair(&self) -> Result<Keypair> {
+    pub fn generate_random_ed_keypair(&self) -> Result<Keypair> {
         let mut rng = OsRng;
         let keypair = Keypair::new_ed25519(&mut rng);
         Ok(keypair)
