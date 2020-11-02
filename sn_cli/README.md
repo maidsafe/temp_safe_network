@@ -871,6 +871,12 @@ Success. TX_ID: 277748716389078887
 
 ### Files
 
+#### [ Warning: Underlying API to be deprecated ]
+
+The underlying files apis used in the CLI, and perhaps much of the CLI will be deprecated in order to use [`sn_fs`](https://github.com/maidsafe/sn_fs) at some point. This is a FUSE based filesystem which is much more comprehensive and performant. It's not yet known the impact (if any) this will have on the CLI commands. But if you're interested in a fiulesystem on SAFE, `sn_fs` is most definitely here you should be looking at the moment.
+
+#### Files...
+
 Uploading files and folders onto the network is also possible with the CLI application, and as we'll see here it's extremely simple to not just upload them but also keep them in sync with any modifications made locally to the folders and files.
 
 Files are uploaded on the Network and stored as `Public Blob` files, and the folders and sub-folders hierarchy is flattened out and stored in a container mapping each file's path with the corresponding `Blob` XOR-URL. This map is maintained on the Network in a special container called `FilesContainer`, which is stored as `Public Sequence` data. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework) and the corresponding `FilesContainer` RFC will be submitted, but at this stage this is being done only using a simple serialised structure.
