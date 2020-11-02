@@ -459,13 +459,6 @@ impl SafeAppClient {
                 })?
         };
 
-        let _op = safe_client
-            .append_to_sequence(address, data.to_vec())
-            .await
-            .map_err(|e| {
-                Error::NetDataError(format!("Failed to append data to the Sequence: {:?}", e))
-            })?;
-
         Ok(xorname)
     }
 
