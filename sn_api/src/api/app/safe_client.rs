@@ -419,7 +419,7 @@ impl SafeAppClient {
         let user_acc_owner = safe_client.public_key().await;
 
         // Store the Sequence on the network
-        let address = if private {
+        let _address = if private {
             // Set permissions for append, delete, and manage perms to this application
             let mut perms = BTreeMap::default();
             let _ = perms.insert(
