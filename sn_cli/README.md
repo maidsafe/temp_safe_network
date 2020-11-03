@@ -873,7 +873,7 @@ Success. TX_ID: 277748716389078887
 
 #### [ Warning: Underlying API to be deprecated ]
 
-The underlying files apis used in the CLI, and perhaps much of the CLI will be deprecated in order to use [`sn_fs`](https://github.com/maidsafe/sn_fs) at some point. This is a FUSE based filesystem which is much more comprehensive and performant. It's not yet known the impact (if any) this will have on the CLI commands. But if you're interested in a fiulesystem on SAFE, `sn_fs` is most definitely here you should be looking at the moment.
+The underlying files APIs used in the CLI, and perhaps much of the CLI will be deprecated in order to use [`sn_fs`](https://github.com/maidsafe/sn_fs) at some point. This is a POSIX based filesystem which is much more comprehensive and performant. It's not yet known the impact (if any) this will have on the CLI commands. But if you're interested in a filesystem on SAFE, `sn_fs` is most definitely where you should be looking at the moment.
 
 #### Files...
 
