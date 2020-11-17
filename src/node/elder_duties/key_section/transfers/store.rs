@@ -25,7 +25,7 @@ pub struct TransferStore {
 impl TransferStore {
     pub fn new(id: XorName, root_dir: &PathBuf, init_mode: Init) -> Result<Self> {
         let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
-        let db_name = format!("{}{}", id.to_db_key(), DB_EXTENSION);
+        let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         Ok(Self {
             id,
             // db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
@@ -50,16 +50,16 @@ impl TransferStore {
             .iter()
             .filter_map(|key| self.db.get::<ReplicaEvent>(key))
             .collect();
-        events
-    }
 
-    ///
+            
+        trace!("all events {:?} ", events);
+
     pub fn try_insert(&mut self, event: ReplicaEvent) -> Result<()> {
         debug!("Trying to insert replica event: {:?}", event.clone());
         match event {
             ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {
-                let key = &e.id().to_db_key();
+                let key = &e.id().to_db_key()?;
                 if self.db.exists(key) {
                     return Err(Error::Logic("Key exists.".to_string()));
                 }
@@ -69,7 +69,7 @@ impl TransferStore {
                     .map_err(|error| Error::PickleDb(error))
             }
             ReplicaEvent::TransferValidated(e) => {
-                let key = &e.id().to_db_key();
+                let key = &e.id().to_db_key()?;
                 if self.db.exists(key) {
                     return Err(Error::Logic("Key exists.".to_string()));
                 }
@@ -78,7 +78,7 @@ impl TransferStore {
                     .map_err(|error| Error::PickleDb(error))
             }
             ReplicaEvent::TransferRegistered(e) => {
-                let key = &e.id().to_db_key();
+                let key = &e.id().to_db_key()?;
                 if self.db.exists(key) {
                     return Err(Error::Logic("Key exists.".to_string()));
                 }
