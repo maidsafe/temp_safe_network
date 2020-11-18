@@ -47,6 +47,12 @@ impl From<Error> for String {
     }
 }
 
+impl From<String> for Error {
+    fn from(str: String) -> Self {
+        Error::Unknown(str)
+    }
+}
+
 impl From<ClientError> for Error {
     fn from(error: ClientError) -> Error {
         Error::ClientError(error.to_string())

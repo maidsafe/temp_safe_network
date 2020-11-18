@@ -16,7 +16,7 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType, XorUrlEncoder},
-    Keypair,
+    Error, Keypair, Result,
 };
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
@@ -24,7 +24,6 @@ use sn_cmd_test_utilities::{
     test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
-use unwrap::unwrap;
 
 const TEST_DATA: &str = "../testdata/";
 const TEST_FILE: &str = "../testdata/test.md";
@@ -35,7 +34,7 @@ const ANOTHER_FILE: &str = "../testdata/another.md";
 const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
-fn calling_safe_cat() {
+fn calling_safe_cat() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -44,25 +43,26 @@ fn calling_safe_cat() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &map[TEST_FILE].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
+    let xorurl_encoder = XorUrlEncoder::from_url(&map[TEST_FILE].1)?;
     assert_eq!(
         xorurl_encoder.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
     assert_eq!(xorurl_encoder.data_type(), SafeDataType::PublicBlob);
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_subfolders() {
+fn calling_safe_cat_subfolders() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -72,7 +72,7 @@ fn calling_safe_cat_subfolders() {
         "--recursive",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
 
@@ -83,7 +83,7 @@ fn calling_safe_cat_subfolders() {
         "--json",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_xorurl, filesmap) = parse_files_container_output(&content);
 
@@ -91,10 +91,11 @@ fn calling_safe_cat_subfolders() {
     assert_eq!(filesmap["/emptyfolder"]["size"], "0");
     assert_eq!(filesmap["/subfolder"]["type"], "inode/directory");
     assert_eq!(filesmap["/subfolder"]["size"], "0");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_on_relative_file_from_id_fails() {
+fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -103,20 +104,21 @@ fn calling_safe_cat_on_relative_file_from_id_fails() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
 
     let relative_url = format!("{}/something_relative.wasm", &map[TEST_FILE].1);
     cmd.args(&vec!["cat", &relative_url])
         .assert()
         .stderr(predicate::str::contains(ID_RELATIVE_FILE_ERROR))
         .failure();
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_hexdump() {
+fn calling_safe_cat_hexdump() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -125,25 +127,26 @@ fn calling_safe_cat_hexdump() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", "--hexdump", &map[TEST_FILE].1])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
         .success();
 
-    let xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&map[TEST_FILE].1));
+    let xorurl_encoder = XorUrlEncoder::from_url(&map[TEST_FILE].1)?;
     assert_eq!(
         xorurl_encoder.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
     assert_eq!(xorurl_encoder.data_type(), SafeDataType::PublicBlob);
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_xorurl_url_with_version() {
+fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -152,14 +155,14 @@ fn calling_safe_cat_xorurl_url_with_version() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&container_xorurl)?;
     xorurl_encoder.set_path("/test.md");
     xorurl_encoder.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec![
         "files",
         "sync",
@@ -170,35 +173,36 @@ fn calling_safe_cat_xorurl_url_with_version() {
     .success();
 
     xorurl_encoder.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
     xorurl_encoder.set_content_version(Some(0));
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
     xorurl_encoder.set_content_version(Some(1));
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
     xorurl_encoder.set_content_version(Some(2));
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .failure();
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_nrsurl_with_version() {
+fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -207,7 +211,7 @@ fn calling_safe_cat_nrsurl_with_version() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
@@ -220,20 +224,20 @@ fn calling_safe_cat_nrsurl_with_version() {
         &container_xorurl,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let nrsurl_with_path = format!("{}/test.md", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &nrsurl_with_path])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
     // let's sync with another file so we get a new version, and a different content in the file
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&container_xorurl)?;
     xorurl_encoder.set_path("/test.md");
     xorurl_encoder.set_content_version(None);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec![
         "files",
         "sync",
@@ -245,7 +249,7 @@ fn calling_safe_cat_nrsurl_with_version() {
 
     // NRS name was not updated (with --updated-nrs) when doing files sync,
     // so our file should not have been updated
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &nrsurl_with_path])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -253,7 +257,7 @@ fn calling_safe_cat_nrsurl_with_version() {
 
     // NRS name has only one version which is 0, so using version 0 should also fetch the file
     let nrsurl_with_path_v0 = format!("{}/test.md?v=0", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &nrsurl_with_path_v0])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
@@ -261,14 +265,15 @@ fn calling_safe_cat_nrsurl_with_version() {
 
     // there is no version 1 of NRS name
     let invalid_version_nrsurl = format!("{}/test.md?v=1", nrsurl);
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["cat", &invalid_version_nrsurl])
         .assert()
         .failure();
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_wallet_xorurl() {
+fn calling_safe_cat_wallet_xorurl() -> Result<()> {
     let wallet_create = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "wallet",
@@ -277,12 +282,13 @@ fn calling_safe_cat_wallet_xorurl() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
     let (wallet_xorurl, key_xorurl, key_pair): (String, String, Option<Keypair>) =
-        serde_json::from_str(&wallet_create)
-            .expect("Failed to parse output of `safe wallet create`");
+        serde_json::from_str(&wallet_create).map_err(|_| {
+            Error::Unknown("Failed to parse output of `safe wallet create`".to_string())
+        })?;
 
-    let (key_pk_xor, sk) = create_preload_and_get_keys("7");
+    let (key_pk_xor, sk) = create_preload_and_get_keys("7")?;
     let _wallet_insert_result = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "wallet",
@@ -294,11 +300,16 @@ fn calling_safe_cat_wallet_xorurl() {
         &sk,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
+
+    let key_pair = key_pair.ok_or_else(|| Error::Unknown("Could not fetch Keypair".to_string()))?;
+    let secret_key = key_pair
+        .secret_key()
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let wallet_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &wallet_xorurl, "--json")
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
     let (xorurl, balances) = parse_cat_wallet_output(&wallet_cat);
 
     assert_eq!(wallet_xorurl, xorurl);
@@ -306,25 +317,24 @@ fn calling_safe_cat_wallet_xorurl() {
 
     assert_eq!(balances[&key_xorurl].0, true);
     assert_eq!(balances[&key_xorurl].1.xorurl, key_xorurl);
-    assert_eq!(
-        balances[&key_xorurl].1.sk,
-        unwrap!(unwrap!(key_pair).secret_key()).to_string()
-    );
+    assert_eq!(balances[&key_xorurl].1.sk, secret_key.to_string());
 
     assert_eq!(balances[&key_pk_xor].0, false);
     assert_eq!(balances[&key_pk_xor].1.xorurl, key_pk_xor);
     assert_eq!(balances[&key_pk_xor].1.sk, sk);
+    Ok(())
 }
 
 #[test]
-fn calling_safe_cat_safekey() {
-    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
+fn calling_safe_cat_safekey() -> Result<()> {
+    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0")?;
 
     let cat_output = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &safekey_xorurl,)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
+    Ok(())
 }
 
 // Test:  safe cat <src>/<path>
@@ -339,7 +349,7 @@ fn calling_safe_cat_safekey() {
 //    expected result: cmd output matches contents of
 //                     ../test_symlinks/sub2/hello.md
 #[test]
-fn calling_cat_symlinks_resolve_dir_and_file() -> Result<(), String> {
+fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
@@ -364,7 +374,7 @@ fn calling_cat_symlinks_resolve_dir_and_file() -> Result<(), String> {
 //
 //    expected result: error, too many links.
 #[test]
-fn calling_cat_symlinks_resolve_infinite_loop() -> Result<(), String> {
+fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
@@ -406,7 +416,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<(), String> {
 //    expected result: cmd output matches contents of
 //                     /sub/readme.md
 #[test]
-fn calling_cat_symlinks_resolve_parent_dir() -> Result<(), String> {
+fn calling_cat_symlinks_resolve_parent_dir() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
@@ -429,7 +439,7 @@ fn calling_cat_symlinks_resolve_parent_dir() -> Result<(), String> {
 //
 //    expected result: error, too many links.
 #[test]
-fn calling_cat_symlinks_resolve_dir_outside() -> Result<(), String> {
+fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());

@@ -1806,7 +1806,8 @@ mod tests {
 
         // here we verify that url::Url has the same path encoding behavior
         // as our implementation.  for better or worse.
-        let mut u = Url::parse("safe://domain/path/to/my%20file.txt?v=1").unwrap();
+        let mut u = Url::parse("safe://domain/path/to/my%20file.txt?v=1")
+            .map_err(|e| Error::InvalidInput(e.to_string()))?;
         assert_eq!(u.path(), "/path/to/my%20file.txt");
         u.set_path("/path/to/my new file.txt");
         assert_eq!(u.path(), "/path/to/my%20new%20file.txt");

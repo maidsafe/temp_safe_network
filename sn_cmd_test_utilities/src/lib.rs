@@ -10,13 +10,14 @@
 use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Keypair};
+use sn_api::{
+    fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Error, Keypair,
+};
 use sn_data_types::Money;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::{env, fs, process, str::FromStr};
 use tiny_keccak::sha3_256;
-use unwrap::unwrap;
 use walkdir::{DirEntry, WalkDir};
 
 #[macro_use]
@@ -52,7 +53,7 @@ pub fn read_cmd(e: duct::Expression) -> Result<String, String> {
 }
 
 #[allow(dead_code)]
-pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
+pub fn create_preload_and_get_keys(preload: &str) -> Result<(String, String), Error> {
     let pk_command_result = cmd!(
         get_bin_location(),
         "keys",
@@ -63,23 +64,25 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
         "--json",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (xorurl, (_pk, sk)): (String, (String, String)) =
         parse_keys_create_output(&pk_command_result);
 
-    (xorurl, sk)
+    Ok((xorurl, sk))
 }
 
 #[allow(dead_code)]
 pub fn create_wallet_with_balance(
     preload: &str,
     balance_name: Option<&str>,
-) -> (String, String, String) {
-    let (_pk, sk) = create_preload_and_get_keys(&preload);
+) -> Result<(String, String, String), Error> {
+    let (_pk, sk) = create_preload_and_get_keys(&preload)?;
     // we spent 1 nano for creating the SafeKey, so we now preload it
     // with 1 nano less than amount request provided
-    let preload_nanos = Money::from_str(preload).unwrap().as_nano();
+    let preload_nanos = Money::from_str(preload)
+        .map_err(|e| Error::Unexpected(e.to_string()))?
+        .as_nano();
     let preload_minus_costs = Money::from_nano(preload_nanos - 1).to_string();
 
     let wallet_create_result = cmd!(
@@ -95,18 +98,19 @@ pub fn create_wallet_with_balance(
         "--json",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
-    let unwrapped_key_pair = unwrap!(key_pair);
-    (
+    let unwrapped_key_pair =
+        key_pair.ok_or_else(|| Error::ContentError("Could not parse wallet".to_string()))?;
+    Ok((
         wallet_xor,
         unwrapped_key_pair.public_key().to_string(),
         unwrapped_key_pair
             .secret_key()
             .expect("Error extracting SecretKey from keypair")
             .to_string(),
-    )
+    ))
 }
 
 #[allow(dead_code)]
@@ -121,7 +125,7 @@ pub fn create_nrs_link(name: &str, link: &str) -> Result<String, String> {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
     assert!(nrs_map_xorurl.contains("safe://"));
@@ -168,8 +172,8 @@ pub fn upload_testfolder_no_trailing_slash() -> Result<(String, ProcessedFiles),
 
 // keeping for compat with older tests
 #[allow(dead_code)]
-pub fn upload_test_folder() -> (String, ProcessedFiles) {
-    upload_test_folder_with_result(true).unwrap()
+pub fn upload_test_folder() -> Result<(String, ProcessedFiles), Error> {
+    upload_test_folder_with_result(true).map_err(Error::Unknown)
 }
 
 #[allow(dead_code)]
@@ -245,7 +249,7 @@ pub fn create_and_upload_test_absolute_symlinks_folder(
 //  dest dir since `safe files put` presently ignores hidden
 //  files.  The hidden files can be included once
 //  'safe files put' is fixed to include them.
-pub fn sum_tree(path: &str) -> String {
+pub fn sum_tree(path: &str) -> Result<String, Error> {
     let paths = WalkDir::new(path)
         .min_depth(1) // ignore top/root directory
         .follow_links(false)
@@ -256,16 +260,22 @@ pub fn sum_tree(path: &str) -> String {
 
     let mut digests = String::new();
     for p in paths {
-        let relpath = p.path().strip_prefix(path).unwrap().display().to_string();
+        let relpath = p
+            .path()
+            .strip_prefix(path)
+            .map_err(|e| Error::Unknown(e.to_string()))?
+            .display()
+            .to_string();
         digests.push_str(&str_to_sha3_256(&relpath));
         if p.path().is_file() {
-            digests.push_str(&digest_file(&p.path().display().to_string()));
+            digests.push_str(&digest_file(&p.path().display().to_string())?);
         } else if p.path_is_symlink() {
-            let target_path = fs::read_link(&p.path()).unwrap();
+            let target_path =
+                fs::read_link(&p.path()).map_err(|e| Error::Unknown(e.to_string()))?;
             digests.push_str(&str_to_sha3_256(&target_path.display().to_string()));
         }
     }
-    str_to_sha3_256(&digests)
+    Ok(str_to_sha3_256(&digests))
 }
 
 // callback for WalkDir::new() in sum_tree()
@@ -284,9 +294,9 @@ pub fn str_to_sha3_256(s: &str) -> String {
 }
 
 // returns sha3_256 digest/hash of a file as a string.
-pub fn digest_file(path: &str) -> String {
-    let data = fs::read_to_string(&path).unwrap();
-    str_to_sha3_256(&data)
+pub fn digest_file(path: &str) -> Result<String, Error> {
+    let data = fs::read_to_string(&path).map_err(|e| Error::Unknown(e.to_string()))?;
+    Ok(str_to_sha3_256(&data))
 }
 
 #[allow(dead_code)]

@@ -15,19 +15,19 @@ extern crate duct;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::xorurl::XorUrlEncoder;
+use sn_api::{Error, Result};
 use sn_cmd_test_utilities::{
     get_random_nrs_string, parse_cat_seq_output, parse_seq_store_output, CLI, SAFE_PROTOCOL,
 };
 use std::{env, process::Command};
-use unwrap::unwrap;
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "Public Sequence stored at: ";
 const PRETTY_FILES_PRIVATE_CREATION_RESPONSE: &str = "Private Sequence stored at: ";
 
 #[test]
-fn calling_safe_seq_store_pretty() {
+fn calling_safe_seq_store_pretty() -> Result<()> {
     let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["seq", "store", &random_content])
         .assert()
         .stdout(predicate::str::contains(PRETTY_FILES_CREATION_RESPONSE))
@@ -42,10 +42,11 @@ fn calling_safe_seq_store_pretty() {
         ))
         .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
         .success();
+    Ok(())
 }
 
 #[test]
-fn calling_safe_seq_store_and_cat() {
+fn calling_safe_seq_store_and_cat() -> Result<()> {
     let content = "first item";
     let seq_store = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -55,21 +56,22 @@ fn calling_safe_seq_store_and_cat() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
 
     let seq_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", seq_url, "--json")
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_url, data) = parse_cat_seq_output(&seq_cat);
 
     assert_eq!(data, content.as_bytes());
+    Ok(())
 }
 
 #[test]
-fn calling_safe_seq_store_priv_and_cat() {
+fn calling_safe_seq_store_priv_and_cat() -> Result<()> {
     let content = "first item";
     let seq_store = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -80,21 +82,22 @@ fn calling_safe_seq_store_priv_and_cat() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
 
     let seq_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", seq_url, "--json")
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_url, data) = parse_cat_seq_output(&seq_cat);
 
     assert_eq!(data, content.as_bytes());
+    Ok(())
 }
 
 #[test]
-fn calling_safe_seq_append() {
+fn calling_safe_seq_append() -> Result<()> {
     let content_v0 = "first item";
     let seq_store = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -104,10 +107,10 @@ fn calling_safe_seq_append() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&seq_url));
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&seq_url)?;
 
     let content_v1 = "second item";
     let _ = cmd!(
@@ -119,11 +122,11 @@ fn calling_safe_seq_append() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &seq_url, "--json")
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v1.as_bytes());
@@ -136,14 +139,15 @@ fn calling_safe_seq_append() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v0.as_bytes());
+    Ok(())
 }
 
 #[test]
-fn calling_safe_seq_priv_append() {
+fn calling_safe_seq_priv_append() -> Result<()> {
     let content_v0 = "first item";
     let seq_store = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -154,10 +158,10 @@ fn calling_safe_seq_priv_append() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&seq_url));
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&seq_url)?;
 
     let content_v1 = "second item";
     let _ = cmd!(
@@ -169,11 +173,11 @@ fn calling_safe_seq_priv_append() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &seq_url, "--json")
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v1.as_bytes());
@@ -186,14 +190,15 @@ fn calling_safe_seq_priv_append() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v0.as_bytes());
+    Ok(())
 }
 
 #[test]
-fn calling_seq_store_and_fetch_with_nrsurl() {
+fn calling_seq_store_and_fetch_with_nrsurl() -> Result<()> {
     let content = "first item";
     let seq_store = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -203,11 +208,11 @@ fn calling_seq_store_and_fetch_with_nrsurl() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
 
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&seq_url));
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&seq_url)?;
     xorurl_encoder.set_content_version(Some(0));
     let files_container_v0 = &xorurl_encoder.to_string();
     let nrsurl = format!("safe://{}", get_random_nrs_string());
@@ -221,12 +226,13 @@ fn calling_seq_store_and_fetch_with_nrsurl() {
         &files_container_v0,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let cat_nrsurl_v1 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json")
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
     let (xorurl, data) = parse_cat_seq_output(&cat_nrsurl_v1);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(data, content.as_bytes());
+    Ok(())
 }

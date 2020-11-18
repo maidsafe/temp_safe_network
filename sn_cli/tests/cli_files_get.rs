@@ -20,7 +20,7 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use sn_api::{xorurl::XorUrlEncoder, Safe};
+use sn_api::{xorurl::XorUrlEncoder, Error, Result, Safe};
 use sn_cmd_test_utilities::{
     can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
     create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
@@ -48,15 +48,15 @@ const NOEXTENSION_PATH: &str = "../testdata/noextension";
 //
 //    expected result: ../testdata matches /tmp/testdata/testdata
 #[test]
-fn files_get_src_is_container_and_dest_is_dir() -> Result<(), String> {
+fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = &files_container_xor;
     let dest = dest_dir(&[TESTDATA]);
     let final_dest = dest_dir(&[TESTDATA, TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unexpected(e.to_string()))?;
 
     files_get(
         &src,
@@ -77,14 +77,14 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<(), String> {
 //
 //    expected result: ../testdata matches /tmp/testdata
 #[test]
-fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<(), String> {
+fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
     let src = &files_container_xor;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
 
     files_get(
         &src,
@@ -105,14 +105,14 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<(), String> {
 //
 //    expected result: ../testdata matches ./testdata
 #[test]
-fn files_get_src_is_container_and_dest_is_cwd() -> Result<(), String> {
+fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = &files_container_xor;
     let dest = ".";
     let final_dest = Path::new(dest).join(TESTDATA).display().to_string();
 
-    remove_dest(&final_dest);
+    remove_dest(&final_dest)?;
 
     files_get(
         &src,
@@ -133,13 +133,13 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<(), String> {
 //
 //    expected result: ../testdata matches ./testdata
 #[test]
-fn files_get_src_is_container_and_dest_is_unspecified() -> Result<(), String> {
+fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = &files_container_xor;
     let final_dest = Path::new(".").join(TESTDATA).display().to_string();
 
-    remove_dest(&final_dest);
+    remove_dest(&final_dest)?;
 
     files_get(
         &src,
@@ -186,16 +186,16 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<(), String> {
 //        /tmp/testdata/another.md exists
 //        stderr contains: "Warning: cannot overwrite non-directory"
 #[test]
-fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<(), String> {
+fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
     let src = &files_container_xor;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     let existing_file = Path::new(&dest).join("subfolder");
-    let f = fs::File::create(&existing_file).unwrap();
+    let f = fs::File::create(&existing_file).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -233,13 +233,13 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<(), String> {
 //
 //    expected result: ../testdata matches ./testdata
 #[test]
-fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<(), String> {
+fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .map_err(|e| Error::Unknown(e.to_string()))?
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
@@ -257,7 +257,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<(), String> {
     let src = format!("safe://{}", &nrs_name);
     let final_dest = Path::new(".").join(TESTDATA).display().to_string();
 
-    remove_dest(&final_dest);
+    remove_dest(&final_dest)?;
 
     files_get(
         &src,
@@ -269,7 +269,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<(), String> {
 
     assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
 
-    remove_dest(&final_dest);
+    remove_dest(&final_dest)?;
 
     Ok(())
 }
@@ -284,7 +284,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<(), String> {
 //
 //    expected result: ../testdata/subfolder/sub2.md matches /tmp/sub2.md
 #[test]
-fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String> {
+fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     const TEST_FILE: &str = "sub2.md";
@@ -298,7 +298,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .map_err(|e| Error::Unknown(e.to_string()))?
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
@@ -319,7 +319,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
     let dest = dest_dir(&[]);
     let final_dest = dest_dir(&[TEST_FILE]);
 
-    remove_dest(&final_dest);
+    remove_dest(&final_dest)?;
 
     files_get(
         &src,
@@ -332,7 +332,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
     let file_src = join_paths(&[TEST_FOLDER, SUBFOLDER, TEST_FILE]);
     assert_eq!(sum_tree(&file_src), sum_tree(&final_dest));
 
-    remove_dest(&final_dest);
+    remove_dest(&final_dest)?;
 
     Ok(())
 }
@@ -345,7 +345,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<(), String
 //
 //    expected result: ../testdata/subfolder matches /tmp/testdata/subfolder
 #[test]
-fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<(), String> {
+fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let td = get_random_nrs_string();
@@ -366,7 +366,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<(), String> 
 
     let dest = dest_dir(&[SUBFOLDER]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -397,7 +397,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<(), String> 
 //
 //    expected result: /tmp/new file is written without error.
 #[test]
-fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<(), String> {
+fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     const DIR_WITH_SPACE: &str = "dir with space";
     const FILE_WITH_SPACE: &str = "file with space";
     const NEW_FILE_WITH_SPACE: &str = "new file";
@@ -406,9 +406,9 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<(), String> {
     // which will be our source dir to PUT, then GET
     let src_dir = dest_dir(&[DIR_WITH_SPACE]);
     let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
-    remove_dest(&src_dir);
-    fs::create_dir_all(&src_dir).unwrap();
-    let f = fs::File::create(&src_file).unwrap();
+    remove_dest(&src_dir)?;
+    fs::create_dir_all(&src_dir).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&src_file).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     let files_container = cmd!(
@@ -427,7 +427,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<(), String> {
     let src = source_path(&files_container_xor, &[DIR_WITH_SPACE, FILE_WITH_SPACE])?;
     let dest = dest_dir(&[NEW_FILE_WITH_SPACE]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -449,7 +449,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<(), String> {
 //
 //    expected result: /tmp/new file is written without error.
 #[test]
-fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<(), String> {
+fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     const DIR_WITH_SPACE: &str = "dir with space";
     const DIR_WITH_SPACE_ENCODED: &str = "dir%20with%20space";
     const FILE_WITH_SPACE: &str = "file with space";
@@ -460,9 +460,9 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<(), String> {
     // which will be our source dir to PUT, then GET
     let src_dir = dest_dir(&[DIR_WITH_SPACE]);
     let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
-    remove_dest(&src_dir);
-    fs::create_dir_all(&src_dir).unwrap();
-    let f = fs::File::create(&src_file).unwrap();
+    remove_dest(&src_dir)?;
+    fs::create_dir_all(&src_dir).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&src_file).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     let files_container = cmd!(
@@ -484,7 +484,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<(), String> {
     )?;
     let dest = dest_dir(&[NEW_FILE_WITH_SPACE]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -516,16 +516,16 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<(), String> {
 //        /tmp/testdata still contains test.md with 0 bytes
 //        /tmp/testdata also contains another.md
 #[test]
-fn files_get_exists_preserve() -> Result<(), String> {
+fn files_get_exists_preserve() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
     let src = &files_container_xor;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     let existing_file = Path::new(&dest).join("test.md");
-    let f = fs::File::create(&existing_file).unwrap();
+    let f = fs::File::create(&existing_file).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -551,16 +551,16 @@ fn files_get_exists_preserve() -> Result<(), String> {
 //    expected result:
 //        ../testdata matches /tmp/testdata
 #[test]
-fn files_get_exists_overwrite() -> Result<(), String> {
+fn files_get_exists_overwrite() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
     let src = &files_container_xor;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     let existing_file = Path::new(&dest).join("test.md");
-    let f = fs::File::create(&existing_file).unwrap();
+    let f = fs::File::create(&existing_file).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -590,13 +590,13 @@ fn files_get_exists_overwrite() -> Result<(), String> {
 //          command fails with exit code 1.
 //          stderr contains string "Path not found"
 #[test]
-fn files_get_src_path_is_invalid() -> Result<(), String> {
+fn files_get_src_path_is_invalid() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &["path", "is", "invalid"])?;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     let cmd_output = files_get(
         &src,
@@ -621,13 +621,13 @@ fn files_get_src_path_is_invalid() -> Result<(), String> {
 //          command fails with exit code 1.
 //          stderr contains string "No such directory:"
 #[test]
-fn files_get_dest_parent_does_not_exist() -> Result<(), String> {
+fn files_get_dest_parent_does_not_exist() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[])?;
     let dest = dest_dir(&[TESTDATA, "foo", "bar"]);
 
-    remove_dest(&dest_dir(&[TESTDATA]));
+    remove_dest(&dest_dir(&[TESTDATA]))?;
 
     let cmd_output = files_get(
         &src,
@@ -693,15 +693,15 @@ testdata   | file      | /tmp/newname              | N           | --        | /
 //
 //    expected result: ../testdata matches /tmp/testdata/testdata
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<(), String> {
+fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA])?;
     let dest = dest_dir(&[TESTDATA]);
     let final_dest = dest_dir(&[TESTDATA, TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
 
     files_get(
         &src,
@@ -724,14 +724,14 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<(), String> {
 //        exit code = 1 and
 //        stderr contains: "[Error] FileSystemError - cannot overwrite non-directory"
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<(), String> {
+fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA])?;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
-    let f = fs::File::create(&dest).unwrap();
+    remove_dest(&dest)?;
+    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -755,13 +755,13 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<(), String> {
 //
 //    expected result: ../testdata matches /tmp/testdata
 #[test]
-fn files_get_src_is_dir_and_dest_not_existing() -> Result<(), String> {
+fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA])?;
     let dest = dest_dir(&[TESTDATA]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -784,15 +784,15 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<(), String> {
 //
 //    expected result: ../testdata matches /tmp/newname/testdata
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<(), String> {
+fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA])?;
     let dest = dest_dir(&[NEWNAME]);
     let final_dest = dest_dir(&[NEWNAME, TESTDATA]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
 
     files_get(
         &src,
@@ -815,14 +815,14 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<(), String> {
 //        exit code = 1 and
 //        stderr contains: "[Error] FileSystemError - cannot overwrite non-directory"
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<(), String> {
+fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
-    let f = fs::File::create(&dest).unwrap();
+    remove_dest(&dest)?;
+    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -846,13 +846,13 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<(), String> 
 //
 //    expected result: ../testdata matches /tmp/newname
 #[test]
-fn files_get_src_is_dir_and_dest_newname_not_existing() -> Result<(), String> {
+fn files_get_src_is_dir_and_dest_newname_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -877,15 +877,15 @@ fn files_get_src_is_dir_and_dest_newname_not_existing() -> Result<(), String> {
 //
 //    expected result: ../testdata/noextension matches /tmp/noextension/noextension
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<(), String> {
+fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA, NOEXTENSION])?;
     let dest = dest_dir(&[NOEXTENSION]);
     let final_dest = dest_dir(&[NOEXTENSION, NOEXTENSION]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
 
     files_get(
         &src,
@@ -906,14 +906,14 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<(), String> {
 //
 //    expected result: ../testdata/noextension matches /tmp/noextension
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_file() -> Result<(), String> {
+fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA, NOEXTENSION])?;
     let dest = dest_dir(&[NOEXTENSION]);
 
-    remove_dest(&dest);
-    let f = fs::File::create(&dest).unwrap();
+    remove_dest(&dest)?;
+    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -935,13 +935,13 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<(), String> {
 //
 //    expected result: ../testdata/noextension matches /tmp/noextension
 #[test]
-fn files_get_src_is_file_and_dest_not_existing() -> Result<(), String> {
+fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA, NOEXTENSION])?;
     let dest = dest_dir(&[NOEXTENSION]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -964,15 +964,15 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<(), String> {
 //
 //    expected result: ../testdata/noextension matches /tmp/newname/noextension
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<(), String> {
+fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA, NOEXTENSION])?;
     let dest = dest_dir(&[NEWNAME]);
     let final_dest = dest_dir(&[NEWNAME, NOEXTENSION]);
 
-    remove_dest(&dest);
-    fs::create_dir_all(&dest).unwrap();
+    remove_dest(&dest)?;
+    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
 
     files_get(
         &src,
@@ -993,14 +993,14 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<(), String> 
 //
 //    expected result: ../testdata/noextension matches /tmp/newname
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<(), String> {
+fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA, NOEXTENSION])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
-    let f = fs::File::create(&dest).unwrap();
+    remove_dest(&dest)?;
+    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -1022,13 +1022,13 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<(), String>
 //
 //    expected result: ../testdata/noextension matches /tmp/newname
 #[test]
-fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<(), String> {
+fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let src = source_path(&files_container_xor, &[TESTDATA, NOEXTENSION])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -1053,7 +1053,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<(), String> {
 //
 //    expected result: ../test_symlinks matches /tmp/newname
 #[test]
-fn files_get_symlinks_relative() -> Result<(), String> {
+fn files_get_symlinks_relative() -> Result<()> {
     // Bail if test_symlinks not valid, or cannot write a test symlink.
     // Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? || !can_write_symlinks() {
@@ -1065,7 +1065,7 @@ fn files_get_symlinks_relative() -> Result<(), String> {
     let src = source_path(&files_container_xor, &[])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -1086,7 +1086,7 @@ fn files_get_symlinks_relative() -> Result<(), String> {
 //
 //    expected result: source directory matches /tmp/newname
 #[test]
-fn files_get_symlinks_absolute() -> Result<(), String> {
+fn files_get_symlinks_absolute() -> Result<()> {
     // Bail if cannot write a test symlink.
     // Typically indicates missing perms on windows.
     if !can_write_symlinks() {
@@ -1099,7 +1099,7 @@ fn files_get_symlinks_absolute() -> Result<(), String> {
     let src = source_path(&files_container_xor, &[])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -1113,7 +1113,7 @@ fn files_get_symlinks_absolute() -> Result<(), String> {
 
     assert_eq!(sum_tree(&symlinks_dir), sum_tree(&dest));
 
-    remove_dest(&tmp_dir);
+    remove_dest(&tmp_dir)?;
 
     Ok(())
 }
@@ -1124,7 +1124,7 @@ fn files_get_symlinks_absolute() -> Result<(), String> {
 //
 //    expected result: source directory matches /tmp/newname
 #[test]
-fn files_get_symlinks_after_sync() -> Result<(), String> {
+fn files_get_symlinks_after_sync() -> Result<()> {
     // Bail if cannot write a test symlink.
     // Typically indicates missing perms on windows.
     if !can_write_symlinks() {
@@ -1151,7 +1151,7 @@ fn files_get_symlinks_after_sync() -> Result<(), String> {
     let src = source_path(&safeurl.to_string(), &[])?;
     let dest = dest_dir(&[NEWNAME]);
 
-    remove_dest(&dest);
+    remove_dest(&dest)?;
 
     files_get(
         &src,
@@ -1166,7 +1166,7 @@ fn files_get_symlinks_after_sync() -> Result<(), String> {
     // downloaded tree should match src tree after sync.
     assert_eq!(sum_tree(&symlinks_dir), sum_tree(&dest));
 
-    remove_dest(&tmp_dir);
+    remove_dest(&tmp_dir)?;
 
     Ok(())
 }
@@ -1174,12 +1174,14 @@ fn files_get_symlinks_after_sync() -> Result<(), String> {
 // recursively removes a directory, or a file.
 // intended for removal of dir/files downloaded
 // by 'safe files get' test cases.
-fn remove_dest(path: &str) {
+fn remove_dest(path: &str) -> Result<()> {
     let p = Path::new(path);
     if p.is_file() {
-        fs::remove_file(&path).unwrap();
+        fs::remove_file(&path).map_err(|e| Error::Unknown(e.to_string()))
     } else if p.is_dir() {
-        fs::remove_dir_all(&path).unwrap();
+        fs::remove_dir_all(&path).map_err(|e| Error::Unknown(e.to_string()))
+    } else {
+        Ok(())
     }
 }
 
@@ -1190,7 +1192,7 @@ fn files_get(
     exists: Option<&str>,
     progress: Option<&str>,
     expect_exit_code: Option<i32>,
-) -> Result<process::Output, String> {
+) -> Result<process::Output> {
     // arg/option with empty string are filtered out.
     let args: Vec<String> = vec![
         "files".to_string(),
@@ -1216,7 +1218,7 @@ fn files_get(
     if let Some(ec) = expect_exit_code {
         match output.status.code() {
             Some(code) => assert_eq!(ec, code),
-            None => return Err("Command returned no exit code".to_string()),
+            None => return Err(Error::Unknown("Command returned no exit code".to_string())),
         }
     }
     Ok(output)
@@ -1268,7 +1270,7 @@ fn join_url_paths(path: &[&str]) -> String {
 }
 
 // sets/appends path in a provided safe URL.  preserves query string.
-fn source_path(url: &str, path: &[&str]) -> Result<String, String> {
+fn source_path(url: &str, path: &[&str]) -> Result<String> {
     let pb = path.join("/");
 
     let x = XorUrlEncoder::from_url(&url).map_err(|e| format!("{:#?}", e))?;

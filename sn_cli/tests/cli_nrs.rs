@@ -17,19 +17,19 @@ use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType},
     xorurl::{XorUrlBase, XorUrlEncoder},
+    Error, Result,
 };
 use sn_cmd_test_utilities::{
     get_random_nrs_string, parse_nrs_create_output, upload_test_folder, CLI, SAFE_PROTOCOL,
 };
 use std::process::Command;
-use unwrap::unwrap;
 use xor_name::XorName;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
 
-fn gen_fake_target() -> String {
+fn gen_fake_target() -> Result<String> {
     let xorname = XorName(*b"12345678901234567890123456789012");
-    unwrap!(XorUrlEncoder::encode(
+    XorUrlEncoder::encode(
         xorname,
         None,
         0x00a5_3cde,
@@ -40,15 +40,15 @@ fn gen_fake_target() -> String {
         None,
         None,
         Some(5),
-        XorUrlBase::Base32
-    ))
+        XorUrlBase::Base32,
+    )
 }
 
 #[test]
-fn calling_safe_nrs_create_pretty() {
+fn calling_safe_nrs_create_pretty() -> Result<()> {
     let test_name = format!("safe://{}", get_random_nrs_string());
-    let fake_target = gen_fake_target();
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let fake_target = gen_fake_target()?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["nrs", "create", &test_name, "-l", &fake_target])
         .assert()
         .stdout(predicate::str::contains(PRETTY_NRS_CREATION_RESPONSE))
@@ -56,12 +56,13 @@ fn calling_safe_nrs_create_pretty() {
         .stdout(predicate::str::contains(fake_target).count(1))
         .stdout(predicate::str::contains("+").count(1))
         .success();
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_twice_w_name_fails() {
+fn calling_safe_nrs_twice_w_name_fails() -> Result<()> {
     let test_name = format!("safe://{}", get_random_nrs_string());
-    let fake_target = gen_fake_target();
+    let fake_target = gen_fake_target()?;
 
     let _nrs_creation = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -73,26 +74,27 @@ fn calling_safe_nrs_twice_w_name_fails() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
-    let mut cmd = Command::cargo_bin(CLI).unwrap();
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     cmd.args(&vec!["nrs", "create", &test_name, "-l", &fake_target])
         .assert()
         .stderr(predicate::str::contains(
             "NRS name already exists. Please use 'nrs add' command to add sub names to it",
         ))
         .failure();
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_folder_and_fetch() {
+fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let test_name = format!("safe://{}", get_random_nrs_string());
 
-    let (container_xorurl, _map) = upload_test_folder();
+    let (container_xorurl, _map) = upload_test_folder()?;
 
     let cat_of_filesmap = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &container_xorurl)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert!(cat_of_filesmap.contains("safe://"));
 
@@ -106,14 +108,14 @@ fn calling_safe_nrs_put_folder_and_fetch() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
 
     assert!(nrs_map_xorurl.contains("safe://"));
     let cat_of_nrs_map_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrs_map_xorurl)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     // does our resolvable map exist?
     assert!(cat_of_nrs_map_url.contains("safe://"));
@@ -127,19 +129,20 @@ fn calling_safe_nrs_put_folder_and_fetch() {
     let another_file = format!("{}/another.md", &test_name);
     let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_file)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
-    assert_eq!(cat_of_new_url, "exists")
+    assert_eq!(cat_of_new_url, "exists");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_no_top_default_fetch() {
+fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
     let nrs_name = get_random_nrs_string();
     let test_name1 = format!("safe://a.b.c.{}", nrs_name);
     let test_name2 = format!("safe://b.c.{}", nrs_name);
 
-    let (container_xorurl, _map) = upload_test_folder();
-    let mut xorurl_encoder = unwrap!(XorUrlEncoder::from_url(&container_xorurl));
+    let (container_xorurl, _map) = upload_test_folder()?;
+    let mut xorurl_encoder = XorUrlEncoder::from_url(&container_xorurl)?;
     xorurl_encoder.set_path("/test.md");
     let link = xorurl_encoder.to_string();
     let _nrs_creation = cmd!(
@@ -152,11 +155,11 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name1)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
     assert_eq!(cat_of_new_url, "hello tests!");
 
     xorurl_encoder.set_path("/another.md");
@@ -171,24 +174,25 @@ fn calling_safe_nrs_put_no_top_default_fetch() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name2)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
     assert_eq!(cat_of_new_url, "exists");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
-    let (container_xorurl, _map) = upload_test_folder();
+fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
+    let (container_xorurl, _map) = upload_test_folder()?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://subname.{}", &test_name);
 
     let cat_of_filesmap = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &container_xorurl)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
     assert!(cat_of_filesmap.contains("safe://"));
 
     let nrs_creation = cmd!(
@@ -201,14 +205,14 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
 
     assert!(nrs_map_xorurl.contains("safe://"));
     let cat_of_nrs_map_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrs_map_xorurl)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     // does our resolvable map exist?
     assert!(cat_of_nrs_map_url.contains("safe://"));
@@ -223,7 +227,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
     let another_file = format!("{}/another.md", &test_name_w_sub);
     let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_file)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_of_new_url, "exists");
 
@@ -233,21 +237,22 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() {
         format!("safe://{}/another.md", &test_name)
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(via_default_also, "exists");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_and_retrieve_many_subnames() {
-    let (container_xorurl, _map) = upload_test_folder();
+fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
+    let (container_xorurl, _map) = upload_test_folder()?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
 
     let cat_of_filesmap = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &container_xorurl)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
     assert!(cat_of_filesmap.contains("safe://"));
 
     let nrs_creation = cmd!(
@@ -260,14 +265,14 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
 
     assert!(nrs_map_xorurl.contains("safe://"));
     let cat_of_nrs_map_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrs_map_xorurl)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     // does our resolvable map exist?
     assert!(cat_of_nrs_map_url.contains("safe://"));
@@ -282,7 +287,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
     let another_file = format!("{}/another.md", &test_name_w_sub);
     let cat_of_new_url = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_file)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_of_new_url, "exists");
 
@@ -292,14 +297,15 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() {
         format!("safe://{}/another.md", &test_name)
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(via_default_from_root, "exists");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
-    let (_container_xorurl, file_map) = upload_test_folder();
+fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Result<()> {
+    let (_container_xorurl, file_map) = upload_test_folder()?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -310,7 +316,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
 
     let cat_of_another_raw = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_md_xor)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_of_another_raw, "exists");
 
@@ -324,11 +330,11 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let cat_of_sub_one = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name_w_sub)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_of_sub_one, "exists");
 
@@ -338,7 +344,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
         format!("safe://{}", test_name)
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(first_default, "exists");
 
@@ -353,11 +359,11 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
         "--default"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let new_nrs_creation_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name_w_new_sub)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(new_nrs_creation_cat, "hello tests!");
 
@@ -367,14 +373,15 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() {
         format!("safe://{}", test_name)
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(new_default, "hello tests!");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
-    let (_container_xorurl, file_map) = upload_test_folder();
+fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result<()> {
+    let (_container_xorurl, file_map) = upload_test_folder()?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -385,7 +392,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
 
     let cat_of_another_raw = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_md_xor)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_of_another_raw, "exists");
 
@@ -399,7 +406,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let _new_nrs_creation = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -412,7 +419,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
         "--default",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let _remove_one_nrs = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -422,11 +429,11 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
         "--json",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let new_nrs_creation_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name_w_new_sub)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(new_nrs_creation_cat, "hello tests!");
 
@@ -436,14 +443,15 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() {
         format!("safe://{}", test_name)
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(new_default, "hello tests!");
+    Ok(())
 }
 
 #[test]
-fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve() {
-    let (_container_xorurl, file_map) = upload_test_folder();
+fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve() -> Result<()> {
+    let (_container_xorurl, file_map) = upload_test_folder()?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -454,7 +462,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
 
     let cat_of_another_raw = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_md_xor)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(cat_of_another_raw, "exists");
 
@@ -468,7 +476,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let _new_nrs_creation = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -480,11 +488,11 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let new_nrs_creation_cat = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &test_name_w_new_sub)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(new_nrs_creation_cat, "hello tests!");
 
@@ -494,7 +502,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
         format!("safe://{}", test_name)
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert_eq!(safe_default, "exists");
 
@@ -506,12 +514,12 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
         "--json",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     assert!(remove_one_nrs.contains('-'));
     assert!(remove_one_nrs.contains(&test_name_w_sub));
 
-    let mut invalid_cat = Command::cargo_bin(CLI).unwrap();
+    let mut invalid_cat = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
     invalid_cat
         .args(&vec!["cat", &test_name_w_sub])
         .assert()
@@ -519,4 +527,5 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
             "Sub name not found in NRS Map Container",
         ))
         .failure();
+    Ok(())
 }

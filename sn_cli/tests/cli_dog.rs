@@ -12,7 +12,7 @@ extern crate sn_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
-use sn_api::{fetch::SafeData, Safe};
+use sn_api::{fetch::SafeData, Error, Result, Safe};
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_dog_output,
     parse_files_put_or_sync_output,
@@ -21,7 +21,7 @@ use sn_cmd_test_utilities::{
 const TEST_FILE: &str = "../testdata/test.md";
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl() {
+fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -30,7 +30,7 @@ fn calling_safe_dog_files_container_nrsurl() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
@@ -43,11 +43,11 @@ fn calling_safe_dog_files_container_nrsurl() {
         &container_xorurl,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--json",)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
@@ -55,13 +55,14 @@ fn calling_safe_dog_files_container_nrsurl() {
 
     if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, container_xorurl);
+        Ok(())
     } else {
         panic!("Content retrieved was unexpected: {:?}", content);
     }
 }
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
+fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -70,7 +71,7 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
         "--output=jsoncompact"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
@@ -83,7 +84,7 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
         &container_xorurl,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let dog_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -92,7 +93,7 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
         "--output=jsoncompact",
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
@@ -100,13 +101,14 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() {
 
     if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, container_xorurl);
+        Ok(())
     } else {
         panic!("Content retrieved was unexpected: {:?}", content);
     }
 }
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl_yaml() {
+fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
     let content = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
@@ -115,7 +117,7 @@ fn calling_safe_dog_files_container_nrsurl_yaml() {
         "--json"
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
@@ -128,11 +130,11 @@ fn calling_safe_dog_files_container_nrsurl_yaml() {
         &container_xorurl,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--output=yaml",)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (url, mut content): (String, Vec<SafeData>) =
         serde_yaml::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
@@ -140,14 +142,15 @@ fn calling_safe_dog_files_container_nrsurl_yaml() {
 
     if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, container_xorurl);
+        Ok(())
     } else {
         panic!("Content retrieved was unexpected: {:?}", content);
     }
 }
 
 #[test]
-fn calling_safe_dog_safekey_nrsurl() {
-    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
+fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
+    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0")?;
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
     let _ = cmd!(
@@ -159,11 +162,11 @@ fn calling_safe_dog_safekey_nrsurl() {
         &safekey_xorurl,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--json",)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
@@ -171,14 +174,18 @@ fn calling_safe_dog_safekey_nrsurl() {
 
     if let Some(SafeData::SafeKey { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, safekey_xorurl);
+        Ok(())
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content);
+        Err(Error::Unexpected(format!(
+            "Content retrieved was unexpected: {:?}",
+            content
+        )))
     }
 }
 
 #[test]
-fn calling_safe_dog_nrs_url_with_subnames() {
-    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0");
+fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
+    let (safekey_xorurl, _sk) = create_preload_and_get_keys("0")?;
 
     let pub_name = get_random_nrs_string();
     let nrsurl = format!("safe://subname.{}", pub_name);
@@ -191,17 +198,17 @@ fn calling_safe_dog_nrs_url_with_subnames() {
         &safekey_xorurl,
     )
     .read()
-    .unwrap();
+    .map_err(|e| Error::Unknown(e.to_string()))?;
 
     // let's check the output with NRS-URL first
     let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrsurl, "--json",)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (url, safe_data_vec) = parse_dog_output(&dog_output);
     assert_eq!(url, nrsurl);
-    let mut xorurl_encoder = Safe::parse_url(&nrsurl).unwrap();
-    xorurl_encoder.set_sub_names("").unwrap();
+    let mut xorurl_encoder = Safe::parse_url(&nrsurl)?;
+    xorurl_encoder.set_sub_names("")?;
     let nrs_map_xorurl = xorurl_encoder.to_xorurl_string();
 
     if let SafeData::NrsMapContainer {
@@ -221,7 +228,7 @@ fn calling_safe_dog_nrs_url_with_subnames() {
     // let's now check the output with its XOR-URL
     let dog_output = cmd!(env!("CARGO_BIN_EXE_safe"), "dog", &nrs_map_xorurl, "--json",)
         .read()
-        .unwrap();
+        .map_err(|e| Error::Unknown(e.to_string()))?;
 
     let (url, safe_data_vec) = parse_dog_output(&dog_output);
     assert_eq!(url, *nrs_map_xorurl);
@@ -236,6 +243,7 @@ fn calling_safe_dog_nrs_url_with_subnames() {
         assert_eq!(*xorurl, nrs_map_xorurl);
         // it doesn't know the public name as it was resolved from a XOR-URL
         assert_eq!(*public_name, None);
+        Ok(())
     } else {
         panic!("Content retrieved was unexpected: {:?}", safe_data_vec);
     }

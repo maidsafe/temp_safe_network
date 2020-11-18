@@ -376,7 +376,7 @@ mod tests {
                 nrs_map.get_default()?,
                 &DefaultRdf::OtherRdf(def_data.clone())
             );
-            let decoder = XorUrlEncoder::from_url(&xor_url).unwrap();
+            let decoder = XorUrlEncoder::from_url(&xor_url)?;
             assert_eq!(nrs_xorname, decoder.xorname());
             Ok(())
         } else {
