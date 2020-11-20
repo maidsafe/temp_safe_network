@@ -129,8 +129,7 @@ pub fn dirs() -> Result<PathBuf, ClientError> {
         path.push(custom_path);
         path
     } else {
-        let mut path =
-            dirs_next::home_dir().ok_or_else(|| "Cannot determine project directory paths")?;
+        let mut path = dirs_next::home_dir().ok_or("Cannot determine project directory paths")?;
         path.push(HOME_DIR_SAFE);
         path.push(CONFIG_DIR_APPLICATION);
         path
@@ -144,8 +143,7 @@ fn node_dirs() -> Result<PathBuf, ClientError> {
         path.push(custom_path);
         path
     } else {
-        let mut path =
-            dirs_next::home_dir().ok_or_else(|| "Cannot determine project directory paths")?;
+        let mut path = dirs_next::home_dir().ok_or("Cannot determine project directory paths")?;
         path.push(HOME_DIR_SAFE);
         path.push(NODE_CONFIG_DIR_APPLICATION);
         path
