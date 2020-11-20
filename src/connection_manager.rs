@@ -93,7 +93,7 @@ impl ConnectionManager {
             let msg_bytes_clone = msg_bytes.clone();
             let connection = Arc::clone(&elder.connection);
             let task_handle = tokio::spawn(async move {
-                let _ = connection.lock().await.send(msg_bytes_clone).await;
+                let _ = connection.lock().await.send_bi(msg_bytes_clone).await;
             });
             tasks.push(task_handle);
         }
@@ -134,7 +134,7 @@ impl ConnectionManager {
             let connection = Arc::clone(&elder.connection);
             let task_handle = tokio::spawn(async move {
                 info!("Sending transfer validation to Elder");
-                let _ = connection.lock().await.send(msg_bytes_clone).await;
+                let _ = connection.lock().await.send_bi(msg_bytes_clone).await;
             });
             tasks.push(task_handle);
         }
@@ -171,7 +171,7 @@ impl ConnectionManager {
                 while !done_trying {
                     let msg_bytes_clone = msg_bytes_clone.clone();
 
-                    match connection.lock().await.send(msg_bytes_clone).await {
+                    match connection.lock().await.send_bi(msg_bytes_clone).await {
                         Ok(mut streams) => {
                             result = match streams.1.next().await {
                                 Ok(bytes) => Ok(bytes),
@@ -355,14 +355,14 @@ impl ConnectionManager {
     // nodes we should establish connections with
     async fn bootstrap_and_handshake(&mut self) -> Result<Vec<SocketAddr>, ClientError> {
         trace!("Bootstrapping with contacts...");
-        let (endpoint, conn) = self.qp2p.bootstrap().await?;
+        let (endpoint, conn, _incoming_messages) = self.qp2p.bootstrap().await?;
         self.endpoint = Arc::new(Mutex::new(endpoint));
 
         trace!("Sending handshake request to bootstrapped node...");
         let public_key = self.keypair.public_key();
         let handshake = HandshakeRequest::Bootstrap(public_key);
         let msg = Bytes::from(serialize(&handshake)?);
-        let mut streams = conn.send(msg).await?;
+        let mut streams = conn.send_bi(msg).await?;
         let response = streams.1.next().await?;
 
         match deserialize(&response) {
@@ -399,11 +399,11 @@ impl ConnectionManager {
         ),
         ClientError,
     > {
-        let connection = endpoint.lock().await.connect_to(&peer_addr).await?;
+        let (connection, _incoming_messages) = endpoint.lock().await.connect_to(&peer_addr).await?;
 
         let handshake = HandshakeRequest::Join(keypair.public_key());
         let msg = Bytes::from(serialize(&handshake)?);
-        let (_send_stream, mut recv_stream) = connection.send(msg).await?;
+        let (_send_stream, mut recv_stream) = connection.send_bi(msg).await?;
         let final_response = recv_stream.next().await?;
 
         match deserialize(&final_response) {
@@ -415,7 +415,7 @@ impl ConnectionManager {
                 );
                 let response = HandshakeRequest::ChallengeResult(keypair.sign(&challenge));
                 let msg = Bytes::from(serialize(&response)?);
-                let (send_stream, recv_stream) = connection.send(msg).await?;
+                let (send_stream, recv_stream) = connection.send_bi(msg).await?;
 
                 Ok((
                     Arc::new(Mutex::new(send_stream)),
@@ -483,6 +483,11 @@ impl ConnectionManager {
         let mut todo = tasks;
 
         while !has_sufficent_connections {
+            if todo.is_empty() {
+                warn!("No more elder connections to try");
+                break;
+            }
+
             let (res, _idx, remaining_futures) = select_all(todo.into_iter()).await;
 
             if remaining_futures.is_empty() {
