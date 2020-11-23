@@ -41,7 +41,7 @@ impl Safe {
     pub async fn wallet_create(&mut self) -> Result<XorUrl> {
         let xorname = self
             .safe_client
-            .store_map(None, WALLET_TYPE_TAG, None)
+            .store_map(None, WALLET_TYPE_TAG, None, None)
             .await?;
 
         XorUrlEncoder::encode_mutable_data(

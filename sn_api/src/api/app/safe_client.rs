@@ -16,8 +16,8 @@ use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
     Blob, BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob,
-    PublicKey as SafeNdPublicKey, SeqMap, SequenceAddress, SequenceIndex,
-    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
+    PublicKey as SafeNdPublicKey, SequenceAddress, SequenceIndex, SequencePrivatePermissions,
+    SequencePublicPermissions, SequenceUser,
 };
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -33,10 +33,10 @@ pub struct SafeAppClient {
 }
 
 impl SafeAppClient {
-    // Private helper to obtain the App instance
-    fn get_safe_client(&mut self) -> Result<Client> {
+    // Private helper to obtain the Safe Client instance
+    fn get_safe_client(&self) -> Result<Client> {
         match &self.safe_client {
-            Some(app) => Ok(app.clone()),
+            Some(client) => Ok(client.clone()),
             None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         }
     }
@@ -46,13 +46,10 @@ impl SafeAppClient {
     }
 
     pub async fn keypair(&self) -> Result<Arc<Keypair>> {
-        if let Some(client) = &self.safe_client {
-            let kp = client.keypair().await;
+        let client = self.get_safe_client()?;
+        let kp = client.keypair().await;
 
-            Ok(kp)
-        } else {
-            Err(Error::ConnectionError("Not yet connected".to_string()))
-        }
+        Ok(kp)
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
@@ -63,9 +60,9 @@ impl SafeAppClient {
             warn!("Connection with the SAFE Network was lost");
         };
 
-        let app = Client::new(None).await?;
+        let client = Client::new(None).await?;
 
-        // let app = match auth_credentials {
+        // let client = match auth_credentials {
         //     Some(auth_credentials) => {
         //         let auth_granted = decode_ipc_msg(auth_credentials)?;
         //         match auth_granted {
@@ -88,7 +85,7 @@ impl SafeAppClient {
         //     Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
         // })?;
 
-        self.safe_client = Some(app);
+        self.safe_client = Some(client);
         debug!("Successfully connected to the Network!!!");
         Ok(())
     }
@@ -227,20 +224,11 @@ impl SafeAppClient {
         &mut self,
         name: Option<XorName>,
         tag: u64,
-        // _data: Option<String>,
+        _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let mut safe_client = self.get_safe_client()?;
-        let client = &safe_client;
-        let owner_key_option = client.public_key().await;
-        let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
-            owners
-        } else {
-            return Err(Error::Unexpected(
-                "Failed to retrieve public key.".to_string(),
-            ));
-        };
-
+        let mut client = self.get_safe_client()?;
+        let owner = client.public_key().await;
         let xorname = name.unwrap_or_else(rand::random);
 
         let permission_set = MapPermissionSet::new()
@@ -251,22 +239,12 @@ impl SafeAppClient {
             .allow(MapAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
-        let sign_pk = get_public_bls_key(&safe_client).await?;
-        let app_pk = SafeNdPublicKey::Bls(sign_pk);
-        permission_map.insert(app_pk, permission_set);
+        permission_map.insert(owner, permission_set);
 
-        let map = Map::Seq(SeqMap::new_with_data(
-            xorname,
-            tag,
-            BTreeMap::new(),
-            permission_map,
-            SafeNdPublicKey::Bls(owners),
-        ));
-
-        safe_client
-            .store_map(map)
+        client
+            .store_seq_map(xorname, tag, owner, None, Some(permission_map))
             .await
-            .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))?;
+            .map_err(|err| Error::NetDataError(format!("Failed to store SeqMap: {}", err)))?;
 
         Ok(xorname)
     }
@@ -279,7 +257,7 @@ impl SafeAppClient {
         client
             .get_map(address)
             .await
-            .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
+            .map_err(|e| Error::NetDataError(format!("Failed to get SeqMap: {:?}", e)))
     }
 
     pub async fn map_insert(
@@ -291,7 +269,7 @@ impl SafeAppClient {
     ) -> Result<()> {
         let entry_actions = MapSeqEntryActions::new();
         let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-        self.edit_map_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
+        self.edit_map_entries(name, tag, entry_actions, "Failed to insert to SeqMap")
             .await
     }
 
@@ -409,50 +387,33 @@ impl SafeAppClient {
             name
         );
 
-        let mut safe_client = self.get_safe_client()?;
+        let mut client = self.get_safe_client()?;
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
-        let app_public_key = get_public_bls_key(&safe_client).await?;
-
-        // The Sequence's owner will be the user
-        let user_acc_owner = safe_client.public_key().await;
+        // The Sequence's owner will be the client's public key
+        let owner = client.public_key().await;
 
         // Store the Sequence on the network
         let _address = if private {
             // Set permissions for append, delete, and manage perms to this application
             let mut perms = BTreeMap::default();
-            let _ = perms.insert(
-                SafeNdPublicKey::Bls(app_public_key),
-                SequencePrivatePermissions::new(true, true, true),
-            );
+            let _ = perms.insert(owner, SequencePrivatePermissions::new(true, true, true));
 
-            safe_client
-                .store_private_sequence(
-                    Some(vec![data.to_vec()]),
-                    xorname,
-                    tag,
-                    user_acc_owner,
-                    perms,
-                )
+            client
+                .store_private_sequence(Some(vec![data.to_vec()]), xorname, tag, owner, perms)
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!("Failed to store Private Sequence data: {:?}", e))
                 })?
         } else {
             // Set permissions for append and manage perms to this application
-            let user_app = SequenceUser::Key(SafeNdPublicKey::Bls(app_public_key));
+            let user_app = SequenceUser::Key(owner);
             let mut perms = BTreeMap::default();
             let _ = perms.insert(user_app, SequencePublicPermissions::new(true, true));
 
-            safe_client
-                .store_public_sequence(
-                    Some(vec![data.to_vec()]),
-                    xorname,
-                    tag,
-                    user_acc_owner,
-                    perms,
-                )
+            client
+                .store_public_sequence(Some(vec![data.to_vec()]), xorname, tag, owner, perms)
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!("Failed to store Public Sequence data: {:?}", e))
@@ -475,14 +436,15 @@ impl SafeAppClient {
             name
         );
 
-        let mut safe_client = self.get_safe_client()?;
+        let mut client = self.get_safe_client()?;
 
         let sequence_address = if private {
             SequenceAddress::Private { name, tag }
         } else {
             SequenceAddress::Public { name, tag }
         };
-        safe_client
+
+        client
             .get_sequence_last_entry(sequence_address)
             .await
             .map_err(|err| {
@@ -511,7 +473,7 @@ impl SafeAppClient {
             name
         );
 
-        let mut safe_client = self.get_safe_client()?;
+        let mut client = self.get_safe_client()?;
 
         let sequence_address = if private {
             SequenceAddress::Private { name, tag }
@@ -520,7 +482,8 @@ impl SafeAppClient {
         };
         let start = SequenceIndex::FromStart(index);
         let end = SequenceIndex::FromStart(index + 1);
-        let res = safe_client
+
+        let res = client
             .get_sequence_range(sequence_address, (start, end))
             .await
             .map_err(|err| {
@@ -561,28 +524,17 @@ impl SafeAppClient {
             name
         );
 
-        let mut safe_client = self.get_safe_client()?;
+        let mut client = self.get_safe_client()?;
 
         let sequence_address = if private {
             SequenceAddress::Private { name, tag }
         } else {
             SequenceAddress::Public { name, tag }
         };
-        safe_client
+
+        client
             .append_to_sequence(sequence_address, data.to_vec())
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
     }
-}
-
-// Helpers
-
-async fn get_public_bls_key(safe_client: &Client) -> Result<PublicKey> {
-    let pk = safe_client
-        .public_key()
-        .await
-        .bls()
-        .ok_or_else(|| Error::Unexpected("Client's key is not a BLS Public Key".to_string()))?;
-
-    Ok(pk)
 }

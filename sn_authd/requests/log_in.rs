@@ -40,14 +40,14 @@ pub async fn process_req(
             // let key_pair = get_sk_from_input(passphrase, password);
             // let sk = key_pair.secret_key().map_err(|e| format!("{:?}", e))?;
 
-            match safe_authenticator.log_in(passphrase, password).await {
+            match safe_authenticator.unlock(passphrase, password).await {
                 Ok(_) => {
-                    let msg = "Logged in successfully!";
+                    let msg = "Unlocked successfully!";
                     info!("{}", msg);
                     Ok(json!(msg))
                 }
                 Err(err) => {
-                    error!("Error occurred when trying to log in: {}", err);
+                    error!("Error occurred when trying to unlock: {}", err);
                     Err(err.to_string())
                 }
             }

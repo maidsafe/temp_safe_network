@@ -7,31 +7,28 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Error, Result, SafeAuthReq, SafeAuthReqId};
-
-use log::{debug, info};
-use rand::rngs::{OsRng, StdRng};
-use rand_core::SeedableRng;
-
-use crate::api::ipc::{
+use crate::{Error, Result, SafeAuthReq, SafeAuthReqId, api::ipc::{
     decode_msg, encode_msg,
     req::{AuthReq, IpcReq},
     resp::{AuthGranted, IpcResp},
     BootstrapConfig, IpcMsg,
-};
+}};
 
+use log::{debug, info};
+use rand::rngs::{OsRng, StdRng};
+use rand_core::SeedableRng;
 use tiny_keccak::{sha3_256, sha3_512};
-
 use hmac::Hmac;
-use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::Keypair;
-use std::sync::Arc;
-
+use sn_data_types::{Keypair, MapPermissionSet, MapAction, MapAddress};
+use std::{collections::BTreeMap,sync::Arc};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 const SHA3_512_HASH_LEN: usize = 64;
+
+// Type tag value used for the Map which holds the vault's content on the network.
+const VAULT_TYPE_TAG: u64 = 1_300;
 
 /// Derive Password, Keyword and PIN (in order).
 pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -45,28 +42,20 @@ pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, V
     (password, keyword, pin)
 }
 
-/// Create a new full id from seed
-fn create_keypair_from_seed(seeder: &[u8]) -> Keypair {
-    let seed = sha3_256(&seeder);
+/// Create a new Ed25519 keypair from seed
+fn create_ed25519_keypair_from_seed(seeder: &[u8]) -> Keypair {
+    let seed = sha3_256(seeder);
     let mut rng = StdRng::from_seed(seed);
     Keypair::new_ed25519(&mut rng)
 }
 
-/// Create a new BLS sk from seed
+/// Create a new BLS keypair from seed
 #[allow(dead_code)]
 fn create_bls_keypair_from_seed(seeder: &[u8]) -> Keypair {
-    let seed = sha3_256(&seeder);
+    let seed = sha3_256(seeder);
     let mut rng = StdRng::from_seed(seed);
 
     Keypair::new_bls(&mut rng)
-}
-
-#[allow(dead_code)]
-fn create_ed25519_sk_from_seed(seeder: &[u8]) -> Keypair {
-    let seed = sha3_256(&seeder);
-    let mut rng = StdRng::from_seed(seed);
-
-    Keypair::new_ed25519(&mut rng)
 }
 
 /// Perform all derivations and seeding to deterministically obtain location and Keypair from input
@@ -77,7 +66,7 @@ pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(
 
     let mut seed = password;
     seed.extend(salt.iter());
-    let keypair = create_keypair_from_seed(&seed);
+    let keypair = create_ed25519_keypair_from_seed(&seed);
 
     Ok((map_data_location, keypair))
 }
@@ -90,8 +79,8 @@ pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(
 //     pbkdf2::pbkdf2::<Hmac<Sha3_256>>(input, &salt, ITERATIONS, output)
 // }
 
-// /// Generates User's Identity for the network using supplied credentials in
-// /// a deterministic way.  This is similar to the username in various places.
+/// Generates User's Identity for the network using supplied credentials in
+/// a deterministic way.  This is similar to the username in various places.
 pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
     let mut id = XorName([0; XOR_NAME_LEN]);
 
@@ -105,21 +94,10 @@ pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
     Ok(id)
 }
 
-/// "Account...."
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct Account {
-    /// The user's configuration directory.
-    // pub config_root: MapInfo,
-    /// Set to `true` when all root and standard containers
-    /// have been created successfully. `false` signifies that
-    /// previous attempt might have failed - check on login.
-    pub root_dirs_created: bool,
-}
-
 // Authenticator API
 #[derive(Default)]
 pub struct SafeAuthenticator {
-    authenticator_client: Option<Client>,
+    safe_client: Option<(Client, MapAddress)>,
 }
 
 impl SafeAuthenticator {
@@ -129,11 +107,20 @@ impl SafeAuthenticator {
         }
 
         Self {
-            authenticator_client: None,
+            safe_client: None,
         }
     }
 
-    /// # Create Account
+    // Private helper to obtain the Safe Client instance
+    #[allow(dead_code)]
+    fn get_safe_client(&self) -> Result<Client> {
+        match &self.safe_client {
+            Some(client) => Ok(client.0.clone()),
+            None => Err(Error::AuthenticatorError("No Vault is currently unlocked".to_string())),
+        }
+    }
+
+    /// # Create Vault
     /// Creates a new account on the SAFE Network.
     /// Returns an error if an account exists or if there was some
     /// problem during the account creation process.
@@ -189,18 +176,33 @@ impl SafeAuthenticator {
     pub async fn create_acc(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a Safe account from provided password and passphrase.");
 
-        let (_location, keypair) = derive_location_and_keypair(passphrase, password)?;
+        let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
+        let data_owner = keypair.public_key();
 
-        debug!("Creating account with PK: {:?}", &keypair.public_key());
+        debug!("Creating account with PK: {:?}", data_owner);
 
-        let auth_client = Client::new(Some(keypair)).await?;
-
-        self.authenticator_client = Some(auth_client);
-
+        let mut client = Client::new(Some(keypair)).await?;
         debug!("Client instantiated properly!");
 
-        // TODO: actually create and put Map data to be used in storage of apps.
+        // Create Map data to store the list of keypairs generated for
+        // each of the user's applications.
+        let permission_set = MapPermissionSet::new()
+            .allow(MapAction::Read)
+            .allow(MapAction::Insert)
+            .allow(MapAction::Update)
+            .allow(MapAction::Delete)
+            .allow(MapAction::ManagePermissions);
 
+        let mut permission_map = BTreeMap::new();
+        permission_map.insert(data_owner, permission_set);
+
+        let map_address = client
+            .store_seq_map(location, VAULT_TYPE_TAG, data_owner, None, Some(permission_map))
+            .await
+            .map_err(|err| Error::AuthenticatorError(format!("Failed to store account on Map: {}", err)))?;
+        debug!("Map stored successfully for new account!");
+
+        self.safe_client = Some((client, map_address));
         Ok(())
     }
 
@@ -246,36 +248,39 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to log in...");
+    pub async fn unlock(&mut self, passphrase: &str, password: &str) -> Result<()> {
+        debug!("Attempting to unlock...");
 
-        let (_location, keypair) = derive_location_and_keypair(passphrase, password)?;
+        let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        debug!("Logging in w/ pk: {:?}", keypair.public_key());
+        debug!("Unlocking w/ pk: {:?}", keypair.public_key());
 
-        let auth_client = Client::new(Some(keypair)).await?;
-
-        self.authenticator_client = Some(auth_client);
-
+        let mut client = Client::new(Some(keypair)).await?;
         debug!("Client instantiated properly!");
-        // TODO: retrieve any data needed
+
+        let map_address = MapAddress::Unseq { name: location, tag: VAULT_TYPE_TAG };
+        // Attempt to retrieve Map to make sure it actually exists
+        client.get_map(map_address).await?;
+        debug!("Vault unlocked successfully!");
+
+        self.safe_client = Some((client, map_address));
         Ok(())
     }
 
     pub fn log_out(&mut self) -> Result<()> {
         debug!("Dropping logged in session...");
-        self.authenticator_client = None;
+        self.safe_client = None;
         Ok(())
     }
 
     pub fn is_logged_in(&self) -> bool {
-        let is_logged_in = self.authenticator_client.is_some();
+        let is_logged_in = self.safe_client.is_some();
         debug!("Is logged in? {}", is_logged_in);
         is_logged_in
     }
 
     pub async fn decode_req(&self, req: &str) -> Result<(SafeAuthReqId, SafeAuthReq)> {
-        let _client = &self.authenticator_client;
+        let _client = &self.safe_client;
 
         let req_msg = match decode_msg(req) {
             Ok(msg) => msg,
@@ -494,7 +499,7 @@ mod tests {
     #[test]
     fn get_deterministic_pk_from_known_seed() -> Result<()> {
         let seed = b"bacon";
-        let pk = create_keypair_from_seed(seed).public_key();
+        let pk = create_ed25519_keypair_from_seed(seed).public_key();
 
         let public_key_bytes: [u8; ed25519_dalek::PUBLIC_KEY_LENGTH] = [
             239, 124, 31, 157, 76, 101, 124, 119, 164, 143, 80, 234, 249, 84, 0, 22, 91, 128, 67,
