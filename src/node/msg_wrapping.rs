@@ -234,6 +234,7 @@ impl MsgWrapping {
                     let bls_key = self.keys.public_key_set().await?.public_key();
                     MsgSender::section(TransientSectionKey { bls_key }, duty).ok()?
                 } else {
+                    info!("Signing as Node!");
                     let key = self.keys.elder_key().await?;
                     if let Signature::BlsShare(sig) = self.keys.sign_as_elder(data).await? {
                         MsgSender::elder(key, duty, sig.share).ok()?
@@ -266,7 +267,8 @@ impl MsgWrapping {
     async fn set_proxy(&self, msg: &MsgEnvelope, as_section: bool) -> Option<MsgEnvelope> {
         // origin signs the message, while proxies sign the envelope
         let mut msg = msg.clone();
-        msg.add_proxy(self.sign(&msg, as_section).await?);
+        msg.add_proxy(self.sign(&msg.message, as_section).await?);
+
         Some(msg)
     }
 }

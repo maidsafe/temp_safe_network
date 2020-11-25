@@ -85,15 +85,6 @@ impl BlobRegister {
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Outcome<NodeMessagingDuty> {
-        // fn cmd_error(error: NdError) {
-        //     self.wrapping.send_to_section(Message::CmdError {
-        //         error: CmdError::Data(error),
-        //         id: MessageId::new(),
-        //         cmd_origin: origin.address(),
-        //         correlation_id: msg_id,
-        //     })
-        // };
-
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
         let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()) {
@@ -148,7 +139,9 @@ impl BlobRegister {
             .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin.id().public_key()))
             .filter(|res| res.is_err())
             .collect();
-        if !results.is_empty() {}
+        if !results.is_empty() {
+            info!("Results is not empty!");
+        }
         let msg = MsgEnvelope {
             message: Message::Cmd {
                 cmd: Cmd::Data {
@@ -224,6 +217,7 @@ impl BlobRegister {
         // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
         //   next closest non-full adult, or elder if none.  Also update the metadata for this
         //   chunk.  Not known yet where we'll get the chunk from to do that.
+        info!("Setting chunk holder");
 
         let db_key = blob_address.to_db_key();
         let mut metadata = self.get_metadata_for(blob_address).unwrap_or_default();
