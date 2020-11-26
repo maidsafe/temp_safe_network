@@ -35,7 +35,7 @@ struct Environment {
 }
 
 #[derive(Deserialize, Debug)]
-struct LoginDetails {
+struct SafeSeed {
     pub passphrase: String,
     pub password: String,
 }
@@ -71,61 +71,65 @@ pub fn authd_restart(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> 
 }
 
 pub async fn authd_create(
-    safe: &mut Safe,
+    _safe: &mut Safe,
     sn_authd: &SafeAuthdClient,
     config_file_str: Option<String>,
-    sk: Option<String>,
+    _sk: Option<String>,
     test_coins: bool,
 ) -> Result<(), String> {
-    let login_details = get_login_details(config_file_str)?;
+    let safe_seed = get_safe_seed(config_file_str)?;
 
-    if test_coins && cfg!(feature = "simulated-payouts") {
-        #[cfg(feature = "simulated-payouts")]
-        {
-            // We then generate a SafeKey with test-coins to use it for the account creation
-            println!("Creating a SafeKey with test-coins...");
-            let (_xorurl, kp) = safe.keys_create_preload_test_coins("1000.11").await?;
-            // let kp =
-            // key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
-            println!("Sending account creation request to authd...");
-            let sk = kp.secret_key().map_err(|e| format!("{:?}", e))?.to_string();
-            sn_authd
-                .create_acc(&sk, &login_details.passphrase, &login_details.password)
-                .await?;
-
-            println!("Account was created successfully!");
-            println!("SafeKey created and preloaded with test-coins. Owner key pair generated:");
-            println!("Public Key = {}", kp.public_key());
-            println!("Secret Key = {}", sk);
-        }
-    } else {
-        let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
-        println!("Sending account creation request to authd...");
+    if test_coins {
+        // We then generate a SafeKey with test-coins to use it for the Safe creation
+        // TODO: generate a payment proof to send to authd
+        // println!("Creating a SafeKey with test-coins...");
+        // let (_xorurl, kp) = safe.keys_create_preload_test_coins("1000.11").await?;
+        // let kp =
+        // key_pair.ok_or("Faild to obtain the secret key of the newly created SafeKey")?;
+        // let sk = kp.secret_key().map_err(|e| format!("{:?}", e))?.to_string();
+        println!("Sending request to authd to create a Safe...");
         sn_authd
-            .create_acc(&sk, &login_details.passphrase, &login_details.password)
+            .create(&safe_seed.passphrase, &safe_seed.password)
             .await?;
-        println!("Account was created successfully!");
-    };
-    Ok(())
+
+        println!("Safe was created successfully!");
+        // println!("SafeKey created and preloaded with test-coins. Owner key pair generated:");
+        // println!("Public Key = {}", kp.public_key());
+        // println!("Secret Key = {}", sk);
+        Ok(())
+    } else {
+        Err("Please use --test-coins option, other options not implemented yet.".to_string())
+        // TODO: support generating a payment proof to be sent to authd, either
+        // by using the provided SK to sign the payment request,
+        // or by obtaining a signed request from the user for the payment request.
+        /*
+        let sk = prompt_sensitive(sk, "Enter SafeKey's secret key to pay with:")?;
+        println!("Sending request to authd to create a Safe...");
+        sn_authd
+            .create(&safe_seed.passphrase, &safe_seed.password)
+            .await?;
+        println!("Safe was created successfully!");
+        */
+    }
 }
 
-pub async fn authd_login(
+pub async fn authd_unlock(
     sn_authd: &mut SafeAuthdClient,
     config_file_str: Option<String>,
 ) -> Result<(), String> {
-    let login_details = get_login_details(config_file_str)?;
-    println!("Sending login action request to authd...");
+    let safe_seed = get_safe_seed(config_file_str)?;
+    println!("Sending action request to authd to unlock the Safe...");
     sn_authd
-        .log_in(&login_details.passphrase, &login_details.password)
+        .unlock(&safe_seed.passphrase, &safe_seed.password)
         .await?;
-    println!("Logged in successfully");
+    println!("Safe unlocked successfully");
     Ok(())
 }
 
-pub async fn authd_logout(sn_authd: &mut SafeAuthdClient) -> Result<(), String> {
-    println!("Sending logout action request to authd...");
-    sn_authd.log_out().await?;
-    println!("Logged out successfully");
+pub async fn authd_lock(sn_authd: &mut SafeAuthdClient) -> Result<(), String> {
+    println!("Sending action request to authd to lock the Safe...");
+    sn_authd.lock().await?;
+    println!("Safe locked successfully");
     Ok(())
 }
 
@@ -285,10 +289,10 @@ fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
     }
 }
 
-fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String> {
+fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
     let environment_details = from_env::<Environment>().map_err(|err| {
         format!(
-            "Failed when attempting to read login details from env vars: {}",
+            "Failed when attempting to read Safe seed from env vars: {}",
             err
         )
     })?;
@@ -308,7 +312,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
     }
 
     if the_passphrase.is_empty() ^ the_password.is_empty() {
-        return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for Safe account creation/login.".to_string());
+        return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for creating/unlocking a Safe.".to_string());
     }
 
     if the_passphrase.is_empty() || the_password.is_empty() {
@@ -320,7 +324,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
                 }
             };
 
-            let json: LoginDetails = serde_json::from_reader(file).map_err(|err| {
+            let json: SafeSeed = serde_json::from_reader(file).map_err(|err| {
                 format!(
                     "Format of the config file is not valid and couldn't be parsed: {}",
                     err
@@ -355,7 +359,7 @@ fn get_login_details(config_file: Option<String>) -> Result<LoginDetails, String
         ));
     }
 
-    let details = LoginDetails {
+    let details = SafeSeed {
         passphrase: the_passphrase,
         password: the_password,
     };

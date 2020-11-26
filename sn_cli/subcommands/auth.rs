@@ -19,32 +19,32 @@ pub enum AuthSubCommands {
     #[structopt(name = "clear")]
     /// Clear Safe CLI authorisation credentials from local file
     Clear {},
-    #[structopt(name = "login")]
-    /// Send request to a remote Authenticator daemon to log in to a Safe account
-    Login {
-        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
+    #[structopt(name = "unlock")]
+    /// Send request to a remote Authenticator daemon to unlock a Safe
+    Unlock {
+        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing this information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]
         config_file_str: Option<String>,
-        /// Automatically self authorise the CLI application using the account is being logged in with
+        /// Automatically self authorise the CLI application adding its keys to the Safe that is being unlocked
         #[structopt(long = "self-auth")]
         self_auth: bool,
     },
-    #[structopt(name = "logout")]
-    /// Send request to a remote Authenticator daemon to logout from currently logged in Safe account
-    Logout {},
+    #[structopt(name = "lock")]
+    /// Send request to a remote Authenticator daemon to lock any currently unlocked Safe
+    Lock {},
     #[structopt(name = "status")]
     /// Send request to a remote Authenticator daemon to obtain a status report
     Status {},
-    #[structopt(name = "create-acc")]
-    /// Send request to a remote Authenticator daemon to create a new Safe account
+    #[structopt(name = "create")]
+    /// Send request to a remote Authenticator daemon to create a new Safe
     Create {
-        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing login information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
+        /// A config file to read passphrase/password from. This is a convenience function, which is not recommended (storing this information unencrypted is not secure). Json file format = { "passphrase": "mypassphrase", "password": "mypassword" }
         #[structopt(short = "c", long = "config")]
         config_file_str: Option<String>,
-        /// The SafeKey's secret key to pay for the account creation, and to be set as the default spendable balance in the newly created Safe account
+        /// The SafeKey's secret key to pay for the cost of Safe creation, and to be set as the owner of the newly created Safe
         #[structopt(long = "sk")]
         sk: Option<String>,
-        /// Request the creation of a SafeKey with test-coins automatically to use it to pay for the account creation
+        /// Request the creation of a SafeKey with test-coins automatically to use it to pay for the cost of Safe creation
         #[structopt(long = "test-coins")]
         test_coins: bool,
     },
@@ -135,20 +135,20 @@ pub async fn auth_commander(
             let sn_authd = SafeAuthdClient::new(endpoint);
             authd_create(safe, &sn_authd, config_file_str, sk, test_coins).await
         }
-        Some(AuthSubCommands::Login {
+        Some(AuthSubCommands::Unlock {
             config_file_str,
             self_auth,
         }) => {
             let mut sn_authd = SafeAuthdClient::new(endpoint.clone());
-            authd_login(&mut sn_authd, config_file_str).await?;
+            authd_unlock(&mut sn_authd, config_file_str).await?;
             if self_auth {
                 self_authorise(endpoint, safe, sn_authd).await?;
             }
             Ok(())
         }
-        Some(AuthSubCommands::Logout {}) => {
+        Some(AuthSubCommands::Lock {}) => {
             let mut sn_authd = SafeAuthdClient::new(endpoint);
-            authd_logout(&mut sn_authd).await
+            authd_lock(&mut sn_authd).await
         }
         Some(AuthSubCommands::Status {}) => {
             let mut sn_authd = SafeAuthdClient::new(endpoint);

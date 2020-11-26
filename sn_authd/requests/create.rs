@@ -18,41 +18,49 @@ pub async fn process_req(
     if let Value::Array(args) = &params {
         if args.is_empty() || args.len() > 2 {
             Err(format!(
-                "Incorrect number of params for 'login' method: {:?}",
+                "Incorrect number of params for 'create' method: {:?}",
                 params
             ))
         } else {
-            info!("Logging in to SAFE account...");
+            info!("Creating a Safe...");
             let passphrase = args[0].as_str().ok_or_else(|| {
                 format!(
-                    "Invalid type for passphrase param for 'login' method: {:?}",
+                    "Invalid type for passphrase param for 'create' method: {:?}",
                     args[0]
                 )
             })?;
             let password = args[1].as_str().ok_or_else(|| {
                 format!(
-                    "Invalid type for password param for 'login' method: {:?}",
+                    "Invalid type for password param for 'create' method: {:?}",
                     args[1]
                 )
             })?;
+            // TODO: support receiving a payment proof
+            /*let _payment = args[2].as_str().ok_or_else(|| {
+                format!(
+                    "Invalid type for payment proof param for 'create' method: {:?}",
+                    args[2]
+                )
+            })?;*/
 
             let mut safe_authenticator = safe_auth_handle.lock().await;
-            // let key_pair = get_sk_from_input(passphrase, password);
-            // let sk = key_pair.secret_key().map_err(|e| format!("{:?}", e))?;
 
-            match safe_authenticator.unlock(passphrase, password).await {
+            match safe_authenticator.create(passphrase, password).await {
                 Ok(_) => {
-                    let msg = "Unlocked successfully!";
+                    let msg = "Safe created successfully";
                     info!("{}", msg);
                     Ok(json!(msg))
                 }
                 Err(err) => {
-                    error!("Error occurred when trying to unlock: {}", err);
+                    error!("Error occurred when trying to create a Safe: {}", err);
                     Err(err.to_string())
                 }
             }
         }
     } else {
-        Err(format!("Incorrect params for 'login' method: {:?}", params))
+        Err(format!(
+            "Incorrect params for 'create' method: {:?}",
+            params
+        ))
     }
 }

@@ -81,7 +81,6 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
     let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd),
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
-        Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, safe).await,
         Some(SubCommands::Keypair {}) => {
             let key_pair = safe.keypair().await?;
             if OutputFmt::Pretty == output_fmt {
@@ -106,7 +105,6 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
                 .join()
                 .map_err(|err| format!("Failed to run self update: {:?}", err))?
         }
-        Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, safe).await,
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
         Some(SubCommands::Xorurl {
             cmd,
@@ -121,6 +119,8 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
             // read-only access and some of these commands will fail if they require write access
             connect(safe).await?;
             match other {
+                SubCommands::Auth { cmd } => auth_commander(cmd, args.endpoint, safe).await,
+                SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, safe).await,
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
                 SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe).await,

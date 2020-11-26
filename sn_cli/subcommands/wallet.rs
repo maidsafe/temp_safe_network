@@ -183,6 +183,7 @@ pub async fn wallet_commander(
                         key_generated_output.0,
                         key_generated_output.1,
                         key_generated_output.2,
+                        test_coins,
                     );
                 }
             } else if let Some(pair) = &key_generated_output.1 {

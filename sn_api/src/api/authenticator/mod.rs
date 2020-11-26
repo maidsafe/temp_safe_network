@@ -7,28 +7,31 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Error, Result, SafeAuthReq, SafeAuthReqId, api::ipc::{
-    decode_msg, encode_msg,
-    req::{AuthReq, IpcReq},
-    resp::{AuthGranted, IpcResp},
-    BootstrapConfig, IpcMsg,
-}};
+use crate::{
+    api::ipc::{
+        decode_msg, encode_msg,
+        req::{AuthReq, IpcReq},
+        resp::{AuthGranted, IpcResp},
+        BootstrapConfig, IpcMsg,
+    },
+    Error, Result, SafeAuthReq, SafeAuthReqId,
+};
 
-use log::{debug, info};
+use hmac::Hmac;
+use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
-use tiny_keccak::{sha3_256, sha3_512};
-use hmac::Hmac;
 use sha3::Sha3_256;
 use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::{Keypair, MapPermissionSet, MapAction, MapAddress};
-use std::{collections::BTreeMap,sync::Arc};
+use sn_data_types::{Keypair, MapAction, MapAddress, Map, MapPermissionSet, Money};
+use std::{collections::BTreeMap, sync::Arc};
+use tiny_keccak::{sha3_256, sha3_512};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 const SHA3_512_HASH_LEN: usize = 64;
 
-// Type tag value used for the Map which holds the vault's content on the network.
-const VAULT_TYPE_TAG: u64 = 1_300;
+// Type tag value used for the Map which holds the Safe's content on the network.
+const SAFE_TYPE_TAG: u64 = 1_300;
 
 /// Derive Password, Keyword and PIN (in order).
 pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -97,7 +100,8 @@ pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
 // Authenticator API
 #[derive(Default)]
 pub struct SafeAuthenticator {
-    safe_client: Option<(Client, MapAddress)>,
+    safe_client: Option<Client>,
+    map: Option<Map>,
 }
 
 impl SafeAuthenticator {
@@ -106,25 +110,25 @@ impl SafeAuthenticator {
             sn_client::config_handler::set_config_dir_path(path);
         }
 
-        Self {
-            safe_client: None,
-        }
+        Self { safe_client: None, map: None }
     }
 
     // Private helper to obtain the Safe Client instance
     #[allow(dead_code)]
     fn get_safe_client(&self) -> Result<Client> {
         match &self.safe_client {
-            Some(client) => Ok(client.0.clone()),
-            None => Err(Error::AuthenticatorError("No Vault is currently unlocked".to_string())),
+            Some(client) => Ok(client.clone()),
+            None => Err(Error::AuthenticatorError(
+                "No Vault is currently unlocked".to_string(),
+            )),
         }
     }
 
-    /// # Create Vault
-    /// Creates a new account on the SAFE Network.
-    /// Returns an error if an account exists or if there was some
-    /// problem during the account creation process.
-    /// If the account is successfully created it keeps the logged in session (discarding a previous session)
+    /// # Create Safe
+    /// Creates a new Safe on the Network.
+    /// Returns an error if a Safe exists or if there was some
+    /// problem during the creation process.
+    /// If the Safe is successfully created it keeps the logged in session (discarding a previous session)
     ///
     /// Note: This does _not_ perform any strength checks on the
     /// strings used to create the account.
@@ -140,7 +144,7 @@ impl SafeAuthenticator {
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
     /// # async_std::task::block_on(async {
-    /// let acc_created = safe_auth.create_acc(sk, my_secret, my_password).await;
+    /// let acc_created = safe_auth.create(sk, my_secret, my_password).await;
     /// match acc_created {
     ///    Ok(()) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
@@ -162,8 +166,8 @@ impl SafeAuthenticator {
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
     /// # async_std::task::block_on(async {
-    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
-    /// let acc_not_created = safe_auth.create_acc(sk, my_secret, my_password).await;
+    /// # safe_auth.create(sk, my_secret, my_password).await.unwrap();
+    /// let acc_not_created = safe_auth.create(sk, my_secret, my_password).await;
     /// match acc_not_created {
     ///    Ok(_) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
@@ -173,16 +177,17 @@ impl SafeAuthenticator {
     /// }
     /// # });
     ///```
-    pub async fn create_acc(&mut self, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to create a Safe account from provided password and passphrase.");
+    pub async fn create(&mut self, passphrase: &str, password: &str) -> Result<()> {
+        debug!("Attempting to create a Safe from provided passphrase and password.");
 
         let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
         let data_owner = keypair.public_key();
 
-        debug!("Creating account with PK: {:?}", data_owner);
+        debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
 
         let mut client = Client::new(Some(keypair)).await?;
-        debug!("Client instantiated properly!");
+        trace!("Client instantiated properly!");
+        client.trigger_simulated_farming_payout(Money::from_nano(777)).await?;
 
         // Create Map data to store the list of keypairs generated for
         // each of the user's applications.
@@ -196,20 +201,28 @@ impl SafeAuthenticator {
         let mut permission_map = BTreeMap::new();
         permission_map.insert(data_owner, permission_set);
 
+        // TODO: encrypt content
         let map_address = client
-            .store_seq_map(location, VAULT_TYPE_TAG, data_owner, None, Some(permission_map))
+            .store_seq_map(
+                location,
+                SAFE_TYPE_TAG,
+                data_owner,
+                None,
+                Some(permission_map),
+            )
             .await
-            .map_err(|err| Error::AuthenticatorError(format!("Failed to store account on Map: {}", err)))?;
-        debug!("Map stored successfully for new account!");
+            .map_err(|err| {
+                Error::AuthenticatorError(format!("Failed to store Safe on a Map: {}", err))
+            })?;
+        debug!("Map stored successfully for new Safe at: {:?}", map_address);
 
-        self.safe_client = Some((client, map_address));
+        self.safe_client = Some(client);
         Ok(())
     }
 
-    /// # Log in
+    /// # Unlock
     ///
-    /// Using an account already created, you can log in to
-    /// the SAFE Network using the `Authenticator` daemon.
+    /// Unlock a Safe already created on the network using the `Authenticator` daemon.
     ///
     /// ## Example
     /// ```ignore
@@ -223,8 +236,8 @@ impl SafeAuthenticator {
     /// # let my_password = &(random_str());
     /// # let sk = "83c055c5efdc483bd967adba5c1769daee0a17bc5fa2b6e129cd6b596c217617";
     /// # async_std::task::block_on(async {
-    /// # safe_auth.create_acc(sk, my_secret, my_password).await.unwrap();
-    /// let logged_in = safe_auth.log_in(my_secret, my_password).await;
+    /// # safe_auth.create(sk, my_secret, my_password).await.unwrap();
+    /// let logged_in = safe_auth.unlock(my_secret, my_password).await;
     /// match logged_in {
     ///    Ok(()) => assert!(true), // This should pass
     ///    Err(_) => assert!(false)
@@ -238,7 +251,7 @@ impl SafeAuthenticator {
     /// use sn_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # async_std::task::block_on(async {
-    /// let not_logged_in = safe_auth.log_in("non", "existant").await;
+    /// let not_logged_in = safe_auth.unlock("non", "existant").await;
     /// match not_logged_in {
     ///    Ok(()) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
@@ -249,26 +262,32 @@ impl SafeAuthenticator {
     /// # });
     ///```
     pub async fn unlock(&mut self, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to unlock...");
+        debug!("Attempting to unlock a Safe...");
 
         let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        debug!("Unlocking w/ pk: {:?}", keypair.public_key());
+        debug!("Unlocking Safe owned by PublicKey: {:?}", keypair.public_key());
 
         let mut client = Client::new(Some(keypair)).await?;
-        debug!("Client instantiated properly!");
+        trace!("Client instantiated properly!");
 
-        let map_address = MapAddress::Unseq { name: location, tag: VAULT_TYPE_TAG };
+        let map_address = MapAddress::Seq {
+            name: location,
+            tag: SAFE_TYPE_TAG,
+        };
+
         // Attempt to retrieve Map to make sure it actually exists
-        client.get_map(map_address).await?;
-        debug!("Vault unlocked successfully!");
+        let map = client.get_map(map_address).await?;
+        debug!("Safe unlocked successfully!");
 
-        self.safe_client = Some((client, map_address));
+        // Keep the Map so we dn't need to retrieve it every time
+        self.safe_client = Some(client);
+        self.map = Some(map);
         Ok(())
     }
 
-    pub fn log_out(&mut self) -> Result<()> {
-        debug!("Dropping logged in session...");
+    pub fn lock(&mut self) -> Result<()> {
+        debug!("Locking Safe...");
         self.safe_client = None;
         Ok(())
     }
@@ -366,9 +385,9 @@ impl SafeAuthenticator {
 
     /// Authenticate an app request.
     ///
-    /// First, this function searches for an app info in the access container.
+    /// First, this function searches for an app info in the Safe.
     /// If the app is found, then the `AuthGranted` struct is returned based on that information.
-    /// If the app is not found in the access container, then it will be authenticated.
+    /// If the app is not found in the Safe, then it will be authenticated.
     pub async fn authenticate(&self, auth_req: AuthReq) -> Result<AuthGranted> {
         let _app_id = auth_req.app_id;
 

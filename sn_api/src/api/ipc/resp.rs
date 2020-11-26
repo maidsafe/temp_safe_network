@@ -31,7 +31,7 @@ pub struct AuthGranted {
     /// The access keys.
     pub app_keypair: Arc<Keypair>,
 
-    /// The crust config.
+    /// Network bootstrap information.
     /// Useful to reuse bootstrap nodes and speed up access.
     pub bootstrap_config: BootstrapConfig,
 }

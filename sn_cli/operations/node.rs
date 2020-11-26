@@ -145,42 +145,37 @@ pub fn node_run(
     if test {
         println!("Setting up authenticator against local Safe network...");
 
-        if cfg!(windows) {
-            // On Windows authd must be installed as a service
-            let auth_install_win_args = vec!["auth", "install"];
-            run_safe_cmd(&auth_install_win_args, None, report_errors, verbosity)?;
-        }
-
-        //stop
+        // stop authd
         let stop_auth_args = vec!["auth", "stop"];
         run_safe_cmd(&stop_auth_args, None, ignore_errors, verbosity)?;
 
         let between_command_interval = Duration::from_secs(interval_as_int * 5);
         thread::sleep(between_command_interval);
-        //stop
+
+        // start authd
         let start_auth_args = vec!["auth", "start"];
         run_safe_cmd(&start_auth_args, None, report_errors, verbosity)?;
 
         thread::sleep(between_command_interval);
 
-        // // Q: can we assume network is correct here? Or do we need to do networks switch?
-        let pass: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let phrase: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        // Q: can we assume network is correct here? Or do we need to do networks switch?
+        let passphrase: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let password: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
-        // setup env for create acc / login
+        // setup env for create / unlock
         let mut env = HashMap::new();
-        env.insert("SAFE_AUTH_PASSPHRASE".to_string(), pass);
-        env.insert("SAFE_AUTH_PASSWORD".to_string(), phrase);
+        env.insert("SAFE_AUTH_PASSPHRASE".to_string(), passphrase);
+        env.insert("SAFE_AUTH_PASSWORD".to_string(), password);
 
-        // create-acc
-        let create_account = vec!["auth", "create-acc", "--test-coins"];
+        // create a Safe
+        let create = vec!["auth", "create", "--test-coins"];
 
-        run_safe_cmd(&create_account, Some(env.clone()), report_errors, verbosity)?;
+        run_safe_cmd(&create, Some(env.clone()), report_errors, verbosity)?;
         thread::sleep(between_command_interval);
 
-        // login
-        let login = vec!["auth", "login", "--self-auth"];
-        run_safe_cmd(&login, Some(env), report_errors, verbosity)?;
+        // unlock the Safe
+        let unlock = vec!["auth", "unlock", "--self-auth"];
+        run_safe_cmd(&unlock, Some(env), report_errors, verbosity)?;
     }
 
     Ok(())

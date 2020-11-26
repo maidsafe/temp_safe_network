@@ -17,23 +17,20 @@ pub async fn process_req(
     auth_reqs_handle: SharedAuthReqsHandle,
 ) -> Result<Value, String> {
     if Value::Null != params {
-        Err(format!(
-            "Unexpected param for 'logout' method: {:?}",
-            params
-        ))
+        Err(format!("Unexpected param for 'lock' method: {:?}", params))
     } else {
-        info!("Logging out...");
+        info!("Locking Safe...");
         let mut safe_authenticator = safe_auth_handle.lock().await;
-        match safe_authenticator.log_out() {
+        match safe_authenticator.lock() {
             Ok(()) => {
-                let msg = "Logged out successfully";
+                let msg = "Safe locked successfully";
                 info!("{}", msg);
                 let mut auth_reqs_list = auth_reqs_handle.lock().await;
                 auth_reqs_list.clear();
                 Ok(json!(msg))
             }
             Err(err) => {
-                let msg = format!("Failed to log out: {}", err);
+                let msg = format!("Failed to lock: {}", err);
                 error!("{}", msg);
                 Err(msg)
             }

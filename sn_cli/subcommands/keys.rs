@@ -94,7 +94,7 @@ pub async fn key_commander(
 
             let (xorurl, key_pair, amount) =
                 create_new_key(safe, test_coins, pay_with, preload, pk).await?;
-            print_new_key_output(output_fmt, xorurl, key_pair, amount);
+            print_new_key_output(output_fmt, xorurl, key_pair, amount, test_coins);
             Ok(())
         }
         KeysSubCommands::Balance {
@@ -182,7 +182,14 @@ pub async fn create_new_key(
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
         // If the --pay-with is not provided the API will use the account's default wallet/sk
-        if pay_with.is_none() {
+        if let Some(payee) = pay_with {
+            let keys_info = safe
+                .keys_create_and_preload_from_sk_string(&payee, preload.as_deref())
+                .await?;
+
+            xorurl = keys_info.0;
+            key_pair = keys_info.1;
+        } else {
             debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
 
             let payee = safe
@@ -192,13 +199,6 @@ pub async fn create_new_key(
                 .map_err(|e| format!("Secret key error: {:?}", e))?;
             let keys_info = safe
                 .keys_create_and_preload_from_sk_string(&payee.to_string(), preload.as_deref())
-                .await?;
-
-            xorurl = keys_info.0;
-            key_pair = keys_info.1;
-        } else {
-            let keys_info = safe
-                .keys_create_and_preload_from_sk_string(&pay_with.unwrap(), preload.as_deref())
                 .await?;
 
             xorurl = keys_info.0;
@@ -216,11 +216,16 @@ pub fn print_new_key_output(
     xorurl: String,
     key_pair: Option<Arc<Keypair>>,
     amount: Option<String>,
+    test_coins: bool,
 ) {
     if OutputFmt::Pretty == output_fmt {
         println!("New SafeKey created at: \"{}\"", xorurl);
         if let Some(n) = amount {
-            println!("Preloaded with {} coins", n);
+            println!(
+                "Preloaded with {} {}",
+                n,
+                if test_coins { "testcoins" } else { "coins" }
+            );
         }
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");

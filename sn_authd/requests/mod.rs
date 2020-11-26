@@ -11,13 +11,13 @@ mod allow;
 mod auth_reqs;
 mod authed_apps;
 mod authorise;
-mod create_acc;
+mod create;
 mod deny;
-mod log_in;
-mod log_out;
+mod lock;
 mod revoke;
 mod status;
 mod subscribe;
+mod unlock;
 mod unsubscribe;
 
 use crate::{
@@ -37,14 +37,14 @@ const METHOD_AUTHORISE: &str = "authorise";
 // Method for getting a status report of the sn_authd
 const METHOD_STATUS: &str = "status";
 
-// Method for logging into a SAFE account
-const METHOD_LOGIN: &str = "login";
+// Method for unlocking a Safe
+const METHOD_UNLOCK: &str = "unlock";
 
-// Method for logging out from a SAFE account
-const METHOD_LOGOUT: &str = "logout";
+// Method for locking any Safe currently unlocked
+const METHOD_LOCK: &str = "lock";
 
-// Method for creating a new SAFE account
-const METHOD_CREATE: &str = "create-acc";
+// Method for creating a new Safe
+const METHOD_CREATE: &str = "create";
 
 // Method for fetching list of authorised apps
 const METHOD_AUTHED_APPS: &str = "authed-apps";
@@ -90,9 +90,9 @@ pub async fn process_jsonrpc_request(
             )
             .await
         }
-        METHOD_LOGIN => log_in::process_req(params, safe_auth_handle).await,
-        METHOD_LOGOUT => log_out::process_req(params, safe_auth_handle, auth_reqs_handle).await,
-        METHOD_CREATE => create_acc::process_req(params, safe_auth_handle).await,
+        METHOD_UNLOCK => unlock::process_req(params, safe_auth_handle).await,
+        METHOD_LOCK => lock::process_req(params, safe_auth_handle, auth_reqs_handle).await,
+        METHOD_CREATE => create::process_req(params, safe_auth_handle).await,
         METHOD_AUTHED_APPS => authed_apps::process_req(params, safe_auth_handle).await,
         METHOD_REVOKE => revoke::process_req(params, safe_auth_handle).await,
         METHOD_AUTH_REQS => auth_reqs::process_req(params, auth_reqs_handle).await,

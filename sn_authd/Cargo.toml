@@ -46,3 +46,7 @@ unwrap = "1.2.1"
 version = "1"
 default-features = false
 features = ["precommit-hook","user-hooks"]
+
+[features]
+default = ["simulated-payouts"]
+simulated-payouts = ["sn_api/simulated-payouts"]

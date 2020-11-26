@@ -53,14 +53,14 @@ pub type AuthAllowPrompt = dyn Fn(AuthReq) -> Option<bool> + std::marker::Send +
 // Authenticator method for getting a status report of the sn_authd
 const SN_AUTHD_METHOD_STATUS: &str = "status";
 
-// Authenticator method for logging into a SAFE account
-const SN_AUTHD_METHOD_LOGIN: &str = "login";
+// Authenticator method for unlocking a Safe
+const SN_AUTHD_METHOD_UNLOCK: &str = "unlock";
 
-// Authenticator method for logging out from a SAFE account
-const SN_AUTHD_METHOD_LOGOUT: &str = "logout";
+// Authenticator method for locking a Safe
+const SN_AUTHD_METHOD_LOCK: &str = "lock";
 
-// Authenticator method for creating a new SAFE account
-const SN_AUTHD_METHOD_CREATE: &str = "create-acc";
+// Authenticator method for creating a new 'Safe'
+const SN_AUTHD_METHOD_CREATE: &str = "create";
 
 // Authenticator method for fetching list of authorised apps
 const SN_AUTHD_METHOD_AUTHED_APPS: &str = "authed-apps";
@@ -186,34 +186,34 @@ impl SafeAuthdClient {
         Ok(status_report)
     }
 
-    // Send a login action request to remote authd endpoint
-    pub async fn log_in(&mut self, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to log in on remote authd...");
+    // Send an action request to remote authd endpoint to unlock a Safe
+    pub async fn unlock(&mut self, passphrase: &str, password: &str) -> Result<()> {
+        debug!("Attempting to unlock a Safe on remote authd...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SN_AUTHD_METHOD_LOGIN,
+            SN_AUTHD_METHOD_UNLOCK,
             json!(vec![passphrase, password]),
         )
         .await?;
 
-        info!("SAFE login action was successful: {}", authd_response);
+        info!("The Safe was unlocked successful: {}", authd_response);
         // TODO: store the authd session token, replacing an existing one
         // self.session_token = authd_response;
 
         Ok(())
     }
 
-    // Sends a logout action request to the SAFE Authenticator
-    pub async fn log_out(&mut self) -> Result<()> {
-        debug!("Dropping logged in session and logging out in remote authd...");
+    // Send an action request to remote authd endpoint to lock a Safe
+    pub async fn lock(&mut self) -> Result<()> {
+        debug!("Locking the Safe on a remote authd...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
-            SN_AUTHD_METHOD_LOGOUT,
+            SN_AUTHD_METHOD_LOCK,
             serde_json::Value::Null,
         )
         .await?;
 
-        info!("SAFE logout action was successful: {}", authd_response);
+        info!("Locking action was successful: {}", authd_response);
 
         // TODO: clean up the stored authd session token
         // self.session_token = "".to_string();
@@ -221,18 +221,19 @@ impl SafeAuthdClient {
         Ok(())
     }
 
-    // Sends an account creation request to the SAFE Authenticator
-    pub async fn create_acc(&self, sk: &str, passphrase: &str, password: &str) -> Result<()> {
-        debug!("Attempting to create a SAFE account on remote authd...");
+    // Sends a request to create an 'Safe' to the SAFE Authenticator
+    // TODO: accept a payment proof to be used to pay the cost of creating the 'Safe'
+    pub async fn create(&self, passphrase: &str, password: &str) -> Result<()> {
+        debug!("Attempting to create a Safe using remote authd...");
         let authd_response = send_authd_request::<String>(
             &self.authd_endpoint,
             SN_AUTHD_METHOD_CREATE,
-            json!(vec![passphrase, password, sk]),
+            json!(vec![passphrase, password]),
         )
         .await?;
 
         debug!(
-            "SAFE account creation action was successful: {}",
+            "Creation of a Safe was successful: {}",
             authd_response
         );
         Ok(())

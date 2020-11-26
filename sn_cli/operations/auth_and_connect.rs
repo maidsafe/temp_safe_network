@@ -26,7 +26,7 @@ pub async fn authorise_cli(
     let (mut file, file_path) = create_credentials_file()?;
     println!("Authorising CLI application...");
     if !is_self_authing {
-        println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth login' command to automatically self authorise the CLI app.");
+        println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth unlock' command to automatically self authorise the CLI app.");
     }
     println!("Waiting for authorising response from authd...");
     let auth_credentials = Safe::auth_app(APP_ID, APP_NAME, APP_VENDOR, endpoint.as_deref())
