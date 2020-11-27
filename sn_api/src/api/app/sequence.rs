@@ -13,6 +13,7 @@ use crate::{
     Error, Result,
 };
 use log::debug;
+use tokio::time::timeout;
 use xor_name::XorName;
 
 impl Safe {
@@ -81,36 +82,46 @@ impl Safe {
         let data = match xorurl_encoder.content_version() {
             Some(version) => {
                 // We fetch a specific entry since the URL specifies a specific version
-                let data = self
-                    .safe_client
-                    .sequence_get_entry(
+               
+                
+                // Wrap the future with a `Timeout` for increased get reliability w/r/t data convergence
+                let data = match timeout(
+                    self.timeout,
+                    self.loop_fetch_sequence_entry(
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
                         version,
                         is_private,
-                    )
-                    .await
-                    .map_err(|err| {
-                        if let Error::VersionNotFound(_) = err {
-                            Error::VersionNotFound(format!(
-                                "Version '{}' is invalid for the Sequence found at \"{}\"",
-                                version, xorurl_encoder,
-                            ))
-                        } else {
-                            err
-                        }
-                    })?;
+                    ),
+                )
+                .await
+                {
+                    Ok(res) => res,
+                    Err(_) => Err(Error::VersionNotFound(format!(
+                        "Version '{}' is invalid for the Sequence found at \"{}\"",
+                        version, xorurl_encoder,
+                    ))),
+                }?;
+
                 Ok((version, data))
             }
             None => {
                 // ...then get last entry in the Sequence
-                self.safe_client
-                    .sequence_get_last_entry(
+                match timeout(
+                    self.timeout,
+                    self.loop_fetch_sequence_last_entry(
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
                         is_private,
-                    )
-                    .await
+                    ),
+                )
+                .await
+                {
+                    Ok(res) => res,
+                    Err(_) => Err(Error::ContentNotFound(
+                        "No content found in before timeout".to_string(),
+                    )),
+                }
             }
         };
 
@@ -128,6 +139,71 @@ impl Safe {
             )),
             other => other,
         }
+    }
+
+    /// loop over fetching a sequence entry, returns when Ok
+    /// Inteded to be wrapped in a timeout to aid in data convergence. (Eg. a fetch shortly after a put may take more time to return Ok)
+    async fn loop_fetch_sequence_entry(
+        &mut self,
+        xorname: XorName,
+        type_tag: u64,
+        version: u64,
+        is_private: bool,
+    ) -> Result<Vec<u8>> {
+        debug!("Running looped seq entry get. Will continue trying until success");
+
+        let mut done_trying = false;
+
+        // We fetch a specific entry since the URL specifies a specific version
+        let mut res = self
+            .safe_client
+            .sequence_get_entry(xorname, type_tag, version, is_private)
+            .await;
+
+        // loop in case original data hasn't been propogated to all elders as yet
+        while !done_trying {
+            res = self
+                .safe_client
+                .sequence_get_entry(xorname, type_tag, version, is_private)
+                .await;
+            if res.is_ok() {
+                done_trying = true;
+            }
+        }
+
+        res
+    }
+
+    /// loop over fetching a sequence's last entry, returns when Ok
+    /// Inteded to be wrapped in a timeout to aid in data convergence. (Eg. a fetch shortly after a put may take more time to return Ok)
+    async fn loop_fetch_sequence_last_entry(
+        &mut self,
+        xorname: XorName,
+        type_tag: u64,
+        is_private: bool,
+    ) -> Result<(u64, Vec<u8>)> {
+        debug!("Running looped seq last entry get. Will continue trying until success");
+
+        let mut done_trying = false;
+
+        // We fetch a specific entry since the URL specifies a specific version
+        let mut res = self
+            .safe_client
+            .sequence_get_last_entry(xorname, type_tag, is_private)
+            .await;
+
+        // loop in case original data hasn't been propogated to all elders as yet
+        while !done_trying {
+            res = self
+                .safe_client
+                .sequence_get_last_entry(xorname, type_tag, is_private)
+                .await;
+            if res.is_ok() {
+                done_trying = true;
+            }
+        }
+
+        res
     }
 
     /// Append data to a Public Sequence on the network
@@ -160,6 +236,8 @@ impl Safe {
         let xorname = xorurl_encoder.xorname();
         let type_tag = xorurl_encoder.type_tag();
         let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
+
+        // append to the data the data
         self.safe_client
             .append_to_sequence(data, xorname, type_tag, is_private)
             .await

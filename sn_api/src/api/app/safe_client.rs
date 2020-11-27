@@ -15,15 +15,13 @@ use log::{debug, info, warn};
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
     Blob, BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
-    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob,
-    PublicKey as SafeNdPublicKey, SequenceAddress, SequenceIndex, SequencePrivatePermissions,
-    SequencePublicPermissions, SequenceUser,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob, PublicKey,
+    SequenceAddress, SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions,
+    SequenceUser,
 };
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use xor_name::XorName;
-
-pub use threshold_crypto::{PublicKey, SecretKey};
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
@@ -152,15 +150,13 @@ impl SafeAppClient {
         from_id: Option<Keypair>,
         to_pk: PublicKey,
         amount: Money,
-    ) -> Result<(u64, SafeNdPublicKey)> {
+    ) -> Result<(u64, PublicKey)> {
         let mut client = match from_id {
             Some(id) => Client::new(Some(id)).await?,
             None => self.get_safe_client()?,
         };
 
-        let transfer_id = client
-            .send_money(SafeNdPublicKey::Bls(to_pk), amount)
-            .await?;
+        let transfer_id = client.send_money(to_pk, amount).await?;
 
         Ok(transfer_id)
     }
@@ -227,8 +223,17 @@ impl SafeAppClient {
         _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let mut client = self.get_safe_client()?;
-        let owner = client.public_key().await;
+        let mut safe_client = self.get_safe_client()?;
+        let client = &safe_client;
+        let owner_key_option = client.public_key().await;
+        let owners = if let PublicKey::Bls(owners) = owner_key_option {
+            owners
+        } else {
+            return Err(Error::Unexpected(
+                "Failed to retrieve public key.".to_string(),
+            ));
+        };
+
         let xorname = name.unwrap_or_else(rand::random);
 
         let permission_set = MapPermissionSet::new()
@@ -239,10 +244,25 @@ impl SafeAppClient {
             .allow(MapAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
-        permission_map.insert(owner, permission_set);
+        let app_pk = safe_client.public_key().await;
+        permission_map.insert(app_pk, permission_set);
 
-        client
-            .store_seq_map(xorname, tag, owner, None, Some(permission_map))
+        // let map = Map::Seq(SeqMap::new_with_data(
+        //     xorname,
+        //     tag,
+        //     BTreeMap::new(),
+        //     permission_map,
+        //     PublicKey::Bls(owners),
+        // ));
+
+        safe_client
+            .store_unseq_map(
+                xorname,
+                tag,
+                PublicKey::Bls(owners),
+                Some(BTreeMap::new()),
+                Some(permission_map),
+            )
             .await
             .map_err(|err| Error::NetDataError(format!("Failed to store SeqMap: {}", err)))?;
 
@@ -394,6 +414,7 @@ impl SafeAppClient {
         // The Sequence's owner will be the client's public key
         let owner = client.public_key().await;
 
+        debug!("?????????????????????????????????//");
         // Store the Sequence on the network
         let _address = if private {
             // Set permissions for append, delete, and manage perms to this application
