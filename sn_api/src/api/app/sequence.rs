@@ -82,8 +82,7 @@ impl Safe {
         let data = match xorurl_encoder.content_version() {
             Some(version) => {
                 // We fetch a specific entry since the URL specifies a specific version
-               
-                
+
                 // Wrap the future with a `Timeout` for increased get reliability w/r/t data convergence
                 let data = match timeout(
                     self.timeout,

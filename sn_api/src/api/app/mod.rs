@@ -39,23 +39,24 @@ use sn_data_types::Keypair;
 use std::sync::Arc;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
-
 use std::time::Duration;
-
 
 // TODO: should we be cloning this?
 #[derive(Clone)]
 pub struct Safe {
     safe_client: SafeAppClient,
     pub xorurl_base: XorUrlBase,
-    timeout: Duration
+    timeout: Duration,
 }
 
 static DEFAULT_TIMEOUT_SECS: u64 = 20;
 
 impl Default for Safe {
     fn default() -> Self {
-        Self::new(Some(DEFAULT_XORURL_BASE), Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+        Self::new(
+            Some(DEFAULT_XORURL_BASE),
+            Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+        )
     }
 }
 
