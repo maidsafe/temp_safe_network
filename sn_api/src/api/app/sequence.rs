@@ -151,8 +151,6 @@ impl Safe {
     ) -> Result<Vec<u8>> {
         debug!("Running looped seq entry get. Will continue trying until success");
 
-        let mut done_trying = false;
-
         // We fetch a specific entry since the URL specifies a specific version
         let mut res = self
             .safe_client
@@ -160,14 +158,11 @@ impl Safe {
             .await;
 
         // loop in case original data hasn't been propogated to all elders as yet
-        while !done_trying {
+        while res.is_err() {
             res = self
                 .safe_client
                 .sequence_get_entry(xorname, type_tag, version, is_private)
                 .await;
-            if res.is_ok() {
-                done_trying = true;
-            }
         }
 
         res
@@ -183,8 +178,6 @@ impl Safe {
     ) -> Result<(u64, Vec<u8>)> {
         debug!("Running looped seq last entry get. Will continue trying until success");
 
-        let mut done_trying = false;
-
         // We fetch a specific entry since the URL specifies a specific version
         let mut res = self
             .safe_client
@@ -192,14 +185,11 @@ impl Safe {
             .await;
 
         // loop in case original data hasn't been propogated to all elders as yet
-        while !done_trying {
+        while res.is_err() {
             res = self
                 .safe_client
                 .sequence_get_last_entry(xorname, type_tag, is_private)
                 .await;
-            if res.is_ok() {
-                done_trying = true;
-            }
         }
 
         res
