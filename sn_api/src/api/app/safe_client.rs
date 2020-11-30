@@ -247,14 +247,6 @@ impl SafeAppClient {
         let app_pk = safe_client.public_key().await;
         permission_map.insert(app_pk, permission_set);
 
-        // let map = Map::Seq(SeqMap::new_with_data(
-        //     xorname,
-        //     tag,
-        //     BTreeMap::new(),
-        //     permission_map,
-        //     PublicKey::Bls(owners),
-        // ));
-
         safe_client
             .store_unseq_map(
                 xorname,
@@ -414,7 +406,6 @@ impl SafeAppClient {
         // The Sequence's owner will be the client's public key
         let owner = client.public_key().await;
 
-        debug!("?????????????????????????????????//");
         // Store the Sequence on the network
         let _address = if private {
             // Set permissions for append, delete, and manage perms to this application
