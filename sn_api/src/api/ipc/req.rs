@@ -6,16 +6,26 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// use super::AppExchangeInfo;
 use crate::api::common::auth_types::SafeAuthReqId;
 use serde::{Deserialize, Serialize};
+
+/// IPC request.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub enum IpcReq {
+    /// Application authorisation request, used to obtain keypair/s the application
+    /// shall sign the network requests with.
+    Auth(AuthReq),
+    /// Unregistered application request, used to obtain network bootstrapping information.
+    /// Takes arbitrary user data as `Vec<u8>`, returns bootstrap information.
+    Unregistered(Vec<u8>),
+}
 
 /// Represents an authorisation request.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AuthReq {
     /// The authorisation request ID
     pub req_id: SafeAuthReqId,
-    /// The App ID. It must be unique.
+    /// The application ID. It must be unique.
     pub app_id: String,
     /// The application friendly-name.
     pub app_name: String,

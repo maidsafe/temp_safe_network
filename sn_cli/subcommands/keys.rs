@@ -163,52 +163,45 @@ pub async fn create_new_key(
     preload: Option<String>,
     _pk: Option<String>,
 ) -> Result<(String, Option<Arc<Keypair>>, Option<String>), String> {
-    let (xorurl, key_pair, amount) = if test_coins {
+    if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
-        let amount = preload.unwrap_or_else(|| PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string());
-
-        if amount == PRELOAD_TESTCOINS_DEFAULT_AMOUNT {
+        let amount = preload.unwrap_or_else(|| {
             warn!(
                 "You can pass a preload amount with test-coins, 1000.111 will be added by default."
             );
-        }
+            PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string()
+        });
 
         let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
-        (xorurl, key_pair, Some(amount))
-    } else {
-        let key_pair;
-        let xorurl;
 
+        Ok((xorurl, Some(Arc::new(key_pair)), Some(amount)))
+    } else {
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
         // If the --pay-with is not provided the API will use the account's default wallet/sk
-        if let Some(payee) = pay_with {
-            let keys_info = safe
-                .keys_create_and_preload_from_sk_string(&payee, preload.as_deref())
-                .await?;
+        let (xorurl, key_pair) = match pay_with {
+            Some(payee) => {
+                safe.keys_create_and_preload_from_sk_string(&payee, preload.as_deref())
+                    .await?
+            }
+            None => {
+                debug!(
+                    "Missing the '--pay-with' argument, using account's default wallet for funds"
+                );
 
-            xorurl = keys_info.0;
-            key_pair = keys_info.1;
-        } else {
-            debug!("Missing the '--pay-with' argument, using account's default wallet for funds");
+                let payee = safe
+                    .keypair()
+                    .await?
+                    .secret_key()
+                    .map_err(|e| format!("Secret key error: {:?}", e))?;
 
-            let payee = safe
-                .keypair()
-                .await?
-                .secret_key()
-                .map_err(|e| format!("Secret key error: {:?}", e))?;
-            let keys_info = safe
-                .keys_create_and_preload_from_sk_string(&payee.to_string(), preload.as_deref())
-                .await?;
+                safe.keys_create_and_preload_from_sk_string(&payee.to_string(), preload.as_deref())
+                    .await?
+            }
+        };
 
-            xorurl = keys_info.0;
-            key_pair = keys_info.1;
-        }
-
-        (xorurl, key_pair, preload)
-    };
-
-    Ok((xorurl, Some(Arc::new(key_pair)), amount))
+        Ok((xorurl, Some(key_pair), preload))
+    }
 }
 
 pub fn print_new_key_output(

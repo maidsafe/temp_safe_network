@@ -7,20 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{fetch::Range, helpers::decode_auth_response_ipc_msg, helpers::xorname_to_hex};
-use crate::{
-    api::authenticator::AuthResponseType,
-    api::ipc::{
-        decode_msg, encode_msg,
-        req::{AuthReq, IpcReq},
-        resp::{AuthGranted, IpcResp},
-        BootstrapConfig, IpcMsg,
-    },
-    decode_auth_ipc_msg, Error, Result,
-};
+use super::{fetch::Range, helpers::xorname_to_hex};
+use crate::{api::authenticator::AuthResponseType, decode_auth_ipc_msg, Error, Result};
 
-use log::{debug, info, warn};
-
+use log::{debug, info};
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
     Blob, BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
@@ -64,25 +54,15 @@ impl SafeAppClient {
     pub async fn connect(&mut self, _app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
-        let _disconnect_cb = || {
-            warn!("Connection with the SAFE Network was lost");
-        };
-
-        // let client = Client::new(None).await?;
-
         let client = match auth_credentials {
             Some(auth_credentials) => {
-                let auth_granted = decode_auth_response_ipc_msg(auth_credentials)?;
-
-                match auth_granted {
-                    AuthResponseType::Registered(authgranted) => {
-                        // TODO: This needs an existing SK now.
-                        // TODO: use bootstrap info  form authgranted
-                        Client::new(Some(authgranted.app_keypair)).await
+                match decode_auth_ipc_msg(auth_credentials)? {
+                    AuthResponseType::Registered(auth_granted) => {
+                        Client::new(Some(auth_granted.app_keypair)).await
                     }
-                    // unregistered type used for returning bootstrap config for client
-                    // TODO: rename?
-                    AuthResponseType::Unregistered(_bootstrap_config) => {
+                    AuthResponseType::Unregistered(config) => {
+                        // unregistered type used for returning bootstrap config for client
+                        // TODO: rename?
                         // TODO: what to do with config...
                         Client::new(None).await
                     }

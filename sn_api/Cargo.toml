@@ -16,7 +16,6 @@ ed25519-dalek = { version = "1.0.0-pre.4", features = [ "serde" ]}
 bincode = "1.2.1"
 chrono = "~0.4.6"
 dirs-next = "1.0.1"
-data-encoding = "2.1.1"
 env_logger = "~0.6.0"
 futures = "~0.3.5"
 qjsonrpc = { path = "../qjsonrpc", version = "~0.0.6" }
@@ -28,8 +27,7 @@ rand = "~0.7.3"
 rand_core = "~0.5.1"
 relative-path = "~0.4.0"
 # sn_client = { path="../../sn_client" }
-sn_client = { git = "https://github.com/joshuef/sn_client", branch = "Feat-ArcKeypair" }
-# sn_client = { git = "https://github.com/maidsafe/sn_client", branch = "master" }
+sn_client = { git = "https://github.com/maidsafe/sn_client", branch = "master" }
 sn_data_types = "~0.11.24"
 #sn_data_types = { path = "../../data-types" }
 serde = "1.0.91"

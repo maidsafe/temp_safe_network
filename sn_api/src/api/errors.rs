@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use super::ipc::IpcError;
 use sn_client::ClientError;
 use sn_data_types::Error as DtError;
 use std::fmt;
@@ -55,6 +56,12 @@ impl From<ClientError> for Error {
 impl From<DtError> for Error {
     fn from(error: DtError) -> Error {
         Error::ContentError(error.to_string())
+    }
+}
+
+impl From<IpcError> for Error {
+    fn from(error: IpcError) -> Self {
+        Self::AuthError(format!("{:?}", error))
     }
 }
 

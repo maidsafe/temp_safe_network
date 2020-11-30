@@ -8,8 +8,13 @@
 // Software.
 
 #[cfg(feature = "app")]
-use crate::api::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
-use crate::{api::authenticator::AuthResponseType, Error, Result};
+use crate::{
+    api::{
+        authenticator::AuthResponseType,
+        ipc::{resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp},
+    },
+    Error, Result,
+};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 use sn_data_types::{Error as SafeNdError, Money, PublicKey};
@@ -64,20 +69,17 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Money> {
 }
 
 pub fn decode_auth_response_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
-    let msg = decode_msg(&ipc_msg)
+    let msg = serde_json::from_str(ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
-        IpcMsg::Resp { response, .. } => match response {
-            IpcResp::Auth(res) => match res {
-                Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
-                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
-            },
-            IpcResp::Unregistered(res) => match res {
-                Ok(config) => Ok(AuthResponseType::Unregistered(config)),
-                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
-            },
-        },
-        IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
+        IpcMsg::Resp(IpcResp::Auth(Ok(authgranted))) => {
+            Ok(AuthResponseType::Registered(authgranted))
+        }
+        IpcMsg::Resp(IpcResp::Auth(Err(e))) => Err(Error::AuthError(format!("{:?}", e))),
+        IpcMsg::Resp(IpcResp::Unregistered(Ok(config))) => {
+            Ok(AuthResponseType::Unregistered(config))
+        }
+        IpcMsg::Resp(IpcResp::Unregistered(Err(e))) => Err(Error::AuthError(format!("{:?}", e))),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
 }

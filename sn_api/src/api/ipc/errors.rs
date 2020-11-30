@@ -6,14 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bincode::Error as SerialisationError;
-use data_encoding::DecodeError;
-use futures::channel::mpsc::SendError;
 use serde::{Deserialize, Serialize};
-use xor_name::XorName;
-
-use std::str::Utf8Error;
-use threshold_crypto::error::FromBytesError;
+//use threshold_crypto::error::FromBytesError;
 
 /// Ipc error.
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -28,10 +22,15 @@ pub enum IpcError {
     AlreadyAuthorised,
     /// App is not registered.
     UnknownApp,
-    /// Requested shared access to non-owned MD.
-    InvalidOwner(Vec<(XorName, u64)>),
     /// Unexpected error.
     Unexpected(String),
+}
+
+/*
+impl From<serde_json::Error> for IpcError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::EncodeDecodeError
+    }
 }
 
 impl From<SendError> for IpcError {
@@ -42,18 +41,6 @@ impl From<SendError> for IpcError {
 
 impl From<Utf8Error> for IpcError {
     fn from(_err: Utf8Error) -> Self {
-        Self::EncodeDecodeError
-    }
-}
-
-impl From<DecodeError> for IpcError {
-    fn from(_err: DecodeError) -> Self {
-        Self::EncodeDecodeError
-    }
-}
-
-impl From<SerialisationError> for IpcError {
-    fn from(_err: SerialisationError) -> Self {
         Self::EncodeDecodeError
     }
 }
@@ -75,3 +62,4 @@ impl From<FromBytesError> for IpcError {
         Self::from(err.to_string())
     }
 }
+*/

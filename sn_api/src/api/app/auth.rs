@@ -13,7 +13,7 @@ use super::{
     helpers::decode_auth_response_ipc_msg,
     Safe,
 };
-use crate::api::ipc::{encode_msg, gen_req_id, AuthReq, IpcMsg, IpcReq};
+use crate::api::ipc::{AuthReq, IpcMsg, IpcReq};
 use crate::{Error, Result};
 use log::{debug, info};
 use serde_json::json;
@@ -32,21 +32,9 @@ impl Safe {
     ) -> Result<String> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
-        let req_id: u32 = gen_req_id();
-        let request = IpcReq::Auth(AuthReq {
-            req_id,
-            app_id: app_id.to_string(),
-            app_name: app_name.to_string(),
-            app_vendor: app_vendor.to_string(),
-        });
 
-        let auth_req_str = encode_msg(&IpcMsg::Req { req_id, request }).map_err(|err| {
-            Error::AuthError(format!(
-                "Failed encoding the authorisation request: {:?}",
-                err
-            ))
-        })?;
-
+        let request = IpcMsg::new_auth_req(app_id, app_name, app_vendor);
+        let auth_req_str = request.to_string()?;
         debug!(
             "Authorisation request generated successfully: {}",
             auth_req_str
@@ -56,10 +44,17 @@ impl Safe {
         let auth_res = send_app_auth_req(&auth_req_str, endpoint).await?;
 
         // Check if the app has been authorised
-        match decode_auth_response_ipc_msg(&auth_res) {
-            Ok(_) => {
-                info!("Application was authorised");
+        match IpcMsg::from_str(&auth_res) {
+            Ok(IpcMsg::Resp(_ipc_resp)) => {
+                info!("Application was authorised: {:?}", auth_res);
                 Ok(auth_res)
+            }
+            Ok(other) => {
+                info!("Unexpected messages received: {:?}", other);
+                Err(Error::AuthError(format!(
+                    "Application was not authorised, unexpected response was received: {:?}",
+                    other
+                )))
             }
             Err(e) => {
                 info!("Application was not authorised");

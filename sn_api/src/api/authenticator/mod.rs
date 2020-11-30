@@ -9,12 +9,11 @@
 
 use crate::{
     api::ipc::{
-        decode_msg, encode_msg,
         req::{AuthReq, IpcReq},
         resp::{AuthGranted, IpcResp},
         BootstrapConfig, IpcMsg,
     },
-    Error, Result, SafeAuthReq, SafeAuthReqId,
+    Error, Result, SafeAuthReq,
 };
 
 use hmac::Hmac;
@@ -309,32 +308,19 @@ impl SafeAuthenticator {
         is_logged_in
     }
 
-    pub async fn decode_req(&self, req: &str) -> Result<(SafeAuthReqId, SafeAuthReq)> {
-        let _client = &self.safe_client;
-
-        let req_msg = match decode_msg(req) {
-            Ok(msg) => msg,
-            Err(err) => {
-                return Err(Error::AuthError(format!(
-                    "Failed to decode the auth request string: {:?}",
-                    err
-                )));
+    pub async fn decode_req(&self, req: &str) -> Result<SafeAuthReq> {
+        match IpcMsg::from_str(req) {
+            Ok(IpcMsg::Req(IpcReq::Auth(app_auth_req))) => {
+                debug!("Auth request string decoded: {:?}", app_auth_req);
+                Ok(SafeAuthReq::Auth(app_auth_req))
             }
-        };
-        debug!("Auth request string decoded: {:?}", req_msg);
-
-        let ipc_req = decode_ipc_msg(req_msg).await.map_err(|err| {
-            Error::AuthenticatorError(format!("Failed to decode request: {}", err))
-        })?;
-
-        match ipc_req {
-            Ok(IpcMsg::Req {
-                request: IpcReq::Auth(app_auth_req),
-                req_id,
-            }) => Ok((req_id, SafeAuthReq::Auth(app_auth_req))),
-            other => Err(Error::AuthError(format!(
+            Ok(other) => Err(Error::AuthError(format!(
                 "Failed to decode string as an authorisation request, it's a: '{:?}'",
                 other
+            ))),
+            Err(error) => Err(Error::AuthenticatorError(format!(
+                "Failed to decode request: {:?}",
+                error
             ))),
         }
     }
@@ -346,51 +332,28 @@ impl SafeAuthenticator {
 
     /// Decode requests and trigger application authorisation against the current client
     pub async fn authorise_app(&self, req: &str) -> Result<String> {
-        let req_msg = match decode_msg(req) {
-            Ok(msg) => msg,
-            Err(err) => {
-                return Err(Error::AuthError(format!(
-                    "Failed to decode the auth request string: {:?}",
-                    err
-                )));
-            }
-        };
-
-        debug!("Auth request string decoded: {:?}", req_msg);
-
-        let ipc_req = decode_ipc_msg(req_msg).await.map_err(|err| {
-            Error::AuthenticatorError(format!("Failed to decode request: {}", err))
+        let ipc_req = IpcMsg::from_str(req).map_err(|err| {
+            Error::AuthenticatorError(format!("Failed to decode authorisation request: {:?}", err))
         })?;
 
+        debug!("Auth request string decoded: {:?}", ipc_req);
+
         match ipc_req {
-            Ok(IpcMsg::Req {
-                request: IpcReq::Auth(app_auth_req),
-                req_id,
-            }) => {
+            IpcMsg::Req(IpcReq::Auth(app_auth_req)) => {
                 info!("Request was recognised as a general app auth request");
-                debug!("Decoded request (req_id={:?}): {:?}", req_id, app_auth_req);
-                self.gen_auth_response(req_id, app_auth_req).await
+                debug!("Decoded request: {:?}", app_auth_req);
+                self.gen_auth_response(app_auth_req).await
             }
 
-            Ok(IpcMsg::Req {
-                request: IpcReq::Unregistered(user_data),
-                req_id,
-            }) => {
+            IpcMsg::Req(IpcReq::Unregistered(user_data)) => {
                 info!("Request was recognised as an unregistered auth request");
-                debug!("Decoded request (req_id={:?}): {:?}", req_id, user_data);
+                debug!("Decoded request: {:?}", user_data);
 
-                self.gen_unreg_auth_response(req_id)
+                self.gen_unreg_auth_response()
             }
-
-            Err(error) => Err(Error::AuthError(format!(
-                "Failed decoding the auth request: {:?}",
-                error
-            ))),
-            Ok(IpcMsg::Resp { .. }) | Ok(IpcMsg::Revoked { .. }) | Ok(IpcMsg::Err(..)) => {
-                Err(Error::AuthError(
-                    "The request was not recognised as a valid auth request".to_string(),
-                ))
-            }
+            IpcMsg::Resp { .. } | IpcMsg::Err(..) => Err(Error::AuthError(
+                "The request was not recognised as a valid auth request".to_string(),
+            )),
         }
     }
 
@@ -415,7 +378,7 @@ impl SafeAuthenticator {
     }
 
     // Helper function to generate an app authorisation response
-    async fn gen_auth_response(&self, req_id: SafeAuthReqId, auth_req: AuthReq) -> Result<String> {
+    async fn gen_auth_response(&self, auth_req: AuthReq) -> Result<String> {
         let auth_granted = self.authenticate(auth_req).await.map_err(|err| {
             Error::AuthenticatorError(format!(
                 "Failed to authorise application on the network: {}",
@@ -424,13 +387,9 @@ impl SafeAuthenticator {
         })?;
 
         debug!("Encoding response with auth credentials auth granted...");
-        let resp = encode_msg(&IpcMsg::Resp {
-            req_id,
-            response: IpcResp::Auth(Ok(auth_granted)),
-        })
-        .map_err(|err| {
-            Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
-        })?;
+        let resp = serde_json::to_string(&IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted)))).map_err(
+            |err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)),
+        )?;
 
         debug!("Returning auth response generated");
 
@@ -438,7 +397,7 @@ impl SafeAuthenticator {
     }
 
     // Helper function to generate an unregistered authorisation response
-    fn gen_unreg_auth_response(&self, req_id: SafeAuthReqId) -> Result<String> {
+    fn gen_unreg_auth_response(&self) -> Result<String> {
         let bootstrap_cfg = bootstrap_config().map_err(|err| {
             Error::AuthenticatorError(format!(
                 "Failed to obtain bootstrap info for response: {}",
@@ -447,11 +406,8 @@ impl SafeAuthenticator {
         })?;
 
         debug!("Encoding response... {:?}", bootstrap_cfg);
-        let resp = encode_msg(&IpcMsg::Resp {
-            req_id,
-            response: IpcResp::Unregistered(Ok(bootstrap_cfg)),
-        })
-        .map_err(|err| {
+        let resp = serde_json::to_string(&IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_cfg))))
+            .map_err(|err| {
             Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
         })?;
 
@@ -467,10 +423,10 @@ pub enum AuthResponseType {
 }
 
 pub fn decode_auth_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
-    let msg = decode_msg(&ipc_msg)
+    let msg = serde_json::from_str(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {
-        IpcMsg::Resp { response, .. } => match response {
+        IpcMsg::Resp(response) => match response {
             IpcResp::Auth(res) => match res {
                 Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
                 Err(e) => Err(Error::AuthError(format!("{:?}", e))),
@@ -479,27 +435,21 @@ pub fn decode_auth_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
                 Ok(config) => Ok(AuthResponseType::Unregistered(config)),
                 Err(e) => Err(Error::AuthError(format!("{:?}", e))),
             },
-            // _ => Err(Error::AuthError(
-            //     "Doesn't support other request.".to_string(),
-            // )),
         },
-        IpcMsg::Revoked { .. } => Err(Error::AuthError("Authorisation denied".to_string())),
         other => Err(Error::AuthError(format!("{:?}", other))),
     }
 }
-
+/*
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
-#[allow(clippy::type_complexity)]
 pub async fn decode_ipc_msg(
-    // client: &Client,
-    msg: IpcMsg,
-) -> Result<Result<IpcMsg>> {
-    match msg {
-        IpcMsg::Req {
+    msg: &str,
+) -> Result<IpcMsg> {
+    match serde_json::from_str(msg) {
+        Ok(IpcMsg::Req {
             request: IpcReq::Auth(auth_req),
             req_id,
-        } => {
+        }) => {
             // Ok status should be returned for all app states (including
             // Revoked and Authenticated).
             Ok(Ok(IpcMsg::Req {
@@ -519,7 +469,7 @@ pub async fn decode_ipc_msg(
         )),
     }
 }
-
+*/
 #[cfg(test)]
 mod tests {
     use super::*;
