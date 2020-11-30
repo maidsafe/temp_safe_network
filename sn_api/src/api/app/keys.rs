@@ -44,7 +44,7 @@ impl Safe {
         };
 
         let keypair = Keypair::from(from_sk);
-        let amount = parse_coins_amount(&preload_amount.unwrap_or_else(|| "0.0"))?;
+        let amount = parse_coins_amount(&preload_amount.unwrap_or("0.0"))?;
 
         let (xorname, keypair) = {
             let our_new_keypair = Keypair::new_ed25519(&mut OsRng);

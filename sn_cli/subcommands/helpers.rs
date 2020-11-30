@@ -86,7 +86,7 @@ pub fn read_stdin_response() -> Result<String, String> {
 
 // Outputs a message and then reads from stdin
 pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>, String> {
-    let the_message = message.unwrap_or_else(|| "...awaiting data from STDIN stream...");
+    let the_message = message.unwrap_or("...awaiting data from STDIN stream...");
     println!("{}", &the_message);
     let mut buffer = Vec::new();
     match std::io::stdin().read_to_end(&mut buffer) {

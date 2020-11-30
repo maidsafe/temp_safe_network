@@ -387,7 +387,7 @@ impl Safe {
             )),
             Err(Error::VersionNotFound(_)) => Err(Error::VersionNotFound(format!(
                 "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                xorurl_encoder.content_version().unwrap_or_else(|| 0),
+                xorurl_encoder.content_version().unwrap_or(0),
                 xorurl_encoder,
             ))),
             Err(err) => Err(Error::NetDataError(format!(
@@ -1008,11 +1008,7 @@ async fn add_or_update_file_item(
                 file_name.to_string(),
                 (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
             );
-            info!(
-                "Skipping file \"{}\": {:?}",
-                file_link.unwrap_or_else(|| ""),
-                err
-            );
+            info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
 
             false
         }
@@ -1459,7 +1455,7 @@ async fn file_system_dir_walk(
 
         for (idx, child) in children_to_process.enumerate() {
             let current_file_path = child.path();
-            let current_path_str = current_file_path.to_str().unwrap_or_else(|| "").to_string();
+            let current_path_str = current_file_path.to_str().unwrap_or("").to_string();
             info!("Processing {}...", current_path_str);
             let normalised_path = normalise_path_separator(&current_path_str);
 
@@ -1560,7 +1556,7 @@ async fn file_system_single_file(
 
     // We now compare both FilesMaps to upload the missing files
     let mut processed_files = BTreeMap::new();
-    let normalised_path = normalise_path_separator(file_path.to_str().unwrap_or_else(|| ""));
+    let normalised_path = normalise_path_separator(file_path.to_str().unwrap_or(""));
     if metadata.is_dir() {
         Err(Error::InvalidInput(format!(
             "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",

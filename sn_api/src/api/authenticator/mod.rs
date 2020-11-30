@@ -23,7 +23,7 @@ use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
 use sha3::Sha3_256;
 use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::{Keypair, MapAction, MapAddress, Map, MapPermissionSet, Money};
+use sn_data_types::{Keypair, Map, MapAction, MapAddress, MapPermissionSet, Money};
 use std::{collections::BTreeMap, sync::Arc};
 use tiny_keccak::{sha3_256, sha3_512};
 use xor_name::{XorName, XOR_NAME_LEN};
@@ -110,7 +110,10 @@ impl SafeAuthenticator {
             sn_client::config_handler::set_config_dir_path(path);
         }
 
-        Self { safe_client: None, map: None }
+        Self {
+            safe_client: None,
+            map: None,
+        }
     }
 
     // Private helper to obtain the Safe Client instance
@@ -187,7 +190,9 @@ impl SafeAuthenticator {
 
         let mut client = Client::new(Some(keypair)).await?;
         trace!("Client instantiated properly!");
-        client.trigger_simulated_farming_payout(Money::from_nano(777)).await?;
+        client
+            .trigger_simulated_farming_payout(Money::from_nano(777))
+            .await?;
 
         // Create Map data to store the list of keypairs generated for
         // each of the user's applications.
@@ -266,7 +271,10 @@ impl SafeAuthenticator {
 
         let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        debug!("Unlocking Safe owned by PublicKey: {:?}", keypair.public_key());
+        debug!(
+            "Unlocking Safe owned by PublicKey: {:?}",
+            keypair.public_key()
+        );
 
         let mut client = Client::new(Some(keypair)).await?;
         trace!("Client instantiated properly!");

@@ -89,7 +89,7 @@ impl Safe {
             ))
         })?;
 
-        let md_key = name.unwrap_or_else(|| &xorurl);
+        let md_key = name.unwrap_or(&xorurl);
         let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
         self.safe_client
             .map_insert(

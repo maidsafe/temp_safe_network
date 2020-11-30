@@ -232,10 +232,7 @@ impl SafeAuthdClient {
         )
         .await?;
 
-        debug!(
-            "Creation of a Safe was successful: {}",
-            authd_response
-        );
+        debug!("Creation of a Safe was successful: {}", authd_response);
         Ok(())
     }
 

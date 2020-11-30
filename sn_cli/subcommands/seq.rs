@@ -59,7 +59,7 @@ pub async fn seq_commander(
             xorname,
             private,
         } => {
-            let tag = type_tag.unwrap_or_else(|| DEFAULT_SEQUENCE_TYPE_TAG);
+            let tag = type_tag.unwrap_or(DEFAULT_SEQUENCE_TYPE_TAG);
             let xorname = match xorname.as_ref() {
                 Some(hex_str) => Some(hex_to_xorname(hex_str)?),
                 None => None,

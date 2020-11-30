@@ -185,7 +185,7 @@ async fn run_in_foreground(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
         }
         Err(err) => {
             // We cannot start the authd services since PID file lock coudln't be obtained
-            let os_error_code = err.raw_os_error().unwrap_or_else(|| 0);
+            let os_error_code = err.raw_os_error().unwrap_or(0);
             debug!(
                 "Failed to lock PID file with OS error code: {}",
                 os_error_code

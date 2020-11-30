@@ -95,7 +95,7 @@ pub fn create_wallet_with_balance(
         "--preload",
         preload_minus_costs,
         "--name",
-        balance_name.unwrap_or_else(|| "default-balance"),
+        balance_name.unwrap_or("default-balance"),
         "--json",
     )
     .read()

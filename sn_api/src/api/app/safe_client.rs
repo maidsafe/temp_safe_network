@@ -201,7 +201,7 @@ impl SafeAppClient {
         let blob_address = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = if let Some(end_index) = end {
-                Some(end_index - start.unwrap_or_else(|| 0))
+                Some(end_index - start.unwrap_or(0))
             } else {
                 None
             };

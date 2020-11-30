@@ -56,7 +56,7 @@ impl Safe {
     pub fn new(xorurl_base: Option<XorUrlBase>) -> Self {
         Self {
             safe_client: SafeAppClient::new(),
-            xorurl_base: xorurl_base.unwrap_or_else(|| DEFAULT_XORURL_BASE),
+            xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
         }
     }
 
