@@ -9,7 +9,7 @@
 
 #[cfg(feature = "app")]
 use crate::api::ipc::{decode_msg, resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp};
-use crate::{Error, Result};
+use crate::{api::authenticator::AuthResponseType, Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 use sn_data_types::{Error as SafeNdError, Money, PublicKey};
@@ -61,12 +61,6 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Money> {
             _ => Error::InvalidAmount(format!("Invalid safecoins amount '{}'", amount_str)),
         }
     })
-}
-
-#[allow(clippy::large_enum_variant)]
-pub enum AuthResponseType {
-    Registered(AuthGranted),
-    Unregistered(BootstrapConfig),
 }
 
 pub fn decode_auth_response_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {

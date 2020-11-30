@@ -3876,7 +3876,7 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client?branch=master#cf4db2c465aade7ab45443758bd2ae0ebc2a5ed9"
+source = "git+https://github.com/joshuef/sn_client?branch=Feat-ArcKeypair#d8be640fb1f3c05353a1915d436a4d9b870681f1"
 dependencies = [
  "async-trait",
  "bincode",

@@ -62,14 +62,17 @@ fn create_bls_keypair_from_seed(seeder: &[u8]) -> Keypair {
 }
 
 /// Perform all derivations and seeding to deterministically obtain location and Keypair from input
-pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(XorName, Keypair)> {
+pub fn derive_location_and_keypair(
+    passphrase: &str,
+    password: &str,
+) -> Result<(XorName, Arc<Keypair>)> {
     let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
     let map_data_location = generate_network_address(&keyword, &salt)?;
 
     let mut seed = password;
     seed.extend(salt.iter());
-    let keypair = create_ed25519_keypair_from_seed(&seed);
+    let keypair = Arc::new(create_ed25519_keypair_from_seed(&seed));
 
     Ok((map_data_location, keypair))
 }

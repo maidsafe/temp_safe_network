@@ -34,7 +34,7 @@ impl Safe {
         &mut self,
         from: &str,
         preload_amount: Option<&str>,
-    ) -> Result<(String, Keypair)> {
+    ) -> Result<(String, Arc<Keypair>)> {
         let from_sk = match ed_sk_from_hex(&from) {
             Ok(sk) => sk,
             Err(_) => return Err(Error::InvalidInput(
@@ -43,11 +43,11 @@ impl Safe {
             )),
         };
 
-        let keypair = Keypair::from(from_sk);
+        let keypair = Arc::new(Keypair::from(from_sk));
         let amount = parse_coins_amount(&preload_amount.unwrap_or("0.0"))?;
 
         let (xorname, keypair) = {
-            let our_new_keypair = Keypair::new_ed25519(&mut OsRng);
+            let our_new_keypair = Arc::new(Keypair::new_ed25519(&mut OsRng));
 
             let mut paying_client = Client::new(Some(keypair)).await?;
             paying_client
@@ -96,6 +96,8 @@ impl Safe {
                 ))
             }
         };
+
+        let keypair = Arc::new(keypair);
 
         let mut temp_client = Client::new(Some(keypair)).await?;
         let balance = temp_client.get_balance().await?;
@@ -203,7 +205,7 @@ impl Safe {
         };
 
         let from = match &from_sk_str {
-            Some(sk) => Some(Keypair::from(ed_sk_from_hex(sk)?)),
+            Some(sk) => Some(Arc::new(Keypair::from(ed_sk_from_hex(sk)?))),
             None => None,
         };
 

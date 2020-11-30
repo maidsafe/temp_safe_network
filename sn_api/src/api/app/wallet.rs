@@ -13,11 +13,11 @@ use crate::{
     xorurl::{SafeContentType, SafeDataType, XorUrl, XorUrlEncoder},
     Error, Result, Safe,
 };
-
 use log::debug;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Keypair, MapValue, Money};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use xor_name::XorName;
 
 // pub use threshold_crypto::{PublicKey, SecretKey};
@@ -62,7 +62,7 @@ impl Safe {
     ) -> Result<String> {
         // TODO: we need URLs / hex indication of which keytype this is....
         let acutal_sk = ed_sk_from_hex(sk)?;
-        let keypair = Keypair::from(acutal_sk);
+        let keypair = Arc::new(Keypair::from(acutal_sk));
         let xorname = XorName::from(keypair.public_key());
         let xorurl = XorUrlEncoder::encode(
             xorname,
@@ -202,7 +202,7 @@ impl Safe {
             debug!("Checking wallet of name: {:?}", name);
             let secret_key = ed_sk_from_hex(&balance.sk)?;
 
-            let id = Keypair::from(secret_key);
+            let id = Arc::new(Keypair::from(secret_key));
             let current_balance = self
                 .safe_client
                 .read_balance_from_keypair(id)
@@ -375,7 +375,7 @@ impl Safe {
         )
         .await?;
         let from_sk = ed_sk_from_hex(&from_wallet_balance.sk)?;
-        let keypair = Keypair::from(from_sk);
+        let keypair = Arc::new(Keypair::from(from_sk));
         // Finally, let's make the transfer
         match self
             .safe_client

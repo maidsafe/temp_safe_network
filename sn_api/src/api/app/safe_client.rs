@@ -7,8 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{fetch::Range, helpers::xorname_to_hex};
-use crate::{Error, Result};
+use super::{fetch::Range, helpers::decode_auth_response_ipc_msg, helpers::xorname_to_hex};
+use crate::{
+    api::authenticator::AuthResponseType,
+    api::ipc::{
+        decode_msg, encode_msg,
+        req::{AuthReq, IpcReq},
+        resp::{AuthGranted, IpcResp},
+        BootstrapConfig, IpcMsg,
+    },
+    decode_auth_ipc_msg, Error, Result,
+};
 
 use log::{debug, info, warn};
 
@@ -19,6 +28,7 @@ use sn_data_types::{
     SequenceAddress, SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions,
     SequenceUser,
 };
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use xor_name::XorName;
@@ -51,37 +61,38 @@ impl SafeAppClient {
     }
 
     // Connect to the SAFE Network using the provided app id and auth credentials
-    pub async fn connect(&mut self, _app_id: &str, _auth_credentials: Option<&str>) -> Result<()> {
+    pub async fn connect(&mut self, _app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
         let _disconnect_cb = || {
             warn!("Connection with the SAFE Network was lost");
         };
 
-        let client = Client::new(None).await?;
+        // let client = Client::new(None).await?;
 
-        // let client = match auth_credentials {
-        //     Some(auth_credentials) => {
-        //         let auth_granted = decode_ipc_msg(auth_credentials)?;
-        //         match auth_granted {
-        //             AuthResponseType::Registered(authgranted) => {
-        //                 // TODO: This needs an existing SK now.
-        //                 Client::new(None).await
-        //                 // Client::new(app_id.to_string(), authgranted, disconnect_cb).await
-        //             }
-        //             // unregistered type used for returning bootstrap config for client
-        //             // TODO: rename?
-        //             AuthResponseType::Unregistered(config) => {
-        //                 // TODO: what to do with config...
-        //                 Client::new(None).await
-        //             }
-        //         }
-        //     }
-        //     None => Client::new(None).await,
-        // }
-        // .map_err(|err| {
-        //     Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-        // })?;
+        let client = match auth_credentials {
+            Some(auth_credentials) => {
+                let auth_granted = decode_auth_response_ipc_msg(auth_credentials)?;
+
+                match auth_granted {
+                    AuthResponseType::Registered(authgranted) => {
+                        // TODO: This needs an existing SK now.
+                        // TODO: use bootstrap info  form authgranted
+                        Client::new(Some(authgranted.app_keypair)).await
+                    }
+                    // unregistered type used for returning bootstrap config for client
+                    // TODO: rename?
+                    AuthResponseType::Unregistered(_bootstrap_config) => {
+                        // TODO: what to do with config...
+                        Client::new(None).await
+                    }
+                }
+            }
+            None => Client::new(None).await,
+        }
+        .map_err(|err| {
+            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+        })?;
 
         self.safe_client = Some(client);
         debug!("Successfully connected to the Network!!!");
@@ -89,7 +100,7 @@ impl SafeAppClient {
     }
 
     // === Money operations ===
-    pub async fn read_balance_from_keypair(&mut self, id: Keypair) -> Result<Money> {
+    pub async fn read_balance_from_keypair(&mut self, id: Arc<Keypair>) -> Result<Money> {
         let mut temp_client = Client::new(Some(id)).await?;
         let coins = temp_client
             .get_balance()
@@ -110,7 +121,7 @@ impl SafeAppClient {
 
     pub async fn safecoin_transfer_to_xorname(
         &mut self,
-        from_id: Option<Keypair>,
+        from_id: Option<Arc<Keypair>>,
         _to_xorname: XorName,
         _amount: Money,
     ) -> Result<()> {
@@ -147,7 +158,7 @@ impl SafeAppClient {
     #[allow(dead_code)]
     pub async fn safecoin_transfer_to_pk(
         &mut self,
-        from_id: Option<Keypair>,
+        from_id: Option<Arc<Keypair>>,
         to_pk: PublicKey,
         amount: Money,
     ) -> Result<(u64, PublicKey)> {
