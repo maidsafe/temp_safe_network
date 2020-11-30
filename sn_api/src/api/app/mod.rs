@@ -65,7 +65,7 @@ impl Safe {
         Self {
             safe_client: SafeAppClient::new(),
             xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
-            timeout
+            timeout,
         }
     }
 
