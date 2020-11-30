@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::{
-    MetadataDuty, NodeMessagingDuty, NodeOperation, PaymentDuty, TransferDuty,
-};
+use crate::node::node_ops::{MetadataDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty};
 use crate::Network;
 use crate::{Error, Outcome, TernaryResult};
 use log::{info, warn};
@@ -95,7 +93,7 @@ impl ClientMsgAnalysis {
     /// The reason for this is that the payment request is already signed
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
-    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Outcome<PaymentDuty> {
+    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {
         let is_data_write = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -109,7 +107,11 @@ impl ClientMsgAnalysis {
             return Ok(None);
         }
 
-        Outcome::oki(PaymentDuty::ProcessPayment(msg.clone())) // TODO: Fix these for type safety
+        Outcome::oki(TransferDuty::ProcessCmd {
+            cmd: TransferCmd::ProcessPayment(msg.clone()),
+            msg_id: msg.id(),
+            origin: msg.origin.address(),
+        })
     }
 
     async fn try_transfers(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {

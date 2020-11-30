@@ -91,7 +91,7 @@ impl ReplicaManager {
     }
 
     pub(crate) fn history(&self, id: &PublicKey) -> Option<Vec<ReplicaEvent>> {
-        self.store.history(id)
+        self.store.history()
     }
 
     pub(crate) fn balance(&self, id: &PublicKey) -> Option<Money> {

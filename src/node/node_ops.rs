@@ -9,7 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use crate::Outcome;
+use crate::{Outcome, ReplicaInfo};
 use serde::export::Formatter;
 use sn_data_types::{
     Address, Blob, BlobAddress, DebitAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
@@ -278,9 +278,7 @@ pub enum KeySectionDuty {
     /// and query responses) with earlier client
     /// msgs, as to route them to the correct client.
     RunAsGateway(GatewayDuty),
-    /// Payment for data writes.
-    RunAsPayment(PaymentDuty),
-    /// Transfers of money between accounts.
+    /// Transfers of money between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
 }
 
@@ -332,27 +330,6 @@ impl Into<NodeOperation> for GatewayDuty {
         use NetworkDuty::*;
         use NodeOperation::*;
         Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
-    }
-}
-
-// --------------- Payment ---------------
-
-/// Payment for data.
-#[derive(Debug)]
-pub enum PaymentDuty {
-    /// Makes sure the payment contained
-    /// within a data write, is credited
-    /// to the section funds.
-    ProcessPayment(MsgEnvelope),
-}
-
-impl Into<NodeOperation> for PaymentDuty {
-    fn into(self) -> NodeOperation {
-        use ElderDuty::*;
-        use KeySectionDuty::*;
-        use NetworkDuty::*;
-        use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsPayment(self))))
     }
 }
 
@@ -533,6 +510,8 @@ pub enum TransferCmd {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     InitiateReplica(Vec<ReplicaEvent>),
+    UpdateReplicaKeys(ReplicaInfo),
+    ProcessPayment(MsgEnvelope),
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout
     SimulatePayout(Transfer),

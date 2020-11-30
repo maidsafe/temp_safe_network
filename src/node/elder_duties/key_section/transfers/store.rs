@@ -6,24 +6,42 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{to_db_key::from_db_key, utils, utils::Init, Error, Result, ToDbKey};
+use crate::{
+    to_db_key::{self, from_db_key},
+    utils,
+    utils::Init,
+    Error, Result, ToDbKey,
+};
+use log::trace;
 use pickledb::PickleDb;
 use sn_data_types::{PublicKey, ReplicaEvent};
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+};
+use xor_name::XorName;
 
-const TRANSFERS_DB_NAME: &str = "transfers.db";
-const GROUP_CHANGES: &str = "group_changes";
-use log::trace;
+const TRANSFERS_DIR_NAME: &str = "transfers";
+const DB_EXTENSION: &str = ".db";
+
 /// Disk storage for transfers.
 pub struct TransferStore {
+    id: XorName,
     db: PickleDb,
 }
 
 impl TransferStore {
-    pub fn new<R: AsRef<Path>>(root_dir: R, init_mode: Init) -> Result<Self> {
+    pub fn new(id: XorName, root_dir: &PathBuf, init_mode: Init) -> Result<Self> {
+        let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME)).as_path();
+        let db_name = format!("{}{}", id.to_db_key(), DB_EXTENSION);
         Ok(Self {
-            db: utils::new_db(root_dir, TRANSFERS_DB_NAME, init_mode)?,
+            id,
+            db: utils::new_db(db_dir, db_name, init_mode)?,
         })
+    }
+
+    pub fn id(&self) -> XorName {
+        self.id
     }
 
     pub fn all_stream_keys(&self) -> Option<Vec<PublicKey>> {
@@ -37,17 +55,19 @@ impl TransferStore {
         Some(keys)
     }
 
-    pub fn history(&self, id: &PublicKey) -> Option<Vec<ReplicaEvent>> {
+    pub fn history(&self) -> Option<Vec<ReplicaEvent>> {
         trace!("Getting History from node store");
 
-        // check list exists. If not, pickle panics
-        if !self.db.lexists(&id.to_db_key()) {
-            return None;
-        }
+        // let name = &self.id.to_db_key();
+
+        // // check list exists. If not, pickle panics
+        // if !self.db.lexists(name) {
+        //     return None;
+        // }
 
         let list: Vec<ReplicaEvent> = self
             .db
-            .liter(&id.to_db_key())
+            .liter("name")
             .filter_map(|c| c.get_item::<ReplicaEvent>())
             .collect();
         Some(list)
@@ -89,22 +109,7 @@ impl TransferStore {
 
     pub fn try_append(&mut self, event: ReplicaEvent) -> Result<()> {
         match event {
-            ReplicaEvent::KnownGroupAdded(e) => {
-                if !self.db.lexists(GROUP_CHANGES) {
-                    // Creates if not exists.
-                    match self.db.lcreate(GROUP_CHANGES) {
-                        Ok(_) => (),
-                        Err(error) => return Err(Error::PickleDb(error)),
-                    };
-                }
-                match self
-                    .db
-                    .ladd(GROUP_CHANGES, &ReplicaEvent::KnownGroupAdded(e))
-                {
-                    Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())),
-                }
-            }
+            ReplicaEvent::KnownGroupAdded(e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {
                 let key = &e.to().to_db_key();
                 if !self.db.lexists(key) {
@@ -154,9 +159,10 @@ mod test {
 
     #[test]
     fn history() -> Result<()> {
-        let tmp_dir = TempDir::new("history")?;
-        let root_dir = tmp_dir.path();
-        let mut store = TransferStore::new(root_dir, Init::New)?;
+        let id = xor_name::XorName::random();
+        let tmp_dir = TempDir::new("root")?;
+        let root_dir = tmp_dir.into_path();
+        let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
         let debit_proof = get_genesis(10, wallet_id)?;
         store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
@@ -164,7 +170,7 @@ mod test {
             debiting_replicas: get_random_pk(),
             crediting_replica_sig: dummy_sig(),
         }))?;
-        if let Some(history) = store.history(&wallet_id) {
+        if let Some(history) = store.history() {
             assert_eq!(history.len(), 1);
         } else {
             panic!();
@@ -174,9 +180,10 @@ mod test {
 
     #[test]
     fn all_stream_keys() -> Result<()> {
-        let tmp_dir = TempDir::new("all_stream_keys")?;
-        let root_dir = tmp_dir.path();
-        let mut store = TransferStore::new(root_dir, Init::New)?;
+        let id = xor_name::XorName::random();
+        let tmp_dir = TempDir::new("root")?;
+        let root_dir = tmp_dir.into_path();
+        let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
         let debit_proof = get_genesis(10, wallet_id)?;
         store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {

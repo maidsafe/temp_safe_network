@@ -101,3 +101,19 @@ impl<T> TernaryResult<T> for Outcome<T> {
         self.map(|c| c.map(|d| d.into()))
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct ReplicaInfo {
+    id: PublicKeyShare,
+    key_index: usize,
+    peer_replicas: PublicKeySet,
+    section_proof_chain: SectionProofChain,
+    signing: Arc<Mutex<ReplicaSigning>>,
+    initiating: bool,
+}
+
+use bls::{PublicKeySet, PublicKeyShare};
+use futures::lock::Mutex;
+use sn_routing::SectionProofChain;
+use sn_transfers::ReplicaSigning;
+use std::sync::Arc;
