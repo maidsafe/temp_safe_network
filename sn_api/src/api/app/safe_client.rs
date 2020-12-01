@@ -58,7 +58,7 @@ impl SafeAppClient {
             Some(auth_credentials) => {
                 match decode_auth_ipc_msg(auth_credentials)? {
                     AuthResponseType::Registered(auth_granted) => {
-                        Client::new(Some(auth_granted.app_keypair)).await
+                        Client::new(Some(auth_granted.app_keypair), Some(auth_granted.bootstrap_config)).await
                     }
                     AuthResponseType::Unregistered(config) => {
                         // unregistered type used for returning bootstrap config for client

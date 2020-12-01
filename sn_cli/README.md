@@ -523,7 +523,7 @@ Note we could have otherwise decided to deny this authorisation request and invo
 If we now switch back to our previous console, the one where we sent the authorisation request with `$ safe auth` command from, we will see the Safe CLI receiving the response from `authd`. You should see in that console a message like the following:
 ```shell
 Safe CLI app was successfully authorised
-Credentials were stored in <home directory>/.local/share/sn_cli/credentials
+Credentials were stored in <home directory>/.safe/cli/credentials
 ```
 
 We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.
@@ -541,7 +541,7 @@ Sending login action request to authd...
 Logged in successfully
 Authorising CLI application...
 Safe CLI app was successfully authorised
-Credentials were stored in <home directory>/.local/share/sn_cli/credentials
+Credentials were stored in <home directory>/.safe/cli/credentials
 ```
 
 #### Auth update

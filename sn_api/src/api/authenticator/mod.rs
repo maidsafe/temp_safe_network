@@ -423,6 +423,7 @@ pub enum AuthResponseType {
 }
 
 pub fn decode_auth_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
+    dbg!(&ipc_msg);
     let msg = serde_json::from_str(&ipc_msg)
         .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
     match msg {

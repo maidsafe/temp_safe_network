@@ -22,6 +22,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
         Ok(val) => val,
         Err(_) => "fake-credentials".to_string(),
     };
+
     safe.connect("", Some(&credentials)).await?;
     Ok(safe)
 }
