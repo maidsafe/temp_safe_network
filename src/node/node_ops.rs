@@ -9,7 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use crate::{Outcome, ReplicaInfo};
+use crate::Outcome;
 use serde::export::Formatter;
 use sn_data_types::{
     Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey, ReplicaEvent, SignedTransfer,
@@ -510,7 +510,6 @@ pub enum TransferCmd {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     InitiateReplica(Vec<ReplicaEvent>),
-    UpdateReplicaKeys(ReplicaInfo),
     ProcessPayment(MsgEnvelope),
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout

@@ -13,10 +13,10 @@ use rand::{CryptoRng, Rng};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
 use sn_routing::SendStream;
 use std::{
-    collections::HashMap,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+use dashmap::DashMap;
 
 /// A client is defined as a public key
 /// used by a specific socket address.
@@ -29,9 +29,9 @@ use std::{
 pub struct Onboarding {
     node_id: PublicKey,
     routing: Network,
-    clients: HashMap<SocketAddr, PublicKey>,
+    clients: DashMap<SocketAddr, PublicKey>,
     /// Map of new client connections to the challenge value we sent them.
-    client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicKey)>,
+    client_candidates: DashMap<SocketAddr, (Vec<u8>, PublicKey)>,
 }
 
 impl Onboarding {
@@ -39,14 +39,15 @@ impl Onboarding {
         Self {
             node_id,
             routing,
-            clients: HashMap::<SocketAddr, PublicKey>::new(),
+            clients: Default::default(),
             client_candidates: Default::default(),
         }
     }
 
     /// Query
-    pub fn get_public_key(&mut self, peer_addr: SocketAddr) -> Option<&PublicKey> {
-        self.clients.get(&peer_addr)
+    pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<&PublicKey> {
+        let value_ref = self.clients.get(&peer_addr)?;
+        Some(&value_ref.to_owned())
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
@@ -59,7 +60,7 @@ impl Onboarding {
     // }
 
     pub async fn onboard_client<G: CryptoRng + Rng>(
-        &mut self,
+        &self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         stream: &mut SendStream,
@@ -136,7 +137,7 @@ impl Onboarding {
 
     /// Handles a received join request from a client.
     async fn try_join<G: CryptoRng + Rng>(
-        &mut self,
+        &self,
         peer_addr: SocketAddr,
         client_key: PublicKey,
         stream: &mut SendStream,
@@ -154,8 +155,9 @@ impl Onboarding {
             self, client_key, peer_addr
         );
         if self.routing.matches_our_prefix(client_key.into()).await {
-            let challenge = if let Some((challenge, _)) = self.client_candidates.get(&peer_addr) {
-                challenge.clone()
+            let challenge = if let Some(challenge_ref) = self.client_candidates.get(&peer_addr) {
+                let (challenge, _) = challenge_ref.to_owned();
+                challenge
             } else {
                 let challenge = utils::random_vec(rng, 8);
                 let _ = self
@@ -190,7 +192,7 @@ impl Onboarding {
     /// Checks that the response contains a valid signature of the challenge we previously sent.
     /// If a client requests the section info, we also send it.
     fn receive_challenge_response(
-        &mut self,
+        &self,
         peer_addr: SocketAddr,
         signature: &Signature,
     ) -> Result<()> {
@@ -199,7 +201,7 @@ impl Onboarding {
             info!("{}: Client is already accepted (on {})", self, peer_addr);
             return Ok(());
         }
-        if let Some((challenge, public_key)) = self.client_candidates.remove(&peer_addr) {
+        if let Some((_, (challenge, public_key))) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
                     info!("{}: Accepted {} on {}.", self, public_key, peer_addr,);

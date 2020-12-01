@@ -8,7 +8,7 @@
 
 use crate::utils;
 use serde::{de::DeserializeOwned, Serialize};
-use sn_data_types::{BlobAddress, Keypair, MapAddress, PublicKey, SequenceAddress};
+use sn_data_types::{BlobAddress, Keypair, MapAddress, PublicKey, SequenceAddress, CreditId, DebitId};
 use xor_name::XorName;
 
 pub(crate) trait ToDbKey: Serialize {
@@ -31,6 +31,8 @@ impl ToDbKey for BlobAddress {}
 impl ToDbKey for MapAddress {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
+impl ToDbKey for CreditId {}
+impl ToDbKey for DebitId {}
 
 #[cfg(test)]
 mod test {

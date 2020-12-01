@@ -25,9 +25,9 @@ pub struct ChunkHolderDbs {
 impl ChunkHolderDbs {
     ///
     pub fn new(path: &Path, init: utils::Init) -> Result<Self> {
-        let metadata = utils::new_db(path, BLOB_META_DB_NAME, init)?;
-        let holders = utils::new_db(path, HOLDER_META_DB_NAME, init)?;
-        let full_adults = utils::new_db(path, FULL_ADULTS_DB_NAME, init)?;
+        let metadata = utils::new_auto_dump_db(path, BLOB_META_DB_NAME, init)?;
+        let holders = utils::new_auto_dump_db(path, HOLDER_META_DB_NAME, init)?;
+        let full_adults = utils::new_auto_dump_db(path, FULL_ADULTS_DB_NAME, init)?;
         let metadata = Rc::new(RefCell::new(metadata));
         let holders = Rc::new(RefCell::new(holders));
         let full_adults = Rc::new(RefCell::new(full_adults));

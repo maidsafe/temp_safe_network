@@ -26,7 +26,7 @@ impl ClientMsgAnalysis {
         Self { routing }
     }
 
-    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+    pub async fn evaluate(&self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
         info!("Evaluation of client msg envelope: {:?}", msg);
 
         // Check if the msg is a New Data Write and verify owners

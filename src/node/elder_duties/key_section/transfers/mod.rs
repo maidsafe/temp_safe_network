@@ -97,7 +97,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Outcome<NodeOperation> {
+    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Outcome<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         let result = match duty {
@@ -117,7 +117,7 @@ impl Transfers {
     }
 
     async fn process_query(
-        &mut self,
+        &self,
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
@@ -135,7 +135,7 @@ impl Transfers {
     }
 
     async fn process_cmd(
-        &mut self,
+        &self,
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
@@ -144,7 +144,6 @@ impl Transfers {
         debug!("Processing Transfer CMD in keysection");
         match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await,
-            UpdateReplicaKeys(info) => self.update_replica_keys(info.clone()),
             ProcessPayment(msg) => self.process_payment(msg).await,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
@@ -174,14 +173,14 @@ impl Transfers {
         }
     }
 
-    fn update_replica_keys(&mut self, info: ReplicaInfo) -> Outcome<NodeMessagingDuty> {
+    pub fn update_replica_keys(&mut self, info: ReplicaInfo) -> Outcome<NodeMessagingDuty> {
         self.replicas.update_replica_keys(info);
         Outcome::oki_no_value()
     }
 
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
-    async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
+    async fn initiate_replica(&self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
         match self.replicas.initiate(events).await {
             Ok(_) => Ok(None),
@@ -195,7 +194,7 @@ impl Transfers {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the section funds.
-    async fn process_payment(&mut self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
+    async fn process_payment(&self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
         let (payment, num_bytes) = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { payment, cmd },
@@ -412,7 +411,7 @@ impl Transfers {
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate(
-        &mut self,
+        &self,
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
@@ -443,7 +442,7 @@ impl Transfers {
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate_section_payout(
-        &mut self,
+        &self,
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
@@ -469,7 +468,7 @@ impl Transfers {
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     async fn register(
-        &mut self,
+        &self,
         proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: Address,
@@ -505,7 +504,7 @@ impl Transfers {
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     async fn register_section_payout(
-        &mut self,
+        &self,
         proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: Address,
@@ -543,7 +542,7 @@ impl Transfers {
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destination.
     async fn receive_propagated(
-        &mut self,
+        &self,
         credit_proof: &CreditAgreementProof,
         msg_id: MessageId,
         origin: Address,

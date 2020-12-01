@@ -18,11 +18,12 @@ use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
-use std::io::Write;
+use std::{time::Duration, io::Write};
 use std::{fs, path::Path};
 use unwrap::unwrap;
 
 const NODE_MODULE_NAME: &str = "sn_node";
+const PERIODIC_DUMP_INTERVAL: Duration = Duration::from_secs(60);
 
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +34,7 @@ pub enum Init {
     New,
 }
 
-pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
+pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,
     init_mode: Init,
@@ -50,6 +51,29 @@ pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     }
     trace!("Loading database at {}", db_path.display());
     let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
+    if let Err(ref error) = &result {
+        error!("Failed to load {}: {}", db_path.display(), error);
+    }
+    Ok(result?)
+}
+
+pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
+    db_dir: D,
+    db_name: N,
+    init_mode: Init,
+) -> Result<PickleDb> {
+    let db_path = db_dir.as_ref().join(db_name);
+    if init_mode == Init::New {
+        trace!("Creating database at {}", db_path.display());
+        fs::create_dir_all(db_dir)?;
+        let mut db = PickleDb::new_bin(db_path, PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL));
+        // Write then delete a value to ensure DB file is actually written to disk.
+        db.set("", &"")?;
+        let _ = db.rem("")?;
+        return Ok(db);
+    }
+    trace!("Loading database at {}", db_path.display());
+    let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL));
     if let Err(ref error) = &result {
         error!("Failed to load {}: {}", db_path.display(), error);
     }

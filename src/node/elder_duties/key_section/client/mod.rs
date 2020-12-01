@@ -50,7 +50,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         Ok(gateway)
     }
 
-    pub async fn process_as_gateway(&mut self, cmd: GatewayDuty) -> Outcome<NodeOperation> {
+    pub async fn process_as_gateway(&self, cmd: GatewayDuty) -> Outcome<NodeOperation> {
         trace!("Processing as gateway");
         use GatewayDuty::*;
         match cmd {
@@ -59,7 +59,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         }
     }
 
-    async fn try_find_client(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+    async fn try_find_client(&self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
         trace!("trying to find client...");
         if let Address::Client(xorname) = &msg.destination()? {
             if self.routing.matches_our_prefix(*xorname).await {
@@ -78,7 +78,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 
     /// This is where client input is parsed.
-    async fn process_client_event(&mut self, event: RoutingEvent) -> Outcome<NodeOperation> {
+    async fn process_client_event(&self, event: RoutingEvent) -> Outcome<NodeOperation> {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived {

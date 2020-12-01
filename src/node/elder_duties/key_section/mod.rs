@@ -41,7 +41,6 @@ pub struct KeySection<R: CryptoRng + Rng> {
     gateway: ClientGateway<R>,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
-    replicas: Replicas,
     routing: Network,
 }
 
@@ -54,14 +53,13 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     ) -> Result<Self> {
         let gateway = ClientGateway::new(info, routing.clone(), rng).await?;
         let replicas = Self::new_replica_manager(info.root_dir.clone(), routing.clone()).await?;
-        let transfers = Transfers::new(info.keys.clone(), replicas.clone(), rate_limit);
+        let transfers = Transfers::new(info.keys.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
         Ok(Self {
             gateway,
             transfers,
             msg_analysis,
-            replicas,
             routing,
         })
     }
@@ -95,8 +93,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             signing: Arc::new(Mutex::new(signing)),
             initiating: false,
         };
-        self.replicas.update_replica_keys(info);
-        Outcome::oki_no_value()
+        self.transfers.update_replica_keys(info).convert()
     }
 
     /// When section splits, the Replicas in either resulting section
@@ -123,7 +120,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     }
 
     pub async fn process_key_section_duty(
-        &mut self,
+        &self,
         duty: KeySectionDuty,
     ) -> Outcome<NodeOperation> {
         trace!("Processing as Elder KeySection");
