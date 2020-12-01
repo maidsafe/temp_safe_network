@@ -6,12 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{to_db_key::from_db_key, utils, utils::Init, Error, Result, ToDbKey};
+use crate::{utils, utils::Init, Error, Result, ToDbKey};
 use log::trace;
 use pickledb::PickleDb;
-use sn_data_types::{PublicKey, ReplicaEvent};
+use sn_data_types::ReplicaEvent;
 use std::{
-    collections::BTreeSet,
     path::{Path, PathBuf},
 };
 use xor_name::XorName;

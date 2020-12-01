@@ -28,7 +28,6 @@ use crate::{
 };
 use bls::SecretKey;
 use log::{error, info};
-use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::{Event, EventStream};
 use std::{
@@ -37,15 +36,15 @@ use std::{
 };
 
 /// Main node struct.
-pub struct Node<R: CryptoRng + Rng> {
-    duties: NodeDuties<R>,
+pub struct Node {
+    duties: NodeDuties,
     network_api: Network,
     network_events: EventStream,
 }
 
-impl<R: CryptoRng + Rng> Node<R> {
+impl Node {
     /// Initialize a new node.
-    pub async fn new(config: &Config, rng: R) -> Result<Self> {
+    pub async fn new(config: &Config) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
@@ -93,7 +92,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             reward_key,
         };
 
-        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng).await;
+        let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
 
         use AgeGroup::*;
         let _ = match age_group {
@@ -211,7 +210,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for Node<R> {
+impl Display for Node {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Node")
     }

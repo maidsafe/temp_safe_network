@@ -45,9 +45,10 @@ impl Onboarding {
     }
 
     /// Query
-    pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<&PublicKey> {
+    pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<PublicKey> {
         let value_ref = self.clients.get(&peer_addr)?;
-        Some(&value_ref.to_owned())
+        let value = value_ref.to_owned();
+        Some(value)
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {

@@ -24,7 +24,6 @@ use crate::{
 use crate::{Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::trace;
-use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -37,21 +36,20 @@ use std::sync::Arc;
 /// and routing messages back and forth to clients.
 /// Payments deals with the payment for data writes,
 /// while transfers deals with sending money between keys.
-pub struct KeySection<R: CryptoRng + Rng> {
-    gateway: ClientGateway<R>,
+pub struct KeySection {
+    gateway: ClientGateway,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
     routing: Network,
 }
 
-impl<R: CryptoRng + Rng> KeySection<R> {
+impl KeySection {
     pub async fn new(
         info: &NodeInfo,
         rate_limit: RateLimit,
         routing: Network,
-        rng: R,
     ) -> Result<Self> {
-        let gateway = ClientGateway::new(info, routing.clone(), rng).await?;
+        let gateway = ClientGateway::new(info, routing.clone()).await?;
         let replicas = Self::new_replica_manager(info.root_dir.clone(), routing.clone()).await?;
         let transfers = Transfers::new(info.keys.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());

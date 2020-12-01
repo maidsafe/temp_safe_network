@@ -19,29 +19,27 @@ use crate::{
 };
 use crate::{Outcome, TernaryResult};
 use log::{debug, trace};
-use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
-pub struct ElderDuties<R: CryptoRng + Rng> {
+pub struct ElderDuties {
     prefix: Prefix,
-    key_section: KeySection<R>,
+    key_section: KeySection,
     data_section: DataSection,
 }
 
-impl<R: CryptoRng + Rng> ElderDuties<R> {
+impl ElderDuties {
     pub async fn new(
         info: &NodeInfo,
         used_space: UsedSpace,
         network: Network,
-        rng: R,
     ) -> Result<Self> {
         let prefix = network.our_prefix().await;
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
-        let key_section = KeySection::new(info, rate_limit, network.clone(), rng).await?;
+        let key_section = KeySection::new(info, rate_limit, network.clone()).await?;
         let data_section = DataSection::new(info, dbs, used_space, network).await?;
         Ok(Self {
             prefix,
@@ -134,7 +132,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for ElderDuties<R> {
+impl Display for ElderDuties {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ElderDuties")
     }

@@ -40,7 +40,7 @@ impl ClientMsgHandling {
         }
     }
 
-    pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<&PublicKey> {
+    pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<PublicKey> {
         self.onboarding.get_public_key(peer_addr)
     }
 
@@ -69,7 +69,6 @@ impl ClientMsgHandling {
             trace!("Client has been onboarded.");
             if let Some(pk) = self.get_public_key(peer_addr) {
                 let mut updated_streams = vec![];
-                let pk = *pk;
 
                 // let's append to any existing known streams for this PK
                 if let Some((_, current_streams_for_pk)) = self.notification_streams.remove(&pk) {
@@ -167,7 +166,6 @@ impl ClientMsgHandling {
                 } else {
                     trace!("Attempting to use bootstrap stream");
                     if let Some(pk) = self.get_public_key(peer_addr) {
-                        let pk = *pk;
                         // get the streams and ownership
                         if let Some((_, streams)) = self.notification_streams.remove(&pk) {
                             let mut used_streams = vec![];

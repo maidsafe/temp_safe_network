@@ -22,7 +22,7 @@ use crate::{
 };
 use crate::{Error, Outcome, TernaryResult};
 use log::{error, info, trace, warn};
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use sn_data_types::{Address, Error as NdError, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
@@ -30,20 +30,18 @@ use std::fmt::{self, Display, Formatter};
 
 /// A client gateway routes messages
 /// back and forth between a client and the network.
-pub struct ClientGateway<R: CryptoRng + Rng> {
+pub struct ClientGateway {
     client_msg_handling: ClientMsgHandling,
-    rng: R,
     routing: Network,
 }
 
-impl<R: CryptoRng + Rng> ClientGateway<R> {
-    pub async fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
+impl ClientGateway {
+    pub async fn new(info: &NodeInfo, routing: Network,) -> Result<Self> {
         let onboarding = Onboarding::new(info.public_key().await, routing.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {
             client_msg_handling,
-            rng,
             routing,
         };
 
@@ -103,7 +101,8 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 } else {
                     match try_deserialize_handshake(&content, src) {
                         Ok(hs) => {
-                            let mut rng = ChaChaRng::from_seed(self.rng.gen());
+                            let mut rng = rand::thread_rng();
+                            let mut rng = ChaChaRng::from_seed(rng.gen());
                             let _ = self
                                 .client_msg_handling
                                 .process_handshake(hs, src, send, &mut rng)
@@ -142,7 +141,7 @@ fn validate_client_sig(msg: &MsgEnvelope) -> bool {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for ClientGateway<R> {
+impl Display for ClientGateway {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ClientGateway")
     }

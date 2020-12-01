@@ -89,8 +89,7 @@ async fn main() {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let mut rng = rand::thread_rng();
-    let mut node = match Node::new(&config, &mut rng).await {
+    let mut node = match Node::new(&config).await {
         Ok(node) => node,
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);

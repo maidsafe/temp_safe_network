@@ -25,31 +25,29 @@ use crate::{chunk_store::UsedSpace, Error, Network, Outcome, TernaryResult};
 use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
-use rand::{CryptoRng, Rng};
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
 
 #[allow(clippy::large_enum_variant)]
-pub enum DutyLevel<R: CryptoRng + Rng> {
+pub enum DutyLevel {
     Infant,
     Adult(AdultDuties),
-    Elder(ElderDuties<R>),
+    Elder(ElderDuties),
 }
 
 /// Node duties are those that all nodes
 /// carry out. (TBD: adjust for Infant level, which might be doing nothing now).
 /// Within the duty level, there are then additional
 /// duties to be carried out, depending on the level.
-pub struct NodeDuties<R: CryptoRng + Rng> {
+pub struct NodeDuties {
     node_info: NodeInfo,
-    duty_level: DutyLevel<R>,
+    duty_level: DutyLevel,
     network_events: NetworkEvents,
     messaging: Messaging,
     network_api: Network,
-    rng: Option<R>,
 }
 
-impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub async fn new(node_info: NodeInfo, network_api: Network, rng: R) -> Self {
+impl NodeDuties {
+    pub async fn new(node_info: NodeInfo, network_api: Network) -> Self {
         let age_grp = if network_api.is_elder().await {
             AgeGroup::Elder
         } else if network_api.is_adult().await {
@@ -69,7 +67,6 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             network_events,
             messaging,
             network_api,
-            rng: Some(rng),
         }
     }
 
@@ -81,7 +78,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         }
     }
 
-    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R>> {
+    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
         use DutyLevel::*;
 
         let level = match &mut self.duty_level {
@@ -155,13 +152,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             return Ok(None);
         }
 
-        let rng = if let Some(rng) = self.rng.take() {
-            rng
-        } else {
-            warn!("No rng found!");
-            return Outcome::error(Error::Logic("No rng found".to_string()));
-        };
-        match ElderDuties::new(&self.node_info, used_space, self.network_api.clone(), rng).await {
+        match ElderDuties::new(&self.node_info, used_space, self.network_api.clone()).await {
             Ok(duties) => {
                 let mut duties = duties;
                 let op = duties.initiate(self.node_info.first).await;
