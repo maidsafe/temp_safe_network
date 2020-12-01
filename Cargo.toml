@@ -37,7 +37,7 @@ unwrap = "1.2.1"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_data_types = "~0.11.37"
+sn_data_types = "~0.11.34"
 sn_transfers = "~0.2.4"
 ed25519 = "1.0.1"
 signature = "1.1.0"
@@ -104,3 +104,4 @@ chaos = [ ]
 [patch.crates-io]
 crdts = { git = "https://github.com/joshuef/rust-crdt", branch="Remove-LseqdefaultApply" }
 sn_transfers = { path = "../sn_transfers" }
+sn_data_types = { path = "../sn_data_types" }

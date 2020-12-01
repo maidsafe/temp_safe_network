@@ -16,9 +16,9 @@ use crate::{Outcome, TernaryResult};
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, DebitAgreementProof,
-    Error as NdError, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, PublicKey,
-    Query, QueryResponse, Result as NdResult,
+    Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, Error as NdError, Message,
+    MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, PublicKey, Query, QueryResponse,
+    Result as NdResult, TransferAgreementProof,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -66,7 +66,7 @@ impl BlobRegister {
         write: BlobWrite,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: DebitAgreementProof,
+        payment: TransferAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Outcome<NodeMessagingDuty> {
         use BlobWrite::*;
@@ -81,7 +81,7 @@ impl BlobRegister {
         data: Blob,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: DebitAgreementProof,
+        payment: TransferAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Outcome<NodeMessagingDuty> {
         // If the data already exist, check the existing no of copies.
@@ -160,7 +160,7 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: DebitAgreementProof,
+        payment: TransferAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Outcome<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {

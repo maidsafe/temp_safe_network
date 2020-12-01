@@ -6,12 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    to_db_key::{self, from_db_key},
-    utils,
-    utils::Init,
-    Error, Result, ToDbKey,
-};
+use crate::{to_db_key::from_db_key, utils, utils::Init, Error, Result, ToDbKey};
 use log::trace;
 use pickledb::PickleDb;
 use sn_data_types::{PublicKey, ReplicaEvent};
@@ -32,11 +27,11 @@ pub struct TransferStore {
 
 impl TransferStore {
     pub fn new(id: XorName, root_dir: &PathBuf, init_mode: Init) -> Result<Self> {
-        let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME)).as_path();
+        let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
         let db_name = format!("{}{}", id.to_db_key(), DB_EXTENSION);
         Ok(Self {
             id,
-            db: utils::new_db(db_dir, db_name, init_mode)?,
+            db: utils::new_db(db_dir.as_path(), db_name, init_mode)?,
         })
     }
 
@@ -109,9 +104,9 @@ impl TransferStore {
 
     pub fn try_append(&mut self, event: ReplicaEvent) -> Result<()> {
         match event {
-            ReplicaEvent::KnownGroupAdded(e) => unimplemented!("to be deprecated"),
+            ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {
-                let key = &e.to().to_db_key();
+                let key = &e.recipient().to_db_key();
                 if !self.db.lexists(key) {
                     // Creates if not exists. A stream always starts with a credit.
                     match self.db.lcreate(key) {
@@ -125,7 +120,7 @@ impl TransferStore {
                 }
             }
             ReplicaEvent::TransferValidated(e) => {
-                let id = e.from();
+                let id = e.sender();
                 match self
                     .db
                     .ladd(&id.to_db_key(), &ReplicaEvent::TransferValidated(e))
@@ -135,7 +130,7 @@ impl TransferStore {
                 }
             }
             ReplicaEvent::TransferRegistered(e) => {
-                let id = e.from();
+                let id = e.sender();
                 match self
                     .db
                     .ladd(&id.to_db_key(), &ReplicaEvent::TransferRegistered(e))
@@ -164,10 +159,10 @@ mod test {
         let root_dir = tmp_dir.into_path();
         let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
-        let debit_proof = get_genesis(10, wallet_id)?;
+        let credit_proof = get_genesis(10, wallet_id)?;
         store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
-            debit_proof,
-            debiting_replicas: get_random_pk(),
+            credit_proof,
+            crediting_replica_keys: get_random_pk(),
             crediting_replica_sig: dummy_sig(),
         }))?;
         if let Some(history) = store.history() {
@@ -185,10 +180,10 @@ mod test {
         let root_dir = tmp_dir.into_path();
         let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
-        let debit_proof = get_genesis(10, wallet_id)?;
+        let credit_proof = get_genesis(10, wallet_id)?;
         store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
-            debit_proof,
-            debiting_replicas: get_random_pk(),
+            credit_proof,
+            crediting_replica_keys: get_random_pk(),
             crediting_replica_sig: dummy_sig(),
         }))?;
         if let Some(list) = store.all_stream_keys() {

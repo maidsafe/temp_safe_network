@@ -13,8 +13,8 @@ use crate::{
 };
 use crate::{Error, Outcome, TernaryResult};
 use sn_data_types::{
-    DebitAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey,
-    ReplicaEvent, Result, TransferValidated,
+    CreditAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey,
+    ReplicaEvent, Result, SignedTransfer, TransferValidated,
 };
 use xor_name::XorName;
 
@@ -65,7 +65,7 @@ impl SectionFunds {
     /// Replica events get synched to section actor instances.
     pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Outcome<NodeMessagingDuty> {
         debug!("Synching replica events to section transfer actor...");
-        match self.actor.synch(events) {
+        match self.actor.synch_events(events) {
             Ok(_) => Ok(None),
             Err(e) => Outcome::error(Error::NetworkData(e)), // temp, will be removed with the other panics here shortly
         }
@@ -116,7 +116,11 @@ impl SectionFunds {
         // previous actor to new actor.
         use NodeCmd::*;
         use NodeTransferCmd::*;
-        match self.actor.transfer(amount, new_id) {
+        match self.actor.transfer(
+            amount,
+            new_id,
+            format!("Section Actor transition to id: {}", new_id),
+        ) {
             Ok(Some(event)) => {
                 match self.apply(TransferInitiated(event.clone())) {
                     Err(e) => {
@@ -133,7 +137,10 @@ impl SectionFunds {
                         self.wrapping
                             .send_to_section(
                                 Message::NodeCmd {
-                                    cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
+                                    cmd: Transfers(ValidateSectionPayout(SignedTransfer {
+                                        debit: event.signed_debit,
+                                        credit: event.signed_credit,
+                                    })),
                                     id: MessageId::new(),
                                 },
                                 true,
@@ -165,7 +172,11 @@ impl SectionFunds {
         use NodeCmd::*;
         use NodeTransferCmd::*;
         // We try initiate the transfer..
-        match self.actor.transfer(payout.amount, payout.to) {
+        match self.actor.transfer(
+            payout.amount,
+            payout.to,
+            format!("Reward for node id: {}", payout.node_id),
+        ) {
             Ok(Some(event)) => {
                 match self.apply(TransferInitiated(event.clone())) {
                     Err(e) => {
@@ -180,7 +191,10 @@ impl SectionFunds {
                         self.wrapping
                             .send_to_section(
                                 Message::NodeCmd {
-                                    cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
+                                    cmd: Transfers(ValidateSectionPayout(SignedTransfer {
+                                        debit: event.signed_debit,
+                                        credit: event.signed_credit,
+                                    })),
                                     id: MessageId::new(),
                                 },
                                 true,
@@ -229,7 +243,7 @@ impl SectionFunds {
 
                         // If we are transitioning to a new actor,
                         // we replace the old with the new.
-                        self.try_transition(proof.clone())?;
+                        self.try_transition(proof.credit_proof())?;
 
                         // If there are queued payouts,
                         // the first in queue will be executed.
@@ -293,8 +307,8 @@ impl SectionFunds {
     }
 
     // If we are transitioning to a new actor, we replace the old with the new.
-    fn try_transition(&mut self, credit: DebitAgreementProof) -> Result<()> {
-        if !self.is_transition_credit(&credit) {
+    fn try_transition(&mut self, credit_proof: CreditAgreementProof) -> Result<()> {
+        if !self.is_transition_credit(&credit_proof) {
             return Ok(());
         }
         // hmm.. it would actually be a bug
@@ -311,10 +325,10 @@ impl SectionFunds {
         // (which we don't really have reason for here)
 
         // Credit the transfer to the new actor.
-        match self.actor.synch(vec![TransferPropagated(
+        match self.actor.synch_events(vec![TransferPropagated(
             sn_data_types::TransferPropagated {
-                debit_proof: credit,
-                debiting_replicas: self.actor.id(),
+                credit_proof,
+                crediting_replica_keys: self.actor.id(),
                 crediting_replica_sig: dummy_sig(),
             },
         )]) {
@@ -330,9 +344,9 @@ impl SectionFunds {
         self.actor.apply(event)
     }
 
-    fn is_transition_credit(&self, credit: &DebitAgreementProof) -> bool {
+    fn is_transition_credit(&self, credit: &CreditAgreementProof) -> bool {
         if let Some(next_actor) = &self.state.next_actor {
-            return credit.to() == next_actor.id();
+            return credit.recipient() == next_actor.id();
         }
         false
     }

@@ -2622,8 +2622,7 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.35"
-source = "git+https://github.com/oetyng/sn_data_types?branch=wallet-actor-model#7e2977aea3a9b53cff2a10b53161dc8338d0a487"
+version = "0.11.34"
 dependencies = [
  "bincode",
  "crdts",

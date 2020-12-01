@@ -14,8 +14,8 @@ use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
 use crate::{Outcome, TernaryResult};
 use log::info;
 use sn_data_types::{
-    AccountWrite, BlobWrite, Cmd, DataCmd, DebitAgreementProof, MapWrite, Message, MessageId,
-    MsgEnvelope, MsgSender, SequenceWrite,
+    AccountWrite, BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
+    SequenceWrite, TransferAgreementProof,
 };
 
 pub(super) async fn get_result(
@@ -70,7 +70,7 @@ async fn blob(
     register: &mut BlobRegister,
     msg_id: MessageId,
     origin: MsgSender,
-    payment: DebitAgreementProof,
+    payment: TransferAgreementProof,
     proxies: Vec<MsgSender>,
 ) -> Outcome<NodeMessagingDuty> {
     register

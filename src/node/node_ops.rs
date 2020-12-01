@@ -12,8 +12,8 @@ use sn_data_types::Transfer;
 use crate::{Outcome, ReplicaInfo};
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, Blob, BlobAddress, DebitAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
-    ReplicaEvent, SignedTransfer, TransferValidated,
+    Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey, ReplicaEvent, SignedTransfer,
+    TransferAgreementProof, TransferValidated,
 };
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
@@ -518,14 +518,14 @@ pub enum TransferCmd {
     /// The cmd to validate a transfer.
     ValidateTransfer(SignedTransfer),
     /// The cmd to register the consensused transfer.
-    RegisterTransfer(DebitAgreementProof),
+    RegisterTransfer(TransferAgreementProof),
     /// As a transfer has been propagated to the
     /// crediting section, it is applied there.
-    PropagateTransfer(DebitAgreementProof),
+    PropagateTransfer(CreditAgreementProof),
     /// The validation of a section transfer.
     ValidateSectionPayout(SignedTransfer),
     /// The registration of a section transfer.
-    RegisterSectionPayout(DebitAgreementProof),
+    RegisterSectionPayout(TransferAgreementProof),
 }
 
 impl From<sn_data_types::TransferCmd> for TransferCmd {

@@ -577,10 +577,10 @@ impl NetworkMsgAnalysis {
         if shall_process {
             return match &msg.message {
                 Message::NodeCmd {
-                    cmd: NodeCmd::Transfers(PropagateTransfer(debit_agreement)),
+                    cmd: NodeCmd::Transfers(PropagateTransfer(proof)),
                     id,
                 } => Outcome::oki(TransferDuty::ProcessCmd {
-                    cmd: TransferCmd::PropagateTransfer(debit_agreement.clone()),
+                    cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
                     msg_id: *id,
                     origin: msg.origin.address(),
                 }),

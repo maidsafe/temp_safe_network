@@ -102,6 +102,7 @@ impl<T> TernaryResult<T> for Outcome<T> {
     }
 }
 
+///
 #[derive(Clone, Debug)]
 pub struct ReplicaInfo {
     id: PublicKeyShare,
