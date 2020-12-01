@@ -54,7 +54,7 @@ impl IpcMsg {
         serde_json::to_string(self).map_err(|_| IpcError::EncodeDecodeError)
     }
 
-    pub fn from_str(msg_str: &str) -> Result<IpcMsg, IpcError> {
+    pub fn from_string(msg_str: &str) -> Result<IpcMsg, IpcError> {
         serde_json::from_str(msg_str).map_err(|_| IpcError::EncodeDecodeError)
     }
 }

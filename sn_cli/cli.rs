@@ -113,13 +113,13 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
             follow_links,
         }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
         Some(SubCommands::Node { cmd }) => node_commander(cmd),
+        Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, safe).await,
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to
             // connect to the network with them, otherwise the connection created will be with
             // read-only access and some of these commands will fail if they require write access
             connect(safe).await?;
             match other {
-                SubCommands::Auth { cmd } => auth_commander(cmd, args.endpoint, safe).await,
                 SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, safe).await,
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,

@@ -18,11 +18,7 @@ use std::{
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
-pub async fn authorise_cli(
-    _safe: &mut Safe,
-    endpoint: Option<String>,
-    is_self_authing: bool,
-) -> Result<(), String> {
+pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> Result<(), String> {
     let (mut file, file_path) = create_credentials_file()?;
     println!("Authorising CLI application...");
     if !is_self_authing {
@@ -87,10 +83,10 @@ pub async fn connect(safe: &mut Safe) -> Result<(), String> {
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    match safe.connect(APP_ID, auth_credentials.as_deref()).await {
+    match safe.connect(auth_credentials.as_deref()).await {
         Err(_err) if auth_credentials.is_some() => {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(APP_ID, None).await
+            safe.connect(None).await
         }
         other => other,
     }

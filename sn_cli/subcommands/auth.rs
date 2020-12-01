@@ -142,7 +142,7 @@ pub async fn auth_commander(
             let mut sn_authd = SafeAuthdClient::new(endpoint.clone());
             authd_unlock(&mut sn_authd, config_file_str).await?;
             if self_auth {
-                self_authorise(endpoint, safe, sn_authd).await?;
+                self_authorise(endpoint, sn_authd).await?;
             }
             Ok(())
         }
@@ -205,13 +205,12 @@ pub async fn auth_commander(
             let sn_authd = SafeAuthdClient::new(endpoint);
             authd_restart(&sn_authd, authd_path)
         }
-        None => authorise_cli(safe, endpoint, false).await,
+        None => authorise_cli(endpoint, false).await,
     }
 }
 
 async fn self_authorise(
     endpoint: Option<String>,
-    safe: &mut Safe,
     mut sn_authd: SafeAuthdClient,
 ) -> Result<(), String> {
     debug!("Let's subscribe so we can automatically allow our own auth request...");
@@ -234,6 +233,6 @@ async fn self_authorise(
         .await?;
 
     debug!("Send the authorisation request for CLI app now...");
-    authorise_cli(safe, endpoint, true).await?;
+    authorise_cli(endpoint, true).await?;
     Ok(())
 }

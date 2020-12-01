@@ -8,13 +8,7 @@
 // Software.
 
 #[cfg(feature = "app")]
-use crate::{
-    api::{
-        authenticator::AuthResponseType,
-        ipc::{resp::AuthGranted, BootstrapConfig, IpcMsg, IpcResp},
-    },
-    Error, Result,
-};
+use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 use sn_data_types::{Error as SafeNdError, Money, PublicKey};
@@ -66,22 +60,6 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Money> {
             _ => Error::InvalidAmount(format!("Invalid safecoins amount '{}'", amount_str)),
         }
     })
-}
-
-pub fn decode_auth_response_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
-    let msg = serde_json::from_str(ipc_msg)
-        .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
-    match msg {
-        IpcMsg::Resp(IpcResp::Auth(Ok(authgranted))) => {
-            Ok(AuthResponseType::Registered(authgranted))
-        }
-        IpcMsg::Resp(IpcResp::Auth(Err(e))) => Err(Error::AuthError(format!("{:?}", e))),
-        IpcMsg::Resp(IpcResp::Unregistered(Ok(config))) => {
-            Ok(AuthResponseType::Unregistered(config))
-        }
-        IpcMsg::Resp(IpcResp::Unregistered(Err(e))) => Err(Error::AuthError(format!("{:?}", e))),
-        other => Err(Error::AuthError(format!("{:?}", other))),
-    }
 }
 
 pub fn systemtime_to_rfc3339(t: &time::SystemTime) -> String {

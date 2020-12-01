@@ -461,6 +461,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "botan"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e05aaaeef77ac5bb0eb14e322432cf15be76918d20a9b7be0e134ff914149f27"
+dependencies = [
+ "botan-sys",
+ "cty",
+]
+
+[[package]]
+name = "botan-src"
+version = "0.21701.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "032615a6d5f02fc090056773b7097ef133e1d80a331e0c9d2e0d4bc23c75b126"
+
+[[package]]
+name = "botan-sys"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3801c6a81dc76f638b72240a6029cb354211fc3a886758abac48c27e27a94c5f"
+dependencies = [
+ "botan-src",
+ "cty",
+]
+
+[[package]]
 name = "brotli"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1010,6 +1036,12 @@ dependencies = [
  "block-cipher-trait",
  "stream-cipher",
 ]
+
+[[package]]
+name = "cty"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 
 [[package]]
 name = "curve25519-dalek"
@@ -2248,9 +2280,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.6.22"
+version = "0.6.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fce347092656428bc8eaf6201042cb551b8d67855af7374542a92a0fbfcac430"
+checksum = "4afd66f5b91bf2a3bc13fad0e21caedac168ca4c707504e75585648ae80e4cc4"
 dependencies = [
  "cfg-if 0.1.10",
  "fuchsia-zircon",
@@ -2906,7 +2938,7 @@ dependencies = [
  "igd",
  "log",
  "quinn",
- "rcgen 0.8.5",
+ "rcgen 0.8.6",
  "rustls 0.17.0",
  "serde",
  "serde_json",
@@ -3208,10 +3240,11 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4974f7e96ee51fa3c90c3022e02c3a7117e71cb2a84518a55e44360135200c25"
+checksum = "3bac1ab9400bb5e4901c4708c98823b563b842ad24d77bdcb0b49b47195a3245"
 dependencies = [
+ "botan",
  "chrono",
  "pem 0.8.2",
  "ring",
@@ -3875,7 +3908,7 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client?branch=master#42997504b1a68cacd1d568ece1c3ef6fae9bfe57"
+source = "git+https://github.com/maidsafe/sn_client?branch=master#d867d8e8f20007e352f82bdd1c33a2bd6e7699b7"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3929,9 +3962,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.33"
+version = "0.11.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42b794b17824654e79cc411c37b1490e236b2a2a4bb24a6dbed645df915b6c47"
+checksum = "a8373c919a03460cdf229340fed185a10fa063c8ea0c72e19e0d7827e082482f"
 dependencies = [
  "bincode",
  "crdts",

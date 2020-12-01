@@ -48,8 +48,8 @@ impl Safe {
 
         let (xorname, keypair) = {
             let our_new_keypair = Arc::new(Keypair::new_ed25519(&mut OsRng));
-
-            let mut paying_client = Client::new(Some(keypair)).await?;
+            let mut paying_client =
+                Client::new(Some(keypair), self.safe_client.bootstrap_config.clone()).await?;
             paying_client
                 .send_money(our_new_keypair.public_key(), amount)
                 .await?;
@@ -99,7 +99,8 @@ impl Safe {
 
         let keypair = Arc::new(keypair);
 
-        let mut temp_client = Client::new(Some(keypair)).await?;
+        let mut temp_client =
+            Client::new(Some(keypair), self.safe_client.bootstrap_config.clone()).await?;
         let balance = temp_client.get_balance().await?;
 
         Ok(balance.to_string())

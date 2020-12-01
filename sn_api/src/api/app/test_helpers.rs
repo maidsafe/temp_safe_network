@@ -12,7 +12,8 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::env::var;
 
-// Environment variable where to read auth credentials to be used for all sn_api tests
+// Environment variable which can be set with the auth credentials
+// to be used for all sn_api tests
 const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 
 // Instantiate a Safe instance
@@ -20,10 +21,10 @@ pub async fn new_safe_instance() -> Result<Safe> {
     let mut safe = Safe::default();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
         Ok(val) => val,
-        Err(_) => "fake-credentials".to_string(),
+        Err(_) => "fake-credentials-string".to_string(),
     };
 
-    safe.connect("", Some(&credentials)).await?;
+    safe.connect(Some(&credentials)).await?;
     Ok(safe)
 }
 

@@ -11,7 +11,7 @@ use crate::{
     api::ipc::{
         req::{AuthReq, IpcReq},
         resp::{AuthGranted, IpcResp},
-        BootstrapConfig, IpcMsg,
+        IpcMsg,
     },
     Error, Result, SafeAuthReq,
 };
@@ -120,9 +120,9 @@ impl SafeAuthenticator {
 
     // Private helper to obtain the Safe Client instance
     #[allow(dead_code)]
-    fn get_safe_client(&self) -> Result<Client> {
+    fn get_safe_client(&self) -> Result<&Client> {
         match &self.safe_client {
-            Some(client) => Ok(client.clone()),
+            Some(client) => Ok(client),
             None => Err(Error::AuthenticatorError(
                 "No Vault is currently unlocked".to_string(),
             )),
@@ -190,7 +190,7 @@ impl SafeAuthenticator {
 
         debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
 
-        let mut client = Client::new(Some(keypair)).await?;
+        let mut client = Client::new(Some(keypair), None).await?;
         trace!("Client instantiated properly!");
         client
             .trigger_simulated_farming_payout(Money::from_nano(777))
@@ -278,7 +278,7 @@ impl SafeAuthenticator {
             keypair.public_key()
         );
 
-        let mut client = Client::new(Some(keypair)).await?;
+        let mut client = Client::new(Some(keypair), None).await?;
         trace!("Client instantiated properly!");
 
         let map_address = MapAddress::Seq {
@@ -309,7 +309,7 @@ impl SafeAuthenticator {
     }
 
     pub async fn decode_req(&self, req: &str) -> Result<SafeAuthReq> {
-        match IpcMsg::from_str(req) {
+        match IpcMsg::from_string(req) {
             Ok(IpcMsg::Req(IpcReq::Auth(app_auth_req))) => {
                 debug!("Auth request string decoded: {:?}", app_auth_req);
                 Ok(SafeAuthReq::Auth(app_auth_req))
@@ -332,7 +332,7 @@ impl SafeAuthenticator {
 
     /// Decode requests and trigger application authorisation against the current client
     pub async fn authorise_app(&self, req: &str) -> Result<String> {
-        let ipc_req = IpcMsg::from_str(req).map_err(|err| {
+        let ipc_req = IpcMsg::from_string(req).map_err(|err| {
             Error::AuthenticatorError(format!("Failed to decode authorisation request: {:?}", err))
         })?;
 
@@ -416,61 +416,6 @@ impl SafeAuthenticator {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-pub enum AuthResponseType {
-    Registered(AuthGranted),
-    Unregistered(BootstrapConfig),
-}
-
-pub fn decode_auth_ipc_msg(ipc_msg: &str) -> Result<AuthResponseType> {
-    dbg!(&ipc_msg);
-    let msg = serde_json::from_str(&ipc_msg)
-        .map_err(|e| Error::InvalidInput(format!("Failed to decode the credentials: {:?}", e)))?;
-    match msg {
-        IpcMsg::Resp(response) => match response {
-            IpcResp::Auth(res) => match res {
-                Ok(authgranted) => Ok(AuthResponseType::Registered(authgranted)),
-                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
-            },
-            IpcResp::Unregistered(res) => match res {
-                Ok(config) => Ok(AuthResponseType::Unregistered(config)),
-                Err(e) => Err(Error::AuthError(format!("{:?}", e))),
-            },
-        },
-        other => Err(Error::AuthError(format!("{:?}", other))),
-    }
-}
-/*
-/// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
-/// an error code + description & an encoded `IpcMsg::Resp` in case of an error
-pub async fn decode_ipc_msg(
-    msg: &str,
-) -> Result<IpcMsg> {
-    match serde_json::from_str(msg) {
-        Ok(IpcMsg::Req {
-            request: IpcReq::Auth(auth_req),
-            req_id,
-        }) => {
-            // Ok status should be returned for all app states (including
-            // Revoked and Authenticated).
-            Ok(Ok(IpcMsg::Req {
-                req_id,
-                request: IpcReq::Auth(auth_req),
-            }))
-        }
-        IpcMsg::Req {
-            request: IpcReq::Unregistered(extra_data),
-            req_id,
-        } => Ok(Ok(IpcMsg::Req {
-            req_id,
-            request: IpcReq::Unregistered(extra_data),
-        })),
-        IpcMsg::Resp { .. } | IpcMsg::Revoked { .. } | IpcMsg::Err(..) => Err(Error::AuthError(
-            "Invalid Authenticator IPC Message".to_string(),
-        )),
-    }
-}
-*/
 #[cfg(test)]
 mod tests {
     use super::*;

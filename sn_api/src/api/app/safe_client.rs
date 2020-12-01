@@ -8,7 +8,10 @@
 // Software.
 
 use super::{fetch::Range, helpers::xorname_to_hex};
-use crate::{api::authenticator::AuthResponseType, decode_auth_ipc_msg, Error, Result};
+use crate::{
+    api::ipc::{IpcMsg, IpcResp},
+    Error, Result,
+};
 
 use log::{debug, info};
 use sn_client::{Client, ClientError as SafeClientError};
@@ -21,6 +24,7 @@ use sn_data_types::{
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::{collections::HashSet, net::SocketAddr};
 use xor_name::XorName;
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
@@ -28,6 +32,7 @@ const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 #[derive(Default, Clone)]
 pub struct SafeAppClient {
     safe_client: Option<Client>,
+    pub(crate) bootstrap_config: Option<HashSet<SocketAddr>>,
 }
 
 impl SafeAppClient {
@@ -40,7 +45,10 @@ impl SafeAppClient {
     }
 
     pub fn new() -> Self {
-        Self { safe_client: None }
+        Self {
+            safe_client: None,
+            bootstrap_config: None,
+        }
     }
 
     pub async fn keypair(&self) -> Result<Arc<Keypair>> {
@@ -50,38 +58,47 @@ impl SafeAppClient {
         Ok(kp)
     }
 
-    // Connect to the SAFE Network using the provided app id and auth credentials
-    pub async fn connect(&mut self, _app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
+    // Connect to the SAFE Network using the provided auth credentials
+    pub async fn connect(&mut self, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
-        let client = match auth_credentials {
-            Some(auth_credentials) => {
-                match decode_auth_ipc_msg(auth_credentials)? {
-                    AuthResponseType::Registered(auth_granted) => {
-                        Client::new(Some(auth_granted.app_keypair), Some(auth_granted.bootstrap_config)).await
-                    }
-                    AuthResponseType::Unregistered(config) => {
-                        // unregistered type used for returning bootstrap config for client
-                        // TODO: rename?
-                        // TODO: what to do with config...
-                        Client::new(None).await
-                    }
+        let app_keypair = if let Some(auth_credentials) = auth_credentials {
+            match IpcMsg::from_string(auth_credentials)? {
+                IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted))) => {
+                    self.bootstrap_config = Some(auth_granted.bootstrap_config);
+                    Some(auth_granted.app_keypair)
+                }
+                IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_config))) => {
+                    // unregistered type used for returning bootstrap config for client
+                    self.bootstrap_config = Some(bootstrap_config);
+                    None
+                }
+                IpcMsg::Resp(IpcResp::Auth(Err(e)))
+                | IpcMsg::Resp(IpcResp::Unregistered(Err(e)))
+                | IpcMsg::Err(e) => return Err(Error::AuthError(format!("{:?}", e))),
+                IpcMsg::Req(req) => {
+                    return Err(Error::AuthError(format!("Invalid credentials: {:?}", req)))
                 }
             }
-            None => Client::new(None).await,
-        }
-        .map_err(|err| {
-            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-        })?;
+        } else {
+            None
+        };
+
+        let client = Client::new(app_keypair, self.bootstrap_config.clone())
+            .await
+            .map_err(|err| {
+                Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+            })?;
 
         self.safe_client = Some(client);
+
         debug!("Successfully connected to the Network!!!");
         Ok(())
     }
 
     // === Money operations ===
     pub async fn read_balance_from_keypair(&mut self, id: Arc<Keypair>) -> Result<Money> {
-        let mut temp_client = Client::new(Some(id)).await?;
+        let mut temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
         let coins = temp_client
             .get_balance()
             .await
@@ -106,7 +123,7 @@ impl SafeAppClient {
         _amount: Money,
     ) -> Result<()> {
         let _client = match from_id {
-            Some(id) => Client::new(Some(id)).await?,
+            Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
             None => self.get_safe_client()?,
         };
 
@@ -143,7 +160,7 @@ impl SafeAppClient {
         amount: Money,
     ) -> Result<(u64, PublicKey)> {
         let mut client = match from_id {
-            Some(id) => Client::new(Some(id)).await?,
+            Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
             None => self.get_safe_client()?,
         };
 
@@ -161,19 +178,9 @@ impl SafeAppClient {
         let blob_for_storage = Blob::Public(PublicBlob::new(data_vec));
         let xorname = *blob_for_storage.address().name();
 
-        let _data_map = client
-            .generate_data_map(&blob_for_storage)
-            .await
-            .map_err(|e| {
-                Error::NetDataError(format!(
-                    "Failed to create data map for Public Blob: {:?}",
-                    e
-                ))
-            })?;
-
         if !dry_run {
             client
-                .store_blob(blob_for_storage)
+                .store_public_blob(data)
                 .await
                 .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
         }
@@ -192,9 +199,9 @@ impl SafeAppClient {
             } else {
                 None
             };
-            client.get_blob(blob_address, start, len).await
+            client.read_blob(blob_address, start, len).await
         } else {
-            client.get_blob(blob_address, None, None).await
+            client.read_blob(blob_address, None, None).await
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET Public Blob: {:?}", e)))?;
 
@@ -203,7 +210,7 @@ impl SafeAppClient {
             &xorname
         );
 
-        Ok(data.value().clone())
+        Ok(data)
     }
 
     // === Map operations ===

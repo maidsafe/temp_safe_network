@@ -10,10 +10,9 @@
 use super::{
     common::send_authd_request,
     constants::{SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT},
-    helpers::decode_auth_response_ipc_msg,
     Safe,
 };
-use crate::api::ipc::{AuthReq, IpcMsg, IpcReq};
+use crate::api::ipc::IpcMsg;
 use crate::{Error, Result};
 use log::{debug, info};
 use serde_json::json;
@@ -44,7 +43,7 @@ impl Safe {
         let auth_res = send_app_auth_req(&auth_req_str, endpoint).await?;
 
         // Check if the app has been authorised
-        match IpcMsg::from_str(&auth_res) {
+        match IpcMsg::from_string(&auth_res) {
             Ok(IpcMsg::Resp(_ipc_resp)) => {
                 info!("Application was authorised: {:?}", auth_res);
                 Ok(auth_res)
@@ -66,9 +65,9 @@ impl Safe {
         }
     }
 
-    // Connect to the SAFE Network using the provided app id and auth credentials
-    pub async fn connect(&mut self, app_id: &str, auth_credentials: Option<&str>) -> Result<()> {
-        self.safe_client.connect(app_id, auth_credentials).await
+    // Connect to the SAFE Network using the provided auth credentials
+    pub async fn connect(&mut self, auth_credentials: Option<&str>) -> Result<()> {
+        self.safe_client.connect(auth_credentials).await
     }
 }
 

@@ -93,11 +93,11 @@ async fn handle_authorisation(
                     )))
                 }
             }
-            /*Ok(SafeAuthReq::Unregistered(_)) => {
+            Ok(SafeAuthReq::Unregistered(_)) => {
                 // We simply allow unregistered authorisation requests
                 match safe_authenticator.authorise_app(&auth_req_str).await {
                     Ok(resp) => {
-                        info!("Authorisation request '{}' was allowed and response sent back to the application", app_auth_req.req_id);
+                        info!("Unregistered authorisation request was allowed and response sent back to the application");
                         Ok(AuthorisationResponse::Ready(json!(resp)))
                     }
                     Err(err) => {
@@ -105,8 +105,7 @@ async fn handle_authorisation(
                         Err(err.to_string())
                     }
                 }
-            }*/
-            Ok(SafeAuthReq::Unregistered(_)) => Err("TODO".to_string()),
+            }
             Err(err) => {
                 error!("{}", err);
                 Err(err.to_string())
