@@ -11,6 +11,7 @@ pub use super::onboarding::Onboarding;
 use crate::utils;
 use crate::with_chaos;
 use crate::{Error, Result};
+use dashmap::{mapref::entry::Entry, DashMap};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
@@ -19,7 +20,6 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
-use dashmap::{DashMap, mapref::entry::Entry};
 
 /// Tracks incoming and outgoingg messages
 /// between client and network.

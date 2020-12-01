@@ -8,6 +8,7 @@
 
 use crate::{utils, Network};
 use crate::{Error, Result};
+use dashmap::DashMap;
 use log::{debug, error, info, trace};
 use rand::{CryptoRng, Rng};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
@@ -16,7 +17,6 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
-use dashmap::DashMap;
 
 /// A client is defined as a public key
 /// used by a specific socket address.

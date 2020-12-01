@@ -21,7 +21,6 @@ pub struct Replicas {
 }
 
 impl Replicas {
-
     pub(crate) fn new(root_dir: PathBuf, info: ReplicaInfo) -> Result<Self> {
         Ok(Self {
             root_dir,
@@ -277,7 +276,8 @@ impl Replicas {
         }
     }
 
-    async fn load_wallet(&self, store: &TransferStore, id: PublicKey) -> Result<WalletReplica> { // id: PublicKey
+    async fn load_wallet(&self, store: &TransferStore, id: PublicKey) -> Result<WalletReplica> {
+        // id: PublicKey
         // let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
         //     Ok(store) => store,
         //     Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,

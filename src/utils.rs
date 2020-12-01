@@ -18,8 +18,8 @@ use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
-use std::{time::Duration, io::Write};
 use std::{fs, path::Path};
+use std::{io::Write, time::Duration};
 use unwrap::unwrap;
 
 const NODE_MODULE_NAME: &str = "sn_node";
@@ -66,14 +66,20 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     if init_mode == Init::New {
         trace!("Creating database at {}", db_path.display());
         fs::create_dir_all(db_dir)?;
-        let mut db = PickleDb::new_bin(db_path, PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL));
+        let mut db = PickleDb::new_bin(
+            db_path,
+            PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),
+        );
         // Write then delete a value to ensure DB file is actually written to disk.
         db.set("", &"")?;
         let _ = db.rem("")?;
         return Ok(db);
     }
     trace!("Loading database at {}", db_path.display());
-    let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL));
+    let result = PickleDb::load_bin(
+        db_path.clone(),
+        PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),
+    );
     if let Err(ref error) = &result {
         error!("Failed to load {}: {}", db_path.display(), error);
     }

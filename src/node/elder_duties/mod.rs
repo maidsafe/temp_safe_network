@@ -31,11 +31,7 @@ pub struct ElderDuties {
 }
 
 impl ElderDuties {
-    pub async fn new(
-        info: &NodeInfo,
-        used_space: UsedSpace,
-        network: Network,
-    ) -> Result<Self> {
+    pub async fn new(info: &NodeInfo, used_space: UsedSpace, network: Network) -> Result<Self> {
         let prefix = network.our_prefix().await;
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));

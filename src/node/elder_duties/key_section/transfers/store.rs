@@ -10,9 +10,7 @@ use crate::{utils, utils::Init, Error, Result, ToDbKey};
 use log::trace;
 use pickledb::PickleDb;
 use sn_data_types::ReplicaEvent;
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use xor_name::XorName;
 
 const TRANSFERS_DIR_NAME: &str = "transfers";
