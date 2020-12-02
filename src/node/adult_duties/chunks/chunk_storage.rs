@@ -162,11 +162,16 @@ impl ChunkStorage {
         }
 
         let result = match self.chunks.get(&address) {
-            Ok(Blob::Private(_)) => self
-                .chunks
-                .delete(&address)
-                .await
-                .map_err(|error| error.to_string().into()),
+            Ok(Blob::Private(data)) => {
+                if data.owner() == origin.id().public_key() {
+                    self.chunks
+                        .delete(&address)
+                        .await
+                        .map_err(|error| error.to_string().into())
+                } else {
+                    Err(NdError::InvalidOwners)
+                }
+            }
             Ok(_) => {
                 error!(
                     "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",

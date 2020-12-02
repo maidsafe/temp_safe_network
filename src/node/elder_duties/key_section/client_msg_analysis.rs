@@ -6,11 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::{MetadataDuty, NodeOperation, PaymentDuty, TransferDuty};
+use crate::node::node_ops::{
+    MetadataDuty, NodeMessagingDuty, NodeOperation, PaymentDuty, TransferDuty,
+};
 use crate::Network;
 use crate::{Error, Outcome, TernaryResult};
 use log::{info, warn};
-use sn_data_types::{Cmd, Message, MsgEnvelope, Query};
+use sn_data_types::{Cmd, CmdError, Message, MessageId, MsgEnvelope, Query};
 
 // NB: Just as with the msg_analysis.rs,
 // this approach is not entirely good, so will need to be improved.
@@ -28,6 +30,39 @@ impl ClientMsgAnalysis {
 
     pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
         info!("Evaluation of client msg envelope: {:?}", msg);
+
+        // Check if the msg is a New Data Write and verify owners
+        match &msg.message {
+            Message::Cmd { cmd, .. } => {
+                match cmd {
+                    Cmd::Data { cmd, .. } => {
+                        // If owner is `Some`, then the Cmd is going to be newly created Data.
+                        if let Some(owner) = cmd.owner() {
+                            if owner != msg.origin.id().public_key() {
+                                return Outcome::oki(
+                                    NodeMessagingDuty::SendToClient(MsgEnvelope {
+                                        message: Message::CmdError {
+                                            error: CmdError::Data(
+                                                sn_data_types::Error::InvalidOwners,
+                                            ),
+                                            id: MessageId::new(),
+                                            correlation_id: msg.id(),
+                                            cmd_origin: msg.origin.address(),
+                                        },
+                                        origin: msg.clone().origin,
+                                        proxies: vec![],
+                                    })
+                                    .into(),
+                                );
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+            _ => (),
+        };
+
         let op = if let Ok(Some(duty)) = self.try_data(msg).await {
             duty.into()
         } else if let Ok(Some(duty)) = self.try_data_payment(msg).await {
