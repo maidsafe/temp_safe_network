@@ -99,14 +99,22 @@ mod test {
         let root_dir = tmp_dir.into_path();
         let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
-        let credit_proof = get_genesis(10, wallet_id)?;
+        let genesis_credit_proof = get_genesis(10, wallet_id)?;
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
-            credit_proof,
+            credit_proof: genesis_credit_proof.clone(),
             crediting_replica_keys: get_random_pk(),
             crediting_replica_sig: dummy_sig(),
         }))?;
 
-        assert_eq!(store.get_all().len(), 1);
+        let events = store.get_all();
+        assert_eq!(events.len(), 1);
+
+        match &events[0] {
+            ReplicaEvent::TransferPropagated(TransferPropagated { credit_proof, .. }) => {
+                assert_eq!(credit_proof, &genesis_credit_proof)
+            }
+            _ => assert!(false),
+        }
 
         Ok(())
     }

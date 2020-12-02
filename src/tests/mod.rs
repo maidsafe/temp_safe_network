@@ -60,7 +60,7 @@ impl Network {
                 routing_config.first = genesis_config.is_first();
                 routing_config.transport_config = genesis_config.network_config().clone();
                 let mut node = runtime
-                    .block_on(Node::new(&genesis_config, rand::rngs::OsRng::default()))
+                    .block_on(Node::new(&genesis_config))
                     .expect("Unable to start Node");
                 let our_conn_info = runtime
                     .block_on(node.our_connection_info())
@@ -93,8 +93,7 @@ impl Network {
 
                     let mut routing_config = RoutingConfig::default();
                     routing_config.transport_config = node_config.network_config().clone();
-                    let rng = rand::rngs::OsRng::default();
-                    let mut node = runtime.block_on(Node::new(&node_config, rng)).unwrap();
+                    let mut node = runtime.block_on(Node::new(&node_config)).unwrap();
                     let _ = runtime.block_on(node.run()).unwrap();
                 })
                 .unwrap();

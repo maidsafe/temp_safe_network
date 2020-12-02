@@ -1,3 +1,11 @@
+// Copyright 2020 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use super::store::TransferStore;
 use crate::{utils::Init, Error, Outcome, ReplicaInfo, Result, TernaryResult};
 use bls::PublicKeySet;
@@ -10,6 +18,15 @@ use sn_transfers::{get_genesis, WalletReplica};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+#[cfg(feature = "simulated-payouts")]
+use {
+    crate::node::node_ops::NodeMessagingDuty,
+    bls::{SecretKey, SecretKeySet, SecretKeyShare},
+    log::trace,
+    rand::thread_rng,
+    sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
+};
 
 type WalletLocks = HashMap<PublicKey, Arc<Mutex<TransferStore>>>;
 
@@ -32,6 +49,18 @@ impl Replicas {
     /// -----------------------------------------------------------------
     /// ---------------------- Queries ----------------------------------
     /// -----------------------------------------------------------------
+
+    /// All keys' histories
+    pub async fn all_events(&self) -> Outcome<Vec<ReplicaEvent>> {
+        let events = self
+            .locks
+            .keys()
+            .filter_map(|id| TransferStore::new((*id).into(), &self.root_dir, Init::Load).ok())
+            .map(|store| store.get_all())
+            .flatten()
+            .collect();
+        Outcome::oki(events)
+    }
 
     /// History of events
     pub async fn history(&self, id: PublicKey) -> Outcome<Vec<ReplicaEvent>> {
@@ -304,5 +333,65 @@ impl Replicas {
         } else {
             Err(NdError::NetworkOther("PublicKey provided by the transfer was never a part of the Section retrospectively".to_string()))
         }
+    }
+
+    #[cfg(feature = "simulated-payouts")]
+    pub async fn credit_without_proof(&self, transfer: Transfer) -> Outcome<NodeMessagingDuty> {
+        trace!("Performing credit without proof");
+        let debit = transfer.debit();
+        let credit = transfer.credit()?;
+        // Acquire lock of the wallet.
+        let id = transfer.to;
+        let key_lock = self.load_key_lock(id).await?;
+        let mut store = key_lock.lock().await;
+
+        // Access to the specific wallet is now serialised!
+        let mut wallet = self.load_wallet(&store, id).await?;
+        wallet.credit_without_proof(credit.clone())?;
+        let dummy_msg = "DUMMY MSG";
+        let mut rng = thread_rng();
+        let sec_key_set = SecretKeySet::random(7, &mut rng);
+        let replica_keys = sec_key_set.public_keys();
+        let sec_key = SecretKey::random();
+        let pub_key = sec_key.public_key();
+        let dummy_shares = SecretKeyShare::default();
+        let dummy_sig = dummy_shares.sign(dummy_msg);
+        let sig = sec_key.sign(dummy_msg);
+        let transfer_proof = TransferAgreementProof {
+            signed_credit: SignedCredit {
+                credit,
+                actor_signature: Signature::from(sig.clone()),
+            },
+            signed_debit: SignedDebit {
+                debit,
+                actor_signature: Signature::from(sig.clone()),
+            },
+            debit_sig: Signature::from(sig.clone()),
+            credit_sig: Signature::from(sig),
+            debiting_replicas_keys: replica_keys,
+        };
+        store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
+            credit_proof: transfer_proof.credit_proof(),
+            crediting_replica_keys: PublicKey::from(pub_key),
+            crediting_replica_sig: SignatureShare {
+                index: 0,
+                share: dummy_sig,
+            },
+        }))?;
+        Ok(None)
+    }
+
+    #[cfg(feature = "simulated-payouts")]
+    pub async fn debit_without_proof(&self, transfer: Transfer) -> Outcome<()> {
+        // Acquire lock of the wallet.
+        let debit = transfer.debit();
+        let id = debit.sender();
+        let key_lock = self.load_key_lock(id).await?;
+        let mut store = key_lock.lock().await;
+
+        // Access to the specific wallet is now serialised!
+        let mut wallet = self.load_wallet(&store, id).await?;
+        wallet.debit_without_proof(debit)?;
+        Ok(None)
     }
 }

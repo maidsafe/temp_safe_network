@@ -22,9 +22,9 @@ use log::{debug, error, info, trace, warn};
 use sn_data_types::Transfer;
 use sn_data_types::{
     Address, Cmd, CmdError, CreditAgreementProof, ElderDuties, Error as NdError, Event, Message,
-    MessageId, MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeTransferCmd,
-    NodeTransferError, NodeTransferQuery, PublicKey, QueryResponse, ReplicaEvent, SignedTransfer,
-    TransferAgreementProof, TransferError,
+    MessageId, MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse,
+    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey,
+    QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -147,11 +147,7 @@ impl Transfers {
             ProcessPayment(msg) => self.process_payment(msg).await,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
-            SimulatePayout(transfer) => self
-                .replica
-                .lock()
-                .await
-                .credit_without_proof(transfer.clone()),
+            SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
@@ -289,32 +285,31 @@ impl Transfers {
     }
 
     /// Get all the events of the Replica.
-    async fn all_events(&self, _msg_id: MessageId, _origin: Address) -> Outcome<NodeMessagingDuty> {
-        unimplemented!("all_events")
-        // let result = match self.replicas.all_events() {
-        //     None => {
-        //         warn!("Error! Could not fetch events.");
-        //         Err(NdError::NoSuchData)
-        //     }
-        //     Some(events) => {
-        //         if events.is_empty() {
-        //             info!("No events found!");
-        //         } else {
-        //             info!("Found {} replica events: {:?}", events.len(), events);
-        //         }
-        //         Ok(events)
-        //     }
-        // };
-        // use NodeQueryResponse::*;
-        // use NodeTransferQueryResponse::*;
-        // self.wrapping
-        //     .send_to_node(Message::NodeQueryResponse {
-        //         response: Transfers(GetReplicaEvents(result)),
-        //         id: MessageId::new(),
-        //         correlation_id: msg_id,
-        //         query_origin: origin,
-        //     })
-        //     .await
+    async fn all_events(&self, msg_id: MessageId, origin: Address) -> Outcome<NodeMessagingDuty> {
+        let result = match self.replicas.all_events().await? {
+            None => {
+                warn!("Error! Could not fetch events.");
+                Err(NdError::NoSuchData)
+            }
+            Some(events) => {
+                if events.is_empty() {
+                    info!("No events found!");
+                } else {
+                    info!("Found {} replica events: {:?}", events.len(), events);
+                }
+                Ok(events)
+            }
+        };
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        self.wrapping
+            .send_to_node(Message::NodeQueryResponse {
+                response: Transfers(GetReplicaEvents(result)),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
     }
 
     /// Get latest StoreCost for the given number of bytes
@@ -562,14 +557,10 @@ impl Transfers {
         self.wrapping.send_to_node(message).await
     }
 
-    #[allow(unused, clippy::redundant_closure)]
+    #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
-    pub async fn pay(&mut self, transfer: Transfer) -> Result<(), Error> {
-        self.replica
-            .lock()
-            .await
-            .debit_without_proof(transfer)
-            .map_err(|e| Error::NetworkData(e))
+    pub async fn pay(&mut self, transfer: Transfer) -> Outcome<()> {
+        self.replicas.debit_without_proof(transfer).await
     }
 }
 
