@@ -32,6 +32,9 @@ const SHA3_512_HASH_LEN: usize = 64;
 // Type tag value used for the Map which holds the Safe's content on the network.
 const SAFE_TYPE_TAG: u64 = 1_300;
 
+// Number of testcoins (in nano) for any new keypair when simulated-payouts is enabled.
+const DEFAULT_TEST_COINS_AMOUNT: u64 = 777_000_000_000;
+
 /// Derive Password, Keyword and PIN (in order).
 pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let passphrase_hash = sha3_512(acc_passphrase);
@@ -193,7 +196,7 @@ impl SafeAuthenticator {
         let mut client = Client::new(Some(keypair), None).await?;
         trace!("Client instantiated properly!");
         client
-            .trigger_simulated_farming_payout(Money::from_nano(777))
+            .trigger_simulated_farming_payout(Money::from_nano(DEFAULT_TEST_COINS_AMOUNT))
             .await?;
 
         // Create Map data to store the list of keypairs generated for
@@ -344,7 +347,6 @@ impl SafeAuthenticator {
                 debug!("Decoded request: {:?}", app_auth_req);
                 self.gen_auth_response(app_auth_req).await
             }
-
             IpcMsg::Req(IpcReq::Unregistered(user_data)) => {
                 info!("Request was recognised as an unregistered auth request");
                 debug!("Decoded request: {:?}", user_data);
@@ -370,9 +372,18 @@ impl SafeAuthenticator {
         // 2 ) if not, make a new app, and store it
 
         let mut rng = OsRng;
+        let keypair = Arc::new(Keypair::new_ed25519(&mut rng));
+        let mut client = Client::new(Some(keypair.clone()), None).await?;
+        client
+            .trigger_simulated_farming_payout(Money::from_nano(DEFAULT_TEST_COINS_AMOUNT))
+            .await?;
+        debug!(
+            "New keypair generated for app being authorised: {}",
+            keypair.public_key()
+        );
 
         Ok(AuthGranted {
-            app_keypair: Arc::new(Keypair::new_ed25519(&mut rng)),
+            app_keypair: keypair,
             bootstrap_config: bootstrap_config()?,
         })
     }

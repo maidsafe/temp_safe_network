@@ -66,6 +66,10 @@ impl SafeAppClient {
             match IpcMsg::from_string(auth_credentials)? {
                 IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted))) => {
                     self.bootstrap_config = Some(auth_granted.bootstrap_config);
+                    debug!(
+                        "Client instantiated with pk: {:?}",
+                        auth_granted.app_keypair.public_key()
+                    );
                     Some(auth_granted.app_keypair)
                 }
                 IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_config))) => {

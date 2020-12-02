@@ -37,7 +37,10 @@ pub enum IpcMsg {
 
 impl IpcMsg {
     pub fn new_auth_req(app_id: &str, app_name: &str, app_vendor: &str) -> Self {
-        let req_id: u32 = gen_req_id();
+        use rand::Rng;
+        // Generate the number in range 1..MAX inclusive.
+        let req_id: u32 = rand::thread_rng().gen_range(0, u32::max_value()) + 1;
+
         Self::Req(IpcReq::Auth(AuthReq {
             req_id,
             app_id: app_id.to_string(),
@@ -57,11 +60,4 @@ impl IpcMsg {
     pub fn from_string(msg_str: &str) -> Result<IpcMsg, IpcError> {
         serde_json::from_str(msg_str).map_err(|_| IpcError::EncodeDecodeError)
     }
-}
-
-// Generate a unique request ID.
-fn gen_req_id() -> u32 {
-    use rand::Rng;
-    // Generate the number in range 1..MAX inclusive.
-    rand::thread_rng().gen_range(0, u32::max_value()) + 1
 }
