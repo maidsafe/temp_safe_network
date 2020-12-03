@@ -163,7 +163,7 @@ impl ChunkStorage {
 
         let result = match self.chunks.get(&address) {
             Ok(Blob::Private(data)) => {
-                if data.owner() == origin.id().public_key() {
+                if *data.owner() == origin.id().public_key() {
                     self.chunks
                         .delete(&address)
                         .await

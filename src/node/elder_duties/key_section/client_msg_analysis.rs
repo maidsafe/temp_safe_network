@@ -32,36 +32,28 @@ impl ClientMsgAnalysis {
         info!("Evaluation of client msg envelope: {:?}", msg);
 
         // Check if the msg is a New Data Write and verify owners
-        match &msg.message {
-            Message::Cmd { cmd, .. } => {
-                match cmd {
-                    Cmd::Data { cmd, .. } => {
-                        // If owner is `Some`, then the Cmd is going to be newly created Data.
-                        if let Some(owner) = cmd.owner() {
-                            if owner != msg.origin.id().public_key() {
-                                return Outcome::oki(
-                                    NodeMessagingDuty::SendToClient(MsgEnvelope {
-                                        message: Message::CmdError {
-                                            error: CmdError::Data(
-                                                sn_data_types::Error::InvalidOwners,
-                                            ),
-                                            id: MessageId::new(),
-                                            correlation_id: msg.id(),
-                                            cmd_origin: msg.origin.address(),
-                                        },
-                                        origin: msg.clone().origin,
-                                        proxies: vec![],
-                                    })
-                                    .into(),
-                                );
-                            }
-                        }
+        if let Message::Cmd { cmd, .. } = &msg.message {
+            if let Cmd::Data { cmd, .. } = cmd {
+                // If owner is `Some`, then the Cmd is going to be newly created Data.
+                if let Some(owner) = cmd.owner() {
+                    if owner != msg.origin.id().public_key() {
+                        return Outcome::oki(
+                            NodeMessagingDuty::SendToClient(MsgEnvelope {
+                                message: Message::CmdError {
+                                    error: CmdError::Data(sn_data_types::Error::InvalidOwners),
+                                    id: MessageId::new(),
+                                    correlation_id: msg.id(),
+                                    cmd_origin: msg.origin.address(),
+                                },
+                                origin: msg.clone().origin,
+                                proxies: vec![],
+                            })
+                            .into(),
+                        );
                     }
-                    _ => (),
                 }
             }
-            _ => (),
-        };
+        }
 
         let op = if let Ok(Some(duty)) = self.try_data(msg).await {
             duty.into()
