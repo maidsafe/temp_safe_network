@@ -255,8 +255,8 @@ pub fn pretty_print_status_report(status_report: AuthdStatus) {
         status_report.authd_version
     ]);
     table.add_row(row![
-        "Logged in to a Safe account?",
-        boolean_to_string(status_report.logged_in),
+        "Is there a Safe currently unlocked?",
+        boolean_to_string(status_report.safe_unlocked),
     ]);
     table.add_row(row![
         "Number of pending authorisation requests",

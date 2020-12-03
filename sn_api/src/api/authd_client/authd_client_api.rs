@@ -37,7 +37,7 @@ const ENV_VAR_SN_AUTHD_PATH: &str = "SN_AUTHD_PATH";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthdStatus {
-    pub logged_in: bool,
+    pub safe_unlocked: bool,
     pub num_auth_reqs: u32,
     pub num_notif_subs: u32,
     pub authd_version: String,

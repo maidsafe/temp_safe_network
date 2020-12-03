@@ -28,9 +28,9 @@ pub async fn process_req(
     } else {
         info!("Preparing authd status report...");
 
-        let logged_in = {
+        let safe_unlocked = {
             let safe_authenticator = safe_auth_handle.lock().await;
-            safe_authenticator.is_logged_in()
+            safe_authenticator.is_a_safe_unlocked()
         };
 
         let num_auth_reqs = {
@@ -46,7 +46,7 @@ pub async fn process_req(
         let authd_version = cargo_crate_version!().to_string();
 
         let status_report = AuthdStatus {
-            logged_in,
+            safe_unlocked,
             num_auth_reqs,
             num_notif_subs,
             authd_version,

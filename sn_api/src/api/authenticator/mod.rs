@@ -22,7 +22,7 @@ use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
 use sha3::Sha3_256;
 use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::{Keypair, Map, MapAction, MapAddress, MapPermissionSet, Money};
+use sn_data_types::{Keypair, MapAction, MapAddress, MapPermissionSet, Money};
 use std::{collections::BTreeMap, sync::Arc};
 use tiny_keccak::{sha3_256, sha3_512};
 use xor_name::{XorName, XOR_NAME_LEN};
@@ -106,7 +106,7 @@ pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
 #[derive(Default)]
 pub struct SafeAuthenticator {
     safe_client: Option<Client>,
-    map: Option<Map>,
+    map_address: Option<MapAddress>,
 }
 
 impl SafeAuthenticator {
@@ -117,7 +117,7 @@ impl SafeAuthenticator {
 
         Self {
             safe_client: None,
-            map: None,
+            map_address: None,
         }
     }
 
@@ -290,12 +290,11 @@ impl SafeAuthenticator {
         };
 
         // Attempt to retrieve Map to make sure it actually exists
-        let map = client.get_map(map_address).await?;
+        let _ = client.get_map(map_address).await?;
         debug!("Safe unlocked successfully!");
 
-        // Keep the Map so we dn't need to retrieve it every time
         self.safe_client = Some(client);
-        self.map = Some(map);
+        self.map_address = Some(map_address);
         Ok(())
     }
 
@@ -305,10 +304,10 @@ impl SafeAuthenticator {
         Ok(())
     }
 
-    pub fn is_logged_in(&self) -> bool {
-        let is_logged_in = self.safe_client.is_some();
-        debug!("Is logged in? {}", is_logged_in);
-        is_logged_in
+    pub fn is_a_safe_unlocked(&self) -> bool {
+        let is_a_safe_unlocked = self.safe_client.is_some();
+        debug!("Is there a Safe currently unlocked? {}", is_a_safe_unlocked);
+        is_a_safe_unlocked
     }
 
     pub async fn decode_req(&self, req: &str) -> Result<SafeAuthReq> {
