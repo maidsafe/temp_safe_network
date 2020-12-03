@@ -159,7 +159,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             rng
         } else {
             warn!("No rng found!");
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic("No rng found".to_string()));
         };
         match ElderDuties::new(&self.node_info, used_space, self.network_api.clone(), rng).await {
             Ok(duties) => {
@@ -175,7 +175,10 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             }
             Err(e) => {
                 warn!("Was not able to assume Elder duties! {:?}", e);
-                Outcome::error(Error::Logic)
+                Outcome::error(Error::Logic(format!(
+                    "Not able to assume Elder Duties: {:?}",
+                    e
+                )))
             }
         }
     }

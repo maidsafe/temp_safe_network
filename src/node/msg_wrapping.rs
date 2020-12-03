@@ -106,7 +106,10 @@ impl ElderMsgWrapping {
                 as_node: false,
             })
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not forward msg to section",
+                msg.id()
+            )))
         }
     }
 
@@ -158,7 +161,10 @@ impl MsgWrapping {
             };
             Outcome::oki(NodeMessagingDuty::SendToClient(msg))
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to client",
+                message.id()
+            )))
         }
     }
 
@@ -171,7 +177,10 @@ impl MsgWrapping {
             };
             Outcome::oki(NodeMessagingDuty::SendToNode(msg))
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to client",
+                message.id()
+            )))
         }
     }
 
@@ -188,7 +197,10 @@ impl MsgWrapping {
             };
             Outcome::oki(NodeMessagingDuty::SendToSection { msg, as_node })
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to section",
+                message.id()
+            )))
         }
     }
 
@@ -200,7 +212,10 @@ impl MsgWrapping {
         if let Some(msg) = self.set_proxy(&msg, false).await {
             Outcome::oki(NodeMessagingDuty::SendToAdults { targets, msg })
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to adults",
+                msg.id()
+            )))
         }
     }
 

@@ -88,7 +88,7 @@ impl NetworkMsgAnalysis {
             duty.into()
         } else {
             error!("Unknown message destination: {:?}", msg.id());
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic("Unknown message destination".to_string()));
         };
         Outcome::oki(result)
     }
@@ -493,11 +493,11 @@ impl NetworkMsgAnalysis {
                             })
                         } else {
                             error!("Unexpected public key!");
-                            Outcome::error(Error::Logic)
+                            Outcome::error(Error::Logic("Unexpected PK".to_string()))
                         }
                     } else {
                         error!("No section public key found!");
-                        Outcome::error(Error::Logic)
+                        Outcome::error(Error::Logic("No section PK found".to_string()))
                     }
                 }
                 Message::NodeQueryResponse {

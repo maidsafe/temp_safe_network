@@ -187,7 +187,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     duties.process_adult_duty(&duty).await
                 } else {
                     error!("Currently not an Adult!");
-                    Outcome::error(Error::Logic)
+                    Outcome::error(Error::Logic("Currently not an Adult".to_string()))
                 }
             }
             RunAsElder(duty) => {
@@ -196,7 +196,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     duties.process_elder_duty(duty).await
                 } else {
                     error!("Currently not an Elder!");
-                    Outcome::error(Error::Logic)
+                    Outcome::error(Error::Logic("Currently not an Elder".to_string()))
                 }
             }
             RunAsNode(duty) => {

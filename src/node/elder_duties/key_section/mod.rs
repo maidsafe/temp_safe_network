@@ -122,7 +122,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             self.replica_manager.lock().await.drop_accounts(&accounts)?;
             Outcome::oki_no_change()
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic("Could not fetch all replica keys".to_string()))
         }
     }
 

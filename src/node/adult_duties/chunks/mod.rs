@@ -52,7 +52,10 @@ impl Chunks {
                     },
                 ..
             } => writing::get_result(write, msg, &mut self.chunk_storage).await,
-            _ => Outcome::error(Error::Logic),
+            _ => Outcome::error(Error::Logic(format!(
+                "{:?}: Could not receive msg as Adult",
+                msg.id()
+            ))),
         }
     }
 

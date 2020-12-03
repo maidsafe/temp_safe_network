@@ -2621,8 +2621,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.34"
-source = "git+https://github.com/Yoga07/sn_data_types?branch=owner-getter#9daa691e30a492a2fc0bb2d854f6ede7cbb76020"
+version = "0.11.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bcba070733753223fc75aa55a8d51a6c47341571059b35b578e14e421d7f70c"
 dependencies = [
  "bincode",
  "crdts",

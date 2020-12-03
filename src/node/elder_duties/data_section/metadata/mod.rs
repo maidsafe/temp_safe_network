@@ -81,7 +81,9 @@ impl Metadata {
         match &msg.message {
             Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
             Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.convert(),
-            _ => Outcome::error(Error::Logic), // only Queries and Cmds from client is handled at Metadata
+            _ => Outcome::error(Error::Logic(
+                "Only Queries and Cmds from client can be handled at Metadata".to_string(),
+            )), // only Queries and Cmds from client is handled at Metadata
         }
     }
 

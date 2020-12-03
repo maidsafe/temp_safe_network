@@ -62,7 +62,10 @@ impl ClientMsgAnalysis {
         } else if let Ok(Some(duty)) = self.try_transfers(msg).await {
             duty.into()
         } else {
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic(format!(
+                "Could not evaluate Client Msg w/id {:?}",
+                msg.id()
+            )));
         };
         Outcome::oki(op)
     }

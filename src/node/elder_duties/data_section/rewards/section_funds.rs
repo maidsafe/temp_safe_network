@@ -81,7 +81,7 @@ impl SectionFunds {
             // one transition at a time.
             // (We could enqueue actors, and when starting transition skip
             // all but the last one, but that is also prone to edge case problems..)
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic("Undergoing transition already".to_string()));
         }
 
         let new_id = to.id();
@@ -89,7 +89,7 @@ impl SectionFunds {
         // When we have a payout in flight, we defer the transition.
         if self.has_payout_in_flight() {
             debug!("has_payout_in_flight");
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic("Has payout in flight".to_string()));
         }
 
         // Get all the money of current actor.
@@ -105,7 +105,9 @@ impl SectionFunds {
                 }
                 None => {
                     error!("Tried to take next actor while non existed!");
-                    Outcome::error(Error::Logic)
+                    Outcome::error(Error::Logic(
+                        "Tried to take next actor while non existed".to_string(),
+                    ))
                 }
             };
         }
@@ -246,7 +248,11 @@ impl SectionFunds {
                             .await?
                         {
                             Some(op) => op.into(),
-                            None => return Outcome::error(Error::Logic),
+                            None => {
+                                return Outcome::error(Error::Logic(
+                                    "Could not send RegisterSectionPayout to section".to_string(),
+                                ))
+                            }
                         };
 
                         if let Some(queued) = queued_op {

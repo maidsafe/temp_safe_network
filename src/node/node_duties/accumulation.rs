@@ -45,13 +45,15 @@ impl Accumulation {
         let sender = msg.most_recent_sender();
         if !sender.is_elder() {
             error!("Only Elder messages are accumulated!");
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic(
+                "Only Elder messages are accumulated".to_string(),
+            ));
         }
         let sig_share = match sender.group_sig_share() {
             Some(sig_share) => sig_share,
             None => {
                 error!("No sig share found!");
-                return Outcome::error(Error::Logic);
+                return Outcome::error(Error::Logic("Signature Share not found".to_string()));
             }
         };
 
@@ -79,20 +81,22 @@ impl Accumulation {
             Some((_, _, signatures)) => signatures,
             None => {
                 error!("No such message id! ({:?})", msg_id);
-                return Outcome::error(Error::Logic);
+                return Outcome::error(Error::Logic(format!("No such message id {:?}", msg_id)));
             }
         };
 
         let sender = msg.most_recent_sender();
         if !sender.is_elder() {
             error!("Only Elder messages are accumulated!");
-            return Outcome::error(Error::Logic);
+            return Outcome::error(Error::Logic(
+                "Only Elder messages are accumulated".to_string(),
+            ));
         }
         let public_key_set = match sender.group_key_set() {
             Some(public_key_set) => public_key_set,
             None => {
                 error!("No public_key_set found!");
-                return Outcome::error(Error::Logic);
+                return Outcome::error(Error::Logic("No PK set found".to_string()));
             }
         };
 
@@ -108,7 +112,10 @@ impl Accumulation {
             Some((msg, _sender, signatures)) => (msg, _sender, signatures),
             None => {
                 error!("No such message id! ({:?})", msg_id);
-                return Outcome::error(Error::Logic);
+                return Outcome::error(Error::Logic(format!(
+                    "No such message id while aggregating {:?}",
+                    msg_id
+                )));
             }
         };
         let signed_data = utils::serialise(&msg.message);
@@ -122,15 +129,14 @@ impl Accumulation {
                 // remove the faulty sig, then insert
                 // the rest back into messages.
                 // One bad egg can't be allowed to ruin it all.
-                return Outcome::error(Error::Logic);
+                return Outcome::error(Error::Logic(
+                    "Invalid Signature Share while accumulation".to_string(),
+                ));
             }
         }
         let signature = public_key_set
             .combine_signatures(signatures.iter().map(|sig| (sig.index, &sig.share)))
-            .map_err(|e| {
-                error!("{}", e);
-                Error::Logic
-            })?;
+            .map_err(|e| Error::Logic(format!("Could not combine signatures: {:?}", e)))?;
         if public_key_set.public_key().verify(&signature, &signed_data) {
             let _ = self.completed.insert(msg_id);
 
@@ -148,7 +154,6 @@ impl Accumulation {
             } else {
                 error!("Only Elder messages are accumulated!");
                 unreachable!() // this condition is tested further up in this method..
-                               //Outcome::error(Error::Logic)
             }
         // beware that we might have to forgo the proxies vector
         // and instead just have a most recent proxy, if we are seeing
@@ -158,7 +163,7 @@ impl Accumulation {
         // part of the purpose; to see the path.
         } else {
             error!("Accumulated signature is invalid");
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic("Accumulated Signature is invalid".to_string()))
         }
     }
 }
