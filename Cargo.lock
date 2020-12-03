@@ -554,9 +554,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.65"
+version = "1.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95752358c8f7552394baf48cd82695b345628ad3f170d607de3ca03b8dacca15"
+checksum = "4c0496836a84f8d0495758516b8621a622beb77c0fed418570e50764093ced48"
 
 [[package]]
 name = "cfg-if"
@@ -3875,7 +3875,7 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client?branch=master#f5c129040e8aa5b9a43e48619e2401e9fa5041b1"
+source = "git+https://github.com/bochaco/sn_client?branch=remove-mut-self-from-api#f5230034f0d2799d2700eca204b12612def74f31"
 dependencies = [
  "async-trait",
  "bincode",

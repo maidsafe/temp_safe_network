@@ -21,8 +21,14 @@ use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
 use sha3::Sha3_256;
-use sn_client::client::{bootstrap_config, Client};
-use sn_data_types::{Keypair, MapAction, MapAddress, MapPermissionSet, Money};
+use sn_client::{
+    client::{bootstrap_config, Client},
+    ClientError,
+};
+use sn_data_types::{
+    Error::NoSuchEntry, Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
+    MapSeqEntryActions, MapValue, Money,
+};
 use std::{collections::BTreeMap, sync::Arc};
 use tiny_keccak::{sha3_256, sha3_512};
 use xor_name::{XorName, XOR_NAME_LEN};
@@ -105,8 +111,9 @@ pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
 // Authenticator API
 #[derive(Default)]
 pub struct SafeAuthenticator {
-    safe_client: Option<Client>,
-    map_address: Option<MapAddress>,
+    // We keep the client instantiated with the derived keypair, along
+    // with the address of the Map which helds its Safe on the network.
+    safe: Option<(Client, MapAddress)>,
 }
 
 impl SafeAuthenticator {
@@ -115,21 +122,7 @@ impl SafeAuthenticator {
             sn_client::config_handler::set_config_dir_path(path);
         }
 
-        Self {
-            safe_client: None,
-            map_address: None,
-        }
-    }
-
-    // Private helper to obtain the Safe Client instance
-    #[allow(dead_code)]
-    fn get_safe_client(&self) -> Result<&Client> {
-        match &self.safe_client {
-            Some(client) => Ok(client),
-            None => Err(Error::AuthenticatorError(
-                "No Vault is currently unlocked".to_string(),
-            )),
-        }
+        Self { safe: None }
     }
 
     /// # Create Safe
@@ -226,7 +219,7 @@ impl SafeAuthenticator {
             })?;
         debug!("Map stored successfully for new Safe at: {:?}", map_address);
 
-        self.safe_client = Some(client);
+        self.safe = Some((client, map_address));
         Ok(())
     }
 
@@ -281,7 +274,7 @@ impl SafeAuthenticator {
             keypair.public_key()
         );
 
-        let mut client = Client::new(Some(keypair), None).await?;
+        let client = Client::new(Some(keypair), None).await?;
         trace!("Client instantiated properly!");
 
         let map_address = MapAddress::Seq {
@@ -293,20 +286,22 @@ impl SafeAuthenticator {
         let _ = client.get_map(map_address).await?;
         debug!("Safe unlocked successfully!");
 
-        self.safe_client = Some(client);
-        self.map_address = Some(map_address);
+        self.safe = Some((client, map_address));
         Ok(())
     }
 
     pub fn lock(&mut self) -> Result<()> {
         debug!("Locking Safe...");
-        self.safe_client = None;
+        self.safe = None;
         Ok(())
     }
 
     pub fn is_a_safe_unlocked(&self) -> bool {
-        let is_a_safe_unlocked = self.safe_client.is_some();
-        debug!("Is there a Safe currently unlocked? {}", is_a_safe_unlocked);
+        let is_a_safe_unlocked = self.safe.is_some();
+        debug!(
+            "Is there a Safe currently unlocked?: {}",
+            is_a_safe_unlocked
+        );
         is_a_safe_unlocked
     }
 
@@ -364,27 +359,92 @@ impl SafeAuthenticator {
     /// If the app is found, then the `AuthGranted` struct is returned based on that information.
     /// If the app is not found in the Safe, then it will be authenticated.
     pub async fn authenticate(&self, auth_req: AuthReq) -> Result<AuthGranted> {
-        let _app_id = auth_req.app_id;
+        if let Some((client, map_address)) = &self.safe {
+            let app_id = auth_req.app_id.as_bytes().to_vec();
+            let keypair = match client.get_map_value(*map_address, app_id.clone()).await {
+                Ok(value) => {
+                    // This app already has its own keypair
 
-        // TODO: 1) check if we already know this app
-        // 1.2) check if app is revoked
-        // 2 ) if not, make a new app, and store it
+                    // TODO: support for scenario when app was previously revoked,
+                    // in which case we should generate a new keypair
 
-        let mut rng = OsRng;
-        let keypair = Arc::new(Keypair::new_ed25519(&mut rng));
-        let mut client = Client::new(Some(keypair.clone()), None).await?;
-        client
-            .trigger_simulated_farming_payout(Money::from_nano(DEFAULT_TEST_COINS_AMOUNT))
-            .await?;
-        debug!(
-            "New keypair generated for app being authorised: {}",
-            keypair.public_key()
-        );
+                    let keypair_bytes = match value {
+                        MapValue::Seq(seq_value) => seq_value.data,
+                        MapValue::Unseq(data) => data,
+                    };
+                    let keypair_str = String::from_utf8(keypair_bytes).map_err(|_err| {
+                        Error::AuthError(
+                            "The Safe contains an invalid keypair associated to this app"
+                                .to_string(),
+                        )
+                    })?;
+                    let keypair: Arc<Keypair> =
+                        Arc::new(serde_json::from_str(&keypair_str).map_err(|_err| {
+                            Error::AuthError(
+                                "The Safe contains an invalid keypair associated to this app"
+                                    .to_string(),
+                            )
+                        })?);
 
-        Ok(AuthGranted {
-            app_keypair: keypair,
-            bootstrap_config: bootstrap_config()?,
-        })
+                    let mut tmp_client = Client::new(Some(keypair.clone()), None).await?;
+                    tmp_client
+                        .trigger_simulated_farming_payout(Money::from_nano(
+                            DEFAULT_TEST_COINS_AMOUNT,
+                        ))
+                        .await?;
+                    debug!(
+                        "Keypair for the app being authorised ('{}') retrieved from the Safe: {}",
+                        auth_req.app_id,
+                        keypair.public_key()
+                    );
+
+                    keypair
+                }
+                Err(ClientError::DataError(NoSuchEntry)) => {
+                    // This is the first time this app is being authorised,
+                    // thus let's generate a keypair for it
+                    let mut rng = OsRng;
+                    let keypair = Keypair::new_ed25519(&mut rng);
+                    let keypair_str = serde_json::to_string(&keypair).map_err(|err| {
+                        Error::AuthError(format!(
+                            "Failed to serialised keypair to store it in the Safe: {}",
+                            err
+                        ))
+                    })?;
+                    let keypair = Arc::new(keypair);
+                    debug!(
+                        "New keypair generated for app ('{}') being authorised: {}",
+                        auth_req.app_id,
+                        keypair.public_key()
+                    );
+
+                    // Store the keypair in the Safe, mapped to the app id
+                    let map_actions =
+                        MapSeqEntryActions::new().ins(app_id, keypair_str.as_bytes().to_vec(), 0);
+
+                    client
+                        .edit_map_entries(*map_address, MapEntryActions::Seq(map_actions))
+                        .await?;
+
+                    keypair
+                }
+                Err(err) => {
+                    return Err(Error::AuthError(format!(
+                        "Failed to retrieve keypair from the Safe: {}",
+                        err
+                    )))
+                }
+            };
+
+            Ok(AuthGranted {
+                app_keypair: keypair,
+                bootstrap_config: bootstrap_config()?,
+            })
+        } else {
+            Err(Error::AuthenticatorError(
+                "No Safe is currently unlocked".to_string(),
+            ))
+        }
     }
 
     // Helper function to generate an app authorisation response

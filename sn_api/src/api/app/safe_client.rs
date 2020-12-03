@@ -101,8 +101,8 @@ impl SafeAppClient {
     }
 
     // === Money operations ===
-    pub async fn read_balance_from_keypair(&mut self, id: Arc<Keypair>) -> Result<Money> {
-        let mut temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
+    pub async fn read_balance_from_keypair(&self, id: Arc<Keypair>) -> Result<Money> {
+        let temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
         let coins = temp_client
             .get_balance()
             .await
@@ -121,7 +121,7 @@ impl SafeAppClient {
     }
 
     pub async fn safecoin_transfer_to_xorname(
-        &mut self,
+        &self,
         from_id: Option<Arc<Keypair>>,
         _to_xorname: XorName,
         _amount: Money,
@@ -158,12 +158,12 @@ impl SafeAppClient {
 
     #[allow(dead_code)]
     pub async fn safecoin_transfer_to_pk(
-        &mut self,
+        &self,
         from_id: Option<Arc<Keypair>>,
         to_pk: PublicKey,
         amount: Money,
     ) -> Result<(u64, PublicKey)> {
-        let mut client = match from_id {
+        let client = match from_id {
             Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
             None => self.get_safe_client()?,
         };
@@ -174,9 +174,9 @@ impl SafeAppClient {
     }
 
     // // === Blob operations ===
-    pub async fn store_public_blob(&mut self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    pub async fn store_public_blob(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
 
         let data_vec = data.to_vec();
         let blob_for_storage = Blob::Public(PublicBlob::new(data_vec));
@@ -192,10 +192,10 @@ impl SafeAppClient {
         Ok(xorname)
     }
 
-    pub async fn get_public_blob(&mut self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
         let blob_address = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = if let Some(end_index) = end {
@@ -219,13 +219,13 @@ impl SafeAppClient {
 
     // === Map operations ===
     pub async fn store_map(
-        &mut self,
+        &self,
         name: Option<XorName>,
         tag: u64,
         _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let mut safe_client = self.get_safe_client()?;
+        let safe_client = self.get_safe_client()?;
         let client = &safe_client;
         let owner_key_option = client.public_key().await;
         let owners = if let PublicKey::Bls(owners) = owner_key_option {
@@ -264,8 +264,8 @@ impl SafeAppClient {
     }
 
     #[allow(dead_code)]
-    pub async fn get_map(&mut self, name: XorName, tag: u64) -> Result<Map> {
-        let mut client = self.get_safe_client()?;
+    pub async fn get_map(&self, name: XorName, tag: u64) -> Result<Map> {
+        let client = self.get_safe_client()?;
         let address = MapAddress::Seq { name, tag };
 
         client
@@ -275,7 +275,7 @@ impl SafeAppClient {
     }
 
     pub async fn map_insert(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         key: &[u8],
@@ -287,8 +287,8 @@ impl SafeAppClient {
             .await
     }
 
-    pub async fn map_get_value(&mut self, name: XorName, tag: u64, key: &[u8]) -> Result<MapValue> {
-        let mut client = self.get_safe_client()?;
+    pub async fn map_get_value(&self, name: XorName, tag: u64, key: &[u8]) -> Result<MapValue> {
+        let client = self.get_safe_client()?;
         let key_vec = key.to_vec();
         let address = MapAddress::Seq { name, tag };
 
@@ -316,11 +316,11 @@ impl SafeAppClient {
     }
 
     pub async fn list_map_entries(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
     ) -> Result<BTreeMap<Vec<u8>, MapSeqValue>> {
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
         client
             .list_seq_map_entries(name, tag)
             .await
@@ -350,13 +350,13 @@ impl SafeAppClient {
     }
 
     async fn edit_map_entries(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         entry_actions: MapSeqEntryActions,
         error_msg: &str,
     ) -> Result<()> {
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
         let message = error_msg.to_string();
         let address = MapAddress::Seq { name, tag };
         client
@@ -372,7 +372,7 @@ impl SafeAppClient {
     }
 
     pub async fn update_map(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         key: &[u8],
@@ -387,7 +387,7 @@ impl SafeAppClient {
 
     // === Sequence data operations ===
     pub async fn store_sequence(
-        &mut self,
+        &self,
         data: &[u8],
         name: Option<XorName>,
         tag: u64,
@@ -401,7 +401,7 @@ impl SafeAppClient {
             name
         );
 
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
         let xorname = name.unwrap_or_else(rand::random);
         info!("Xorname for storage: {:?}", &xorname);
 
@@ -438,7 +438,7 @@ impl SafeAppClient {
     }
 
     pub async fn sequence_get_last_entry(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         private: bool,
@@ -450,7 +450,7 @@ impl SafeAppClient {
             name
         );
 
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
 
         let sequence_address = if private {
             SequenceAddress::Private { name, tag }
@@ -474,7 +474,7 @@ impl SafeAppClient {
     }
 
     pub async fn sequence_get_entry(
-        &mut self,
+        &self,
         name: XorName,
         tag: u64,
         index: u64,
@@ -487,7 +487,7 @@ impl SafeAppClient {
             name
         );
 
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
 
         let sequence_address = if private {
             SequenceAddress::Private { name, tag }
@@ -525,7 +525,7 @@ impl SafeAppClient {
     }
 
     pub async fn append_to_sequence(
-        &mut self,
+        &self,
         data: &[u8],
         name: XorName,
         tag: u64,
@@ -538,7 +538,7 @@ impl SafeAppClient {
             name
         );
 
-        let mut client = self.get_safe_client()?;
+        let client = self.get_safe_client()?;
 
         let sequence_address = if private {
             SequenceAddress::Private { name, tag }
