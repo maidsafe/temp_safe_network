@@ -50,7 +50,7 @@ impl ElderDuties {
     pub async fn initiate(&mut self, first: bool) -> Outcome<NodeOperation> {
         // currently only key section needs to catch up
         if first {
-            let _ = self.key_section.init_first().await;
+            self.key_section.init_first().await?;
         }
         self.key_section.catchup_with_section().await
     }
