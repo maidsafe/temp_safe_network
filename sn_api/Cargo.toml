@@ -27,7 +27,7 @@ rand = "~0.7.3"
 rand_core = "~0.5.1"
 relative-path = "~0.4.0"
 # sn_client = { path="../../sn_client" }
-sn_client = { git = "https://github.com/bochaco/sn_client", branch = "remove-mut-self-from-api" }
+sn_client = { git = "https://github.com/maidsafe/sn_client", branch = "master" }
 sn_data_types = "~0.11.24"
 #sn_data_types = { path = "../../data-types" }
 serde = "1.0.91"

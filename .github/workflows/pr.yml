@@ -82,7 +82,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        component: [api-network-tests, cli-network-tests]
+        component: [api-tests, cli-tests]
     steps:
       # Set git to checkout symlinks correctly on Windows only
       # Otherwise the symlinks aren't created and tests fail

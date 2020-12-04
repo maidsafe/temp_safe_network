@@ -366,9 +366,9 @@ dependencies = [
 
 [[package]]
 name = "bit-vec"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f0dc55f2d8a1a85650ac47858bb001b4c0dd73d79e3c455a842925e68d29cd3"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitflags"
@@ -2906,7 +2906,7 @@ dependencies = [
  "igd",
  "log",
  "quinn",
- "rcgen 0.8.7",
+ "rcgen 0.8.9",
  "rustls 0.17.0",
  "serde",
  "serde_json",
@@ -3208,9 +3208,9 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.8.7"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b676155349f1b548fa3214e14780836b747788c012796a3553ca8f1b9c71c7d1"
+checksum = "5cb7a2dc0e5307189b6933a61290ff06b65b35bdcaae2b2c50a0c3e355cb118e"
 dependencies = [
  "chrono",
  "pem 0.8.2",
@@ -3875,7 +3875,7 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/bochaco/sn_client?branch=remove-mut-self-from-api#f5230034f0d2799d2700eca204b12612def74f31"
+source = "git+https://github.com/maidsafe/sn_client?branch=master#b3243d029d996e5f4bcc64d5cf671cde777e774f"
 dependencies = [
  "async-trait",
  "bincode",

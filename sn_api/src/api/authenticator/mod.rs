@@ -112,7 +112,7 @@ pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
 #[derive(Default)]
 pub struct SafeAuthenticator {
     // We keep the client instantiated with the derived keypair, along
-    // with the address of the Map which helds its Safe on the network.
+    // with the address of the Map which holds its Safe on the network.
     safe: Option<(Client, MapAddress)>,
 }
 

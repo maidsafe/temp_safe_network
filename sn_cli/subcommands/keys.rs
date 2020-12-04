@@ -229,6 +229,6 @@ pub fn print_new_key_output(
             }
         }
     } else if let Some(pair) = &key_pair {
-        println!("{}", serialise_output(&(pair), output_fmt));
+        println!("{}", serialise_output(&(xorurl, pair), output_fmt));
     }
 }

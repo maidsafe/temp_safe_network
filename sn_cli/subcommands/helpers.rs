@@ -174,7 +174,7 @@ where
         OutputFmt::Json => serde_json::to_string_pretty(&value)
             .unwrap_or_else(|_| "Failed to serialise output to json".to_string()),
         OutputFmt::JsonCompact => serde_json::to_string(&value)
-            .unwrap_or_else(|_| "Failed to serialise output to json".to_string()),
+            .unwrap_or_else(|_| "Failed to serialise output to compact json".to_string()),
         OutputFmt::Pretty => {
             "OutputFmt::Pretty' not handled by caller, in serialise_output()".to_string()
         }
