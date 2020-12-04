@@ -50,9 +50,6 @@ pub enum WalletSubCommands {
         /// The target Wallet to check the total balance
         target: Option<String>,
     },
-    /*#[structopt(name = "check-tx")]
-    /// Check the status of a given transfer
-    CheckTx {},*/
     #[structopt(name = "create")]
     /// Create a new Wallet
     Create {
@@ -100,16 +97,6 @@ pub enum WalletSubCommands {
         to_is_bls: bool,
         // TODO: BlsShare when we have multisig
     },
-    /*#[structopt(name = "sweep")]
-    /// Move all coins within a Wallet to a second given Wallet or Key
-    Sweep {
-        /// The source Wallet for funds
-        #[structopt(long = "from")]
-        from: String,
-        /// The receiving Wallet/Key
-        #[structopt(long = "to")]
-        to: String,
-    },*/
 }
 
 pub async fn wallet_commander(

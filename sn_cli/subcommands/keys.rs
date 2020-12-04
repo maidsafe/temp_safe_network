@@ -13,7 +13,7 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
-use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, Safe, SecretKey};
+use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, PublicKey, Safe, SecretKey};
 use std::sync::Arc;
 use structopt::StructOpt;
 
@@ -222,13 +222,38 @@ pub fn print_new_key_output(
         }
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");
-            println!("Public Key = {}", pair.public_key());
-            match pair.secret_key() {
-                Ok(sk) => println!("Secret Key = {}", sk),
-                Err(error) => println!("{:?}", error),
+            match keypair_to_hex_strings(&pair) {
+                Ok((pk_hex, sk_hex)) => {
+                    println!("Public Key = {}", pk_hex);
+                    println!("Secret Key = {}", sk_hex);
+                }
+                Err(err) => println!("{}", err),
             }
         }
     } else if let Some(pair) = &key_pair {
-        println!("{}", serialise_output(&(xorurl, pair), output_fmt));
+        match keypair_to_hex_strings(&pair) {
+            Ok((pk_hex, sk_hex)) => println!(
+                "{}",
+                serialise_output(&(xorurl, (pk_hex, sk_hex)), output_fmt)
+            ),
+            Err(err) => println!("{}", err),
+        }
     }
+}
+
+fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String), String> {
+    let pk_hex = match keypair.public_key() {
+        PublicKey::Ed25519(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
+        PublicKey::Bls(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
+        PublicKey::BlsShare(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
+    };
+
+    let sk_hex = match keypair.secret_key() {
+        Ok(SecretKey::Ed25519(sk)) => sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
+        Ok(SecretKey::Bls(sk)) => sk.inner().reveal(),
+        Ok(SecretKey::BlsShare(sk)) => sk.inner().reveal(),
+        Err(err) => return Err(format!("{:?}", err)),
+    };
+
+    Ok((pk_hex, sk_hex))
 }
