@@ -65,14 +65,10 @@ pub fn create_preload_and_get_keys(preload: &str) -> (String, String) {
     .read()
     .unwrap();
 
-    let (xorurl, pair): (String, Keypair) = serde_json::from_str(&pk_command_result)
-        .expect("Failed to parse output of `safe files sync`");
-    (
-        xorurl,
-        pair.secret_key()
-            .expect("Error extracting SecretKey from keypair")
-            .to_string(),
-    )
+    let (xorurl, (_pk, sk)): (String, (String, String)) =
+        parse_keys_create_output(&pk_command_result);
+
+    (xorurl, sk)
 }
 
 #[allow(dead_code)]
@@ -312,7 +308,7 @@ pub fn parse_files_tree_output(output: &str) -> serde_json::Value {
 
 #[allow(dead_code)]
 pub fn parse_files_put_or_sync_output(output: &str) -> (String, ProcessedFiles) {
-    serde_json::from_str(output).expect("Failed to parse output of `safe files sync`")
+    serde_json::from_str(output).expect("Failed to parse output of `safe files put/sync`")
 }
 
 #[allow(dead_code)]
@@ -348,6 +344,11 @@ pub fn parse_cat_seq_output(output: &str) -> (String, Vec<u8>) {
 #[allow(dead_code)]
 pub fn parse_dog_output(output: &str) -> (String, Vec<SafeData>) {
     serde_json::from_str(output).expect("Failed to parse output of `safe dog`")
+}
+
+#[allow(dead_code)]
+pub fn parse_keys_create_output(output: &str) -> (String, (String, String)) {
+    serde_json::from_str(output).expect("Failed to parse output of `safe keys create`")
 }
 
 // Executes arbitrary `safe ` commands and returns
