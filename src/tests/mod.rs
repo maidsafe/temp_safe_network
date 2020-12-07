@@ -12,6 +12,7 @@ use crate::config_handler::write_connection_info;
 use crate::{utils, utils::Command, Config, Node};
 use crossbeam_channel::Sender;
 use sn_routing::{Config as RoutingConfig, TransportConfig as NetworkConfig};
+use std::env::var;
 use std::net::SocketAddr;
 use std::thread;
 use std::thread::JoinHandle;
@@ -22,10 +23,16 @@ struct Network {
     nodes: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
 
-static NODE_STARTUP_INTERVAL: u64 = 3;
+static DEFAULT_NODE_STARTUP_INTERVAL: u64 = 1;
 
 impl Network {
     pub async fn new(no_of_nodes: usize) -> Self {
+        let interval: u64 = match var("TEST_STARTUP_INTERVAL") {
+            Ok(int) => int
+                .parse::<u64>()
+                .expect("Could not parse test startup interval env var"),
+            Err(_) => DEFAULT_NODE_STARTUP_INTERVAL,
+        };
         let path = std::path::Path::new("nodes");
         std::fs::remove_dir_all(&path).unwrap_or(()); // Delete nodes directory if it exists;
         std::fs::create_dir_all(&path).expect("Cannot create nodes directory");
@@ -64,7 +71,7 @@ impl Network {
             .unwrap();
         nodes.push((command_tx, handle));
         for i in 1..no_of_nodes {
-            thread::sleep(std::time::Duration::from_secs(NODE_STARTUP_INTERVAL));
+            thread::sleep(std::time::Duration::from_secs(interval));
             let mut runtime = tokio::runtime::Runtime::new().unwrap();
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut node_config = node_config.clone();
@@ -72,7 +79,10 @@ impl Network {
                 .name(format!("node-{n}", n = i))
                 .spawn(move || {
                     let node_path = path.join(format!("node-{}", i));
-                    println!("Starting new node: {:?}", &node_path);
+                    println!(
+                        "Starting new node: {:?} with interval {:?}",
+                        &node_path, &interval
+                    );
                     std::fs::create_dir_all(&node_path).expect("Cannot create node directory");
                     node_config.set_root_dir(&node_path);
 
@@ -90,7 +100,7 @@ impl Network {
                 .unwrap();
             nodes.push((command_tx, handle));
         }
-        thread::sleep(std::time::Duration::from_secs(30));
+        thread::sleep(std::time::Duration::from_secs(interval * 12));
         Self { nodes }
     }
 }
