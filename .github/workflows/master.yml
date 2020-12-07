@@ -44,7 +44,10 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      # Build prod libraries.
+      # Build
+      - name: Build
+        run: cargo build --release
+      
       - shell: bash
         run: |
           [[ -d "artifacts" ]] && rm -rf artifacts
