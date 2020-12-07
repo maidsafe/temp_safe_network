@@ -97,7 +97,7 @@ mod test {
         let id = xor_name::XorName::random();
         let tmp_dir = TempDir::new("root")?;
         let root_dir = tmp_dir.into_path();
-        let mut store = TransferStore::new(id, &root_dir, Init::New)?;
+        let mut store = futures::executor::block_on(TransferStore::new(id, &root_dir, Init::New))?;
         let wallet_id = get_random_pk();
         let genesis_credit_proof = get_genesis(10, wallet_id)?;
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {

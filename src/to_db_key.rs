@@ -18,12 +18,12 @@ pub(crate) trait ToDbKey: Serialize {
     /// PickleDB <key,value> store.
     fn to_db_key(&self) -> String {
         let serialised = utils::serialise(&self);
-        base64::encode(&serialised)
+        hex::encode(&serialised)
     }
 }
 
 pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Option<T> {
-    let decoded = base64::decode(key).ok()?;
+    let decoded = hex::decode(key).ok()?;
     Some(utils::deserialise(&decoded))
 }
 
