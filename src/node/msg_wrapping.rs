@@ -106,7 +106,10 @@ impl ElderMsgWrapping {
                 as_node: false,
             })
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not forward msg to section",
+                msg.id()
+            )))
         }
     }
 
@@ -158,7 +161,10 @@ impl MsgWrapping {
             };
             Outcome::oki(NodeMessagingDuty::SendToClient(msg))
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to client",
+                message.id()
+            )))
         }
     }
 
@@ -171,7 +177,10 @@ impl MsgWrapping {
             };
             Outcome::oki(NodeMessagingDuty::SendToNode(msg))
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to client",
+                message.id()
+            )))
         }
     }
 
@@ -188,7 +197,10 @@ impl MsgWrapping {
             };
             Outcome::oki(NodeMessagingDuty::SendToSection { msg, as_node })
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to section",
+                message.id()
+            )))
         }
     }
 
@@ -200,7 +212,10 @@ impl MsgWrapping {
         if let Some(msg) = self.set_proxy(&msg, false).await {
             Outcome::oki(NodeMessagingDuty::SendToAdults { targets, msg })
         } else {
-            Outcome::error(Error::Logic)
+            Outcome::error(Error::Logic(format!(
+                "{:?}: Could not send msg to adults",
+                msg.id()
+            )))
         }
     }
 
@@ -234,6 +249,7 @@ impl MsgWrapping {
                     let bls_key = self.keys.public_key_set().await?.public_key();
                     MsgSender::section(TransientSectionKey { bls_key }, duty).ok()?
                 } else {
+                    info!("Signing as Node!");
                     let key = self.keys.elder_key().await?;
                     if let Signature::BlsShare(sig) = self.keys.sign_as_elder(data).await? {
                         MsgSender::elder(key, duty, sig.share).ok()?
@@ -266,7 +282,8 @@ impl MsgWrapping {
     async fn set_proxy(&self, msg: &MsgEnvelope, as_section: bool) -> Option<MsgEnvelope> {
         // origin signs the message, while proxies sign the envelope
         let mut msg = msg.clone();
-        msg.add_proxy(self.sign(&msg, as_section).await?);
+        msg.add_proxy(self.sign(&msg.message, as_section).await?);
+
         Some(msg)
     }
 }

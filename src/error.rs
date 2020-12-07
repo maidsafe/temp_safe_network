@@ -65,11 +65,6 @@ quick_error! {
             display("Routing error: {:?}", error)
             from()
         }
-        ///
-        InvalidConfig(error: String) {
-            display("Config error: {:?}", error)
-            from()
-        }
         /// Onboarding error
         Onboarding{
             display("Onboarding error")
@@ -79,8 +74,8 @@ quick_error! {
         /// Account doesn't exist.
         NoSuchAccount {}
         /// Logic error.
-        Logic {
-            display("Logic error")
+        Logic(error: String) {
+            display("Logic error {:?}", error)
             from()
         }
     }

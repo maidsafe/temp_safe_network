@@ -116,7 +116,9 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
             }
             other => {
                 error!("NOT SUPPORTED YET: {:?}", other);
-                Outcome::error(Error::Logic)
+                Outcome::error(Error::Logic(
+                    "Event not supported in Client event processing".to_string(),
+                ))
             }
         }
     }

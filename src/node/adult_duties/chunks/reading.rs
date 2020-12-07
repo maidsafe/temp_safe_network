@@ -46,7 +46,10 @@ pub(super) async fn get_result(
     //         None
     //     }
     } else {
-        // only receiving these requests from other sections
-        Outcome::error(Error::Logic)
+        // only receiving these requests from sections
+        Outcome::error(Error::Logic(format!(
+            "{:?}: Can only receive requests from sections",
+            msg.id()
+        )))
     }
 }

@@ -97,7 +97,7 @@ pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
     PublicKey::from_bytes(pk_bytes_array)
-        .map_err(|_| Error::InvalidConfig("Invalid public key bytes".to_string()))
+        .map_err(|_| Error::Logic("Config error: Invalid public key bytes".to_string()))
 }
 
 fn sk_to_hex(secret: &SecretKey) -> String {

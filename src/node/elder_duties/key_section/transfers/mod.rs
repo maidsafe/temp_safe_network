@@ -79,7 +79,7 @@ impl Transfers {
         // prepare replica init
         let pub_key = match self.replica.lock().await.replicas_pk_set() {
             Some(set) => PublicKey::Bls(set.public_key()),
-            _ => return Outcome::error(Error::Logic),
+            _ => return Outcome::error(Error::Logic("Could not get replica PK Set".to_string())),
         };
         self.wrapping
             .send_to_section(

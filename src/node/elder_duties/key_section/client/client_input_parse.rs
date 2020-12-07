@@ -46,13 +46,16 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Result<MsgEnvelope> {
                 ..
             },
         ) => msg,
-        _ => return Err(Error::Logic), // Only cmds and queries from client are allowed through here.
+        _ => return Err(Error::Logic("Error deserializing Client msg".to_string())), // Only cmds and queries from client are allowed through here.
     };
 
     if msg.origin.is_client() {
         Ok(msg)
     } else {
-        Err(Error::Logic)
+        Err(Error::Logic(format!(
+            "{:?}: Msg origin is not Client",
+            msg.id()
+        )))
     }
 }
 

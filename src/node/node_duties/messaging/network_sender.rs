@@ -67,11 +67,14 @@ impl NetworkSender {
         result.map_or_else(
             |err| {
                 error!("Unable to send MsgEnvelope to Peer: {:?}", err);
-                Outcome::error(Error::Logic)
+                Outcome::error(Error::Logic(format!(
+                    "{:?}: Unable to send Msg to Peer",
+                    msg.id()
+                )))
             },
             |()| {
                 info!("Sent MsgEnvelope to Peer {:?} from node {:?}", dst, name);
-                Outcome::error(Error::Logic)
+                Outcome::oki_no_change()
             },
         )
     }
@@ -124,11 +127,14 @@ impl NetworkSender {
         result.map_or_else(
             |err| {
                 error!("Unable to send to section: {:?}", err);
-                Outcome::error(Error::Logic)
+                Outcome::error(Error::Logic(format!(
+                    "{:?}: Unable to send to section",
+                    msg.id()
+                )))
             },
             |()| {
                 info!("Sent to section with: {:?}", msg);
-                Outcome::error(Error::Logic)
+                Outcome::oki_no_change()
             },
         )
     }

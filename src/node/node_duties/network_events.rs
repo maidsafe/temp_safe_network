@@ -75,7 +75,7 @@ impl NetworkEvents {
                     )
                 } else {
                     trace!("Invalid member config");
-                    Outcome::error(Error::Logic)
+                    Outcome::error(Error::Logic("Invalid member config".to_string()))
                 }
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
@@ -139,7 +139,10 @@ impl NetworkEvents {
                     "Error deserializing received network message into MsgEnvelope type: {:?}",
                     e
                 );
-                Outcome::error(Error::Logic)
+                Outcome::error(Error::Logic(format!(
+                    "Error deserializing network msg into MsgEnvelope: {:?}",
+                    e
+                )))
             }
         }
     }

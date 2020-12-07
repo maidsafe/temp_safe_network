@@ -36,7 +36,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Outcome<NodeMessagingDuty> {
-        if let Err(error) = self.try_store(data).await {
+        if let Err(error) = self.try_store(data, origin).await {
             return self
                 .wrapping
                 .error(CmdError::Data(error), msg_id, &origin.address())
@@ -53,7 +53,7 @@ impl ChunkStorage {
         origin: &MsgSender,
         accumulated_signature: &Signature,
     ) -> Outcome<NodeMessagingDuty> {
-        let message = match self.try_store(data).await {
+        let message = match self.try_store(data, origin).await {
             Ok(()) => Message::NodeEvent {
                 event: NodeEvent::DuplicationComplete {
                     chunk: *data.address(),
@@ -75,7 +75,21 @@ impl ChunkStorage {
         self.wrapping.send_to_node(message).await
     }
 
-    async fn try_store(&mut self, data: &Blob) -> NdResult<()> {
+    async fn try_store(&mut self, data: &Blob, origin: &MsgSender) -> NdResult<()> {
+        info!("TRYING TO STORE BLOB");
+        let id = origin.id().public_key();
+
+        if data.is_unpub() {
+            let data_owner = *data.owner().ok_or(NdError::InvalidOwners)?;
+            info!("Blob is unpub");
+            info!("DATA OWNER: {:?}", data_owner);
+            info!("ID OWNER: {:?}", id);
+            if data_owner != id {
+                info!("INVALID OWNER! Returning error");
+                return Err(NdError::InvalidOwners);
+            }
+        }
+
         if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -148,11 +162,16 @@ impl ChunkStorage {
         }
 
         let result = match self.chunks.get(&address) {
-            Ok(Blob::Private(_)) => self
-                .chunks
-                .delete(&address)
-                .await
-                .map_err(|error| error.to_string().into()),
+            Ok(Blob::Private(data)) => {
+                if *data.owner() == origin.id().public_key() {
+                    self.chunks
+                        .delete(&address)
+                        .await
+                        .map_err(|error| error.to_string().into())
+                } else {
+                    Err(NdError::InvalidOwners)
+                }
+            }
             Ok(_) => {
                 error!(
                     "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
