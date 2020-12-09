@@ -55,7 +55,7 @@ impl TransferStore {
             ReplicaEvent::TransferPropagated(e) => {
                 let key = &e.id().to_db_key();
                 if self.db.exists(key) {
-                    return Err(Error::Logic);
+                    return Err(Error::Logic("Key exists.".to_string()));
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferPropagated(e))
@@ -64,7 +64,7 @@ impl TransferStore {
             ReplicaEvent::TransferValidated(e) => {
                 let key = &e.id().to_db_key();
                 if self.db.exists(key) {
-                    return Err(Error::Logic);
+                    return Err(Error::Logic("Key exists.".to_string()));
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferValidated(e))
@@ -73,7 +73,7 @@ impl TransferStore {
             ReplicaEvent::TransferRegistered(e) => {
                 let key = &e.id().to_db_key();
                 if self.db.exists(key) {
-                    return Err(Error::Logic);
+                    return Err(Error::Logic("Key exists.".to_string()));
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferRegistered(e))

@@ -8,7 +8,6 @@
 
 pub mod replicas;
 pub mod store;
-
 use self::replicas::Replicas;
 use crate::{
     capacity::RateLimit,
@@ -27,6 +26,7 @@ use sn_data_types::{
     QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
+use xor_name::Prefix;
 
 /*
 Transfers is the layer that manages
@@ -93,6 +93,16 @@ impl Transfers {
             )
             .await
             .convert()
+    }
+
+    /// When section splits, the Replicas in either resulting section
+    /// also split the responsibility of the accounts.
+    /// Thus, both Replica groups need to drop the accounts that
+    /// the other group is now responsible for.
+    pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
+        // Removes keys that are no longer our section responsibility.
+        let _ = self.replicas.keep_keys_of(prefix).await?;
+        Ok(None)
     }
 
     /// When handled by Elders in the dst

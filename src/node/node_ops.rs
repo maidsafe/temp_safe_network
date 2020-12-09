@@ -12,8 +12,8 @@ use sn_data_types::Transfer;
 use crate::Outcome;
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey, ReplicaEvent, SignedTransfer,
-    TransferAgreementProof, TransferValidated,
+    Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
+    ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferValidated,
 };
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;

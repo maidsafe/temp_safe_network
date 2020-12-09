@@ -18,6 +18,7 @@ use sn_transfers::{get_genesis, WalletReplica};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use xor_name::Prefix;
 
 #[cfg(feature = "simulated-payouts")]
 use {
@@ -162,6 +163,20 @@ impl Replicas {
         self.info = info;
     }
 
+    pub async fn keep_keys_of(&mut self, prefix: Prefix) -> Result<()> {
+        // Removes keys that are no longer our section responsibility.
+        let keys: Vec<PublicKey> = self.locks.iter().map(|(k, _)| *k).collect();
+        for key in keys.into_iter() {
+            if !prefix.matches(&key.into()) {
+                let key_lock = self.load_key_lock(key).await?;
+                let _store = key_lock.lock().await;
+                let _ = self.locks.remove(&key);
+                // todo: remove db from disk
+            }
+        }
+        Ok(())
+    }
+
     /// For now, with test money there is no from wallet.., money is created from thin air.
     pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Outcome<()> {
         let id = signed_transfer.sender();
@@ -301,16 +316,11 @@ impl Replicas {
     async fn load_key_lock(&self, id: PublicKey) -> Result<Arc<Mutex<TransferStore>>> {
         match self.locks.get(&id) {
             Some(val) => Ok(val.clone()),
-            None => Err(Error::Logic),
+            None => Err(Error::Logic("Key does not exist among locks.".to_string())),
         }
     }
 
     async fn load_wallet(&self, store: &TransferStore, id: PublicKey) -> Result<WalletReplica> {
-        // id: PublicKey
-        // let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
-        //     Ok(store) => store,
-        //     Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
-        // };
         let events = store.get_all();
         let wallet = WalletReplica::from_history(
             id,
@@ -387,7 +397,7 @@ impl Replicas {
         let debit = transfer.debit();
         let id = debit.sender();
         let key_lock = self.load_key_lock(id).await?;
-        let mut store = key_lock.lock().await;
+        let store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, id).await?;

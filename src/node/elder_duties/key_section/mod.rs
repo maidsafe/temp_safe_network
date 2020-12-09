@@ -91,26 +91,9 @@ impl KeySection {
     }
 
     /// When section splits, the Replicas in either resulting section
-    /// also split the responsibility of the accounts.
-    /// Thus, both Replica groups need to drop the accounts that
-    /// the other group is now responsible for.
+    /// also split the responsibility of their data.
     pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
-        // Removes accounts that are no longer our section responsibility.
-        let not_matching = |key: PublicKey| {
-            let xorname: XorName = key.into();
-            !prefix.matches(&XorName(xorname.0))
-        };
-        if let Some(all_keys) = self.replica_manager.lock().await.all_keys() {
-            let accounts = all_keys
-                .iter()
-                .filter(|key| not_matching(**key))
-                .copied()
-                .collect::<BTreeSet<PublicKey>>();
-            self.replica_manager.lock().await.drop_accounts(&accounts)?;
-            Outcome::oki_no_change()
-        } else {
-            Outcome::error(Error::Logic("Could not fetch all replica keys".to_string()))
-        }
+        self.transfers.section_split(prefix).await
     }
 
     pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Outcome<NodeOperation> {

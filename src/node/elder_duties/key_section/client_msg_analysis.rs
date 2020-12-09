@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::{MetadataDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty};
+use crate::node::node_ops::{
+    MetadataDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty,
+};
 use crate::Network;
 use crate::{Error, Outcome, TernaryResult};
 use log::{info, warn};
