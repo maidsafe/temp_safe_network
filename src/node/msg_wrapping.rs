@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
-use crate::{Error, Outcome, TernaryResult};
+use crate::{Error, Result};
 use ed25519_dalek::{PublicKey as EdPK, Signature as EdSign};
 use log::info;
 use sn_data_types::{
@@ -57,11 +57,11 @@ impl NodeMsgWrapping {
         &self,
         message: Message,
         as_node: bool,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.send_to_section(message, as_node).await
     }
 
-    // pub async fn send_to_node(&self, message: Message) -> Outcome<NodeMessagingDuty> {
+    // pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
     //     self.inner.send_to_node(message).await
     // }
 }
@@ -80,11 +80,11 @@ impl AdultMsgWrapping {
         &self,
         message: Message,
         as_node: bool,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.send_to_section(message, as_node).await
     }
 
-    pub async fn send_to_node(&self, message: Message) -> Outcome<NodeMessagingDuty> {
+    pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
         self.inner.send_to_node(message).await
     }
 
@@ -92,7 +92,7 @@ impl AdultMsgWrapping {
         &self,
         message: &MsgEnvelope,
         targets: BTreeSet<XorName>,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.send_to_adults(targets, message).await
     }
 
@@ -101,7 +101,7 @@ impl AdultMsgWrapping {
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.error(error, msg_id, origin).await
     }
 
@@ -124,21 +124,21 @@ impl ElderMsgWrapping {
         Self { inner }
     }
 
-    pub async fn forward(&self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
+    pub async fn forward(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
         if let Some(msg) = self.inner.set_proxy(&msg, true).await {
-            Outcome::oki(NodeMessagingDuty::SendToSection {
+            Ok(NodeMessagingDuty::SendToSection {
                 msg,
                 as_node: false,
             })
         } else {
-            Outcome::error(Error::Logic(format!(
+            Err(Error::Logic(format!(
                 "{:?}: Could not forward msg to section",
                 msg.id()
             )))
         }
     }
 
-    pub async fn send_to_client(&self, message: Message) -> Outcome<NodeMessagingDuty> {
+    pub async fn send_to_client(&self, message: Message) -> Result<NodeMessagingDuty> {
         self.inner.send_to_client(message).await
     }
 
@@ -146,11 +146,11 @@ impl ElderMsgWrapping {
         &self,
         message: Message,
         as_node: bool,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.send_to_section(message, as_node).await
     }
 
-    pub async fn send_to_node(&self, message: Message) -> Outcome<NodeMessagingDuty> {
+    pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
         self.inner.send_to_node(message).await
     }
 
@@ -158,7 +158,7 @@ impl ElderMsgWrapping {
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.send_to_adults(targets, msg).await
     }
 
@@ -167,7 +167,7 @@ impl ElderMsgWrapping {
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         self.inner.error(error, msg_id, origin).await
     }
 }
@@ -177,32 +177,32 @@ impl MsgWrapping {
         Self { keys, duty }
     }
 
-    pub async fn send_to_client(&self, message: Message) -> Outcome<NodeMessagingDuty> {
+    pub async fn send_to_client(&self, message: Message) -> Result<NodeMessagingDuty> {
         if let Some(origin) = self.sign(&message, true).await {
             let msg = MsgEnvelope {
                 message,
                 origin,
                 proxies: Default::default(),
             };
-            Outcome::oki(NodeMessagingDuty::SendToClient(msg))
+            Ok(NodeMessagingDuty::SendToClient(msg))
         } else {
-            Outcome::error(Error::Logic(format!(
+            Err(Error::Logic(format!(
                 "{:?}: Could not send msg to client",
                 message.id()
             )))
         }
     }
 
-    pub async fn send_to_node(&self, message: Message) -> Outcome<NodeMessagingDuty> {
+    pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
         if let Some(origin) = self.sign(&message, false).await {
             let msg = MsgEnvelope {
                 message,
                 origin,
                 proxies: Default::default(),
             };
-            Outcome::oki(NodeMessagingDuty::SendToNode(msg))
+            Ok(NodeMessagingDuty::SendToNode(msg))
         } else {
-            Outcome::error(Error::Logic(format!(
+            Err(Error::Logic(format!(
                 "{:?}: Could not send msg to client",
                 message.id()
             )))
@@ -213,16 +213,16 @@ impl MsgWrapping {
         &self,
         message: Message,
         as_node: bool,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         if let Some(origin) = self.sign(&message, !as_node).await {
             let msg = MsgEnvelope {
                 message,
                 origin,
                 proxies: Default::default(),
             };
-            Outcome::oki(NodeMessagingDuty::SendToSection { msg, as_node })
+            Ok(NodeMessagingDuty::SendToSection { msg, as_node })
         } else {
-            Outcome::error(Error::Logic(format!(
+            Err(Error::Logic(format!(
                 "{:?}: Could not send msg to section",
                 message.id()
             )))
@@ -233,11 +233,11 @@ impl MsgWrapping {
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         if let Some(msg) = self.set_proxy(&msg, false).await {
-            Outcome::oki(NodeMessagingDuty::SendToAdults { targets, msg })
+            Ok(NodeMessagingDuty::SendToAdults { targets, msg })
         } else {
-            Outcome::error(Error::Logic(format!(
+            Err(Error::Logic(format!(
                 "{:?}: Could not send msg to adults",
                 msg.id()
             )))
@@ -249,7 +249,7 @@ impl MsgWrapping {
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         info!("Error {:?}", error);
         self.send_to_section(
             Message::CmdError {

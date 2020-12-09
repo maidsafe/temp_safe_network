@@ -17,11 +17,11 @@ use crate::node::{
     elder_duties::ElderDuties,
     msg_wrapping::NodeMsgWrapping,
     node_duties::messaging::Messaging,
-    node_ops::{NodeDuty, NodeOperation},
+    node_ops::{Blah, NodeDuty, NodeOperation},
     state_db::AgeGroup,
     state_db::NodeInfo,
 };
-use crate::{chunk_store::UsedSpace, Error, Network, Outcome, TernaryResult};
+use crate::{chunk_store::UsedSpace, Error, Network, Result};
 use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
@@ -94,7 +94,7 @@ impl NodeDuties {
         level
     }
 
-    pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Outcome<NodeOperation> {
+    pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Result<NodeOperation> {
         use NodeDuty::*;
         info!("Processing Node Duty: {:?}", duty);
         match duty {
@@ -107,10 +107,11 @@ impl NodeDuties {
                     .process_network_event(event, &self.network_api)
                     .await
             }
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn register_wallet(&mut self, wallet: PublicKey) -> Outcome<NodeOperation> {
+    async fn register_wallet(&mut self, wallet: PublicKey) -> Result<NodeOperation> {
         let wrapping =
             NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
         wrapping
@@ -128,7 +129,7 @@ impl NodeDuties {
             .convert()
     }
 
-    async fn become_adult(&mut self) -> Outcome<NodeOperation> {
+    async fn become_adult(&mut self) -> Result<NodeOperation> {
         trace!("Becoming Adult");
         use DutyLevel::*;
         let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
@@ -139,17 +140,17 @@ impl NodeDuties {
             // Also, "Error-to-Unit" is not a good conversion..
             //dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
         }
-        Ok(None)
+        Ok(NodeOperation::NoOp)
     }
 
-    async fn become_elder(&mut self) -> Outcome<NodeOperation> {
+    async fn become_elder(&mut self) -> Result<NodeOperation> {
         trace!("Becoming Elder");
 
         use DutyLevel::*;
         let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
         info!("Attempting to assume Elder duties..");
         if matches!(self.duty_level, Elder(_)) {
-            return Ok(None);
+            return Ok(NodeOperation::NoOp);
         }
 
         match ElderDuties::new(&self.node_info, used_space, self.network_api.clone()).await {
@@ -166,7 +167,7 @@ impl NodeDuties {
             }
             Err(e) => {
                 warn!("Was not able to assume Elder duties! {:?}", e);
-                Outcome::error(Error::Logic(format!(
+                Err(Error::Logic(format!(
                     "Not able to assume Elder Duties: {:?}",
                     e
                 )))

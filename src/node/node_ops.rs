@@ -9,7 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use crate::Outcome;
+use crate::Result;
 use serde::export::Formatter;
 use sn_data_types::{
     Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
@@ -19,6 +19,19 @@ use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
+
+pub trait Blah {
+    fn convert(self) -> Result<NodeOperation>;
+}
+
+impl Blah for Result<NodeMessagingDuty> {
+    fn convert(self) -> Result<NodeOperation> {
+        match self? {
+            NodeMessagingDuty::NoOp => Ok(NodeOperation::NoOp),
+            op => Ok(op.into()),
+        }
+    }
+}
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and
@@ -76,10 +89,10 @@ impl Into<NodeOperation> for Vec<NodeOperation> {
     }
 }
 
-impl Into<NodeOperation> for Vec<Outcome<NodeOperation>> {
+impl Into<NodeOperation> for Vec<Result<NodeOperation>> {
     /// NB: This drops errors!
     fn into(self) -> NodeOperation {
-        NodeOperation::from_many(self.into_iter().flatten().flatten().collect())
+        NodeOperation::from_many(self.into_iter().flatten().collect())
     }
 }
 
@@ -91,6 +104,7 @@ pub enum NetworkDuty {
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
     RunAsNode(NodeDuty),
+    NoOp,
 }
 
 // --------------- Node ---------------
@@ -108,6 +122,7 @@ pub enum NodeDuty {
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
     ProcessNetworkEvent(RoutingEvent),
+    NoOp,
 }
 
 impl Into<NodeOperation> for NodeDuty {
@@ -126,6 +141,7 @@ impl Debug for NodeDuty {
             Self::BecomeElder => write!(f, "BecomeElder"),
             Self::ProcessMessaging(duty) => duty.fmt(f),
             Self::ProcessNetworkEvent(event) => event.fmt(f),
+            Self::NoOp => write!(f, "No op."),
         }
     }
 }
@@ -153,6 +169,8 @@ pub enum NodeMessagingDuty {
         targets: BTreeSet<XorName>,
         msg: MsgEnvelope,
     },
+    // No operation
+    NoOp,
 }
 
 impl From<NodeMessagingDuty> for NodeOperation {
@@ -160,7 +178,11 @@ impl From<NodeMessagingDuty> for NodeOperation {
         use NetworkDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;
-        Single(RunAsNode(ProcessMessaging(duty)))
+        if matches!(duty, NodeMessagingDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsNode(ProcessMessaging(duty)))
+        }
     }
 }
 
@@ -173,6 +195,7 @@ impl Debug for NodeMessagingDuty {
             Self::SendToClient(msg) => write!(f, "SendToClient [ msg: {:?} ]", msg),
             Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
             Self::SendToSection { msg, .. } => write!(f, "SendToSection [ msg: {:?} ]", msg),
+            Self::NoOp => write!(f, "No op."),
         }
     }
 }
@@ -215,13 +238,18 @@ pub enum ElderDuty {
     /// A data section receives requests relayed
     /// via key sections.
     RunAsDataSection(DataSectionDuty),
+    NoOp,
 }
 
 impl Into<NodeOperation> for ElderDuty {
     fn into(self) -> NodeOperation {
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(self))
+        if matches!(self, ElderDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(self))
+        }
     }
 }
 
@@ -253,13 +281,18 @@ pub enum AdultDuty {
     StoreDuplicatedBlob {
         blob: Blob,
     },
+    NoOp,
 }
 
 impl Into<NodeOperation> for AdultDuty {
     fn into(self) -> NodeOperation {
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsAdult(self))
+        if matches!(self, AdultDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsAdult(self))
+        }
     }
 }
 
@@ -280,6 +313,7 @@ pub enum KeySectionDuty {
     RunAsGateway(GatewayDuty),
     /// Transfers of money between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
+    NoOp,
 }
 
 impl Into<NodeOperation> for KeySectionDuty {
@@ -287,7 +321,11 @@ impl Into<NodeOperation> for KeySectionDuty {
         use ElderDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(self)))
+        if matches!(self, KeySectionDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsKeySection(self)))
+        }
     }
 }
 
@@ -306,6 +344,7 @@ pub enum DataSectionDuty {
     /// the network by storing metadata / data, and
     /// carrying out operations on those.
     RunAsRewards(RewardDuty),
+    NoOp,
 }
 
 // --------------- Gateway ---------------
@@ -321,6 +360,7 @@ pub enum GatewayDuty {
     /// Incoming events from clients are parsed
     /// at the Gateway, and forwarded to other modules.
     ProcessClientEvent(RoutingEvent),
+    NoOp,
 }
 
 impl Into<NodeOperation> for GatewayDuty {
@@ -329,7 +369,11 @@ impl Into<NodeOperation> for GatewayDuty {
         use KeySectionDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
+        if matches!(self, GatewayDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
+        }
     }
 }
 
@@ -346,6 +390,7 @@ pub enum MetadataDuty {
     ProcessRead(MsgEnvelope),
     /// Writes.
     ProcessWrite(MsgEnvelope),
+    NoOp,
 }
 
 impl Into<NodeOperation> for MetadataDuty {
@@ -354,7 +399,11 @@ impl Into<NodeOperation> for MetadataDuty {
         use ElderDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
+        if matches!(self, MetadataDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
+        }
     }
 }
 
@@ -367,6 +416,7 @@ pub enum ChunkDuty {
     ReadChunk(MsgEnvelope),
     /// Writes.
     WriteChunk(MsgEnvelope),
+    NoOp,
 }
 
 // --------------- Rewards ---------------
@@ -432,6 +482,7 @@ pub enum RewardDuty {
     /// receives and accumulates the validated
     /// reward payout from its Replicas,
     ReceivePayoutValidation(TransferValidated),
+    NoOp,
 }
 
 impl Into<NodeOperation> for RewardDuty {
@@ -440,7 +491,11 @@ impl Into<NodeOperation> for RewardDuty {
         use ElderDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
+        if matches!(self, RewardDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
+        }
     }
 }
 
@@ -467,6 +522,7 @@ pub enum TransferDuty {
         ///
         origin: Address,
     },
+    NoOp,
 }
 
 impl Into<NodeOperation> for TransferDuty {
@@ -475,7 +531,11 @@ impl Into<NodeOperation> for TransferDuty {
         use KeySectionDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
+        if matches!(self, TransferDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
+        }
     }
 }
 

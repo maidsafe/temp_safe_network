@@ -14,7 +14,7 @@ use crate::{
             RewardDuty, TransferCmd, TransferDuty, TransferQuery,
         },
     },
-    utils, Error, Network, Outcome, Result, TernaryResult,
+    utils, Error, Network, Result,
 };
 use log::{error, info};
 use sn_data_types::{
@@ -58,44 +58,53 @@ impl NetworkMsgAnalysis {
         origin == self.routing.name().await
     }
 
-    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let msg = if self.should_accumulate(msg).await? {
             if let Some(msg) = self.accumulation.process_message_envelope(msg)? {
                 msg
             } else {
-                return Ok(None);
+                return Ok(NodeOperation::NoOp);
             }
         } else {
             msg.clone() // TODO remove this clone
         };
 
-        let result = if let Some(duty) = self.try_messaging(&msg).await? {
+        match self.try_messaging(&msg).await? {
             // Identified as an outbound msg, to be sent on the wire.
-            duty.into()
-        } else if let Some(duty) = self.try_client_entry(&msg).await? {
+            NodeMessagingDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
-            duty.into()
-        } else if let Some(duty) = self.try_transfers(&msg).await? {
-            duty.into()
-        } else if let Some(duty) = self.try_metadata(&msg).await? {
-            // Accumulated msg from `Payment`!
-            duty.into()
-        } else if let Some(duty) = self.try_adult(&msg).await? {
-            // Accumulated msg from `Metadata`!
-            duty.into()
-        } else if let Some(duty) = self.try_rewards(&msg).await? {
-            // Identified as a Rewards msg
-            duty.into()
-        } else {
-            error!("Unknown message destination: {:?}", msg.id());
-            return Outcome::error(Error::Logic("Unknown message destination".to_string()));
+            GatewayDuty::NoOp => (),
+            op => return Ok(op.into()),
         };
-        Outcome::oki(result)
+        match self.try_transfers(&msg).await? {
+            TransferDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_metadata(&msg).await? {
+            // Accumulated msg from `Payment`!
+            MetadataDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_adult(&msg).await? {
+            // Accumulated msg from `Metadata`!
+            AdultDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_rewards(&msg).await? {
+            // Identified as a Rewards msg
+            RewardDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        error!("Unknown message destination: {:?}", msg.id());
+        Err(Error::Logic("Unknown message destination".to_string()))
     }
 
-    async fn try_messaging(&self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
+    async fn try_messaging(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
         use Address::*;
         let destined_for_network = match msg.destination()? {
             Client(address) => !self.self_is_handler_for(&address).await,
@@ -104,12 +113,12 @@ impl NetworkMsgAnalysis {
         };
 
         if destined_for_network {
-            Outcome::oki(NodeMessagingDuty::SendToSection {
+            Ok(NodeMessagingDuty::SendToSection {
                 msg: msg.clone(),
                 as_node: true,
             }) // Forwards without stamping the duty (was not processed).
         } else {
-            Outcome::oki_no_change()
+            Ok(NodeMessagingDuty::NoOp)
         }
     }
 
@@ -236,7 +245,7 @@ impl NetworkMsgAnalysis {
     // ---- .... -----
 
     // todo: eval all msg types!
-    async fn try_client_entry(&self, msg: &MsgEnvelope) -> Outcome<GatewayDuty> {
+    async fn try_client_entry(&self, msg: &MsgEnvelope) -> Result<GatewayDuty> {
         let is_our_client_msg = match msg.destination()? {
             Address::Client(address) => self.self_is_handler_for(&address).await,
             _ => false,
@@ -245,16 +254,16 @@ impl NetworkMsgAnalysis {
         let shall_process = is_our_client_msg && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(GatewayDuty::NoOp);
         }
 
-        Outcome::oki(GatewayDuty::FindClientFor(msg.clone()))
+        Ok(GatewayDuty::FindClientFor(msg.clone()))
     }
 
     /// After the data write sent from Payment Elders has been
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
-    async fn try_metadata(&self, msg: &MsgEnvelope) -> Outcome<MetadataDuty> {
+    async fn try_metadata(&self, msg: &MsgEnvelope) -> Result<MetadataDuty> {
         let is_data_cmd = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -264,7 +273,7 @@ impl NetworkMsgAnalysis {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(MetadataDuty::NoOp);
         };
         let from_payment_section = || {
             msg.most_recent_sender().is_section()
@@ -288,18 +297,18 @@ impl NetworkMsgAnalysis {
         } else if is_data_cmd() && from_payment_section() && is_correct_dst {
             MetadataDuty::ProcessWrite(msg.clone()) // TODO: Fix these for type safety
         } else {
-            return Ok(None);
+            return Ok(MetadataDuty::NoOp);
         };
-        Outcome::oki(duty)
+        Ok(duty)
     }
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    async fn try_adult(&self, msg: &MsgEnvelope) -> Outcome<AdultDuty> {
+    async fn try_adult(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(AdultDuty::NoOp);
         };
         let from_metadata_section = || {
             msg.most_recent_sender().is_section()
@@ -333,7 +342,7 @@ impl NetworkMsgAnalysis {
             && self.is_adult().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(AdultDuty::NoOp);
         }
 
         info!("Checking chunking duplication!");
@@ -437,55 +446,55 @@ impl NetworkMsgAnalysis {
         } else if let Some(request) = is_chunk_duplication {
             request
         } else {
-            return Ok(None);
+            return Ok(AdultDuty::NoOp);
         };
-        Outcome::oki(duty)
+        Ok(duty)
     }
 
-    async fn try_rewards(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
-        let result = self.try_nonacc_rewards(msg).await;
-        if result.has_value() || result.is_err() {
-            return result;
-        }
-        let result = self.try_accumulated_rewards(msg).await;
-        if result.has_value() || result.is_err() {
-            return result;
-        }
+    async fn try_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        match self.try_nonacc_rewards(msg).await? {
+            RewardDuty::NoOp => (),
+            op => return Ok(op),
+        };
+        match self.try_accumulated_rewards(msg).await? {
+            RewardDuty::NoOp => (),
+            op => return Ok(op),
+        };
         self.try_wallet_register(msg).await
     }
 
-    async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
+    async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         };
         let is_node_config = || matches!(duty, Duty::Node(NodeDuties::NodeConfig));
         let shall_process =
             is_node_config() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         }
 
         match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
                 ..
-            } => Outcome::oki(RewardDuty::SetNodeWallet {
+            } => Ok(RewardDuty::SetNodeWallet {
                 wallet_id: *wallet,
                 node_id: msg.origin.address().xorname(),
             }),
-            _ => Ok(None),
+            _ => Ok(RewardDuty::NoOp),
         }
     }
 
     // Check non-accumulated reward msgs.
-    async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
+    async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         };
         let from_single_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
@@ -495,7 +504,7 @@ impl NetworkMsgAnalysis {
             from_single_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         }
 
         // SectionPayoutValidated and GetWalletId
@@ -505,24 +514,24 @@ impl NetworkMsgAnalysis {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
                 ..
-            } => Outcome::oki(RewardDuty::ReceivePayoutValidation(validation.clone())),
+            } => Ok(RewardDuty::ReceivePayoutValidation(validation.clone())),
             Message::NodeQueryResponse {
                 response: NodeQueryResponse::Rewards(GetWalletId(Ok((wallet_id, new_node_id)))),
                 ..
-            } => Outcome::oki(RewardDuty::ActivateNodeRewards {
+            } => Ok(RewardDuty::ActivateNodeRewards {
                 id: *wallet_id,
                 node_id: *new_node_id,
             }),
-            _ => Ok(None),
+            _ => Ok(RewardDuty::NoOp),
         }
     }
 
     // Check accumulated reward msgs.
-    async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
+    async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         };
         let from_rewards_section = || {
             msg.most_recent_sender().is_section()
@@ -533,7 +542,7 @@ impl NetworkMsgAnalysis {
             from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process_accumulated {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         }
 
         use NodeRewardQuery::*;
@@ -545,18 +554,18 @@ impl NetworkMsgAnalysis {
                         new_node_id,
                     }),
                 id,
-            } => Outcome::oki(RewardDuty::GetWalletId {
+            } => Ok(RewardDuty::GetWalletId {
                 old_node_id: *old_node_id,
                 new_node_id: *new_node_id,
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
-            _ => Ok(None),
+            _ => Ok(RewardDuty::NoOp),
         }
     }
 
     // Check internal transfer cmds.
-    async fn try_transfers(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {
+    async fn try_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
         use NodeTransferCmd::*;
 
         // From Transfer module we get `PropagateTransfer`.
@@ -564,7 +573,7 @@ impl NetworkMsgAnalysis {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(TransferDuty::NoOp);
         };
         let from_transfer_elder = || {
             msg.most_recent_sender().is_elder()
@@ -579,7 +588,7 @@ impl NetworkMsgAnalysis {
                 Message::NodeCmd {
                     cmd: NodeCmd::Transfers(PropagateTransfer(proof)),
                     id,
-                } => Outcome::oki(TransferDuty::ProcessCmd {
+                } => Ok(TransferDuty::ProcessCmd {
                     cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
                     msg_id: *id,
                     origin: msg.origin.address(),
@@ -592,18 +601,18 @@ impl NetworkMsgAnalysis {
                     // as to handle that the expected public key is not the same as the current.
                     if let Some(section_pk) = self.routing.section_public_key().await {
                         if public_key == &section_pk {
-                            Outcome::oki(TransferDuty::ProcessQuery {
+                            Ok(TransferDuty::ProcessQuery {
                                 query: TransferQuery::GetReplicaEvents,
                                 msg_id: *id,
                                 origin: msg.origin.address(),
                             })
                         } else {
                             error!("Unexpected public key!");
-                            Outcome::error(Error::Logic("Unexpected PK".to_string()))
+                            Err(Error::Logic("Unexpected PK".to_string()))
                         }
                     } else {
                         error!("No section public key found!");
-                        Outcome::error(Error::Logic("No section PK found".to_string()))
+                        Err(Error::Logic("No section PK found".to_string()))
                     }
                 }
                 Message::NodeQueryResponse {
@@ -613,12 +622,12 @@ impl NetworkMsgAnalysis {
                         )),
                     id,
                     ..
-                } => Outcome::oki(TransferDuty::ProcessCmd {
+                } => Ok(TransferDuty::ProcessCmd {
                     cmd: TransferCmd::InitiateReplica(events.clone()?),
                     msg_id: *id,
                     origin: msg.origin.address(),
                 }),
-                _ => Outcome::oki_no_change(),
+                _ => Ok(TransferDuty::NoOp),
             };
         }
 
@@ -628,7 +637,7 @@ impl NetworkMsgAnalysis {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(TransferDuty::NoOp);
         };
         let from_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
@@ -638,14 +647,14 @@ impl NetworkMsgAnalysis {
             from_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(TransferDuty::NoOp);
         }
 
         match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(ValidateSectionPayout(signed_transfer)),
                 id,
-            } => Outcome::oki(TransferDuty::ProcessCmd {
+            } => Ok(TransferDuty::ProcessCmd {
                 cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
@@ -653,12 +662,12 @@ impl NetworkMsgAnalysis {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(RegisterSectionPayout(debit_agreement)),
                 id,
-            } => Outcome::oki(TransferDuty::ProcessCmd {
+            } => Ok(TransferDuty::ProcessCmd {
                 cmd: TransferCmd::RegisterSectionPayout(debit_agreement.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
-            _ => Ok(None),
+            _ => Ok(TransferDuty::NoOp),
         }
     }
 

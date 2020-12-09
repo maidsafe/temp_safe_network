@@ -11,7 +11,7 @@ use crate::node::{
     duty_cfg::DutyConfig,
     node_ops::{ElderDuty, NodeOperation},
 };
-use crate::{Error, Network, Outcome, TernaryResult};
+use crate::{Error, Network, Result};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
@@ -35,7 +35,7 @@ impl NetworkEvents {
         &mut self,
         event: RoutingEvent,
         network: &Network,
-    ) -> Outcome<NodeOperation> {
+    ) -> Result<NodeOperation> {
         use ElderDuty::*;
 
         trace!("Processing Routing Event: {:?}", event);
@@ -46,13 +46,11 @@ impl NetworkEvents {
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
-                Outcome::oki(
-                    ProcessLostMember {
-                        name: XorName(name.0),
-                        age,
-                    }
-                    .into(),
-                )
+                Ok(ProcessLostMember {
+                    name: XorName(name.0),
+                    age,
+                }
+                .into())
             }
             RoutingEvent::MemberJoined {
                 name,
@@ -62,20 +60,18 @@ impl NetworkEvents {
             } => {
                 if startup_relocation {
                     trace!("New node has joined the network");
-                    Outcome::oki(ProcessNewMember(XorName(name.0)).into())
+                    Ok(ProcessNewMember(XorName(name.0)).into())
                 } else if let Some(prev_name) = previous_name {
                     trace!("New member has joined the section");
-                    Outcome::oki(
-                        ProcessRelocatedMember {
-                            old_node_id: XorName(prev_name.0),
-                            new_node_id: XorName(name.0),
-                            age,
-                        }
-                        .into(),
-                    )
+                    Ok(ProcessRelocatedMember {
+                        old_node_id: XorName(prev_name.0),
+                        new_node_id: XorName(name.0),
+                        age,
+                    }
+                    .into())
                 } else {
                     trace!("Invalid member config");
-                    Outcome::error(Error::Logic("Invalid member config".to_string()))
+                    Err(Error::Logic("Invalid member config".to_string()))
                 }
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
@@ -91,14 +87,12 @@ impl NetworkEvents {
                 key,
                 elders,
                 prefix,
-            } => Outcome::oki(
-                ProcessElderChange {
-                    prefix,
-                    key: PublicKey::Bls(key),
-                    elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-                }
-                .into(),
-            ),
+            } => Ok(ProcessElderChange {
+                prefix,
+                key: PublicKey::Bls(key),
+                elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+            }
+            .into()),
             RoutingEvent::Relocated { .. } => {
                 // Check our current status
                 let age = network.age().await;
@@ -108,7 +102,7 @@ impl NetworkEvents {
                     self.duty_cfg.setup_as_adult()
                 } else {
                     info!("Our AGE: {:?}", age);
-                    Outcome::oki_no_change()
+                    Ok(NodeOperation::NoOp)
                 }
             }
             RoutingEvent::Demoted => {
@@ -120,15 +114,15 @@ impl NetworkEvents {
                 } else {
                     info!("We are not Adult, do nothing");
                     info!("Our Age: {:?}", age);
-                    Outcome::oki_no_change()
+                    Ok(NodeOperation::NoOp)
                 }
             }
             // Ignore all other events
-            _ => Outcome::oki_no_change(),
+            _ => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn evaluate_msg(&mut self, content: Bytes) -> Outcome<NodeOperation> {
+    async fn evaluate_msg(&mut self, content: Bytes) -> Result<NodeOperation> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => {
                 warn!("Message Envelope received. Contents: {:?}", &msg);
@@ -139,7 +133,7 @@ impl NetworkEvents {
                     "Error deserializing received network message into MsgEnvelope type: {:?}",
                     e
                 );
-                Outcome::error(Error::Logic(format!(
+                Err(Error::Logic(format!(
                     "Error deserializing network msg into MsgEnvelope: {:?}",
                     e
                 )))

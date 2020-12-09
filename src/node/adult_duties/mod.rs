@@ -11,9 +11,9 @@ mod chunks;
 use self::chunks::{Chunks, UsedSpace};
 use crate::node::msg_wrapping::AdultMsgWrapping;
 use crate::{
-    node::node_ops::{AdultDuty, ChunkDuty, NodeOperation},
+    node::node_ops::{AdultDuty, Blah, ChunkDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Outcome, Result, TernaryResult,
+    Result,
 };
 use log::{error, info};
 use sn_data_types::{
@@ -38,12 +38,13 @@ impl AdultDuties {
         })
     }
 
-    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Outcome<NodeOperation> {
+    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
         let result = match duty {
             RunAsChunks(chunk_duty) => match chunk_duty {
                 ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
+                ChunkDuty::NoOp => return Ok(NodeOperation::NoOp),
             },
             RequestForChunk {
                 section_authority,
@@ -93,11 +94,12 @@ impl AdultDuties {
                     Err(e) => {
                         // TODO: Penalise adult for this behaviour
                         error!("Chunk doesn't exist at current holder for Duplication. But it should. Check Logic");
-                        Outcome::error(e)
+                        Err(e)
                     }
                 }
             }
             StoreDuplicatedBlob { blob } => self.chunks.store_duplicated_chunk(blob).await,
+            AdultDuty::NoOp => return Ok(NodeOperation::NoOp),
         };
 
         result.convert()

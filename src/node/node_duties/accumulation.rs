@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Error, Outcome, TernaryResult};
+use crate::{utils, Error, Result};
 use log::{error, info};
 use sn_data_types::{
     Duty, MessageId, MsgEnvelope, MsgSender, SignatureShare, TransientSectionKey as SectionKey,
@@ -32,20 +32,23 @@ impl Accumulation {
         }
     }
 
-    pub(crate) fn process_message_envelope(&mut self, msg: &MsgEnvelope) -> Outcome<MsgEnvelope> {
+    pub(crate) fn process_message_envelope(
+        &mut self,
+        msg: &MsgEnvelope,
+    ) -> Result<Option<MsgEnvelope>> {
         if self.completed.contains(&msg.id()) {
             info!("Message already processed.");
-            return Outcome::oki_no_change();
+            return Ok(None);
         }
         if msg.most_recent_sender().is_section() {
             info!("Received message sent by a Section. No need to accumulate");
-            return Outcome::oki(msg.clone()); // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
+            return Ok(Some(msg.clone())); // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
         }
 
         let sender = msg.most_recent_sender();
         if !sender.is_elder() {
             error!("Only Elder messages are accumulated!");
-            return Outcome::error(Error::Logic(
+            return Err(Error::Logic(
                 "Only Elder messages are accumulated".to_string(),
             ));
         }
@@ -53,7 +56,7 @@ impl Accumulation {
             Some(sig_share) => sig_share,
             None => {
                 error!("No sig share found!");
-                return Outcome::error(Error::Logic("Signature Share not found".to_string()));
+                return Err(Error::Logic("Signature Share not found".to_string()));
             }
         };
 
@@ -75,20 +78,20 @@ impl Accumulation {
         self.try_aggregate(msg)
     }
 
-    fn try_aggregate(&mut self, msg: &MsgEnvelope) -> Outcome<MsgEnvelope> {
+    fn try_aggregate(&mut self, msg: &MsgEnvelope) -> Result<Option<MsgEnvelope>> {
         let msg_id = msg.id();
         let signatures = match self.messages.get(&msg_id) {
             Some((_, _, signatures)) => signatures,
             None => {
                 error!("No such message id! ({:?})", msg_id);
-                return Outcome::error(Error::Logic(format!("No such message id {:?}", msg_id)));
+                return Err(Error::Logic(format!("No such message id {:?}", msg_id)));
             }
         };
 
         let sender = msg.most_recent_sender();
         if !sender.is_elder() {
             error!("Only Elder messages are accumulated!");
-            return Outcome::error(Error::Logic(
+            return Err(Error::Logic(
                 "Only Elder messages are accumulated".to_string(),
             ));
         }
@@ -96,7 +99,7 @@ impl Accumulation {
             Some(public_key_set) => public_key_set,
             None => {
                 error!("No public_key_set found!");
-                return Outcome::error(Error::Logic("No PK set found".to_string()));
+                return Err(Error::Logic("No PK set found".to_string()));
             }
         };
 
@@ -106,13 +109,13 @@ impl Accumulation {
             public_key_set.threshold() + 1
         );
         if public_key_set.threshold() >= signatures.len() {
-            return Outcome::oki_no_change();
+            return Ok(None);
         }
         let (msg, _sender, signatures) = match self.messages.remove(&msg_id) {
             Some((msg, _sender, signatures)) => (msg, _sender, signatures),
             None => {
                 error!("No such message id! ({:?})", msg_id);
-                return Outcome::error(Error::Logic(format!(
+                return Err(Error::Logic(format!(
                     "No such message id while aggregating {:?}",
                     msg_id
                 )));
@@ -129,7 +132,7 @@ impl Accumulation {
                 // remove the faulty sig, then insert
                 // the rest back into messages.
                 // One bad egg can't be allowed to ruin it all.
-                return Outcome::error(Error::Logic(
+                return Err(Error::Logic(
                     "Invalid Signature Share while accumulation".to_string(),
                 ));
             }
@@ -150,7 +153,7 @@ impl Accumulation {
                 let mut msg = msg;
                 let _ = msg.proxies.pop();
                 msg.add_proxy(sender);
-                Outcome::oki(msg)
+                Ok(Some(msg))
             } else {
                 error!("Only Elder messages are accumulated!");
                 unreachable!() // this condition is tested further up in this method..
@@ -163,7 +166,7 @@ impl Accumulation {
         // part of the purpose; to see the path.
         } else {
             error!("Accumulated signature is invalid");
-            Outcome::error(Error::Logic("Accumulated Signature is invalid".to_string()))
+            Err(Error::Logic("Accumulated Signature is invalid".to_string()))
         }
     }
 }

@@ -19,9 +19,8 @@ use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, ReplicaInfo, Result,
+    Error, Network, ReplicaInfo, Result,
 };
-use crate::{Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::trace;
 use sn_routing::Prefix;
@@ -59,20 +58,20 @@ impl KeySection {
     }
 
     /// Initiates as first node in a network.
-    pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
+    pub async fn init_first(&mut self) -> Result<NodeOperation> {
         self.transfers.init_first().await
     }
 
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn catchup_with_section(&mut self) -> Outcome<NodeOperation> {
+    pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
         // currently only at2 replicas need to catch up
         self.transfers.catchup_with_replicas().await
     }
 
     // Update our replica with the latest keys
-    pub async fn elders_changed(&mut self) -> Outcome<NodeOperation> {
+    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
         let secret_key_share = self.routing.secret_key_share().await?;
         let id = secret_key_share.public_key_share();
         let key_index = self.routing.our_index().await?;
@@ -87,22 +86,23 @@ impl KeySection {
             signing: Arc::new(Mutex::new(signing)),
             initiating: false,
         };
-        self.transfers.update_replica_keys(info).convert()
+        self.transfers.update_replica_keys(info).map(|c| c.into())
     }
 
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of their data.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
+    pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
         self.transfers.section_split(prefix).await
     }
 
-    pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Outcome<NodeOperation> {
+    pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg).await,
             RunAsGateway(duty) => self.gateway.process_as_gateway(duty).await,
             RunAsTransfers(duty) => self.transfers.process_transfer_duty(&duty).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 

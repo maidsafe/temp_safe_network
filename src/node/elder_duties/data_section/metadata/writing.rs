@@ -10,8 +10,8 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
-use crate::{Outcome, TernaryResult};
+use crate::node::node_ops::{Blah, NodeMessagingDuty, NodeOperation};
+use crate::{Error, Result};
 use log::info;
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
@@ -21,7 +21,7 @@ use sn_data_types::{
 pub(super) async fn get_result(
     msg: MsgEnvelope,
     stores: &mut ElderStores,
-) -> Outcome<NodeOperation> {
+) -> Result<NodeOperation> {
     use DataCmd::*;
     let msg_id = msg.id();
     let msg_origin = msg.origin;
@@ -72,7 +72,7 @@ async fn blob(
     origin: MsgSender,
     payment: TransferAgreementProof,
     proxies: Vec<MsgSender>,
-) -> Outcome<NodeMessagingDuty> {
+) -> Result<NodeMessagingDuty> {
     register
         .write(write, msg_id, origin, payment, proxies)
         .await
@@ -83,7 +83,7 @@ async fn map(
     storage: &mut MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Outcome<NodeMessagingDuty> {
+) -> Result<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin).await
 }
 
@@ -92,7 +92,7 @@ async fn sequence(
     storage: &mut SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Outcome<NodeMessagingDuty> {
+) -> Result<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin).await
 }
 
@@ -101,6 +101,6 @@ async fn account(
     storage: &mut AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Outcome<NodeMessagingDuty> {
+) -> Result<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin).await
 }

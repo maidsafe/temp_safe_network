@@ -8,8 +8,7 @@
 
 pub use crate::chunk_store::UsedSpace;
 use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
-use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
-use crate::{Outcome, TernaryResult};
+use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Error, Result};
 use log::{error, info};
 use sn_data_types::{
     AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
@@ -35,14 +34,14 @@ impl ChunkStorage {
         data: &Blob,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data, origin).await {
             return self
                 .wrapping
                 .error(CmdError::Data(error), msg_id, &origin.address())
                 .await;
         }
-        Outcome::oki_no_value()
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     #[allow(unused)]
@@ -52,7 +51,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: &MsgSender,
         accumulated_signature: &Signature,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         let message = match self.try_store(data, origin).await {
             Ok(()) => Message::NodeEvent {
                 event: NodeEvent::DuplicationComplete {
@@ -109,7 +108,7 @@ impl ChunkStorage {
         address: &BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         let result = self
             .chunks
             .get(address)
@@ -133,33 +132,30 @@ impl ChunkStorage {
             .map_err(|error| error.to_string().into())
     }
 
-    pub async fn store_for_duplication(&mut self, blob: Blob) -> Outcome<NodeMessagingDuty> {
+    pub async fn store_for_duplication(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
         if self.chunks.has(blob.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
                 blob.address()
             );
-            return Outcome::oki_no_change();
+            return Ok(NodeMessagingDuty::NoOp);
         }
 
-        if let Err(e) = self
+        let _ = self
             .chunks
             .put(&blob)
             .await
-            .map_err(|error| error.to_string().into())
-        {
-            Outcome::error(e)
-        } else {
-            Outcome::oki_no_change()
-        }
+            .map_err(|error| Error::ChunkStore(error))?;
+
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     // pub(crate) fn get_for_duplciation(
     //     &self,
     //     address: BlobAddress,
     //     msg: &MsgEnvelope,
-    // ) -> Outcome<NodeMessagingDuty> {
+    // ) -> Result<NodeMessagingDuty> {
 
     //     match self.chunks.get(&address) {
 
@@ -183,10 +179,10 @@ impl ChunkStorage {
         address: BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
-            return Outcome::oki_no_change();
+            return Ok(NodeMessagingDuty::NoOp);
         }
 
         let result = match self.chunks.get(&address) {
@@ -217,7 +213,7 @@ impl ChunkStorage {
                 .error(CmdError::Data(error), msg_id, &origin.address())
                 .await;
         }
-        Outcome::oki_no_value()
+        Ok(NodeMessagingDuty::NoOp)
     }
 }
 

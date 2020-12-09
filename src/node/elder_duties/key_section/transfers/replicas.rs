@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::store::TransferStore;
-use crate::{utils::Init, Error, Outcome, ReplicaInfo, Result, TernaryResult};
+use crate::{utils::Init, Error, ReplicaInfo, Result};
 use bls::PublicKeySet;
 use futures::lock::Mutex;
 use sn_data_types::{
@@ -52,7 +52,7 @@ impl Replicas {
     /// -----------------------------------------------------------------
 
     /// All keys' histories
-    pub async fn all_events(&self) -> Outcome<Vec<ReplicaEvent>> {
+    pub async fn all_events(&self) -> Result<Vec<ReplicaEvent>> {
         let events = self
             .locks
             .keys()
@@ -60,26 +60,26 @@ impl Replicas {
             .map(|store| store.get_all())
             .flatten()
             .collect();
-        Outcome::oki(events)
+        Ok(events)
     }
 
     /// History of events
-    pub async fn history(&self, id: PublicKey) -> Outcome<Vec<ReplicaEvent>> {
+    pub async fn history(&self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
         let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
             Ok(store) => store,
             Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
         };
-        Outcome::oki(store.get_all())
+        Ok(store.get_all())
     }
 
     ///
-    pub async fn balance(&self, id: PublicKey) -> Outcome<Money> {
+    pub async fn balance(&self, id: PublicKey) -> Result<Money> {
         let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
             Ok(store) => store,
             Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
         };
         let wallet = self.load_wallet(&store, id).await?;
-        Outcome::oki(wallet.balance())
+        Ok(wallet.balance())
     }
 
     /// Get the replica's PK set
@@ -97,7 +97,7 @@ impl Replicas {
         &self,
         credit_proof: &CreditAgreementProof,
         past_key: F,
-    ) -> Outcome<()> {
+    ) -> Result<()> {
         let id = credit_proof.recipient();
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
@@ -105,29 +105,26 @@ impl Replicas {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
-        if wallet.genesis(credit_proof, past_key).is_ok() {
-            // sign + update state
-            if let Some(crediting_replica_sig) = self
-                .info
-                .signing
-                .lock()
-                .await
-                .sign_credit_proof(credit_proof)?
-            {
-                // Q: are we locked on `info.signing` here? (we don't want to be)
-                store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
-                    credit_proof: credit_proof.clone(),
-                    crediting_replica_sig,
-                    crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
-                }))?;
-                return Ok(None);
-            }
-            return Ok(None);
+        let _ = wallet.genesis(credit_proof, past_key)?;
+        // sign + update state
+        if let Some(crediting_replica_sig) = self
+            .info
+            .signing
+            .lock()
+            .await
+            .sign_credit_proof(credit_proof)?
+        {
+            // Q: are we locked on `info.signing` here? (we don't want to be)
+            store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
+                credit_proof: credit_proof.clone(),
+                crediting_replica_sig,
+                crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
+            }))?;
         }
-        Err(Error::InvalidMessage)
+        return Ok(());
     }
 
-    pub async fn initiate(&self, events: &[ReplicaEvent]) -> Outcome<()> {
+    pub async fn initiate(&self, events: &[ReplicaEvent]) -> Result<()> {
         use ReplicaEvent::*;
         if events.is_empty() {
             //info!("Events are empty. Initiating Genesis replica.");
@@ -155,7 +152,7 @@ impl Replicas {
             // Access to the specific wallet is now serialised!
             store.try_insert(e.to_owned())?;
         }
-        Outcome::oki_no_value()
+        Ok(())
     }
 
     ///
@@ -178,7 +175,7 @@ impl Replicas {
     }
 
     /// For now, with test money there is no from wallet.., money is created from thin air.
-    pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Outcome<()> {
+    pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Result<()> {
         let id = signed_transfer.sender();
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
@@ -186,34 +183,28 @@ impl Replicas {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
-        match wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit) {
-            Ok(None) => (),
-            Err(e) => return Err(Error::NetworkData(e)),
-            Ok(Some(())) => {
-                // sign + update state
-                if let Some((replica_debit_sig, replica_credit_sig)) = self
-                    .info
-                    .signing
-                    .lock()
-                    .await
-                    .sign_transfer(&signed_transfer)?
-                {
-                    store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
-                        signed_credit: signed_transfer.credit,
-                        signed_debit: signed_transfer.debit,
-                        replica_debit_sig,
-                        replica_credit_sig,
-                        replicas: self.info.peer_replicas.clone(),
-                    }))?;
-                    return Ok(None);
-                }
-            }
-        };
-        Ok(None)
+        let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
+        // sign + update state
+        if let Some((replica_debit_sig, replica_credit_sig)) = self
+            .info
+            .signing
+            .lock()
+            .await
+            .sign_transfer(&signed_transfer)?
+        {
+            store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
+                signed_credit: signed_transfer.credit,
+                signed_debit: signed_transfer.debit,
+                replica_debit_sig,
+                replica_credit_sig,
+                replicas: self.info.peer_replicas.clone(),
+            }))?;
+        }
+        Ok(())
     }
 
     /// Step 1. Main business logic validation of a debit.
-    pub async fn validate(&self, signed_transfer: SignedTransfer) -> Outcome<TransferValidated> {
+    pub async fn validate(&self, signed_transfer: SignedTransfer) -> Result<TransferValidated> {
         let id = signed_transfer.sender();
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
@@ -221,39 +212,35 @@ impl Replicas {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
-        match wallet.validate(&signed_transfer.debit, &signed_transfer.credit) {
-            Ok(None) => (),
-            Err(e) => return Err(Error::NetworkData(e)),
-            Ok(Some(())) => {
-                // signing will be serialised
-                if let Some((replica_debit_sig, replica_credit_sig)) = self
-                    .info
-                    .signing
-                    .lock()
-                    .await
-                    .sign_transfer(&signed_transfer)?
-                {
-                    // release lock and update state
-                    let event = TransferValidated {
-                        signed_credit: signed_transfer.credit,
-                        signed_debit: signed_transfer.debit,
-                        replica_debit_sig,
-                        replica_credit_sig,
-                        replicas: self.info.peer_replicas.clone(),
-                    };
-                    store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
-                    return Outcome::oki(event);
-                }
-            }
-        };
-        Ok(None)
+        let _ = wallet.validate(&signed_transfer.debit, &signed_transfer.credit)?;
+        // signing will be serialised
+        if let Some((replica_debit_sig, replica_credit_sig)) = self
+            .info
+            .signing
+            .lock()
+            .await
+            .sign_transfer(&signed_transfer)?
+        {
+            // release lock and update state
+            let event = TransferValidated {
+                signed_credit: signed_transfer.credit,
+                signed_debit: signed_transfer.debit,
+                replica_debit_sig,
+                replica_credit_sig,
+                replicas: self.info.peer_replicas.clone(),
+            };
+            store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
+            Ok(event)
+        } else {
+            Err(Error::InvalidMessage)
+        }
     }
 
     /// Step 2. Validation of agreement, and order at debit source.
     pub async fn register(
         &self,
         transfer_proof: &TransferAgreementProof,
-    ) -> Outcome<TransferRegistered> {
+    ) -> Result<TransferRegistered> {
         let id = transfer_proof.sender();
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
@@ -263,15 +250,14 @@ impl Replicas {
         let wallet = self.load_wallet(&store, id).await?;
         match wallet.register(transfer_proof, || {
             self.find_past_key(&transfer_proof.replica_keys())
-        }) {
-            Ok(None) => (),
-            Err(e) => return Err(Error::NetworkData(e)),
-            Ok(Some(event)) => {
+        })? {
+            None => (),
+            Some(event) => {
                 store.try_insert(ReplicaEvent::TransferRegistered(event.clone()))?;
-                return Outcome::oki(event);
+                return Ok(event);
             }
         };
-        Ok(None)
+        Err(Error::InvalidMessage)
     }
 
     /// Step 3. Validation of DebitAgreementProof, and credit idempotency at credit destination.
@@ -279,7 +265,7 @@ impl Replicas {
     pub async fn receive_propagated(
         &self,
         credit_proof: &CreditAgreementProof,
-    ) -> Outcome<TransferPropagated> {
+    ) -> Result<TransferPropagated> {
         // Acquire lock of the wallet.
         let id = credit_proof.recipient();
         let key_lock = self.load_key_lock(id).await?;
@@ -307,7 +293,7 @@ impl Replicas {
                     crediting_replica_sig,
                 };
                 store.try_insert(ReplicaEvent::TransferPropagated(event.clone()))?;
-                return Outcome::oki(event);
+                return Ok(event);
             }
         }
         Err(Error::InvalidMessage)
@@ -346,7 +332,7 @@ impl Replicas {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn credit_without_proof(&self, transfer: Transfer) -> Outcome<NodeMessagingDuty> {
+    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeMessagingDuty> {
         trace!("Performing credit without proof");
         let debit = transfer.debit();
         let credit = transfer.credit()?;
@@ -388,11 +374,11 @@ impl Replicas {
                 share: dummy_sig,
             },
         }))?;
-        Ok(None)
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn debit_without_proof(&self, transfer: Transfer) -> Outcome<()> {
+    pub async fn debit_without_proof(&self, transfer: Transfer) -> Result<()> {
         // Acquire lock of the wallet.
         let debit = transfer.debit();
         let id = debit.sender();
@@ -402,6 +388,6 @@ impl Replicas {
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, id).await?;
         wallet.debit_without_proof(debit)?;
-        Ok(None)
+        Ok(())
     }
 }

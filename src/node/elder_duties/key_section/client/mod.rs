@@ -18,9 +18,8 @@ use self::{
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, Result,
+    Error, Network, Result,
 };
-use crate::{Error, Outcome, TernaryResult};
 use log::{error, info, trace, warn};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -48,35 +47,34 @@ impl ClientGateway {
         Ok(gateway)
     }
 
-    pub async fn process_as_gateway(&self, cmd: GatewayDuty) -> Outcome<NodeOperation> {
+    pub async fn process_as_gateway(&self, cmd: GatewayDuty) -> Result<NodeOperation> {
         trace!("Processing as gateway");
         use GatewayDuty::*;
         match cmd {
             FindClientFor(msg) => self.try_find_client(&msg).await,
             ProcessClientEvent(event) => self.process_client_event(event).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn try_find_client(&self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+    async fn try_find_client(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         trace!("trying to find client...");
         if let Address::Client(xorname) = &msg.destination()? {
             if self.routing.matches_our_prefix(*xorname).await {
                 trace!("Message matches gateway prefix");
                 let _ = self.client_msg_handling.match_outgoing(msg).await;
-                return Ok(None);
+                return Ok(NodeOperation::NoOp);
             }
         }
-        Outcome::oki(
-            NodeMessagingDuty::SendToSection {
-                msg: msg.clone(),
-                as_node: true,
-            }
-            .into(),
-        )
+        Ok(NodeMessagingDuty::SendToSection {
+            msg: msg.clone(),
+            as_node: true,
+        }
+        .into())
     }
 
     /// This is where client input is parsed.
-    async fn process_client_event(&self, event: RoutingEvent) -> Outcome<NodeOperation> {
+    async fn process_client_event(&self, event: RoutingEvent) -> Result<NodeOperation> {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived {
@@ -88,15 +86,15 @@ impl ClientGateway {
                     info!("Deserialized client msg from {}", public_key);
                     trace!("Deserialized client msg is {:?}", msg.message);
                     if !validate_client_sig(&msg) {
-                        return Outcome::error(Error::NetworkData(NdError::InvalidSignature));
+                        return Err(Error::NetworkData(NdError::InvalidSignature));
                     }
                     match self
                         .client_msg_handling
                         .track_incoming(&msg.message, src, send)
                         .await
                     {
-                        Ok(()) => Outcome::oki(KeySectionDuty::EvaluateClientMsg(msg).into()),
-                        Err(e) => Outcome::error(e),
+                        Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(msg).into()),
+                        Err(e) => Err(e),
                     }
                 } else {
                     match try_deserialize_handshake(&content, src) {
@@ -107,15 +105,15 @@ impl ClientGateway {
                                 .client_msg_handling
                                 .process_handshake(hs, src, send, &mut rng)
                                 .await;
-                            Ok(None)
+                            Ok(NodeOperation::NoOp)
                         }
-                        Err(e) => Outcome::error(e),
+                        Err(e) => Err(e),
                     }
                 }
             }
             other => {
                 error!("NOT SUPPORTED YET: {:?}", other);
-                Outcome::error(Error::Logic(
+                Err(Error::Logic(
                     "Event not supported in Client event processing".to_string(),
                 ))
             }

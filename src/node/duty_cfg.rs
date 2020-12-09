@@ -9,7 +9,7 @@
 use crate::node::state_db::AgeGroup;
 use crate::{
     node::node_ops::{NodeDuty, NodeOperation, RewardDuty},
-    Network, Outcome, TernaryResult,
+    Error, Network, Result,
 };
 use sn_data_types::PublicKey;
 
@@ -45,22 +45,22 @@ impl DutyConfig {
 
     /// When first node in network.
     #[allow(dead_code)]
-    pub async fn setup_as_first(&self) -> Outcome<NodeOperation> {
-        Outcome::oki_no_change()
+    pub async fn setup_as_first(&self) -> Result<NodeOperation> {
+        Ok(NodeOperation::NoOp)
     }
 
     /// When becoming Adult.
-    pub fn setup_as_adult(&mut self) -> Outcome<NodeOperation> {
+    pub fn setup_as_adult(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Adult;
         // 1. Becomde Adult.
         let first: NodeOperation = NodeDuty::BecomeAdult.into();
         // 2. Register wallet at Elders.
         let second = NodeDuty::RegisterWallet(self.reward_key).into();
-        Outcome::oki(vec![first, second].into())
+        Ok(vec![first, second].into())
     }
 
     /// When becoming Elder.
-    pub async fn setup_as_elder(&mut self) -> Outcome<NodeOperation> {
+    pub async fn setup_as_elder(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Elder;
         // 1. Become Elder.
         let first: NodeOperation = NodeDuty::BecomeElder.into();
@@ -73,6 +73,6 @@ impl DutyConfig {
             wallet_id: self.reward_key,
         }
         .into();
-        Outcome::oki(vec![first, second, third].into())
+        Ok(vec![first, second, third].into())
     }
 }

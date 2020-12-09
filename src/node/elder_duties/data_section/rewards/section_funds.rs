@@ -11,10 +11,10 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation},
 };
-use crate::{Error, Outcome, TernaryResult};
+use crate::{Error, Result};
 use sn_data_types::{
     CreditAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey,
-    ReplicaEvent, Result, SignedTransfer, TransferValidated,
+    ReplicaEvent, Result as NdResult, SignedTransfer, TransferValidated,
 };
 use xor_name::XorName;
 
@@ -63,16 +63,17 @@ impl SectionFunds {
     }
 
     /// Replica events get synched to section actor instances.
-    pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Outcome<NodeMessagingDuty> {
+    pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Result<NodeMessagingDuty> {
         debug!("Synching replica events to section transfer actor...");
-        match self.actor.synch_events(events) {
-            Ok(_) => Ok(None),
-            Err(e) => Outcome::error(Error::NetworkData(e)), // temp, will be removed with the other panics here shortly
-        }
+        let _ = self
+            .actor
+            .synch_events(events)
+            .map_err(|e| Error::NetworkData(e))?;
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     /// At Elder churn, we must transition to a new account.
-    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Outcome<NodeMessagingDuty> {
+    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeMessagingDuty> {
         debug!("Transitioning section transfer actor...");
         if self.is_transitioning() {
             debug!("is_transitioning");
@@ -81,7 +82,7 @@ impl SectionFunds {
             // one transition at a time.
             // (We could enqueue actors, and when starting transition skip
             // all but the last one, but that is also prone to edge case problems..)
-            return Outcome::error(Error::Logic("Undergoing transition already".to_string()));
+            return Err(Error::Logic("Undergoing transition already".to_string()));
         }
 
         let new_id = to.id();
@@ -89,7 +90,7 @@ impl SectionFunds {
         // When we have a payout in flight, we defer the transition.
         if self.has_payout_in_flight() {
             debug!("has_payout_in_flight");
-            return Outcome::error(Error::Logic("Has payout in flight".to_string()));
+            return Err(Error::Logic("Has payout in flight".to_string()));
         }
 
         // Get all the money of current actor.
@@ -101,11 +102,11 @@ impl SectionFunds {
             return match self.state.next_actor.take() {
                 Some(actor) => {
                     self.actor = actor;
-                    Ok(None)
+                    Ok(NodeMessagingDuty::NoOp)
                 }
                 None => {
                     error!("Tried to take next actor while non existed!");
-                    Outcome::error(Error::Logic(
+                    Err(Error::Logic(
                         "Tried to take next actor while non existed".to_string(),
                     ))
                 }
@@ -120,53 +121,38 @@ impl SectionFunds {
             amount,
             new_id,
             format!("Section Actor transition to id: {}", new_id),
-        ) {
-            Ok(Some(event)) => {
-                match self.apply(TransferInitiated(event.clone())) {
-                    Err(e) => {
-                        // This would be a bug!
-                        // send some error, log, crash .. or something
-                        error!("Applying TransferInitiated during transition failed!");
-                        Outcome::error(Error::NetworkData(e))
-                    }
-                    Ok(_) => {
-                        debug!(
-                            "Section actor transition transfer is being requested of the replicas.."
-                        );
-                        // We ask of our Replicas to validate this transfer.
-                        self.wrapping
-                            .send_to_section(
-                                Message::NodeCmd {
-                                    cmd: Transfers(ValidateSectionPayout(SignedTransfer {
-                                        debit: event.signed_debit,
-                                        credit: event.signed_credit,
-                                    })),
-                                    id: MessageId::new(),
-                                },
-                                true,
-                            )
-                            .await
-                    }
-                }
+        )? {
+            None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
+            Some(event) => {
+                let _ = self.apply(TransferInitiated(event.clone()))?;
+                debug!("Section actor transition transfer is being requested of the replicas..");
+                // We ask of our Replicas to validate this transfer.
+                self.wrapping
+                    .send_to_section(
+                        Message::NodeCmd {
+                            cmd: Transfers(ValidateSectionPayout(SignedTransfer {
+                                debit: event.signed_debit,
+                                credit: event.signed_credit,
+                            })),
+                            id: MessageId::new(),
+                        },
+                        true,
+                    )
+                    .await
             }
-            Ok(None) => Outcome::oki_no_change(), // Would indicate that this apparently has already been done, so no change.
-            Err(e) => {
-                error!("Error at creating transfer during transition");
-                Outcome::error(Error::NetworkData(e))
-            } // This would be a bug! Cannot move on from here, some solution needed.
         }
     }
 
     /// Will validate and sign the payout, and ask of the replicas to
     /// do the same, and await their responses as to accumulate the result.
-    pub async fn initiate_reward_payout(&mut self, payout: Payout) -> Outcome<NodeMessagingDuty> {
+    pub async fn initiate_reward_payout(&mut self, payout: Payout) -> Result<NodeMessagingDuty> {
         if self.state.finished.contains(&payout.node_id) {
-            return Outcome::oki_no_change();
+            return Ok(NodeMessagingDuty::NoOp);
         }
         // if we are transitioning, or having payout in flight, the payout is deferred.
         if self.is_transitioning() || self.has_payout_in_flight() {
             self.state.queued_payouts.push_back(payout);
-            return Outcome::oki_no_change();
+            return Ok(NodeMessagingDuty::NoOp);
         }
 
         use NodeCmd::*;
@@ -176,134 +162,107 @@ impl SectionFunds {
             payout.amount,
             payout.to,
             format!("Reward for node id: {}", payout.node_id),
-        ) {
-            Ok(Some(event)) => {
-                match self.apply(TransferInitiated(event.clone())) {
-                    Err(e) => {
-                        // This would be a bug!
-                        error!("Error at applying transfer initiation at reward payout!");
-                        Outcome::error(Error::NetworkData(e))
-                    }
-                    Ok(_) => {
-                        // We now have a payout in flight.
-                        self.state.payout_in_flight = Some(payout);
-                        // We ask of our Replicas to validate this transfer.
-                        self.wrapping
-                            .send_to_section(
-                                Message::NodeCmd {
-                                    cmd: Transfers(ValidateSectionPayout(SignedTransfer {
-                                        debit: event.signed_debit,
-                                        credit: event.signed_credit,
-                                    })),
-                                    id: MessageId::new(),
-                                },
-                                true,
-                            )
-                            .await
-                    }
-                }
+        )? {
+            None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
+            Some(event) => {
+                let _ = self.apply(TransferInitiated(event.clone()))?;
+                // We now have a payout in flight.
+                self.state.payout_in_flight = Some(payout);
+                // We ask of our Replicas to validate this transfer.
+                self.wrapping
+                    .send_to_section(
+                        Message::NodeCmd {
+                            cmd: Transfers(ValidateSectionPayout(SignedTransfer {
+                                debit: event.signed_debit,
+                                credit: event.signed_credit,
+                            })),
+                            id: MessageId::new(),
+                        },
+                        true,
+                    )
+                    .await
             }
-            Ok(None) => Outcome::oki_no_change(), // Would indicate that this apparently has already been done, so no change.
-            Err(e) => Outcome::error(Error::NetworkData(e)), // for now, but should give NodeCmdError
         }
     }
 
     /// As all Replicas have accumulated the distributed
     /// actor cmds and applied them, they'll send out the
     /// result, which each actor instance accumulates locally.
-    pub async fn receive(&mut self, validation: TransferValidated) -> Outcome<NodeOperation> {
+    pub async fn receive(&mut self, validation: TransferValidated) -> Result<NodeOperation> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
-        match self.actor.receive(validation) {
-            Ok(Some(event)) => {
-                match self.apply(TransferValidationReceived(event.clone())) {
-                    Err(e) => {
-                        // This would be a bug!
-                        error!("Error at creating transfer during transition");
-                        Outcome::error(Error::NetworkData(e))
-                    }
-                    Ok(_) => {
-                        let proof = if let Some(proof) = event.proof {
-                            proof
-                        } else {
-                            return Ok(None);
-                        };
-                        // If we have an accumulated proof, we'll update local state.
-                        match self.actor.register(proof.clone()) {
-                            Ok(None) => (),
-                            Ok(Some(event)) => self.apply(TransferRegistrationSent(event))?,
-                            Err(e) => return Outcome::error(Error::NetworkData(e)), // for now, but should give NodeCmdError
-                        };
+        if let Some(event) = self.actor.receive(validation)? {
+            let _ = self.apply(TransferValidationReceived(event.clone()))?;
+            // If we have an accumulated proof, we'll continue with registering the proof.
+            let proof = if let Some(proof) = event.proof {
+                proof
+            } else {
+                return Ok(NodeOperation::NoOp);
+            };
 
-                        // The payout flow is completed,
-                        // thus we have no payout in flight;
-                        if let Some(payout) = self.state.payout_in_flight.take() {
-                            let _ = self.state.finished.insert(payout.node_id);
-                        }
+            if let Some(event) = self.actor.register(proof.clone())? {
+                let _ = self.apply(TransferRegistrationSent(event))?;
+            };
 
-                        // If we are transitioning to a new actor,
-                        // we replace the old with the new.
-                        self.try_transition(proof.credit_proof())?;
-
-                        // If there are queued payouts,
-                        // the first in queue will be executed.
-                        let queued_op = self.try_pop_queue().await;
-
-                        // We ask of our Replicas to register this transfer.
-                        let reg_op = match self
-                            .wrapping
-                            .send_to_section(
-                                Message::NodeCmd {
-                                    cmd: Transfers(RegisterSectionPayout(proof)),
-                                    id: MessageId::new(),
-                                },
-                                true,
-                            )
-                            .await?
-                        {
-                            Some(op) => op.into(),
-                            None => {
-                                return Outcome::error(Error::Logic(
-                                    "Could not send RegisterSectionPayout to section".to_string(),
-                                ))
-                            }
-                        };
-
-                        if let Some(queued) = queued_op {
-                            // First register the transfer, then
-                            // carry out the first queued payout.
-                            return Outcome::oki(vec![reg_op, queued].into());
-                        }
-
-                        Outcome::oki(reg_op)
-                    }
-                }
+            // The payout flow is completed,
+            // thus we have no payout in flight;
+            if let Some(payout) = self.state.payout_in_flight.take() {
+                let _ = self.state.finished.insert(payout.node_id);
             }
-            Ok(None) => Outcome::oki_no_change(),
-            Err(e) => Outcome::error(Error::NetworkData(e)), // for now, but should give NodeCmdError
+
+            // If we are transitioning to a new actor,
+            // we replace the old with the new.
+            self.try_transition(proof.credit_proof())?;
+
+            // If there are queued payouts,
+            // the first in queue will be executed.
+            let queued_op = self.try_pop_queue().await?;
+
+            // We ask of our Replicas to register this transfer.
+            let reg_op = self
+                .wrapping
+                .send_to_section(
+                    Message::NodeCmd {
+                        cmd: Transfers(RegisterSectionPayout(proof)),
+                        id: MessageId::new(),
+                    },
+                    true,
+                )
+                .await?
+                .into();
+
+            // First register the transfer, then
+            // carry out the first queued payout.
+            Ok(vec![reg_op, queued_op].into())
+        } else {
+            Ok(NodeOperation::NoOp)
         }
     }
 
     // Can safely be called without overwriting any
     // payout in flight, since validations for that are made.
-    async fn try_pop_queue(&mut self) -> Option<NodeOperation> {
+    async fn try_pop_queue(&mut self) -> Result<NodeOperation> {
         if let Some(payout) = self.state.queued_payouts.pop_front() {
             // Validation logic when inititating rewards prevents enqueueing a payout that is already
             // in the finished set. Therefore, calling initiate here cannot return None because of
             // the payout already being finished.
             // For that reason it is safe to enqueue it again, if this call returns None.
             // (we will not loop on that payout)
-            if let Ok(Some(msg)) = self.initiate_reward_payout(payout.clone()).await {
-                return Some(msg.into());
-            } else if !self.state.finished.contains(&payout.node_id) {
-                // buut.. just to prevent any future changes to
-                // enable such a loop, we do the check above anyway :)
-                // (NB: We put it at the front of the queue again,
-                //  since that's where the other instances will expect it to be. (Unclear atm if this is necessary or not.))
-                self.state.queued_payouts.insert(0, payout);
+            match self.initiate_reward_payout(payout.clone()).await? {
+                NodeMessagingDuty::NoOp => {
+                    if !self.state.finished.contains(&payout.node_id) {
+                        // buut.. just to prevent any future changes to
+                        // enable such a loop, we do the check above anyway :)
+                        // (NB: We put it at the front of the queue again,
+                        //  since that's where the other instances will expect it to be. (Unclear atm if this is necessary or not.))
+                        self.state.queued_payouts.insert(0, payout);
+                    }
+                }
+                op => return Ok(op.into()),
             }
         }
-        None
+
+        Ok(NodeOperation::NoOp)
     }
 
     // If we are transitioning to a new actor, we replace the old with the new.
@@ -334,14 +293,14 @@ impl SectionFunds {
         )]) {
             Ok(Some(event)) => self.apply(TransfersSynched(event))?,
             Ok(None) => (),
-            Err(error) => return Err(error),
+            Err(error) => return Err(Error::NetworkData(error)),
         };
 
         Ok(())
     }
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
-        self.actor.apply(event)
+        self.actor.apply(event).map_err(|e| Error::NetworkData(e))
     }
 
     fn is_transition_credit(&self, credit: &CreditAgreementProof) -> bool {

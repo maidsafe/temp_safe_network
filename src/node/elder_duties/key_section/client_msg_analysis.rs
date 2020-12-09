@@ -10,7 +10,7 @@ use crate::node::node_ops::{
     MetadataDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty,
 };
 use crate::Network;
-use crate::{Error, Outcome, TernaryResult};
+use crate::{Error, Result};
 use log::{info, warn};
 use sn_data_types::{Cmd, CmdError, Message, MessageId, MsgEnvelope, Query};
 
@@ -28,52 +28,56 @@ impl ClientMsgAnalysis {
         Self { routing }
     }
 
-    pub async fn evaluate(&self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+    pub async fn evaluate(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         info!("Evaluation of client msg envelope: {:?}", msg);
 
         // Check if the msg is a New Data Write and verify owners
-        if let Message::Cmd { cmd, .. } = &msg.message {
-            if let Cmd::Data { cmd, .. } = cmd {
-                // If owner is `Some`, then the Cmd is going to be newly created Data.
-                if let Some(owner) = cmd.owner() {
-                    if owner != msg.origin.id().public_key() {
-                        return Outcome::oki(
-                            NodeMessagingDuty::SendToClient(MsgEnvelope {
-                                message: Message::CmdError {
-                                    error: CmdError::Data(sn_data_types::Error::InvalidOwners),
-                                    id: MessageId::new(),
-                                    correlation_id: msg.id(),
-                                    cmd_origin: msg.origin.address(),
-                                },
-                                origin: msg.clone().origin,
-                                proxies: vec![],
-                            })
-                            .into(),
-                        );
-                    }
+        if let Message::Cmd {
+            cmd: Cmd::Data { cmd, .. },
+            ..
+        } = &msg.message
+        {
+            // If owner is `Some`, then the Cmd is going to be newly created Data.
+            if let Some(owner) = cmd.owner() {
+                if owner != msg.origin.id().public_key() {
+                    return Ok(NodeMessagingDuty::SendToClient(MsgEnvelope {
+                        message: Message::CmdError {
+                            error: CmdError::Data(sn_data_types::Error::InvalidOwners),
+                            id: MessageId::new(),
+                            correlation_id: msg.id(),
+                            cmd_origin: msg.origin.address(),
+                        },
+                        origin: msg.clone().origin,
+                        proxies: vec![],
+                    })
+                    .into());
                 }
             }
         }
 
-        let op = if let Ok(Some(duty)) = self.try_data(msg).await {
-            duty.into()
-        } else if let Ok(Some(duty)) = self.try_data_payment(msg).await {
-            duty.into()
-        } else if let Ok(Some(duty)) = self.try_transfers(msg).await {
-            duty.into()
-        } else {
-            return Outcome::error(Error::Logic(format!(
-                "Could not evaluate Client Msg w/id {:?}",
-                msg.id()
-            )));
+        match self.try_data(msg).await? {
+            NodeOperation::NoOp => (),
+            op => return Ok(op),
         };
-        Outcome::oki(op)
+        match self.try_data_payment(msg).await? {
+            NodeOperation::NoOp => (),
+            op => return Ok(op),
+        };
+        match self.try_transfers(msg).await? {
+            NodeOperation::NoOp => (),
+            op => return Ok(op),
+        };
+
+        Err(Error::Logic(format!(
+            "Could not evaluate Client Msg w/id {:?}",
+            msg.id()
+        )))
     }
 
     /// We do not accumulate these request, they are executed
     /// at once and sent on to Metadata section. They don't accumulate either,
     /// just send back the response, for the client to accumulate.
-    async fn try_data(&self, msg: &MsgEnvelope) -> Outcome<MetadataDuty> {
+    async fn try_data(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let is_data_read = || {
             matches!(msg.message, Message::Query {
                 query: Query::Data { .. },
@@ -83,10 +87,10 @@ impl ClientMsgAnalysis {
         let shall_process = || is_data_read() && msg.origin.is_client();
 
         if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
-            return Ok(None);
+            return Ok(NodeOperation::NoOp);
         }
 
-        Outcome::oki(MetadataDuty::ProcessRead(msg.clone())) // TODO: Fix these for type safety
+        Ok(MetadataDuty::ProcessRead(msg.clone()).into()) // TODO: Fix these for type safety
     }
 
     /// We do not accumulate these request, they are executed
@@ -95,7 +99,7 @@ impl ClientMsgAnalysis {
     /// The reason for this is that the payment request is already signed
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
-    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {
+    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let is_data_write = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -106,17 +110,18 @@ impl ClientMsgAnalysis {
         let shall_process = || is_data_write() && msg.origin.is_client();
 
         if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
-            return Ok(None);
+            return Ok(NodeOperation::NoOp);
         }
 
-        Outcome::oki(TransferDuty::ProcessCmd {
+        Ok(TransferDuty::ProcessCmd {
             cmd: TransferCmd::ProcessPayment(msg.clone()),
             msg_id: msg.id(),
             origin: msg.origin.address(),
-        })
+        }
+        .into())
     }
 
-    async fn try_transfers(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {
+    async fn try_transfers(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let duty = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
@@ -124,7 +129,7 @@ impl ClientMsgAnalysis {
             } => {
                 if !msg.origin.is_client() || !self.is_dst_for(msg).await || !self.is_elder().await
                 {
-                    return Ok(None);
+                    return Ok(NodeOperation::NoOp);
                 }
                 TransferDuty::ProcessCmd {
                     cmd: cmd.clone().into(),
@@ -138,7 +143,7 @@ impl ClientMsgAnalysis {
             } => {
                 if !msg.origin.is_client() || !self.is_dst_for(msg).await || !self.is_elder().await
                 {
-                    return Ok(None);
+                    return Ok(NodeOperation::NoOp);
                 }
                 TransferDuty::ProcessQuery {
                     query: query.clone().into(),
@@ -146,9 +151,9 @@ impl ClientMsgAnalysis {
                     origin: msg.origin.address(),
                 }
             }
-            _ => return Ok(None),
+            _ => return Ok(NodeOperation::NoOp),
         };
-        Outcome::oki(duty)
+        Ok(duty.into())
     }
 
     async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {

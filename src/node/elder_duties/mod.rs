@@ -15,9 +15,8 @@ use crate::{
     chunk_store::UsedSpace,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, Result,
+    Error, Network, Result,
 };
-use crate::{Outcome, TernaryResult};
 use log::{debug, trace};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
@@ -47,7 +46,7 @@ impl ElderDuties {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self, first: bool) -> Outcome<NodeOperation> {
+    pub async fn initiate(&mut self, first: bool) -> Result<NodeOperation> {
         // currently only key section needs to catch up
         if first {
             self.key_section.init_first().await?;
@@ -56,7 +55,7 @@ impl ElderDuties {
     }
 
     /// Processing of any Elder duty.
-    pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Outcome<NodeOperation> {
+    pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<NodeOperation> {
         trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
@@ -77,11 +76,12 @@ impl ElderDuties {
                     .await
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
     ///
-    async fn new_node_joined(&mut self, name: XorName) -> Outcome<NodeOperation> {
+    async fn new_node_joined(&mut self, name: XorName) -> Result<NodeOperation> {
         self.data_section.new_node_joined(name).await
     }
 
@@ -91,40 +91,43 @@ impl ElderDuties {
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Outcome<NodeOperation> {
+    ) -> Result<NodeOperation> {
         self.data_section
             .relocated_node_joined(old_node_id, new_node_id, age)
             .await
     }
 
     ///
-    async fn member_left(&mut self, node_id: XorName, age: u8) -> Outcome<NodeOperation> {
+    async fn member_left(&mut self, node_id: XorName, age: u8) -> Result<NodeOperation> {
         self.data_section.member_left(node_id, age).await
     }
 
     ///
-    async fn elders_changed(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
+    async fn elders_changed(&mut self, prefix: Prefix) -> Result<NodeOperation> {
         let mut ops = Vec::new();
-        if let Ok(Some(op)) = self.key_section.elders_changed().await {
-            ops.push(op)
+        match self.key_section.elders_changed().await? {
+            NodeOperation::NoOp => (),
+            op => ops.push(op),
         };
         debug!("Key section completed elder change update.");
-        if let Ok(Some(op)) = self.data_section.elders_changed().await {
-            debug!("Data section elder change resulting in: {:?}", op);
-            ops.push(op)
+        match self.data_section.elders_changed().await? {
+            NodeOperation::NoOp => (),
+            op => ops.push(op),
         };
         debug!("Data section completed elder change update.");
         if prefix != self.prefix {
             debug!("Prefix changed, i.e. split occurred!");
-            if let Ok(Some(op)) = self.key_section.section_split(prefix).await {
-                ops.push(op)
+            match self.key_section.section_split(prefix).await? {
+                NodeOperation::NoOp => (),
+                op => ops.push(op),
             };
-            if let Ok(Some(op)) = self.data_section.section_split(prefix).await {
-                ops.push(op)
+            match self.data_section.section_split(prefix).await? {
+                NodeOperation::NoOp => (),
+                op => ops.push(op),
             };
         }
 
-        Outcome::oki(ops.into())
+        Ok(ops.into())
     }
 }
 

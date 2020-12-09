@@ -18,11 +18,10 @@ use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MetadataDuty, NodeOperation},
+    node::node_ops::{Blah, MetadataDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, Result,
+    Error, Network, Result,
 };
-use crate::{Error, Outcome, TernaryResult};
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
@@ -70,18 +69,19 @@ impl Metadata {
         })
     }
 
-    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Outcome<NodeOperation> {
+    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NodeOperation> {
         use MetadataDuty::*;
         match duty {
             ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn process_msg(&mut self, msg: MsgEnvelope) -> Outcome<NodeOperation> {
+    async fn process_msg(&mut self, msg: MsgEnvelope) -> Result<NodeOperation> {
         match &msg.message {
             Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
             Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.convert(),
-            _ => Outcome::error(Error::Logic(
+            _ => Err(Error::Logic(
                 "Only Queries and Cmds from client can be handled at Metadata".to_string(),
             )), // only Queries and Cmds from client is handled at Metadata
         }
@@ -90,7 +90,7 @@ impl Metadata {
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    pub async fn trigger_chunk_duplication(&mut self, node: XorName) -> Outcome<NodeOperation> {
+    pub async fn trigger_chunk_duplication(&mut self, node: XorName) -> Result<NodeOperation> {
         self.elder_stores
             .blob_register_mut()
             .duplicate_chunks(node)
@@ -113,7 +113,7 @@ impl Metadata {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Outcome<NodeMessagingDuty> {
+    // ) -> Result<NodeMessagingDuty> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",
@@ -168,7 +168,7 @@ impl Metadata {
     //     holders: BTreeSet<XorName>,
     //     message_id: MessageId,
     //     accumulated_signature: Option<Signature>,
-    // ) -> Outcome<NodeMessagingDuty> {
+    // ) -> Result<NodeMessagingDuty> {
     //     trace!(
     //         "Sending GetBlob request for address: ({:?}) to {:?}",
     //         address,
@@ -193,7 +193,7 @@ impl Metadata {
     //     message_id: MessageId,
     //     Blob_address: BlobAddress,
     //     signature: Signature,
-    // ) -> Outcome<NodeMessagingDuty> {
+    // ) -> Result<NodeMessagingDuty> {
     //     use Response::*;
     //     if self
     //         .routing

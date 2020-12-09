@@ -10,8 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Result};
-use crate::{Error, Outcome, TernaryResult};
+use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Error, Result};
 use chunk_storage::ChunkStorage;
 
 use log::trace;
@@ -32,7 +31,7 @@ impl Chunks {
         Ok(Self { chunk_storage })
     }
 
-    pub async fn receive_msg(&mut self, msg: MsgEnvelope) -> Outcome<NodeMessagingDuty> {
+    pub async fn receive_msg(&mut self, msg: MsgEnvelope) -> Result<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,
@@ -52,7 +51,7 @@ impl Chunks {
                     },
                 ..
             } => writing::get_result(write, msg.clone(), &mut self.chunk_storage).await,
-            _ => Outcome::error(Error::Logic(format!(
+            _ => Err(Error::Logic(format!(
                 "{:?}: Could not receive msg as Adult",
                 msg.id()
             ))),
@@ -66,7 +65,7 @@ impl Chunks {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Outcome<NodeMessagingDuty> {
+    // ) -> Result<NodeMessagingDuty> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",
@@ -150,7 +149,7 @@ impl Chunks {
         self.chunk_storage.get_for_duplication(address)
     }
 
-    pub async fn store_duplicated_chunk(&mut self, blob: Blob) -> Outcome<NodeMessagingDuty> {
+    pub async fn store_duplicated_chunk(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
         self.chunk_storage.store_for_duplication(blob).await
     }
 }
