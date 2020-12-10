@@ -110,7 +110,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
+    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Result<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         let result = match duty {
@@ -131,7 +131,7 @@ impl Transfers {
     }
 
     async fn process_query(
-        &self,
+        &mut self,
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
@@ -149,7 +149,7 @@ impl Transfers {
     }
 
     async fn process_cmd(
-        &self,
+        &mut self,
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
@@ -356,17 +356,20 @@ impl Transfers {
     }
 
     async fn balance(
-        &self,
+        &mut self,
         wallet_id: PublicKey,
         msg_id: MessageId,
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
+        debug!("Getting balance for {:?}", wallet_id);
+
         // validate signature
         let result = self
             .replicas
             .balance(wallet_id)
             .await
             .map_err(|e| NdError::Unexpected(e.to_string()));
+
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
@@ -378,7 +381,7 @@ impl Transfers {
     }
 
     async fn history(
-        &self,
+        &mut self,
         wallet_id: &PublicKey,
         _since_version: usize,
         msg_id: MessageId,

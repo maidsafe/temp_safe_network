@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{utils, utils::Init, Error, Result, ToDbKey};
-use log::trace;
+use log::{debug, trace};
 use pickledb::PickleDb;
 use sn_data_types::ReplicaEvent;
 use std::path::{Path, PathBuf};
@@ -28,6 +28,7 @@ impl TransferStore {
         let db_name = format!("{}{}", id.to_db_key(), DB_EXTENSION);
         Ok(Self {
             id,
+            // db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
             db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
         })
     }
@@ -39,17 +40,25 @@ impl TransferStore {
 
     ///
     pub fn get_all(&self) -> Vec<ReplicaEvent> {
-        trace!("Getting all events from transfer store");
+        trace!(
+            "Getting all events from transfer store w/id: {:?}",
+            self.id()
+        );
         let keys = self.db.get_all();
+
+        trace!("all keys {:?} ", keys);
         let events: Vec<ReplicaEvent> = keys
             .iter()
             .filter_map(|key| self.db.get::<ReplicaEvent>(key))
             .collect();
+        trace!("all events {:?} ", events);
+
         events
     }
 
     ///
     pub fn try_insert(&mut self, event: ReplicaEvent) -> Result<()> {
+        debug!("Trying to insert replica event: {:?}", event.clone());
         match event {
             ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {
@@ -57,6 +66,7 @@ impl TransferStore {
                 if self.db.exists(key) {
                     return Err(Error::Logic("Key exists.".to_string()));
                 }
+
                 self.db
                     .set(key, &ReplicaEvent::TransferPropagated(e))
                     .map_err(|error| Error::PickleDb(error))
@@ -97,7 +107,7 @@ mod test {
         let id = xor_name::XorName::random();
         let tmp_dir = TempDir::new("root")?;
         let root_dir = tmp_dir.into_path();
-        let mut store = futures::executor::block_on(TransferStore::new(id, &root_dir, Init::New))?;
+        let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
         let genesis_credit_proof = get_genesis(10, wallet_id)?;
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {

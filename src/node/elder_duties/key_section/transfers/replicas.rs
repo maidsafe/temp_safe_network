@@ -24,7 +24,7 @@ use xor_name::Prefix;
 use {
     crate::node::node_ops::NodeMessagingDuty,
     bls::{SecretKey, SecretKeySet, SecretKeyShare},
-    log::trace,
+    log::{debug, trace},
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
 };
@@ -56,6 +56,7 @@ impl Replicas {
         let events = self
             .locks
             .keys()
+            // TODO: This presupposes a dump has occured...
             .filter_map(|id| TransferStore::new((*id).into(), &self.root_dir, Init::Load).ok())
             .map(|store| store.get_all())
             .flatten()
@@ -63,21 +64,45 @@ impl Replicas {
         Ok(events)
     }
 
-    /// History of events
-    pub async fn history(&self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
-        let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
-            Ok(store) => store,
-            Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
+    async fn get_load_or_create_store(
+        &mut self,
+        id: PublicKey,
+    ) -> Result<Arc<Mutex<TransferStore>>> {
+        // get or create the store for PK.
+        let key_lock = match self.load_key_lock(id).await {
+            Ok(lock) => lock,
+            Err(_) => {
+                let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+                    Ok(store) => store,
+                    Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
+                };
+
+                let lock = Arc::new(Mutex::new(store));
+                // no key lock, so we create one for this simulated payout...
+                let _ = self.locks.insert(id, lock.clone());
+                lock
+            }
         };
+        Ok(key_lock)
+    }
+
+    /// History of events
+    pub async fn history(&mut self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
+        debug!("Replica history get");
+
+        let store = self.get_load_or_create_store(id).await?;
+        let store = store.lock().await;
+
         Ok(store.get_all())
     }
 
     ///
-    pub async fn balance(&self, id: PublicKey) -> Result<Money> {
-        let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
-            Ok(store) => store,
-            Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
-        };
+    pub async fn balance(&mut self, id: PublicKey) -> Result<Money> {
+        debug!("Replica: Getting balance of: {:?}", id);
+
+        let store = self.get_load_or_create_store(id).await?;
+        let store = store.lock().await;
+
         let wallet = self.load_wallet(&store, id).await?;
         Ok(wallet.balance())
     }
@@ -332,14 +357,17 @@ impl Replicas {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeMessagingDuty> {
-        trace!("Performing credit without proof");
+    pub async fn credit_without_proof(&mut self, transfer: Transfer) -> Result<NodeMessagingDuty> {
+        debug!("Performing credit without proof");
+
         let debit = transfer.debit();
         let credit = transfer.credit()?;
+
         // Acquire lock of the wallet.
         let id = transfer.to;
-        let key_lock = self.load_key_lock(id).await?;
-        let mut store = key_lock.lock().await;
+
+        let store = self.get_load_or_create_store(id).await?;
+        let mut store = store.lock().await;
 
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, id).await?;
@@ -351,6 +379,7 @@ impl Replicas {
         let sec_key = SecretKey::random();
         let pub_key = sec_key.public_key();
         let dummy_shares = SecretKeyShare::default();
+
         let dummy_sig = dummy_shares.sign(dummy_msg);
         let sig = sec_key.sign(dummy_msg);
         let transfer_proof = TransferAgreementProof {
@@ -366,6 +395,7 @@ impl Replicas {
             credit_sig: Signature::from(sig),
             debiting_replicas_keys: replica_keys,
         };
+
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
             credit_proof: transfer_proof.credit_proof(),
             crediting_replica_keys: PublicKey::from(pub_key),
@@ -374,6 +404,7 @@ impl Replicas {
                 share: dummy_sig,
             },
         }))?;
+
         Ok(NodeMessagingDuty::NoOp)
     }
 
