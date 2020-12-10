@@ -68,7 +68,7 @@ impl TransferStore {
 
                 self.db
                     .set(key, &ReplicaEvent::TransferPropagated(e))
-                    .map_err(|error| Error::PickleDb(error))
+                    .map_err(Error::PickleDb)
             }
             ReplicaEvent::TransferValidated(e) => {
                 let key = &e.id().to_db_key()?;
@@ -77,7 +77,7 @@ impl TransferStore {
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferValidated(e))
-                    .map_err(|error| Error::PickleDb(error))
+                    .map_err(Error::PickleDb)
             }
             ReplicaEvent::TransferRegistered(e) => {
                 let key = &e.id().to_db_key()?;
@@ -86,7 +86,7 @@ impl TransferStore {
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferRegistered(e))
-                    .map_err(|error| Error::PickleDb(error))
+                    .map_err(Error::PickleDb)
             }
         }
     }
@@ -122,7 +122,12 @@ mod test {
             ReplicaEvent::TransferPropagated(TransferPropagated { credit_proof, .. }) => {
                 assert_eq!(credit_proof, &genesis_credit_proof)
             }
-            _ => assert!(false),
+            other => {
+                return Err(Error::Logic(format!(
+                    "Incorrect Replica event: {:?}",
+                    other
+                )))
+            }
         }
 
         Ok(())
