@@ -158,6 +158,9 @@ impl Transfers {
         match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await,
             ProcessPayment(msg) => self.process_payment(msg).await,
+            #[cfg(feature = "simulated-payouts")]
+            // Cmd to simulate a farming payout
+            SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
@@ -176,8 +179,6 @@ impl Transfers {
                 self.receive_propagated(&debit_agreement, msg_id, origin)
                     .await
             }
-            #[cfg(feature = "simulated-payouts")]
-            SimulatePayout(_) => unreachable!(),
         }
     }
 

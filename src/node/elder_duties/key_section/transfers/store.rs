@@ -28,7 +28,6 @@ impl TransferStore {
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         Ok(Self {
             id,
-            // db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
             db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
         })
     }

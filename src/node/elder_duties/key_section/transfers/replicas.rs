@@ -259,18 +259,17 @@ impl Replicas {
                 match self.load_key_lock(id).await {
                     Ok(store) => store,
                     Err(_) => {
-                        // no key lock, so we create one for this simulated payout...
+                        // no key lock (hence no store), so we create one
                         let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
                         let locked_store = Arc::new(Mutex::new(store));
                         let _ = self.locks.insert(id, locked_store.clone());
-                        let _ = self_lock.overflowing_add(0); // is a usage at end of block necessary to actually engage the lock?
+                        let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
                         locked_store
                     }
                 }
             }
         };
 
-        // let key_lock = self.load_key_lock(id).await?;
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
@@ -335,7 +334,6 @@ impl Replicas {
     //  --------------------  Simulated Payouts ------------------------
     // ------------------------------------------------------------------
 
-    #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
     pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeMessagingDuty> {
         debug!("Performing credit without proof");
