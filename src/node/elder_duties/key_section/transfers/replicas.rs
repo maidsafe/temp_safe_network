@@ -9,13 +9,13 @@
 use super::store::TransferStore;
 use crate::{utils::Init, Error, ReplicaInfo, Result};
 use bls::PublicKeySet;
+use dashmap::DashMap;
 use futures::lock::Mutex;
 use sn_data_types::{
     CreditAgreementProof, Error as NdError, Money, PublicKey, ReplicaEvent, SignedTransfer,
     TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
 };
 use sn_transfers::{get_genesis, WalletReplica};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use xor_name::Prefix;
@@ -29,13 +29,14 @@ use {
     sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
 };
 
-type WalletLocks = HashMap<PublicKey, Arc<Mutex<TransferStore>>>;
+type WalletLocks = DashMap<PublicKey, Arc<Mutex<TransferStore>>>;
 
 #[derive(Clone)]
 pub struct Replicas {
     root_dir: PathBuf,
     info: ReplicaInfo,
     locks: WalletLocks,
+    self_lock: Arc<Mutex<usize>>,
 }
 
 impl Replicas {
@@ -44,6 +45,7 @@ impl Replicas {
             root_dir,
             info,
             locks: Default::default(),
+            self_lock: Arc::new(Mutex::new(0)),
         })
     }
 
@@ -55,54 +57,27 @@ impl Replicas {
     pub async fn all_events(&self) -> Result<Vec<ReplicaEvent>> {
         let events = self
             .locks
-            .keys()
+            .iter()
+            .map(|r| *r.key())
             // TODO: This presupposes a dump has occured...
-            .filter_map(|id| TransferStore::new((*id).into(), &self.root_dir, Init::Load).ok())
+            .filter_map(|id| TransferStore::new(id.into(), &self.root_dir, Init::Load).ok())
             .map(|store| store.get_all())
             .flatten()
             .collect();
         Ok(events)
     }
 
-    async fn get_load_or_create_store(
-        &mut self,
-        id: PublicKey,
-    ) -> Result<Arc<Mutex<TransferStore>>> {
-        // get or create the store for PK.
-        let key_lock = match self.load_key_lock(id).await {
-            Ok(lock) => lock,
-            Err(_) => {
-                let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
-                    Ok(store) => store,
-                    Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
-                };
-
-                let lock = Arc::new(Mutex::new(store));
-                // no key lock, so we create one for this simulated payout...
-                let _ = self.locks.insert(id, lock.clone());
-                lock
-            }
-        };
-        Ok(key_lock)
-    }
-
     /// History of events
-    pub async fn history(&mut self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
+    pub async fn history(&self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
         debug!("Replica history get");
-
-        let store = self.get_load_or_create_store(id).await?;
-        let store = store.lock().await;
-
+        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load)?;
         Ok(store.get_all())
     }
 
     ///
-    pub async fn balance(&mut self, id: PublicKey) -> Result<Money> {
+    pub async fn balance(&self, id: PublicKey) -> Result<Money> {
         debug!("Replica: Getting balance of: {:?}", id);
-
-        let store = self.get_load_or_create_store(id).await?;
-        let store = store.lock().await;
-
+        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load)?;
         let wallet = self.load_wallet(&store, id).await?;
         Ok(wallet.balance())
     }
@@ -185,9 +160,9 @@ impl Replicas {
         self.info = info;
     }
 
-    pub async fn keep_keys_of(&mut self, prefix: Prefix) -> Result<()> {
+    pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
-        let keys: Vec<PublicKey> = self.locks.iter().map(|(k, _)| *k).collect();
+        let keys: Vec<PublicKey> = self.locks.iter().map(|r| *r.key()).collect();
         for key in keys.into_iter() {
             if !prefix.matches(&key.into()) {
                 let key_lock = self.load_key_lock(key).await?;
@@ -195,36 +170,6 @@ impl Replicas {
                 let _ = self.locks.remove(&key);
                 // todo: remove db from disk
             }
-        }
-        Ok(())
-    }
-
-    /// For now, with test money there is no from wallet.., money is created from thin air.
-    #[allow(unused)] // TODO: Can this be removed?
-    pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Result<()> {
-        let id = signed_transfer.sender();
-        // Acquire lock of the wallet.
-        let key_lock = self.load_key_lock(id).await?;
-        let mut store = key_lock.lock().await;
-
-        // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, id).await?;
-        let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
-        // sign + update state
-        if let Some((replica_debit_sig, replica_credit_sig)) = self
-            .info
-            .signing
-            .lock()
-            .await
-            .sign_transfer(&signed_transfer)?
-        {
-            store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
-                signed_credit: signed_transfer.credit,
-                signed_debit: signed_transfer.debit,
-                replica_debit_sig,
-                replica_credit_sig,
-                replicas: self.info.peer_replicas.clone(),
-            }))?;
         }
         Ok(())
     }
@@ -302,7 +247,30 @@ impl Replicas {
     ) -> Result<TransferPropagated> {
         // Acquire lock of the wallet.
         let id = credit_proof.recipient();
-        let key_lock = self.load_key_lock(id).await?;
+
+        // Only when propagated is there a risk that the store doesn't exist,
+        // and that we want to create it. All other write operations require that
+        // a propagation has occurred first. Read ops simply return error when it doesn't exist.
+        let key_lock = match self.load_key_lock(id).await {
+            Ok(key_lock) => key_lock,
+            Err(_) => {
+                // lock on us, but only when store doesn't exist
+                let self_lock = self.self_lock.lock().await;
+                match self.load_key_lock(id).await {
+                    Ok(store) => store,
+                    Err(_) => {
+                        // no key lock, so we create one for this simulated payout...
+                        let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
+                        let locked_store = Arc::new(Mutex::new(store));
+                        let _ = self.locks.insert(id, locked_store.clone());
+                        let _ = self_lock.overflowing_add(0); // is a usage at end of block necessary to actually engage the lock?
+                        locked_store
+                    }
+                }
+            }
+        };
+
+        // let key_lock = self.load_key_lock(id).await?;
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
@@ -363,8 +331,13 @@ impl Replicas {
         }
     }
 
+    // ------------------------------------------------------------------
+    //  --------------------  Simulated Payouts ------------------------
+    // ------------------------------------------------------------------
+
+    #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
-    pub async fn credit_without_proof(&mut self, transfer: Transfer) -> Result<NodeMessagingDuty> {
+    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeMessagingDuty> {
         debug!("Performing credit without proof");
 
         let debit = transfer.debit();
@@ -438,6 +411,57 @@ impl Replicas {
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, id).await?;
         wallet.debit_without_proof(debit)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "simulated-payouts")]
+    async fn get_load_or_create_store(&self, id: PublicKey) -> Result<Arc<Mutex<TransferStore>>> {
+        // get or create the store for PK.
+        let key_lock = match self.load_key_lock(id).await {
+            Ok(lock) => lock,
+            Err(_) => {
+                let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+                    Ok(store) => store,
+                    Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
+                };
+
+                let lock = Arc::new(Mutex::new(store));
+                // no key lock, so we create one for this simulated payout...
+                let _ = self.locks.insert(id, lock.clone());
+                lock
+            }
+        };
+        Ok(key_lock)
+    }
+
+    /// For now, with test money there is no from wallet.., money is created from thin air.
+    #[allow(unused)] // TODO: Can this be removed?
+    #[cfg(feature = "simulated-payouts")]
+    pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Result<()> {
+        let id = signed_transfer.sender();
+        // Acquire lock of the wallet.
+        let key_lock = self.load_key_lock(id).await?;
+        let mut store = key_lock.lock().await;
+
+        // Access to the specific wallet is now serialised!
+        let wallet = self.load_wallet(&store, id).await?;
+        let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
+        // sign + update state
+        if let Some((replica_debit_sig, replica_credit_sig)) = self
+            .info
+            .signing
+            .lock()
+            .await
+            .sign_transfer(&signed_transfer)?
+        {
+            store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
+                signed_credit: signed_transfer.credit,
+                signed_debit: signed_transfer.debit,
+                replica_debit_sig,
+                replica_credit_sig,
+                replicas: self.info.peer_replicas.clone(),
+            }))?;
+        }
         Ok(())
     }
 }

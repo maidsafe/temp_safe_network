@@ -74,7 +74,7 @@ impl Transfers {
         }
     }
 
-    pub async fn init_first(&mut self) -> Result<NodeOperation> {
+    pub async fn init_first(&self) -> Result<NodeOperation> {
         let result = self.initiate_replica(&[]).await;
         result.convert()
     }
@@ -82,7 +82,7 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&mut self) -> Result<NodeOperation> {
+    pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
         // prepare replica init
         let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
         self.wrapping
@@ -101,7 +101,7 @@ impl Transfers {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
+    pub async fn section_split(&self, prefix: Prefix) -> Result<NodeOperation> {
         // Removes keys that are no longer our section responsibility.
         let _ = self.replicas.keep_keys_of(prefix).await?;
         Ok(NodeOperation::NoOp)
@@ -109,7 +109,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Result<NodeOperation> {
+    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         let result = match duty {
@@ -130,7 +130,7 @@ impl Transfers {
     }
 
     async fn process_query(
-        &mut self,
+        &self,
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
@@ -148,7 +148,7 @@ impl Transfers {
     }
 
     async fn process_cmd(
-        &mut self,
+        &self,
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
@@ -158,9 +158,6 @@ impl Transfers {
         match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await,
             ProcessPayment(msg) => self.process_payment(msg).await,
-            #[cfg(feature = "simulated-payouts")]
-            // Cmd to simulate a farming payout
-            SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
@@ -179,6 +176,8 @@ impl Transfers {
                 self.receive_propagated(&debit_agreement, msg_id, origin)
                     .await
             }
+            #[cfg(feature = "simulated-payouts")]
+            SimulatePayout(_) => unreachable!(),
         }
     }
 
@@ -354,7 +353,7 @@ impl Transfers {
     }
 
     async fn balance(
-        &mut self,
+        &self,
         wallet_id: PublicKey,
         msg_id: MessageId,
         origin: Address,
@@ -379,7 +378,7 @@ impl Transfers {
     }
 
     async fn history(
-        &mut self,
+        &self,
         wallet_id: &PublicKey,
         _since_version: usize,
         msg_id: MessageId,

@@ -95,10 +95,7 @@ impl KeySection {
         self.transfers.section_split(prefix).await
     }
 
-    pub async fn process_key_section_duty(
-        &mut self,
-        duty: KeySectionDuty,
-    ) -> Result<NodeOperation> {
+    pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
@@ -127,25 +124,4 @@ impl KeySection {
         let replica_manager = Replicas::new(root_dir, info)?;
         Ok(replica_manager)
     }
-
-    // async fn new_replica_manager(
-    //     info: &NodeInfo,
-    //     routing: Network,
-    //     rate_limit: RateLimit,
-    // ) -> Result<Arc<Mutex<ReplicaManager>>> {
-    //     let public_key_set = routing.public_key_set().await?;
-    //     let secret_key_share = routing.secret_key_share().await?;
-    //     let key_index = routing.our_index().await?;
-    //     let proof_chain = routing.our_history().await;
-    //     let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
-    //     let replica_manager = ReplicaManager::new(
-    //         store,
-    //         &secret_key_share,
-    //         key_index,
-    //         rate_limit,
-    //         &public_key_set,
-    //         proof_chain,
-    //     )?;
-    //     Ok(Arc::new(Mutex::new(replica_manager)))
-    // }
 }

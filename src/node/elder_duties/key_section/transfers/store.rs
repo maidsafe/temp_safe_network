@@ -1,5 +1,3 @@
-#![allow(unused)] // FIXME
-
 // Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
