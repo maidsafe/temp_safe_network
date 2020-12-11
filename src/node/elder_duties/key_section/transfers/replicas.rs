@@ -146,7 +146,7 @@ impl Replicas {
                 crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
             }))?;
         }
-        return Ok(());
+        Ok(())
     }
 
     pub async fn initiate(&self, events: &[ReplicaEvent]) -> Result<()> {
