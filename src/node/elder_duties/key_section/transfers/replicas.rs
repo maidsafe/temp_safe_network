@@ -230,6 +230,7 @@ impl Replicas {
 
     /// Step 1. Main business logic validation of a debit.
     pub async fn validate(&self, signed_transfer: SignedTransfer) -> Result<TransferValidated> {
+        debug!("Replica validating transfer: {:?}", signed_transfer);
         let id = signed_transfer.sender();
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
@@ -237,7 +238,14 @@ impl Replicas {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
-        let _ = wallet.validate(&signed_transfer.debit, &signed_transfer.credit)?;
+
+        debug!("******************&&&&&swallet loadded");
+        let r = wallet.validate(&signed_transfer.debit, &signed_transfer.credit);
+
+        debug!("validation sezzzz: {:?}", r);
+
+        r?;
+        debug!("wallet valid");
         // signing will be serialised
         if let Some((replica_debit_sig, replica_credit_sig)) = self
             .info
@@ -361,17 +369,30 @@ impl Replicas {
         debug!("Performing credit without proof");
 
         let debit = transfer.debit();
+
+        debug!("provided debit {:?}", debit);
         let credit = transfer.credit()?;
+
+        debug!("provided credit {:?}", credit);
 
         // Acquire lock of the wallet.
         let id = transfer.to;
 
         let store = self.get_load_or_create_store(id).await?;
         let mut store = store.lock().await;
-
-        // Access to the specific wallet is now serialised!
+        
         let mut wallet = self.load_wallet(&store, id).await?;
+
+        debug!("wallet loaded");
         wallet.credit_without_proof(credit.clone())?;
+
+        // let debit_store = self.get_load_or_create_store(debit.id().actor).await?;
+        // let mut debit_store = debit_store.lock().await;
+        // // Access to the specific wallet is now serialised!
+        // let mut debit_wallet = self.load_wallet(&debit_store, debit.id().actor).await?;
+        // debit_wallet.debit_without_proof(debit.clone())?;
+
+
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();
         let sec_key_set = SecretKeySet::random(7, &mut rng);

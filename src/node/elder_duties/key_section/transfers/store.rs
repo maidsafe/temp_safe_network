@@ -46,13 +46,10 @@ impl TransferStore {
         );
         let keys = self.db.get_all();
 
-        trace!("all keys {:?} ", keys);
         let events: Vec<ReplicaEvent> = keys
             .iter()
             .filter_map(|key| self.db.get::<ReplicaEvent>(key))
             .collect();
-        trace!("all events {:?} ", events);
-
         events
     }
 

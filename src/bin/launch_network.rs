@@ -55,6 +55,7 @@ async fn main() -> Result<(), String> {
     println!("Building current sn_node");
     let _child = Command::new("cargo")
         .args(args.clone())
+        .env("RUST_LOG", "debug")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
