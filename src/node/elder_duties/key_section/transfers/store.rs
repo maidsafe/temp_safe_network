@@ -52,12 +52,13 @@ impl TransferStore {
             .iter()
             .filter_map(|key| self.db.get::<ReplicaEvent>(key))
             .collect();
-
-            
         trace!("all events {:?} ", events);
+        events
+    }
 
+    ///
     pub fn try_insert(&mut self, event: ReplicaEvent) -> Result<()> {
-        debug!("Trying to insert replica event: {:?}", event.clone());
+        debug!("Trying to insert replica event: {:?}", event);
         match event {
             ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {

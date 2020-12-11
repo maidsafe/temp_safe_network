@@ -241,11 +241,11 @@ impl Replicas {
         let wallet = self.load_wallet(&store, id).await?;
 
         debug!("******************&&&&&swallet loadded");
-        let r = wallet.validate(&signed_transfer.debit, &signed_transfer.credit);
+        let result = wallet.validate(&signed_transfer.debit, &signed_transfer.credit);
 
-        debug!("validation sezzzz: {:?}", r);
+        debug!("validation sezzzz: {:?}", result);
 
-        r?;
+        let _ = result?;
         debug!("wallet valid");
         // signing will be serialised
         if let Some((replica_debit_sig, replica_credit_sig)) = self
@@ -379,7 +379,7 @@ impl Replicas {
 
         let store = self.get_load_or_create_store(id).await?;
         let mut store = store.lock().await;
-        
+
         let mut wallet = self.load_wallet(&store, id).await?;
 
         debug!("wallet loaded");
@@ -390,7 +390,6 @@ impl Replicas {
         // // Access to the specific wallet is now serialised!
         // let mut debit_wallet = self.load_wallet(&debit_store, debit.id().actor).await?;
         // debit_wallet.debit_without_proof(debit.clone())?;
-
 
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();
