@@ -28,7 +28,8 @@ impl TransferStore {
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         Ok(Self {
             id,
-            db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
+            db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
+            //db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
         })
     }
 
@@ -45,10 +46,25 @@ impl TransferStore {
         );
         let keys = self.db.get_all();
 
-        let events: Vec<ReplicaEvent> = keys
+        let mut events: Vec<(usize, ReplicaEvent)> = keys
             .iter()
-            .filter_map(|key| self.db.get::<ReplicaEvent>(key))
+            .filter_map(|key| {
+                let value = self.db.get::<ReplicaEvent>(key);
+                let key = key.parse::<usize>();
+                match value {
+                    Some(v) => match key {
+                        Ok(k) => Some((k, v)),
+                        _ => None,
+                    },
+                    None => None,
+                }
+            })
             .collect();
+
+        events.sort_by(|(key_a, _), (key_b, _)| key_a.partial_cmp(key_b).unwrap());
+
+        let events: Vec<ReplicaEvent> = events.into_iter().map(|(_, val)| val).collect();
+
         trace!("all events {:?} ", events);
         events
     }
@@ -56,31 +72,28 @@ impl TransferStore {
     ///
     pub fn try_insert(&mut self, event: ReplicaEvent) -> Result<()> {
         debug!("Trying to insert replica event: {:?}", event);
+        let key = &self.db.total_keys().to_string();
         match event {
             ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {
-                let key = &e.id().to_db_key()?;
                 if self.db.exists(key) {
-                    return Err(Error::Logic("Key exists.".to_string()));
+                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
                 }
-
                 self.db
                     .set(key, &ReplicaEvent::TransferPropagated(e))
                     .map_err(Error::PickleDb)
             }
             ReplicaEvent::TransferValidated(e) => {
-                let key = &e.id().to_db_key()?;
                 if self.db.exists(key) {
-                    return Err(Error::Logic("Key exists.".to_string()));
+                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferValidated(e))
                     .map_err(Error::PickleDb)
             }
             ReplicaEvent::TransferRegistered(e) => {
-                let key = &e.id().to_db_key()?;
                 if self.db.exists(key) {
-                    return Err(Error::Logic("Key exists.".to_string()));
+                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
                 }
                 self.db
                     .set(key, &ReplicaEvent::TransferRegistered(e))

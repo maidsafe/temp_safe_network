@@ -6,16 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::genesis::get_genesis;
 use super::store::TransferStore;
 use crate::{utils::Init, Error, ReplicaInfo, Result};
 use bls::PublicKeySet;
 use dashmap::DashMap;
 use futures::lock::Mutex;
+use log::info;
 use sn_data_types::{
     CreditAgreementProof, Error as NdError, Money, PublicKey, ReplicaEvent, SignedTransfer,
     TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
 };
-use sn_transfers::{get_genesis, WalletReplica};
+use sn_transfers::WalletReplica;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use xor_name::Prefix;
@@ -91,51 +94,13 @@ impl Replicas {
     /// ---------------------- Cmds -------------------------------------
     /// -----------------------------------------------------------------
 
-    /// This is the one and only infusion of money to the system. Ever.
-    /// It is carried out by the first node in the network.
-    async fn genesis<F: FnOnce() -> Result<PublicKey, NdError>>(
-        &self,
-        credit_proof: &CreditAgreementProof,
-        past_key: F,
-    ) -> Result<()> {
-        let id = credit_proof.recipient();
-        // Acquire lock of the wallet.
-        let key_lock = self.load_key_lock(id).await?;
-        let mut store = key_lock.lock().await;
-
-        // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, id).await?;
-        let _ = wallet.genesis(credit_proof, past_key)?;
-        // sign + update state
-        if let Some(crediting_replica_sig) = self
-            .info
-            .signing
-            .lock()
-            .await
-            .sign_credit_proof(credit_proof)?
-        {
-            // Q: are we locked on `info.signing` here? (we don't want to be)
-            store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
-                credit_proof: credit_proof.clone(),
-                crediting_replica_sig,
-                crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
-            }))?;
-        }
-        Ok(())
-    }
-
     pub async fn initiate(&self, events: &[ReplicaEvent]) -> Result<()> {
         use ReplicaEvent::*;
         if events.is_empty() {
-            //info!("Events are empty. Initiating Genesis replica.");
-            // This means we are the first node in the network.
-            let balance = u32::MAX as u64 * 1_000_000_000;
-            let credit_proof = get_genesis(
-                balance,
-                PublicKey::Bls(self.info.peer_replicas.public_key()),
-            )?;
+            info!("Events are empty. Initiating Genesis replica.");
+            let credit_proof = self.create_genesis().await?;
             let genesis_source = Ok(PublicKey::Bls(credit_proof.replica_keys().public_key()));
-            return self.genesis(&credit_proof, || genesis_source).await;
+            return self.store_genesis(&credit_proof, || genesis_source).await;
         }
         for e in events {
             let id = match e {
@@ -230,13 +195,17 @@ impl Replicas {
         match wallet.register(transfer_proof, || {
             self.find_past_key(&transfer_proof.replica_keys())
         })? {
-            None => (),
+            None => {
+                info!("transfer already registered!");
+                Err(Error::NetworkData(NdError::NetworkOther(
+                    "transfer already registered!".to_string(),
+                )))
+            }
             Some(event) => {
                 store.try_insert(ReplicaEvent::TransferRegistered(event.clone()))?;
-                return Ok(event);
+                Ok(event)
             }
-        };
-        Err(Error::InvalidMessage)
+        }
     }
 
     /// Step 3. Validation of DebitAgreementProof, and credit idempotency at credit destination.
@@ -331,6 +300,85 @@ impl Replicas {
     }
 
     // ------------------------------------------------------------------
+    //  ------------------------- Genesis ------------------------------
+    // ------------------------------------------------------------------
+
+    async fn create_genesis(&self) -> Result<CreditAgreementProof> {
+        // This means we are the first node in the network.
+        let balance = u32::MAX as u64 * 1_000_000_000;
+        let signed_credit = get_genesis(
+            balance,
+            PublicKey::Bls(self.info.peer_replicas.public_key()),
+        )?;
+        let replica_credit_sig = self
+            .info
+            .signing
+            .lock()
+            .await
+            .sign_validated_credit(&signed_credit)?
+            .unwrap();
+        let mut credit_sig_shares = BTreeMap::new();
+        let _ = credit_sig_shares.insert(0, replica_credit_sig.share);
+
+        let debiting_replicas_sig = sn_data_types::Signature::Bls(
+            self.info
+                .peer_replicas
+                .combine_signatures(&credit_sig_shares)
+                .map_err(|e| Error::Logic(e.to_string()))?,
+        );
+
+        Ok(CreditAgreementProof {
+            signed_credit,
+            debiting_replicas_sig,
+            debiting_replicas_keys: self.info.peer_replicas.clone(),
+        })
+    }
+
+    /// This is the one and only infusion of money to the system. Ever.
+    /// It is carried out by the first node in the network.
+    async fn store_genesis<F: FnOnce() -> Result<PublicKey, NdError>>(
+        &self,
+        credit_proof: &CreditAgreementProof,
+        past_key: F,
+    ) -> Result<()> {
+        let id = credit_proof.recipient();
+        // Acquire lock on self.
+        let self_lock = self.self_lock.lock().await;
+        // We expect nothing to exist before this transfer.
+        if self.load_key_lock(id).await.is_ok() {
+            return Err(Error::NetworkData(NdError::BalanceExists));
+        }
+        // No key lock (hence no store), so we create one
+        let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
+        let locked_store = Arc::new(Mutex::new(store));
+        let _ = self.locks.insert(id, locked_store.clone());
+        // Acquire lock of the wallet.
+        let mut store = locked_store.lock().await;
+        // last usage of self lock (we want to let go of the lock on self here)
+        let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
+
+        // Access to the specific wallet is now serialised!
+        let wallet = self.load_wallet(&store, id).await?;
+        let _ = wallet.genesis(credit_proof, past_key)?;
+        // sign + update state
+        if let Some(crediting_replica_sig) = self
+            .info
+            .signing
+            .lock()
+            .await
+            .sign_credit_proof(credit_proof)?
+        {
+            // Q: are we locked on `info.signing` here? (we don't want to be)
+            store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
+                credit_proof: credit_proof.clone(),
+                crediting_replica_sig,
+                crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
+            }))?;
+        }
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
     //  --------------------  Simulated Payouts ------------------------
     // ------------------------------------------------------------------
 
@@ -414,21 +462,24 @@ impl Replicas {
 
     #[cfg(feature = "simulated-payouts")]
     async fn get_load_or_create_store(&self, id: PublicKey) -> Result<Arc<Mutex<TransferStore>>> {
+        let self_lock = self.self_lock.lock().await;
         // get or create the store for PK.
         let key_lock = match self.load_key_lock(id).await {
             Ok(lock) => lock,
             Err(_) => {
                 let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
                     Ok(store) => store,
+                    // no key lock, so we create one for this simulated payout...
                     Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
                 };
-
-                let lock = Arc::new(Mutex::new(store));
-                // no key lock, so we create one for this simulated payout...
-                let _ = self.locks.insert(id, lock.clone());
-                lock
+                debug!("store retrieved..");
+                let locked_store = Arc::new(Mutex::new(store));
+                let _ = self.locks.insert(id, locked_store.clone());
+                locked_store
             }
         };
+        let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
+
         Ok(key_lock)
     }
 

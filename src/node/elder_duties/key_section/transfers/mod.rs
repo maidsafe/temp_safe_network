@@ -6,8 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod genesis;
 pub mod replicas;
 pub mod store;
+
 use self::replicas::Replicas;
 use crate::{
     capacity::RateLimit,
@@ -270,17 +272,18 @@ impl Transfers {
                 // informed of this transfer as well..
                 self.wrapping.forward(msg).await
             }
-            Err(Error::NetworkData(error)) => {
-                warn!("Payment: registration or propagation failed: {}", error);
+            Err(e) => {
+                warn!("Payment: registration or propagation failed: {}", e);
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferRegistration(error)),
+                        CmdError::Transfer(TransferRegistration(NdError::NetworkOther(
+                            e.to_string(),
+                        ))),
                         msg.id(),
                         &msg.origin.address(),
                     )
                     .await
             }
-            Err(_e) => unimplemented!("process_payment"),
         }
     }
 
