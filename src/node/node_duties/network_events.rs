@@ -14,7 +14,7 @@ use crate::node::{
 use crate::{Error, Network, Result};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
-use log::{error, info, trace, warn};
+use log::{error, info, trace};
 use sn_data_types::{MsgEnvelope, PublicKey};
 use sn_routing::{Event as RoutingEvent, MIN_AGE};
 use xor_name::XorName;
@@ -125,7 +125,7 @@ impl NetworkEvents {
     async fn evaluate_msg(&mut self, content: Bytes) -> Result<NodeOperation> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => {
-                warn!("Message Envelope received. Contents: {:?}", &msg);
+                info!("Message Envelope received. Contents: {:?}", &msg);
                 self.analysis.evaluate(&msg).await
             }
             Err(e) => {
