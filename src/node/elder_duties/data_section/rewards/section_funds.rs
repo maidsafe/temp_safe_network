@@ -18,7 +18,7 @@ use sn_data_types::{
 };
 use xor_name::XorName;
 
-use log::{debug, error};
+use log::{error, info};
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use ActorEvent::*;
@@ -62,9 +62,14 @@ impl SectionFunds {
         }
     }
 
+    /// Current Replicas
+    pub fn replicas(&self) -> PublicKey {
+        self.actor.replicas()
+    }
+
     /// Replica events get synched to section actor instances.
     pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Result<NodeMessagingDuty> {
-        debug!("Synching replica events to section transfer actor...");
+        info!("Synching replica events to section transfer actor...");
         let _ = self
             .actor
             .synch_events(events)
@@ -74,9 +79,9 @@ impl SectionFunds {
 
     /// At Elder churn, we must transition to a new account.
     pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeMessagingDuty> {
-        debug!("Transitioning section transfer actor...");
+        info!("Transitioning section transfer actor...");
         if self.is_transitioning() {
-            debug!("is_transitioning");
+            info!("is_transitioning");
             // hm, could be tricky edge cases here, but
             // we'll start by assuming there will only be
             // one transition at a time.
@@ -89,14 +94,14 @@ impl SectionFunds {
         self.state.next_actor = Some(to);
         // When we have a payout in flight, we defer the transition.
         if self.has_payout_in_flight() {
-            debug!("has_payout_in_flight");
+            info!("has_payout_in_flight");
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
 
         // Get all the money of current actor.
         let amount = self.actor.balance();
         if amount == Money::zero() {
-            debug!("No money to transfer in this section.");
+            info!("No money to transfer in this section.");
             // if zero, then there is nothing to transfer..
             // so just go ahead and become the new actor.
             return match self.state.next_actor.take() {
@@ -125,7 +130,7 @@ impl SectionFunds {
             None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
             Some(event) => {
                 let _ = self.apply(TransferInitiated(event.clone()))?;
-                debug!("Section actor transition transfer is being requested of the replicas..");
+                info!("Section actor transition transfer is being requested of the replicas..");
                 // We ask of our Replicas to validate this transfer.
                 self.wrapping
                     .send_to_section(

@@ -8,10 +8,11 @@
 
 use crate::node::state_db::AgeGroup;
 use crate::{
-    node::node_ops::{NodeDuty, NodeOperation, RewardDuty},
+    node::node_ops::{NodeDuty, NodeOperation, RewardCmd, RewardDuty},
     Network, Result,
 };
-use sn_data_types::PublicKey;
+use sn_data_types::MessageId;
+use sn_data_types::{Address, PublicKey};
 
 /// Configuration made after connected to
 /// network, or promoted to elder.
@@ -62,17 +63,36 @@ impl DutyConfig {
     /// When becoming Elder.
     pub async fn setup_as_elder(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Elder;
-        // 1. Become Elder.
-        let first: NodeOperation = NodeDuty::BecomeElder.into();
-        // 2. Add own node id to rewards.
+
+        let mut ops: Vec<NodeOperation> = vec![];
         let node_id = self.network_api.name().await;
-        let second = RewardDuty::AddNewNode(node_id).into();
+
+        // 1. Become Elder.
+        ops.push(NodeDuty::BecomeElder.into());
+
+        // 2. Add own node id to rewards.
+        ops.push(
+            RewardDuty::ProcessCmd {
+                cmd: RewardCmd::AddNewNode(node_id),
+                msg_id: MessageId::new(),
+                origin: Address::Node(node_id),
+            }
+            .into(),
+        );
+
         // 3. Add own wallet to rewards.
-        let third = RewardDuty::SetNodeWallet {
-            node_id,
-            wallet_id: self.reward_key,
-        }
-        .into();
-        Ok(vec![first, second, third].into())
+        ops.push(
+            RewardDuty::ProcessCmd {
+                cmd: RewardCmd::SetNodeWallet {
+                    node_id,
+                    wallet_id: self.reward_key,
+                },
+                msg_id: MessageId::new(),
+                origin: Address::Node(node_id),
+            }
+            .into(),
+        );
+
+        Ok(ops.into())
     }
 }

@@ -139,6 +139,7 @@ impl Transfers {
     ) -> Result<NodeMessagingDuty> {
         use TransferQuery::*;
         match query {
+            GetSectionActorHistory => self.section_actor_history(msg_id, origin).await,
             GetReplicaEvents => self.all_events(msg_id, origin).await,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await,
             GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await,
@@ -374,6 +375,31 @@ impl Transfers {
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
+    }
+
+    async fn section_actor_history(
+        &self,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Handling GetSectionActorHistory query");
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        let wallet_id = self.section_wallet_id();
+        // todo: validate signature
+        let result = self
+            .replicas
+            .history(wallet_id)
+            .await
+            .map_err(|e| NdError::Unexpected(e.to_string()));
+        self.wrapping
+            .send_to_node(Message::NodeQueryResponse {
+                response: Transfers(GetSectionActorHistory(result)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
                 query_origin: origin,

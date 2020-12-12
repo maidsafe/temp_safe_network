@@ -16,10 +16,11 @@ use self::{
 use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
-    node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
+    node::node_ops::{DataSectionDuty, NodeOperation, RewardCmd, RewardDuty},
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
+use sn_data_types::{Address, MessageId};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::sync::Arc;
@@ -76,6 +77,14 @@ impl DataSection {
         }
     }
 
+    /// Issues queries to Elders of the section
+    /// as to catch up with shares state and
+    /// start working properly in the group.
+    pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
+        // currently only at2 replicas need to catch up
+        self.rewards.catchup_with_replicas().await
+    }
+
     // Transition the section funds account to the new key.
     pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
         let pub_key_set = self.network.public_key_set().await?;
@@ -103,7 +112,11 @@ impl DataSection {
     /// When a new node joins, it is registered for receiving rewards.
     pub async fn new_node_joined(&mut self, id: XorName) -> Result<NodeOperation> {
         self.rewards
-            .process_reward_duty(RewardDuty::AddNewNode(id))
+            .process_reward_duty(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::AddNewNode(id),
+                msg_id: MessageId::new(),
+                origin: Address::Node(self.network.name().await),
+            })
             .await
     }
 
@@ -119,10 +132,14 @@ impl DataSection {
         // Adds the relocated account.
         let first = self
             .rewards
-            .process_reward_duty(RewardDuty::AddRelocatingNode {
-                old_node_id,
-                new_node_id,
-                age,
+            .process_reward_duty(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::AddRelocatingNode {
+                    old_node_id,
+                    new_node_id,
+                    age,
+                },
+                msg_id: MessageId::new(),
+                origin: Address::Node(self.network.name().await),
             })
             .await;
         let second = self.metadata.trigger_chunk_duplication(new_node_id).await;
@@ -136,7 +153,11 @@ impl DataSection {
         // awaiting claiming of the counter
         let first = self
             .rewards
-            .process_reward_duty(RewardDuty::DeactivateNode(node_id))
+            .process_reward_duty(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::DeactivateNode(node_id),
+                msg_id: MessageId::new(),
+                origin: Address::Node(self.network.name().await),
+            })
             .await;
         let second = self.metadata.trigger_chunk_duplication(node_id).await;
         Ok(vec![first, second].into())

@@ -426,9 +426,31 @@ pub enum ChunkDuty {
 /// Elders are responsible for the duties of
 /// keeping track of rewards, and issuing
 /// payouts from the section account.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+pub enum RewardDuty {
+    ///
+    ProcessQuery {
+        query: RewardQuery,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    ///
+    ProcessCmd {
+        cmd: RewardCmd,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    NoOp,
+}
+
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum RewardDuty {
+pub enum RewardCmd {
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
     InitiateSectionActor(Vec<ReplicaEvent>),
@@ -453,19 +475,6 @@ pub enum RewardDuty {
         // The age of the node, determines if it is eligible for rewards yet.
         age: u8,
     },
-    /// When a node is relocated from us, the other
-    /// section will claim the reward counter, so that
-    /// they can pay it out to their new node.
-    GetWalletId {
-        /// The id of the node at the previous section.
-        old_node_id: XorName,
-        /// The id of the node at its new section (i.e. this one).
-        new_node_id: XorName,
-        /// The id of the remote msg.
-        msg_id: MessageId,
-        /// The origin of the remote msg.
-        origin: Address,
-    },
     /// When a node has been relocated to our section
     /// we receive the account id from the other section.
     ActivateNodeRewards {
@@ -482,7 +491,21 @@ pub enum RewardDuty {
     /// receives and accumulates the validated
     /// reward payout from its Replicas,
     ReceivePayoutValidation(TransferValidated),
-    NoOp,
+}
+
+/// payouts from the section account.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum RewardQuery {
+    /// When a node is relocated from us, the other
+    /// section will claim the reward counter, so that
+    /// they can pay it out to their new node.
+    GetWalletId {
+        /// The id of the node at the previous section.
+        old_node_id: XorName,
+        /// The id of the node at its new section (i.e. this one).
+        new_node_id: XorName,
+    },
 }
 
 impl Into<NodeOperation> for RewardDuty {
@@ -543,13 +566,15 @@ impl Into<NodeOperation> for TransferDuty {
 /// handled by AT2 Replicas.
 #[derive(Debug)]
 pub enum TransferQuery {
+    /// Get section actor transfers.
+    GetSectionActorHistory,
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.
     GetBalance(PublicKey),
     /// Get key transfers since specified version.
     GetHistory {
-        /// The balance key.
+        /// The wallet key.
         at: PublicKey,
         /// The last version of transfers we know of.
         since_version: usize,
@@ -559,7 +584,7 @@ pub enum TransferQuery {
     GetStoreCost {
         /// The requester's key.
         requester: PublicKey,
-        ///
+        /// Number of bytes to write.
         bytes: u64,
     },
 }
@@ -596,8 +621,8 @@ impl From<sn_data_types::TransferCmd> for TransferCmd {
             sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
-            sn_data_types::TransferCmd::RegisterTransfer(debit_agreement) => {
-                Self::RegisterTransfer(debit_agreement)
+            sn_data_types::TransferCmd::RegisterTransfer(transfer_agreement) => {
+                Self::RegisterTransfer(transfer_agreement)
             }
         }
     }

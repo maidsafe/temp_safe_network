@@ -51,7 +51,10 @@ impl ElderDuties {
         if first {
             let _ = self.key_section.init_first().await?;
         }
-        self.key_section.catchup_with_section().await
+        //self.key_section.catchup_with_section().await
+        let op1 = self.key_section.catchup_with_section().await;
+        let op2 = self.data_section.catchup_with_section().await;
+        Ok(vec![op2, op1].into())
     }
 
     /// Processing of any Elder duty.
