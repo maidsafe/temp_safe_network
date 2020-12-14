@@ -110,6 +110,7 @@ pub async fn key_commander(
             } else {
                 SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
             };
+
             let sk = Arc::new(sk);
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(sk).await
