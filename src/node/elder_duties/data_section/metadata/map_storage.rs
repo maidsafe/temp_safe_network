@@ -251,7 +251,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetMap(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -274,7 +274,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetMapShell(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -297,7 +297,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetMapVersion(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -331,7 +331,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetMapValue(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -354,7 +354,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::ListMapKeys(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -379,7 +379,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::ListMapValues(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -404,7 +404,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::ListMapEntries(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -427,7 +427,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::ListMapPermissions(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },
@@ -451,7 +451,7 @@ impl MapStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::ListMapUserPermissions(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     query_origin: origin.address(),
                 },

@@ -20,6 +20,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
+use log::info;
 use sn_data_types::{Address, MessageId};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
@@ -87,6 +88,7 @@ impl DataSection {
 
     // Transition the section funds account to the new key.
     pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
+        info!("updating section public key set in data section!");
         let pub_key_set = self.network.public_key_set().await?;
         let keypair = utils::key_pair(self.network.clone()).await?;
         let actor = TransferActor::new(Arc::new(keypair), pub_key_set, Validator {});

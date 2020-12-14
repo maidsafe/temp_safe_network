@@ -70,10 +70,15 @@ impl SectionFunds {
     /// Replica events get synched to section actor instances.
     pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Result<NodeMessagingDuty> {
         info!("Synching replica events to section transfer actor...");
-        let _ = self
+        if let Some(event) = self
             .actor
             .synch_events(events)
-            .map_err(Error::NetworkData)?;
+            .map_err(Error::NetworkData)?
+        {
+            self.actor.apply(TransfersSynched(event.clone()))?;
+            info!("Synched: {:?}", event);
+        }
+        info!("Section Actor balance: {}", self.actor.balance());
         Ok(NodeMessagingDuty::NoOp)
     }
 

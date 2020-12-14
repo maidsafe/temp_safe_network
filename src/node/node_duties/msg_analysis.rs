@@ -51,7 +51,16 @@ impl NetworkMsgAnalysis {
             && self
                 .self_is_handler_for(&msg.destination()?.xorname())
                 .await;
-        Ok(is_dst)
+        Ok(is_dst || (are_we_origin && self.is_genesis_request().await))
+    }
+
+    async fn is_genesis_request(&self) -> bool {
+        let elders = self.routing.our_elder_names().await;
+        if elders.len() == 1 {
+            elders.contains(&self.routing.name().await)
+        } else {
+            false
+        }
     }
 
     async fn are_we_origin(&self, msg: &MsgEnvelope) -> bool {
@@ -70,11 +79,13 @@ impl NetworkMsgAnalysis {
             msg.clone() // TODO remove this clone
         };
 
+        info!("Msg analysis: try_messaging..");
         match self.try_messaging(&msg).await? {
             // Identified as an outbound msg, to be sent on the wire.
             NodeMessagingDuty::NoOp => (),
             op => return Ok(op.into()),
         };
+        info!("Msg analysis: try_client_entry..");
         match self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
@@ -82,20 +93,24 @@ impl NetworkMsgAnalysis {
             GatewayDuty::NoOp => (),
             op => return Ok(op.into()),
         };
+        info!("Msg analysis: try_transfers..");
         match self.try_transfers(&msg).await? {
             TransferDuty::NoOp => (),
             op => return Ok(op.into()),
         };
+        info!("Msg analysis: try_metadata..");
         match self.try_metadata(&msg).await? {
             // Accumulated msg from `Payment`!
             MetadataDuty::NoOp => (),
             op => return Ok(op.into()),
         };
+        info!("Msg analysis: try_adult..");
         match self.try_adult(&msg).await? {
             // Accumulated msg from `Metadata`!
             AdultNoOp => (),
             op => return Ok(op.into()),
         };
+        info!("Msg analysis: try_rewards..");
         match self.try_rewards(&msg).await? {
             // Identified as a Rewards msg
             RewardDuty::NoOp => (),
@@ -109,7 +124,7 @@ impl NetworkMsgAnalysis {
         use Address::*;
         let destined_for_network = match msg.destination()? {
             Client(address) => !self.self_is_handler_for(&address).await,
-            Node(_) => self.are_we_origin(msg).await, // if we sent the msg, then it should go to network..
+            Node(_) => !self.is_dst_for(msg).await?, // if we are not dst, then it should go to network..
             Section(address) => !self.self_is_handler_for(&address).await,
         };
 
@@ -130,6 +145,7 @@ impl NetworkMsgAnalysis {
         let accumulate = self.should_accumulate_for_metadata_write(msg).await? // Metadata Elders accumulate the msgs from Payment Elders.
             // Incoming msg from `Metadata`!
             || self.should_accumulate_for_adult(msg).await? // Adults accumulate the msgs from Metadata Elders.
+            || self.should_accumulate_for_transfers(msg).await? // Transfer Elders accumulate GetSectionActorHistory from Rewards Elders
             || self.should_accumulate_for_rewards(msg).await?; // Rewards Elders accumulate GetWalletId from other Rewards Elders
 
         Ok(accumulate)
@@ -167,7 +183,7 @@ impl NetworkMsgAnalysis {
         Ok(accumulate)
     }
 
-    async fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> Result<bool> {
+    async fn should_accumulate_for_transfers(&self, msg: &MsgEnvelope) -> Result<bool> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -179,29 +195,123 @@ impl NetworkMsgAnalysis {
             info!("from single rewards elder: {:?}", res);
             res
         };
-        let is_accumulating_reward_query = || {
+        let from_single_transfer_elder = || {
+            let res = msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer));
+            info!("from single transfer elder: {:?}", res);
+            res
+        };
+        use NodeQuery::Transfers as TransfersQuery;
+        use NodeQueryResponse::Transfers as TransfersReponse;
+        use NodeTransferQuery::GetReplicaEvents as GetReplicaEventsQuery;
+        use NodeTransferQuery::GetSectionActorHistory;
+        use NodeTransferQueryResponse::GetReplicaEvents as GetReplicaEventsResponse;
+        let from_transfers_to_transfers = || {
             let res1 = matches!(msg.message, Message::NodeQuery {
-                query: NodeQuery::Rewards(NodeRewardQuery::GetWalletId { .. }),
+                query: TransfersQuery(GetReplicaEventsQuery(_)),
                 ..
             });
-            let res2 = matches!(msg.message, Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetSectionActorHistory(_)),
-                ..
-            });
-            info!("is accumulating reward query (GetWalletId): {:?}", res1);
             info!(
-                "is accumulating transfer query (GetSectionActorHistory): {:?}",
+                "is accumulating transfer query (GetReplicaEvents): {:?}",
+                res1
+            );
+
+            let res2 = matches!(msg.message, Message::NodeQueryResponse {
+                response:
+                    TransfersReponse(GetReplicaEventsResponse(_)),
+                ..
+            });
+            info!(
+                "is accumulating transfer response (GetReplicaEvents): {:?}",
                 res2
             );
+
             res1 || res2
         };
 
-        let accumulate = is_accumulating_reward_query()
-            && from_single_rewards_elder()
+        let from_rewards_to_transfers = || {
+            let res = matches!(msg.message, Message::NodeQuery {
+                query: TransfersQuery(GetSectionActorHistory(_)),
+                ..
+            });
+            info!(
+                "is accumulating transfer query (GetSectionActorHistory): {:?}",
+                res
+            );
+            res
+        };
+
+        let from_rewards = || from_rewards_to_transfers() && from_single_rewards_elder();
+        let from_transfers = || from_transfers_to_transfers() && from_single_transfer_elder();
+
+        let accumulate_for_transfers = (from_rewards() || from_transfers())
             && self.is_dst_for(msg).await?
             && self.is_elder().await;
 
-        Ok(accumulate)
+        Ok(accumulate_for_transfers)
+    }
+
+    async fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> Result<bool> {
+        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
+            duty
+        } else {
+            return Ok(false);
+        };
+
+        use NodeQueryResponse::Rewards;
+        use NodeRewardQuery::GetWalletId as GetWalletIdQuery;
+        use NodeRewardQueryResponse::GetWalletId as GetWalletIdResponse;
+        let from_single_rewards_elder = || {
+            let res = msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Rewards));
+            info!("from single rewards elder: {:?}", res);
+            res
+        };
+        let from_rewards_to_rewards = || {
+            let res1 = matches!(msg.message, Message::NodeQuery {
+                query: NodeQuery::Rewards(GetWalletIdQuery { .. }),
+                ..
+            });
+            info!("is accumulating reward query (GetWalletId): {:?}", res1);
+
+            let res2 = matches!(msg.message, Message::NodeQueryResponse {
+                response: Rewards(GetWalletIdResponse { .. }),
+                ..
+            });
+            info!("is accumulating reward response (GetWalletId): {:?}", res2);
+
+            res1 || res2
+        };
+
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        let from_single_transfer_elder = || {
+            let res = msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer));
+            info!("from single transfer elder: {:?}", res);
+            res
+        };
+        let from_transfers_to_rewards = || {
+            let res = matches!(msg.message, Message::NodeQueryResponse {
+                response:
+                    Transfers(GetSectionActorHistory(_)),
+                ..
+            });
+            info!(
+                "is accumulating transfer response (GetSectionActorHistory): {:?}",
+                res
+            );
+            res
+        };
+
+        let from_rewards = || from_rewards_to_rewards() && from_single_rewards_elder();
+        let from_transfers = || from_transfers_to_rewards() && from_single_transfer_elder();
+
+        let accumulate_for_rewards = (from_rewards() || from_transfers())
+            && self.is_dst_for(msg).await?
+            && self.is_elder().await;
+
+        Ok(accumulate_for_rewards)
     }
 
     /// Adults accumulate the write requests from Elders.
@@ -461,14 +571,17 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        info!("Msg analysis: try_nonacc_rewards..");
         match self.try_nonacc_rewards(msg).await? {
             RewardDuty::NoOp => (),
             op => return Ok(op),
         };
+        info!("Msg analysis: try_accumulated_rewards..");
         match self.try_accumulated_rewards(msg).await? {
             RewardDuty::NoOp => (),
             op => return Ok(op),
         };
+        info!("Msg analysis: try_wallet_register..");
         self.try_wallet_register(msg).await
     }
 
@@ -522,7 +635,7 @@ impl NetworkMsgAnalysis {
         }
         // SectionPayoutValidated and GetWalletId
         // do not need accumulation since they are accumulated in the domain logic.
-        use NodeRewardQueryResponse::*;
+
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
@@ -530,18 +643,6 @@ impl NetworkMsgAnalysis {
                 ..
             } => Ok(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::ReceivePayoutValidation(validation.clone()),
-                msg_id: *id,
-                origin: msg.origin.address(),
-            }),
-            Message::NodeQueryResponse {
-                response: NodeQueryResponse::Rewards(GetWalletId(Ok((wallet_id, new_node_id)))),
-                id,
-                ..
-            } => Ok(RewardDuty::ProcessCmd {
-                cmd: RewardCmd::ActivateNodeRewards {
-                    id: *wallet_id,
-                    node_id: *new_node_id,
-                },
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
@@ -556,20 +657,32 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(RewardDuty::NoOp);
         };
-        let from_rewards_section = || {
+        let from_rewards_section = {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
 
+        info!(
+            "Msg analysis: from_rewards_section: {}",
+            from_rewards_section
+        );
+
         let shall_process_accumulated =
-            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+            from_rewards_section && self.is_dst_for(msg).await? && self.is_elder().await;
+
+        info!(
+            "Msg analysis: shall_process_accumulated: {}",
+            shall_process_accumulated
+        );
 
         if shall_process_accumulated {
-            use NodeRewardQuery::*;
+            use NodeQueryResponse::Rewards;
+            use NodeRewardQuery::GetWalletId as GetWalletIdQuery;
+            use NodeRewardQueryResponse::GetWalletId as GetWalletIdResponse;
             return match &msg.message {
                 Message::NodeQuery {
                     query:
-                        NodeQuery::Rewards(GetWalletId {
+                        NodeQuery::Rewards(GetWalletIdQuery {
                             old_node_id,
                             new_node_id,
                         }),
@@ -582,6 +695,18 @@ impl NetworkMsgAnalysis {
                     msg_id: *id,
                     origin: msg.origin.address(),
                 }),
+                Message::NodeQueryResponse {
+                    response: Rewards(GetWalletIdResponse(Ok((wallet_id, new_node_id)))),
+                    id,
+                    ..
+                } => Ok(RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::ActivateNodeRewards {
+                        id: *wallet_id,
+                        node_id: *new_node_id,
+                    },
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
                 _ => Ok(RewardDuty::NoOp),
             };
         }
@@ -589,26 +714,27 @@ impl NetworkMsgAnalysis {
         // From Transfer module, we get
         // `GetSectionActorHistory` query response.
 
-        info!("Trying: Do we have a GetSectionActorHistory query response?");
-
-        let from_transfer_section = || {
+        let from_transfer_section = {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
+        info!(
+            "Msg analysis: from_transfer_section: {}",
+            from_transfer_section
+        );
 
         let shall_process =
-            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+            from_transfer_section && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process {
             return Ok(RewardDuty::NoOp);
         }
 
+        use NodeQueryResponse::Transfers;
+        use NodeTransferQueryResponse::*;
         match &msg.message {
             Message::NodeQueryResponse {
-                response:
-                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetSectionActorHistory(Ok(
-                        events,
-                    ))),
+                response: Transfers(GetSectionActorHistory(Ok(events))),
                 id,
                 ..
             } => {
@@ -625,6 +751,123 @@ impl NetworkMsgAnalysis {
 
     // Check internal transfer cmds.
     async fn try_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
+        info!("Msg analysis: try_nonacc_transfers..");
+        match self.try_nonacc_transfers(msg).await? {
+            TransferDuty::NoOp => (),
+            op => return Ok(op),
+        };
+        info!("Msg analysis: try_accumulated_transfers..");
+        self.try_accumulated_transfers(msg).await
+    }
+
+    // Check accumulated transfer msgs.
+    async fn try_accumulated_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
+        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
+            duty
+        } else {
+            return Ok(TransferDuty::NoOp);
+        };
+
+        let from_rewards_section = || {
+            msg.most_recent_sender().is_section()
+                && matches!(duty, Duty::Elder(ElderDuties::Rewards))
+        };
+
+        let shall_process_accumulated =
+            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+
+        if shall_process_accumulated {
+            use NodeTransferQuery::GetSectionActorHistory;
+            return match &msg.message {
+                Message::NodeQuery {
+                    query: NodeQuery::Transfers(GetSectionActorHistory(public_key)),
+                    id,
+                } => {
+                    // This comparison is a good example of the need to use `lazy messaging`,
+                    // as to handle that the expected public key is not the same as the current.
+                    if let Some(section_pk) = self.routing.section_public_key().await {
+                        if public_key == &section_pk {
+                            info!("TransferQuery::GetSectionActorHistory received!");
+                            Ok(TransferDuty::ProcessQuery {
+                                query: TransferQuery::GetSectionActorHistory,
+                                msg_id: *id,
+                                origin: msg.origin.address(),
+                            })
+                        } else {
+                            error!("Unexpected public key!");
+                            Err(Error::Logic("Unexpected PK".to_string()))
+                        }
+                    } else {
+                        error!("No section public key found!");
+                        Err(Error::Logic("No section PK found".to_string()))
+                    }
+                }
+                _ => Ok(TransferDuty::NoOp),
+            };
+        }
+
+        let from_transfer_section = {
+            msg.most_recent_sender().is_section()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        info!(
+            "Msg analysis: from_transfer_section: {}",
+            from_transfer_section
+        );
+
+        let from_transfers_section = || {
+            msg.most_recent_sender().is_section()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+
+        let shall_process_accumulated =
+            from_transfers_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+
+        if !shall_process_accumulated {
+            return Ok(TransferDuty::NoOp);
+        }
+
+        use NodeQueryResponse::Transfers;
+        use NodeTransferQuery::GetReplicaEvents as GetReplicaEventsQuery;
+        use NodeTransferQueryResponse::GetReplicaEvents;
+        match &msg.message {
+            Message::NodeQuery {
+                query: NodeQuery::Transfers(GetReplicaEventsQuery(public_key)),
+                id,
+            } => {
+                // This comparison is a good example of the need to use `lazy messaging`,
+                // as to handle that the expected public key is not the same as the current.
+                if let Some(section_pk) = self.routing.section_public_key().await {
+                    if public_key == &section_pk {
+                        Ok(TransferDuty::ProcessQuery {
+                            query: TransferQuery::GetReplicaEvents,
+                            msg_id: *id,
+                            origin: msg.origin.address(),
+                        })
+                    } else {
+                        error!("Unexpected public key!");
+                        Err(Error::Logic("Unexpected PK".to_string()))
+                    }
+                } else {
+                    error!("No section public key found!");
+                    Err(Error::Logic("No section PK found".to_string()))
+                }
+            }
+            Message::NodeQueryResponse {
+                response: Transfers(GetReplicaEvents(events)),
+                id,
+                ..
+            } => Ok(TransferDuty::ProcessCmd {
+                cmd: TransferCmd::InitiateReplica(events.clone()?),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            _ => Ok(TransferDuty::NoOp),
+        }
+    }
+
+    // Check non accumulated transfer msgss.
+    async fn try_nonacc_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
         use NodeTransferCmd::*;
 
         // From Transfer module we get `PropagateTransfer`.
@@ -649,40 +892,6 @@ impl NetworkMsgAnalysis {
                     id,
                 } => Ok(TransferDuty::ProcessCmd {
                     cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                }),
-                Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(public_key)),
-                    id,
-                } => {
-                    // This comparison is a good example of the need to use `lazy messaging`,
-                    // as to handle that the expected public key is not the same as the current.
-                    if let Some(section_pk) = self.routing.section_public_key().await {
-                        if public_key == &section_pk {
-                            Ok(TransferDuty::ProcessQuery {
-                                query: TransferQuery::GetReplicaEvents,
-                                msg_id: *id,
-                                origin: msg.origin.address(),
-                            })
-                        } else {
-                            error!("Unexpected public key!");
-                            Err(Error::Logic("Unexpected PK".to_string()))
-                        }
-                    } else {
-                        error!("No section public key found!");
-                        Err(Error::Logic("No section PK found".to_string()))
-                    }
-                }
-                Message::NodeQueryResponse {
-                    response:
-                        NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(
-                            events,
-                        )),
-                    id,
-                    ..
-                } => Ok(TransferDuty::ProcessCmd {
-                    cmd: TransferCmd::InitiateReplica(events.clone()?),
                     msg_id: *id,
                     origin: msg.origin.address(),
                 }),
@@ -723,29 +932,7 @@ impl NetworkMsgAnalysis {
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
-            Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetSectionActorHistory(public_key)),
-                id,
-            } => {
-                // This comparison is a good example of the need to use `lazy messaging`,
-                // as to handle that the expected public key is not the same as the current.
-                if let Some(section_pk) = self.routing.section_public_key().await {
-                    if public_key == &section_pk {
-                        info!("TransferQuery::GetSectionActorHistory received!");
-                        Ok(TransferDuty::ProcessQuery {
-                            query: TransferQuery::GetSectionActorHistory,
-                            msg_id: *id,
-                            origin: msg.origin.address(),
-                        })
-                    } else {
-                        error!("Unexpected public key!");
-                        Err(Error::Logic("Unexpected PK".to_string()))
-                    }
-                } else {
-                    error!("No section public key found!");
-                    Err(Error::Logic("No section PK found".to_string()))
-                }
-            }
+
             _ => Ok(TransferDuty::NoOp),
         }
     }

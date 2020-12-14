@@ -1767,6 +1767,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
 
 [[package]]
+name = "numtoa"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
+
+[[package]]
 name = "object"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2242,6 +2248,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
+name = "redox_termios"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e891cfe48e9100a70a3b6eb652fef28920c117d366339687bd5576160db0f76"
+dependencies = [
+ "redox_syscall",
+]
+
+[[package]]
 name = "redox_users"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2315,6 +2330,18 @@ dependencies = [
  "web-sys",
  "webpki-roots",
  "winreg",
+]
+
+[[package]]
+name = "resource_proof"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e66c5d4c791f45a7aed7ad699b1d0ddce80544a17eeb703f4480b775e9b593b1"
+dependencies = [
+ "clap",
+ "rand 0.4.6",
+ "termion",
+ "tiny-keccak 1.5.0",
 ]
 
 [[package]]
@@ -2653,7 +2680,7 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.11.37"
-source = "git+https://github.com/oetyng/sn_data_types?branch=initiate-section-actor#3419e275c933caa5b3560aefa45cf0267dbf632b"
+source = "git+https://github.com/oetyng/sn_data_types?branch=initiate-section-actor#6f5cf29b57ddcb6baad61b014dff503e3aaf43f0"
 dependencies = [
  "bincode",
  "crdts",
@@ -2731,9 +2758,8 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.38.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc028836322b8a344485995bbb833d57ac2a77c3a20a42929d18ff67324d6b00"
+version = "0.39.5"
+source = "git+https://github.com/oetyng/sn_routing?branch=initiate-section-actor#b3a3eec69efaee5f3bea26aefb12c9f147a89fae"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2744,22 +2770,23 @@ dependencies = [
  "futures",
  "hex_fmt",
  "itertools",
- "log",
  "lru_time_cache",
  "qp2p",
  "rand 0.7.3",
  "rand_chacha",
+ "resource_proof",
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
  "tokio",
+ "tracing",
  "xor_name",
 ]
 
 [[package]]
 name = "sn_transfers"
 version = "0.2.4"
-source = "git+https://github.com/oetyng/sn_transfers?branch=initiate-section-actor#c9217a12c4d36198e4aeca48c5df066f566ae3dd"
+source = "git+https://github.com/oetyng/sn_transfers?branch=initiate-section-actor#5fd6715ac74037750c128752f3624a5c5f0f4945"
 dependencies = [
  "bincode",
  "crdts",
@@ -2950,6 +2977,18 @@ checksum = "4bd2d183bd3fac5f5fe38ddbeb4dc9aec4a39a9d7d59e7491d900302da01cbe1"
 dependencies = [
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "termion"
+version = "1.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c22cec9d8978d906be5ac94bceb5a010d885c626c4c8855721a4dbd20e3ac905"
+dependencies = [
+ "libc",
+ "numtoa",
+ "redox_syscall",
+ "redox_termios",
 ]
 
 [[package]]

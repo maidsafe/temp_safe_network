@@ -116,7 +116,7 @@ impl ChunkStorage {
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     response: QueryResponse::GetBlob(result),
                     correlation_id: msg_id,
                     query_origin: origin.address(),

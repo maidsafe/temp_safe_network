@@ -157,7 +157,13 @@ impl Node {
         let mut next_op = op;
         while let Ok(op) = next_op {
             next_op = match op {
-                Single(operation) => self.process(operation).await,
+                Single(operation) => match self.process(operation).await {
+                    Err(e) => {
+                        self.handle_error(&e);
+                        Ok(NoOp)
+                    }
+                    result => result,
+                },
                 Multiple(ops) => {
                     let mut node_ops = Vec::new();
                     for c in ops.into_iter() {

@@ -23,7 +23,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
 };
-use tiny_keccak::sha3_256;
 use xor_name::XorName;
 
 // The number of separate copies of a blob chunk which should be maintained.
@@ -326,10 +325,7 @@ impl BlobRegister {
             .await
             .into_iter()
             .map(|new_holder| {
-                let mut hash_bytes = Vec::new();
-                hash_bytes.extend_from_slice(&address.name().0);
-                hash_bytes.extend_from_slice(&new_holder.0);
-                let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                let message_id = MessageId::combine(vec![*address.name(), new_holder]);
                 info!("Sending duplicate chunk msg to NewHolder {:?}", new_holder);
                 Message::NodeCmd {
                     cmd: Data(DuplicateChunk {
@@ -374,7 +370,7 @@ impl BlobRegister {
             self.wrapping.send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetBlob(Err(error)),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },

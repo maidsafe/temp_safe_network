@@ -90,7 +90,7 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
 /// Uses SNLT to create a local network of nodes
 pub async fn run_network() -> Result<(), String> {
     info!("Starting local network");
-    let verbosity = 0;
+    let verbosity = 4;
     let node_path = Some(PathBuf::from("./target/release"));
     let node_path = get_node_bin_path(node_path)?;
 

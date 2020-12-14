@@ -90,6 +90,7 @@ impl Rewards {
     /// asking for their events, as to catch up and
     /// start working properly in the group.
     pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
+        info!("Rewards: Catching up with our Replicas (section actor history)!");
         // prepare actor init
         let pub_key = self.section_funds.replicas();
         self.wrapping
@@ -379,7 +380,7 @@ impl Rewards {
                         response: Rewards(GetWalletId(Err(NdError::NetworkOther(
                             "Node is not being relocated.".to_string(),
                         )))),
-                        id: MessageId::new(),
+                        id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
                         query_origin: origin.clone(),
                     })
@@ -399,7 +400,7 @@ impl Rewards {
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Rewards(GetWalletId(Ok((wallet, new_node_id)))),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin.clone(),
             })

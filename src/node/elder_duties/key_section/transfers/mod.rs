@@ -85,6 +85,7 @@ impl Transfers {
     /// asking for their events, as to catch up and
     /// start working properly in the group.
     pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
+        info!("Transfers: Catching up with transfer Replicas!");
         // prepare replica init
         let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
         self.wrapping
@@ -305,7 +306,7 @@ impl Transfers {
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(result)),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -332,7 +333,7 @@ impl Transfers {
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetStoreCost(result),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -350,7 +351,7 @@ impl Transfers {
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetReplicaKeys(Ok(pk_set)),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -375,7 +376,7 @@ impl Transfers {
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -400,7 +401,7 @@ impl Transfers {
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetSectionActorHistory(result)),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -424,7 +425,7 @@ impl Transfers {
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetHistory(result),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })

@@ -113,7 +113,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequence(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
@@ -199,7 +199,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceRange(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
@@ -229,7 +229,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceLastEntry(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
@@ -259,7 +259,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceOwner(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
@@ -282,7 +282,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceUserPermissions(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
@@ -314,7 +314,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequencePublicPolicy(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
@@ -346,7 +346,7 @@ impl SequenceStorage {
             .send_to_section(
                 Message::QueryResponse {
                     response: QueryResponse::GetSequencePrivatePolicy(result),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     query_origin: origin.address(),
                     correlation_id: msg_id,
                 },
