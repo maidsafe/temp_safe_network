@@ -47,7 +47,6 @@ impl ElderDuties {
     /// as to catch up with shares state and
     /// start working properly in the group.
     pub async fn initiate(&mut self, first: bool) -> Result<NodeOperation> {
-        // currently only key section needs to catch up
         let mut ops = vec![];
         if first {
             ops.push(self.key_section.init_first().await?);

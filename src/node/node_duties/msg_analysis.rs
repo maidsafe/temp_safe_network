@@ -25,7 +25,6 @@ use sn_data_types::{
     NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
-use tiny_keccak::sha3_256;
 use xor_name::XorName;
 
 // NB: This approach is not entirely good, so will need to be improved.
@@ -79,13 +78,11 @@ impl NetworkMsgAnalysis {
             msg.clone() // TODO remove this clone
         };
 
-        info!("Msg analysis: try_messaging..");
         match self.try_messaging(&msg).await? {
             // Identified as an outbound msg, to be sent on the wire.
             NodeMessagingDuty::NoOp => (),
             op => return Ok(op.into()),
         };
-        info!("Msg analysis: try_client_entry..");
         match self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
@@ -93,24 +90,20 @@ impl NetworkMsgAnalysis {
             GatewayDuty::NoOp => (),
             op => return Ok(op.into()),
         };
-        info!("Msg analysis: try_transfers..");
         match self.try_transfers(&msg).await? {
             TransferDuty::NoOp => (),
             op => return Ok(op.into()),
         };
-        info!("Msg analysis: try_metadata..");
         match self.try_metadata(&msg).await? {
             // Accumulated msg from `Payment`!
             MetadataDuty::NoOp => (),
             op => return Ok(op.into()),
         };
-        info!("Msg analysis: try_adult..");
         match self.try_adult(&msg).await? {
             // Accumulated msg from `Metadata`!
             AdultNoOp => (),
             op => return Ok(op.into()),
         };
-        info!("Msg analysis: try_rewards..");
         match self.try_rewards(&msg).await? {
             // Identified as a Rewards msg
             RewardDuty::NoOp => (),
@@ -161,18 +154,13 @@ impl NetworkMsgAnalysis {
         };
 
         let from_single_payment_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Payment));
-            info!("from single payment elder: {:?}", res);
-            res
+            msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Payment))
         };
         let is_data_cmd = || {
-            let res = matches!(msg.message, Message::Cmd {
+            matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
                 ..
-            });
-            info!("is data cmd: {:?}", res);
-            res
+            })
         };
 
         let accumulate = is_data_cmd()
@@ -190,16 +178,11 @@ impl NetworkMsgAnalysis {
             return Ok(false);
         };
         let from_single_rewards_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Rewards));
-            info!("from single rewards elder: {:?}", res);
-            res
+            msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
         let from_single_transfer_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer));
-            info!("from single transfer elder: {:?}", res);
-            res
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         use NodeQuery::Transfers as TransfersQuery;
         use NodeQueryResponse::Transfers as TransfersReponse;
@@ -211,34 +194,19 @@ impl NetworkMsgAnalysis {
                 query: TransfersQuery(GetReplicaEventsQuery(_)),
                 ..
             });
-            info!(
-                "is accumulating transfer query (GetReplicaEvents): {:?}",
-                res1
-            );
-
             let res2 = matches!(msg.message, Message::NodeQueryResponse {
                 response:
                     TransfersReponse(GetReplicaEventsResponse(_)),
                 ..
             });
-            info!(
-                "is accumulating transfer response (GetReplicaEvents): {:?}",
-                res2
-            );
-
             res1 || res2
         };
 
         let from_rewards_to_transfers = || {
-            let res = matches!(msg.message, Message::NodeQuery {
+            matches!(msg.message, Message::NodeQuery {
                 query: TransfersQuery(GetSectionActorHistory(_)),
                 ..
-            });
-            info!(
-                "is accumulating transfer query (GetSectionActorHistory): {:?}",
-                res
-            );
-            res
+            })
         };
 
         let from_rewards = || from_rewards_to_transfers() && from_single_rewards_elder();
@@ -492,10 +460,7 @@ impl NetworkMsgAnalysis {
                     let proof_chain = self.routing.our_history().await;
 
                     // Recreate original MessageId from Section
-                    let mut hash_bytes = Vec::new();
-                    hash_bytes.extend_from_slice(&address.name().0);
-                    hash_bytes.extend_from_slice(&new_holder.0);
-                    let msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                    let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
 
                     // Recreate Message that was sent by the message.
                     let message = Message::NodeCmd {
@@ -538,10 +503,8 @@ impl NetworkMsgAnalysis {
                 } => {
                     info!("Verifying GiveChunk Message!");
                     // Recreate original MessageId from Section
-                    let mut hash_bytes = Vec::new();
-                    hash_bytes.extend_from_slice(&blob.address().name().0);
-                    hash_bytes.extend_from_slice(&self.routing.name().await.0);
-                    let msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                    let msg_id =
+                        MessageId::combine(vec![*blob.address().name(), self.routing.name().await]);
                     if msg_id == *correlation_id {
                         Some(StoreDuplicatedBlob {
                             // TODO: Remove the clone
@@ -571,17 +534,14 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
-        info!("Msg analysis: try_nonacc_rewards..");
         match self.try_nonacc_rewards(msg).await? {
             RewardDuty::NoOp => (),
             op => return Ok(op),
         };
-        info!("Msg analysis: try_accumulated_rewards..");
         match self.try_accumulated_rewards(msg).await? {
             RewardDuty::NoOp => (),
             op => return Ok(op),
         };
-        info!("Msg analysis: try_wallet_register..");
         self.try_wallet_register(msg).await
     }
 
@@ -657,23 +617,12 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(RewardDuty::NoOp);
         };
-        let from_rewards_section = {
+        let from_rewards_section = || {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-
-        info!(
-            "Msg analysis: from_rewards_section: {}",
-            from_rewards_section
-        );
-
         let shall_process_accumulated =
-            from_rewards_section && self.is_dst_for(msg).await? && self.is_elder().await;
-
-        info!(
-            "Msg analysis: shall_process_accumulated: {}",
-            shall_process_accumulated
-        );
+            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if shall_process_accumulated {
             use NodeQueryResponse::Rewards;
@@ -714,18 +663,12 @@ impl NetworkMsgAnalysis {
         // From Transfer module, we get
         // `GetSectionActorHistory` query response.
 
-        let from_transfer_section = {
+        let from_transfer_section = || {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        info!(
-            "Msg analysis: from_transfer_section: {}",
-            from_transfer_section
-        );
-
         let shall_process =
-            from_transfer_section && self.is_dst_for(msg).await? && self.is_elder().await;
-
+            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
         if !shall_process {
             return Ok(RewardDuty::NoOp);
         }
@@ -767,12 +710,10 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(TransferDuty::NoOp);
         };
-
         let from_rewards_section = || {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-
         let shall_process_accumulated =
             from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
 
@@ -806,23 +747,12 @@ impl NetworkMsgAnalysis {
             };
         }
 
-        let from_transfer_section = {
-            msg.most_recent_sender().is_section()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
-        };
-        info!(
-            "Msg analysis: from_transfer_section: {}",
-            from_transfer_section
-        );
-
         let from_transfers_section = || {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-
         let shall_process_accumulated =
             from_transfers_section() && self.is_dst_for(msg).await? && self.is_elder().await;
-
         if !shall_process_accumulated {
             return Ok(TransferDuty::NoOp);
         }
@@ -881,7 +811,6 @@ impl NetworkMsgAnalysis {
             msg.most_recent_sender().is_elder()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-
         let shall_process =
             from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
 
@@ -905,15 +834,11 @@ impl NetworkMsgAnalysis {
         let from_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-
         let shall_process =
             from_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
-
         if !shall_process {
             return Ok(TransferDuty::NoOp);
         }
-
-        info!("Trying: Is this a TransferQuery::GetSectionActorHistory?");
 
         match &msg.message {
             Message::NodeCmd {
@@ -932,7 +857,6 @@ impl NetworkMsgAnalysis {
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
-
             _ => Ok(TransferDuty::NoOp),
         }
     }

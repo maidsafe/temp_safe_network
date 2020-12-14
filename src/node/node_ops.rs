@@ -498,8 +498,7 @@ pub enum RewardCmd {
 #[allow(clippy::large_enum_variant)]
 pub enum RewardQuery {
     /// When a node is relocated from us, the other
-    /// section will claim the reward counter, so that
-    /// they can pay it out to their new node.
+    /// section will query for the node wallet id.
     GetWalletId {
         /// The id of the node at the previous section.
         old_node_id: XorName,

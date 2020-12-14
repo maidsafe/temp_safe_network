@@ -78,11 +78,9 @@ impl DataSection {
         }
     }
 
-    /// Issues queries to Elders of the section
-    /// as to catch up with shares state and
-    /// start working properly in the group.
+    /// Issues query to Elders of the section
+    /// as to catch up with the current state of the replicas.
     pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
-        // currently only at2 replicas need to catch up
         self.rewards.catchup_with_replicas().await
     }
 
