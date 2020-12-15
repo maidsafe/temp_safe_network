@@ -65,16 +65,17 @@ impl Safe {
     pub async fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: &str,
-    ) -> Result<(String, Keypair)> {
+    ) -> Result<(String, Arc<Keypair>)> {
         let amount = parse_coins_amount(preload_amount)?;
         let mut rng = OsRng;
-        let keypair = Keypair::new_ed25519(&mut rng);
+        let keypair = Arc::new(Keypair::new_ed25519(&mut rng));
         self.safe_client
-            .trigger_simulated_farming_payout(amount)
+            .trigger_simulated_farming_payout(amount, Some(Arc::clone(&keypair)))
             .await?;
-        let xorname = XorName::from(keypair.public_key());
 
+        let xorname = XorName::from(keypair.public_key());
         let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+
         Ok((xorurl, keypair))
     }
 

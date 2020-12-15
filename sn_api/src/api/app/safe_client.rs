@@ -112,8 +112,16 @@ impl SafeAppClient {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn trigger_simulated_farming_payout(&mut self, amount: Money) -> Result<()> {
-        let mut client = self.get_safe_client()?;
+    pub async fn trigger_simulated_farming_payout(
+        &mut self,
+        amount: Money,
+        id: Option<Arc<Keypair>>,
+    ) -> Result<()> {
+        let mut client = if id.is_some() {
+            Client::new(id, self.bootstrap_config.clone()).await?
+        } else {
+            self.get_safe_client()?
+        };
 
         client.trigger_simulated_farming_payout(amount).await?;
 

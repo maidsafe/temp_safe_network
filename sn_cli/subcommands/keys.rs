@@ -175,7 +175,7 @@ pub async fn create_new_key(
 
         let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
 
-        Ok((xorurl, Some(Arc::new(key_pair)), Some(amount)))
+        Ok((xorurl, Some(key_pair), Some(amount)))
     } else {
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
