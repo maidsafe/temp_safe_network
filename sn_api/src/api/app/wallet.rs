@@ -312,9 +312,7 @@ impl Safe {
         amount: &str,
         from_url: Option<&str>,
         to_url: &str,
-        // tx_id: Option<u64>,
-        // TODO: return tx id if that stillmakes sense
-    ) -> Result<()> {
+    ) -> Result<u64> {
         // Parse and validate the amount is valid
         let amount_coins = parse_coins_amount(amount)?;
 
@@ -364,9 +362,6 @@ impl Safe {
             )));
         };
 
-        // Generate a random transfer TX ID
-        // let tx_id = tx_id.unwrap_or_else(|| rand::thread_rng().next_u64());
-
         let from_wallet_balance = resolve_wallet_url(
             self,
             from_wallet_url,
@@ -376,6 +371,7 @@ impl Safe {
         .await?;
         let from_sk = ed_sk_from_hex(&from_wallet_balance.sk)?;
         let keypair = Arc::new(Keypair::from(from_sk));
+
         // Finally, let's make the transfer
         match self
             .safe_client
@@ -394,9 +390,7 @@ impl Safe {
                 "Unexpected error when attempting to transfer: {}",
                 other_error
             ))),
-            // TODO: return tx id...
-            Ok(_tx) => Ok(()),
-            // Ok(tx) => Ok(tx.id),
+            Ok(tx) => Ok(tx),
         }
     }
 

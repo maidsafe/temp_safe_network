@@ -131,54 +131,51 @@ impl SafeAppClient {
     pub async fn safecoin_transfer_to_xorname(
         &self,
         from_id: Option<Arc<Keypair>>,
-        _to_xorname: XorName,
-        _amount: Money,
-    ) -> Result<()> {
-        let _client = match from_id {
-            Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
-            None => self.get_safe_client()?,
-        };
+        to_xorname: XorName,
+        amount: Money,
+    ) -> Result<u64> {
+        // Get pk from xorname. We assume Ed25519 key for now, which is
+        // 32 bytes long, just like a xorname.
+        // TODO: support for BLS keys which are longer.
+        let to_pk = ed25519_dalek::PublicKey::from_bytes(to_xorname.as_ref()).map_err(|err| {
+            Error::NetDataError(format!(
+                "Failed to derive Ed25519 PublicKey from Xorname '{}': {:?}",
+                to_xorname, err
+            ))
+        })?;
 
-        unimplemented!();
-
-        // TODO: attempt to get wallet pk from xorname
-
-        // let to_pk = self.fetch(format!("safe://{:?}", to_xorname));
-        // let to_url  = xorurl::SafeUrl::from::<XorName>(to_xorname);
-
-        // let from_fullid = from_sk.map(Keypair::from);
-        // let transfer_id = client
-        //     .send_money( to_xorname, amount)
-        //     .await
-        //     .map_err(|err| match err {
-        //         SafeClientError::DataError(SafeNdError::ExcessiveValue)
-        //         | SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
-        //             Error::NotEnoughBalance(amount.to_string())
-        //         }
-        //         SafeClientError::DataError(SafeNdError::InvalidOperation) => {
-        //             Error::InvalidAmount(amount.to_string())
-        //         }
-        //         other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
-        //     })?;
-
-        // Ok(transfer_id)
+        self.safecoin_transfer_to_pk(from_id, to_pk.into(), amount)
+            .await
     }
 
-    #[allow(dead_code)]
     pub async fn safecoin_transfer_to_pk(
         &self,
         from_id: Option<Arc<Keypair>>,
         to_pk: PublicKey,
         amount: Money,
-    ) -> Result<(u64, PublicKey)> {
+    ) -> Result<u64> {
         let client = match from_id {
             Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
             None => self.get_safe_client()?,
         };
 
-        let transfer_id = client.send_money(to_pk, amount).await?;
+        let (dot_counter, _dot_actor) =
+            client
+                .send_money(to_pk, amount)
+                .await
+                .map_err(|err| match err {
+                    SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
+                        Error::NotEnoughBalance(amount.to_string())
+                    }
+                    SafeClientError::DataError(SafeNdError::ExcessiveValue)
+                    | SafeClientError::DataError(SafeNdError::InvalidOperation) => {
+                        Error::InvalidAmount(amount.to_string())
+                    }
+                    other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
+                })?;
 
-        Ok(transfer_id)
+        // TODO: perhaps include the actor as part of the TX ID
+        Ok(dot_counter)
     }
 
     // // === Blob operations ===

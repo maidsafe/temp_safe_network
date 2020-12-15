@@ -146,9 +146,9 @@ pub async fn key_commander(
                 .await?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Successful. TX_ID: {:?}", &tx_id);
+                println!("Successful. TX_ID: {}", tx_id);
             } else {
-                println!("{:?}", &tx_id)
+                println!("{}", tx_id)
             }
 
             Ok(())

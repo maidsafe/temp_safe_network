@@ -181,7 +181,7 @@ impl Safe {
         amount: &str,
         from_sk_str: Option<&str>,
         to_url: &str,
-    ) -> Result<()> {
+    ) -> Result<u64> {
         // Parse and validate the amount is a valid
         let amount_coins = parse_coins_amount(amount)?;
 
@@ -234,9 +234,7 @@ impl Safe {
                 "Unexpected error when attempting to transfer: {}",
                 other_error
             ))),
-            // TODO: return transfer id...?
-            Ok(_tx) => Ok(()),
-            // Ok(tx) => Ok(tx.id),
+            Ok(id) => Ok(id),
         }
     }
 }
