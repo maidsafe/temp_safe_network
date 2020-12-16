@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Result, Safe, SecretKey};
+use crate::{Result, Safe};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::env::var;
@@ -31,13 +31,4 @@ pub async fn new_safe_instance() -> Result<Safe> {
 // Create a random NRS name
 pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
-}
-
-// Get hex string of a SecretKey
-pub fn sk_to_hex_str(sk: SecretKey) -> String {
-    match sk {
-        SecretKey::Ed25519(sk) => sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
-        SecretKey::Bls(sk) => sk.inner().reveal(),
-        SecretKey::BlsShare(sk) => sk.inner().reveal(),
-    }
 }

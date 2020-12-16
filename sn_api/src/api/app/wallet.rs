@@ -64,19 +64,8 @@ impl Safe {
         let acutal_sk = ed_sk_from_hex(sk)?;
         let keypair = Arc::new(Keypair::from(acutal_sk));
         let xorname = XorName::from(keypair.public_key());
-        let xorurl = XorUrlEncoder::encode(
-            xorname,
-            None,
-            0,
-            SafeDataType::SafeKey,
-            SafeContentType::Raw,
-            None,
-            None,
-            None,
-            None,
-            None,
-            self.xorurl_base,
-        )?;
+        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+
         let value = WalletSpendableBalance {
             xorurl: xorurl.clone(),
             sk: sk.to_string(),
@@ -113,13 +102,15 @@ impl Safe {
         );
 
         if default {
+            let default_key = md_key.to_string().into_bytes();
+
             match self
                 .safe_client
                 .map_insert(
                     xorurl_encoder.xorname(),
                     WALLET_TYPE_TAG,
                     WALLET_DEFAULT_BYTES,
-                    &md_key.to_string().into_bytes(),
+                    &default_key,
                 )
                 .await
             {
@@ -130,7 +121,7 @@ impl Safe {
                             xorurl_encoder.xorname(),
                             WALLET_TYPE_TAG,
                             WALLET_DEFAULT_BYTES,
-                            &md_key.to_string().into_bytes(),
+                            &default_key,
                             version + 1,
                         )
                         .await
@@ -244,7 +235,7 @@ impl Safe {
                     url
                 )),
                 Error::ContentNotFound(_) => {
-                    Error::ContentError(format!("No Wallet found at Wallet \"{}\"", url))
+                    Error::ContentError(format!("No Wallet found at \"{}\"", url))
                 }
                 _other => {
                     Error::ContentError(format!("No default balance found at Wallet \"{}\"", url))
@@ -378,16 +369,12 @@ impl Safe {
             .safecoin_transfer_to_xorname(Some(keypair), to_xorname, amount_coins)
             .await
         {
-            Err(Error::InvalidAmount(msg)) => Err(Error::InvalidAmount(msg)),
             Err(Error::NotEnoughBalance(_)) => Err(Error::NotEnoughBalance(format!(
                 "Not enough balance for the transfer at Wallet \"{}\"",
                 from_wallet_url
             ))),
-            Err(other_error) => Err(Error::Unexpected(format!(
-                "Unexpected error when attempting to transfer: {}",
-                other_error
-            ))),
-            Ok(tx) => Ok(tx),
+            Err(other_error) => Err(other_error),
+            Ok(id) => Ok(id),
         }
     }
 
@@ -548,7 +535,10 @@ async fn resolve_wallet_url(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use crate::api::{
+        app::test_helpers::{new_safe_instance, random_nrs_name},
+        common::sk_to_hex,
+    };
     use std::sync::Arc;
 
     #[tokio::test]
@@ -556,7 +546,6 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let xorurl = safe.wallet_create().await?;
         assert!(xorurl.starts_with("safe://"));
-
         let current_balance = safe.wallet_balance(&xorurl).await?;
         assert_eq!("0.000000000", current_balance);
         Ok(())
@@ -566,28 +555,18 @@ mod tests {
     async fn test_wallet_insert_and_balance() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
-        let (_key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
-        let (_key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
-
-        safe.wallet_insert(
-            &wallet_xorurl,
-            Some("my-first-balance"),
-            true,
-            &key_pair1.secret_key()?.to_string(),
-        )
-        .await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
+        let (_, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
+        safe.wallet_insert(&wallet_xorurl, Some("my-first-balance"), true, &sk1_hex)
+            .await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!("12.230000000", current_balance);
 
-        safe.wallet_insert(
-            &wallet_xorurl,
-            Some("my-second-balance"),
-            false,
-            &key_pair2.secret_key()?.to_string(),
-        )
-        .await?;
-
+        safe.wallet_insert(&wallet_xorurl, Some("my-second-balance"), false, &sk2_hex)
+            .await?;
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!("13.760000000" /*== 12.23 + 1.53*/, current_balance);
         Ok(())
@@ -598,37 +577,29 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
         let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("12.23").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("1.53").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
 
-        safe.wallet_insert(
-            &wallet_xorurl,
-            Some("my-first-balance"),
-            true,
-            &key_pair1.secret_key()?.to_string(),
-        )
-        .await?;
+        safe.wallet_insert(&wallet_xorurl, Some("my-first-balance"), true, &sk1_hex)
+            .await?;
 
-        safe.wallet_insert(
-            &wallet_xorurl,
-            Some("my-second-balance"),
-            false,
-            &key_pair2.secret_key()?.to_string(),
-        )
-        .await?;
+        safe.wallet_insert(&wallet_xorurl, Some("my-second-balance"), false, &sk2_hex)
+            .await?;
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert_eq!(wallet_balances["my-first-balance"].0, true);
         assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
         assert_eq!(
             wallet_balances["my-first-balance"].1.sk,
-            key_pair1.secret_key()?.to_string()
+            sk_to_hex(key_pair1.secret_key()?)
         );
 
         assert_eq!(wallet_balances["my-second-balance"].0, false);
         assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
         assert_eq!(
             wallet_balances["my-second-balance"].1.sk,
-            key_pair2.secret_key()?.to_string()
+            sk_to_hex(key_pair2.secret_key()?)
         );
         Ok(())
     }
@@ -638,37 +609,28 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
         let (key1_xorurl, key_pair1) = safe.keys_create_preload_test_coins("65.82").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         let (key2_xorurl, key_pair2) = safe.keys_create_preload_test_coins("11.44").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
 
-        safe.wallet_insert(
-            &wallet_xorurl,
-            Some("my-first-balance"),
-            true,
-            &key_pair1.secret_key()?.to_string(),
-        )
-        .await?;
-
-        safe.wallet_insert(
-            &wallet_xorurl,
-            Some("my-second-balance"),
-            true,
-            &key_pair2.secret_key()?.to_string(),
-        )
-        .await?;
+        safe.wallet_insert(&wallet_xorurl, Some("my-first-balance"), true, &sk1_hex)
+            .await?;
+        safe.wallet_insert(&wallet_xorurl, Some("my-second-balance"), true, &sk2_hex)
+            .await?;
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert_eq!(wallet_balances["my-first-balance"].0, false);
         assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
         assert_eq!(
             wallet_balances["my-first-balance"].1.sk,
-            key_pair1.secret_key()?.to_string()
+            sk_to_hex(key_pair1.secret_key()?)
         );
 
         assert_eq!(wallet_balances["my-second-balance"].0, true);
         assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
         assert_eq!(
             wallet_balances["my-second-balance"].1.sk,
-            key_pair2.secret_key()?.to_string()
+            sk_to_hex(key_pair2.secret_key()?)
         );
         Ok(())
     }
@@ -679,12 +641,13 @@ mod tests {
         let from_wallet_xorurl = safe.wallet_create().await?; // this one won't have a default balance
 
         let to_wallet_xorurl = safe.wallet_create().await?; // we'll insert a default balance
-        let (_key_xorurl, key_pair) = safe.keys_create_preload_test_coins("43523").await?;
+        let (_, key_pair) = safe.keys_create_preload_test_coins("43523").await?;
+        let sk_hex = sk_to_hex(key_pair.secret_key()?);
         safe.wallet_insert(
             &to_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair.secret_key()?.to_string(),
+            &sk_hex,
         )
         .await?;
 
@@ -742,26 +705,26 @@ mod tests {
     async fn test_wallet_transfer_from_zero_balance() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
-        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("0.0").await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("0.0").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk1_hex,
         )
         .await?;
 
-        let (to_key_xorurl, _key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        let (to_key_xorurl, _) = safe.keys_create_preload_test_coins("0.5").await?;
 
         // test fail to transfer with 0 balance at wallet in <from> argument
         match safe
             .wallet_transfer("0", Some(&from_wallet_xorurl), &to_key_xorurl)
             .await
         {
-            Err(Error::InvalidAmount(msg)) => assert_eq!(
-                msg,
-                "The amount '0' specified for the transfer is invalid".to_string()
-            ),
+            Err(Error::NetDataError(msg)) => {
+                assert!(msg.contains("Cannot send zero-value transfers"))
+            }
             Err(err) => {
                 return Err(Error::Unexpected(format!(
                     "Error returned is not the expected: {:?}",
@@ -776,12 +739,13 @@ mod tests {
         };
 
         let to_wallet_xorurl = safe.wallet_create().await?;
-        let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        let (_, key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
         safe.wallet_insert(
             &to_wallet_xorurl,
             Some("also-my-balance"),
             true, // set --default
-            &key_pair2.secret_key()?.to_string(),
+            &sk2_hex,
         )
         .await?;
 
@@ -790,11 +754,8 @@ mod tests {
             .wallet_transfer("0", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
-            Err(Error::InvalidAmount(msg)) => {
-                assert_eq!(
-                    msg,
-                    "The amount '0' specified for the transfer is invalid".to_string()
-                );
+            Err(Error::NetDataError(msg)) => {
+                assert!(msg.contains("Cannot send zero-value transfers"));
                 Ok(())
             }
             Err(err) => Err(Error::Unexpected(format!(
@@ -811,22 +772,24 @@ mod tests {
     async fn test_wallet_transfer_diff_amounts() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
-        let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        let (_, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk1_hex,
         )
         .await?;
 
         let to_wallet_xorurl = safe.wallet_create().await?;
-        let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        let (_, key_pair2) = safe.keys_create_preload_test_coins("0.5").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
         safe.wallet_insert(
             &to_wallet_xorurl,
             Some("also-my-balance"),
             true, // set --default
-            &key_pair2.secret_key()?.to_string(),
+            &sk2_hex,
         )
         .await?;
 
@@ -862,7 +825,7 @@ mod tests {
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.06' (Can\'t parse coin units)"
+                "Invalid safecoins amount '.06' (Can\'t parse Money units)"
             ),
             Err(err) => {
                 return Err(Error::Unexpected(format!(
@@ -901,25 +864,27 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_, key_pair1) = safe.keys_create_preload_test_coins("4621.45").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk1_hex,
         )
         .await?;
 
         let from_wallet_xorurl = safe.wallet_create().await?;
-        let (_, key_pair1) = safe.keys_create_preload_test_coins("4621.45").await?;
+        let (_, key_pair2) = safe.keys_create_preload_test_coins("4621.45").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk2_hex,
         )
         .await?;
 
-        let (key_xorurl, key_pair2) = safe.keys_create_preload_test_coins("10.0").await?;
+        let (key_xorurl, key_pair3) = safe.keys_create_preload_test_coins("10.0").await?;
 
         // test successful transfer
         match safe
@@ -937,7 +902,7 @@ mod tests {
                     from_current_balance
                 );
                 let key_current_balance = safe
-                    .keys_balance_from_sk(Arc::new(key_pair2.secret_key()?))
+                    .keys_balance_from_sk(Arc::new(key_pair3.secret_key()?))
                     .await?;
                 assert_eq!("533.870000000", key_current_balance);
                 Ok(())
@@ -977,21 +942,23 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_, key_pair1) = safe.keys_create_preload_test_coins("0.2").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk1_hex,
         )
         .await?;
 
         let from_wallet_xorurl = safe.wallet_create().await?;
-        let (_, key_pair1) = safe.keys_create_preload_test_coins("0.2").await?;
+        let (_, key_pair2) = safe.keys_create_preload_test_coins("0.2").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk2_hex,
         )
         .await?;
 
@@ -1000,7 +967,7 @@ mod tests {
             .nrs_map_container_create(&from_nrsurl, &from_wallet_xorurl, false, true, false)
             .await?;
 
-        let (key_xorurl, key_pair2) = safe.keys_create_preload_test_coins("0.1").await?;
+        let (key_xorurl, key_pair3) = safe.keys_create_preload_test_coins("0.1").await?;
         let to_nrsurl = random_nrs_name();
         let _ = safe
             .nrs_map_container_create(&to_nrsurl, &key_xorurl, false, true, false)
@@ -1019,7 +986,7 @@ mod tests {
                 let from_current_balance = safe.wallet_balance(&from_nrsurl).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
                 let key_current_balance = safe
-                    .keys_balance_from_sk(Arc::new(key_pair2.secret_key()?))
+                    .keys_balance_from_sk(Arc::new(key_pair3.secret_key()?))
                     .await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
                 Ok(())
@@ -1032,30 +999,33 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("from-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk1_hex,
         )
         .await?;
 
         let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("200.5").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("from-second-balance"),
             false,
-            &key_pair2.secret_key()?.to_string(),
+            &sk2_hex,
         )
         .await?;
 
         let to_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl3, key_pair3) = safe.keys_create_preload_test_coins("10.5").await?;
+        let sk3_hex = sk_to_hex(key_pair3.secret_key()?);
         safe.wallet_insert(
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &key_pair3.secret_key()?.to_string(),
+            &sk3_hex,
         )
         .await?;
 
@@ -1121,30 +1091,33 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("100.7").await?;
+        let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
         safe.wallet_insert(
             &from_wallet_xorurl,
             Some("from-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk1_hex,
         )
         .await?;
 
         let to_wallet_xorurl = safe.wallet_create().await?;
         let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("10.2").await?;
+        let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
         safe.wallet_insert(
             &to_wallet_xorurl,
             Some("to-first-balance"),
             true, // set --default
-            &key_pair2.secret_key()?.to_string(),
+            &sk2_hex,
         )
         .await?;
 
         let (_key_xorurl3, key_pair3) = safe.keys_create_preload_test_coins("20.2").await?;
+        let sk3_hex = sk_to_hex(key_pair3.secret_key()?);
         safe.wallet_insert(
             &to_wallet_xorurl,
             Some("to-second-balance"),
             false,
-            &key_pair3.secret_key()?.to_string(),
+            &sk3_hex,
         )
         .await?;
 
@@ -1201,21 +1174,23 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let from_wallet_xorurl = {
             let from_wallet_xorurl = safe.wallet_create().await?;
-            let (_key_xorurl1, key_pair1) = safe.keys_create_preload_test_coins("10.1").await?;
+            let (_, key_pair1) = safe.keys_create_preload_test_coins("10.1").await?;
+            let sk1_hex = sk_to_hex(key_pair1.secret_key()?);
             safe.wallet_insert(
                 &from_wallet_xorurl,
                 Some("from-first-balance"),
                 true, // set --default
-                &key_pair1.secret_key()?.to_string(),
+                &sk1_hex,
             )
             .await?;
 
-            let (_key_xorurl2, key_pair2) = safe.keys_create_preload_test_coins("20.2").await?;
+            let (_, key_pair2) = safe.keys_create_preload_test_coins("20.2").await?;
+            let sk2_hex = sk_to_hex(key_pair2.secret_key()?);
             safe.wallet_insert(
                 &from_wallet_xorurl,
                 Some("from-second-balance"),
                 false,
-                &key_pair2.secret_key()?.to_string(),
+                &sk2_hex,
             )
             .await?;
             from_wallet_xorurl
@@ -1223,21 +1198,23 @@ mod tests {
 
         let to_wallet_xorurl = {
             let to_wallet_xorurl = safe.wallet_create().await?;
-            let (_key_xorurl3, key_pair3) = safe.keys_create_preload_test_coins("30.3").await?;
+            let (_, key_pair3) = safe.keys_create_preload_test_coins("30.3").await?;
+            let sk3_hex = sk_to_hex(key_pair3.secret_key()?);
             safe.wallet_insert(
                 &to_wallet_xorurl,
                 Some("to-first-balance"),
                 true, // set --default
-                &key_pair3.secret_key()?.to_string(),
+                &sk3_hex,
             )
             .await?;
 
-            let (_key_xorurl4, key_pair4) = safe.keys_create_preload_test_coins("40.4").await?;
+            let (_, key_pair4) = safe.keys_create_preload_test_coins("40.4").await?;
+            let sk4_hex = sk_to_hex(key_pair4.secret_key()?);
             safe.wallet_insert(
                 &to_wallet_xorurl,
                 Some("to-second-balance"),
                 false,
-                &key_pair4.secret_key()?.to_string(),
+                &sk4_hex,
             )
             .await?;
             to_wallet_xorurl
@@ -1304,12 +1281,13 @@ mod tests {
     async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let account1_wallet_xorurl = safe.wallet_create().await?;
-        let (key_xorurl, key_pair1) = safe.keys_create_preload_test_coins("100.5").await?;
+        let (key_xorurl, key_pair) = safe.keys_create_preload_test_coins("100.5").await?;
+        let sk_hex = sk_to_hex(key_pair.secret_key()?);
         safe.wallet_insert(
             &account1_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
-            &key_pair1.secret_key()?.to_string(),
+            &sk_hex,
         )
         .await?;
 

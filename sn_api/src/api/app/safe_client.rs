@@ -170,8 +170,7 @@ impl SafeAppClient {
                             amount
                         ))
                     }
-                    SafeClientError::DataError(SafeNdError::ExcessiveValue)
-                    | SafeClientError::DataError(SafeNdError::InvalidOperation) => {
+                    SafeClientError::DataError(SafeNdError::ExcessiveValue) => {
                         Error::InvalidAmount(format!(
                             "The amount '{}' specified for the transfer is invalid",
                             amount

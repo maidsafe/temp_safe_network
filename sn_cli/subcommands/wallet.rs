@@ -15,7 +15,7 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, Safe, SecretKey};
+use sn_api::{bls_sk_from_hex, ed_sk_from_hex, sk_to_hex, Keypair, Safe, SecretKey};
 use std::sync::Arc;
 
 #[derive(StructOpt, Debug)]
@@ -124,24 +124,19 @@ pub async fn wallet_commander(
                 // get or create keypair
                 let sk = match keyurl {
                     Some(linked_key) => {
-                        let sk = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
+                        let sk_hex =
+                            get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
                         let sk = if is_bls {
-                            SecretKey::from(bls_sk_from_hex(&sk)?)
+                            SecretKey::from(bls_sk_from_hex(&sk_hex)?)
                         } else {
-                            SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
+                            SecretKey::Ed25519(ed_sk_from_hex(&sk_hex)?)
                         };
-                        let sk = Arc::new(sk);
-                        let _pk = safe.validate_sk_for_url(sk.clone(), &linked_key).await?;
-                        sk
+                        let _ = safe.validate_sk_for_url(Arc::new(sk), &linked_key).await?;
+
+                        sk_hex
                     }
                     None => match secret_key {
-                        Some(sk) => {
-                            if is_bls {
-                                Arc::new(SecretKey::from(bls_sk_from_hex(&sk)?))
-                            } else {
-                                Arc::new(SecretKey::Ed25519(ed_sk_from_hex(&sk)?))
-                            }
-                        }
+                        Some(sk) => sk,
                         None => {
                             key_generated_output =
                                 create_new_key(safe, test_coins, pay_with, preload, None).await?;
@@ -153,13 +148,13 @@ pub async fn wallet_commander(
                                 .secret_key()
                                 .map_err(|e| format!("{:?}", e))?;
 
-                            Arc::new(sk)
+                            sk_to_hex(sk)
                         }
                     },
                 };
 
                 // insert and set as default
-                safe.wallet_insert(&wallet_xorurl, name.as_deref(), true, &sk.to_string())
+                safe.wallet_insert(&wallet_xorurl, name.as_deref(), true, &sk)
                     .await?;
             }
 
@@ -231,32 +226,24 @@ pub async fn wallet_commander(
 
             let sk = match keyurl {
                 Some(linked_key) => {
-                    let sk = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
+                    let sk_hex = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
                     let sk = if is_bls {
-                        SecretKey::from(bls_sk_from_hex(&sk)?)
+                        SecretKey::from(bls_sk_from_hex(&sk_hex)?)
                     } else {
-                        SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
+                        SecretKey::Ed25519(ed_sk_from_hex(&sk_hex)?)
                     };
 
-                    let sk = Arc::new(sk);
+                    let _ = safe.validate_sk_for_url(Arc::new(sk), &linked_key).await?;
 
-                    let _pk = safe.validate_sk_for_url(sk.clone(), &linked_key).await?;
-                    sk
+                    sk_hex
                 }
-                None => {
-                    let sk = get_secret_key("", secret_key, "the SafeKey to insert")?;
-                    let sk = if is_bls {
-                        SecretKey::from(bls_sk_from_hex(&sk)?)
-                    } else {
-                        SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
-                    };
-                    Arc::new(sk)
-                }
+                None => get_secret_key("", secret_key, "the SafeKey to insert")?,
             };
 
             let the_name = safe
-                .wallet_insert(&target, name.as_deref(), default, &sk.to_string())
+                .wallet_insert(&target, name.as_deref(), default, &sk)
                 .await?;
+
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable balance inserted with name '{}' in Wallet located at \"{}\"",
@@ -265,6 +252,7 @@ pub async fn wallet_commander(
             } else {
                 println!("{}", target);
             }
+
             Ok(())
         }
         WalletSubCommands::Transfer {
@@ -280,19 +268,16 @@ pub async fn wallet_commander(
                 Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
             )?;
 
-            safe.wallet_transfer(&amount, from.as_deref(), &destination)
+            let tx_id = safe
+                .wallet_transfer(&amount, from.as_deref(), &destination)
                 .await?;
 
-            // if OutputFmt::Pretty == output_fmt {
-            //     println!("Success. TX_ID: {}", &tx_id);
-            // } else {
-            //     println!("{}", &tx_id)
-            // }
-            // if OutputFmt::Pretty == output_fmt {
-            println!("Transfer Success.");
-            // } else {
-            //     println!("{}", &tx_id)
-            // }
+            if OutputFmt::Pretty == output_fmt {
+                println!("Success. TX_ID: {}", tx_id);
+            } else {
+                println!("{}", tx_id)
+            }
+
             Ok(())
         }
     }

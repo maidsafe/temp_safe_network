@@ -13,10 +13,11 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
-use sn_api::{bls_sk_from_hex, ed_sk_from_hex, Keypair, PublicKey, Safe, SecretKey};
+use sn_api::{bls_sk_from_hex, ed_sk_from_hex, sk_to_hex, Keypair, PublicKey, Safe, SecretKey};
 use std::sync::Arc;
 use structopt::StructOpt;
 
+const PRELOAD_DEFAULT_AMOUNT: &str = "0.000000001";
 const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 
 #[derive(StructOpt, Debug)]
@@ -148,7 +149,7 @@ pub async fn key_commander(
                 .await?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Successful. TX_ID: {}", tx_id);
+                println!("Success. TX_ID: {}", tx_id);
             } else {
                 println!("{}", tx_id)
             }
@@ -171,7 +172,7 @@ pub async fn create_new_key(
         let amount = match preload {
             None => {
                 warn!(
-                    "You can specify a preload amount with --preload arg, 1000.111 will be used by default."
+                    "You can specify a preload amount with --preload argument, 1000.111 will be used by default."
                 );
                 PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string()
             }
@@ -182,7 +183,15 @@ pub async fn create_new_key(
 
         Ok((xorurl, Some(key_pair), amount))
     } else {
-        let amount = preload.unwrap_or_else(|| "0.0".to_string());
+        let amount = match preload {
+            None => {
+                warn!(
+                    "You can specify a preload amount with --preload argument, 1 nano will be used by default."
+                );
+                PRELOAD_DEFAULT_AMOUNT.to_string()
+            }
+            Some(n) => n,
+        };
 
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
@@ -245,12 +254,11 @@ fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String), String>
         PublicKey::BlsShare(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
     };
 
-    let sk_hex = match keypair.secret_key() {
-        Ok(SecretKey::Ed25519(sk)) => sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
-        Ok(SecretKey::Bls(sk)) => sk.inner().reveal(),
-        Ok(SecretKey::BlsShare(sk)) => sk.inner().reveal(),
-        Err(err) => return Err(format!("{:?}", err)),
-    };
+    let sk_hex = sk_to_hex(
+        keypair
+            .secret_key()
+            .map_err(|err| format!("Failed to obtain secret key: {}", err))?,
+    );
 
     Ok((pk_hex, sk_hex))
 }

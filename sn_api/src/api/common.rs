@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
+use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result, SecretKey};
 use log::info;
 use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
@@ -65,6 +65,15 @@ pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
     ed25519_dalek::SecretKey::from_bytes(&sk_bytes).map_err(|_| {
         Error::InvalidInput("Failed to deserialize provided Ed25519 secret key".to_string())
     })
+}
+
+// Get hex string of a SecretKey
+pub fn sk_to_hex(sk: SecretKey) -> String {
+    match sk {
+        SecretKey::Ed25519(sk) => sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
+        SecretKey::Bls(sk) => sk.inner().reveal(), // FIXME
+        SecretKey::BlsShare(sk) => sk.inner().reveal(), // FIXME
+    }
 }
 
 // Send a request to authd using JSON-RPC over QUIC
