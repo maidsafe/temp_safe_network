@@ -378,10 +378,7 @@ impl Safe {
             .safecoin_transfer_to_xorname(Some(keypair), to_xorname, amount_coins)
             .await
         {
-            Err(Error::InvalidAmount(_)) => Err(Error::InvalidAmount(format!(
-                "The amount '{}' specified for the transfer is invalid",
-                amount
-            ))),
+            Err(Error::InvalidAmount(msg)) => Err(Error::InvalidAmount(msg)),
             Err(Error::NotEnoughBalance(_)) => Err(Error::NotEnoughBalance(format!(
                 "Not enough balance for the transfer at Wallet \"{}\"",
                 from_wallet_url

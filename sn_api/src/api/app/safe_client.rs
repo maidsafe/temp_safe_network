@@ -103,12 +103,12 @@ impl SafeAppClient {
     // === Money operations ===
     pub async fn read_balance_from_keypair(&self, id: Arc<Keypair>) -> Result<Money> {
         let temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
-        let coins = temp_client
-            .get_balance()
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to retrieve balance: {:?}", e)))?;
-
-        Ok(coins)
+        temp_client.get_balance().await.map_err(|err| match err {
+            SafeClientError::DataError(SafeNdError::NoSuchBalance) => {
+                Error::ContentNotFound("No SafeKey found at specified location".to_string())
+            }
+            other => Error::NetDataError(format!("Failed to retrieve balance: {:?}", other)),
+        })
     }
 
     #[cfg(feature = "simulated-payouts")]
@@ -165,11 +165,17 @@ impl SafeAppClient {
                 .await
                 .map_err(|err| match err {
                     SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
-                        Error::NotEnoughBalance(amount.to_string())
+                        Error::NotEnoughBalance(format!(
+                            "Not enough balance at 'source' for the operation: {}",
+                            amount
+                        ))
                     }
                     SafeClientError::DataError(SafeNdError::ExcessiveValue)
                     | SafeClientError::DataError(SafeNdError::InvalidOperation) => {
-                        Error::InvalidAmount(amount.to_string())
+                        Error::InvalidAmount(format!(
+                            "The amount '{}' specified for the transfer is invalid",
+                            amount
+                        ))
                     }
                     other => Error::NetDataError(format!("Failed to transfer coins: {:?}", other)),
                 })?;
@@ -230,18 +236,11 @@ impl SafeAppClient {
         _data: Option<String>,
         _permissions: Option<String>,
     ) -> Result<XorName> {
-        let safe_client = self.get_safe_client()?;
-        let client = &safe_client;
-        let owner_key_option = client.public_key().await;
-        let owners = if let PublicKey::Bls(owners) = owner_key_option {
-            owners
-        } else {
-            return Err(Error::Unexpected(
-                "Failed to retrieve public key.".to_string(),
-            ));
-        };
-
         let xorname = name.unwrap_or_else(rand::random);
+
+        // The Map's owner will be the client's public key
+        let client = self.get_safe_client()?;
+        let owner = client.public_key().await;
 
         let permission_set = MapPermissionSet::new()
             .allow(MapAction::Read)
@@ -251,14 +250,14 @@ impl SafeAppClient {
             .allow(MapAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
-        let app_pk = safe_client.public_key().await;
+        let app_pk = client.public_key().await;
         permission_map.insert(app_pk, permission_set);
 
-        safe_client
-            .store_unseq_map(
+        client
+            .store_seq_map(
                 xorname,
                 tag,
-                PublicKey::Bls(owners),
+                owner,
                 Some(BTreeMap::new()),
                 Some(permission_map),
             )

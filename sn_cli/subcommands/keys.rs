@@ -84,6 +84,7 @@ pub async fn key_commander(
             test_coins,
             ..
         } => {
+            // TODO: support pk argument
             if test_coins && (pk.is_some() | pay_with.is_some()) {
                 // We don't support these args with --test-coins
                 return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
@@ -95,6 +96,7 @@ pub async fn key_commander(
             let (xorurl, key_pair, amount) =
                 create_new_key(safe, test_coins, pay_with, preload, pk).await?;
             print_new_key_output(output_fmt, xorurl, key_pair, amount, test_coins);
+
             Ok(())
         }
         KeysSubCommands::Balance {
@@ -163,45 +165,40 @@ pub async fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     _pk: Option<String>,
-) -> Result<(String, Option<Arc<Keypair>>, Option<String>), String> {
+) -> Result<(String, Option<Arc<Keypair>>, String), String> {
     if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
-        let amount = preload.unwrap_or_else(|| {
-            warn!(
-                "You can pass a preload amount with test-coins, 1000.111 will be added by default."
-            );
-            PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string()
-        });
+        let amount = match preload {
+            None => {
+                warn!(
+                    "You can specify a preload amount with --preload arg, 1000.111 will be used by default."
+                );
+                PRELOAD_TESTCOINS_DEFAULT_AMOUNT.to_string()
+            }
+            Some(n) => n,
+        };
 
         let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
 
-        Ok((xorurl, Some(key_pair), Some(amount)))
+        Ok((xorurl, Some(key_pair), amount))
     } else {
+        let amount = preload.unwrap_or_else(|| "0.0".to_string());
+
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
         // If the --pay-with is not provided the API will use the account's default wallet/sk
         let (xorurl, key_pair) = match pay_with {
             Some(payee) => {
-                safe.keys_create_and_preload_from_sk_string(&payee, preload.as_deref())
+                safe.keys_create_and_preload_from_sk_string(&payee, &amount)
                     .await?
             }
             None => {
-                debug!(
-                    "Missing the '--pay-with' argument, using account's default wallet for funds"
-                );
-
-                let payee = safe
-                    .keypair()
-                    .await?
-                    .secret_key()
-                    .map_err(|e| format!("Secret key error: {:?}", e))?;
-
-                safe.keys_create_and_preload_from_sk_string(&payee.to_string(), preload.as_deref())
-                    .await?
+                debug!("Missing the '--pay-with' argument, using app's wallet for funds");
+                safe.keys_create_and_preload(&amount).await?
             }
         };
 
-        Ok((xorurl, Some(key_pair), preload))
+        Ok((xorurl, Some(key_pair), amount))
     }
 }
 
@@ -209,18 +206,17 @@ pub fn print_new_key_output(
     output_fmt: OutputFmt,
     xorurl: String,
     key_pair: Option<Arc<Keypair>>,
-    amount: Option<String>,
+    amount: String,
     test_coins: bool,
 ) {
     if OutputFmt::Pretty == output_fmt {
         println!("New SafeKey created at: \"{}\"", xorurl);
-        if let Some(n) = amount {
-            println!(
-                "Preloaded with {} {}",
-                n,
-                if test_coins { "testcoins" } else { "coins" }
-            );
-        }
+        println!(
+            "Preloaded with {} {}",
+            amount,
+            if test_coins { "testcoins" } else { "coins" }
+        );
+
         if let Some(pair) = &key_pair {
             println!("Key pair generated:");
             match keypair_to_hex_strings(&pair) {
