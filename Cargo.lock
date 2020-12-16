@@ -1890,8 +1890,7 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ee9f0b3316afe89ae9b98fca92e5d44dadc4b0136dbe76350696d932aece918"
+source = "git+https://github.com/oetyng/sn_data_types?branch=rewards-flow#d188bbc852ff3794fcc5d375f78722f6e8219838"
 dependencies = [
  "bincode",
  "crdts",
@@ -1913,8 +1912,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "1.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78161f7453aa5dfb3275e13df3ef034506ab9001bc7b4abcbb86e98d4a98256b"
+source = "git+https://github.com/oetyng/sn_messaging?branch=rewards-flow#51de54f2551f75da73fd394b1ecf61db726efe8a"
 dependencies = [
  "bytes 1.0.1",
  "cookie-factory",
@@ -1940,8 +1938,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d2b4db4ee6deffe534087af017f5a3ce312f2d40ddb8c1cbb63fcf62e7207a6"
+source = "git+https://github.com/oetyng/sn_transfers?branch=rewards-flow#f06d41a2d5560ddae843b04b72ec60b952b4b69f"
 dependencies = [
  "bincode",
  "crdts",
