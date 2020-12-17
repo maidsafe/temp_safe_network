@@ -43,7 +43,7 @@ pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     if init_mode == Init::New {
         debug!("Creating auto dump database at {}", db_path.display());
         fs::create_dir_all(db_dir)?;
-        let db = PickleDb::new_json(db_path, PickleDbDumpPolicy::AutoDump);
+        let db = PickleDb::new_bin(db_path, PickleDbDumpPolicy::AutoDump);
         return Ok(db);
     }
     debug!("Loading auto dump database at {}", db_path.display());
@@ -75,7 +75,7 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
             }
         }?;
 
-        let db = PickleDb::new_json(
+        let db = PickleDb::new_bin(
             db_path,
             PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),
         );
