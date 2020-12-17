@@ -1011,7 +1011,7 @@ dependencies = [
  "byteorder",
  "digest 0.9.0",
  "rand_core 0.5.1",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "zeroize 1.2.0",
 ]
 
@@ -2296,7 +2296,7 @@ dependencies = [
  "generic-array 0.12.3",
  "pmac",
  "stream-cipher",
- "subtle 2.3.0",
+ "subtle 2.4.0",
  "zeroize 0.5.2",
 ]
 
@@ -3856,8 +3856,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.44.5"
-source = "git+https://github.com/maidsafe/sn_client?branch=master#47896a3c8b4c58f5f3483b10fefe9447917994ef"
+version = "0.44.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0bc3425171f7584d729af590f3919c9ab1f0a8ee1afe62be83fdb7273aa0c71"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3909,9 +3910,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.37"
+version = "0.11.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45238e39a539e08a2d677c017eff7d1d6acfef30b5faec2534272316c7af1cdb"
+checksum = "96551ff5cd5d5a09cc8e4a5206fb85f0d10a1b5719ae8cb248008de88263b104"
 dependencies = [
  "bincode",
  "crdts",
@@ -3943,9 +3944,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2c166ffa7cf86a89ad7b5dcdc0360232aa5cdbc60518d4d0e062fb8bb27788"
+checksum = "51115a429f553358c46ba6d1fd06b907ca4d103fd4b14af6d87c818f9b1ed531"
 dependencies = [
  "bincode",
  "crdts",
@@ -4053,9 +4054,9 @@ checksum = "2d67a5a62ba6e01cb2192ff309324cb4875d0c451d55fe2319433abe7a05a8ee"
 
 [[package]]
 name = "subtle"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "343f3f510c2915908f155e94f17220b19ccfacf2a64a2a5d8004f2c3e311e7fd"
+checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"

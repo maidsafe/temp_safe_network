@@ -1642,6 +1642,7 @@ async fn files_map_create(
 mod tests {
     use super::*;
     use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     // make some constants for these, in case entries in the
     // testdata folder change.
@@ -1713,6 +1714,23 @@ mod tests {
             new_processed_files[filename].1,
             new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_files_store_pub_blob() -> Result<()> {
+        let mut safe = new_safe_instance().await?;
+        let random_blob_content: String =
+            thread_rng().sample_iter(&Alphanumeric).take(20).collect();
+
+        let file_xorurl = safe
+            .files_store_public_blob(random_blob_content.as_bytes(), None, false)
+            .await?;
+        std::thread::sleep(std::time::Duration::from_millis(5000));
+
+        let retrieved = safe.files_get_public_blob(&file_xorurl, None).await?;
+        assert_eq!(retrieved, random_blob_content.as_bytes());
+
         Ok(())
     }
 

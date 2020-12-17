@@ -16,10 +16,9 @@ use crate::{
 use log::{debug, info};
 use sn_client::{Client, ClientError as SafeClientError};
 use sn_data_types::{
-    Blob, BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
-    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicBlob, PublicKey,
-    SequenceAddress, SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions,
-    SequenceUser,
+    BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicKey, SequenceAddress,
+    SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 
 use std::collections::BTreeMap;
@@ -184,21 +183,16 @@ impl SafeAppClient {
     }
 
     // // === Blob operations ===
-    pub async fn store_public_blob(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    pub async fn store_public_blob(&self, data: &[u8], _dry_run: bool) -> Result<XorName> {
         // TODO: allow this operation to work without a connection when it's a dry run
         let client = self.get_safe_client()?;
 
-        let data_vec = data.to_vec();
-        let blob_for_storage = Blob::Public(PublicBlob::new(data_vec));
-        let xorname = *blob_for_storage.address().name();
+        let address = client
+            .store_public_blob(data)
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
 
-        if !dry_run {
-            client
-                .store_public_blob(data)
-                .await
-                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
-        }
-
+        let xorname = *address.name();
         Ok(xorname)
     }
 
