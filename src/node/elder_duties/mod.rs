@@ -17,8 +17,14 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
+<<<<<<< HEAD
 use log::{debug, trace};
 use sn_data_types::PublicKey;
+=======
+use crate::{Outcome, TernaryResult};
+use log::{debug, info, trace};
+use rand::{CryptoRng, Rng};
+>>>>>>> master
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -121,6 +127,7 @@ impl ElderDuties {
 
     ///
     async fn elders_changed(&mut self, prefix: Prefix) -> Result<NodeOperation> {
+        info!("Elders changed");
         let mut ops = Vec::new();
         match self.key_section.elders_changed().await? {
             NodeOperation::NoOp => (),
@@ -133,7 +140,8 @@ impl ElderDuties {
         // };
         // debug!("Data section completed elder change update.");
         if prefix != self.prefix {
-            debug!("Prefix changed, i.e. split occurred!");
+            info!("Split occured");
+            info!("New prefix is: {:?}", prefix);
             match self.key_section.section_split(prefix).await? {
                 NodeOperation::NoOp => (),
                 op => ops.push(op),
