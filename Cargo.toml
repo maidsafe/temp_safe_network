@@ -36,8 +36,8 @@ tiny-keccak = "1.5.0"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_data_types = { git = "https://github.com/yoga07/sn_data_types", branch = "storage-check" }
-sn_transfers = { git = "https://github.com/yoga07/sn_transfers", branch = "master" }
+sn_data_types = "~0.11.39"
+sn_transfers = "~0.2.5"
 self_encryption = "~0.19.4"
 ed25519 = "1.0.1"
 signature = "1.1.0"
@@ -82,10 +82,8 @@ tempdir = "~0.3.7"
 futures = "~0.3.5"
 
   [dev_dependencies.sn_client]
-  version = "0.44.3"
+  version = "0.44.6"
   features = [ "simulated-payouts" ]
-  git = "https://github.com/yoga07/sn_client"
-  branch = "testnet"
 
   [dev_dependencies.tokio]
   version = "~0.2.21"
