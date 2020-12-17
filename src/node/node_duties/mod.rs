@@ -21,8 +21,8 @@ use crate::node::{
     state_db::AgeGroup,
     state_db::NodeInfo,
 };
-use crate::{chunk_store::UsedSpace, Error, Network, Outcome, TernaryResult};
-use log::{info, warn};
+use crate::{chunk_store::UsedSpace, Error, Network, Result};
+use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};

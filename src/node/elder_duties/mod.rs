@@ -17,14 +17,8 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
-<<<<<<< HEAD
-use log::{debug, trace};
-use sn_data_types::PublicKey;
-=======
-use crate::{Outcome, TernaryResult};
 use log::{debug, info, trace};
-use rand::{CryptoRng, Rng};
->>>>>>> master
+use sn_data_types::PublicKey;
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
