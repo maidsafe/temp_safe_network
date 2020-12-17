@@ -13,9 +13,9 @@ use sn_data_types::{Keypair, Money};
 use unwrap::unwrap;
 
 /// Generates a random BLS secret and public keypair.
-pub fn gen_bls_keypair() -> Keypair {
+pub fn gen_ed_keypair() -> Keypair {
     let mut rng = rand::thread_rng();
-    Keypair::new_bls(&mut rng)
+    Keypair::new_ed25519(&mut rng)
 }
 
 /// Helper function to calculate the total cost of expenditure by adding number of mutations and

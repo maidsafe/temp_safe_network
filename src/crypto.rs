@@ -106,7 +106,7 @@ pub mod shared_box {
     }
 
     /// Generate new random public/secret keypair.
-    pub fn gen_bls_keypair() -> (threshold_crypto::SecretKey, threshold_crypto::PublicKey) {
+    pub fn gen_ed_keypair() -> (threshold_crypto::SecretKey, threshold_crypto::PublicKey) {
         let sk = threshold_crypto::SecretKey::random();
         let pk = sk.public_key();
         (sk, pk)

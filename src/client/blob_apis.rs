@@ -320,7 +320,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::{Blob, BlobAddress, Client, Error};
-    use crate::utils::{generate_random_vector, test_utils::gen_bls_keypair};
+    use crate::utils::{generate_random_vector, test_utils::gen_ed_keypair};
     use anyhow::{bail, Result};
     use sn_data_types::{Money, PrivateBlob, PublicBlob};
     use sn_messaging::Error as ErrorMessage;
@@ -337,7 +337,7 @@ mod tests {
         let value = generate_random_vector::<u8>(10);
         let data = Blob::Public(PublicBlob::new(value.clone()));
         let address = *data.address();
-        let _pk = gen_bls_keypair().public_key();
+        let _pk = gen_ed_keypair().public_key();
 
         let res = client
             // Get non-existent blob
