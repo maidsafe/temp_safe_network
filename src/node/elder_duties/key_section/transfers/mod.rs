@@ -120,7 +120,7 @@ impl Transfers {
     pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
-        let result = match duty {
+        match duty {
             ProcessQuery {
                 query,
                 msg_id,
@@ -134,10 +134,8 @@ impl Transfers {
                 .process_cmd(cmd, *msg_id, origin.clone())
                 .await
                 .convert(),
-            NoOp => return Ok(NodeOperation::NoOp),
-        };
-
-        result
+            NoOp => Ok(NodeOperation::NoOp),
+        }
     }
 
     async fn process_query(

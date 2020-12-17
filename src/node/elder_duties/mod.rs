@@ -53,7 +53,7 @@ impl ElderDuties {
             ops.push(self.key_section.init_first().await?);
         }
         ops.push(self.key_section.catchup_with_section().await?);
-        ops.push(self.data_section.catchup_with_section().await?);
+        //ops.push(self.data_section.catchup_with_section().await?);
 
         Ok(ops.into())
     }
@@ -103,18 +103,20 @@ impl ElderDuties {
     ///
     async fn relocated_node_joined(
         &mut self,
-        old_node_id: XorName,
-        new_node_id: XorName,
-        age: u8,
+        _old_node_id: XorName,
+        _new_node_id: XorName,
+        _age: u8,
     ) -> Result<NodeOperation> {
-        self.data_section
-            .relocated_node_joined(old_node_id, new_node_id, age)
-            .await
+        // self.data_section
+        //     .relocated_node_joined(old_node_id, new_node_id, age)
+        //     .await
+        Ok(NodeOperation::NoOp)
     }
 
     ///
-    async fn member_left(&mut self, node_id: XorName, age: u8) -> Result<NodeOperation> {
-        self.data_section.member_left(node_id, age).await
+    async fn member_left(&mut self, _node_id: XorName, _age: u8) -> Result<NodeOperation> {
+        //self.data_section.member_left(node_id, age).await
+        Ok(NodeOperation::NoOp)
     }
 
     ///
@@ -125,21 +127,21 @@ impl ElderDuties {
             op => ops.push(op),
         };
         debug!("Key section completed elder change update.");
-        match self.data_section.elders_changed().await? {
-            NodeOperation::NoOp => (),
-            op => ops.push(op),
-        };
-        debug!("Data section completed elder change update.");
+        // match self.data_section.elders_changed().await? {
+        //     NodeOperation::NoOp => (),
+        //     op => ops.push(op),
+        // };
+        // debug!("Data section completed elder change update.");
         if prefix != self.prefix {
             debug!("Prefix changed, i.e. split occurred!");
             match self.key_section.section_split(prefix).await? {
                 NodeOperation::NoOp => (),
                 op => ops.push(op),
             };
-            match self.data_section.section_split(prefix).await? {
-                NodeOperation::NoOp => (),
-                op => ops.push(op),
-            };
+            // match self.data_section.section_split(prefix).await? {
+            //     NodeOperation::NoOp => (),
+            //     op => ops.push(op),
+            // };
         }
 
         Ok(ops.into())

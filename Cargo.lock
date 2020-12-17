@@ -2787,7 +2787,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.4"
-source = "git+https://github.com/yoga07/sn_transfers?branch=master#06129005bb0595a920013c681a88ce92e73c0eba"
+source = "git+https://github.com/yoga07/sn_transfers#06129005bb0595a920013c681a88ce92e73c0eba"
 dependencies = [
  "bincode",
  "crdts",

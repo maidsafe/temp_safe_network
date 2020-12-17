@@ -63,6 +63,7 @@ impl SectionFunds {
     }
 
     /// Current Replicas
+    #[allow(unused)]
     pub fn replicas(&self) -> PublicKey {
         self.actor.replicas()
     }

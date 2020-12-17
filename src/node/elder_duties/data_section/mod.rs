@@ -80,11 +80,13 @@ impl DataSection {
 
     /// Issues query to Elders of the section
     /// as to catch up with the current state of the replicas.
+    #[allow(unused)]
     pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
         self.rewards.catchup_with_replicas().await
     }
 
-    // Transition the section funds account to the new key.
+    /// Transition the section funds account to the new key.
+    #[allow(unused)]
     pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
         info!("updating section public key set in data section!");
         let pub_key_set = self.network.public_key_set().await?;
@@ -93,7 +95,8 @@ impl DataSection {
         self.rewards.transition(actor).await
     }
 
-    // At section split, all Elders get their reward payout.
+    /// At section split, all Elders get their reward payout.
+    #[allow(unused)]
     pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
         // First remove nodes that are no longer in our section.
         let to_remove = self
@@ -123,6 +126,7 @@ impl DataSection {
     /// When a relocated node joins, a DataSection
     /// has a few different things to do, such as
     /// pay out rewards and trigger chunk replication.
+    #[allow(unused)]
     pub async fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,
@@ -145,6 +149,7 @@ impl DataSection {
 
     /// Name of the node
     /// Age of the node
+    #[allow(unused)]
     pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter

@@ -8,11 +8,10 @@
 
 use crate::node::state_db::AgeGroup;
 use crate::{
-    node::node_ops::{NodeDuty, NodeOperation, RewardCmd, RewardDuty},
+    node::node_ops::{NodeDuty, NodeOperation},
     Network, Result,
 };
-use sn_data_types::MessageId;
-use sn_data_types::{Address, PublicKey};
+use sn_data_types::PublicKey;
 
 /// Configuration made after connected to
 /// network, or promoted to elder.
@@ -30,7 +29,9 @@ use sn_data_types::{Address, PublicKey};
 /// -> 2. Add own node id to rewards.
 /// -> 3. Add own wallet to rewards.
 pub struct DutyConfig {
+    #[allow(unused)]
     reward_key: PublicKey,
+    #[allow(unused)]
     network_api: Network,
     status: AgeGroup,
 }
@@ -53,11 +54,12 @@ impl DutyConfig {
     /// When becoming Adult.
     pub fn setup_as_adult(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Adult;
+        let mut ops: Vec<NodeOperation> = vec![];
         // 1. Become Adult.
-        let first: NodeOperation = NodeDuty::BecomeAdult.into();
-        // 2. Register wallet at Elders.
-        let second = NodeDuty::RegisterWallet(self.reward_key).into();
-        Ok(vec![first, second].into())
+        ops.push(NodeDuty::BecomeAdult.into());
+        // // 2. Register wallet at Elders.
+        // ops.push(NodeDuty::RegisterWallet(self.reward_key).into());
+        Ok(ops.into())
     }
 
     /// When becoming Elder.
@@ -65,33 +67,33 @@ impl DutyConfig {
         self.status = AgeGroup::Elder;
 
         let mut ops: Vec<NodeOperation> = vec![];
-        let node_id = self.network_api.name().await;
+        //let node_id = self.network_api.name().await;
 
         // 1. Become Elder.
         ops.push(NodeDuty::BecomeElder.into());
 
-        // 2. Add own node id to rewards.
-        ops.push(
-            RewardDuty::ProcessCmd {
-                cmd: RewardCmd::AddNewNode(node_id),
-                msg_id: MessageId::new(),
-                origin: Address::Node(node_id),
-            }
-            .into(),
-        );
+        // // 2. Add own node id to rewards.
+        // ops.push(
+        //     RewardDuty::ProcessCmd {
+        //         cmd: RewardCmd::AddNewNode(node_id),
+        //         msg_id: MessageId::new(),
+        //         origin: Address::Node(node_id),
+        //     }
+        //     .into(),
+        // );
 
-        // 3. Add own wallet to rewards.
-        ops.push(
-            RewardDuty::ProcessCmd {
-                cmd: RewardCmd::SetNodeWallet {
-                    node_id,
-                    wallet_id: self.reward_key,
-                },
-                msg_id: MessageId::new(),
-                origin: Address::Node(node_id),
-            }
-            .into(),
-        );
+        // // 3. Add own wallet to rewards.
+        // ops.push(
+        //     RewardDuty::ProcessCmd {
+        //         cmd: RewardCmd::SetNodeWallet {
+        //             node_id,
+        //             wallet_id: self.reward_key,
+        //         },
+        //         msg_id: MessageId::new(),
+        //         origin: Address::Node(node_id),
+        //     }
+        //     .into(),
+        // );
 
         Ok(ops.into())
     }
