@@ -26,8 +26,8 @@
       - [Auth install](#auth-install)
       - [Auth start](#auth-start)
       - [Auth status](#auth-status)
-      - [Auth create-acc](#auth-create-acc)
-      - [Auth login](#auth-login)
+      - [Auth create](#auth-create)
+      - [Auth unlock](#auth-unlock)
         - [Passing credentials from a config file](#passing-credentials-from-a-config-file)
         - [Using environment variables](#using-environment-variables)
       - [Auth reqs](#auth-reqs)
@@ -127,7 +127,7 @@ If otherwise you prefer to build the Safe CLI from source code, please follow th
 
 ## Build
 
-In order to build this CLI from source code you need to make sure you have `rustc v1.44.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this CLI from source code you need to make sure you have `rustc v1.48.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `sn_cli` (the build process may take several minutes the first time you run it on this crate):
 ```shell
@@ -166,10 +166,7 @@ All commands have a `--help` function which lists args, options and subcommands.
 
 The CLI, like any other Safe application, can connect to different Safe networks that may be available. As the project advances several networks may coexist with the main Safe Network, there could be Safe networks available for testing upcoming features, or networks that are local to the user in their own computer or WAN/LAN.
 
-The way Safe applications currently connect to a Safe network is by reading the connection information from a specific location in the system:
-- Linux: from `~/.config/sn_node/`
-- macOS: from `/Users/<USERNAME>/Library/Preferences/net.MaidSafe.sn_node/`
-- Windows: from `C:\Users\<USERNAME>\AppData\Roaming\MaidSafe\sn_node\config\`
+The way Safe applications currently connect to a Safe network is by reading the connection information from a specific location in the system: `~/.safe/node/node_connection_info.config`
 
 Currently, there is a public test network accessible to anyone. Users may also have local nodes running in their own environment creating a local network. The CLI allows users to easily create a list of different Safe networks in its config settings, to then be able to switch between them with just a simple command.
 
@@ -178,9 +175,9 @@ Currently, there is a public test network accessible to anyone. Users may also h
 Let's first look at how to run a local Safe network using the CLI. A local network is bootstrapped by running several Safe Network nodes which automatically interconnect forming a network. We therefore first need to install the Safe Network node in our system:
 ```shell
 $ safe node install
-Latest release found: sn_node v0.21.0
-Downloading https://sn-node.s3.eu-west-2.amazonaws.com/sn_node-0.21.0-x86_64-unknown-linux-musl.zip...
-[00:00:36] [========================================] 6.28MB/6.28MB (0s) Done
+Latest release found: sn_node v0.25.14
+Downloading https://sn-node.s3.eu-west-2.amazonaws.com/sn_node-0.25.14-x86_64-unknown-linux-musl.zip...
+[00:00:08] [========================================] 9.34MB/9.34MB (0s) Done
 Installing sn_node binary at ~/.safe/node ...
 Setting execution permissions to installed binary '~/.safe/node/sn_node'...
 Done!
@@ -329,15 +326,15 @@ This command will check if a newer sn_node release is available on [GitHub](http
 
 ### Auth
 
-The CLI is just another client Safe application, therefore it needs to be authorised by the user to gain access to the Safe Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the account owner (the user) via the Safe Authenticator.
+The CLI is just another client Safe application, therefore it needs to be authorised by the user to gain access to the Safe Network on behalf of the user. The `auth` command allows us to obtain such authorisation from the user via the Safe Authenticator.
 
-This command simply sends an authorisation request to the Authenticator available, e.g. the `sn_authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `$XDG_DATA_DIRS/sn_cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the Safe Network for the corresponding operation.
+This command simply sends an authorisation request to the Authenticator available, e.g. the `sn_authd` daemon (see further below for an explanation of how to run it), and it then stores the authorisation response (credentials) in the user's `~/.safe/cli/credentials` file. Any subsequent CLI command will read this file to obtain the credentials and connect to the Safe Network for the corresponding operation.
 
 #### The Authenticator daemon (authd)
 
 In order to be able to allow any Safe application to connect to the Network and have access to your data, we need to start the Safe Authenticator daemon (authd). This application exposes an interface as a [QUIC (Quick UDP Internet Connections)](https://en.wikipedia.org/wiki/QUIC) endpoint, which Safe applications will communicate with to request for access permissions. These permissions need to be reviewed by the user and approved, which can be all done with the Safe CLI as we'll see in this guide.
 
-The Safe Authenticator, which runs as a daemon or as a service in Windows platforms, can be started and managed with the Safe CLI if the `sn_authd`/`sn_authd.exe` binary is properly installed in the system.
+The Safe Authenticator, which runs as a daemon, can be started and managed with the Safe CLI if the `sn_authd`/`sn_authd.exe` binary is properly installed in the system.
 
 #### Auth install
 
@@ -380,45 +377,41 @@ Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 ```
 
-#### Auth create-acc
+#### Auth create
 
 Since we now have our Safe Authenticator running and ready to accept requests, we can start interacting with it by using other Safe CLI `auth` subcommands.
 
-In order to create a Safe Network account we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create-acc` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
+In order to create a Safe on the network, we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
 ```shell
-$ safe auth create-acc --test-coins
+$ safe auth create --test-coins
 Passphrase:
 Password:
-Creating a SafeKey with test-coins...
-Sending account creation request to authd...
-Account was created successfully!
-SafeKey created and preloaded with test-coins. Owner key pair generated:
-Public Key = a42c991eb33c1e2530205bc726eba0279e151a334ba8dcd7212b131abb210145bc859ae5f6f5d4ce63ece54c64fe8792
-Secret Key = 5cc0951bb95be85dec3f0358ddb40570d0e045b3ff0007562af9b5c9162f2518
+Sending request to authd to create a Safe...
+Safe was created successfully!
 ```
 
 Alternatively, if we own some safecoins on a `SafeKey` already (see [`SafeKeys` section](#safekeys) for details about `SafeKey`s), we can provide the corresponding secret key to the safe CLI to use it for paying the cost of creating the account, as well as setting it as the default `SafeKey` for the account being created:
 ```shell
-$ safe auth create-acc
+$ safe auth create
 Passphrase:
 Password:
 Enter SafeKey's secret key to pay with:
-Sending account creation request to authd...
-Account was created successfully!
+Sending request to authd to create a Safe...
+Safe was created successfully!
 ```
 
-#### Auth login
+#### Auth unlock
 
-When a new account is created with CLI, as we've seen above, the `authd` will stay logged into that same account. However if we want to log in to a different account, or to the same account after the PC or `authd` was restarted, we can log in using the following command:
+When a new Safe is created with CLI, as we've seen above, we can unlock it using the following command:
 ```shell
-$ safe auth login
+$ safe auth unlock
 Passphrase:
 Password:
-Sending login action request to authd...
-Logged in successfully
+Sending action request to authd to unlock the Safe...
+Safe unlocked successfully
 ```
 
-If we now send a status report request to `authd`, it should now show that it's logged in to a Safe account:
+If we now send a status report request to `authd`, it should now show that a Safe is currently unlocked:
 ```shell
 $ safe auth status
 Sending request to authd to obtain a status report...
@@ -427,7 +420,7 @@ Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | Authenticator daemon version             | 0.0.3 |
 +------------------------------------------+-------+
-| Logged in to a Safe account?             | Yes   |
+| Is there a Safe currently unlocked?      | Yes   |
 +------------------------------------------+-------+
 | Number of pending authorisation requests | 0     |
 +------------------------------------------+-------+
@@ -449,26 +442,26 @@ It's possible (though not secure) to use a simple json file to pass the passphra
 ```
 And so you can log in with:
 ```shell
-$ safe auth login --config ./my-config.json
-Sending login action request to authd...
-Logged in successfully
+$ safe auth unlock --config ./my-config.json
+Sending action request to authd to unlock the Safe...
+Safe unlocked successfully
 ```
 
 ##### Using environment variables
 
 Another method for passing passphrase/password involves using the environment variables `SAFE_AUTH_PASSPHRASE` and `SAFE_AUTH_PASSWORD`.
 
-With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then log in without needing to enter login details, or pass a config file:
+With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then log in without needing to enter unlock details, or pass a config file:
 ```shell
-$ safe auth login
-Sending login action request to authd...
-Logged in successfully
+$ safe auth unlock
+Sending action request to authd to unlock the Safe...
+Safe unlocked successfully
 ```
 Or, you can choose to pass the environment variables to the command directly (though this can be insecure):
 ```shell
-$ SAFE_AUTH_PASSPHRASE="<passphrase>" SAFE_AUTH_PASSWORD="<password>" safe auth login
-Sending login action request to authd...
-Logged in successfully
+$ SAFE_AUTH_PASSPHRASE="<passphrase>" SAFE_AUTH_PASSWORD="<password>" safe auth unlock
+Sending action request to authd to unlock the Safe...
+Safe unlocked successfully
 ```
 Please note, that both the passphrase and password environment variables must be set to use this method. If only one is set, an error will be thrown.
 
@@ -523,7 +516,7 @@ Note we could have otherwise decided to deny this authorisation request and invo
 If we now switch back to our previous console, the one where we sent the authorisation request with `$ safe auth` command from, we will see the Safe CLI receiving the response from `authd`. You should see in that console a message like the following:
 ```shell
 Safe CLI app was successfully authorised
-Credentials were stored in <home directory>/.safe/cli/credentials
+Credentials were stored in ~/.safe/cli/credentials
 ```
 
 We are now ready to start using the CLI to operate with the network, via its commands and supported operations!.
@@ -534,14 +527,14 @@ It could be the case the Safe CLI is the only Safe application that the user is 
 
 Therefore there is an option which allows the Safe CLI to automatically self authorise when the user logs in using the CLI, which is as simple as:
 ```shell
-$ safe auth login --self-auth
+$ safe auth unlock --self-auth
 Passphrase:
 Password:
-Sending login action request to authd...
-Logged in successfully
+Sending action request to authd to unlock the Safe...
+Safe unlocked successfully
 Authorising CLI application...
 Safe CLI app was successfully authorised
-Credentials were stored in <home directory>/.safe/cli/credentials
+Credentials were stored in ~/.safe/cli/credentials
 ```
 
 #### Auth update
@@ -585,7 +578,7 @@ Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | Authenticator daemon version             | 0.0.3 |
 +------------------------------------------+-------+
-| Logged in to a Safe account?             | No    |
+| Is there a Safe currently unlocked?      | No    |
 +------------------------------------------+-------+
 | Number of pending authorisation requests | 0     |
 +------------------------------------------+-------+
@@ -650,7 +643,7 @@ But we can also create a `SafeKey` with test-coins to begin with (this is tempor
 ```shell
 $ safe keys create --test-coins --preload 15.342
 New SafeKey created at: "safe://bbkulcbnrmdzhdkrfb6zbbf7fisbdn7ggztdvgcxueyq2iys272koaplks"
-Preloaded with 15.342 coins
+Preloaded with 15.342 testcoins
 Key pair generated:
 Public Key = b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a970539df819e31990c1edf09b882e61
 Secret Key = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
@@ -660,7 +653,7 @@ Once we have some `SafeKey`s with some test-coins we can use them to pay for the
 ```shell
 $ safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 New SafeKey created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
-Preloaded with 8.15 coins
+Preloaded with 8.15 testcoins
 Key pair generated:
 Public Key = 9754a42c0b568e692b10401c4129bff61088df6ae51bef883b28693d8c3e0e8ce23054e236bd64edc45791549ef60ce1
 Secret Key = 2f211ad4606c716c2c2965e8ea2bd76a63bfc5a5936b792cda448ddea70a031c

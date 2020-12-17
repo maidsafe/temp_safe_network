@@ -1,6 +1,6 @@
 [package]
 name = "sn_api"
-version = "0.15.0"
+version = "0.16.0"
 description = "Safe API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 license = "MIT OR BSD-3-Clause"
@@ -18,7 +18,7 @@ chrono = "~0.4.6"
 dirs-next = "1.0.1"
 env_logger = "~0.6.0"
 futures = "~0.3.5"
-qjsonrpc = { path = "../qjsonrpc", version = "~0.0.6" }
+qjsonrpc = { path = "../qjsonrpc", version = "~0.0.9" }
 lazy_static = "1.4.0"
 log = "~0.4.6"
 mime_guess = "2.0.1"

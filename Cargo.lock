@@ -2869,7 +2869,7 @@ dependencies = [
 
 [[package]]
 name = "qjsonrpc"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "dirs-next 1.0.2",
  "futures 0.3.8",
@@ -3746,7 +3746,7 @@ dependencies = [
 
 [[package]]
 name = "sn_api"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -3786,7 +3786,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "cargo-husky",
  "cluFlock",
@@ -3810,7 +3810,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "ansi_term 0.9.0",
  "assert_cmd",
