@@ -17,31 +17,25 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
-use crate::{Outcome, TernaryResult};
 use log::{debug, info, trace};
-use rand::{CryptoRng, Rng};
+use sn_data_types::PublicKey;
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
-pub struct ElderDuties<R: CryptoRng + Rng> {
+pub struct ElderDuties {
     prefix: Prefix,
-    key_section: KeySection<R>,
+    key_section: KeySection,
     data_section: DataSection,
 }
 
-impl<R: CryptoRng + Rng> ElderDuties<R> {
-    pub async fn new(
-        info: &NodeInfo,
-        used_space: UsedSpace,
-        network: Network,
-        rng: R,
-    ) -> Result<Self> {
+impl ElderDuties {
+    pub async fn new(info: &NodeInfo, used_space: UsedSpace, network: Network) -> Result<Self> {
         let prefix = network.our_prefix().await;
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
-        let key_section = KeySection::new(info, rate_limit, network.clone(), rng).await?;
+        let key_section = KeySection::new(info, rate_limit, network.clone()).await?;
         let data_section = DataSection::new(info, dbs, used_space, network).await?;
         Ok(Self {
             prefix,
@@ -53,16 +47,19 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self, first: bool) -> Outcome<NodeOperation> {
-        // currently only key section needs to catch up
+    pub async fn initiate(&mut self, first: bool) -> Result<NodeOperation> {
+        let mut ops = vec![];
         if first {
-            let _ = self.key_section.init_first().await;
+            ops.push(self.key_section.init_first().await?);
         }
-        self.key_section.catchup_with_section().await
+        ops.push(self.key_section.catchup_with_section().await?);
+        //ops.push(self.data_section.catchup_with_section().await?);
+
+        Ok(ops.into())
     }
 
     /// Processing of any Elder duty.
-    pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Outcome<NodeOperation> {
+    pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<NodeOperation> {
         trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
@@ -83,61 +80,77 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
                     .await
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
+            NoOp => Ok(NodeOperation::NoOp),
+            StorageFull { node_id } => self.increase_full_node_count(node_id).await,
+            SwitchNodeJoin(joins_allowed) => {
+                self.key_section.set_node_join_flag(joins_allowed).await
+            }
         }
     }
 
     ///
-    async fn new_node_joined(&mut self, name: XorName) -> Outcome<NodeOperation> {
+    async fn new_node_joined(&mut self, name: XorName) -> Result<NodeOperation> {
         self.data_section.new_node_joined(name).await
+    }
+
+    async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<NodeOperation> {
+        self.key_section
+            .increase_full_node_count(node_id)
+            .await
+            .map(|()| NodeOperation::NoOp)
     }
 
     ///
     async fn relocated_node_joined(
         &mut self,
-        old_node_id: XorName,
-        new_node_id: XorName,
-        age: u8,
-    ) -> Outcome<NodeOperation> {
-        self.data_section
-            .relocated_node_joined(old_node_id, new_node_id, age)
-            .await
+        _old_node_id: XorName,
+        _new_node_id: XorName,
+        _age: u8,
+    ) -> Result<NodeOperation> {
+        // self.data_section
+        //     .relocated_node_joined(old_node_id, new_node_id, age)
+        //     .await
+        Ok(NodeOperation::NoOp)
     }
 
     ///
-    async fn member_left(&mut self, node_id: XorName, age: u8) -> Outcome<NodeOperation> {
-        self.data_section.member_left(node_id, age).await
+    async fn member_left(&mut self, _node_id: XorName, _age: u8) -> Result<NodeOperation> {
+        //self.data_section.member_left(node_id, age).await
+        Ok(NodeOperation::NoOp)
     }
 
     ///
-    async fn elders_changed(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
+    async fn elders_changed(&mut self, prefix: Prefix) -> Result<NodeOperation> {
         info!("Elders changed");
-
         let mut ops = Vec::new();
-        if let Ok(Some(op)) = self.key_section.elders_changed().await {
-            ops.push(op)
+        match self.key_section.elders_changed().await? {
+            NodeOperation::NoOp => (),
+            op => ops.push(op),
         };
         debug!("Key section completed elder change update.");
-        if let Ok(Some(op)) = self.data_section.elders_changed().await {
-            debug!("Data section elder change resulting in: {:?}", op);
-            ops.push(op)
-        };
-        debug!("Data section completed elder change update.");
+        // match self.data_section.elders_changed().await? {
+        //     NodeOperation::NoOp => (),
+        //     op => ops.push(op),
+        // };
+        // debug!("Data section completed elder change update.");
         if prefix != self.prefix {
             info!("Split occured");
             info!("New prefix is: {:?}", prefix);
-            if let Ok(Some(op)) = self.key_section.section_split(prefix).await {
-                ops.push(op)
+            match self.key_section.section_split(prefix).await? {
+                NodeOperation::NoOp => (),
+                op => ops.push(op),
             };
-            if let Ok(Some(op)) = self.data_section.section_split(prefix).await {
-                ops.push(op)
-            };
+            // match self.data_section.section_split(prefix).await? {
+            //     NodeOperation::NoOp => (),
+            //     op => ops.push(op),
+            // };
         }
 
-        Outcome::oki(ops.into())
+        Ok(ops.into())
     }
 }
 
-impl<R: CryptoRng + Rng> Display for ElderDuties<R> {
+impl Display for ElderDuties {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ElderDuties")
     }

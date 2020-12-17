@@ -40,9 +40,6 @@ mod to_db_key;
 
 pub mod utils;
 
-#[cfg(all(test, feature = "simulated-payouts"))]
-mod tests;
-
 pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
@@ -53,51 +50,19 @@ pub use crate::{
     node::Node,
 };
 
+#[derive(Clone, Debug)]
 ///
-pub type Outcome<T> = Result<Option<T>>;
-
-trait TernaryResult<T> {
-    fn oki(item: T) -> Self;
-    fn oki_no_change() -> Self;
-    fn oki_no_value() -> Self;
-    fn error(error: Error) -> Self;
-    fn has_value(&self) -> bool;
-    fn get_value(&self) -> Option<&T>;
-    fn get_error(&self) -> Option<&Error>;
-    fn convert<K: From<T>>(self) -> Outcome<K>;
+pub struct ReplicaInfo {
+    id: PublicKeyShare,
+    key_index: usize,
+    peer_replicas: PublicKeySet,
+    section_proof_chain: SectionProofChain,
+    signing: Arc<Mutex<ReplicaSigning>>,
+    initiating: bool,
 }
 
-impl<T> TernaryResult<T> for Outcome<T> {
-    fn oki(item: T) -> Self {
-        Ok(Some(item))
-    }
-    fn oki_no_change() -> Self {
-        Ok(None)
-    }
-    fn oki_no_value() -> Self {
-        Ok(None)
-    }
-    fn error(error: Error) -> Self {
-        Err(error)
-    }
-    fn has_value(&self) -> bool {
-        matches!(self, Ok(Some(_)))
-    }
-    fn get_value(&self) -> Option<&T> {
-        if let Ok(Some(value)) = self {
-            Some(value)
-        } else {
-            None
-        }
-    }
-    fn get_error(&self) -> Option<&Error> {
-        if let Err(error) = self {
-            Some(error)
-        } else {
-            None
-        }
-    }
-    fn convert<K: From<T>>(self) -> Outcome<K> {
-        self.map(|c| c.map(|d| d.into()))
-    }
-}
+use bls::{PublicKeySet, PublicKeyShare};
+use futures::lock::Mutex;
+use sn_routing::SectionProofChain;
+use sn_transfers::ReplicaSigning;
+use std::sync::Arc;

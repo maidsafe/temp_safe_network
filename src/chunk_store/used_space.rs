@@ -156,7 +156,10 @@ mod inner {
         /// writers
         pub async fn local(used_space: Arc<Mutex<UsedSpace>>, id: StoreId) -> u64 {
             let used_space_lock = used_space.lock().await;
-            used_space_lock.local_stores.get(&id).unwrap().local_value
+            used_space_lock
+                .local_stores
+                .get(&id)
+                .map_or(0, |res| res.local_value)
         }
 
         /// Adds a new record for tracking the actions
@@ -214,7 +217,7 @@ mod inner {
             let new_local = used_space_lock
                 .local_stores
                 .get(&id)
-                .unwrap()
+                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
                 .local_value
                 .checked_add(consumed)
                 .ok_or(Error::NotEnoughSpace)?;
@@ -223,7 +226,7 @@ mod inner {
                 let record = &mut used_space_lock
                     .local_stores
                     .get_mut(&id)
-                    .unwrap()
+                    .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
                     .local_record;
                 Self::write_local_to_file(record, new_local).await?;
             }
@@ -231,7 +234,7 @@ mod inner {
             used_space_lock
                 .local_stores
                 .get_mut(&id)
-                .unwrap()
+                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
                 .local_value = new_local;
 
             Ok(())
@@ -248,7 +251,7 @@ mod inner {
             let new_local = used_space_lock
                 .local_stores
                 .get_mut(&id)
-                .unwrap()
+                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
                 .local_value
                 .saturating_sub(released);
             let new_total = used_space_lock.total_value.saturating_sub(released);
@@ -256,7 +259,7 @@ mod inner {
                 let record = &mut used_space_lock
                     .local_stores
                     .get_mut(&id)
-                    .unwrap()
+                    .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
                     .local_record;
                 Self::write_local_to_file(record, new_local).await?;
             }
@@ -264,7 +267,7 @@ mod inner {
             used_space_lock
                 .local_stores
                 .get_mut(&id)
-                .unwrap()
+                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
                 .local_value = new_local;
             Ok(())
         }
@@ -289,21 +292,25 @@ mod inner {
 #[cfg(test)]
 mod tests {
 
-    use super::{Init, Result, UsedSpace};
+    use super::{Error, Init, Result, UsedSpace};
     use tempdir::TempDir;
-    use unwrap::unwrap;
 
     const TEST_STORE_MAX_SIZE: u64 = u64::MAX;
 
     /// creates a temp dir for the root of all stores
-    fn create_temp_root() -> TempDir {
-        unwrap!(TempDir::new(&"temp_store_root"))
+    fn create_temp_root() -> Result<TempDir> {
+        TempDir::new(&"temp_store_root").map_err(|e| Error::Other(e.to_string()))
     }
 
     /// create a temp dir for a store at a given temp store root
-    fn create_temp_store(temp_root: &TempDir) -> TempDir {
+    fn create_temp_store(temp_root: &TempDir) -> Result<TempDir> {
         let path_str = temp_root.path().join(&"temp_store");
-        unwrap!(TempDir::new(unwrap!(path_str.to_str())))
+        TempDir::new(
+            path_str
+                .to_str()
+                .ok_or_else(|| Error::Other("Could not convert to str".to_string()))?,
+        )
+        .map_err(|e| Error::Other(e.to_string()))
     }
 
     #[tokio::test]
@@ -311,8 +318,8 @@ mod tests {
         const NUMS_TO_ADD: usize = 128;
 
         // alloc store
-        let root_dir = create_temp_root();
-        let store_dir = create_temp_store(&root_dir);
+        let root_dir = create_temp_root()?;
+        let store_dir = create_temp_store(&root_dir)?;
         let used_space = UsedSpace::new(TEST_STORE_MAX_SIZE);
         let id = used_space.add_local_store(&store_dir, Init::New).await?;
 

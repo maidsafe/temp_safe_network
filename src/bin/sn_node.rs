@@ -32,7 +32,6 @@ use self_update::{cargo_crate_version, Status};
 use sn_node::{self, utils, write_connection_info, Config, Node};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
-use unwrap::unwrap;
 
 const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
@@ -58,7 +57,13 @@ fn main() {
 }
 
 async fn run_node() {
-    let mut config = Config::new();
+    let mut config = match Config::new() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            println!("Failed to create Config: {:?}", e);
+            process::exit(1);
+        }
+    };
 
     if let Some(c) = &config.completions() {
         match c.parse::<clap::Shell>() {
@@ -107,8 +112,7 @@ async fn run_node() {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let mut rng = rand::thread_rng();
-    let mut node = match Node::new(&config, &mut rng).await {
+    let mut node = match Node::new(&config).await {
         Ok(node) => node,
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);
@@ -121,15 +125,20 @@ async fn run_node() {
         Ok(our_conn_info) => {
             println!(
                 "Node connection info:\n{}",
-                unwrap!(serde_json::to_string(&our_conn_info))
+                serde_json::to_string(&our_conn_info)
+                    .unwrap_or_else(|_| "Failed to serialize connection info".into())
             );
             info!(
                 "Node connection info: {}",
-                unwrap!(serde_json::to_string(&our_conn_info))
+                serde_json::to_string(&our_conn_info)
+                    .unwrap_or_else(|_| "Failed to serialize connection info".into())
             );
 
             if config.is_first() {
-                unwrap!(write_connection_info(&our_conn_info));
+                let _ = write_connection_info(&our_conn_info).unwrap_or_else(|err| {
+                    log::error!("Unable to write config to disk: {}", err);
+                    Default::default()
+                });
             }
         }
         Err(e) => {

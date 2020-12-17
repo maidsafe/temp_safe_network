@@ -24,28 +24,27 @@ use crate::{
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
     },
     utils::Init,
-    Config, Error, Network, Outcome, Result, TernaryResult,
+    Config, Error, Network, Result,
 };
 use bls::SecretKey;
 use log::{error, info};
-use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
-use sn_routing::{Event, EventStream};
+use sn_routing::{Event, EventStream, MIN_AGE};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
 
 /// Main node struct.
-pub struct Node<R: CryptoRng + Rng> {
-    duties: NodeDuties<R>,
+pub struct Node {
+    duties: NodeDuties,
     network_api: Network,
     network_events: EventStream,
 }
 
-impl<R: CryptoRng + Rng> Node<R> {
+impl Node {
     /// Initialize a new node.
-    pub async fn new(config: &Config, rng: R) -> Result<Self> {
+    pub async fn new(config: &Config) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
@@ -77,7 +76,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             res
         };
 
-        let (reward_key, age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
+        let (reward_key, _age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
         let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
@@ -93,14 +92,32 @@ impl<R: CryptoRng + Rng> Node<R> {
             reward_key,
         };
 
-        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng).await;
-
         use AgeGroup::*;
+        let age = network_api.age().await;
+        info!("Our Age: {:?}", age);
+
+        info!("Fetching age group");
+        let age_group = if !network_api.is_elder().await && age > MIN_AGE {
+            info!("We are Adult");
+            Adult
+        } else {
+            info!("We are Infant");
+            Infant
+        };
+
+        let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
         let _ = match age_group {
-            Infant => Ok(None),
+            Infant => {
+                info!("Becoming Infant, do nothing.");
+                Ok(NodeOperation::NoOp)
+            }
             Adult => {
-                duties
+                info!("Becoming Adult");
+                let _ = duties
                     .process_node_duty(node_ops::NodeDuty::BecomeAdult)
+                    .await;
+                duties
+                    .process_node_duty(node_ops::NodeDuty::RegisterWallet(reward_key))
                     .await
             }
             Elder => {
@@ -136,7 +153,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let info = self.network_api.our_connection_info().await.unwrap();
+        let info = self.network_api.our_connection_info().await?;
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
@@ -146,39 +163,42 @@ impl<R: CryptoRng + Rng> Node<R> {
             } else {
                 NodeDuty::ProcessNetworkEvent(event).into()
             };
-            self.process_while_any(Outcome::oki(duty)).await;
+            self.process_while_any(Ok(duty)).await;
         }
 
         Ok(())
     }
 
     /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, op: Outcome<NodeOperation>) {
+    async fn process_while_any(&mut self, op: Result<NodeOperation>) {
         use NodeOperation::*;
-        if let Some(e) = op.get_error() {
-            return self.handle_error(e);
-        }
         let mut next_op = op;
-        while let Ok(Some(op)) = next_op {
+        while let Ok(op) = next_op {
             next_op = match op {
-                Single(operation) => self.process(operation).await,
+                Single(operation) => match self.process(operation).await {
+                    Err(e) => {
+                        self.handle_error(&e);
+                        Ok(NoOp)
+                    }
+                    result => result,
+                },
                 Multiple(ops) => {
                     let mut node_ops = Vec::new();
                     for c in ops.into_iter() {
                         match self.process(c).await {
-                            Ok(None) | Ok(Some(NoOp)) => (),
-                            Ok(Some(op)) => node_ops.push(op),
+                            Ok(NoOp) => (),
+                            Ok(op) => node_ops.push(op),
                             Err(e) => self.handle_error(&e),
                         };
                     }
-                    Outcome::oki(node_ops.into())
+                    Ok(node_ops.into())
                 }
                 NoOp => break,
             }
         }
     }
 
-    async fn process(&mut self, duty: NetworkDuty) -> Outcome<NodeOperation> {
+    async fn process(&mut self, duty: NetworkDuty) -> Result<NodeOperation> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
@@ -187,7 +207,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     duties.process_adult_duty(duty).await
                 } else {
                     error!("Currently not an Adult!");
-                    Outcome::error(Error::Logic("Currently not an Adult".to_string()))
+                    Err(Error::Logic("Currently not an Adult".to_string()))
                 }
             }
             RunAsElder(duty) => {
@@ -196,13 +216,14 @@ impl<R: CryptoRng + Rng> Node<R> {
                     duties.process_elder_duty(duty).await
                 } else {
                     error!("Currently not an Elder!");
-                    Outcome::error(Error::Logic("Currently not an Elder".to_string()))
+                    Err(Error::Logic("Currently not an Elder".to_string()))
                 }
             }
             RunAsNode(duty) => {
                 info!("Running as Node: {:?}", duty);
                 self.duties.process_node_duty(duty).await
             }
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
@@ -211,7 +232,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for Node<R> {
+impl Display for Node {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Node")
     }

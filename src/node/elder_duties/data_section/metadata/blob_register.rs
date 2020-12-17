@@ -12,19 +12,17 @@ use crate::{
     node::node_ops::{NodeMessagingDuty, NodeOperation},
     Network, Result, ToDbKey,
 };
-use crate::{Outcome, TernaryResult};
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, DebitAgreementProof,
-    Error as NdError, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, PublicKey,
-    Query, QueryResponse, Result as NdResult,
+    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, DataQuery, Error as NdError, Message,
+    MessageId, MsgSender, NodeCmd, NodeDataCmd, PublicKey, Query, QueryResponse,
+    Result as NdResult,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
 };
-use tiny_keccak::sha3_256;
 use xor_name::XorName;
 
 // The number of separate copies of a blob chunk which should be maintained.
@@ -66,13 +64,12 @@ impl BlobRegister {
         write: BlobWrite,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin, payment, proxies).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies).await,
+            New(data) => self.store(data, msg_id, origin, proxies).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin, proxies).await,
         }
     }
 
@@ -81,16 +78,15 @@ impl BlobRegister {
         data: Blob,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
         let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()) {
             if metadata.holders.len() == CHUNK_COPY_COUNT {
                 if data.is_pub() {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
-                    return Outcome::oki_no_change();
+                    return Ok(NodeMessagingDuty::NoOp);
                 } else {
                     return self
                         .wrapping
@@ -141,18 +137,17 @@ impl BlobRegister {
         if !results.is_empty() {
             info!("Results is not empty!");
         }
-        let msg = MsgEnvelope {
-            message: Message::Cmd {
-                cmd: Cmd::Data {
-                    cmd: sn_data_types::DataCmd::Blob(BlobWrite::New(data)),
-                    payment,
-                },
-                id: msg_id,
-            },
-            origin,
-            proxies,
+        let message = Message::NodeCmd {
+            cmd: NodeCmd::Data(sn_data_types::NodeDataCmd::Blob(BlobWrite::New(data))),
+            id: msg_id,
         };
-        self.wrapping.send_to_adults(target_holders, &msg).await
+        //     ,
+        //     origin,
+        //     proxies,
+        // };
+        self.wrapping
+            .send_to_adults(target_holders, message, true, origin, proxies)
+            .await
     }
 
     async fn delete(
@@ -160,9 +155,8 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send_to_section(
                 Message::CmdError {
@@ -180,6 +174,7 @@ impl BlobRegister {
             Err(error) => return cmd_error(error).await,
         };
 
+        // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id().public_key() {
                 return cmd_error(NdError::AccessDenied).await;
@@ -192,18 +187,13 @@ impl BlobRegister {
             .collect();
         if !results.is_empty() {}
 
-        let msg = MsgEnvelope {
-            message: Message::Cmd {
-                cmd: Cmd::Data {
-                    cmd: sn_data_types::DataCmd::Blob(BlobWrite::DeletePrivate(address)),
-                    payment,
-                },
-                id: msg_id,
-            },
-            origin,
-            proxies,
+        let message = Message::NodeCmd {
+            cmd: NodeCmd::Data(NodeDataCmd::Blob(BlobWrite::DeletePrivate(address))),
+            id: msg_id,
         };
-        self.wrapping.send_to_adults(metadata.holders, &msg).await
+        self.wrapping
+            .send_to_adults(metadata.holders, message, true, origin, proxies)
+            .await
     }
 
     fn set_chunk_holder(
@@ -218,7 +208,7 @@ impl BlobRegister {
         //   chunk.  Not known yet where we'll get the chunk from to do that.
         info!("Setting chunk holder");
 
-        let db_key = blob_address.to_db_key();
+        let db_key = blob_address.to_db_key()?;
         let mut metadata = self.get_metadata_for(blob_address).unwrap_or_default();
         if blob_address.is_unpub() {
             metadata.owner = Some(origin);
@@ -239,7 +229,7 @@ impl BlobRegister {
             .dbs
             .holders
             .borrow_mut()
-            .set(&holder.to_db_key(), &holders_metadata)
+            .set(&holder.to_db_key()?, &holders_metadata)
         {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
             return Err(error.into());
@@ -252,7 +242,7 @@ impl BlobRegister {
         blob_address: BlobAddress,
         holder_name: XorName,
     ) -> Result<()> {
-        let db_key = blob_address.to_db_key();
+        let db_key = blob_address.to_db_key()?;
         let metadata = self.get_metadata_for(blob_address);
         if let Ok(mut metadata) = metadata {
             let holder = self.get_holder(holder_name);
@@ -261,7 +251,7 @@ impl BlobRegister {
             if let Ok(mut holder) = holder {
                 let _ = holder.chunks.remove(&blob_address);
                 if holder.chunks.is_empty() {
-                    if let Err(error) = self.dbs.holders.borrow_mut().rem(&holder_name.to_db_key())
+                    if let Err(error) = self.dbs.holders.borrow_mut().rem(&holder_name.to_db_key()?)
                     {
                         warn!(
                             "{}: Failed to delete holder metadata from DB: {:?}",
@@ -272,7 +262,7 @@ impl BlobRegister {
                     .dbs
                     .holders
                     .borrow_mut()
-                    .set(&holder_name.to_db_key(), &holder)
+                    .set(&holder_name.to_db_key()?, &holder)
                 {
                     warn!(
                         "{}: Failed to write holder metadata to DB: {:?}",
@@ -300,21 +290,21 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn duplicate_chunks(&mut self, holder: XorName) -> Outcome<NodeOperation> {
-        trace!("Duplicating chunks of holder {:?}", holder);
+    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NodeOperation> {
+        trace!("Replicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
             Ok(chunks) => chunks,
-            _ => return Outcome::oki_no_change(),
+            _ => return Ok(NodeOperation::NoOp),
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
-            cmds.extend(self.get_duplication_msgs(address, holders).await);
+            cmds.extend(self.get_replication_msgs(address, holders).await);
         }
-        Outcome::oki(cmds.into())
+        Ok(cmds.into())
     }
 
-    async fn get_duplication_msgs(
+    async fn get_replication_msgs(
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
@@ -327,24 +317,22 @@ impl BlobRegister {
             .await
             .into_iter()
             .map(|new_holder| {
-                let mut hash_bytes = Vec::new();
-                hash_bytes.extend_from_slice(&address.name().0);
-                hash_bytes.extend_from_slice(&new_holder.0);
-                let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
-                info!("Sending duplicate chunk msg to NewHolder {:?}", new_holder);
+                let message_id = MessageId::combine(vec![*address.name(), new_holder]);
+                info!("Sending replicate-chunk cmd to NewHolder {:?}", new_holder);
                 Message::NodeCmd {
-                    cmd: Data(DuplicateChunk {
+                    cmd: Data(ReplicateChunk {
                         new_holder,
                         address,
-                        fetch_from_holders: current_holders.clone(),
+                        current_holders: current_holders.clone(),
                     }),
                     id: message_id,
                 }
             })
             .collect::<Vec<_>>();
         for message in messages {
-            if let Ok(Some(op)) = self.wrapping.send_to_node(message).await {
-                node_ops.push(op.into());
+            match self.wrapping.send_to_node(message.clone()).await {
+                Ok(op) => node_ops.push(op.into()),
+                Err(e) => warn!("Error: {}. Failed to send msg to node: {:?}", e, message),
             }
         }
         node_ops
@@ -356,7 +344,7 @@ impl BlobRegister {
         msg_id: MessageId,
         origin: MsgSender,
         proxies: Vec<MsgSender>,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin, proxies).await,
@@ -369,17 +357,20 @@ impl BlobRegister {
         msg_id: MessageId,
         origin: MsgSender,
         proxies: Vec<MsgSender>,
-    ) -> Outcome<NodeMessagingDuty> {
-        let query_error = |error: NdError| {
-            self.wrapping.send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetBlob(Err(error)),
-                    id: MessageId::new(),
-                    query_origin: origin.address(),
-                    correlation_id: msg_id,
-                },
-                true,
-            )
+    ) -> Result<NodeMessagingDuty> {
+        let query_error = |error: NdError| async {
+            let err_msg = Message::QueryResponse {
+                response: QueryResponse::GetBlob(Err(error)),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            };
+            // short circuit sending the response directly to client if there are no intermediaries
+            if proxies.is_empty() && origin.is_client() {
+                self.wrapping.send_to_client(err_msg).await
+            } else {
+                self.wrapping.send_to_section(err_msg, false).await
+            }
         };
 
         let metadata = match self.get_metadata_for(address) {
@@ -392,15 +383,13 @@ impl BlobRegister {
                 return query_error(NdError::AccessDenied).await;
             }
         };
-        let msg = MsgEnvelope {
-            message: Message::Query {
-                query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
-                id: msg_id,
-            },
-            origin,
-            proxies,
+        let message = Message::Query {
+            query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
+            id: msg_id,
         };
-        self.wrapping.send_to_adults(metadata.holders, &msg).await
+        self.wrapping
+            .send_to_adults(metadata.holders, message, true, origin, proxies)
+            .await
     }
 
     #[allow(unused)]
@@ -410,14 +399,14 @@ impl BlobRegister {
         holder: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
         let _ = chunk_metadata.holders.insert(holder);
         if let Err(error) = self
             .dbs
             .metadata
             .borrow_mut()
-            .set(&address.to_db_key(), &chunk_metadata)
+            .set(&address.to_db_key()?, &chunk_metadata)
         {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
@@ -427,15 +416,15 @@ impl BlobRegister {
             .dbs
             .holders
             .borrow_mut()
-            .set(&holder.to_db_key(), &holders_metadata)
+            .set(&holder.to_db_key()?, &holders_metadata)
         {
             warn!(
                 "{}: Failed to write holder metadata to DB: {:?}",
                 self, error
             );
         }
-        info!("Duplication process completed for: {:?}", message_id);
-        Outcome::oki_no_value()
+        info!("Replication process completed for: {:?}", message_id);
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     // Updates the metadata of the chunks help by a node that left.
@@ -449,7 +438,9 @@ impl BlobRegister {
 
         if let Ok(holder) = chunk_holder {
             for chunk_address in holder.chunks {
-                let db_key = chunk_address.to_db_key();
+                let db_key = chunk_address
+                    .to_db_key()
+                    .map_err(|e| NdError::NetworkOther(e.to_string()))?;
                 let chunk_metadata = self.get_metadata_for(chunk_address);
 
                 if let Ok(mut metadata) = chunk_metadata {
@@ -473,7 +464,11 @@ impl BlobRegister {
         }
 
         // Since the node has left the section, remove it from the holders DB
-        if let Err(error) = self.dbs.holders.borrow_mut().rem(&node.to_db_key()) {
+        if let Err(error) = self.dbs.holders.borrow_mut().rem(
+            &node
+                .to_db_key()
+                .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+        ) {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
 
@@ -481,12 +476,11 @@ impl BlobRegister {
     }
 
     fn get_holder(&self, holder: XorName) -> NdResult<HolderMetadata> {
-        match self
-            .dbs
-            .holders
-            .borrow()
-            .get::<HolderMetadata>(&holder.to_db_key())
-        {
+        match self.dbs.holders.borrow().get::<HolderMetadata>(
+            &holder
+                .to_db_key()
+                .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+        ) {
             Some(metadata) => {
                 if metadata.chunks.is_empty() {
                     warn!("{}: is not responsible for any chunk", holder);
@@ -503,12 +497,11 @@ impl BlobRegister {
     }
 
     fn get_metadata_for(&self, address: BlobAddress) -> NdResult<ChunkMetadata> {
-        match self
-            .dbs
-            .metadata
-            .borrow()
-            .get::<ChunkMetadata>(&address.to_db_key())
-        {
+        match self.dbs.metadata.borrow().get::<ChunkMetadata>(
+            &address
+                .to_db_key()
+                .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+        ) {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
                     warn!("{}: Metadata holders is empty for: {:?}", self, address);
@@ -527,10 +520,10 @@ impl BlobRegister {
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
     async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        let closest_adults = self
-            .routing
+        //let closest_adults =
+        self.routing
             .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
-            .await;
+            .await
 
         // TODO: Investigate elder blob storage
         // if closest_adults.len() < CHUNK_COPY_COUNT {
@@ -545,7 +538,7 @@ impl BlobRegister {
         //     closest_adults
         // }
 
-        closest_adults
+        //closest_adults
     }
 
     // Returns `XorName`s of the new target holders for an Blob chunk.

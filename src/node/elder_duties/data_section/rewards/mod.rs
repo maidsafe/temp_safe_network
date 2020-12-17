@@ -15,23 +15,24 @@ pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeMessagingDuty, NodeOperation, RewardDuty},
+    node::node_ops::{Blah, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery},
 };
-use crate::{Error, Outcome, TernaryResult};
+use crate::{Error, Result};
+use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{
     Address, ElderDuties, Error as NdError, Message, MessageId, Money, NodeQuery,
-    NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, PublicKey,
+    NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery, PublicKey,
 };
 use sn_transfers::TransferActor;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// The accumulation and paying
 /// out of rewards to nodes for
 /// their work in the network.
 pub struct Rewards {
-    node_rewards: HashMap<XorName, NodeRewards>,
+    node_rewards: DashMap<XorName, NodeRewards>,
     section_funds: SectionFunds,
     wrapping: ElderMsgWrapping,
     reward_calc: RewardCalc,
@@ -40,7 +41,7 @@ pub struct Rewards {
 // Node age
 type Age = u8;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeRewards {
     /// When a new node joins the network.
     NewNode,
@@ -73,7 +74,7 @@ impl Rewards {
 
     /// Returns the node ids of all nodes.
     pub fn all_nodes(&self) -> Vec<XorName> {
-        self.node_rewards.keys().copied().collect()
+        self.node_rewards.iter().map(|r| *r.key()).collect()
     }
 
     /// Removes a subset of the nodes,
@@ -85,21 +86,61 @@ impl Rewards {
         }
     }
 
-    /// After Elder change, we transition to a new
-    /// transfer actor, as there is now a new keypair for it.
-    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Outcome<NodeOperation> {
-        Ok(self.section_funds.transition(to).await?.map(|c| c.into()))
+    /// Issues a query to existing Replicas
+    /// asking for their events, as to catch up and
+    /// start working properly in the group.
+    #[allow(unused)]
+    pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
+        info!("Rewards: Catching up with our Replicas (section actor history)!");
+        // prepare actor init
+        let pub_key = self.section_funds.replicas();
+        self.wrapping
+            .send_to_section(
+                Message::NodeQuery {
+                    query: NodeQuery::Transfers(NodeTransferQuery::GetSectionActorHistory(pub_key)),
+                    id: MessageId::new(),
+                },
+                true,
+            )
+            .await
+            .convert()
     }
 
-    pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Outcome<NodeOperation> {
+    /// After Elder change, we transition to a new
+    /// transfer actor, as there is now a new keypair for it.
+    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeOperation> {
+        Ok(self.section_funds.transition(to).await?.into())
+    }
+
+    pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Result<NodeOperation> {
         use RewardDuty::*;
-        let result = match duty {
-            InitiateSectionActor(events) => {
-                self.section_funds.synch(events).await?.map(|c| c.into())
-            }
-            AddNewNode(node_id) => self.add_new_node(node_id)?.map(|c| c.into()),
+        match duty {
+            ProcessCmd {
+                cmd,
+                msg_id,
+                origin,
+            } => self.process_reward_cmd(cmd, msg_id, origin).await,
+            ProcessQuery {
+                query,
+                origin,
+                msg_id,
+            } => self.process_reward_query(query, msg_id, origin).await,
+            NoOp => Ok(NodeOperation::NoOp),
+        }
+    }
+
+    async fn process_reward_cmd(
+        &mut self,
+        cmd: RewardCmd,
+        _msg_id: MessageId,
+        _origin: Address,
+    ) -> Result<NodeOperation> {
+        use RewardCmd::*;
+        let result = match cmd {
+            InitiateSectionActor(events) => self.section_funds.synch(events).await?.into(),
+            AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
             SetNodeWallet { node_id, wallet_id } => {
-                self.set_node_wallet(node_id, wallet_id)?.map(|c| c.into())
+                self.set_node_wallet(node_id, wallet_id)?.into()
             }
             AddRelocatingNode {
                 old_node_id,
@@ -108,29 +149,39 @@ impl Rewards {
             } => self
                 .add_relocating_node(old_node_id, new_node_id, age)
                 .await?
-                .map(|c| c.into()),
-            GetWalletId {
-                old_node_id,
-                new_node_id,
-                msg_id,
-                origin,
-            } => self
-                .get_wallet_id(old_node_id, new_node_id, msg_id, &origin)
-                .await?
-                .map(|c| c.into()),
-            ActivateNodeRewards { id, node_id } => self
-                .activate_node_rewards(id, node_id)
-                .await?
-                .map(|c| c.into()),
-            DeactivateNode(node_id) => self.deactivate(node_id)?.map(|c| c.into()),
+                .into(),
+            ActivateNodeRewards { id, node_id } => {
+                self.activate_node_rewards(id, node_id).await?.into()
+            }
+            DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
             ReceivePayoutValidation(validation) => self.section_funds.receive(validation).await?,
         };
 
         Ok(result)
     }
 
+    async fn process_reward_query(
+        &self,
+        query: RewardQuery,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeOperation> {
+        use RewardQuery::*;
+        let result = match query {
+            GetWalletId {
+                old_node_id,
+                new_node_id,
+            } => self
+                .get_wallet_id(old_node_id, new_node_id, msg_id, &origin)
+                .await?
+                .into(),
+        };
+
+        Ok(result)
+    }
+
     /// On section splits, we are paying out to Elders.
-    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<XorName>) -> Outcome<NodeOperation> {
+    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<XorName>) -> Result<NodeOperation> {
         let mut payouts: Vec<NodeOperation> = vec![];
         for node_id in node_ids {
             // Try get the wallet..
@@ -140,9 +191,9 @@ impl Rewards {
                     continue;
                 }
                 Some(state) => {
-                    match state {
+                    match *state {
                         // ..and validate its state.
-                        NodeRewards::Active { wallet, age } => (*wallet, *age),
+                        NodeRewards::Active { wallet, age } => (wallet, age),
                         _ => {
                             warn!("Invalid operation: Node rewards is not activated.");
                             continue;
@@ -152,7 +203,7 @@ impl Rewards {
             };
             info!("Initiating local reward payout to node: {}.", node_id);
             // Because of the more frequent payout, every such payout is made a bit smaller (dividing by age).
-            if let Some(payout) = self
+            let payout = self
                 .section_funds
                 .initiate_reward_payout(Payout {
                     to: wallet,
@@ -161,14 +212,13 @@ impl Rewards {
                     ),
                     node_id,
                 })
-                .await?
-            {
-                // add the payout to list of ops
-                payouts.push(payout.into());
-            }
+                .await?;
+
+            // add the payout to list of ops
+            payouts.push(payout.into());
         }
 
-        Outcome::oki(payouts.into())
+        Ok(payouts.into())
     }
 
     /// 0. A brand new node has joined our section.
@@ -176,49 +226,45 @@ impl Rewards {
     /// It still hasn't registered a wallet id at
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
-    fn add_new_node(&mut self, node_id: XorName) -> Outcome<NodeMessagingDuty> {
+    fn add_new_node(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
         let _ = self.node_rewards.insert(node_id, NodeRewards::NewNode);
-        Ok(None)
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     /// 1. A new node registers a wallet id for future reward payout.
     /// ... or, an active node updates its wallet.
-    fn set_node_wallet(
-        &mut self,
-        node_id: XorName,
-        wallet: PublicKey,
-    ) -> Outcome<NodeMessagingDuty> {
+    fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeMessagingDuty> {
         // Try get the info..
         let state = match self.node_rewards.get_mut(&node_id) {
             None => {
                 error!("Cannot set node wallet unless active or new.");
-                return Outcome::error(Error::NetworkData(NdError::NoSuchKey));
+                return Err(Error::NetworkData(NdError::NoSuchKey));
             }
             Some(state) => {
-                match state {
+                match *state {
                     // ..and validate its state.
                     NodeRewards::NewNode => NodeRewards::AwaitingRelocation(wallet),
-                    NodeRewards::Active { age, .. } => NodeRewards::Active { age: *age, wallet },
+                    NodeRewards::Active { age, .. } => NodeRewards::Active { age, wallet },
                     _ => {
                         warn!("Cannot set node wallet unless active or new.");
-                        return Outcome::error(Error::NetworkData(NdError::InvalidOperation));
+                        return Err(Error::NetworkData(NdError::InvalidOperation));
                     }
                 }
             }
         };
         debug!("Node wallet set! {}, {:?}", node_id, state);
         let _ = self.node_rewards.insert(node_id, state);
-        Ok(None)
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     /// 2. When a node is relocated to our section, we add the node id
     /// and send a query to old section, for retreiving the wallet id.
     async fn add_relocating_node(
-        &mut self,
+        &self,
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use NodeQuery::*;
         use NodeRewardQuery::*;
         use NodeRewards::*;
@@ -247,7 +293,7 @@ impl Rewards {
         &mut self,
         wallet: PublicKey,
         node_id: XorName,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         // If we ever hit these errors, something is very odd
         // most likely a bug, because we are receiving a response to our query.
         // So, it doesn't make much sense to send some error msg back on the wire.
@@ -258,15 +304,15 @@ impl Rewards {
         let age = match self.node_rewards.get_mut(&node_id) {
             None => {
                 warn!("Invalid operation: Node not found {}.", node_id);
-                return Outcome::error(Error::NetworkData(NdError::NoSuchBalance));
+                return Err(Error::NetworkData(NdError::NoSuchBalance));
             }
             Some(state) => {
-                match state {
+                match *state {
                     // ..and validate its state.
-                    NodeRewards::AwaitingActivation(age) => *age,
+                    NodeRewards::AwaitingActivation(age) => age,
                     _ => {
                         warn!("Invalid operation: Node is not awaiting reward activation.");
-                        return Outcome::error(Error::NetworkData(NdError::InvalidOperation));
+                        return Err(Error::NetworkData(NdError::InvalidOperation));
                     }
                 }
             }
@@ -289,18 +335,21 @@ impl Rewards {
 
     /// 4. When the section becomes aware that a node has left,
     /// its account is deactivated.
-    fn deactivate(&mut self, node_id: XorName) -> Outcome<NodeMessagingDuty> {
-        let wallet = match self.node_rewards.get(&node_id) {
-            Some(NodeRewards::Active { wallet, .. }) => *wallet,
-            Some(NodeRewards::AwaitingActivation { .. }) // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
-            | Some(NodeRewards::AwaitingRelocation(_))
-            | Some(NodeRewards::NewNode)
-            | None => return Outcome::oki_no_change(),
+    fn deactivate(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
+        let entry = match self.node_rewards.get(&node_id) {
+            Some(entry) => entry.clone(),
+            None => return Ok(NodeMessagingDuty::NoOp),
+        };
+        let wallet = match entry {
+            NodeRewards::Active { wallet, .. } => wallet,
+            NodeRewards::AwaitingActivation { .. } // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
+            | NodeRewards::AwaitingRelocation(_)
+            | NodeRewards::NewNode => return Ok(NodeMessagingDuty::NoOp),
         };
         let _ = self
             .node_rewards
             .insert(node_id, NodeRewards::AwaitingRelocation(wallet));
-        Outcome::oki_no_value()
+        Ok(NodeMessagingDuty::NoOp)
     }
 
     /// 5. The section that received a relocated node,
@@ -308,17 +357,21 @@ impl Rewards {
     /// thereby sending a query to the old section, leading to this method
     /// here being called. A query response will be sent back with the wallet id.
     async fn get_wallet_id(
-        &mut self,
+        &self,
         old_node_id: XorName,
         new_node_id: XorName,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Outcome<NodeMessagingDuty> {
-        let wallet = match self.node_rewards.get(&old_node_id) {
-            Some(NodeRewards::AwaitingRelocation(id)) => *id,
-            Some(NodeRewards::NewNode)
-            | Some(NodeRewards::AwaitingActivation { .. })
-            | Some(NodeRewards::Active { .. }) => {
+    ) -> Result<NodeMessagingDuty> {
+        let entry = match self.node_rewards.get(&old_node_id) {
+            Some(entry) => entry.clone(),
+            None => return Ok(NodeMessagingDuty::NoOp),
+        };
+        let wallet = match entry {
+            NodeRewards::AwaitingRelocation(id) => id,
+            NodeRewards::NewNode
+            | NodeRewards::AwaitingActivation { .. }
+            | NodeRewards::Active { .. } => {
                 // ..means the node has not left, and was not
                 // marked as relocating..
                 // (Could be a case for lazy messaging..)
@@ -328,13 +381,12 @@ impl Rewards {
                         response: Rewards(GetWalletId(Err(NdError::NetworkOther(
                             "Node is not being relocated.".to_string(),
                         )))),
-                        id: MessageId::new(),
+                        id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
                         query_origin: origin.clone(),
                     })
                     .await;
             }
-            None => return Outcome::oki_no_value(),
         };
 
         // Remove the old node, as it is being
@@ -349,7 +401,7 @@ impl Rewards {
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Rewards(GetWalletId(Ok((wallet, new_node_id)))),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin.clone(),
             })

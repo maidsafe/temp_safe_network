@@ -18,11 +18,10 @@ use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MetadataDuty, NodeOperation},
+    node::node_ops::{Blah, MetadataDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, Result,
+    Error, Network, Result,
 };
-use crate::{Error, Outcome, TernaryResult};
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
@@ -70,18 +69,19 @@ impl Metadata {
         })
     }
 
-    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Outcome<NodeOperation> {
+    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NodeOperation> {
         use MetadataDuty::*;
         match duty {
             ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn process_msg(&mut self, msg: MsgEnvelope) -> Outcome<NodeOperation> {
+    async fn process_msg(&mut self, msg: MsgEnvelope) -> Result<NodeOperation> {
         match &msg.message {
             Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
             Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.convert(),
-            _ => Outcome::error(Error::Logic(
+            _ => Err(Error::Logic(
                 "Only Queries and Cmds from client can be handled at Metadata".to_string(),
             )), // only Queries and Cmds from client is handled at Metadata
         }
@@ -90,161 +90,12 @@ impl Metadata {
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    pub async fn trigger_chunk_duplication(&mut self, node: XorName) -> Outcome<NodeOperation> {
+    pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NodeOperation> {
         self.elder_stores
             .blob_register_mut()
-            .duplicate_chunks(node)
+            .replicate_chunks(node)
             .await
     }
-
-    // trace!(
-    //     "{}: Received ({:?} {:?}) from src {:?} (client {:?})",
-    //     self,
-    //     request,
-    //     message_id,
-    //     src,
-    //     requester
-    // );
-
-    // pub fn handle_response(
-    //     &mut self,
-    //     src: SrcLocation,
-    //     response: Response,
-    //     requester: PublicId,
-    //     message_id: MessageId,
-    //     proof: Option<(Request, Signature)>,
-    // ) -> Outcome<NodeMessagingDuty> {
-    //     use Response::*;
-    //     trace!(
-    //         "{}: Received ({:?} {:?}) from {}",
-    //         self,
-    //         response,
-    //         message_id,
-    //         utils::get_source_name(src),
-    //     );
-    //     if let Some((request, signature)) = proof {
-    //         if !matches!(requester, PublicId::Node(_))
-    //             && self
-    //                 .validate_section_signature(&request, &signature)
-    //                 .is_none()
-    //         {
-    //             error!("Invalid section signature");
-    //             return None;
-    //         }
-    //         match response {
-    //             Write(result) => self.elder_stores.blob_register_mut().handle_write_result(
-    //                 utils::get_source_name(src),
-    //                 requester,
-    //                 result,
-    //                 message_id,
-    //                 request,
-    //             ),
-    //             GetBlob(result) => self.elder_stores.blob_register().handle_get_result(
-    //                 result,
-    //                 message_id,
-    //                 requester,
-    //                 (request, signature),
-    //             ),
-    //             //
-    //             // ===== Invalid =====
-    //             //
-    //             ref _other => {
-    //                 error!(
-    //                     "{}: Should not receive {:?} as a data handler.",
-    //                     self, response
-    //                 );
-    //                 None
-    //             }
-    //         }
-    //     } else {
-    //         error!("Missing section signature");
-    //         None
-    //     }
-    // }
-
-    // fn initiate_duplication(
-    //     &mut self,
-    //     address: BlobAddress,
-    //     holders: BTreeSet<XorName>,
-    //     message_id: MessageId,
-    //     accumulated_signature: Option<Signature>,
-    // ) -> Outcome<NodeMessagingDuty> {
-    //     trace!(
-    //         "Sending GetBlob request for address: ({:?}) to {:?}",
-    //         address,
-    //         holders,
-    //     );
-    //     let our_id = self.id.clone();
-    //     wrap(MetadataCmd::SendToAdults {
-    //         targets: holders,
-    //         msg: Message::Request {
-    //             request: Request::Node(NodeRequest::Read(Read::Blob(BlobRead::Get(address)))),
-    //             requester: PublicId::Node(our_id),
-    //             message_id,
-    //             signature: Some((0, SignatureShare(accumulated_signature?))),
-    //         },
-    //     })
-    // }
-
-    // fn finalise_duplication(
-    //     &mut self,
-    //     sender: SrcLocation,
-    //     response: Response,
-    //     message_id: MessageId,
-    //     Blob_address: BlobAddress,
-    //     signature: Signature,
-    // ) -> Outcome<NodeMessagingDuty> {
-    //     use Response::*;
-    //     if self
-    //         .routing
-    //         .borrow()
-    //         .public_key_set()
-    //         .ok()?
-    //         .public_key()
-    //         .verify(&signature, &utils::serialise(&Blob_address))
-    //     {
-    //         match response {
-    //             Write(result) => self.elder_stores.blob_register_mut().update_holders(
-    //                 Blob_address,
-    //                 utils::get_source_name(sender),
-    //                 result,
-    //                 message_id,
-    //             ),
-    //             // Duplication doesn't care about other type of responses
-    //             ref _other => {
-    //                 error!(
-    //                     "{}: Should not receive {:?} as a data handler.",
-    //                     self, response
-    //                 );
-    //                 None
-    //             }
-    //         }
-    //     } else {
-    //         error!("Ignoring duplication response. Invalid Signature.");
-    //         None
-    //     }
-    // }
-
-    // fn public_key(&self) -> Option<PublicKey> {
-    //     Some(
-    //         self.routing
-    //             .borrow()
-    //             .public_key_set()
-    //             .ok()?
-    //             .public_key(),
-    //     )
-    // }
-
-    // fn validate_section_signature(&self, signature: &Signature) -> Option<()> {
-    //     if self
-    //         .public_key()?
-    //         .verify(signature, &utils::serialise(request))
-    //     {
-    //         Some(())
-    //     } else {
-    //         None
-    //     }
-    // }
 }
 
 impl Display for Metadata {

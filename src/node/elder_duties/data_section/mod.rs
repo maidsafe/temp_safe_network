@@ -16,11 +16,12 @@ use self::{
 use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
-    node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
+    node::node_ops::{DataSectionDuty, NodeOperation, RewardCmd, RewardDuty},
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
-use crate::{Outcome, TernaryResult};
+use log::info;
+use sn_data_types::{Address, MessageId};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::sync::Arc;
@@ -68,24 +69,35 @@ impl DataSection {
     pub async fn process_data_section_duty(
         &mut self,
         duty: DataSectionDuty,
-    ) -> Outcome<NodeOperation> {
+    ) -> Result<NodeOperation> {
         use DataSectionDuty::*;
         match duty {
             RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty).await,
             RunAsRewards(duty) => self.rewards.process_reward_duty(duty).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    // Transition the section funds account to the new key.
-    pub async fn elders_changed(&mut self) -> Outcome<NodeOperation> {
+    /// Issues query to Elders of the section
+    /// as to catch up with the current state of the replicas.
+    #[allow(unused)]
+    pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
+        self.rewards.catchup_with_replicas().await
+    }
+
+    /// Transition the section funds account to the new key.
+    #[allow(unused)]
+    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
+        info!("updating section public key set in data section!");
         let pub_key_set = self.network.public_key_set().await?;
         let keypair = utils::key_pair(self.network.clone()).await?;
         let actor = TransferActor::new(Arc::new(keypair), pub_key_set, Validator {});
         self.rewards.transition(actor).await
     }
 
-    // At section split, all Elders get their reward payout.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
+    /// At section split, all Elders get their reward payout.
+    #[allow(unused)]
+    pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
         // First remove nodes that are no longer in our section.
         let to_remove = self
             .rewards
@@ -101,44 +113,55 @@ impl DataSection {
     }
 
     /// When a new node joins, it is registered for receiving rewards.
-    pub async fn new_node_joined(&mut self, id: XorName) -> Outcome<NodeOperation> {
+    pub async fn new_node_joined(&mut self, id: XorName) -> Result<NodeOperation> {
         self.rewards
-            .process_reward_duty(RewardDuty::AddNewNode(id))
+            .process_reward_duty(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::AddNewNode(id),
+                msg_id: MessageId::new(),
+                origin: Address::Node(self.network.name().await),
+            })
             .await
     }
 
     /// When a relocated node joins, a DataSection
     /// has a few different things to do, such as
-    /// pay out rewards and trigger chunk duplication.
+    /// pay out rewards and trigger chunk replication.
+    #[allow(unused)]
     pub async fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Outcome<NodeOperation> {
+    ) -> Result<NodeOperation> {
         // Adds the relocated account.
-        let first = self
-            .rewards
-            .process_reward_duty(RewardDuty::AddRelocatingNode {
-                old_node_id,
-                new_node_id,
-                age,
+        self.rewards
+            .process_reward_duty(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::AddRelocatingNode {
+                    old_node_id,
+                    new_node_id,
+                    age,
+                },
+                msg_id: MessageId::new(),
+                origin: Address::Node(self.network.name().await),
             })
-            .await;
-        let second = self.metadata.trigger_chunk_duplication(new_node_id).await;
-        Outcome::oki(vec![first, second].into())
+            .await
     }
 
     /// Name of the node
     /// Age of the node
-    pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Outcome<NodeOperation> {
+    #[allow(unused)]
+    pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
         let first = self
             .rewards
-            .process_reward_duty(RewardDuty::DeactivateNode(node_id))
+            .process_reward_duty(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::DeactivateNode(node_id),
+                msg_id: MessageId::new(),
+                origin: Address::Node(self.network.name().await),
+            })
             .await;
-        let second = self.metadata.trigger_chunk_duplication(node_id).await;
-        Outcome::oki(vec![first, second].into())
+        let second = self.metadata.trigger_chunk_replication(node_id).await;
+        Ok(vec![first, second].into())
     }
 }

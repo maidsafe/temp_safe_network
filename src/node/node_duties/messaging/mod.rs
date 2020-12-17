@@ -9,7 +9,7 @@
 pub mod network_sender;
 
 use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
-use crate::{Network, Outcome};
+use crate::{Network, Result};
 use log::info;
 use network_sender::NetworkSender;
 
@@ -28,7 +28,7 @@ impl Messaging {
     pub async fn process_messaging_duty(
         &mut self,
         duty: NodeMessagingDuty,
-    ) -> Outcome<NodeOperation> {
+    ) -> Result<NodeOperation> {
         use NodeMessagingDuty::*;
         info!("Sending message: {:?}", duty);
         match duty {
@@ -38,6 +38,7 @@ impl Messaging {
                 self.network_sender.send_to_network(msg, as_node).await
             }
             SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 }

@@ -17,39 +17,37 @@ use crate::node::{
     elder_duties::ElderDuties,
     msg_wrapping::NodeMsgWrapping,
     node_duties::messaging::Messaging,
-    node_ops::{NodeDuty, NodeOperation},
+    node_ops::{Blah, NodeDuty, NodeOperation},
     state_db::AgeGroup,
     state_db::NodeInfo,
 };
-use crate::{chunk_store::UsedSpace, Error, Network, Outcome, TernaryResult};
-use log::{info, warn};
+use crate::{chunk_store::UsedSpace, Error, Network, Result};
+use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
-use rand::{CryptoRng, Rng};
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
 
 #[allow(clippy::large_enum_variant)]
-pub enum DutyLevel<R: CryptoRng + Rng> {
+pub enum DutyLevel {
     Infant,
     Adult(AdultDuties),
-    Elder(ElderDuties<R>),
+    Elder(ElderDuties),
 }
 
 /// Node duties are those that all nodes
 /// carry out. (TBD: adjust for Infant level, which might be doing nothing now).
 /// Within the duty level, there are then additional
 /// duties to be carried out, depending on the level.
-pub struct NodeDuties<R: CryptoRng + Rng> {
+pub struct NodeDuties {
     node_info: NodeInfo,
-    duty_level: DutyLevel<R>,
+    duty_level: DutyLevel,
     network_events: NetworkEvents,
     messaging: Messaging,
     network_api: Network,
-    rng: Option<R>,
 }
 
-impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub async fn new(node_info: NodeInfo, network_api: Network, rng: R) -> Self {
+impl NodeDuties {
+    pub async fn new(node_info: NodeInfo, network_api: Network) -> Self {
         let age_grp = if network_api.is_elder().await {
             AgeGroup::Elder
         } else if network_api.is_adult().await {
@@ -69,7 +67,6 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             network_events,
             messaging,
             network_api,
-            rng: Some(rng),
         }
     }
 
@@ -81,7 +78,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         }
     }
 
-    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R>> {
+    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
         use DutyLevel::*;
 
         let level = match &mut self.duty_level {
@@ -97,7 +94,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         level
     }
 
-    pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Outcome<NodeOperation> {
+    pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Result<NodeOperation> {
         use NodeDuty::*;
         info!("Processing Node Duty: {:?}", duty);
         match duty {
@@ -110,10 +107,31 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
                     .process_network_event(event, &self.network_api)
                     .await
             }
+            NoOp => Ok(NodeOperation::NoOp),
+            StorageFull => self.notify_section_of_our_storage().await,
         }
     }
 
-    async fn register_wallet(&mut self, wallet: PublicKey) -> Outcome<NodeOperation> {
+    async fn notify_section_of_our_storage(&mut self) -> Result<NodeOperation> {
+        let wrapping =
+            NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
+        let node_id = self.node_info.public_key().await;
+        wrapping
+            .send_to_section(
+                Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+                        section: node_id.into(),
+                        node_id,
+                    }),
+                    id: MessageId::new(),
+                },
+                true,
+            )
+            .await
+            .convert()
+    }
+
+    async fn register_wallet(&mut self, wallet: PublicKey) -> Result<NodeOperation> {
         let wrapping =
             NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
         wrapping
@@ -131,8 +149,8 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             .convert()
     }
 
-    async fn become_adult(&mut self) -> Outcome<NodeOperation> {
-        info!("Becoming Adult");
+    async fn become_adult(&mut self) -> Result<NodeOperation> {
+        trace!("Becoming Adult");
         use DutyLevel::*;
         let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
         if let Ok(duties) = AdultDuties::new(&self.node_info, used_space).await {
@@ -142,26 +160,20 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             // Also, "Error-to-Unit" is not a good conversion..
             //dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
         }
-        Ok(None)
+        Ok(NodeOperation::NoOp)
     }
 
-    async fn become_elder(&mut self) -> Outcome<NodeOperation> {
-        info!("Becoming Elder");
+    async fn become_elder(&mut self) -> Result<NodeOperation> {
+        trace!("Becoming Elder");
 
         use DutyLevel::*;
         let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
         info!("Attempting to assume Elder duties..");
         if matches!(self.duty_level, Elder(_)) {
-            return Ok(None);
+            return Ok(NodeOperation::NoOp);
         }
 
-        let rng = if let Some(rng) = self.rng.take() {
-            rng
-        } else {
-            warn!("No rng found!");
-            return Outcome::error(Error::Logic("No rng found".to_string()));
-        };
-        match ElderDuties::new(&self.node_info, used_space, self.network_api.clone(), rng).await {
+        match ElderDuties::new(&self.node_info, used_space, self.network_api.clone()).await {
             Ok(duties) => {
                 let mut duties = duties;
                 let op = duties.initiate(self.node_info.first).await;
@@ -175,7 +187,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             }
             Err(e) => {
                 warn!("Was not able to assume Elder duties! {:?}", e);
-                Outcome::error(Error::Logic(format!(
+                Err(Error::Logic(format!(
                     "Not able to assume Elder Duties: {:?}",
                     e
                 )))

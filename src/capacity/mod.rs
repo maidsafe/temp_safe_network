@@ -9,8 +9,11 @@
 mod chunk_dbs;
 mod rate_limit;
 
+use crate::Result;
 pub use chunk_dbs::ChunkHolderDbs;
+use log::info;
 pub use rate_limit::RateLimit;
+use sn_data_types::PublicKey;
 
 /// A util for sharing the
 /// info on data capacity among the
@@ -28,5 +31,17 @@ impl Capacity {
     /// Number of full chunk storing nodes in the section.
     pub fn full_nodes(&self) -> u8 {
         self.dbs.full_adults.borrow().total_keys() as u8
+    }
+
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        info!("Increasing full node count");
+        let _ = self
+            .dbs
+            .full_adults
+            .borrow_mut()
+            .lcreate(&node_id.to_string())?
+            .ladd(&"Node Full");
+        Ok(())
     }
 }

@@ -10,21 +10,22 @@ use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
-            AdultDuty, ChunkDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty, NodeOperation,
-            RewardDuty, TransferCmd, TransferDuty, TransferQuery,
+            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkReplicationCmd, ChunkReplicationDuty,
+            ChunkReplicationQuery, ChunkStoreDuty, ElderDuty, GatewayDuty, MetadataDuty,
+            NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd,
+            TransferDuty, TransferQuery,
         },
     },
-    utils, Error, Network, Outcome, Result, TernaryResult,
+    utils, Error, Network, Result,
 };
 use log::{error, info};
 use sn_data_types::{
-    Address, AdultDuties::ChunkStorage, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message,
-    MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDuties, NodeEvent, NodeQuery,
-    NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd,
-    NodeTransferQuery, NodeTransferQueryResponse, Query,
+    Address, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message, MessageId,
+    MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties, NodeEvent,
+    NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd,
+    NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
-use tiny_keccak::sha3_256;
 use xor_name::XorName;
 
 // NB: This approach is not entirely good, so will need to be improved.
@@ -50,7 +51,16 @@ impl NetworkMsgAnalysis {
             && self
                 .self_is_handler_for(&msg.destination()?.xorname())
                 .await;
-        Ok(is_dst)
+        Ok(is_dst || (are_we_origin && self.is_genesis_request().await))
+    }
+
+    async fn is_genesis_request(&self) -> bool {
+        let elders = self.routing.our_elder_names().await;
+        if elders.len() == 1 {
+            elders.contains(&self.routing.name().await)
+        } else {
+            false
+        }
     }
 
     async fn are_we_origin(&self, msg: &MsgEnvelope) -> bool {
@@ -58,58 +68,94 @@ impl NetworkMsgAnalysis {
         origin == self.routing.name().await
     }
 
-    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let msg = if self.should_accumulate(msg).await? {
             if let Some(msg) = self.accumulation.process_message_envelope(msg)? {
                 msg
             } else {
-                return Ok(None);
+                return Ok(NodeOperation::NoOp);
             }
         } else {
             msg.clone() // TODO remove this clone
         };
 
-        let result = if let Some(duty) = self.try_messaging(&msg).await? {
+        match self.try_messaging(&msg).await? {
             // Identified as an outbound msg, to be sent on the wire.
-            duty.into()
-        } else if let Some(duty) = self.try_client_entry(&msg).await? {
+            NodeMessagingDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_system_cmd(&msg).await? {
+            NodeOperation::NoOp => (),
+            op => return Ok(op),
+        };
+        match self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
-            duty.into()
-        } else if let Some(duty) = self.try_transfers(&msg).await? {
-            duty.into()
-        } else if let Some(duty) = self.try_metadata(&msg).await? {
-            // Accumulated msg from `Payment`!
-            duty.into()
-        } else if let Some(duty) = self.try_adult(&msg).await? {
-            // Accumulated msg from `Metadata`!
-            duty.into()
-        } else if let Some(duty) = self.try_rewards(&msg).await? {
-            // Identified as a Rewards msg
-            duty.into()
-        } else {
-            error!("Unknown message destination: {:?}", msg.id());
-            return Outcome::error(Error::Logic("Unknown message destination".to_string()));
+            GatewayDuty::NoOp => (),
+            op => return Ok(op.into()),
         };
-        Outcome::oki(result)
+        match self.try_transfers(&msg).await? {
+            TransferDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_metadata(&msg).await? {
+            // Accumulated msg from `Payment`!
+            MetadataDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_adult(&msg).await? {
+            // Accumulated msg from `Metadata`!
+            AdultNoOp => (),
+            op => return Ok(op.into()),
+        };
+        match self.try_chunk_replication(&msg).await? {
+            // asdf aSdF AsDf `..`!
+            AdultNoOp => (),
+            op => return Ok(op.into()),
+        }
+        match self.try_rewards(&msg).await? {
+            // Identified as a Rewards msg
+            RewardDuty::NoOp => (),
+            op => return Ok(op.into()),
+        };
+        error!("Unknown message destination: {:?}", msg.id());
+        Err(Error::Logic("Unknown message destination".to_string()))
     }
 
-    async fn try_messaging(&self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
+    async fn try_system_cmd(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
+        use NodeCmd::*;
+        use NodeSystemCmd::*;
+        // Check if it a message from adult
+        if !msg.origin.is_any_node() {
+            return Ok(NodeOperation::NoOp);
+        }
+        if let Message::NodeCmd {
+            cmd: System(StorageFull { node_id, .. }),
+            ..
+        } = &msg.message
+        {
+            Ok(ElderDuty::StorageFull { node_id: *node_id }.into())
+        } else {
+            Ok(NodeOperation::NoOp)
+        }
+    }
+
+    async fn try_messaging(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
         use Address::*;
         let destined_for_network = match msg.destination()? {
             Client(address) => !self.self_is_handler_for(&address).await,
-            Node(_) => self.are_we_origin(msg).await, // if we sent the msg, then it should go to network..
+            Node(_) => !self.is_dst_for(msg).await?, // if we are not dst, then it should go to network..
             Section(address) => !self.self_is_handler_for(&address).await,
         };
 
         if destined_for_network {
-            Outcome::oki(NodeMessagingDuty::SendToSection {
+            Ok(NodeMessagingDuty::SendToSection {
                 msg: msg.clone(),
                 as_node: true,
             }) // Forwards without stamping the duty (was not processed).
         } else {
-            Outcome::oki_no_change()
+            Ok(NodeMessagingDuty::NoOp)
         }
     }
 
@@ -117,10 +163,11 @@ impl NetworkMsgAnalysis {
 
     async fn should_accumulate(&self, msg: &MsgEnvelope) -> Result<bool> {
         // Incoming msg from `Payment`!
-        let accumulate = self.should_accumulate_for_metadata_write(msg).await? // Metadata Elders accumulate the msgs from Payment Elders.
+        let accumulate = self.should_accumulate_for_metadata_write(msg).await? // Metadata(DataSection) Elders accumulate the msgs from Payment Elders.
             // Incoming msg from `Metadata`!
             || self.should_accumulate_for_adult(msg).await? // Adults accumulate the msgs from Metadata Elders.
-            || self.should_accumulate_for_rewards(msg).await?; // Rewards Elders accumulate the claim counter cmd from other Rewards Elders
+            || self.should_accumulate_for_transfers(msg).await? // Transfer Elders accumulate GetSectionActorHistory from Rewards Elders
+            || self.should_accumulate_for_rewards(msg).await?; // Rewards Elders accumulate GetWalletId from other Rewards Elders
 
         Ok(accumulate)
     }
@@ -135,18 +182,14 @@ impl NetworkMsgAnalysis {
         };
 
         let from_single_payment_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Payment));
-            info!("from single payment elder: {:?}", res);
-            res
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let is_data_cmd = || {
-            let res = matches!(msg.message, Message::Cmd {
+            matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
                 ..
-            });
-            info!("is data cmd: {:?}", res);
-            res
+            })
         };
 
         let accumulate = is_data_cmd()
@@ -157,33 +200,85 @@ impl NetworkMsgAnalysis {
         Ok(accumulate)
     }
 
+    async fn should_accumulate_for_transfers(&self, msg: &MsgEnvelope) -> Result<bool> {
+        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
+            duty
+        } else {
+            return Ok(false);
+        };
+        let from_single_transfer_elder = || {
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        use NodeQueryResponse::Transfers as TransfersReponse;
+        use NodeTransferQueryResponse::GetReplicaEvents as GetReplicaEventsResponse;
+        let from_transfers_to_transfers = || {
+            matches!(msg.message, Message::NodeQueryResponse {
+                response:
+                    TransfersReponse(GetReplicaEventsResponse(_)),
+                ..
+            })
+        };
+
+        let from_transfers = || from_transfers_to_transfers() && from_single_transfer_elder();
+
+        let accumulate_for_transfers =
+            from_transfers() && self.is_dst_for(msg).await? && self.is_elder().await;
+
+        Ok(accumulate_for_transfers)
+    }
+
     async fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> Result<bool> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
             return Ok(false);
         };
+
+        use NodeQueryResponse::Rewards;
+        use NodeRewardQueryResponse::GetWalletId as GetWalletIdResponse;
         let from_single_rewards_elder = || {
             let res = msg.most_recent_sender().is_elder()
                 && matches!(duty, Duty::Elder(ElderDuties::Rewards));
             info!("from single rewards elder: {:?}", res);
             res
         };
-        let is_accumulating_reward_query = || {
-            let res = matches!(msg.message, Message::NodeQuery {
-                query: NodeQuery::Rewards(NodeRewardQuery::GetWalletId { .. }),
+        let from_rewards_to_rewards = || {
+            matches!(msg.message, Message::NodeQueryResponse {
+                response: Rewards(GetWalletIdResponse { .. }),
+                ..
+            })
+        };
+
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        let from_single_transfer_elder = || {
+            let res = msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer));
+            info!("from single transfer elder: {:?}", res);
+            res
+        };
+        let from_transfers_to_rewards = || {
+            let res = matches!(msg.message, Message::NodeQueryResponse {
+                response:
+                    Transfers(GetSectionActorHistory(_)),
                 ..
             });
-            info!("is accumulating reward query: {:?}", res);
+            info!(
+                "is accumulating transfer response (GetSectionActorHistory): {:?}",
+                res
+            );
             res
         };
 
-        let accumulate = is_accumulating_reward_query()
-            && from_single_rewards_elder()
+        let from_rewards = || from_rewards_to_rewards() && from_single_rewards_elder();
+        let from_transfers = || from_transfers_to_rewards() && from_single_transfer_elder();
+
+        let accumulate_for_rewards = (from_rewards() || from_transfers())
             && self.is_dst_for(msg).await?
             && self.is_elder().await;
 
-        Ok(accumulate)
+        Ok(accumulate_for_rewards)
     }
 
     /// Adults accumulate the write requests from Elders.
@@ -206,12 +301,9 @@ impl NetworkMsgAnalysis {
         }
 
         let is_chunk_msg = matches!(msg.message,
-        Message::Cmd {
+        Message::NodeCmd {
             cmd:
-                Cmd::Data {
-                    cmd: DataCmd::Blob(_),
-                    ..
-                },
+                NodeCmd::Data(NodeDataCmd::Blob(_)),
             ..
         }
         | Message::Query { // TODO: Should not accumulate queries, just pass them through.
@@ -220,23 +312,24 @@ impl NetworkMsgAnalysis {
         });
         info!("is chunk msg: {:?}", is_chunk_msg);
 
-        let duplication_msg = matches!(msg.message,
-        Message::NodeCmd { cmd: NodeCmd::Data(NodeDataCmd::DuplicateChunk { .. }), .. });
-        info!("is duplication msg: {:?}", duplication_msg);
+        let is_replication_msg = matches!(msg.message,
+        Message::NodeCmd { cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk { .. }), .. });
+        info!("is replication msg: {:?}", is_replication_msg);
 
-        if !(is_chunk_msg || duplication_msg) {
+        if !(is_chunk_msg || is_replication_msg) {
             return Ok(false);
         }
 
         let accumulate = self.is_dst_for(msg).await? && self.is_adult().await;
-        info!("Accumulating as Adult");
+        info!("Accumulating as Adult: {:?}", self.is_adult().await);
+        info!("Accumulating as Adult: {:?}", accumulate);
         Ok(accumulate)
     }
 
     // ---- .... -----
 
     // todo: eval all msg types!
-    async fn try_client_entry(&self, msg: &MsgEnvelope) -> Outcome<GatewayDuty> {
+    async fn try_client_entry(&self, msg: &MsgEnvelope) -> Result<GatewayDuty> {
         let is_our_client_msg = match msg.destination()? {
             Address::Client(address) => self.self_is_handler_for(&address).await,
             _ => false,
@@ -245,16 +338,16 @@ impl NetworkMsgAnalysis {
         let shall_process = is_our_client_msg && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(GatewayDuty::NoOp);
         }
 
-        Outcome::oki(GatewayDuty::FindClientFor(msg.clone()))
+        Ok(GatewayDuty::FindClientFor(msg.clone()))
     }
 
     /// After the data write sent from Payment Elders has been
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
-    async fn try_metadata(&self, msg: &MsgEnvelope) -> Outcome<MetadataDuty> {
+    async fn try_metadata(&self, msg: &MsgEnvelope) -> Result<MetadataDuty> {
         let is_data_cmd = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -264,11 +357,11 @@ impl NetworkMsgAnalysis {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(MetadataDuty::NoOp);
         };
         let from_payment_section = || {
             msg.most_recent_sender().is_section()
-                && matches!(duty, Duty::Elder(ElderDuties::Payment))
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
 
         let is_data_query = || {
@@ -288,25 +381,25 @@ impl NetworkMsgAnalysis {
         } else if is_data_cmd() && from_payment_section() && is_correct_dst {
             MetadataDuty::ProcessWrite(msg.clone()) // TODO: Fix these for type safety
         } else {
-            return Ok(None);
+            return Ok(MetadataDuty::NoOp);
         };
-        Outcome::oki(duty)
+        Ok(duty)
     }
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    async fn try_adult(&self, msg: &MsgEnvelope) -> Outcome<AdultDuty> {
+    async fn try_adult(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(AdultNoOp);
         };
         let from_metadata_section = || {
             msg.most_recent_sender().is_section()
                 && matches!(duty, Duty::Elder(ElderDuties::Metadata))
         };
 
-        let from_adult_for_chunk_duplication = matches!(duty, Duty::Adult(ChunkStorage));
+        let from_adult_for_chunk_replication = matches!(duty, Duty::Adult(ChunkStorage));
 
         // TODO: Should not accumulate queries, just pass them through.
         let is_chunk_query = || {
@@ -318,174 +411,192 @@ impl NetworkMsgAnalysis {
 
         let is_chunk_cmd = || {
             matches!(msg.message,
-            Message::Cmd {
-                cmd:
-                    Cmd::Data {
-                        cmd: DataCmd::Blob(_),
-                        ..
-                    },
+            Message::NodeCmd {
+                cmd:NodeCmd::Data(NodeDataCmd::Blob(_)),
                 ..
             })
         };
 
-        let shall_process = (from_metadata_section() || from_adult_for_chunk_duplication)
+        let shall_process = (from_metadata_section() || from_adult_for_chunk_replication)
             && self.is_dst_for(&msg).await?
             && self.is_adult().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(AdultNoOp);
         }
 
-        info!("Checking chunking duplication!");
-        let is_chunk_duplication = match &msg.message {
+        use AdultDuty::*;
+        use ChunkStoreDuty::*;
+        let duty = if is_chunk_cmd() {
+            RunAsChunkStore(WriteChunk(msg.clone()))
+        } else if is_chunk_query() {
+            RunAsChunkStore(ReadChunk(msg.clone()))
+        } else {
+            return Ok(AdultNoOp);
+        };
+        Ok(duty)
+    }
+
+    async fn try_chunk_replication(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
+        info!("Trying chunk replication");
+        use ChunkReplicationDuty::*;
+
+        use ChunkReplicationCmd::*;
+        use ChunkReplicationQuery::*;
+        let chunk_replication = match &msg.message {
             Message::NodeCmd {
-                cmd: NodeCmd::Data(cmd),
+                cmd:
+                    NodeCmd::Data(NodeDataCmd::ReplicateChunk {
+                        address,
+                        current_holders,
+                        ..
+                    }),
                 ..
-            } => match cmd {
-                NodeDataCmd::DuplicateChunk {
-                    fetch_from_holders,
-                    address,
-                    ..
-                } => {
-                    info!("Creating request for duplicating chunk");
-                    Some(RequestForChunk {
-                        targets: fetch_from_holders.clone(),
+            } => {
+                info!("Origin of Replicate Chunk: {:?}", msg.origin.clone());
+                Some(ProcessCmd {
+                    cmd: ReplicateChunk {
+                        current_holders: current_holders.clone(),
                         address: *address,
                         section_authority: msg.most_recent_sender().clone(),
+                    },
+                    msg_id: Default::default(),
+                    origin: msg.most_recent_sender().clone(),
+                })
+            }
+            Message::NodeQueryResponse {
+                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+                correlation_id,
+                ..
+            } => {
+                let blob = result.to_owned()?;
+                info!("Verifying GetChunk NodeQueryResponse!");
+                // Recreate original MessageId from Section
+                let msg_id =
+                    MessageId::combine(vec![*blob.address().name(), self.routing.name().await]);
+                if msg_id == *correlation_id {
+                    Some(ProcessCmd {
+                        cmd: StoreReplicatedBlob(blob),
+                        msg_id,
+                        origin: msg.origin.clone(),
                     })
+                } else {
+                    info!("Given blob is incorrect.");
+                    None
                 }
-                NodeDataCmd::GetChunk {
-                    section_authority,
-                    new_holder,
-                    address,
-                    fetch_from_holders,
-                } => {
-                    info!("Verifying GetChunk Message!");
-                    let proof_chain = self.routing.our_history().await;
+            }
+            Message::NodeQuery {
+                query:
+                    NodeQuery::Data(NodeDataQuery::GetChunk {
+                        section_authority,
+                        new_holder,
+                        address,
+                        current_holders,
+                    }),
+                ..
+            } => {
+                info!("Verifying GetChunk query!");
+                let proof_chain = self.routing.our_history().await;
 
-                    // Recreate original MessageId from Section
-                    let mut hash_bytes = Vec::new();
-                    hash_bytes.extend_from_slice(&address.name().0);
-                    hash_bytes.extend_from_slice(&new_holder.0);
-                    let msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                // Recreate original MessageId from Section
+                let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
 
-                    // Recreate Message that was sent by the message.
-                    let message = Message::NodeCmd {
-                        cmd: NodeCmd::Data(NodeDataCmd::DuplicateChunk {
-                            new_holder: *new_holder,
-                            address: *address,
-                            fetch_from_holders: fetch_from_holders.clone(),
-                        }),
-                        id: msg_id,
-                    };
+                // Recreate cmd that was sent by the section.
+                let message = Message::NodeCmd {
+                    cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk {
+                        new_holder: *new_holder,
+                        address: *address,
+                        current_holders: current_holders.clone(),
+                    }),
+                    id: msg_id,
+                };
 
-                    // Verify that the message was
-                    let verify_section_authority =
-                        section_authority.verify(&utils::serialise(&message));
+                // Verify that the message was sent from the section
+                let verify_section_authority =
+                    section_authority.verify(&utils::serialise(&message)?);
 
-                    let given_section_pk =
-                        &section_authority.id().public_key().bls().ok_or_else(|| {
-                            Error::Logic("Section Key cannot be non-BLS".to_string())
-                        })?;
+                let given_section_pk = &section_authority
+                    .id()
+                    .public_key()
+                    .bls()
+                    .ok_or_else(|| Error::Logic("Section Key cannot be non-BLS".to_string()))?;
 
-                    // Verify that the DuplicateChunk Msg was sent with SectionAuthority
-                    if section_authority.is_section()
-                        && verify_section_authority
-                        && proof_chain.has_key(given_section_pk)
-                    {
-                        info!("Creating internal Cmd for ReplyForDuplication");
-                        Some(ReplyForDuplication {
-                            address: *address,
-                            new_holder: *new_holder,
-                            correlation_id: msg_id,
-                        })
-                    } else {
-                        None
-                    }
+                // Verify that the original ReplicateChunk cmd was sent with SectionAuthority
+                if section_authority.is_section()
+                    && verify_section_authority
+                    && proof_chain.has_key(given_section_pk)
+                {
+                    info!("Internal ChunkReplicationQuery ProcessQuery");
+                    Some(ProcessQuery {
+                        query: GetChunk(*address),
+                        msg_id,
+                        origin: msg.origin.address(),
+                    })
+                } else {
+                    None
                 }
-                NodeDataCmd::GiveChunk {
-                    blob,
-                    correlation_id,
-                    ..
-                } => {
-                    info!("Verifying GiveChunk Message!");
-                    // Recreate original MessageId from Section
-                    let mut hash_bytes = Vec::new();
-                    hash_bytes.extend_from_slice(&blob.address().name().0);
-                    hash_bytes.extend_from_slice(&self.routing.name().await.0);
-                    let msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
-                    if msg_id == *correlation_id {
-                        Some(StoreDuplicatedBlob {
-                            // TODO: Remove the clone
-                            blob: blob.clone(),
-                        })
-                    } else {
-                        info!("Given blob is incorrect.");
-                        None
-                    }
-                }
-            },
+            }
             _ => None,
         };
 
         use AdultDuty::*;
-        use ChunkDuty::*;
-        let duty = if is_chunk_cmd() {
-            RunAsChunks(WriteChunk(msg.clone()))
-        } else if is_chunk_query() {
-            RunAsChunks(ReadChunk(msg.clone()))
-        } else if let Some(request) = is_chunk_duplication {
-            request
+        let duty = if let Some(request) = chunk_replication {
+            RunAsChunkReplication(request)
         } else {
-            return Ok(None);
+            return Ok(AdultNoOp);
         };
-        Outcome::oki(duty)
+        Ok(duty)
     }
 
-    async fn try_rewards(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
-        let result = self.try_nonacc_rewards(msg).await;
-        if result.has_value() || result.is_err() {
-            return result;
-        }
-        let result = self.try_accumulated_rewards(msg).await;
-        if result.has_value() || result.is_err() {
-            return result;
-        }
+    async fn try_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        match self.try_nonacc_rewards(msg).await? {
+            RewardDuty::NoOp => (),
+            op => return Ok(op),
+        };
+        match self.try_accumulated_rewards(msg).await? {
+            RewardDuty::NoOp => (),
+            op => return Ok(op),
+        };
         self.try_wallet_register(msg).await
     }
 
-    async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
+    async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         };
         let is_node_config = || matches!(duty, Duty::Node(NodeDuties::NodeConfig));
         let shall_process =
             is_node_config() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         }
 
         match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
+                id,
                 ..
-            } => Outcome::oki(RewardDuty::SetNodeWallet {
-                wallet_id: *wallet,
-                node_id: msg.origin.address().xorname(),
+            } => Ok(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::SetNodeWallet {
+                    wallet_id: *wallet,
+                    node_id: msg.origin.address().xorname(),
+                },
+                msg_id: *id,
+                origin: msg.origin.address(),
             }),
-            _ => Ok(None),
+            _ => Ok(RewardDuty::NoOp),
         }
     }
 
     // Check non-accumulated reward msgs.
-    async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
+    async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         };
         let from_single_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
@@ -495,49 +606,22 @@ impl NetworkMsgAnalysis {
             from_single_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if !shall_process {
-            return Ok(None);
+            return Ok(RewardDuty::NoOp);
         }
-
         // SectionPayoutValidated and GetWalletId
         // do not need accumulation since they are accumulated in the domain logic.
-        use NodeRewardQueryResponse::*;
+
+        use NodeRewardQuery::GetWalletId;
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
+                id,
                 ..
-            } => Outcome::oki(RewardDuty::ReceivePayoutValidation(validation.clone())),
-            Message::NodeQueryResponse {
-                response: NodeQueryResponse::Rewards(GetWalletId(Ok((wallet_id, new_node_id)))),
-                ..
-            } => Outcome::oki(RewardDuty::ActivateNodeRewards {
-                id: *wallet_id,
-                node_id: *new_node_id,
+            } => Ok(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::ReceivePayoutValidation(validation.clone()),
+                msg_id: *id,
+                origin: msg.origin.address(),
             }),
-            _ => Ok(None),
-        }
-    }
-
-    // Check accumulated reward msgs.
-    async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Outcome<RewardDuty> {
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(None);
-        };
-        let from_rewards_section = || {
-            msg.most_recent_sender().is_section()
-                && matches!(duty, Duty::Elder(ElderDuties::Rewards))
-        };
-
-        let shall_process_accumulated =
-            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
-
-        if !shall_process_accumulated {
-            return Ok(None);
-        }
-
-        use NodeRewardQuery::*;
-        match &msg.message {
             Message::NodeQuery {
                 query:
                     NodeQuery::Rewards(GetWalletId {
@@ -545,107 +629,200 @@ impl NetworkMsgAnalysis {
                         new_node_id,
                     }),
                 id,
-            } => Outcome::oki(RewardDuty::GetWalletId {
-                old_node_id: *old_node_id,
-                new_node_id: *new_node_id,
+            } => Ok(RewardDuty::ProcessQuery {
+                query: RewardQuery::GetWalletId {
+                    old_node_id: *old_node_id,
+                    new_node_id: *new_node_id,
+                },
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
-            _ => Ok(None),
+            _ => Ok(RewardDuty::NoOp),
+        }
+    }
+
+    // Check accumulated reward msgs.
+    async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
+            duty
+        } else {
+            return Ok(RewardDuty::NoOp);
+        };
+        let from_rewards_section = || {
+            msg.most_recent_sender().is_section()
+                && matches!(duty, Duty::Elder(ElderDuties::Rewards))
+        };
+        let shall_process_accumulated =
+            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+
+        if shall_process_accumulated {
+            use NodeQueryResponse::Rewards;
+            use NodeRewardQueryResponse::GetWalletId;
+            return match &msg.message {
+                Message::NodeQueryResponse {
+                    response: Rewards(GetWalletId(Ok((wallet_id, new_node_id)))),
+                    id,
+                    ..
+                } => Ok(RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::ActivateNodeRewards {
+                        id: *wallet_id,
+                        node_id: *new_node_id,
+                    },
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                _ => Ok(RewardDuty::NoOp),
+            };
+        }
+
+        // From Transfer module, we get
+        // `GetSectionActorHistory` query response.
+
+        let from_transfer_section = || {
+            msg.most_recent_sender().is_section()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        let shall_process =
+            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        if !shall_process {
+            return Ok(RewardDuty::NoOp);
+        }
+
+        use NodeQueryResponse::Transfers;
+        use NodeTransferQueryResponse::*;
+        match &msg.message {
+            Message::NodeQueryResponse {
+                response: Transfers(GetSectionActorHistory(Ok(events))),
+                id,
+                ..
+            } => {
+                info!("We have a GetSectionActorHistory query response!");
+                Ok(RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::InitiateSectionActor(events.clone()),
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                })
+            }
+            _ => Ok(RewardDuty::NoOp),
         }
     }
 
     // Check internal transfer cmds.
-    async fn try_transfers(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {
-        use NodeTransferCmd::*;
+    async fn try_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
+        info!("Msg analysis: try_nonacc_transfers..");
+        match self.try_nonacc_transfers(msg).await? {
+            TransferDuty::NoOp => (),
+            op => return Ok(op),
+        };
+        info!("Msg analysis: try_accumulated_transfers..");
+        self.try_accumulated_transfers(msg).await
+    }
 
-        // From Transfer module we get `PropagateTransfer`.
-
+    // Check accumulated transfer msgs.
+    async fn try_accumulated_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(None);
+            return Ok(TransferDuty::NoOp);
+        };
+
+        let from_transfers_section = || {
+            msg.most_recent_sender().is_section()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        let shall_process_accumulated =
+            from_transfers_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        if !shall_process_accumulated {
+            return Ok(TransferDuty::NoOp);
+        }
+
+        use NodeQueryResponse::Transfers;
+        use NodeTransferQueryResponse::GetReplicaEvents;
+        match &msg.message {
+            Message::NodeQueryResponse {
+                response: Transfers(GetReplicaEvents(events)),
+                id,
+                ..
+            } => Ok(TransferDuty::ProcessCmd {
+                cmd: TransferCmd::InitiateReplica(events.clone()?),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            _ => Ok(TransferDuty::NoOp),
+        }
+    }
+
+    // Check non accumulated transfer msgss.
+    async fn try_nonacc_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
+        // From Transfer module we get `PropagateTransfer`.
+        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
+            duty
+        } else {
+            return Ok(TransferDuty::NoOp);
         };
         let from_transfer_elder = || {
             msg.most_recent_sender().is_elder()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-
         let shall_process =
             from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         if shall_process {
+            use NodeTransferQuery::GetReplicaEvents;
             return match &msg.message {
                 Message::NodeCmd {
-                    cmd: NodeCmd::Transfers(PropagateTransfer(debit_agreement)),
+                    cmd: NodeCmd::Transfers(PropagateTransfer(proof)),
                     id,
-                } => Outcome::oki(TransferDuty::ProcessCmd {
-                    cmd: TransferCmd::PropagateTransfer(debit_agreement.clone()),
+                } => Ok(TransferDuty::ProcessCmd {
+                    cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
                     msg_id: *id,
                     origin: msg.origin.address(),
                 }),
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(public_key)),
+                    query: NodeQuery::Transfers(GetReplicaEvents(public_key)),
                     id,
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
                     if let Some(section_pk) = self.routing.section_public_key().await {
                         if public_key == &section_pk {
-                            Outcome::oki(TransferDuty::ProcessQuery {
+                            Ok(TransferDuty::ProcessQuery {
                                 query: TransferQuery::GetReplicaEvents,
                                 msg_id: *id,
                                 origin: msg.origin.address(),
                             })
                         } else {
                             error!("Unexpected public key!");
-                            Outcome::error(Error::Logic("Unexpected PK".to_string()))
+                            Err(Error::Logic("Unexpected PK".to_string()))
                         }
                     } else {
                         error!("No section public key found!");
-                        Outcome::error(Error::Logic("No section PK found".to_string()))
+                        Err(Error::Logic("No section PK found".to_string()))
                     }
                 }
-                Message::NodeQueryResponse {
-                    response:
-                        NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(
-                            events,
-                        )),
-                    id,
-                    ..
-                } => Outcome::oki(TransferDuty::ProcessCmd {
-                    cmd: TransferCmd::InitiateReplica(events.clone()?),
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                }),
-                _ => Outcome::oki_no_change(),
+                _ => Ok(TransferDuty::NoOp),
             };
         }
 
         // From Rewards module, we get
         // `ValidateSectionPayout` and `RegisterSectionPayout`.
 
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(None);
-        };
         let from_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-
         let shall_process =
             from_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
-
         if !shall_process {
-            return Ok(None);
+            return Ok(TransferDuty::NoOp);
         }
 
+        use NodeTransferCmd::*;
+        use NodeTransferQuery::GetSectionActorHistory;
         match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(ValidateSectionPayout(signed_transfer)),
                 id,
-            } => Outcome::oki(TransferDuty::ProcessCmd {
+            } => Ok(TransferDuty::ProcessCmd {
                 cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
@@ -653,12 +830,35 @@ impl NetworkMsgAnalysis {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(RegisterSectionPayout(debit_agreement)),
                 id,
-            } => Outcome::oki(TransferDuty::ProcessCmd {
+            } => Ok(TransferDuty::ProcessCmd {
                 cmd: TransferCmd::RegisterSectionPayout(debit_agreement.clone()),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
-            _ => Ok(None),
+            Message::NodeQuery {
+                query: NodeQuery::Transfers(GetSectionActorHistory(public_key)),
+                id,
+            } => {
+                // This comparison is a good example of the need to use `lazy messaging`,
+                // as to handle that the expected public key is not the same as the current.
+                if let Some(section_pk) = self.routing.section_public_key().await {
+                    if public_key == &section_pk {
+                        info!("TransferQuery::GetSectionActorHistory received!");
+                        Ok(TransferDuty::ProcessQuery {
+                            query: TransferQuery::GetSectionActorHistory,
+                            msg_id: *id,
+                            origin: msg.origin.address(),
+                        })
+                    } else {
+                        error!("Unexpected public key!");
+                        Err(Error::Logic("Unexpected PK".to_string()))
+                    }
+                } else {
+                    error!("No section public key found!");
+                    Err(Error::Logic("No section PK found".to_string()))
+                }
+            }
+            _ => Ok(TransferDuty::NoOp),
         }
     }
 

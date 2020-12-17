@@ -8,30 +8,25 @@
 
 mod client;
 mod client_msg_analysis;
-mod payment;
 mod transfers;
 
 use self::{
     client::ClientGateway,
     client_msg_analysis::ClientMsgAnalysis,
-    payment::Payments,
-    transfers::{replica_manager::ReplicaManager, store::TransferStore, Transfers},
+    transfers::{replicas::Replicas, Transfers},
 };
 use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, Result,
+    Network, ReplicaInfo, Result,
 };
-use crate::{Error, Outcome, TernaryResult};
 use futures::lock::Mutex;
-use log::trace;
-use rand::{CryptoRng, Rng};
+use log::{info, trace};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
-use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::sync::Arc;
-use xor_name::XorName;
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -41,123 +36,108 @@ use xor_name::XorName;
 /// and routing messages back and forth to clients.
 /// Payments deals with the payment for data writes,
 /// while transfers deals with sending money between keys.
-pub struct KeySection<R: CryptoRng + Rng> {
-    gateway: ClientGateway<R>,
-    payments: Payments,
+pub struct KeySection {
+    gateway: ClientGateway,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
-    replica_manager: Arc<Mutex<ReplicaManager>>,
     routing: Network,
 }
 
-impl<R: CryptoRng + Rng> KeySection<R> {
-    pub async fn new(
-        info: &NodeInfo,
-        rate_limit: RateLimit,
-        routing: Network,
-        rng: R,
-    ) -> Result<Self> {
-        let gateway = ClientGateway::new(info, routing.clone(), rng).await?;
-        let replica_manager = Self::new_replica_manager(info, routing.clone(), rate_limit).await?;
-        let payments = Payments::new(info.keys.clone(), replica_manager.clone());
-        let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
+impl KeySection {
+    pub async fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network) -> Result<Self> {
+        let gateway = ClientGateway::new(info, routing.clone()).await?;
+        let replicas = Self::new_replica_manager(info.root_dir.clone(), routing.clone()).await?;
+        let transfers = Transfers::new(info.keys.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
         Ok(Self {
             gateway,
-            payments,
             transfers,
             msg_analysis,
-            replica_manager,
             routing,
         })
     }
 
+    ///
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.transfers.increase_full_node_count(node_id)
+    }
+
     /// Initiates as first node in a network.
-    pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
+    pub async fn init_first(&mut self) -> Result<NodeOperation> {
         self.transfers.init_first().await
     }
 
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn catchup_with_section(&mut self) -> Outcome<NodeOperation> {
+    pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
         // currently only at2 replicas need to catch up
         self.transfers.catchup_with_replicas().await
     }
 
-    // Update our replica with the latest keys
-    pub async fn elders_changed(&mut self) -> Outcome<NodeOperation> {
-        let pub_key_set = self.routing.public_key_set().await?;
-        let sec_key_share = self.routing.secret_key_share().await?;
-        let proof_chain = self.routing.our_history().await;
-        let index = self.routing.our_index().await?;
-        match self.replica_manager.lock().await.update_replica_keys(
-            sec_key_share,
-            index,
-            pub_key_set,
-            proof_chain,
-        ) {
-            Ok(()) => Outcome::oki_no_change(),
-            Err(e) => Outcome::error(Error::NetworkData(e)),
+    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
+        match self.routing.set_joins_allowed(joins_allowed).await {
+            Ok(()) => {
+                info!("Successfully set joins_allowed to true");
+                Ok(NodeOperation::NoOp)
+            }
+            Err(e) => Err(e),
         }
+    }
+
+    // Update our replica with the latest keys
+    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
+        let secret_key_share = self.routing.secret_key_share().await?;
+        let id = secret_key_share.public_key_share();
+        let key_index = self.routing.our_index().await?;
+        let peer_replicas = self.routing.public_key_set().await?;
+        let signing =
+            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+        let info = ReplicaInfo {
+            id,
+            key_index,
+            peer_replicas,
+            section_proof_chain: self.routing.our_history().await,
+            signing: Arc::new(Mutex::new(signing)),
+            initiating: false,
+        };
+        self.transfers.update_replica_keys(info).map(|c| c.into())
     }
 
     /// When section splits, the Replicas in either resulting section
-    /// also split the responsibility of the accounts.
-    /// Thus, both Replica groups need to drop the accounts that
-    /// the other group is now responsible for.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
-        // Removes accounts that are no longer our section responsibility.
-        let not_matching = |key: PublicKey| {
-            let xorname: XorName = key.into();
-            !prefix.matches(&XorName(xorname.0))
-        };
-        if let Some(all_keys) = self.replica_manager.lock().await.all_keys() {
-            let accounts = all_keys
-                .iter()
-                .filter(|key| not_matching(**key))
-                .copied()
-                .collect::<BTreeSet<PublicKey>>();
-            self.replica_manager.lock().await.drop_accounts(&accounts)?;
-            Outcome::oki_no_change()
-        } else {
-            Outcome::error(Error::Logic("Could not fetch all replica keys".to_string()))
-        }
+    /// also split the responsibility of their data.
+    pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
+        self.transfers.section_split(prefix).await
     }
 
-    pub async fn process_key_section_duty(
-        &mut self,
-        duty: KeySectionDuty,
-    ) -> Outcome<NodeOperation> {
+    pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg).await,
             RunAsGateway(duty) => self.gateway.process_as_gateway(duty).await,
-            RunAsPayment(duty) => self.payments.process_payment_duty(&duty).await,
             RunAsTransfers(duty) => self.transfers.process_transfer_duty(&duty).await,
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn new_replica_manager(
-        info: &NodeInfo,
-        routing: Network,
-        rate_limit: RateLimit,
-    ) -> Result<Arc<Mutex<ReplicaManager>>> {
-        let public_key_set = routing.public_key_set().await?;
+    async fn new_replica_manager(root_dir: PathBuf, routing: Network) -> Result<Replicas> {
         let secret_key_share = routing.secret_key_share().await?;
         let key_index = routing.our_index().await?;
-        let proof_chain = routing.our_history().await;
-        let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
-        let replica_manager = ReplicaManager::new(
-            store,
-            &secret_key_share,
+        let peer_replicas = routing.public_key_set().await?;
+        let id = secret_key_share.public_key_share();
+        let signing =
+            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+        let info = ReplicaInfo {
+            id,
             key_index,
-            rate_limit,
-            &public_key_set,
-            proof_chain,
-        )?;
-        Ok(Arc::new(Mutex::new(replica_manager)))
+            peer_replicas,
+            section_proof_chain: routing.our_history().await,
+            signing: Arc::new(Mutex::new(signing)),
+            initiating: true,
+        };
+        let replica_manager = Replicas::new(root_dir, info)?;
+        Ok(replica_manager)
     }
 }

@@ -6,23 +6,26 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::utils;
+use crate::{utils, Error, Result};
 use serde::{de::DeserializeOwned, Serialize};
-use sn_data_types::{BlobAddress, Keypair, MapAddress, PublicKey, SequenceAddress};
+use sn_data_types::{
+    BlobAddress, CreditId, DebitId, Keypair, MapAddress, PublicKey, SequenceAddress,
+};
 use xor_name::XorName;
 
 pub(crate) trait ToDbKey: Serialize {
     /// The encoded string representation of an identifier, used as a key in the context of a
     /// PickleDB <key,value> store.
-    fn to_db_key(&self) -> String {
-        let serialised = utils::serialise(&self);
-        base64::encode(&serialised)
+    fn to_db_key(&self) -> Result<String> {
+        let serialised = utils::serialise(&self)?;
+        Ok(hex::encode(&serialised))
     }
 }
 
-pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Option<T> {
-    let decoded = base64::decode(key).ok()?;
-    Some(utils::deserialise(&decoded))
+#[allow(unused)]
+pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Result<T> {
+    let decoded = hex::decode(key).map_err(|e| Error::Logic(e.to_string()))?;
+    utils::deserialise(&decoded)
 }
 
 impl ToDbKey for SequenceAddress {}
@@ -31,6 +34,8 @@ impl ToDbKey for BlobAddress {}
 impl ToDbKey for MapAddress {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
+impl ToDbKey for CreditId {}
+impl ToDbKey for DebitId {}
 
 #[cfg(test)]
 mod test {
@@ -42,8 +47,8 @@ mod test {
     #[test]
     fn to_from_db_key() -> Result<()> {
         let key = get_random_pk();
-        let serialised = key.to_db_key();
-        let deserialised = from_db_key(&serialised).unwrap();
+        let serialised = key.to_db_key()?;
+        let deserialised: PublicKey = from_db_key(&serialised)?;
         assert_eq!(key, deserialised);
         Ok(())
     }

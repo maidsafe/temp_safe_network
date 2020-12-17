@@ -8,8 +8,8 @@
 
 use crate::node::state_db::AgeGroup;
 use crate::{
-    node::node_ops::{NodeDuty, NodeOperation, RewardDuty},
-    Network, Outcome, TernaryResult,
+    node::node_ops::{NodeDuty, NodeOperation},
+    Network, Result,
 };
 use sn_data_types::PublicKey;
 
@@ -29,7 +29,9 @@ use sn_data_types::PublicKey;
 /// -> 2. Add own node id to rewards.
 /// -> 3. Add own wallet to rewards.
 pub struct DutyConfig {
+    #[allow(unused)]
     reward_key: PublicKey,
+    #[allow(unused)]
     network_api: Network,
     status: AgeGroup,
 }
@@ -45,34 +47,54 @@ impl DutyConfig {
 
     /// When first node in network.
     #[allow(dead_code)]
-    pub async fn setup_as_first(&self) -> Outcome<NodeOperation> {
-        Outcome::oki_no_change()
+    pub async fn setup_as_first(&self) -> Result<NodeOperation> {
+        Ok(NodeOperation::NoOp)
     }
 
     /// When becoming Adult.
-    pub fn setup_as_adult(&mut self) -> Outcome<NodeOperation> {
+    pub fn setup_as_adult(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Adult;
-        // 1. Becomde Adult.
-        let first: NodeOperation = NodeDuty::BecomeAdult.into();
-        // 2. Register wallet at Elders.
-        let second = NodeDuty::RegisterWallet(self.reward_key).into();
-        Outcome::oki(vec![first, second].into())
+        let mut ops: Vec<NodeOperation> = vec![];
+        // 1. Become Adult.
+        ops.push(NodeDuty::BecomeAdult.into());
+        // // 2. Register wallet at Elders.
+        // ops.push(NodeDuty::RegisterWallet(self.reward_key).into());
+        Ok(ops.into())
     }
 
     /// When becoming Elder.
-    pub async fn setup_as_elder(&mut self) -> Outcome<NodeOperation> {
+    pub async fn setup_as_elder(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Elder;
+
+        let mut ops: Vec<NodeOperation> = vec![];
+        //let node_id = self.network_api.name().await;
+
         // 1. Become Elder.
-        let first: NodeOperation = NodeDuty::BecomeElder.into();
-        // 2. Add own node id to rewards.
-        let node_id = self.network_api.name().await;
-        let second = RewardDuty::AddNewNode(node_id).into();
-        // 3. Add own wallet to rewards.
-        let third = RewardDuty::SetNodeWallet {
-            node_id,
-            wallet_id: self.reward_key,
-        }
-        .into();
-        Outcome::oki(vec![first, second, third].into())
+        ops.push(NodeDuty::BecomeElder.into());
+
+        // // 2. Add own node id to rewards.
+        // ops.push(
+        //     RewardDuty::ProcessCmd {
+        //         cmd: RewardCmd::AddNewNode(node_id),
+        //         msg_id: MessageId::new(),
+        //         origin: Address::Node(node_id),
+        //     }
+        //     .into(),
+        // );
+
+        // // 3. Add own wallet to rewards.
+        // ops.push(
+        //     RewardDuty::ProcessCmd {
+        //         cmd: RewardCmd::SetNodeWallet {
+        //             node_id,
+        //             wallet_id: self.reward_key,
+        //         },
+        //         msg_id: MessageId::new(),
+        //         origin: Address::Node(node_id),
+        //     }
+        //     .into(),
+        // );
+
+        Ok(ops.into())
     }
 }

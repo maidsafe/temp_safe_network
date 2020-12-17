@@ -107,7 +107,7 @@ impl<T: Chunk> ChunkStore<T> {
     /// If a chunk with the same id already exists, it will be overwritten.
     pub async fn put(&mut self, chunk: &T) -> Result<()> {
         info!("Writing chunk");
-        let serialised_chunk = utils::serialise(chunk);
+        let serialised_chunk = utils::serialise(chunk).map_err(|e| Error::Other(e.to_string()))?;
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
@@ -150,6 +150,17 @@ impl<T: Chunk> ChunkStore<T> {
         self.do_delete(&self.file_path(id)?).await
     }
 
+    /// Remaining space to max space ratio.
+    pub async fn remaining_space_ratio(&self) -> f64 {
+        let used = self.total_used_space().await;
+        let total = self.used_space.max_capacity().await;
+        let remaining_space_ratio = used as f64 / total as f64;
+        info!("Used space: {:?}", used);
+        info!("Total space: {:?}", total);
+        info!("Remaining space ratio: {:?}", remaining_space_ratio);
+        remaining_space_ratio
+    }
+
     /// Returns a data chunk previously stored under `id`.
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
@@ -166,7 +177,6 @@ impl<T: Chunk> ChunkStore<T> {
         }
     }
 
-    #[cfg(test)]
     pub async fn total_used_space(&self) -> u64 {
         self.used_space.total().await
     }
@@ -205,7 +215,9 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     fn file_path(&self, id: &T::Id) -> Result<PathBuf> {
-        Ok(self.dir.join(&hex::encode(utils::serialise(id))))
+        Ok(self.dir.join(&hex::encode(
+            utils::serialise(id).map_err(|e| Error::Other(e.to_string()))?,
+        )))
     }
 }
 

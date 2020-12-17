@@ -6,28 +6,32 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod replica_manager;
+mod genesis;
+pub mod replicas;
 pub mod store;
 
-pub use self::replica_manager::ReplicaManager;
+use self::replicas::Replicas;
 use crate::{
+    capacity::RateLimit,
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
+    node::node_ops::{
+        Blah, ElderDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery,
+    },
+    utils, Error, ReplicaInfo, Result,
 };
-use crate::{Error, Outcome, TernaryResult};
-use futures::lock::Mutex;
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    Address, CmdError, DebitAgreementProof, ElderDuties, Error as NdError, Event, Message,
-    MessageId, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd,
-    NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse,
-    ReplicaEvent, SignedTransfer, TransferError,
+    Address, Cmd, CmdError, CreditAgreementProof, ElderDuties, Error as NdError, Event, Message,
+    MessageId, MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse,
+    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey,
+    QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
+use xor_name::Prefix;
+
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -57,17 +61,22 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
 pub struct Transfers {
-    replica: Arc<Mutex<ReplicaManager>>,
+    replicas: Replicas,
+    rate_limit: RateLimit,
     wrapping: ElderMsgWrapping,
 }
 
 impl Transfers {
-    pub fn new(keys: NodeSigningKeys, replica: Arc<Mutex<ReplicaManager>>) -> Self {
+    pub fn new(keys: NodeSigningKeys, replicas: Replicas, rate_limit: RateLimit) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Transfer);
-        Self { replica, wrapping }
+        Self {
+            replicas,
+            rate_limit,
+            wrapping,
+        }
     }
 
-    pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
+    pub async fn init_first(&self) -> Result<NodeOperation> {
         let result = self.initiate_replica(&[]).await;
         result.convert()
     }
@@ -75,12 +84,10 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&mut self) -> Outcome<NodeOperation> {
+    pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
+        info!("Transfers: Catching up with transfer Replicas!");
         // prepare replica init
-        let pub_key = match self.replica.lock().await.replicas_pk_set() {
-            Some(set) => PublicKey::Bls(set.public_key()),
-            _ => return Outcome::error(Error::Logic("Could not get replica PK Set".to_string())),
-        };
+        let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
         self.wrapping
             .send_to_section(
                 Message::NodeQuery {
@@ -93,12 +100,27 @@ impl Transfers {
             .convert()
     }
 
+    /// When section splits, the Replicas in either resulting section
+    /// also split the responsibility of the accounts.
+    /// Thus, both Replica groups need to drop the accounts that
+    /// the other group is now responsible for.
+    pub async fn section_split(&self, prefix: Prefix) -> Result<NodeOperation> {
+        // Removes keys that are no longer our section responsibility.
+        let _ = self.replicas.keep_keys_of(prefix).await?;
+        Ok(NodeOperation::NoOp)
+    }
+
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.rate_limit.increase_full_node_count(node_id)
+    }
+
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Outcome<NodeOperation> {
+    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
-        let result = match duty {
+        match duty {
             ProcessQuery {
                 query,
                 msg_id,
@@ -108,47 +130,48 @@ impl Transfers {
                 cmd,
                 msg_id,
                 origin,
-            } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
-        };
-
-        result.convert()
+            } => self
+                .process_cmd(cmd, *msg_id, origin.clone())
+                .await
+                .convert(),
+            NoOp => Ok(NodeOperation::NoOp),
+        }
     }
 
     async fn process_query(
-        &mut self,
+        &self,
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         use TransferQuery::*;
         match query {
-            GetReplicaEvents => self.all_events(msg_id, origin).await,
-            GetReplicaKeys(wallet_id) => self.get_replica_pks(wallet_id, msg_id, origin).await,
-            GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin).await,
-            GetHistory { at, since_version } => {
-                self.history(at, *since_version, msg_id, origin).await
-            }
+            GetSectionActorHistory => self.section_actor_history(msg_id, origin).await.convert(),
+            GetReplicaEvents => self.all_events(msg_id, origin).await.convert(),
+            GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await.convert(),
+            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await.convert(),
+            GetHistory { at, since_version } => self
+                .history(at, *since_version, msg_id, origin)
+                .await
+                .convert(),
             GetStoreCost { bytes, .. } => self.get_store_cost(*bytes, msg_id, origin).await,
         }
     }
 
     async fn process_cmd(
-        &mut self,
+        &self,
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use TransferCmd::*;
         debug!("Processing Transfer CMD in keysection");
         match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await,
+            ProcessPayment(msg) => self.process_payment(msg).await,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
-            SimulatePayout(transfer) => self
-                .replica
-                .lock()
-                .await
-                .credit_without_proof(transfer.clone()),
+            SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
@@ -170,91 +193,168 @@ impl Transfers {
         }
     }
 
+    pub fn update_replica_keys(&mut self, info: ReplicaInfo) -> Result<NodeMessagingDuty> {
+        self.replicas.update_replica_keys(info);
+        Ok(NodeMessagingDuty::NoOp)
+    }
+
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
-    async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
+    async fn initiate_replica(&self, events: &[ReplicaEvent]) -> Result<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
-        match self.replica.lock().await.initiate(events) {
-            Ok(()) => Ok(None),
+        let _ = self.replicas.initiate(events).await?;
+        Ok(NodeMessagingDuty::NoOp)
+    }
+
+    /// Makes sure the payment contained
+    /// within a data write, is credited
+    /// to the section funds.
+    async fn process_payment(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
+        let (payment, num_bytes) = match &msg.message {
+            Message::Cmd {
+                cmd: Cmd::Data { payment, cmd },
+                ..
+            } => (payment, utils::serialise(cmd)?.len() as u64),
+            _ => return Ok(NodeMessagingDuty::NoOp),
+        };
+
+        // Make sure we are actually at the correct replicas,
+        // before executing the debit.
+        // (We could also add a method that executes both
+        // debit + credit atomically, but this is much simpler).
+        let recipient_is_not_section = payment.recipient() != self.section_wallet_id();
+
+        use TransferError::*;
+        if recipient_is_not_section {
+            warn!("Payment: recipient is not section");
+            return self
+                .wrapping
+                .error(
+                    CmdError::Transfer(TransferRegistration(NdError::NoSuchRecipient)),
+                    msg.id(),
+                    &msg.origin.address(),
+                )
+                .await;
+        }
+        let registration = self.replicas.register(&payment).await;
+        let result = match registration {
+            Ok(_) => match self
+                .replicas
+                .receive_propagated(&payment.credit_proof())
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(error) => Err(error),
+            },
+            Err(error) => Err(error), // not using TransferPropagation error, since that is for NodeCmds, so wouldn't be returned to client.
+        };
+        match result {
+            Ok(_) => {
+                info!("Payment: registration and propagation succeeded.");
+                // Paying too little will see the amount be forfeited.
+                // This prevents spam of the network.
+                let total_cost = self.rate_limit.from(num_bytes).await;
+                if total_cost > payment.amount() {
+                    warn!(
+                        "Payment: Too low payment: {}, expected: {}",
+                        payment.amount(),
+                        total_cost
+                    );
+                    // todo, better error, like `TooLowPayment`
+                    return self
+                        .wrapping
+                        .error(
+                            CmdError::Transfer(TransferRegistration(NdError::InsufficientBalance)),
+                            msg.id(),
+                            &msg.origin.address(),
+                        )
+                        .await;
+                }
+                info!("Payment: forwarding data..");
+                // consider having the section actor be
+                // informed of this transfer as well..
+                self.wrapping.forward(msg).await
+            }
             Err(e) => {
-                error!("Error instantiating replica for transfers....");
-                Outcome::error(Error::NetworkData(e))
+                warn!("Payment: registration or propagation failed: {}", e);
+                self.wrapping
+                    .error(
+                        CmdError::Transfer(TransferRegistration(NdError::NetworkOther(
+                            e.to_string(),
+                        ))),
+                        msg.id(),
+                        &msg.origin.address(),
+                    )
+                    .await
             }
         }
     }
 
+    fn section_wallet_id(&self) -> PublicKey {
+        let set = self.replicas.replicas_pk_set();
+        PublicKey::Bls(set.public_key())
+    }
+
     /// Get all the events of the Replica.
-    async fn all_events(&self, msg_id: MessageId, origin: Address) -> Outcome<NodeMessagingDuty> {
-        let result = match self.replica.lock().await.all_events() {
-            None => {
-                warn!("Error! Could not fetch events.");
-                Err(NdError::NoSuchData)
-            }
-            Some(events) => {
-                if events.is_empty() {
-                    info!("No events found!");
-                } else {
-                    info!("Found {} replica events: {:?}", events.len(), events);
-                }
-                Ok(events)
-            }
-        };
+    async fn all_events(&self, msg_id: MessageId, origin: Address) -> Result<NodeMessagingDuty> {
+        let result = self
+            .replicas
+            .all_events()
+            .await
+            .map_err(|e| NdError::Unexpected(e.to_string()));
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(result)),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
             .await
     }
 
-    /// Get latest StoreCost for the given number of bytes
+    /// Get latest StoreCost for the given number of bytes.
+    /// Also check for Section storage capacity and report accordingly.
     async fn get_store_cost(
         &self,
         bytes: u64,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         info!("Computing StoreCost for {:?} bytes", bytes);
-        let result = self
-            .replica
-            .lock()
-            .await
-            .get_store_cost(bytes)
-            .await
-            .ok_or_else(|| NdError::Unexpected("Could not compute latest StoreCost".to_string()));
-        info!("Got StoreCost {:?}", result.clone().unwrap());
-        self.wrapping
+        let result = self.rate_limit.from(bytes).await;
+
+        info!("Got StoreCost {:?}", result);
+
+        let first = self
+            .wrapping
             .send_to_client(Message::QueryResponse {
-                response: QueryResponse::GetStoreCost(result),
-                id: MessageId::new(),
+                response: QueryResponse::GetStoreCost(Ok(result)),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
             .await
+            .convert();
+        let second: Result<NodeOperation> =
+            Ok(ElderDuty::SwitchNodeJoin(self.rate_limit.check_network_storage().await).into());
+
+        Ok(vec![first, second].into())
     }
 
     /// Get the PublicKeySet of our replicas
     async fn get_replica_pks(
         &self,
-        _wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         // validate signature
-        let result = self
-            .replica
-            .lock()
-            .await
-            .replicas_pk_set()
-            .ok_or(NdError::NoSuchKey);
+        let pk_set = self.replicas.replicas_pk_set();
         self.wrapping
             .send_to_client(Message::QueryResponse {
-                response: QueryResponse::GetReplicaKeys(result),
-                id: MessageId::new(),
+                response: QueryResponse::GetReplicaKeys(Ok(pk_set)),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -263,21 +363,48 @@ impl Transfers {
 
     async fn balance(
         &self,
-        wallet_id: &PublicKey,
+        wallet_id: PublicKey,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
+        debug!("Getting balance for {:?}", wallet_id);
+
         // validate signature
         let result = self
-            .replica
-            .lock()
-            .await
+            .replicas
             .balance(wallet_id)
-            .ok_or(NdError::NoSuchBalance);
+            .await
+            .map_err(|e| NdError::Unexpected(e.to_string()));
+
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
+    }
+
+    async fn section_actor_history(
+        &self,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Handling GetSectionActorHistory query");
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        let wallet_id = self.section_wallet_id();
+        // todo: validate signature
+        let result = self
+            .replicas
+            .history(wallet_id)
+            .await
+            .map_err(|e| NdError::Unexpected(e.to_string()));
+        self.wrapping
+            .send_to_node(Message::NodeQueryResponse {
+                response: Transfers(GetSectionActorHistory(result)),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -290,21 +417,16 @@ impl Transfers {
         _since_version: usize,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         trace!("Handling GetHistory");
         // validate signature
-        let result = match self
-            .replica
-            .lock().await
-            .history(wallet_id) // since_version
-        {
-            None => Ok(vec![]),
-            Some(history) => Ok(history),
-        };
+        let result = self.replicas.history(*wallet_id).await.map_err(|_e| {
+            NdError::Unexpected(format!("Could not get history for key {:?}", wallet_id))
+        });
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetHistory(result),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
@@ -315,15 +437,14 @@ impl Transfers {
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate(
-        &mut self,
+        &self,
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
-        let message = match self.replica.lock().await.validate(transfer) {
-            Ok(None) => return Outcome::oki_no_change(),
-            Ok(Some(event)) => Message::Event {
+        let message = match self.replicas.validate(transfer).await {
+            Ok(event) => Message::Event {
                 event: Event::TransferValidated {
                     client: origin.xorname(),
                     event,
@@ -331,9 +452,11 @@ impl Transfers {
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(error) => Message::CmdError {
+            Err(e) => Message::CmdError {
                 id: MessageId::new(),
-                error: CmdError::Transfer(TransferError::TransferValidation(error)),
+                error: CmdError::Transfer(TransferError::TransferValidation(NdError::Unexpected(
+                    e.to_string(),
+                ))),
                 correlation_id: msg_id,
                 cmd_origin: origin,
             },
@@ -345,21 +468,22 @@ impl Transfers {
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate_section_payout(
-        &mut self,
+        &self,
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
-        let message = match self.replica.lock().await.validate(transfer) {
-            Ok(None) => return Outcome::oki_no_change(),
-            Ok(Some(event)) => Message::NodeEvent {
+    ) -> Result<NodeMessagingDuty> {
+        let message = match self.replicas.validate(transfer).await {
+            Ok(event) => Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(event),
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(error) => Message::NodeCmdError {
+            Err(e) => Message::NodeCmdError {
                 id: MessageId::new(),
-                error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(error)), // TODO: SHOULD BE TRANSFERVALIDATION
+                error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
+                    NdError::Unexpected(e.to_string()),
+                )), // TODO: SHOULD BE TRANSFERVALIDATION
                 correlation_id: msg_id,
                 cmd_origin: origin,
             },
@@ -370,30 +494,31 @@ impl Transfers {
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     async fn register(
-        &mut self,
-        proof: &DebitAgreementProof,
+        &self,
+        proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
-        match self.replica.lock().await.register(proof) {
-            Ok(None) => Outcome::oki_no_change(),
-            Ok(Some(event)) => {
+        match self.replicas.register(proof).await {
+            Ok(event) => {
                 self.wrapping
                     .send_to_section(
                         Message::NodeCmd {
-                            cmd: Transfers(PropagateTransfer(event.debit_proof)),
+                            cmd: Transfers(PropagateTransfer(event.transfer_proof)),
                             id: MessageId::new(),
                         },
                         true,
                     )
                     .await
             }
-            Err(error) => {
+            Err(e) => {
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferError::TransferRegistration(error)),
+                        CmdError::Transfer(TransferError::TransferRegistration(
+                            NdError::Unexpected(e.to_string()),
+                        )),
                         msg_id,
                         &origin,
                     )
@@ -405,30 +530,31 @@ impl Transfers {
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     async fn register_section_payout(
-        &mut self,
-        proof: &DebitAgreementProof,
+        &self,
+        proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
-        match self.replica.lock().await.register(proof) {
-            Ok(None) => Outcome::oki_no_change(),
-            Ok(Some(event)) => {
+        match self.replicas.register(proof).await {
+            Ok(event) => {
                 self.wrapping
                     .send_to_section(
                         Message::NodeCmd {
-                            cmd: Transfers(PropagateTransfer(event.debit_proof)),
+                            cmd: Transfers(PropagateTransfer(event.transfer_proof)),
                             id: MessageId::new(),
                         },
                         true,
                     )
                     .await
             }
-            Err(error) => {
+            Err(e) => {
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferError::TransferRegistration(error)),
+                        CmdError::Transfer(TransferError::TransferRegistration(
+                            NdError::Unexpected(e.to_string()),
+                        )),
                         msg_id,
                         &origin,
                     )
@@ -442,33 +568,30 @@ impl Transfers {
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destination.
     async fn receive_propagated(
-        &mut self,
-        proof: &DebitAgreementProof,
+        &self,
+        credit_proof: &CreditAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Result<NodeMessagingDuty> {
         use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
-        let message = match self.replica.lock().await.receive_propagated(proof) {
-            Ok(_) => return Outcome::oki_no_change(),
-            Err(err) => Message::NodeCmdError {
-                error: NodeCmdError::Transfers(TransferPropagation(err)),
+        let message = match self.replicas.receive_propagated(credit_proof).await {
+            Ok(_) => return Ok(NodeMessagingDuty::NoOp),
+            Err(Error::NetworkData(error)) => Message::NodeCmdError {
+                error: NodeCmdError::Transfers(TransferPropagation(error)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
                 cmd_origin: origin,
             },
+            Err(_e) => unimplemented!("receive_propagated"),
         };
         self.wrapping.send_to_node(message).await
     }
 
-    #[allow(unused, clippy::redundant_closure)]
+    #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
-    pub async fn pay(&mut self, transfer: Transfer) -> Result<(), Error> {
-        self.replica
-            .lock()
-            .await
-            .debit_without_proof(transfer)
-            .map_err(|e| Error::NetworkData(e))
+    pub async fn pay(&mut self, transfer: Transfer) -> Result<()> {
+        self.replicas.debit_without_proof(transfer).await
     }
 }
 

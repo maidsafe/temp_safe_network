@@ -43,10 +43,10 @@ impl Network {
         ))
     }
 
-    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {
-        let data = utils::serialise(data);
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
+        let data = utils::serialise(data)?;
         let sig = self.routing.lock().await.sign(&data).await;
-        Signature::Ed25519(sig)
+        Ok(Signature::Ed25519(sig))
     }
 
     pub async fn age(&self) -> u8 {
@@ -115,6 +115,15 @@ impl Network {
             .send_message(src, dst, content)
             .await
         // Ok(())
+    }
+
+    pub async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
+        self.routing
+            .lock()
+            .await
+            .set_joins_allowed(joins_allowed)
+            .await
+            .map_err(Error::Routing)
     }
 
     pub async fn send_message_to_client(

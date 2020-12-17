@@ -9,16 +9,29 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use crate::Outcome;
+use crate::Result;
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, Blob, BlobAddress, DebitAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
-    ReplicaEvent, SignedTransfer, TransferValidated,
+    Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
+    ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferValidated,
 };
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
+
+pub trait Blah {
+    fn convert(self) -> Result<NodeOperation>;
+}
+
+impl Blah for Result<NodeMessagingDuty> {
+    fn convert(self) -> Result<NodeOperation> {
+        match self? {
+            NodeMessagingDuty::NoOp => Ok(NodeOperation::NoOp),
+            op => Ok(op.into()),
+        }
+    }
+}
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and
@@ -76,10 +89,10 @@ impl Into<NodeOperation> for Vec<NodeOperation> {
     }
 }
 
-impl Into<NodeOperation> for Vec<Outcome<NodeOperation>> {
+impl Into<NodeOperation> for Vec<Result<NodeOperation>> {
     /// NB: This drops errors!
     fn into(self) -> NodeOperation {
-        NodeOperation::from_many(self.into_iter().flatten().flatten().collect())
+        NodeOperation::from_many(self.into_iter().flatten().collect())
     }
 }
 
@@ -91,6 +104,7 @@ pub enum NetworkDuty {
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
     RunAsNode(NodeDuty),
+    NoOp,
 }
 
 // --------------- Node ---------------
@@ -108,6 +122,9 @@ pub enum NodeDuty {
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
     ProcessNetworkEvent(RoutingEvent),
+    NoOp,
+    /// Storage reaching max capacity.
+    StorageFull,
 }
 
 impl Into<NodeOperation> for NodeDuty {
@@ -126,6 +143,8 @@ impl Debug for NodeDuty {
             Self::BecomeElder => write!(f, "BecomeElder"),
             Self::ProcessMessaging(duty) => duty.fmt(f),
             Self::ProcessNetworkEvent(event) => event.fmt(f),
+            Self::NoOp => write!(f, "No op."),
+            Self::StorageFull => write!(f, "StorageFull"),
         }
     }
 }
@@ -153,6 +172,8 @@ pub enum NodeMessagingDuty {
         targets: BTreeSet<XorName>,
         msg: MsgEnvelope,
     },
+    // No operation
+    NoOp,
 }
 
 impl From<NodeMessagingDuty> for NodeOperation {
@@ -160,7 +181,11 @@ impl From<NodeMessagingDuty> for NodeOperation {
         use NetworkDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;
-        Single(RunAsNode(ProcessMessaging(duty)))
+        if matches!(duty, NodeMessagingDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsNode(ProcessMessaging(duty)))
+        }
     }
 }
 
@@ -173,6 +198,7 @@ impl Debug for NodeMessagingDuty {
             Self::SendToClient(msg) => write!(f, "SendToClient [ msg: {:?} ]", msg),
             Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
             Self::SendToSection { msg, .. } => write!(f, "SendToSection [ msg: {:?} ]", msg),
+            Self::NoOp => write!(f, "No op."),
         }
     }
 }
@@ -215,13 +241,24 @@ pub enum ElderDuty {
     /// A data section receives requests relayed
     /// via key sections.
     RunAsDataSection(DataSectionDuty),
+    NoOp,
+    /// Increase number of Full Nodes in the network
+    StorageFull {
+        /// Node ID of node that reached max capacity.
+        node_id: PublicKey,
+    },
+    SwitchNodeJoin(bool),
 }
 
 impl Into<NodeOperation> for ElderDuty {
     fn into(self) -> NodeOperation {
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(self))
+        if matches!(self, ElderDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(self))
+        }
     }
 }
 
@@ -232,34 +269,20 @@ impl Into<NodeOperation> for ElderDuty {
 pub enum AdultDuty {
     /// The main duty of an Adult is
     /// storage and retrieval of data chunks.
-    RunAsChunks(ChunkDuty),
-    /// Request for duplicate chunk
-    RequestForChunk {
-        ///
-        targets: BTreeSet<XorName>,
-        ///
-        address: BlobAddress,
-        ///
-        section_authority: MsgSender,
-    },
-    ReplyForDuplication {
-        ///
-        address: BlobAddress,
-        ///
-        new_holder: XorName,
-        ///
-        correlation_id: MessageId,
-    },
-    StoreDuplicatedBlob {
-        blob: Blob,
-    },
+    RunAsChunkStore(ChunkStoreDuty),
+    RunAsChunkReplication(ChunkReplicationDuty),
+    NoOp,
 }
 
 impl Into<NodeOperation> for AdultDuty {
     fn into(self) -> NodeOperation {
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsAdult(self))
+        if matches!(self, AdultDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsAdult(self))
+        }
     }
 }
 
@@ -278,10 +301,9 @@ pub enum KeySectionDuty {
     /// and query responses) with earlier client
     /// msgs, as to route them to the correct client.
     RunAsGateway(GatewayDuty),
-    /// Payment for data writes.
-    RunAsPayment(PaymentDuty),
-    /// Transfers of money between accounts.
+    /// Transfers of money between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
+    NoOp,
 }
 
 impl Into<NodeOperation> for KeySectionDuty {
@@ -289,7 +311,11 @@ impl Into<NodeOperation> for KeySectionDuty {
         use ElderDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(self)))
+        if matches!(self, KeySectionDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsKeySection(self)))
+        }
     }
 }
 
@@ -308,6 +334,7 @@ pub enum DataSectionDuty {
     /// the network by storing metadata / data, and
     /// carrying out operations on those.
     RunAsRewards(RewardDuty),
+    NoOp,
 }
 
 // --------------- Gateway ---------------
@@ -323,6 +350,7 @@ pub enum GatewayDuty {
     /// Incoming events from clients are parsed
     /// at the Gateway, and forwarded to other modules.
     ProcessClientEvent(RoutingEvent),
+    NoOp,
 }
 
 impl Into<NodeOperation> for GatewayDuty {
@@ -331,28 +359,11 @@ impl Into<NodeOperation> for GatewayDuty {
         use KeySectionDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
-    }
-}
-
-// --------------- Payment ---------------
-
-/// Payment for data.
-#[derive(Debug)]
-pub enum PaymentDuty {
-    /// Makes sure the payment contained
-    /// within a data write, is credited
-    /// to the section funds.
-    ProcessPayment(MsgEnvelope),
-}
-
-impl Into<NodeOperation> for PaymentDuty {
-    fn into(self) -> NodeOperation {
-        use ElderDuty::*;
-        use KeySectionDuty::*;
-        use NetworkDuty::*;
-        use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsPayment(self))))
+        if matches!(self, GatewayDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
+        }
     }
 }
 
@@ -369,6 +380,7 @@ pub enum MetadataDuty {
     ProcessRead(MsgEnvelope),
     /// Writes.
     ProcessWrite(MsgEnvelope),
+    NoOp,
 }
 
 impl Into<NodeOperation> for MetadataDuty {
@@ -377,7 +389,11 @@ impl Into<NodeOperation> for MetadataDuty {
         use ElderDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
+        if matches!(self, MetadataDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
+        }
     }
 }
 
@@ -385,12 +401,90 @@ impl Into<NodeOperation> for MetadataDuty {
 
 /// Chunk storage and retrieval is done at Adults.
 #[derive(Debug)]
-pub enum ChunkDuty {
+pub enum ChunkStoreDuty {
     /// Reads.
     ReadChunk(MsgEnvelope),
     /// Writes.
     WriteChunk(MsgEnvelope),
+    NoOp,
 }
+
+/// Chunk storage and retrieval is done at Adults.
+#[derive(Debug)]
+pub enum ChunkReplicationDuty {
+    ///
+    ProcessCmd {
+        cmd: ChunkReplicationCmd,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: MsgSender,
+    },
+    ///
+    ProcessQuery {
+        query: ChunkReplicationQuery,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    NoOp,
+}
+
+/// Queries for chunk to replicate
+#[derive(Debug)]
+pub enum ChunkReplicationQuery {
+    ///
+    GetChunk(BlobAddress),
+}
+
+/// Cmds carried out on AT2 Replicas.
+#[derive(Debug)]
+#[allow(clippy::clippy::large_enum_variant)]
+pub enum ChunkReplicationCmd {
+    /// Request for chunk
+    ReplicateChunk {
+        ///
+        current_holders: BTreeSet<XorName>,
+        ///
+        address: BlobAddress,
+        ///
+        section_authority: MsgSender,
+    },
+    StoreReplicatedBlob(Blob),
+}
+
+// impl From<sn_data_types::TransferCmd> for ChunkReplicationCmd {
+//     fn from(cmd: sn_data_types::TransferCmd) -> Self {
+//         match cmd {
+//             #[cfg(feature = "simulated-payouts")]
+//             sn_data_types::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+//             sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
+//                 Self::ValidateTransfer(signed_transfer)
+//             }
+//             sn_data_types::TransferCmd::RegisterTransfer(transfer_agreement) => {
+//                 Self::RegisterTransfer(transfer_agreement)
+//             }
+//         }
+//     }
+// }
+
+// impl From<sn_data_types::TransferQuery> for ChunkReplicationQuery {
+//     fn from(cmd: sn_data_types::TransferQuery) -> Self {
+//         match cmd {
+//             sn_data_types::TransferQuery::GetReplicaKeys(transfer) => {
+//                 Self::GetReplicaKeys(transfer)
+//             }
+//             sn_data_types::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+//             sn_data_types::TransferQuery::GetHistory { at, since_version } => {
+//                 Self::GetHistory { at, since_version }
+//             }
+//             sn_data_types::TransferQuery::GetStoreCost { requester, bytes } => {
+//                 Self::GetStoreCost { requester, bytes }
+//             }
+//         }
+//     }
+// }
 
 // --------------- Rewards ---------------
 
@@ -399,9 +493,31 @@ pub enum ChunkDuty {
 /// Elders are responsible for the duties of
 /// keeping track of rewards, and issuing
 /// payouts from the section account.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+pub enum RewardDuty {
+    ///
+    ProcessQuery {
+        query: RewardQuery,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    ///
+    ProcessCmd {
+        cmd: RewardCmd,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    NoOp,
+}
+
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum RewardDuty {
+pub enum RewardCmd {
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
     InitiateSectionActor(Vec<ReplicaEvent>),
@@ -426,19 +542,6 @@ pub enum RewardDuty {
         // The age of the node, determines if it is eligible for rewards yet.
         age: u8,
     },
-    /// When a node is relocated from us, the other
-    /// section will claim the reward counter, so that
-    /// they can pay it out to their new node.
-    GetWalletId {
-        /// The id of the node at the previous section.
-        old_node_id: XorName,
-        /// The id of the node at its new section (i.e. this one).
-        new_node_id: XorName,
-        /// The id of the remote msg.
-        msg_id: MessageId,
-        /// The origin of the remote msg.
-        origin: Address,
-    },
     /// When a node has been relocated to our section
     /// we receive the account id from the other section.
     ActivateNodeRewards {
@@ -457,13 +560,31 @@ pub enum RewardDuty {
     ReceivePayoutValidation(TransferValidated),
 }
 
+/// payouts from the section account.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum RewardQuery {
+    /// When a node is relocated from us, the other
+    /// section will query for the node wallet id.
+    GetWalletId {
+        /// The id of the node at the previous section.
+        old_node_id: XorName,
+        /// The id of the node at its new section (i.e. this one).
+        new_node_id: XorName,
+    },
+}
+
 impl Into<NodeOperation> for RewardDuty {
     fn into(self) -> NodeOperation {
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
+        if matches!(self, RewardDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
+        }
     }
 }
 
@@ -490,6 +611,7 @@ pub enum TransferDuty {
         ///
         origin: Address,
     },
+    NoOp,
 }
 
 impl Into<NodeOperation> for TransferDuty {
@@ -498,7 +620,11 @@ impl Into<NodeOperation> for TransferDuty {
         use KeySectionDuty::*;
         use NetworkDuty::*;
         use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
+        if matches!(self, TransferDuty::NoOp) {
+            NodeOperation::NoOp
+        } else {
+            Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
+        }
     }
 }
 
@@ -506,13 +632,15 @@ impl Into<NodeOperation> for TransferDuty {
 /// handled by AT2 Replicas.
 #[derive(Debug)]
 pub enum TransferQuery {
+    /// Get section actor transfers.
+    GetSectionActorHistory,
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.
     GetBalance(PublicKey),
     /// Get key transfers since specified version.
     GetHistory {
-        /// The balance key.
+        /// The wallet key.
         at: PublicKey,
         /// The last version of transfers we know of.
         since_version: usize,
@@ -522,31 +650,33 @@ pub enum TransferQuery {
     GetStoreCost {
         /// The requester's key.
         requester: PublicKey,
-        ///
+        /// Number of bytes to write.
         bytes: u64,
     },
 }
 
 /// Cmds carried out on AT2 Replicas.
 #[derive(Debug)]
+#[allow(clippy::clippy::large_enum_variant)]
 pub enum TransferCmd {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     InitiateReplica(Vec<ReplicaEvent>),
+    ProcessPayment(MsgEnvelope),
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout
     SimulatePayout(Transfer),
     /// The cmd to validate a transfer.
     ValidateTransfer(SignedTransfer),
     /// The cmd to register the consensused transfer.
-    RegisterTransfer(DebitAgreementProof),
+    RegisterTransfer(TransferAgreementProof),
     /// As a transfer has been propagated to the
     /// crediting section, it is applied there.
-    PropagateTransfer(DebitAgreementProof),
+    PropagateTransfer(CreditAgreementProof),
     /// The validation of a section transfer.
     ValidateSectionPayout(SignedTransfer),
     /// The registration of a section transfer.
-    RegisterSectionPayout(DebitAgreementProof),
+    RegisterSectionPayout(TransferAgreementProof),
 }
 
 impl From<sn_data_types::TransferCmd> for TransferCmd {
@@ -557,8 +687,8 @@ impl From<sn_data_types::TransferCmd> for TransferCmd {
             sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
-            sn_data_types::TransferCmd::RegisterTransfer(debit_agreement) => {
-                Self::RegisterTransfer(debit_agreement)
+            sn_data_types::TransferCmd::RegisterTransfer(transfer_agreement) => {
+                Self::RegisterTransfer(transfer_agreement)
             }
         }
     }

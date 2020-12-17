@@ -6,138 +6,98 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{to_db_key::from_db_key, utils, utils::Init, Error, Result, ToDbKey};
+use crate::{utils, utils::Init, Error, Result, ToDbKey};
+use log::{debug, trace};
 use pickledb::PickleDb;
-use sn_data_types::{PublicKey, ReplicaEvent};
-use std::{collections::BTreeSet, path::Path};
+use sn_data_types::ReplicaEvent;
+use std::path::{Path, PathBuf};
+use xor_name::XorName;
 
-const TRANSFERS_DB_NAME: &str = "transfers.db";
-const GROUP_CHANGES: &str = "group_changes";
-use log::trace;
+const TRANSFERS_DIR_NAME: &str = "transfers";
+const DB_EXTENSION: &str = ".db";
+
 /// Disk storage for transfers.
 pub struct TransferStore {
+    id: XorName,
     db: PickleDb,
 }
 
 impl TransferStore {
-    pub fn new<R: AsRef<Path>>(root_dir: R, init_mode: Init) -> Result<Self> {
+    pub fn new(id: XorName, root_dir: &PathBuf, init_mode: Init) -> Result<Self> {
+        let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
+        let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         Ok(Self {
-            db: utils::new_db(root_dir, TRANSFERS_DB_NAME, init_mode)?,
+            id,
+            db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
+            //db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
         })
     }
 
-    pub fn all_stream_keys(&self) -> Option<Vec<PublicKey>> {
-        let keys = self
-            .db
-            .get_all()
-            .iter()
-            .filter_map(|key| from_db_key(key))
-            .collect();
-
-        Some(keys)
+    ///
+    pub fn id(&self) -> XorName {
+        self.id
     }
 
-    pub fn history(&self, id: &PublicKey) -> Option<Vec<ReplicaEvent>> {
-        trace!("Getting History from node store");
-
-        // check list exists. If not, pickle panics
-        if !self.db.lexists(&id.to_db_key()) {
-            return None;
-        }
-
-        let list: Vec<ReplicaEvent> = self
-            .db
-            .liter(&id.to_db_key())
-            .filter_map(|c| c.get_item::<ReplicaEvent>())
-            .collect();
-        Some(list)
-    }
-
-    pub fn try_load(&self) -> Result<Vec<ReplicaEvent>> {
-        // Only the order within the streams is important, not between streams.
+    ///
+    pub fn get_all(&self) -> Vec<ReplicaEvent> {
+        trace!(
+            "Getting all events from transfer store w/id: {:?}",
+            self.id()
+        );
         let keys = self.db.get_all();
-        let events: Vec<ReplicaEvent> = keys
+
+        let mut events: Vec<(usize, ReplicaEvent)> = keys
             .iter()
-            //.filter(|key| self.db.lexists(&key)) 
-            // not all keys are necessarily lists..,
-            // in which case we would get an exception at liter below
-            // but in current impl, they all are, so no need to filter, yet.
-            .map(|key| {
-                self.db
-                    .liter(&key)
-                    .filter_map(|c| c.get_item::<ReplicaEvent>())
-                    .collect::<Vec<ReplicaEvent>>()
+            .filter_map(|key| {
+                let value = self.db.get::<ReplicaEvent>(key);
+                let key = key.parse::<usize>();
+                match value {
+                    Some(v) => match key {
+                        Ok(k) => Some((k, v)),
+                        _ => None,
+                    },
+                    None => None,
+                }
             })
-            .flatten()
             .collect();
-        Ok(events)
+
+        events.sort_by(|(key_a, _), (key_b, _)| key_a.partial_cmp(key_b).unwrap());
+
+        let events: Vec<ReplicaEvent> = events.into_iter().map(|(_, val)| val).collect();
+
+        trace!("all events {:?} ", events);
+        events
     }
 
-    pub fn drop(&mut self, streams: &BTreeSet<PublicKey>) -> Result<()> {
-        for stream in streams {
-            let _ = self.db.lrem_list(&stream.to_db_key());
-        }
-        Ok(())
-    }
-
-    pub fn init(&mut self, events: Vec<ReplicaEvent>) -> Result<()> {
-        for event in events {
-            self.try_append(event)?;
-        }
-        Ok(())
-    }
-
-    pub fn try_append(&mut self, event: ReplicaEvent) -> Result<()> {
+    ///
+    pub fn try_insert(&mut self, event: ReplicaEvent) -> Result<()> {
+        debug!("Trying to insert replica event: {:?}", event);
+        let key = &self.db.total_keys().to_string();
         match event {
-            ReplicaEvent::KnownGroupAdded(e) => {
-                if !self.db.lexists(GROUP_CHANGES) {
-                    // Creates if not exists.
-                    match self.db.lcreate(GROUP_CHANGES) {
-                        Ok(_) => (),
-                        Err(error) => return Err(Error::PickleDb(error)),
-                    };
-                }
-                match self
-                    .db
-                    .ladd(GROUP_CHANGES, &ReplicaEvent::KnownGroupAdded(e))
-                {
-                    Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())),
-                }
-            }
+            ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
             ReplicaEvent::TransferPropagated(e) => {
-                let key = &e.to().to_db_key();
-                if !self.db.lexists(key) {
-                    // Creates if not exists. A stream always starts with a credit.
-                    match self.db.lcreate(key) {
-                        Ok(_) => (),
-                        Err(error) => return Err(Error::PickleDb(error)),
-                    };
+                if self.db.exists(key) {
+                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
                 }
-                match self.db.ladd(key, &ReplicaEvent::TransferPropagated(e)) {
-                    Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())),
-                }
+                self.db
+                    .set(key, &ReplicaEvent::TransferPropagated(e))
+                    .map_err(Error::PickleDb)
             }
             ReplicaEvent::TransferValidated(e) => {
-                let id = e.from();
-                match self
-                    .db
-                    .ladd(&id.to_db_key(), &ReplicaEvent::TransferValidated(e))
-                {
-                    Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
+                if self.db.exists(key) {
+                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
                 }
+                self.db
+                    .set(key, &ReplicaEvent::TransferValidated(e))
+                    .map_err(Error::PickleDb)
             }
             ReplicaEvent::TransferRegistered(e) => {
-                let id = e.from();
-                match self
-                    .db
-                    .ladd(&id.to_db_key(), &ReplicaEvent::TransferRegistered(e))
-                {
-                    Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
+                if self.db.exists(key) {
+                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
                 }
+                self.db
+                    .set(key, &ReplicaEvent::TransferRegistered(e))
+                    .map_err(Error::PickleDb)
             }
         }
     }
@@ -154,41 +114,33 @@ mod test {
 
     #[test]
     fn history() -> Result<()> {
-        let tmp_dir = TempDir::new("history")?;
-        let root_dir = tmp_dir.path();
-        let mut store = TransferStore::new(root_dir, Init::New)?;
+        let id = xor_name::XorName::random();
+        let tmp_dir = TempDir::new("root")?;
+        let root_dir = tmp_dir.into_path();
+        let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
-        let debit_proof = get_genesis(10, wallet_id)?;
-        store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
-            debit_proof,
-            debiting_replicas: get_random_pk(),
+        let genesis_credit_proof = get_genesis(10, wallet_id)?;
+        store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
+            credit_proof: genesis_credit_proof.clone(),
+            crediting_replica_keys: get_random_pk(),
             crediting_replica_sig: dummy_sig(),
         }))?;
-        if let Some(history) = store.history(&wallet_id) {
-            assert_eq!(history.len(), 1);
-        } else {
-            panic!();
-        }
-        Ok(())
-    }
 
-    #[test]
-    fn all_stream_keys() -> Result<()> {
-        let tmp_dir = TempDir::new("all_stream_keys")?;
-        let root_dir = tmp_dir.path();
-        let mut store = TransferStore::new(root_dir, Init::New)?;
-        let wallet_id = get_random_pk();
-        let debit_proof = get_genesis(10, wallet_id)?;
-        store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
-            debit_proof,
-            debiting_replicas: get_random_pk(),
-            crediting_replica_sig: dummy_sig(),
-        }))?;
-        if let Some(list) = store.all_stream_keys() {
-            assert_eq!(list.len(), 1);
-        } else {
-            panic!();
+        let events = store.get_all();
+        assert_eq!(events.len(), 1);
+
+        match &events[0] {
+            ReplicaEvent::TransferPropagated(TransferPropagated { credit_proof, .. }) => {
+                assert_eq!(credit_proof, &genesis_credit_proof)
+            }
+            other => {
+                return Err(Error::Logic(format!(
+                    "Incorrect Replica event: {:?}",
+                    other
+                )))
+            }
         }
+
         Ok(())
     }
 

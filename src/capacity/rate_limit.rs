@@ -6,11 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{capacity::Capacity, Network};
-use sn_data_types::Money;
+use crate::{capacity::Capacity, Network, Result};
+use log::info;
+use sn_data_types::{Money, PublicKey};
 
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
 const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
+const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
 
 /// Calculation of rate limit for writes.
 pub struct RateLimit {
@@ -26,7 +28,7 @@ impl RateLimit {
 
     /// Calculates the rate limit of write operations,
     /// as a cost to be paid for a certain number of bytes.
-    pub async fn from(&self, bytes: u64) -> Option<Money> {
+    pub async fn from(&self, bytes: u64) -> Money {
         let prefix = self.network.our_prefix().await;
         let prefix_len = prefix.bit_count();
         let section_supply_share = MAX_SUPPLY as f64 / 2_f64.powf(prefix_len as f64);
@@ -34,13 +36,13 @@ impl RateLimit {
         let full_nodes = self.capacity.full_nodes();
         let all_nodes = self.network.our_adults().await.len() as u8;
 
-        Some(RateLimit::rate_limit(
+        RateLimit::rate_limit(
             bytes,
             full_nodes,
             all_nodes,
             section_supply_share,
             prefix_len,
-        ))
+        )
     }
 
     fn rate_limit(
@@ -60,6 +62,23 @@ impl RateLimit {
         let token_source = steepness_reductor * section_supply_share.powf(0.5_f64);
         let rate_limit = (token_source * data_size_factor * supply_demand_factor).round() as u64;
         Money::from_nano(rate_limit)
+    }
+
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.capacity.increase_full_node_count(node_id)
+    }
+
+    ///
+    pub async fn check_network_storage(&self) -> bool {
+        info!("Checking network storage");
+        let all_nodes = self.network.our_adults().await.len() as f64;
+        let full_nodes = self.capacity.full_nodes() as f64;
+        let usage_ratio = full_nodes / all_nodes;
+        info!("Total number of adult nodes: {:?}", all_nodes);
+        info!("Number of Full adult nodes: {:?}", full_nodes);
+        info!("Section storage usage ratio: {:?}", usage_ratio);
+        usage_ratio > MAX_NETWORK_STORAGE_RATIO
     }
 }
 
