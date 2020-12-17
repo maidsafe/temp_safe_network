@@ -47,7 +47,7 @@ pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
         return Ok(db);
     }
     debug!("Loading auto dump database at {}", db_path.display());
-    let result = PickleDb::load_json(db_path.clone(), PickleDbDumpPolicy::AutoDump);
+    let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
     if let Err(ref error) = &result {
         error!(
             "Failed to load auto dump db at {}: {}",
@@ -82,7 +82,7 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
         return Ok(db);
     }
     debug!("Loading database at {}", db_path.display());
-    let result = PickleDb::load_json(
+    let result = PickleDb::load_bin(
         db_path.clone(),
         PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),
     );
