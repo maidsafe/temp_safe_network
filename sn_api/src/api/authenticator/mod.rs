@@ -397,12 +397,6 @@ impl SafeAuthenticator {
                             )
                         })?);
 
-                    let mut tmp_client = Client::new(Some(keypair.clone()), None).await?;
-                    tmp_client
-                        .trigger_simulated_farming_payout(Money::from_nano(
-                            DEFAULT_TEST_COINS_AMOUNT,
-                        ))
-                        .await?;
                     debug!(
                         "Keypair for the app being authorised ('{}') retrieved from the Safe: {}",
                         auth_req.app_id,
@@ -416,18 +410,31 @@ impl SafeAuthenticator {
                     // thus let's generate a keypair for it
                     let mut rng = OsRng;
                     let keypair = Keypair::new_ed25519(&mut rng);
+
                     let keypair_str = serde_json::to_string(&keypair).map_err(|err| {
                         Error::AuthError(format!(
                             "Failed to serialised keypair to store it in the Safe: {}",
                             err
                         ))
                     })?;
+
                     let keypair = Arc::new(keypair);
                     debug!(
                         "New keypair generated for app ('{}') being authorised: {}",
                         auth_req.app_id,
                         keypair.public_key()
                     );
+
+                    // Allocate some test coins
+                    // TODO: we may want to allow different options here, either accept
+                    // a proof of payment from the requester, transfer from the Safe's balance,
+                    // or simply allocate testcoins as it's now.
+                    let mut tmp_client = Client::new(Some(keypair.clone()), None).await?;
+                    tmp_client
+                        .trigger_simulated_farming_payout(Money::from_nano(
+                            DEFAULT_TEST_COINS_AMOUNT,
+                        ))
+                        .await?;
 
                     // Store the keypair in the Safe, mapped to the app id
                     let map_actions =
