@@ -188,6 +188,17 @@ impl SafeAuthenticator {
 
         let mut client = Client::new(Some(keypair), None).await?;
         trace!("Client instantiated properly!");
+
+        // check if client data already exists
+        // TODO: Use a more reliable test for existing data...
+        let existing_balance = client.get_balance().await?;
+
+        if existing_balance != Money::from_nano(0) {
+            return Err(Error::AuthenticatorError(
+                "Client already data exists".to_string(),
+            ));
+        }
+
         client
             .trigger_simulated_farming_payout(Money::from_nano(DEFAULT_TEST_COINS_AMOUNT))
             .await?;
