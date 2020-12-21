@@ -50,6 +50,7 @@ simulated-payouts = ["sn_client/simulated-payouts"]
 default = ["simulated-payouts","authenticator", "authd_client", "app"]
 
 [dev-dependencies]
+anyhow = "1.0.35"
 tokio = { version = "~0.2.21", features = ["macros"] }
 proptest = "0.10.1"
 

@@ -314,7 +314,6 @@ fn update_progress_bars(m: &MultiProgress, bars: &[ProgressBar], status: &FilesG
 
         // We re-set this for each file because it can change if a pre-existing file is preserved.
         bars[2].set_length(status.total_transfer_bytes);
-        // thread::sleep(Duration::from_millis(1000));
 
         if !b_onefile {
             bars[1].set_length(status.file_size);
@@ -423,7 +422,7 @@ async fn files_container_get_files(
     url: &str,
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> ApiResult<(u64, ProcessedFiles)> {
+) -> Result<(u64, ProcessedFiles), String> {
     debug!("Getting files in container {:?}", url);
     let (version, files_map) = match safe.fetch(url, None).await? {
         SafeData::FilesContainer {
@@ -436,17 +435,13 @@ async fn files_container_get_files(
                 (0, files_map)
             } else {
                 // TODO: support it even if no stats are shown of the file being downloaded
-                return Err(Error::ContentError(
+                return Err(
                     "You can target files only by providing a FilesContainer with the file's path."
                         .to_string(),
-                ));
+                );
             }
         }
-        _other_type => {
-            return Err(Error::ContentError(
-                "Make sure the URL targets a FilesContainer.".to_string(),
-            ))
-        }
+        _other_type => return Err("Make sure the URL targets a FilesContainer.".to_string()),
     };
 
     // Todo: This test will need to be modified once we support empty directories.
@@ -566,7 +561,7 @@ async fn files_map_get_files(
     files_map: &FilesMap,
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> ApiResult<ProcessedFiles> {
+) -> Result<ProcessedFiles, String> {
     trace!("Fetching files from FilesMap");
 
     let dpath = Path::new(dirpath);
@@ -592,12 +587,9 @@ async fn files_map_get_files(
 
         // determine the file size from metadata.  string must be parsed.
         let size_str = details.getattr("size")?;
-        let size: u64 = size_str.parse().map_err(|err| {
-            Error::Unexpected(format!(
-                "Invalid file size: {} for {}.  {:?}",
-                size_str, path, err
-            ))
-        })?;
+        let size: u64 = size_str
+            .parse()
+            .map_err(|err| format!("Invalid file size: {} for {}.  {:?}", size_str, path, err))?;
 
         // Setup status to notify our caller of progress in callback.
         let mut status = FilesGetStatus {

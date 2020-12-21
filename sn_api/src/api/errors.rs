@@ -8,6 +8,8 @@
 // Software.
 
 use super::ipc::IpcError;
+#[cfg(test)]
+use anyhow::{anyhow, Error as AnyHowError};
 use sn_client::ClientError;
 use sn_data_types::Error as DtError;
 use std::fmt;
@@ -37,19 +39,12 @@ pub enum Error {
     InvalidMediaType(String),
     NotEnoughBalance(String),
     FileSystemError(String),
-    Unexpected(String),
-    Unknown(String),
+    Serialisation(String),
 }
 
 impl From<Error> for String {
     fn from(error: Error) -> String {
         error.to_string()
-    }
-}
-
-impl From<String> for Error {
-    fn from(str: String) -> Self {
-        Error::Unknown(str)
     }
 }
 
@@ -97,12 +92,18 @@ impl fmt::Display for Error {
             InvalidMediaType(info) => ("InvalidMediaType", info),
             NotEnoughBalance(info) => ("NotEnoughBalance", info),
             FileSystemError(info) => ("FileSystemError", info),
-            Unexpected(info) => ("Unexpected", info),
-            Unknown(info) => ("Unknown", info),
+            Serialisation(info) => ("Serialisation", info),
         };
         let description = format!("[Error] {} - {}", error_type, error_msg);
 
         write!(f, "{}", description)
+    }
+}
+
+#[cfg(test)]
+impl From<Error> for AnyHowError {
+    fn from(error: Error) -> Self {
+        anyhow!("{}", error)
     }
 }
 
@@ -112,8 +113,8 @@ mod tests {
 
     #[test]
     fn error_display() {
-        let err = Error::Unknown("test error".to_string());
+        let err = Error::Serialisation("test error".to_string());
         let s: String = err.into();
-        assert_eq!(s, "[Error] Unknown - test error");
+        assert_eq!(s, "[Error] Serialisation - test error");
     }
 }

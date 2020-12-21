@@ -7,12 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use anyhow::{anyhow, bail, Context, Result};
 use multibase::{encode, Base};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use sn_api::{
-    fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Error, Keypair,
-};
+use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Keypair};
 use sn_data_types::Money;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -48,12 +47,7 @@ pub fn get_bin_location() -> String {
 }
 
 #[allow(dead_code)]
-pub fn read_cmd(e: duct::Expression) -> Result<String, String> {
-    e.read().map_err(|e| format!("{:#?}", e))
-}
-
-#[allow(dead_code)]
-pub fn create_preload_and_get_keys(preload: &str) -> Result<(String, String), Error> {
+pub fn create_preload_and_get_keys(preload: &str) -> Result<(String, String)> {
     let pk_command_result = cmd!(
         get_bin_location(),
         "keys",
@@ -63,8 +57,7 @@ pub fn create_preload_and_get_keys(preload: &str) -> Result<(String, String), Er
         preload,
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (xorurl, (_pk, sk)): (String, (String, String)) =
         parse_keys_create_output(&pk_command_result);
@@ -76,13 +69,11 @@ pub fn create_preload_and_get_keys(preload: &str) -> Result<(String, String), Er
 pub fn create_wallet_with_balance(
     preload: &str,
     balance_name: Option<&str>,
-) -> Result<(String, String, String), Error> {
+) -> Result<(String, String, String)> {
     let (_pk, sk) = create_preload_and_get_keys(&preload)?;
     // we spent 1 nano for creating the SafeKey, so we now preload it
     // with 1 nano less than amount request provided
-    let preload_nanos = Money::from_str(preload)
-        .map_err(|e| Error::Unexpected(e.to_string()))?
-        .as_nano();
+    let preload_nanos = Money::from_str(preload)?.as_nano();
     let preload_minus_costs = Money::from_nano(preload_nanos - 1).to_string();
 
     let wallet_create_result = cmd!(
@@ -97,24 +88,24 @@ pub fn create_wallet_with_balance(
         balance_name.unwrap_or("default-balance"),
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (wallet_xor, _key_xorurl, key_pair) = parse_wallet_create_output(&wallet_create_result);
     let unwrapped_key_pair =
-        key_pair.ok_or_else(|| Error::ContentError("Could not parse wallet".to_string()))?;
+        key_pair.ok_or_else(|| anyhow!("Could not parse wallet".to_string()))?;
+
     Ok((
         wallet_xor,
         unwrapped_key_pair.public_key().to_string(),
         unwrapped_key_pair
             .secret_key()
-            .expect("Error extracting SecretKey from keypair")
+            .context("Error extracting SecretKey from keypair")?
             .to_string(),
     ))
 }
 
 #[allow(dead_code)]
-pub fn create_nrs_link(name: &str, link: &str) -> Result<String, String> {
+pub fn create_nrs_link(name: &str, link: &str) -> Result<String> {
     let nrs_creation = cmd!(
         get_bin_location(),
         "nrs",
@@ -124,8 +115,7 @@ pub fn create_nrs_link(name: &str, link: &str) -> Result<String, String> {
         &link,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (nrs_map_xorurl, _change_map) = parse_nrs_create_output(&nrs_creation);
     assert!(nrs_map_xorurl.contains("safe://"));
@@ -134,10 +124,10 @@ pub fn create_nrs_link(name: &str, link: &str) -> Result<String, String> {
 }
 
 #[allow(dead_code)]
-pub fn upload_path_with_result(
+pub fn upload_path(
     path: &str,
     add_trailing_slash: bool,
-) -> Result<(String, ProcessedFiles, String), String> {
+) -> Result<(String, ProcessedFiles, String)> {
     let final_path = if add_trailing_slash {
         format!("{}/", path)
     } else {
@@ -153,53 +143,56 @@ pub fn upload_path_with_result(
 }
 
 #[allow(dead_code)]
-pub fn upload_test_folder_with_result(
-    trailing_slash: bool,
-) -> Result<(String, ProcessedFiles), String> {
-    let d = upload_path_with_result(TEST_FOLDER_NO_TRAILING_SLASH, trailing_slash)?;
+pub fn upload_test_folder(trailing_slash: bool) -> Result<(String, ProcessedFiles)> {
+    let d = upload_path(TEST_FOLDER_NO_TRAILING_SLASH, trailing_slash)?;
     Ok((d.0, d.1))
 }
 
 #[allow(dead_code)]
-pub fn upload_testfolder_trailing_slash() -> Result<(String, ProcessedFiles), String> {
-    upload_test_folder_with_result(true)
+pub fn upload_testfolder_trailing_slash() -> Result<(String, ProcessedFiles)> {
+    upload_test_folder(true)
 }
 
 #[allow(dead_code)]
-pub fn upload_testfolder_no_trailing_slash() -> Result<(String, ProcessedFiles), String> {
-    upload_test_folder_with_result(false)
-}
-
-// keeping for compat with older tests
-#[allow(dead_code)]
-pub fn upload_test_folder() -> Result<(String, ProcessedFiles), Error> {
-    upload_test_folder_with_result(true).map_err(Error::Unknown)
+pub fn upload_testfolder_no_trailing_slash() -> Result<(String, ProcessedFiles)> {
+    upload_test_folder(false)
 }
 
 #[allow(dead_code)]
 pub fn upload_test_symlinks_folder(
     trailing_slash: bool,
-) -> Result<(String, ProcessedFiles, String), String> {
-    upload_path_with_result(TEST_SYMLINKS_FOLDER, trailing_slash)
+) -> Result<(String, ProcessedFiles, String)> {
+    upload_path(TEST_SYMLINKS_FOLDER, trailing_slash)
 }
 
 // Creates a tmp
 #[allow(dead_code)]
-fn create_tmp_absolute_symlinks_folder() -> Result<(String, String), String> {
+fn create_tmp_absolute_symlinks_folder() -> Result<(String, String)> {
     let paths = mk_emptyfolder("abs_symlinks")?;
     let symlinks = Path::new(&paths.1);
 
     let subdir = symlinks.join("subdir");
-    fs::create_dir(&subdir).map_err(|e| format!("{:?}", e))?;
+    fs::create_dir(&subdir).context(format!("Failed to create directory: {}", subdir.display()))?;
 
     let dir_link_path = symlinks.join("absolute_link_to_dir");
-    create_symlink(&subdir, &dir_link_path, false).map_err(|e| format!("{:?}", e))?;
+    create_symlink(&subdir, &dir_link_path, false).context(format!(
+        "Failed to create symlink '{}' to: {}",
+        dir_link_path.display(),
+        subdir.display()
+    ))?;
 
     let filepath = symlinks.join("file.txt");
-    fs::write(&filepath, "Some data").map_err(|e| format!("{:?}", e))?;
+    fs::write(&filepath, "Some data").context(format!(
+        "Failed to write to file at: {}",
+        filepath.display()
+    ))?;
 
     let file_link_path = symlinks.join("absolute_link_to_file.txt");
-    create_symlink(&filepath, &file_link_path, false).map_err(|e| format!("{:?}", e))?;
+    create_symlink(&filepath, &file_link_path, false).context(format!(
+        "Failed to create symlink '{}' to: {}",
+        file_link_path.display(),
+        filepath.display()
+    ))?;
 
     Ok(paths)
 }
@@ -221,11 +214,14 @@ pub fn create_symlink(target: &Path, link: &Path, is_dir: bool) -> Result<(), st
 // We create a folder named "emptyfolder" inside a randomly
 // named folder in system temp dir, and return both paths.
 #[allow(dead_code)]
-pub fn mk_emptyfolder(folder_name: &str) -> Result<(String, String), String> {
+pub fn mk_emptyfolder(folder_name: &str) -> Result<(String, String)> {
     let name = get_random_nrs_string();
     let path_random = env::temp_dir().join(name);
     let path_emptyfolder = path_random.join(folder_name);
-    fs::create_dir_all(&path_emptyfolder).map_err(|e| format!("{:?}", e))?;
+    fs::create_dir_all(&path_emptyfolder).context(format!(
+        "Failed to create path: {}",
+        path_emptyfolder.display()
+    ))?;
     let empty_folder_path_trailing_slash = format!("{}/", path_emptyfolder.display().to_string());
     Ok((
         path_random.display().to_string(),
@@ -236,9 +232,9 @@ pub fn mk_emptyfolder(folder_name: &str) -> Result<(String, String), String> {
 #[allow(dead_code)]
 pub fn create_and_upload_test_absolute_symlinks_folder(
     trailing_slash: bool,
-) -> Result<(String, ProcessedFiles, String, String), String> {
+) -> Result<(String, ProcessedFiles, String, String)> {
     let paths = create_tmp_absolute_symlinks_folder()?;
-    let d = upload_path_with_result(&paths.1, trailing_slash)?;
+    let d = upload_path(&paths.1, trailing_slash)?;
     Ok((d.0, d.1, paths.0, paths.1))
 }
 
@@ -249,7 +245,7 @@ pub fn create_and_upload_test_absolute_symlinks_folder(
 //  dest dir since `safe files put` presently ignores hidden
 //  files.  The hidden files can be included once
 //  'safe files put' is fixed to include them.
-pub fn sum_tree(path: &str) -> Result<String, Error> {
+pub fn sum_tree(path: &str) -> Result<String> {
     let paths = WalkDir::new(path)
         .min_depth(1) // ignore top/root directory
         .follow_links(false)
@@ -263,15 +259,21 @@ pub fn sum_tree(path: &str) -> Result<String, Error> {
         let relpath = p
             .path()
             .strip_prefix(path)
-            .map_err(|e| Error::Unknown(e.to_string()))?
+            .context(format!(
+                "Failed to strip prefix '{}' to '{}'",
+                path,
+                p.path().display()
+            ))?
             .display()
             .to_string();
         digests.push_str(&str_to_sha3_256(&relpath));
         if p.path().is_file() {
             digests.push_str(&digest_file(&p.path().display().to_string())?);
         } else if p.path_is_symlink() {
-            let target_path =
-                fs::read_link(&p.path()).map_err(|e| Error::Unknown(e.to_string()))?;
+            let target_path = fs::read_link(&p.path()).context(format!(
+                "Failed to follow link from file at: {}",
+                p.path().display()
+            ))?;
             digests.push_str(&str_to_sha3_256(&target_path.display().to_string()));
         }
     }
@@ -294,8 +296,9 @@ pub fn str_to_sha3_256(s: &str) -> String {
 }
 
 // returns sha3_256 digest/hash of a file as a string.
-pub fn digest_file(path: &str) -> Result<String, Error> {
-    let data = fs::read_to_string(&path).map_err(|e| Error::Unknown(e.to_string()))?;
+pub fn digest_file(path: &str) -> Result<String> {
+    let data = fs::read_to_string(&path)
+        .context(format!("Failed to read string from file at: {}", path))?;
     Ok(str_to_sha3_256(&data))
 }
 
@@ -367,7 +370,7 @@ pub fn parse_keys_create_output(output: &str) -> (String, (String, String)) {
 // If expect_exit_code is Some, then an Err is returned
 // if value does not match process exit code.
 #[allow(dead_code)]
-pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output, String> {
+pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process::Output> {
     println!("Executing: safe {}", args.join(" "));
 
     let output = duct::cmd(get_bin_location(), args)
@@ -375,12 +378,12 @@ pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process:
         .stderr_capture()
         .unchecked()
         .run()
-        .map_err(|e| format!("{:#?}", e))?;
+        .with_context(|| format!("Failed to run 'safe' command with args: {}", args.join(" ")))?;
 
     if let Some(ec) = expect_exit_code {
         match output.status.code() {
             Some(code) => assert_eq!(ec, code),
-            None => return Err("Command returned no exit code".to_string()),
+            None => bail!("Command returned no exit code".to_string()),
         }
     }
     Ok(output)
@@ -392,9 +395,10 @@ pub fn safe_cmd(args: &[&str], expect_exit_code: Option<i32>) -> Result<process:
 // If expect_exit_code is Some, then an Err is returned
 // if value does not match process exit code.
 #[allow(dead_code)]
-pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<String, String> {
+pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
     let output = safe_cmd(&args, expect_exit_code)?;
-    String::from_utf8(output.stdout).map_err(|_| "Invalid UTF-8".to_string())
+    String::from_utf8(output.stdout)
+        .context("Failed to parse the error output as a UTF-8 string".to_string())
 }
 
 // Executes arbitrary `safe ` commands and returns
@@ -402,9 +406,10 @@ pub fn safe_cmd_stdout(args: &[&str], expect_exit_code: Option<i32>) -> Result<S
 //
 // If expect_exit_code is Some, then an Err is returned
 // if value does not match process exit code.
-pub fn safe_cmd_stderr(args: &[&str], expect_exit_code: Option<i32>) -> Result<String, String> {
+pub fn safe_cmd_stderr(args: &[&str], expect_exit_code: Option<i32>) -> Result<String> {
     let output = safe_cmd(&args, expect_exit_code)?;
-    String::from_utf8(output.stderr).map_err(|_| "Invalid UTF-8".to_string())
+    String::from_utf8(output.stderr)
+        .context("Failed to parse the error output as a UTF-8 string".to_string())
 }
 
 // returns true if the OS permits writing symlinks
@@ -438,11 +443,11 @@ pub fn can_write_symlinks() -> bool {
 // This is a proxy to determine if symlinks within symlinks_test
 // dir were created properly (eg by git checkout) since this
 // will fail on windows without adequate permissions.
-pub fn test_symlinks_are_valid() -> Result<bool, String> {
+pub fn test_symlinks_are_valid() -> Result<bool> {
     let result = std::fs::symlink_metadata(TEST_SYMLINK);
 
     match result {
         Ok(meta) => Ok(meta.file_type().is_symlink()),
-        Err(e) => Err(format!("{:?}", e)),
+        Err(e) => Err(anyhow!("{:?}", e)),
     }
 }

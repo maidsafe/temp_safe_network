@@ -55,13 +55,9 @@ impl Safe {
             .await?;
 
         // The resolved content is the last item in the resolution chain we obtained
-        let safe_data = match resolution_chain.pop() {
-            Some(safe_data) => Ok(safe_data),
-            None => {
-                // weird...it didn't fail but it returned an empty list...
-                Err(Error::Unexpected(format!("Failed to resolve {}", url)))
-            }
-        }?;
+        let safe_data = resolution_chain
+            .pop()
+            .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))?;
 
         // Set the original path so we return the XorUrlEncoder with it
         let mut xorurl_encoder = XorUrlEncoder::from_url(&safe_data.xorurl())?;
@@ -324,7 +320,7 @@ fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<Vec<u8>> {
     // an entry containing the serialised NrsMap
     // TODO: use RDF format
     let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
-        Error::Unexpected(format!(
+        Error::Serialisation(format!(
             "Couldn't serialise the NrsMap generated: {:?}",
             err
         ))
@@ -337,6 +333,7 @@ fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use anyhow::{anyhow, Result};
 
     #[tokio::test]
     async fn test_nrs_map_container_create() -> Result<()> {
@@ -364,12 +361,9 @@ mod tests {
         );
 
         if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
-            let link = def_data.get(FAKE_RDF_PREDICATE_LINK).ok_or_else(|| {
-                Error::Unexpected(format!(
-                    "Entry not found with key '{}'",
-                    FAKE_RDF_PREDICATE_LINK
-                ))
-            })?;
+            let link = def_data
+                .get(FAKE_RDF_PREDICATE_LINK)
+                .ok_or_else(|| anyhow!("Entry not found with key '{}'", FAKE_RDF_PREDICATE_LINK))?;
 
             assert_eq!(*link, "safe://linked-from-<site_name>?v=0".to_string());
             assert_eq!(
@@ -380,9 +374,7 @@ mod tests {
             assert_eq!(nrs_xorname, decoder.xorname());
             Ok(())
         } else {
-            Err(Error::Unexpected(
-                "No default definition map found...".to_string(),
-            ))
+            Err(anyhow!("No default definition map found...".to_string(),))
         }
     }
 
@@ -450,7 +442,7 @@ mod tests {
             .await
         {
             Ok(_) => {
-                return Err(Error::Unexpected(
+                return Err(anyhow!(
                     "NRS map add was unexpectedly successful".to_string(),
                 ))
             }
@@ -467,7 +459,7 @@ mod tests {
             .nrs_map_container_remove(&versioned_sitename, false)
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "NRS map remove was unexpectedly successful".to_string(),
             )),
             Err(err) => {
@@ -543,10 +535,7 @@ mod tests {
         assert_eq!(version, 1);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
         match updated_nrs_map.get_default_link() {
-            Ok(link) => Err(Error::Unexpected(format!(
-                "Unexpectedly retrieved a default link: {}",
-                link
-            ))),
+            Ok(link) => Err(anyhow!("Unexpectedly retrieved a default link: {}", link)),
             Err(Error::ContentError(msg)) => {
                 assert_eq!(
                     msg,
@@ -555,10 +544,7 @@ mod tests {
                 );
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected one: {}",
-                err
-            ))),
+            Err(err) => Err(anyhow!("Error returned is not the expected one: {}", err)),
         }
     }
 

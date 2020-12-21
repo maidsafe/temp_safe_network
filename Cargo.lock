@@ -108,6 +108,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34fde25430d87a9388dadbe6e34d7f72a462c8b43ac8d309b42b0a8505d7e2a5"
 
 [[package]]
+name = "anyhow"
+version = "1.0.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c0df63cb2955042487fad3aefd2c6e3ae7389ac5dc1beb28921de0b69f779d4"
+
+[[package]]
 name = "arc-swap"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3748,6 +3754,7 @@ dependencies = [
 name = "sn_api"
 version = "0.17.0"
 dependencies = [
+ "anyhow",
  "async-std",
  "async-trait",
  "bincode",
@@ -3897,6 +3904,7 @@ dependencies = [
 name = "sn_cmd_test_utilities"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "duct",
  "multibase 0.6.0",
  "rand 0.7.3",

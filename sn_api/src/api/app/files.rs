@@ -305,7 +305,7 @@ impl Safe {
             "".to_string()
         } else {
             let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
-                Error::Unexpected(format!(
+                Error::Serialisation(format!(
                     "Couldn't serialise the FilesMap generated: {:?}",
                     err
                 ))
@@ -702,7 +702,7 @@ impl Safe {
             // The FilesContainer is updated by adding an entry containing the timestamp as the
             // entry's key, and the serialised new version of the FilesMap as the entry's value
             let serialised_files_map = serde_json::to_string(new_files_map).map_err(|err| {
-                Error::Unexpected(format!(
+                Error::Serialisation(format!(
                     "Couldn't serialise the FilesMap generated: {:?}",
                     err
                 ))
@@ -1642,6 +1642,7 @@ async fn files_map_create(
 mod tests {
     use super::*;
     use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use anyhow::{anyhow, bail, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     // make some constants for these, in case entries in the
@@ -2182,9 +2183,7 @@ mod tests {
             )
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
-                "Sync was unexpectedly successful".to_string(),
-            )),
+            Ok(_) => Err(anyhow!("Sync was unexpectedly successful".to_string(),)),
             Err(err) => {
                 assert_eq!(
                     err,
@@ -2281,9 +2280,7 @@ mod tests {
             )
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
-                "Sync was unexpectedly successful".to_string(),
-            )),
+            Ok(_) => Err(anyhow!("Sync was unexpectedly successful".to_string(),)),
             Err(err) => {
                 assert_eq!(
                     err,
@@ -2311,7 +2308,7 @@ mod tests {
             .nrs_map_container_create(&nrsurl, &unversioned_link, false, true, false)
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "NRS create was unexpectedly successful".to_string(),
             )),
             Err(err) => {
@@ -2346,9 +2343,7 @@ mod tests {
             )
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
-                "Sync was unexpectedly successful".to_string(),
-            )),
+            Ok(_) => Err(anyhow!("Sync was unexpectedly successful".to_string(),)),
             Err(err) => {
                 assert_eq!(
                     err,
@@ -2648,7 +2643,7 @@ mod tests {
         // let's fetch version 2 (invalid)
         xorurl_encoder.set_content_version(Some(2));
         match safe.files_container_get(&xorurl_encoder.to_string()).await {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "Unexpectedly retrieved verion 3 of container".to_string(),
             )),
             Err(Error::VersionNotFound(msg)) => {
@@ -2661,10 +2656,10 @@ mod tests {
                 );
                 Ok(())
             }
-            other => Err(Error::Unexpected(format!(
+            other => Err(anyhow!(
                 "Error returned is not the expected one: {:?}",
                 other
-            ))),
+            )),
         }
     }
 
@@ -2856,7 +2851,7 @@ mod tests {
             .files_container_add("../testdata", &xorurl, false, false, false, false)
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "Unexpectedly added a folder to files container".to_string(),
             )),
             Err(Error::InvalidInput(msg)) => {
@@ -2866,10 +2861,10 @@ mod tests {
                 );
                 Ok(())
             }
-            other => Err(Error::Unexpected(format!(
+            other => Err(anyhow!(
                 "Error returned is not the expected one: {:?}",
                 other
-            ))),
+            )),
         }
     }
 
@@ -2972,19 +2967,14 @@ mod tests {
             .await
         {
             Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Unexpectedly added a folder to files container".to_string(),
-                ))
+                bail!("Unexpectedly added a folder to files container".to_string(),)
             }
             Err(Error::FileSystemError(msg)) => {
                 assert!(msg
                     .starts_with("Couldn't read metadata from source path ('/non-existing-path')"))
             }
             other => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected one: {:?}",
-                    other
-                )))
+                bail!("Error returned is not the expected one: {:?}", other)
             }
         }
 
@@ -2999,7 +2989,7 @@ mod tests {
             )
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "Unexpectedly added a folder to files container".to_string(),
             )),
             Err(Error::FileSystemError(msg)) => {
@@ -3007,10 +2997,10 @@ mod tests {
                     .starts_with("Couldn't read metadata from source path ('/non-existing-path')"));
                 Ok(())
             }
-            other => Err(Error::Unexpected(format!(
+            other => Err(anyhow!(
                 "Error returned is not the expected one: {:?}",
                 other
-            ))),
+            )),
         }
     }
 

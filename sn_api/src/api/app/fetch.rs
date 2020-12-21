@@ -149,13 +149,9 @@ impl Safe {
     pub async fn fetch(&mut self, url: &str, range: Range) -> Result<SafeData> {
         let mut resolution_chain = self.retrieve_from_url(url, true, range, true).await?;
         // Construct return data using the last and first items from the resolution chain
-        match resolution_chain.pop() {
-            Some(other_safe_data) => Ok(other_safe_data),
-            None => {
-                // weird...it didn't fail but it returned an empty list...
-                Err(Error::Unexpected(format!("Failed to resolve {}", url)))
-            }
-        }
+        resolution_chain
+            .pop()
+            .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))
     }
 
     /// # Inspect a safe:// URL and retrieve metadata information but the actual target content
@@ -310,7 +306,7 @@ impl Safe {
                                         "symlink should not be present in resolved real path. {}",
                                         realpath
                                     );
-                                    return Err(Error::Unexpected(msg));
+                                    return Err(Error::ContentError(msg));
                                 } else {
                                     // Must be a directory.
                                     (gen_filtered_filesmap(&realpath, &files_map, &xorurl)?, None)
@@ -585,6 +581,7 @@ mod tests {
     use super::*;
     use crate::api::app::test_helpers::new_safe_instance;
     use crate::api::xorurl::XorUrlEncoder;
+    use anyhow::{anyhow, bail, Context, Result};
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use std::io::Read;
@@ -729,9 +726,7 @@ mod tests {
                 assert_eq!(content, inspected_content[1]);
                 Ok(())
             }
-            _ => Err(Error::Unexpected(
-                "NRS map container was not returned".to_string(),
-            )),
+            _ => Err(anyhow!("NRS map container was not returned".to_string(),)),
         }
     }
 
@@ -770,9 +765,7 @@ mod tests {
                 assert_eq!(content, inspected_content[1]);
                 Ok(())
             }
-            _ => Err(Error::Unexpected(
-                "Nrs map container was not returned".to_string(),
-            )),
+            _ => Err(anyhow!("Nrs map container was not returned".to_string(),)),
         }
     }
 
@@ -830,10 +823,7 @@ mod tests {
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
         } else {
-            return Err(Error::Unexpected(format!(
-                "Content fetched is not a PublicBlob: {:?}",
-                content
-            )));
+            bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
         // Fetch second half and match
@@ -844,10 +834,10 @@ mod tests {
             assert_eq!(data.clone(), saved_data[size / 2..size].to_vec());
             Ok(())
         } else {
-            Err(Error::Unexpected(format!(
+            Err(anyhow!(
                 "Content fetched is not a PublicBlob: {:?}",
                 content
-            )))
+            ))
         }
     }
 
@@ -870,10 +860,10 @@ mod tests {
         let nrs_url = format!("safe://{}/test.md", site_name);
 
         let mut file = File::open("../testdata/test.md")
-            .map_err(|err| Error::Unexpected(format!("Failed to open local file: {}", err)))?;
+            .context("Failed to open local file: ../testdata/test.md".to_string())?;
         let mut file_data = Vec::new();
         file.read_to_end(&mut file_data)
-            .map_err(|err| Error::Unexpected(format!("Failed to read local file: {}", err)))?;
+            .context("Failed to read local file: ../testdata/test.md".to_string())?;
         let file_size = file_data.len();
 
         // Fetch full file and match
@@ -881,10 +871,7 @@ mod tests {
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {
-            return Err(Error::Unexpected(format!(
-                "Content fetched is not a PublicBlob: {:?}",
-                content
-            )));
+            bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
         // Fetch first half and match
@@ -894,10 +881,7 @@ mod tests {
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
         } else {
-            return Err(Error::Unexpected(format!(
-                "Content fetched is not a PublicBlob: {:?}",
-                content
-            )));
+            bail!("Content fetched is not a PublicBlob: {:?}", content);
         }
 
         // Fetch second half and match
@@ -908,10 +892,10 @@ mod tests {
             assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
             Ok(())
         } else {
-            Err(Error::Unexpected(format!(
+            Err(anyhow!(
                 "Content fetched is not a PublicBlob: {:?}",
                 content
-            )))
+            ))
         }
     }
 
@@ -972,10 +956,7 @@ mod tests {
 
         match safe.fetch(&xorurl, None).await {
             Ok(c) => {
-                return Err(Error::Unexpected(format!(
-                    "Unxpected fetched content: {:?}",
-                    c
-                )))
+                bail!("Unxpected fetched content: {:?}", c)
             }
             Err(msg) => assert_eq!(
                 msg,
@@ -985,10 +966,7 @@ mod tests {
 
         match safe.inspect(&xorurl).await {
             Ok(c) => {
-                return Err(Error::Unexpected(format!(
-                    "Unxpected fetched content: {:?}",
-                    c
-                )))
+                bail!("Unxpected fetched content: {:?}", c)
             }
             Err(msg) => assert_eq!(
                 msg,
@@ -1019,10 +997,7 @@ mod tests {
 
         match safe.fetch(&xorurl, None).await {
             Ok(c) => {
-                return Err(Error::Unexpected(format!(
-                    "Unxpected fetched content: {:?}",
-                    c
-                )))
+                bail!("Unxpected fetched content: {:?}", c)
             }
             Err(msg) => assert_eq!(
                 msg,
@@ -1032,10 +1007,7 @@ mod tests {
 
         match safe.inspect(&xorurl).await {
             Ok(c) => {
-                return Err(Error::Unexpected(format!(
-                    "Unxpected fetched content: {:?}",
-                    c
-                )))
+                bail!("Unxpected fetched content: {:?}", c)
             }
             Err(msg) => assert_eq!(
                 msg,
@@ -1056,10 +1028,7 @@ mod tests {
         xorurl_encoder.set_path(path);
         match safe.fetch(&xorurl_encoder.to_string(), None).await {
             Ok(c) => {
-                return Err(Error::Unexpected(format!(
-                    "Unxpected fetched content: {:?}",
-                    c
-                )))
+                bail!("Unxpected fetched content: {:?}", c)
             }
             Err(msg) => assert_eq!(
                 msg,
@@ -1080,10 +1049,7 @@ mod tests {
         let url_with_path = xorurl_encoder.to_string();
         match safe.fetch(&url_with_path, None).await {
             Ok(c) => {
-                return Err(Error::Unexpected(format!(
-                    "Unxpected fetched content: {:?}",
-                    c
-                )))
+                bail!("Unxpected fetched content: {:?}", c)
             }
             Err(msg) => assert_eq!(
                 msg,

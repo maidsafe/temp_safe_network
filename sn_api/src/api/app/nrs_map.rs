@@ -294,7 +294,7 @@ fn parse_nrs_name(name: &str) -> Result<Vec<String>> {
     // get the TLD
     let _ = sub_names
         .pop()
-        .ok_or_else(|| Error::Unexpected("Failed to parse NRS name".to_string()))?;
+        .ok_or_else(|| Error::InvalidInput("Failed to parse NRS name".to_string()))?;
 
     Ok(sub_names)
 }
@@ -327,14 +327,13 @@ fn validate_nrs_link(link: &str) -> Result<()> {
 
 fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> Result<NrsMap> {
     let mut updated_nrs_map = nrs_map.clone();
-    let curr_sub_name = if sub_names.is_empty() {
-        let definition_data = create_public_name_description(link)?;
-        updated_nrs_map.default = DefaultRdf::OtherRdf(definition_data);
-        return Ok(updated_nrs_map);
-    } else {
-        sub_names
-            .pop()
-            .ok_or_else(|| Error::Unexpected("Failed to generate NRS Map".to_string()))?
+    let curr_sub_name = match sub_names.pop() {
+        Some(sub_name) => sub_name,
+        None => {
+            let definition_data = create_public_name_description(link)?;
+            updated_nrs_map.default = DefaultRdf::OtherRdf(definition_data);
+            return Ok(updated_nrs_map);
+        }
     };
 
     match nrs_map.sub_names_map.get(&curr_sub_name) {
@@ -370,8 +369,10 @@ fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> R
 
 fn remove_nrs_sub_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>) -> Result<(NrsMap, String)> {
     let mut updated_nrs_map = nrs_map.clone();
-    let curr_sub_name = if sub_names.is_empty() {
-        match nrs_map.get_default()? {
+
+    let curr_sub_name = match sub_names.pop() {
+        Some(sub_name) => sub_name,
+        None => match nrs_map.get_default()? {
             DefaultRdf::NotSet => {
                 return Err(Error::ContentError(
                     "Sub name not found in NRS Map Container".to_string(),
@@ -386,11 +387,7 @@ fn remove_nrs_sub_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>) -> Result<(
                 return Ok((updated_nrs_map, link));
             }
             DefaultRdf::ExistingRdf(sub_name) => sub_name.to_string(),
-        }
-    } else {
-        sub_names
-            .pop()
-            .ok_or_else(|| Error::Unexpected("Failed to generate NRS Map".to_string()))?
+        },
     };
 
     match nrs_map.sub_names_map.get(&curr_sub_name) {

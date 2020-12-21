@@ -72,7 +72,7 @@ impl Safe {
         };
 
         let serialised_value = serde_json::to_string(&value).map_err(|err| {
-            Error::Unexpected(format!(
+            Error::Serialisation(format!(
                 "Failed to serialise data to insert in Wallet container: {:?}",
                 err
             ))
@@ -205,9 +205,10 @@ impl Safe {
             debug!("{}: balance is {}", name, current_balance);
             match total_balance.checked_add(current_balance) {
                 None => {
-                    return Err(Error::Unexpected(
-                        "Failed to calculate total balance due to overflow".to_string(),
-                    ))
+                    return Err(Error::ContentError(format!(
+                        "Failed to calculate total balance due to overflow: {}",
+                        total_balance
+                    )))
                 }
                 Some(new_balance_coins) => total_balance = new_balance_coins,
             };
@@ -447,13 +448,14 @@ async fn gen_wallet_spendable_balances_list(
 
     if !default_balance.is_empty() {
         let mut default = balances.get_mut(&default_balance).ok_or_else(|| {
-            Error::Unexpected(format!(
+            Error::ContentError(format!(
                 "Failed to get default spendable balance from Wallet at \"{}\"",
                 url
             ))
         })?;
         default.0 = true;
     }
+
     Ok(balances)
 }
 
@@ -539,6 +541,7 @@ mod tests {
         app::test_helpers::{new_safe_instance, random_nrs_name},
         common::sk_to_hex,
     };
+    use anyhow::{anyhow, bail, Result};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -663,17 +666,8 @@ mod tests {
                     from_wallet_xorurl
                 )
             ),
-            Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
-            }
-            Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
-            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Transfer succeeded unexpectedly".to_string(),),
         };
 
         // invert wallets and test no default balance at wallet in <to> argument
@@ -691,13 +685,8 @@ mod tests {
                 );
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(_) => Err(Error::Unexpected(
-                "Transfer succeeded unexpectedly".to_string(),
-            )),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Transfer succeeded unexpectedly".to_string(),)),
         }
     }
 
@@ -725,17 +714,8 @@ mod tests {
             Err(Error::NetDataError(msg)) => {
                 assert!(msg.contains("Cannot send zero-value transfers"))
             }
-            Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
-            }
-            Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
-            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Transfer succeeded unexpectedly"),
         };
 
         let to_wallet_xorurl = safe.wallet_create().await?;
@@ -758,13 +738,8 @@ mod tests {
                 assert!(msg.contains("Cannot send zero-value transfers"));
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(_) => Err(Error::Unexpected(
-                "Transfer succeeded unexpectedly".to_string(),
-            )),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Transfer succeeded unexpectedly".to_string(),)),
         }
     }
 
@@ -805,17 +780,8 @@ mod tests {
                     from_wallet_xorurl
                 )
             ),
-            Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
-            }
-            Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
-            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),
         };
 
         // test fail to transfer as it's a invalid/non-numeric amount
@@ -827,17 +793,8 @@ mod tests {
                 msg,
                 "Invalid safecoins amount '.06' (Can\'t parse Money units)"
             ),
-            Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
-            }
-            Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
-            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),
         };
 
         // test successful transfer
@@ -845,10 +802,7 @@ mod tests {
             .wallet_transfer("100.4", Some(&from_wallet_xorurl), &to_wallet_xorurl)
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!("0.100000000", from_current_balance);
@@ -891,10 +845,7 @@ mod tests {
             .wallet_transfer("523.87", Some(&from_wallet_xorurl), &key_xorurl)
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!(
@@ -920,7 +871,7 @@ mod tests {
             .wallet_transfer("1", Some(&safekey_xorurl1), &safekey_xorurl2)
             .await
         {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "Transfer from SafeKey was expected to fail".to_string(),
             )),
             Err(Error::InvalidInput(msg)) => {
@@ -930,10 +881,7 @@ mod tests {
                 );
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error is not the expected one: {:?}",
-                err
-            ))),
+            Err(err) => Err(anyhow!("Error is not the expected one: {:?}", err)),
         }
     }
 
@@ -978,10 +926,7 @@ mod tests {
             .wallet_transfer("0.2", Some(&from_nrsurl), &to_nrsurl)
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_nrsurl).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
@@ -1044,17 +989,8 @@ mod tests {
                     from_spendable_balance
                 )
             ),
-            Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
-            }
-            Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
-            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),
         };
 
         // test successful transfer
@@ -1062,10 +998,7 @@ mod tests {
             .wallet_transfer("100.3", Some(&from_spendable_balance), &to_wallet_xorurl)
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_first_current_balance = safe
                     .wallet_balance(&format!("{}/from-first-balance", from_wallet_xorurl))
@@ -1129,12 +1062,7 @@ mod tests {
             .wallet_transfer("100.5", Some(&from_wallet_xorurl), &to_spendable_balance)
             .await
         {
-            Err(msg) => {
-                return Err(Error::Unexpected(format!(
-                    "Transfer was expected to succeed: {}",
-                    msg
-                )))
-            }
+            Err(msg) => bail!("Transfer was expected to succeed: {}", msg),
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!("0.200000000" /* 100.7 - 100.5 */, from_current_balance);
@@ -1237,10 +1165,7 @@ mod tests {
             .wallet_transfer("5.8", Some(&from_spendable_balance), &to_spendable_balance)
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_wallet_xorurl).await?;
                 assert_eq!(
@@ -1309,13 +1234,8 @@ mod tests {
                 );
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(_) => Err(Error::Unexpected(
-                "Transfer succeeded unexpectedly".to_string(),
-            )),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Transfer succeeded unexpectedly".to_string(),)),
         }
     }
 }

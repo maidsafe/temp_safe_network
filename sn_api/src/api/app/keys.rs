@@ -105,13 +105,14 @@ impl Safe {
             SecretKey::Bls(sk) => Keypair::from(sk),
             SecretKey::Ed25519(sk) => {
                 let bytes = sk.to_bytes();
-                let secret_key = ed25519_dalek::SecretKey::from_bytes(&bytes)
-                    .map_err(|_| Error::Unexpected("Error parsing SecretKey bytes".to_string()))?;
+                let secret_key = ed25519_dalek::SecretKey::from_bytes(&bytes).map_err(|err| {
+                    Error::InvalidInput(format!("Error parsing SecretKey bytes: {}", err))
+                })?;
                 Keypair::from(secret_key)
             }
-            _ => {
-                return Err(Error::Unexpected(
-                    "Cannot convert from BlsShare to a FullId".to_string(),
+            SecretKey::BlsShare(_) => {
+                return Err(Error::InvalidInput(
+                    "Cannot convert from BlsShare key to a Keypair".to_string(),
                 ))
             }
         };
@@ -145,8 +146,9 @@ impl Safe {
             SecretKey::Bls(sk) => Keypair::from(sk),
             SecretKey::Ed25519(sk) => {
                 let bytes = sk.to_bytes();
-                let secret_key = ed25519_dalek::SecretKey::from_bytes(&bytes)
-                    .map_err(|_| Error::Unexpected("Error parsing SecretKey bytes".to_string()))?;
+                let secret_key = ed25519_dalek::SecretKey::from_bytes(&bytes).map_err(|err| {
+                    Error::InvalidInput(format!("Error parsing SecretKey bytes: {}", err))
+                })?;
                 Keypair::from(secret_key)
             }
             _ => {
@@ -254,6 +256,7 @@ mod tests {
         app::test_helpers::{new_safe_instance, random_nrs_name},
         common::sk_to_hex,
     };
+    use anyhow::{anyhow, bail, Result};
 
     #[tokio::test]
     async fn test_keys_create_preload_test_coins() -> Result<()> {
@@ -290,9 +293,7 @@ mod tests {
                 )
             ),
             Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Key with test-coins was created unexpectedly".to_string(),
-                ))
+                bail!("Key with test-coins was created unexpectedly".to_string(),)
             }
         };
 
@@ -309,9 +310,7 @@ mod tests {
                 )
             ),
             Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Key was created unexpectedly".to_string(),
-                ))
+                bail!("Key was created unexpectedly".to_string(),)
             }
         };
 
@@ -328,9 +327,7 @@ mod tests {
                 )
             ),
             Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Key was created unexpectedly".to_string(),
-                ))
+                bail!("Key was created unexpectedly".to_string(),)
             }
         };
 
@@ -350,9 +347,7 @@ mod tests {
                 );
                 Ok(())
             }
-            Ok(_) => Err(Error::Unexpected(
-                "Key was created unexpectedly".to_string(),
-            )),
+            Ok(_) => Err(anyhow!("Key was created unexpectedly".to_string(),)),
         }
     }
 
@@ -405,14 +400,8 @@ mod tests {
                 assert!(msg.contains(&format!("Content not found at {}", invalid_xorurl)));
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(balance) => Err(Error::Unexpected(format!(
-                "Unexpected balance obtained: {:?}",
-                balance
-            ))),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(balance) => Err(anyhow!("Unexpected balance obtained: {:?}", balance)),
         }
     }
 
@@ -439,14 +428,8 @@ mod tests {
             ));
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(balance) => Err(Error::Unexpected(format!(
-                "Unexpected balance obtained: {:?}",
-                balance
-            ))),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(balance) => Err(anyhow!("Unexpected balance obtained: {:?}", balance)),
         }
     }
 
@@ -463,14 +446,8 @@ mod tests {
                 assert_eq!(msg, "The URL doesn't correspond to the public key derived from the provided secret key");
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(balance) => Err(Error::Unexpected(format!(
-                "Unexpected balance obtained: {:?}",
-                balance
-            ))),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(balance) => Err(anyhow!("Unexpected balance obtained: {:?}", balance)),
         }
     }
 
@@ -556,13 +533,8 @@ mod tests {
                 assert!(msg.contains("Cannot send zero-value transfers"));
                 Ok(())
             }
-            Err(err) => Err(Error::Unexpected(format!(
-                "Error returned is not the expected: {:?}",
-                err
-            ))),
-            Ok(_) => Err(Error::Unexpected(
-                "Transfer succeeded unexpectedly".to_string(),
-            )),
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Transfer succeeded unexpectedly".to_string(),)),
         }
     }
 
@@ -585,15 +557,10 @@ mod tests {
                 "Not enough balance for the transfer at provided source SafeKey".to_string()
             ),
             Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
+                bail!("Error returned is not the expected: {:?}", err)
             }
             Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
+                bail!("Transfer succeeded unexpectedly".to_string(),)
             }
         };
 
@@ -607,15 +574,10 @@ mod tests {
                 "Invalid safecoins amount '.06' (Can\'t parse Money units)"
             ),
             Err(err) => {
-                return Err(Error::Unexpected(format!(
-                    "Error returned is not the expected: {:?}",
-                    err
-                )))
+                bail!("Error returned is not the expected: {:?}", err)
             }
             Ok(_) => {
-                return Err(Error::Unexpected(
-                    "Transfer succeeded unexpectedly".to_string(),
-                ))
+                bail!("Transfer succeeded unexpectedly".to_string(),)
             }
         };
 
@@ -626,8 +588,8 @@ mod tests {
                 &safekey2_xorurl,
             ).await {
                     Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '0.0000000009', the minimum possible amount is one nano coin (0.000000001)"),
-                    Err(err) => return Err(Error::Unexpected(format!("Error returned is not the expected: {:?}", err))),
-                    Ok(_) => return Err(Error::Unexpected("Transfer succeeded unexpectedly".to_string())),
+                    Err(err) => bail!("Error returned is not the expected: {:?}", err),
+                    Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),
             };
 
         // test successful transfer
@@ -635,10 +597,7 @@ mod tests {
             .keys_transfer("100.4", Some(&from_sk2_hex), &safekey1_xorurl)
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_current_balance = safe
                     .keys_balance_from_sk(Arc::new(keypair2.secret_key()?))
@@ -675,10 +634,7 @@ mod tests {
             .keys_transfer("523.87", Some(&sk2_hex), &to_wallet_xorurl.clone())
             .await
         {
-            Err(msg) => Err(Error::Unexpected(format!(
-                "Transfer was expected to succeed: {}",
-                msg
-            ))),
+            Err(msg) => Err(anyhow!("Transfer was expected to succeed: {}", msg)),
             Ok(_) => {
                 let from_current_balance = safe
                     .keys_balance_from_sk(Arc::new(keypair2.secret_key()?))

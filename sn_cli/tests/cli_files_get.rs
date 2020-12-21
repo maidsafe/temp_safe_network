@@ -20,7 +20,8 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use sn_api::{xorurl::XorUrlEncoder, Error, Result, Safe};
+use anyhow::Result;
+use sn_api::{xorurl::XorUrlEncoder, Safe};
 use sn_cmd_test_utilities::{
     can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
     create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
@@ -1164,7 +1165,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     println!("FileContainer: {}", files_container_xor);
 
     // downloaded tree should match src tree after sync.
-    assert_eq!(sum_tree(&symlinks_dir), sum_tree(&dest));
+    assert_eq!(sum_tree(&symlinks_dir)?, sum_tree(&dest)?);
 
     remove_dest(&tmp_dir)?;
 
@@ -1273,7 +1274,7 @@ fn join_url_paths(path: &[&str]) -> String {
 fn source_path(url: &str, path: &[&str]) -> Result<String> {
     let pb = path.join("/");
 
-    let x = XorUrlEncoder::from_url(&url).map_err(|e| format!("{:#?}", e))?;
+    let x = XorUrlEncoder::from_url(&url)?;
 
     let url = format!(
         "{}://{}/{}{}{}",

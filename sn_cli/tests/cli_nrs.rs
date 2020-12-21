@@ -90,7 +90,7 @@ fn calling_safe_nrs_twice_w_name_fails() -> Result<()> {
 fn calling_safe_nrs_put_folder_and_fetch() -> Result<()> {
     let test_name = format!("safe://{}", get_random_nrs_string());
 
-    let (container_xorurl, _map) = upload_test_folder()?;
+    let (container_xorurl, _map) = upload_test_folder(true)?;
 
     let cat_of_filesmap = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &container_xorurl)
         .read()
@@ -141,7 +141,7 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
     let test_name1 = format!("safe://a.b.c.{}", nrs_name);
     let test_name2 = format!("safe://b.c.{}", nrs_name);
 
-    let (container_xorurl, _map) = upload_test_folder()?;
+    let (container_xorurl, _map) = upload_test_folder(true)?;
     let mut xorurl_encoder = XorUrlEncoder::from_url(&container_xorurl)?;
     xorurl_encoder.set_path("/test.md");
     let link = xorurl_encoder.to_string();
@@ -185,7 +185,7 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
 
 #[test]
 fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
-    let (container_xorurl, _map) = upload_test_folder()?;
+    let (container_xorurl, _map) = upload_test_folder(true)?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://subname.{}", &test_name);
@@ -245,7 +245,7 @@ fn calling_safe_nrs_put_folder_and_fetch_from_subname() -> Result<()> {
 
 #[test]
 fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
-    let (container_xorurl, _map) = upload_test_folder()?;
+    let (container_xorurl, _map) = upload_test_folder(true)?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -305,7 +305,7 @@ fn calling_safe_nrs_put_and_retrieve_many_subnames() -> Result<()> {
 
 #[test]
 fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Result<()> {
-    let (_container_xorurl, file_map) = upload_test_folder()?;
+    let (_container_xorurl, file_map) = upload_test_folder(true)?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -381,7 +381,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
 
 #[test]
 fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result<()> {
-    let (_container_xorurl, file_map) = upload_test_folder()?;
+    let (_container_xorurl, file_map) = upload_test_folder(true)?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
@@ -451,7 +451,7 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
 
 #[test]
 fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve() -> Result<()> {
-    let (_container_xorurl, file_map) = upload_test_folder()?;
+    let (_container_xorurl, file_map) = upload_test_folder(true)?;
 
     let test_name = get_random_nrs_string();
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);

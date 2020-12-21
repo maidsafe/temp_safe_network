@@ -1340,6 +1340,7 @@ impl fmt::Display for SafeUrl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::{anyhow, bail, Result};
 
     #[test]
     fn test_safeurl_new_validation() -> Result<()> {
@@ -1366,9 +1367,7 @@ mod tests {
         .expect_err(msg);
         match result {
             Error::InvalidMediaType(e) => assert!(e.contains("You can use 'SafeContentType::Raw'")),
-            _ => {
-                return Err(Error::Unexpected(wrong_err.to_string()));
-            }
+            _ => bail!(wrong_err.to_string()),
         }
 
         // test: "nrs_name cannot be empty string."
@@ -1647,17 +1646,17 @@ mod tests {
             "safe://heyyynunctugo4ucp3a8radnctugo4ucp3a8radnctugo4ucp3a8radnctmfp5zq75zq75zq7";
 
         match SafeUrl::from_xorurl(xorurl) {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "Unexpectedly parsed an invalid (too long) xorurl".to_string(),
             )),
             Err(Error::InvalidXorUrl(msg)) => {
                 assert!(msg.starts_with("Invalid XOR-URL, encoded string too long"));
                 Ok(())
             }
-            other => Err(Error::Unexpected(format!(
+            other => Err(anyhow!(
                 "Error returned is not the expected one: {:?}",
                 other
-            ))),
+            )),
         }
     }
 
@@ -1672,17 +1671,17 @@ mod tests {
 
         let len = xorurl.len() - 1;
         match SafeUrl::from_xorurl(&xorurl[..len]) {
-            Ok(_) => Err(Error::Unexpected(
+            Ok(_) => Err(anyhow!(
                 "Unexpectedly parsed an invalid (too short) xorurl".to_string(),
             )),
             Err(Error::InvalidXorUrl(msg)) => {
                 assert!(msg.starts_with("Invalid XOR-URL, encoded string too short"));
                 Ok(())
             }
-            other => Err(Error::Unexpected(format!(
+            other => Err(anyhow!(
                 "Error returned is not the expected one: {:?}",
                 other
-            ))),
+            )),
         }
     }
 
@@ -1987,7 +1986,7 @@ mod tests {
         let result = SafeUrl::from_xorurl("safe://invalidxor").expect_err(msg);
         match result {
             Error::InvalidXorUrl(e) => assert!(e.contains("Failed to decode XOR-URL")),
-            _ => return Err(Error::Unexpected(wrong_err)),
+            _ => bail!(wrong_err),
         }
 
         // test: xorurl with a space in it
@@ -1998,7 +1997,7 @@ mod tests {
         println!("{:#?}", result);
         match result {
             Error::InvalidXorUrl(e) => assert!(e.contains("invalid domain character")),
-            _ => return Err(Error::Unexpected(wrong_err)),
+            _ => bail!(wrong_err),
         }
 
         // note: too long/short have separate tests already.

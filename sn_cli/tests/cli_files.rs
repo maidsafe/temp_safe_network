@@ -12,15 +12,15 @@ extern crate sn_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
+use anyhow::Result;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::xorurl::XorUrlEncoder;
-use sn_api::{Error, Result};
 use sn_cmd_test_utilities::{
     create_nrs_link, get_random_nrs_string, mk_emptyfolder, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_files_tree_output, read_cmd, safe_cmd_stderr,
-    safe_cmd_stdout, test_symlinks_are_valid, upload_test_symlinks_folder,
-    upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
+    parse_files_put_or_sync_output, parse_files_tree_output, safe_cmd_stderr, safe_cmd_stdout,
+    test_symlinks_are_valid, upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
+    upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{
     env,
@@ -76,8 +76,7 @@ fn calling_safe_files_put_dry_run() -> Result<()> {
         "--json",
         "--dry-run"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (_container_xorurl, map) = parse_files_put_or_sync_output(&content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
@@ -110,8 +109,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
         "/aha",
         "--recursive",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -127,8 +125,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(file_cat, "hello tests!");
 
     xorurl_encoder.set_path("/aha/subfolder/subexists.md");
@@ -137,8 +134,7 @@ fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(subfile_cat, "hello from a subfolder!");
     Ok(())
 }
@@ -193,8 +189,7 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
         TEST_FOLDER,
         "--recursive"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -210,8 +205,7 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(file_cat, "hello tests!");
 
     let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor)?;
@@ -221,8 +215,7 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(subfile_cat, "hello from a subfolder!");
     Ok(())
 }
@@ -236,8 +229,7 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
         TEST_FOLDER_NO_TRAILING_SLASH,
         "--recursive"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -253,8 +245,7 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(file_cat, "hello tests!");
 
     let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor)?;
@@ -264,8 +255,7 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(subfile_cat, "hello from a subfolder!");
     Ok(())
 }
@@ -279,8 +269,7 @@ fn calling_safe_files_sync() -> Result<()> {
         TEST_FOLDER,
         "--recursive"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let mut lines = files_container.lines();
     let files_container_xor_line = lines
@@ -297,8 +286,7 @@ fn calling_safe_files_sync() -> Result<()> {
         files_container_xor,
         "--recursive"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor)?;
     xorurl_encoder.set_path("/subexists.md");
@@ -308,8 +296,7 @@ fn calling_safe_files_sync() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(synced_file_cat, "hello from a subfolder!");
     Ok(())
 }
@@ -323,8 +310,7 @@ fn calling_safe_files_sync_dry_run() -> Result<()> {
         TEST_FOLDER,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content);
     let mut target = XorUrlEncoder::from_url(&container_xorurl)?;
@@ -342,8 +328,7 @@ fn calling_safe_files_sync_dry_run() -> Result<()> {
         "--json",
         "--dry-run"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (_, map) = parse_files_put_or_sync_output(&sync_content);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
@@ -363,8 +348,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         "--recursive",
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(Error::Unknown)?;
 
@@ -387,8 +371,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         "--dry-run",
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     xorurl_encoder.set_content_version(Some(1));
     let files_container_v1 = xorurl_encoder.to_string();
@@ -402,8 +385,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         &files_container_xor,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
     assert_eq!(xorurl, files_container_xor);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -419,8 +401,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         "--delete",
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| Error::Unknown(e.to_string()))?;
@@ -437,8 +418,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
         &xorurl_encoder.to_string(),
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (xorurl, files_map) = parse_files_container_output(&synced_file_cat);
     assert_eq!(xorurl, xorurl_encoder.to_string());
@@ -455,8 +435,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
         TEST_FOLDER_SUBFOLDER,
         "--recursive"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let file_to_delete = format!("{}/sub2.md", TEST_FOLDER_SUBFOLDER);
     let file_to_modify = format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER);
@@ -491,8 +470,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
         "--recursive",
         // "--delete"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let mut xorurl_encoder = XorUrlEncoder::from_url(&files_container_xor)?;
     xorurl_encoder.set_path("/subexists.md");
@@ -502,8 +480,7 @@ fn calling_safe_files_put_recursive_with_slash_then_sync_after_modifications() -
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     // remove modified lines
     let mut replace_test_md = OpenOptions::new()
@@ -550,8 +527,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         "--recursive",
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(Error::Unknown)?;
 
@@ -572,8 +548,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         "--delete",
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| Error::Unknown(e.to_string()))?;
@@ -591,8 +566,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         &files_container_v1,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
@@ -606,8 +580,7 @@ fn calling_files_sync_and_fetch_with_version() -> Result<()> {
         &files_container_v0,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v0);
     assert_eq!(xorurl, files_container_v0);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -624,8 +597,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         "--recursive",
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -645,8 +617,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         "-l",
         &files_container_v0,
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(Error::Unknown)?;
 
@@ -661,8 +632,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         "--json",
         "--update-nrs"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| Error::Unknown(e.to_string()))?;
@@ -674,9 +644,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
 
     // now everything should be gone in version 1
     // since NRS name was updated to link version 1 of the FilesContainer
-    let cat_nrsurl_v1 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json")
-        .read()
-        .map_err(|e| Error::Unknown(e.to_string()))?;
+    let cat_nrsurl_v1 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json").read()?;
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v1);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), 0);
@@ -684,9 +652,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
     // but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
     // where all files should still be there
     let nrsurl_v0 = format!("{}?v=0", nrsurl);
-    let cat_nrsurl_v0 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl_v0, "--json")
-        .read()
-        .map_err(|e| Error::Unknown(e.to_string()))?;
+    let cat_nrsurl_v0 = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl_v0, "--json").read()?;
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl_v0);
     assert_eq!(xorurl, nrsurl_v0);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -703,8 +669,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         "--recursive",
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -723,8 +688,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         "-l",
         &files_container_v0,
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let emptyfolder_paths = mk_emptyfolder("emptyfolder").map_err(Error::Unknown)?;
 
@@ -738,8 +702,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         "--delete",
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     // cleanup
     fs::remove_dir_all(&emptyfolder_paths.0).map_err(|e| Error::Unknown(e.to_string()))?;
@@ -758,17 +721,14 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
         &files_container_v1,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     let (xorurl, files_map) = parse_files_container_output(&cat_container_v1);
     assert_eq!(xorurl, files_container_v1);
     assert_eq!(files_map.len(), 0);
 
     // but the NRS name should still link to version 0 of the FilesContainer
     // where all files should still be there
-    let cat_nrsurl = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json")
-        .read()
-        .map_err(|e| Error::Unknown(e.to_string()))?;
+    let cat_nrsurl = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &nrsurl, "--json").read()?;
     let (xorurl, files_map) = parse_files_container_output(&cat_nrsurl);
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), EXPECT_TESTDATA_PUT_CNT);
@@ -785,8 +745,7 @@ fn calling_safe_files_add() -> Result<()> {
         "--recursive",
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (files_container_xor, _processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -800,8 +759,7 @@ fn calling_safe_files_add() -> Result<()> {
         TEST_FILE,
         &format!("{}/new_test.md", xorurl_encoder),
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     xorurl_encoder.set_path("/new_test.md");
     let synced_file_cat = cmd!(
@@ -809,8 +767,7 @@ fn calling_safe_files_add() -> Result<()> {
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(synced_file_cat, "hello tests!");
     Ok(())
 }
@@ -825,8 +782,7 @@ fn calling_safe_files_add_dry_run() -> Result<()> {
         "--recursive",
         "--json",
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container_output);
 
@@ -840,11 +796,10 @@ fn calling_safe_files_add_dry_run() -> Result<()> {
         &format!("{}/new_test.md", xorurl_encoder),
         "--dry-run"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     xorurl_encoder.set_path("/new_test.md");
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI)?;
     cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
         .assert()
         .failure();
@@ -861,8 +816,7 @@ fn calling_safe_files_add_a_url() -> Result<()> {
         "--recursive",
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -878,16 +832,14 @@ fn calling_safe_files_add_a_url() -> Result<()> {
         &xorurl_encoder.to_string(),
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let synced_file_cat = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "cat",
         xorurl_encoder.to_string()
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
     assert_eq!(synced_file_cat, "hello tests!");
     Ok(())
 }
@@ -902,8 +854,7 @@ fn calling_files_ls() -> Result<()> {
         "--recursive",
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output);
@@ -919,8 +870,7 @@ fn calling_files_ls() -> Result<()> {
         &container_xorurl_no_version,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     // Sample output:
     //
@@ -968,8 +918,7 @@ fn calling_files_ls() -> Result<()> {
         &subfolder_path,
         "--json"
     )
-    .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .read()?;
 
     let (xorurl, files_map) = parse_files_container_output(&files_ls_output);
     assert_eq!(xorurl, subfolder_path);
@@ -1024,13 +973,14 @@ fn calling_files_ls_on_single_file() -> Result<()> {
     xorurl_encoder.set_path("/subfolder/sub2.md");
     let single_file_url = xorurl_encoder.to_string();
 
-    let files_ls_output = read_cmd(cmd!(
+    let files_ls_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "ls",
         &single_file_url,
         "--json"
-    ))?;
+    )
+    .read()?;
 
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
     assert_eq!(files_map.len(), 1);
@@ -1061,13 +1011,8 @@ fn calling_files_ls_on_nrs_with_path() -> Result<()> {
     nrsurl_encoder.set_path("/subfolder");
     let nrsurl = nrsurl_encoder.to_string();
 
-    let files_ls_output = read_cmd(cmd!(
-        env!("CARGO_BIN_EXE_safe"),
-        "files",
-        "ls",
-        &nrsurl,
-        "--json"
-    ))?;
+    let files_ls_output =
+        cmd!(env!("CARGO_BIN_EXE_safe"), "files", "ls", &nrsurl, "--json").read()?;
 
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output);
     assert_eq!(files_map.len(), 2);
@@ -1138,13 +1083,14 @@ fn calling_files_tree() -> Result<()> {
     xorurl_encoder.set_content_version(None);
     let container_xorurl_no_version = xorurl_encoder.to_string();
 
-    let files_tree_output = read_cmd(cmd!(
+    let files_tree_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "tree",
         &container_xorurl_no_version,
         "--json"
-    ))?;
+    )
+    .read()?;
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);
@@ -1161,12 +1107,13 @@ fn calling_files_tree() -> Result<()> {
     assert_eq!(root["sub"][5]["sub"][1]["name"], "subexists.md");
     assert_eq!(root["sub"][6]["name"], "test.md");
 
-    let files_tree_output = read_cmd(cmd!(
+    let files_tree_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "tree",
         &container_xorurl_no_version
-    ))?;
+    )
+    .read()?;
 
     let should_match = format!(
         "{}\n{}",
@@ -1188,14 +1135,15 @@ fn calling_files_tree() -> Result<()> {
     );
     assert_eq!(files_tree_output, should_match);
 
-    let files_tree_output = read_cmd(cmd!(
+    let files_tree_output = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "files",
         "tree",
         &container_xorurl_no_version,
         "--details",
         "--json",
-    ))?;
+    )
+    .read()?;
 
     let root = parse_files_tree_output(&files_tree_output);
     assert_eq!(root["name"], container_xorurl_no_version);

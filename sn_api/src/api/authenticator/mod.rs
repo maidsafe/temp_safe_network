@@ -507,6 +507,7 @@ impl SafeAuthenticator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::{Context, Result};
     use proptest::prelude::*;
     use sn_data_types::PublicKey;
 
@@ -521,7 +522,7 @@ mod tests {
         ];
 
         let ed_pk = ed25519_dalek::PublicKey::from_bytes(&public_key_bytes)
-            .map_err(|_| Error::Unexpected("Cannot deserialise expected key".to_string()))?;
+            .with_context(|| "Cannot deserialise expected key".to_string())?;
         let expected_pk = PublicKey::from(ed_pk);
 
         assert_eq!(pk, expected_pk);
