@@ -19,9 +19,9 @@
 
 ## Description
 
-This crate implements a Safe Authenticator service which runs as a daemon (or as a service in Windows platforms).
+This crate implements a Safe Authenticator service which runs as a daemon.
 
-The `sn_authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create Safe Network accounts, log in using an existing account's credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
+The `sn_authd` exposes its services as a [JSON-RPC](https://www.jsonrpc.org/) interface, over [QUIC](https://en.wikipedia.org/wiki/QUIC), allowing applications and users to connect to create Safes, unlock it using its credentials (passphrase and password), authorise applications which need to store data on the network on behalf of the user, as well as revoke permissions previously granted to applications.
 
 It keeps in memory a list of authorisation requests pending of approval/denial, as well as the list of the registered subscribers that the notifications shall be sent to.
 
@@ -101,7 +101,7 @@ If otherwise you prefer to build the Safe Authenticator daemon from source code,
 
 ## Build
 
-In order to build this application from source code you need to make sure you have `rustc v1.44.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
+In order to build this application from source code you need to make sure you have `rustc v1.48.0` (or higher) installed. Please take a look at this [notes about Rust installation](https://www.rust-lang.org/tools/install) if you need help with installing it. We recommend you install it with `rustup` which will install the `cargo` tool which this guide makes use of.
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `sn_authd` (the build process may take several minutes the first time you run it on this crate):
 ```shell

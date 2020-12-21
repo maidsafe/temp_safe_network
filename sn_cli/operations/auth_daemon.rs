@@ -345,7 +345,7 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
                 the_password = json.password;
             }
         } else {
-            // Prompt the user for the Safe account credentials
+            // Prompt the user for the Safe's credentials
             the_passphrase = prompt_sensitive(None, "Passphrase: ")
                 .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
             the_password = prompt_sensitive(None, "Password: ")

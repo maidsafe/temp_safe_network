@@ -25,7 +25,7 @@ pub enum WalletSubCommands {
     Insert {
         /// The target Wallet to insert the spendable balance
         target: String,
-        /// The secret key of a SafeKey for paying the operation costs. If not provided, the default wallet from the account will be used
+        /// The secret key of a SafeKey for paying the operation costs. If not provided, the application's default wallet will be used
         #[structopt(short = "w", long = "pay-with")]
         pay_with: Option<String>,
         /// Pass the secret key needed to make the balance spendable, it will be prompted if not provided

@@ -25,7 +25,7 @@ pub enum KeysSubCommands {
     #[structopt(name = "create")]
     /// Create a new SafeKey
     Create {
-        /// The secret key of a SafeKey for paying the operation costs. If not provided, the default wallet from the account will be used, unless '--test-coins' was set
+        /// The secret key of a SafeKey for paying the operation costs. If not provided, the application's default wallet will be used, unless '--test-coins' was set
         #[structopt(short = "w", long = "pay-with")]
         pay_with: Option<String>,
         /// Create a SafeKey and allocate test-coins onto it
@@ -56,7 +56,7 @@ pub enum KeysSubCommands {
     Transfer {
         /// Number of safecoins to transfer
         amount: String,
-        /// Source SafeKey's secret key, or funds from Account's default SafeKey will be used
+        /// Source SafeKey's secret key, or funds from the application's default SafeKey will be used
         #[structopt(long = "from")]
         from: Option<String>,
         /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
@@ -195,7 +195,7 @@ pub async fn create_new_key(
 
         // '--pay-with' is either a Wallet XOR-URL, or a secret key
         // TODO: support Wallet XOR-URL, we now support only secret key
-        // If the --pay-with is not provided the API will use the account's default wallet/sk
+        // If the --pay-with is not provided the API will use the application's default wallet/sk
         let (xorurl, key_pair) = match pay_with {
             Some(payee) => {
                 safe.keys_create_and_preload_from_sk_string(&payee, &amount)

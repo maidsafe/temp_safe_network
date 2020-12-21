@@ -30,7 +30,7 @@ pub mod auth_types {
         pub vendor: String,
     }
 
-    // Type of the list of authorised applications in a SAFE account
+    // Type of the list of authorised applications in a Safe
     pub type AuthedAppsList = Vec<AuthedApp>;
 }
 

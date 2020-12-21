@@ -132,7 +132,7 @@ impl SafeAuthenticator {
     /// If the Safe is successfully created it keeps the logged in session (discarding a previous session)
     ///
     /// Note: This does _not_ perform any strength checks on the
-    /// strings used to create the account.
+    /// strings used to create the Safe.
     ///
     /// ## Example
     /// ```ignore
@@ -154,13 +154,13 @@ impl SafeAuthenticator {
     ///```
     ///
     /// ## Error Example
-    /// If an account with same passphrase already exists,
+    /// If a Safe with same passphrase already exists,
     /// the function will return an error:
     /// ```ignore
     /// use sn_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account's passphrase and password:
+    /// /// Using an already existing Safe's passphrase and password:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
@@ -172,7 +172,7 @@ impl SafeAuthenticator {
     /// match acc_not_created {
     ///    Ok(_) => assert!(false), // This should not pass
     ///    Err(Error::AuthError(message)) => {
-    ///         assert!(message.contains("Failed to create an account"));
+    ///         assert!(message.contains("Failed to create a Safe"));
     ///    }
     ///    Err(_) => assert!(false), // This should not pass
     /// }
@@ -243,7 +243,7 @@ impl SafeAuthenticator {
     /// use sn_api::SafeAuthenticator;
     /// let mut safe_auth = SafeAuthenticator::new(None);
     /// # fn random_str() -> String { (0..4).map(|_| rand::random::<char>()).collect() }
-    /// /// Using an already existing account's passphrase and password:
+    /// /// Using an already existing Safe's passphrase and password:
     /// let my_secret = "mysecretstring";
     /// let my_password = "mypassword";
     /// # let my_secret = &(random_str());
@@ -260,7 +260,7 @@ impl SafeAuthenticator {
     ///```
     ///
     /// ## Error Example
-    /// If the account does not exist, the function will return an appropriate error:
+    /// If the Safe does not exist, the function will return an appropriate error:
     ///```ignore
     /// use sn_api::{SafeAuthenticator, Error};
     /// let mut safe_auth = SafeAuthenticator::new(None);

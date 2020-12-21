@@ -214,13 +214,13 @@ Success, all processes instances of sn_node were stopped!
 
 ##### Run a local network for testing: `--test`
 
-The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new account and log in the CLI for test purposes. This requires that the `node`, `authd` and `cli` themselves be installed in the correct locations on the system
+The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new Safe and authorise the CLI for test purposes. This requires that the `node`, `authd` and `cli` themselves be installed in the correct locations on the system
 
 #### Connect to a shared network
 
 Ready to play your part in a shared network by adding your node from home to a single section with other people's nodes? Keep reading...
 
-MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your node joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create an account on this network, log in, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
+MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your node joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create a Safe on this network, unlock it, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
 
 You will need the network configuration containing the details of the hardcoded contacts that will bootstrap you to the shared section. If you have connected to this or previous iterations of the MaidSafe shared section then you may already have a `shared-section` network profile saved on your machine. You can confirm this and update it to the latest configuration using `safe networks check`:
 ```shell
@@ -244,7 +244,7 @@ $ safe networks switch shared-section
 Switching to 'shared-section' network...
 Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
 Successfully switched to 'shared-section' network in your system!
-If you need write access to the 'shared-section' network, you'll need to restart authd, log in and re-authorise the CLI again
+If you need write access to the 'shared-section' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
 ```
 
 We're now ready to launch our node and add it as a node. This is achieved using `safe node join` as follows:
@@ -300,7 +300,7 @@ $ safe networks switch shared-section
 Switching to 'shared-section' network...
 Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
 Successfully switched to 'shared-section' network in your system!
-If you need write access to the 'shared-section' network, you'll need to restart authd, log in and re-authorise the CLI again
+If you need write access to the 'shared-section' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
 ```
 
 Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your current setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
@@ -369,7 +369,7 @@ Sending request to authd to obtain a status report...
 +------------------------------------------+-------+
 | Authenticator daemon version             | 0.0.3 |
 +------------------------------------------+-------+
-| Logged in to a Safe account?             | No    |
+| Is there a Safe currently unlocked?      | No    |
 +------------------------------------------+-------+
 | Number of pending authorisation requests | 0     |
 +------------------------------------------+-------+
@@ -381,7 +381,7 @@ Sending request to authd to obtain a status report...
 
 Since we now have our Safe Authenticator running and ready to accept requests, we can start interacting with it by using other Safe CLI `auth` subcommands.
 
-In order to create a Safe on the network, we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating an account. We can do so by passing `--test-coins` flag to the `create` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
+In order to create a Safe on the network, we need some `safecoins` to pay with. Since this is still under development, we can have the CLI to generate some test-coins and use them for paying the cost of creating a Safe. We can do so by passing `--test-coins` flag to the `create` subcommand. The CLI will request us to enter a passphrase and password for the new account to be created:
 ```shell
 $ safe auth create --test-coins
 Passphrase:
@@ -432,15 +432,14 @@ The Safe Authenticator is now ready to receive authorisation requests from any S
 
 ##### Passing credentials from a config file
 
-It's possible (though not secure) to use a simple json file to pass the passphrase and password to the auth commands, and so avoid having to manually input both, either when creating an account or when logging in.
+It's possible (though not secure) to use a simple json file to pass the passphrase and password to the auth commands, and so avoid having to manually input both, either when creating a Safe or when unlocking it. E.g., having a file named `my-config.json` with:
 ```
-// my-config.json
 {
-  "passphrase": "mypassphrase"
-  "password": "mypassword",
+  "passphrase": "mypassphrase",
+  "password": "mypassword"
 }
 ```
-And so you can log in with:
+And so you can unlock the Safe with:
 ```shell
 $ safe auth unlock --config ./my-config.json
 Sending action request to authd to unlock the Safe...
@@ -451,7 +450,7 @@ Safe unlocked successfully
 
 Another method for passing passphrase/password involves using the environment variables `SAFE_AUTH_PASSPHRASE` and `SAFE_AUTH_PASSWORD`.
 
-With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then log in without needing to enter unlock details, or pass a config file:
+With those set (eg, on Linux/macOS: `export SAFE_AUTH_PASSPHRASE="<your passphrase>;"`, and `export SAFE_AUTH_PASSWORD="<your password>"`), you can then unlock a Safe without needing to enter this information, or pass a config file:
 ```shell
 $ safe auth unlock
 Sending action request to authd to unlock the Safe...
@@ -525,7 +524,7 @@ We are now ready to start using the CLI to operate with the network, via its com
 
 It could be the case the Safe CLI is the only Safe application that the user is intended to use to interact with the Safe Network. In such a case authorising the CLI application as explained above (when there is no other UI for the `authd`) using another instance of the CLI in a second console is not that comfortable.
 
-Therefore there is an option which allows the Safe CLI to automatically self authorise when the user logs in using the CLI, which is as simple as:
+Therefore there is an option which allows the Safe CLI to automatically self authorise when the user unlocks a Safe using the CLI, which is as simple as:
 ```shell
 $ safe auth unlock --self-auth
 Passphrase:
@@ -649,7 +648,7 @@ Public Key = b62c1e4e3544a1f64212fca89046df98d998ea615e84c4348c4b5fd29c07ad52a97
 Secret Key = c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 ```
 
-Once we have some `SafeKey`s with some test-coins we can use them to pay for the creation of a Safe Account (using the [Safe Authenticator](https://github.com/maidsafe/safe-authenticator-cli)), or to pay for the creation of new `SafeKey`s. Thus if we use the `SafeKey` we just created with test-coins we can create a second `SafeKey`:
+Once we have some `SafeKey`s with some test-coins we can use them to pay for the creation of a Safe (using the [Safe Authenticator](https://github.com/maidsafe/safe-authenticator-cli)), or to pay for the creation of new `SafeKey`s. Thus if we use the `SafeKey` we just created with test-coins we can create a second `SafeKey`:
 ```shell
 $ safe keys create --preload 8.15 --pay-with c4cc596d7321a3054d397beff82fe64f49c3896a07a349d31f29574ac9f56965
 New SafeKey created at: "safe://bbkulcbf2uuqwawvuonevraqa4ieu375qqrdpwvzi356edwkdjhwgd4dum"
@@ -816,8 +815,8 @@ OPTIONS:
                                   The corresponding secret key will be prompted if not provided with '--sk'
         --name <name>             The name to give this spendable balance
     -o, --output <output_fmt>     Output data serialisation. Currently only supported 'json'
-    -w, --pay-with <pay_with>     The secret key of a SafeKey for paying the operation costs. If not provided, the default
-                                  wallet from the account will be used
+    -w, --pay-with <pay_with>     The secret key of a SafeKey for paying the operation costs. If not provided, the application's
+                                  default wallet will be used
         --sk <secret>             Pass the secret key needed to make the balance spendable, it will be prompted if not
                                   provided
         --xorurl <xorurl_base>    Base encoding to be used for XOR-URLs generated. Currently supported: base32z

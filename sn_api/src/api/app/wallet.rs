@@ -307,7 +307,7 @@ impl Safe {
         // Parse and validate the amount is valid
         let amount_coins = parse_coins_amount(amount)?;
 
-        // 'from_url' is not optional until we know the account's default Wallet
+        // 'from_url' is not optional until we know the client's default Wallet
         let (from_wallet_url, from_xorurl_encoder, from_nrs_xorurl_encoder) = match from_url {
             Some(url) => {
                 // Check if 'from_url' is a valid Wallet URL
@@ -326,7 +326,7 @@ impl Safe {
                 }
             }
             None => Err(Error::InvalidInput(
-                "A 'from_url' Wallet is required until a default Wallet has been configured in the Account, which is currently not supported/possible."
+                "A 'from_url' Wallet is required until a default Wallet has been configured for the application, which is currently not supported/possible."
                     .to_string(),
             )),
         }?;
@@ -1280,11 +1280,11 @@ mod tests {
     #[tokio::test]
     async fn test_wallet_transfer_from_not_owned_wallet() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let account1_wallet_xorurl = safe.wallet_create().await?;
+        let source_wallet_xorurl = safe.wallet_create().await?;
         let (key_xorurl, key_pair) = safe.keys_create_preload_test_coins("100.5").await?;
         let sk_hex = sk_to_hex(key_pair.secret_key()?);
         safe.wallet_insert(
-            &account1_wallet_xorurl,
+            &source_wallet_xorurl,
             Some("my-first-balance"),
             true, // set --default
             &sk_hex,
@@ -1296,7 +1296,7 @@ mod tests {
 
         // test fail to transfer from a not owned wallet in <from> argument
         match another_safe
-            .wallet_transfer("0.2", Some(&account1_wallet_xorurl), &key_xorurl)
+            .wallet_transfer("0.2", Some(&source_wallet_xorurl), &key_xorurl)
             .await
         {
             Err(Error::AccessDenied(msg)) => {
@@ -1304,7 +1304,7 @@ mod tests {
                     msg,
                     format!(
                         "Couldn't read source Wallet for the transfer at \"{}\"",
-                        account1_wallet_xorurl
+                        source_wallet_xorurl
                     )
                 );
                 Ok(())
