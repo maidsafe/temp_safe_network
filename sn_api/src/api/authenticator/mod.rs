@@ -195,7 +195,7 @@ impl SafeAuthenticator {
 
         if existing_balance != Money::from_nano(0) {
             return Err(Error::AuthenticatorError(
-                "Client already data exists".to_string(),
+                "Client data already exists".to_string(),
             ));
         }
 
