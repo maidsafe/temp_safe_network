@@ -57,6 +57,9 @@ pub enum NodeSubCommands {
         /// Interval in seconds between launching each of the nodes
         #[structopt(short = "i", long, default_value = "1")]
         interval: u64,
+        /// Number of nodes to be launched
+        #[structopt(short = "n", long = "nodes", default_value = "11")]
+        num_of_nodes: u8,
         /// IP to be used to launch the local nodes.
         #[structopt(long = "ip")]
         ip: Option<String>,
@@ -142,6 +145,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
             node_path,
             verbosity,
             interval,
+            num_of_nodes,
             ip,
             test,
         }) => node_run(
@@ -149,6 +153,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
             NODES_DATA_FOLDER,
             verbosity,
             &interval.to_string(),
+            &num_of_nodes.to_string(),
             ip,
             test,
         ),

@@ -78,6 +78,7 @@ pub fn node_run(
     nodes_dir: &str,
     verbosity: u8,
     interval: &str,
+    num_of_nodes: &str,
     ip: Option<String>,
     test: bool,
 ) -> Result<(), String> {
@@ -108,8 +109,10 @@ pub fn node_run(
         "--nodes-dir",
         &arg_nodes_dir,
         "--interval",
-        &interval,
+        interval,
         "--local",
+        "--num-nodes",
+        num_of_nodes,
     ];
 
     let interval_as_int = &interval.parse::<u64>().unwrap();

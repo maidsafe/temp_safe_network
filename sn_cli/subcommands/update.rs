@@ -8,12 +8,15 @@
 // Software.
 
 use log::debug;
+use std::error::Error;
 
-pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
+const REPO_NAME: &str = "sn_api";
+
+pub fn update_commander() -> Result<(), Box<dyn Error>> {
     let target = self_update::get_target();
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
-        .repo_name("sn_cli")
+        .repo_name(REPO_NAME)
         .with_target(&target)
         .build()?
         .fetch()?;
@@ -30,7 +33,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
         };
         let status = self_update::backends::github::Update::configure()
             .repo_owner("maidsafe")
-            .repo_name("sn_cli")
+            .repo_name(REPO_NAME)
             .target(&target)
             .bin_name(&bin_name)
             .show_download_progress(true)
