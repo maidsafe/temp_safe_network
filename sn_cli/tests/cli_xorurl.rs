@@ -12,11 +12,11 @@ extern crate sn_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
+use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::xorurl::XorUrlEncoder;
-use sn_api::{Error, Result};
-use sn_cmd_test_utilities::{parse_xorurl_output, CLI, SAFE_PROTOCOL};
+use sn_cmd_test_utilities::{parse_xorurl_output, xorurl_encoder_from, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 
 const TEST_FILE: &str = "../testdata/test.md";
@@ -24,7 +24,7 @@ const TEST_FOLDER: &str = "../testdata/";
 
 #[test]
 fn calling_safe_xorurl() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["xorurl", TEST_FILE])
         .assert()
         .stdout(predicate::str::contains("1 file/s processed"))
@@ -36,7 +36,7 @@ fn calling_safe_xorurl() -> Result<()> {
 
 #[test]
 fn calling_safe_xorurl_recursive() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["xorurl", TEST_FOLDER, "--recursive"])
         .assert()
         .stdout(predicate::str::contains("11 file/s processed"))
@@ -50,11 +50,11 @@ fn calling_safe_xorurl_recursive() -> Result<()> {
 fn calling_safe_xorurl_decode() -> Result<()> {
     let content = cmd!(env!("CARGO_BIN_EXE_safe"), "xorurl", TEST_FILE, "--json",)
         .read()
-        .map_err(|e| Error::Unknown(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let xorurls = parse_xorurl_output(&content);
     let file_xorurl = &xorurls[0].1;
-    let xorurl_encoder = XorUrlEncoder::from_url(file_xorurl)?;
+    let xorurl_encoder = xorurl_encoder_from(file_xorurl)?;
 
     let xorurl_decoded = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -64,7 +64,7 @@ fn calling_safe_xorurl_decode() -> Result<()> {
         "--json",
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     let decoded_obj: XorUrlEncoder = serde_json::from_str(&xorurl_decoded)
         .expect("Failed to parse output of `safe xorurl decode`");

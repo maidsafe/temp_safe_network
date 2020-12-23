@@ -20,21 +20,20 @@ const EXISTS_OVERWRITE: &str = "overwrite";
 const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
-use anyhow::Result;
-use sn_api::{xorurl::XorUrlEncoder, Safe};
+use anyhow::{anyhow, bail, Result};
 use sn_cmd_test_utilities::{
     can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
     create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
     safe_cmd_stdout, str_to_sha3_256, sum_tree, test_symlinks_are_valid,
     upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
-    upload_testfolder_trailing_slash, TEST_FOLDER,
+    upload_testfolder_trailing_slash, xorurl_encoder_from, TEST_FOLDER,
 };
-
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    process,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 const NOEXTENSION: &str = "noextension";
 const NOEXTENSION_PATH: &str = "../testdata/noextension";
@@ -57,7 +56,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     let final_dest = dest_dir(&[TESTDATA, TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unexpected(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
         &src,
@@ -67,7 +66,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&final_dest)?);
 
     Ok(())
 }
@@ -85,7 +84,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
         &src,
@@ -95,7 +94,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -123,7 +122,7 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&final_dest)?);
 
     Ok(())
 }
@@ -150,7 +149,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&final_dest)?);
 
     Ok(())
 }
@@ -194,9 +193,9 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
     let existing_file = Path::new(&dest).join("subfolder");
-    let f = fs::File::create(&existing_file).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&existing_file).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -208,7 +207,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     )?;
 
     // verify that src and dest folders don't match.
-    assert_ne!(sum_tree(TEST_FOLDER), sum_tree(&dest));
+    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     // Check that exit code is 0, existing file remains, and new files written.
     assert_eq!(cmd_output.status.code().unwrap(), 0);
@@ -240,7 +239,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| Error::Unknown(e.to_string()))?
+        .map_err(|e| anyhow!(e.to_string()))?
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
@@ -253,7 +252,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
         &files_container_xor
     )
     .read()
-    .map_err(|e| format!("{:#?}", e))?;
+    .map_err(|e| anyhow!("{:#?}", e))?;
 
     let src = format!("safe://{}", &nrs_name);
     let final_dest = Path::new(".").join(TESTDATA).display().to_string();
@@ -268,7 +267,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&final_dest)?);
 
     remove_dest(&final_dest)?;
 
@@ -292,14 +291,14 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 
     // make safe://.../testdata/subfolder
     let xor_path = join_url_paths(&[TESTDATA, SUBFOLDER]);
-    let mut e = XorUrlEncoder::from_url(&files_container_xor)?;
+    let mut e = xorurl_encoder_from(&files_container_xor)?;
     e.set_path(&xor_path);
     let xor_url_with_path = e.to_string();
 
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| Error::Unknown(e.to_string()))?
+        .map_err(|e| anyhow!(e.to_string()))?
         .as_micros();
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
@@ -312,7 +311,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
         &xor_url_with_path
     )
     .read()
-    .map_err(|e| format!("{:#?}", e))?;
+    .map_err(|e| anyhow!("{:#?}", e))?;
 
     // make safe://nrsname/sub2.md
     let src = format!("safe://{}/{}", &nrs_name, TEST_FILE);
@@ -331,7 +330,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     )?;
 
     let file_src = join_paths(&[TEST_FOLDER, SUBFOLDER, TEST_FILE]);
-    assert_eq!(sum_tree(&file_src), sum_tree(&final_dest));
+    assert_eq!(sum_tree(&file_src)?, sum_tree(&final_dest)?);
 
     remove_dest(&final_dest)?;
 
@@ -350,7 +349,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     let td = get_random_nrs_string();
-    let mut xor_url = Safe::parse_url(&files_container_xor)?;
+    let mut xor_url = xorurl_encoder_from(&files_container_xor)?;
     xor_url.set_path("/testdata");
     let td_url = format!("safe://{}", td);
     println!(
@@ -380,7 +379,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     let src_subfolder = Path::new(TEST_FOLDER).join(SUBFOLDER).display().to_string();
     println!("src: {}", src_subfolder);
 
-    assert_eq!(sum_tree(&src_subfolder), sum_tree(&dest));
+    assert_eq!(sum_tree(&src_subfolder)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -408,8 +407,8 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     let src_dir = dest_dir(&[DIR_WITH_SPACE]);
     let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
     remove_dest(&src_dir)?;
-    fs::create_dir_all(&src_dir).map_err(|e| Error::Unknown(e.to_string()))?;
-    let f = fs::File::create(&src_file).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&src_dir).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&src_file).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     let files_container = cmd!(
@@ -421,7 +420,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| format!("{:#?}", e))?;
+    .map_err(|e| anyhow!("{:#?}", e))?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -439,7 +438,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     )?;
 
     assert!(Path::new(&dest).is_file());
-    assert_eq!(sum_tree(&dest), sum_tree(&src_file));
+    assert_eq!(sum_tree(&dest)?, sum_tree(&src_file)?);
 
     Ok(())
 }
@@ -462,8 +461,8 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     let src_dir = dest_dir(&[DIR_WITH_SPACE]);
     let src_file = dest_dir(&[DIR_WITH_SPACE, FILE_WITH_SPACE]);
     remove_dest(&src_dir)?;
-    fs::create_dir_all(&src_dir).map_err(|e| Error::Unknown(e.to_string()))?;
-    let f = fs::File::create(&src_file).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&src_dir).map_err(|e| anyhow!(e.to_string()))?;
+    let f = fs::File::create(&src_file).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     let files_container = cmd!(
@@ -475,7 +474,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| format!("{:#?}", e))?;
+    .map_err(|e| anyhow!("{:#?}", e))?;
 
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container);
 
@@ -496,7 +495,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     )?;
 
     assert!(Path::new(&dest).is_file());
-    assert_eq!(sum_tree(&dest), sum_tree(&src_file));
+    assert_eq!(sum_tree(&dest)?, sum_tree(&src_file)?);
 
     Ok(())
 }
@@ -524,9 +523,9 @@ fn files_get_exists_preserve() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
     let existing_file = Path::new(&dest).join("test.md");
-    let f = fs::File::create(&existing_file).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&existing_file).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -537,7 +536,7 @@ fn files_get_exists_preserve() -> Result<()> {
         Some(0),
     )?;
 
-    assert_ne!(sum_tree(TEST_FOLDER), sum_tree(&dest));
+    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
     assert_eq!(existing_file.metadata().unwrap().len(), 0); // file size = 0.
     assert!(Path::new(&dest).join("another.md").is_file());
 
@@ -559,9 +558,9 @@ fn files_get_exists_overwrite() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
     let existing_file = Path::new(&dest).join("test.md");
-    let f = fs::File::create(&existing_file).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&existing_file).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -572,7 +571,7 @@ fn files_get_exists_overwrite() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -702,7 +701,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     let final_dest = dest_dir(&[TESTDATA, TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
         &src,
@@ -712,7 +711,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&final_dest)?);
 
     Ok(())
 }
@@ -732,7 +731,7 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
     let dest = dest_dir(&[TESTDATA]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -772,7 +771,7 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -793,7 +792,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     let final_dest = dest_dir(&[NEWNAME, TESTDATA]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
         &src,
@@ -803,7 +802,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&final_dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&final_dest)?);
 
     Ok(())
 }
@@ -823,7 +822,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     let dest = dest_dir(&[NEWNAME]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     let cmd_output = files_get(
@@ -863,7 +862,7 @@ fn files_get_src_is_dir_and_dest_newname_not_existing() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(TEST_FOLDER), sum_tree(&dest));
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -886,7 +885,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     let final_dest = dest_dir(&[NOEXTENSION, NOEXTENSION]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
         &src,
@@ -896,7 +895,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(digest_file(NOEXTENSION_PATH), digest_file(&final_dest));
+    assert_eq!(digest_file(NOEXTENSION_PATH)?, digest_file(&final_dest)?);
 
     Ok(())
 }
@@ -914,7 +913,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     let dest = dest_dir(&[NOEXTENSION]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -925,7 +924,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(digest_file(NOEXTENSION_PATH), digest_file(&dest));
+    assert_eq!(digest_file(NOEXTENSION_PATH)?, digest_file(&dest)?);
 
     Ok(())
 }
@@ -952,7 +951,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(digest_file(NOEXTENSION_PATH), digest_file(&dest));
+    assert_eq!(digest_file(NOEXTENSION_PATH)?, digest_file(&dest)?);
 
     Ok(())
 }
@@ -973,7 +972,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     let final_dest = dest_dir(&[NEWNAME, NOEXTENSION]);
 
     remove_dest(&dest)?;
-    fs::create_dir_all(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    fs::create_dir_all(&dest).map_err(|e| anyhow!(e.to_string()))?;
 
     files_get(
         &src,
@@ -983,7 +982,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(digest_file(NOEXTENSION_PATH), digest_file(&final_dest));
+    assert_eq!(digest_file(NOEXTENSION_PATH)?, digest_file(&final_dest)?);
 
     Ok(())
 }
@@ -1001,7 +1000,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     let dest = dest_dir(&[NEWNAME]);
 
     remove_dest(&dest)?;
-    let f = fs::File::create(&dest).map_err(|e| Error::Unknown(e.to_string()))?;
+    let f = fs::File::create(&dest).map_err(|e| anyhow!(e.to_string()))?;
     drop(f); // close file.
 
     files_get(
@@ -1012,7 +1011,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(digest_file(NOEXTENSION_PATH), digest_file(&dest));
+    assert_eq!(digest_file(NOEXTENSION_PATH)?, digest_file(&dest)?);
 
     Ok(())
 }
@@ -1039,7 +1038,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(digest_file(NOEXTENSION_PATH), digest_file(&dest));
+    assert_eq!(digest_file(NOEXTENSION_PATH)?, digest_file(&dest)?);
 
     Ok(())
 }
@@ -1076,7 +1075,7 @@ fn files_get_symlinks_relative() -> Result<()> {
         Some(0),
     )?;
 
-    assert_eq!(sum_tree(&path), sum_tree(&dest));
+    assert_eq!(sum_tree(&path)?, sum_tree(&dest)?);
 
     Ok(())
 }
@@ -1112,7 +1111,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
 
     println!("FileContainer: {}", files_container_xor);
 
-    assert_eq!(sum_tree(&symlinks_dir), sum_tree(&dest));
+    assert_eq!(sum_tree(&symlinks_dir)?, sum_tree(&dest)?);
 
     remove_dest(&tmp_dir)?;
 
@@ -1135,15 +1134,14 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     let (files_container_xor, _processed_files, tmp_dir, symlinks_dir) =
         create_and_upload_test_absolute_symlinks_folder(true)?;
 
-    let mut safeurl =
-        XorUrlEncoder::from_xorurl(&files_container_xor).map_err(|e| format!("{:#?}", e))?;
+    let mut safeurl = xorurl_encoder_from(&files_container_xor)?;
     safeurl.set_content_version(None);
 
     // create a new symlink inside the directory.
     let new_symlink_path = Path::new(&symlinks_dir).join("newlink");
     let new_symlink_target = Path::new(&symlinks_dir).join("newlink_target");
     create_symlink(&new_symlink_target, &new_symlink_path, false)
-        .map_err(|e| format!("{:?}", e))?;
+        .map_err(|e| anyhow!("{:?}", e))?;
 
     // sync dir with new symlink to network
     let args = ["files", "sync", &symlinks_dir, &safeurl.to_string()];
@@ -1178,9 +1176,9 @@ fn files_get_symlinks_after_sync() -> Result<()> {
 fn remove_dest(path: &str) -> Result<()> {
     let p = Path::new(path);
     if p.is_file() {
-        fs::remove_file(&path).map_err(|e| Error::Unknown(e.to_string()))
+        fs::remove_file(&path).map_err(|e| anyhow!(e.to_string()))
     } else if p.is_dir() {
-        fs::remove_dir_all(&path).map_err(|e| Error::Unknown(e.to_string()))
+        fs::remove_dir_all(&path).map_err(|e| anyhow!(e.to_string()))
     } else {
         Ok(())
     }
@@ -1214,12 +1212,12 @@ fn files_get(
         .stderr_capture()
         .unchecked()
         .run()
-        .map_err(|e| format!("{:#?}", e))?;
+        .map_err(|e| anyhow!("{:#?}", e))?;
 
     if let Some(ec) = expect_exit_code {
         match output.status.code() {
             Some(code) => assert_eq!(ec, code),
-            None => return Err(Error::Unknown("Command returned no exit code".to_string())),
+            None => bail!("Command returned no exit code".to_string()),
         }
     }
     Ok(output)
@@ -1274,7 +1272,7 @@ fn join_url_paths(path: &[&str]) -> String {
 fn source_path(url: &str, path: &[&str]) -> Result<String> {
     let pb = path.join("/");
 
-    let x = XorUrlEncoder::from_url(&url)?;
+    let x = xorurl_encoder_from(&url).map_err(|e| anyhow!(e))?;
 
     let url = format!(
         "{}://{}/{}{}{}",

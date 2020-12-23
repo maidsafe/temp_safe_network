@@ -12,9 +12,9 @@ extern crate sn_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
+use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_api::{Error, Result};
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, create_wallet_with_balance, get_random_nrs_string, CLI,
     SAFE_PROTOCOL,
@@ -25,7 +25,7 @@ const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created at:";
 
 #[test]
 fn calling_safe_keys_create_pretty() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["keys", "create", "--test-coins", "--preload", "123"])
         .assert()
         .stdout(predicate::str::contains(PRETTY_KEYS_CREATION_RESPONSE))
@@ -36,7 +36,7 @@ fn calling_safe_keys_create_pretty() -> Result<()> {
 
 #[test]
 fn calling_safe_keys_create() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec![
         "keys",
         "create",
@@ -54,7 +54,7 @@ fn calling_safe_keys_create() -> Result<()> {
 
 #[test]
 fn calling_safe_keypair() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["keypair"])
         .assert()
         .stdout(predicate::str::contains("Secret Key = "))
@@ -65,7 +65,7 @@ fn calling_safe_keypair() -> Result<()> {
 
 #[test]
 fn calling_safe_keypair_pretty() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["keypair"])
         .assert()
         .stdout(predicate::str::contains("Key pair generated:"))
@@ -80,7 +80,7 @@ fn calling_safe_keys_balance() -> Result<()> {
     let (pk_xor, sk) = create_preload_and_get_keys("123")?;
     assert!(pk_xor.contains("safe://"));
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec![
         "keys", "balance", "--keyurl", &pk_xor, "--sk", &sk, "--json",
     ])
@@ -95,12 +95,12 @@ fn calling_safe_keys_balance_with_nrs_for_keyurl() -> Result<()> {
     let (pk_xor, sk) = create_preload_and_get_keys("3006.77")?;
 
     let nrsurl = format!("safe://{}", get_random_nrs_string());
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["nrs", "create", &nrsurl, "-l", &pk_xor])
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec![
         "keys", "balance", "--keyurl", &nrsurl, "--sk", &sk, "--json",
     ])
@@ -112,7 +112,7 @@ fn calling_safe_keys_balance_with_nrs_for_keyurl() -> Result<()> {
 
 #[test]
 fn calling_safe_keys_transfer() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     let (_safekey1_xorurl, sk1) = create_preload_and_get_keys("160.0")?;
     let (safekey2_xorurl, sk2) = create_preload_and_get_keys("5.0")?;
 
@@ -140,7 +140,7 @@ fn calling_safe_keys_transfer() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(to_has, "105.000000000");
 
@@ -154,7 +154,7 @@ fn calling_safe_keys_transfer() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_has, "60.000000000");
     Ok(())
@@ -162,7 +162,7 @@ fn calling_safe_keys_transfer() -> Result<()> {
 
 #[test]
 fn calling_safe_keys_transfer_to_wallet_xorurl() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (to_wallet, _pk, _sk) = create_wallet_with_balance("0.000000001", None)?; // we need 1 nano to pay for the costs of creation
     let (_safekey_xorurl, safekey_sk) = create_preload_and_get_keys("35.65")?;
@@ -191,7 +191,7 @@ fn calling_safe_keys_transfer_to_wallet_xorurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(safekey_has, "17.420000000" /* 35.65 - 18.23 */);
 
@@ -204,7 +204,7 @@ fn calling_safe_keys_transfer_to_wallet_xorurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(to_has, "18.230000000");
     Ok(())
@@ -212,7 +212,7 @@ fn calling_safe_keys_transfer_to_wallet_xorurl() -> Result<()> {
 
 #[test]
 fn calling_safe_keys_transfer_to_key_nrsurl() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (_from_safekey_xorurl, from_safekey_sk) = create_preload_and_get_keys("1535.65")?;
     let (to_safekey_xorurl, to_safekey_sk) = create_preload_and_get_keys("0.0")?;
@@ -227,7 +227,7 @@ fn calling_safe_keys_transfer_to_key_nrsurl() -> Result<()> {
         &to_safekey_xorurl,
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec![
         "keys",
@@ -253,7 +253,7 @@ fn calling_safe_keys_transfer_to_key_nrsurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(key_has, "118.230000000");
 
@@ -267,7 +267,7 @@ fn calling_safe_keys_transfer_to_key_nrsurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_has, "1417.420000000" /* 1535.65 - 118.23 */);
     Ok(())

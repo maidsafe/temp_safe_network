@@ -12,9 +12,9 @@ extern crate sn_cmd_test_utilities;
 #[macro_use]
 extern crate duct;
 
+use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_api::{Error, Result};
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, create_wallet_with_balance, get_random_nrs_string, CLI,
     SAFE_PROTOCOL,
@@ -27,7 +27,7 @@ const UNMATCHED_SK_XORURL: &str =
 
 #[test]
 fn calling_safe_wallet_transfer() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_from, _pk, _sk) = create_wallet_with_balance("160.000000001", None)?; // we need 1 nano to pay for the costs of creation
     assert!(wallet_from.contains(SAFE_PROTOCOL));
@@ -43,7 +43,7 @@ fn calling_safe_wallet_transfer() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(to_starts_with, "5.000000000");
 
@@ -56,7 +56,7 @@ fn calling_safe_wallet_transfer() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_starts_with, "160.000000000");
 
@@ -83,7 +83,7 @@ fn calling_safe_wallet_transfer() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(to_has, "105.000000000");
 
@@ -96,7 +96,7 @@ fn calling_safe_wallet_transfer() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_has, "60.000000000");
     Ok(())
@@ -104,7 +104,7 @@ fn calling_safe_wallet_transfer() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_transfer_spendable_balance_urls() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_from, _pk, _sk) =
         create_wallet_with_balance("96.000000001", Some("one-spendable-balance"))?; // we need 1 nano to pay for the costs of creation
@@ -122,7 +122,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(to_starts_with, "5.100000000");
 
@@ -136,7 +136,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_starts_with, "96.000000000");
 
@@ -163,7 +163,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(to_has, "55.100000000");
 
@@ -176,7 +176,7 @@ fn calling_safe_wallet_transfer_spendable_balance_urls() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_has, "46.000000000");
     Ok(())
@@ -192,7 +192,7 @@ fn calling_safe_wallet_unexisting_spendable_balances() -> Result<()> {
 
     // Test failure when transferring from an unexisting source spendable balance
     let from_unexisting_balance = format!("{}/from-unexisting-spendable-balance", wallet_from);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec![
         "wallet",
         "transfer",
@@ -211,7 +211,7 @@ fn calling_safe_wallet_unexisting_spendable_balances() -> Result<()> {
 
     // Test failure when transferring to an unexisting destination spendable balance
     let to_unexisting_balance = format!("{}/to-unexisting-spendable-balance", wallet_to);
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec![
         "wallet",
         "transfer",
@@ -229,7 +229,7 @@ fn calling_safe_wallet_unexisting_spendable_balances() -> Result<()> {
     .failure();
 
     // Test failure when checking balance of an unexisting spendable balance
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
     cmd.args(&vec!["wallet", "balance", &from_unexisting_balance])
         .assert()
         .stderr(predicate::str::contains(&format!(
@@ -242,7 +242,7 @@ fn calling_safe_wallet_unexisting_spendable_balances() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_balance() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("10.000000001", None)?; // we need 1 nano to pay for the costs of creation
 
@@ -255,7 +255,7 @@ fn calling_safe_wallet_balance() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_balance_with_spendable_balance_url() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_xor, _pk, _sk) =
         create_wallet_with_balance("453.006000001", Some("my-first-balance"))?; // we need 1 nano to pay for the costs of creation
@@ -278,7 +278,7 @@ fn calling_safe_wallet_insert() -> Result<()> {
     let (wallet_xor, _pk, _sk) = create_wallet_with_balance("50", None)?;
     let (key_pk_xor, sk) = create_preload_and_get_keys("300.000000001")?; // we need 1 nano to pay for the costs of creation
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let _wallet_insert_result = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -292,7 +292,7 @@ fn calling_safe_wallet_insert() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec!["wallet", "balance", &wallet_xor, "--json"])
         .assert()
@@ -303,7 +303,7 @@ fn calling_safe_wallet_insert() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_create_no_source() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec!["wallet", "create"]).assert().success();
     Ok(())
@@ -311,7 +311,7 @@ fn calling_safe_wallet_create_no_source() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_no_balance() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec!["wallet", "create", "--no-balance"])
         .assert()
@@ -332,7 +332,7 @@ fn calling_safe_wallet_create_w_preload_has_balance() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
     assert_eq!("55.000000000", balance);
     Ok(())
 }
@@ -354,10 +354,10 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_xorurl, _): (String, String) =
-        serde_json::from_str(&wallet_create_result).map_err(|e| Error::Unknown(e.to_string()))?;
+        serde_json::from_str(&wallet_create_result).map_err(|e| anyhow!(e.to_string()))?;
 
     let balance = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -367,7 +367,7 @@ fn calling_safe_wallet_create_w_premade_keys_has_balance() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
     assert_eq!("300.000000000", balance);
     Ok(())
 }
@@ -385,10 +385,10 @@ fn calling_safe_wallet_create_w_sk_only() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_xorurl, _): (String, String) =
-        serde_json::from_str(&wallet_create_result).map_err(|e| Error::Unknown(e.to_string()))?;
+        serde_json::from_str(&wallet_create_result).map_err(|e| anyhow!(e.to_string()))?;
 
     let balance = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -398,7 +398,7 @@ fn calling_safe_wallet_create_w_sk_only() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
     assert_eq!("333.000000000", balance);
     Ok(())
 }
@@ -407,7 +407,7 @@ fn calling_safe_wallet_create_w_sk_only() -> Result<()> {
 fn calling_safe_wallet_create_w_bad_secret() -> Result<()> {
     let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300")?;
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec![
         "wallet",
@@ -430,7 +430,7 @@ fn calling_safe_wallet_create_w_bad_secret() -> Result<()> {
 fn calling_safe_wallet_create_w_bad_location() -> Result<()> {
     let (_pk_pay_xor, pay_sk) = create_preload_and_get_keys("300")?;
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec![
         "wallet",
@@ -456,7 +456,7 @@ fn calling_safe_wallet_create_w_wrong_pk_for_sk() -> Result<()> {
     let (pk_pay_xor, pay_sk) = create_preload_and_get_keys("300")?;
     let (_, key_sk) = create_preload_and_get_keys("300")?;
 
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec![
         "wallet",
@@ -477,7 +477,7 @@ fn calling_safe_wallet_create_w_wrong_pk_for_sk() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_transfer_to_key_xorurl() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_from, _pk, _sk) = create_wallet_with_balance("35.650000001", None)?; // we need 1 nano to pay for the costs of creation
     let (key_xorurl, key_sk) = create_preload_and_get_keys("0.0")?;
@@ -506,7 +506,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(key_has, "18.230000000");
 
@@ -519,7 +519,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_has, "17.420000000" /* 35.65 - 18.23 */);
     Ok(())
@@ -527,7 +527,7 @@ fn calling_safe_wallet_transfer_to_key_xorurl() -> Result<()> {
 
 #[test]
 fn calling_safe_wallet_transfer_to_key_nrsurl() -> Result<()> {
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| Error::Unknown(e.to_string()))?;
+    let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
     let (wallet_from, _pk, _sk) = create_wallet_with_balance("1535.650000001", None)?; // we need 1 nano to pay for the costs of creation
     let (key_xorurl, key_sk) = create_preload_and_get_keys("0.0")?;
@@ -542,7 +542,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() -> Result<()> {
         &key_xorurl,
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     cmd.args(&vec![
         "wallet",
@@ -568,7 +568,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(key_has, "118.230000000");
 
@@ -581,7 +581,7 @@ fn calling_safe_wallet_transfer_to_key_nrsurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(from_has, "1417.420000000" /* 1535.65 - 118.23 */);
     Ok(())
@@ -601,7 +601,7 @@ fn calling_safe_wallet_balance_with_nrsurl() -> Result<()> {
         &wallet_xorurl,
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     // check wallet balance with NRS url
     let wallet_has = cmd!(
@@ -612,7 +612,7 @@ fn calling_safe_wallet_balance_with_nrsurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(wallet_has, "1.120000000");
 
@@ -626,7 +626,7 @@ fn calling_safe_wallet_balance_with_nrsurl() -> Result<()> {
         "--json"
     )
     .read()
-    .map_err(|e| Error::Unknown(e.to_string()))?;
+    .map_err(|e| anyhow!(e.to_string()))?;
 
     assert_eq!(spendable_balance_has, "1.120000000");
     Ok(())

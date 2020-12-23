@@ -9,13 +9,13 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use multibase::{encode, Base};
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
-use sn_api::{fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Keypair};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use sn_api::{
+    fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, xorurl::XorUrlEncoder,
+    Keypair,
+};
 use sn_data_types::Money;
-use std::collections::BTreeMap;
-use std::path::Path;
-use std::{env, fs, process, str::FromStr};
+use std::{collections::BTreeMap, env, fs, path::Path, process, str::FromStr};
 use tiny_keccak::sha3_256;
 use walkdir::{DirEntry, WalkDir};
 
@@ -305,6 +305,11 @@ pub fn digest_file(path: &str) -> Result<String> {
 #[allow(dead_code)]
 pub fn get_random_nrs_string() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
+}
+
+#[allow(dead_code)]
+pub fn xorurl_encoder_from(url: &str) -> Result<XorUrlEncoder> {
+    XorUrlEncoder::from_url(url).map_err(|e| anyhow!("Failed to parse URL: {}", e))
 }
 
 #[allow(dead_code)]

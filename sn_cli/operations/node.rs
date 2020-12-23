@@ -110,7 +110,6 @@ pub fn node_run(
         &arg_nodes_dir,
         "--interval",
         interval,
-        "--local",
         "--num-nodes",
         num_of_nodes,
     ];
@@ -128,7 +127,9 @@ pub fn node_run(
     if let Some(ref launch_ip) = ip {
         sn_launch_tool_args.push("--ip");
         sn_launch_tool_args.push(launch_ip);
-    };
+    } else {
+        sn_launch_tool_args.push("--local");
+    }
 
     debug!(
         "Running network launch tool with args: {:?}",

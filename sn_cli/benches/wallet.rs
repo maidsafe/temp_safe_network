@@ -14,7 +14,7 @@ use std::time::Duration;
 
 extern crate sn_cmd_test_utilities;
 
-use sn_api::Error;
+use anyhow::Result;
 use sn_cmd_test_utilities::{create_wallet_with_balance, get_bin_location};
 
 // sample size is _NOT_ the number of times the command is run...
@@ -32,7 +32,7 @@ fn main() {
     bench_cli_wallet(&mut criterion).unwrap();
 }
 
-fn bench_cli_wallet(c: &mut Criterion) -> Result<(), Error> {
+fn bench_cli_wallet(c: &mut Criterion) -> Result<()> {
     let (wallet_from, _pk, _sk) = create_wallet_with_balance("1600.000000001", None)?; // we need 1 nano to pay for the costs of creation
     let (wallet_to, _pk, _sk) = create_wallet_with_balance("5.000000001", None)?; // we need 1 nano to pay for the costs of creation
     c.bench_function("performing transfers", |b| {
