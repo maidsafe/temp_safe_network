@@ -1726,7 +1726,6 @@ mod tests {
         let file_xorurl = safe
             .files_store_public_blob(random_blob_content.as_bytes(), None, false)
             .await?;
-        std::thread::sleep(std::time::Duration::from_millis(5000));
 
         let retrieved = safe.files_get_public_blob(&file_xorurl, None).await?;
         assert_eq!(retrieved, random_blob_content.as_bytes());

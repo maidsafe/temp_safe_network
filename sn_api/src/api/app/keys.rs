@@ -453,13 +453,14 @@ mod tests {
     #[tokio::test]
     async fn test_keys_test_coins_balance_wrong_sk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (_xorurl, _kp) = safe.keys_create_preload_test_coins("0").await?;
+        let (xorurl, _) = safe.keys_create_preload_test_coins("0").await?;
+
         let bls_sk = threshold_crypto::SecretKey::random();
         let sk = SecretKey::Bls(threshold_crypto::serde_impl::SerdeSecret(bls_sk));
-        let current_balance = safe.keys_balance_from_sk(Arc::new(sk)).await;
+        let current_balance = safe.keys_balance_from_url(&xorurl, Arc::new(sk)).await;
         match current_balance {
-            Err(Error::ContentNotFound(msg)) => {
-                assert!(msg.contains("No SafeKey found at specified location"));
+            Err(Error::InvalidInput(msg)) => {
+                assert_eq!(msg, "The URL doesn't correspond to the public key derived from the provided secret key");
                 Ok(())
             }
             Err(err) => Err(Error::Unexpected(format!(

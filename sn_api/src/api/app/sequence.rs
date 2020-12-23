@@ -258,7 +258,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_append_to_sequence() -> Result<()> {
+    async fn test_sequence_append() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data_v0 = b"First in the sequence";
         let data_v1 = b"Second in the sequence";
@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_append_to_sequence_concurrently_from_second_client() -> Result<()> {
+    async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
         let mut client1 = new_safe_instance().await?;
         let mut client2 = new_safe_instance().await?;
         let data_v0 = b"First from client1";
