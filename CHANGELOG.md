@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.17.0 (2020-12-23)
+
+### Features
+
+* ***cli*** change the default number of nodes launched by `$ safe node run-baby-fleming` command to 11 (eleven nodes): also by PR #660
+
+### Bug Fixes
+
+* ***api*** known issue in authorising CLI, as reported in last week's dev update, was solved: https://github.com/maidsafe/sn_api/pull/659
+  
+* ***cli*** fix `$ safe update` command as it was not looking up in the correct URL: https://github.com/maidsafe/sn_api/pull/660
+
+* ***cli*** install script had an issue for Mac users: https://github.com/maidsafe/sn_api/pull/661
+
+
+### 0.16.0 (2020-12-17)
+
+### Features
+
+* ***api*** re-enable implementation for coins transfers with Ed25519 keys ([b2e3faf](https://github.com/maidsafe/sn_api/commit/b2e3faf9b0943ec779b1e513c76179048dbb0db3))
+
+* ***authd*** insert and retrieve authorised apps keypairs into/from the Safe ([d8186c3](https://github.com/maidsafe/sn_api/commit/d8186c309a7e6ca4862fb8855da6636a9f0d84c6))
+
+* ***api*** reenable use of connect from auth responses ([d64d0fd](https://github.com/maidsafe/sn_api/commit/d64d0fd9c0d6cd9002405985ff03f6d9ff7aa695))
+
+* ***api*** loop seq gets w/ timeout ([0cd75fb](https://github.com/maidsafe/sn_api/commit/0cd75fbd9aceace5fbfc4b726a48d652177d61ce))
+
+* ***authd*** adapt authd client api and service names to new terminology of Safe creation and unlocking ([58ecf7f](https://github.com/maidsafe/sn_api/commit/58ecf7fbae95dee0a103ce39d61efaac6e2cf550))
+
+### Bug Fixes
+
+* ***api*** store Blob API was returning the wrong xorname ([3694efb](https://github.com/maidsafe/sn_api/commit/3694efb16b16fcfc0d34db51187c043d0e24f09c))
+
+* ***api*** keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey ([5a30bf3](https://github.com/maidsafe/sn_api/commit/5a30bf331242ba8dd9b3189dc255b134fdf24587))
+
+* ***api*** ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes ([01cc289](https://github.com/maidsafe/sn_api/commit/01cc2894b37908377eb822a826f46c7fef39347e))
+
+
 ### 0.15.0 (2020-07-16)
 
 ### Features
