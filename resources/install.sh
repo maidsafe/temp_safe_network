@@ -15,7 +15,7 @@ sn_cli_install_dir() {
 }
 
 sn_cli_latest_version() {
-  curl -s https://api.github.com/repos/maidsafe/sn_api/releases/latest | grep -oP 'tag_name\": \"\K.*(?=\")' | sed 's/v//'
+  curl -s "https://api.github.com/repos/maidsafe/sn_api/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/'
 }
 
 sn_cli_download() {
