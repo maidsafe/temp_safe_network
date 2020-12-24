@@ -65,10 +65,6 @@ impl SafeAppClient {
             match IpcMsg::from_string(auth_credentials)? {
                 IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted))) => {
                     self.bootstrap_config = Some(auth_granted.bootstrap_config);
-                    debug!(
-                        "Client instantiated with pk: {:?}",
-                        auth_granted.app_keypair.public_key()
-                    );
                     Some(auth_granted.app_keypair)
                 }
                 IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_config))) => {
@@ -87,6 +83,11 @@ impl SafeAppClient {
             None
         };
 
+        debug!("Client to be instantiated with specific pk?: {:?}", app_keypair);
+        debug!(
+            "Bootstrap contacts list set to: {:?}",
+            self.bootstrap_config
+        );
         let client = Client::new(app_keypair, self.bootstrap_config.clone())
             .await
             .map_err(|err| {
