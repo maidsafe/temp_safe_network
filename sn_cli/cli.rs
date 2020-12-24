@@ -14,11 +14,21 @@ use crate::{
     operations::safe_net::connect,
     shell,
     subcommands::{
-        auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
-        files::files_commander, keys::key_commander, networks::networks_commander,
-        node::node_commander, nrs::nrs_commander, seq::seq_commander, setup::setup_commander,
-        update::update_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
-        SubCommands,
+        auth::auth_commander,
+        cat::cat_commander,
+        config::config_commander,
+        dog::dog_commander,
+        files::files_commander,
+        keys::{key_commander, keypair_to_hex_strings},
+        networks::networks_commander,
+        node::node_commander,
+        nrs::nrs_commander,
+        seq::seq_commander,
+        setup::setup_commander,
+        update::update_commander,
+        wallet::wallet_commander,
+        xorurl::xorurl_commander,
+        OutputFmt, SubCommands,
     },
 };
 use sn_api::{xorurl::XorUrlBase, Safe};
@@ -82,17 +92,19 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
         Some(SubCommands::Config { cmd }) => config_commander(cmd),
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
         Some(SubCommands::Keypair {}) => {
-            let key_pair = safe.keypair().await?;
+            let key_pair = safe.keypair();
             if OutputFmt::Pretty == output_fmt {
                 println!("Key pair generated:");
             }
-            let sk = key_pair
-                .secret_key()
-                .map_err(|e| format!("{:?}", e))?
-                .to_string();
 
-            println!("Public Key = {}", key_pair.public_key());
-            println!("Secret Key = {}", sk);
+            match keypair_to_hex_strings(&key_pair) {
+                Ok((pk_hex, sk_hex)) => {
+                    println!("Public Key = {}", pk_hex);
+                    println!("Secret Key = {}", sk_hex);
+                }
+                Err(err) => println!("{}", err),
+            }
+
             Ok(())
         }
         Some(SubCommands::Update {}) => {

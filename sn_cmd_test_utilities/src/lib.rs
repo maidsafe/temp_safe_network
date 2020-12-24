@@ -14,8 +14,7 @@ use sn_api::{
     fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, xorurl::XorUrlEncoder,
     Keypair,
 };
-use sn_data_types::Money;
-use std::{collections::BTreeMap, env, fs, path::Path, process, str::FromStr};
+use std::{collections::BTreeMap, env, fs, path::Path, process};
 use tiny_keccak::sha3_256;
 use walkdir::{DirEntry, WalkDir};
 
@@ -70,11 +69,7 @@ pub fn create_wallet_with_balance(
     preload: &str,
     balance_name: Option<&str>,
 ) -> Result<(String, String, String)> {
-    let (_pk, sk) = create_preload_and_get_keys(&preload)?;
-    // we spent 1 nano for creating the SafeKey, so we now preload it
-    // with 1 nano less than amount request provided
-    let preload_nanos = Money::from_str(preload)?.as_nano();
-    let preload_minus_costs = Money::from_nano(preload_nanos - 1).to_string();
+    let (_, sk) = create_preload_and_get_keys(&preload)?;
 
     let wallet_create_result = cmd!(
         get_bin_location(),
@@ -83,7 +78,7 @@ pub fn create_wallet_with_balance(
         "--pay-with",
         &sk,
         "--preload",
-        preload_minus_costs,
+        preload,
         "--name",
         balance_name.unwrap_or("default-balance"),
         "--json",

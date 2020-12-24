@@ -17,7 +17,7 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType},
-    Keypair,
+    sk_to_hex, Keypair,
 };
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
@@ -315,7 +315,7 @@ fn calling_safe_cat_wallet_xorurl() -> Result<()> {
 
     assert_eq!(balances[&key_xorurl].0, true);
     assert_eq!(balances[&key_xorurl].1.xorurl, key_xorurl);
-    assert_eq!(balances[&key_xorurl].1.sk, secret_key.to_string());
+    assert_eq!(balances[&key_xorurl].1.sk, sk_to_hex(secret_key));
 
     assert_eq!(balances[&key_pk_xor].0, false);
     assert_eq!(balances[&key_pk_xor].1.xorurl, key_pk_xor);

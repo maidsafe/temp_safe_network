@@ -164,8 +164,8 @@ fn calling_safe_keys_transfer() -> Result<()> {
 fn calling_safe_keys_transfer_to_wallet_xorurl() -> Result<()> {
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
 
-    let (to_wallet, _pk, _sk) = create_wallet_with_balance("0.000000001", None)?; // we need 1 nano to pay for the costs of creation
-    let (_safekey_xorurl, safekey_sk) = create_preload_and_get_keys("35.65")?;
+    let (to_wallet, _, _) = create_wallet_with_balance("1", None)?;
+    let (_, safekey_sk) = create_preload_and_get_keys("35.65")?;
 
     cmd.args(&vec![
         "keys",
@@ -206,7 +206,7 @@ fn calling_safe_keys_transfer_to_wallet_xorurl() -> Result<()> {
     .read()
     .map_err(|e| anyhow!(e.to_string()))?;
 
-    assert_eq!(to_has, "18.230000000");
+    assert_eq!(to_has, "19.230000000" /* 1 + 18.23 */);
     Ok(())
 }
 

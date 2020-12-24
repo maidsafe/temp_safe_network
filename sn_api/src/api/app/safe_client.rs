@@ -50,13 +50,6 @@ impl SafeAppClient {
         }
     }
 
-    pub async fn keypair(&self) -> Result<Arc<Keypair>> {
-        let client = self.get_safe_client()?;
-        let kp = client.keypair().await;
-
-        Ok(kp)
-    }
-
     // Connect to the SAFE Network using the provided auth credentials
     pub async fn connect(&mut self, auth_credentials: Option<&str>) -> Result<()> {
         debug!("Connecting to SAFE Network...");
@@ -83,7 +76,10 @@ impl SafeAppClient {
             None
         };
 
-        debug!("Client to be instantiated with specific pk?: {:?}", app_keypair);
+        debug!(
+            "Client to be instantiated with specific pk?: {:?}",
+            app_keypair
+        );
         debug!(
             "Bootstrap contacts list set to: {:?}",
             self.bootstrap_config

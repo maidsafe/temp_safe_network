@@ -247,7 +247,7 @@ pub fn print_new_key_output(
     }
 }
 
-fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String), String> {
+pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String), String> {
     let pk_hex = match keypair.public_key() {
         PublicKey::Ed25519(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
         PublicKey::Bls(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),

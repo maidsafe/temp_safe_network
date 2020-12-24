@@ -19,9 +19,11 @@ mod sequence;
 mod test_helpers;
 mod xorurl_media_types;
 
-use super::common;
-use super::constants;
+use super::{common, constants};
+use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
+use sn_data_types::Keypair;
+use std::{sync::Arc, time::Duration};
 use xorurl::XorUrlBase;
 
 // The following is what's meant to be the public API
@@ -31,15 +33,10 @@ pub mod files;
 pub mod nrs_map;
 pub mod wallet;
 pub mod xorurl;
-use super::Result;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_coins_amount;
 pub use nrs::ProcessedEntries;
-use sn_data_types::Keypair;
-use std::sync::Arc;
 pub use xor_name::{XorName, XOR_NAME_LEN};
-
-use std::time::Duration;
 
 // TODO: should we be cloning this?
 #[derive(Clone)]
@@ -69,7 +66,9 @@ impl Safe {
         }
     }
 
-    pub async fn keypair(&self) -> Result<Arc<Keypair>> {
-        self.safe_client.keypair().await
+    /// Generate a new random Ed25519 keypair
+    pub fn keypair(&self) -> Arc<Keypair> {
+        let mut rng = OsRng;
+        Arc::new(Keypair::new_ed25519(&mut rng))
     }
 }
