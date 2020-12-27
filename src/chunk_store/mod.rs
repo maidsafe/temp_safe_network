@@ -150,15 +150,15 @@ impl<T: Chunk> ChunkStore<T> {
         self.do_delete(&self.file_path(id)?).await
     }
 
-    /// Remaining space to max space ratio.
-    pub async fn remaining_space_ratio(&self) -> f64 {
+    /// Used space to max space ratio.
+    pub async fn used_space_ratio(&self) -> f64 {
         let used = self.total_used_space().await;
         let total = self.used_space.max_capacity().await;
-        let remaining_space_ratio = used as f64 / total as f64;
+        let used_space_ratio = used as f64 / total as f64;
         info!("Used space: {:?}", used);
         info!("Total space: {:?}", total);
-        info!("Remaining space ratio: {:?}", remaining_space_ratio);
-        remaining_space_ratio
+        info!("Used space ratio: {:?}", used_space_ratio);
+        used_space_ratio
     }
 
     /// Returns a data chunk previously stored under `id`.

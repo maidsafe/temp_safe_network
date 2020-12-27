@@ -192,8 +192,8 @@ impl ChunkStorage {
         Ok(NodeMessagingDuty::NoOp)
     }
 
-    pub async fn remaining_space_ratio(&self) -> f64 {
-        self.chunks.remaining_space_ratio().await
+    pub async fn used_space_ratio(&self) -> f64 {
+        self.chunks.used_space_ratio().await
     }
 
     // pub(crate) fn get_for_duplciation(
