@@ -446,32 +446,13 @@ impl ConnectionManager {
 
         let handshake = HandshakeRequest::Join(keypair.public_key());
         let msg = Bytes::from(serialize(&handshake)?);
-        let (_send_stream, mut recv_stream) = connection.send_bi(msg).await?;
-        let final_response = recv_stream.next().await?;
-
-        match deserialize(&final_response) {
-            Ok(HandshakeResponse::Challenge(node_public_key, challenge)) => {
-                trace!(
-                    "Got the challenge from {:?}, public id: {}",
-                    peer_addr,
-                    node_public_key
-                );
-                let response = HandshakeRequest::ChallengeResult(keypair.sign(&challenge));
-                let msg = Bytes::from(serialize(&response)?);
-                let (send_stream, recv_stream) = connection.send_bi(msg).await?;
-
+        let (send_stream, recv_stream) = connection.send_bi(msg).await?;
                 Ok((
                     Arc::new(Mutex::new(send_stream)),
                     Arc::new(Mutex::new(connection)),
                     recv_stream,
                     peer_addr,
                 ))
-            }
-            Ok(_) => Err(ClientError::from(
-                "Unexpected message type while expeccting challenge from Elder.",
-            )),
-            Err(e) => Err(ClientError::from(format!("Unexpected error {:?}", e))),
-        }
     }
 
     // Connect to a set of Elders nodes which will be
