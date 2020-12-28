@@ -37,14 +37,12 @@ use crate::errors::ClientError;
 use crdts::Dot;
 use futures::lock::Mutex;
 use log::{debug, info, trace, warn};
-use lru::LruCache;
 use qp2p::Config as QuicP2pConfig;
 use rand::rngs::OsRng;
 use std::str::FromStr;
 
 use sn_data_types::{
-    Blob, BlobAddress, Cmd, DataCmd, Keypair, Message, MessageId, Money, PublicKey, Query,
-    QueryResponse,
+    Cmd, DataCmd, Keypair, Message, MessageId, Money, PublicKey, Query, QueryResponse,
 };
 
 #[cfg(any(test, feature = "simulated-payouts", feature = "testing"))]
@@ -76,7 +74,6 @@ pub fn bootstrap_config() -> Result<HashSet<SocketAddr>, ClientError> {
 #[derive(Clone)]
 pub struct Client {
     keypair: Arc<Keypair>,
-    blob_cache: Arc<Mutex<LruCache<BlobAddress, Blob>>>,
     /// Sequence CRDT replica
     transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator>>>,
     replicas_pk_set: PublicKeySet,
@@ -164,7 +161,6 @@ impl Client {
             transfer_actor,
             replicas_pk_set,
             simulated_farming_payout_dot,
-            blob_cache: Arc::new(Mutex::new(LruCache::new(IMMUT_DATA_CACHE_SIZE))),
             notification_receiver: Arc::new(Mutex::new(notification_receiver)),
         };
 
