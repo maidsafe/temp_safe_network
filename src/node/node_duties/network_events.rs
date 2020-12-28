@@ -31,6 +31,26 @@ impl NetworkEvents {
         Self { duty_cfg, analysis }
     }
 
+    // Dump elders and adults count
+    async fn log_node_counts(&mut self) {
+        let elder_count = format!(
+            "No. of Elders in our Section: {:?}",
+            self.analysis.no_of_elders().await
+        );
+        let adult_count = format!(
+            "No. of Adults in our Section: {:?}",
+            self.analysis.no_of_adults().await
+        );
+        let separator_len = std::cmp::max(elder_count.len(), adult_count.len());
+        let separator = std::iter::repeat('-')
+            .take(separator_len)
+            .collect::<String>();
+        info!("--{}--", separator);
+        info!("| {:<1$} |", elder_count, separator_len);
+        info!("| {:<1$} |", adult_count, separator_len);
+        info!("--{}--", separator);
+    }
+
     pub async fn process_network_event(
         &mut self,
         event: RoutingEvent,
@@ -46,6 +66,7 @@ impl NetworkEvents {
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
+                self.log_node_counts().await;
                 Ok(ProcessLostMember {
                     name: XorName(name.0),
                     age,
@@ -59,16 +80,7 @@ impl NetworkEvents {
                 ..
             } => {
                 info!("New member has joined the section");
-                info!("---------------------------------------------");
-                info!(
-                    "| No. of Elders in our Section: {:?} |",
-                    self.analysis.no_of_elders().await
-                );
-                info!(
-                    "| No. of Adults in our Section: {:?} |",
-                    self.analysis.no_of_adults().await
-                );
-                info!("---------------------------------------------");
+                self.log_node_counts().await;
                 if let Some(prev_name) = previous_name {
                     trace!("The new member is a Relocated Node");
                     let first: NodeOperation = ProcessRelocatedMember {
