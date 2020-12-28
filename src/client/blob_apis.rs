@@ -155,11 +155,6 @@ impl Client {
         &self,
         address: BlobAddress,
     ) -> Result<Blob, ClientError> {
-        if let Some(data) = self.blob_cache.lock().await.get_mut(&address) {
-            trace!("Blob found in cache.");
-            return Ok(data.clone());
-        }
-
         let res = self
             .send_query(Query::Data(DataQuery::Blob(BlobRead::Get(address))))
             .await?;
@@ -219,9 +214,6 @@ impl Client {
         let cmd = DataCmd::Blob(BlobWrite::DeletePrivate(address));
 
         self.pay_and_send_data_command(cmd).await?;
-        info!("Dropping from cache");
-        let res = self.blob_cache.lock().await.pop(&address);
-        info!("Dropped {:?} from cache", res);
         Ok(())
     }
 
