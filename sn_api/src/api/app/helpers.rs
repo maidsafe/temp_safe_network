@@ -8,7 +8,7 @@
 // Software.
 
 #[cfg(feature = "app")]
-use crate::{Error, Result};
+use crate::{api::common::parse_hex, Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 use sn_data_types::{Error as SafeNdError, Money, PublicKey};
@@ -35,14 +35,12 @@ pub fn pk_to_hex(pk: &PublicKey) -> String {
     xorname_to_hex(&xorname)
 }
 
-// #[allow(dead_code)]
-// pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
-//     let pk_bytes = parse_hex(&hex_str);
-//     let mut pk_bytes_array: [u8; PK_SIZE] = [0; PK_SIZE];
-//     pk_bytes_array.copy_from_slice(&pk_bytes[..PK_SIZE]);
-//     PublicKey::from_bytes(pk_bytes_array)
-//         .map_err(|_| Error::InvalidInput("Invalid public key bytes".to_string()))
-// }
+pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
+    let pk_bytes = parse_hex(&hex_str);
+    let ed25519_pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes)
+        .map_err(|_| Error::InvalidInput(format!("Invalid public key bytes: {}", hex_str)))?;
+    Ok(PublicKey::Ed25519(ed25519_pk))
+}
 
 pub fn parse_coins_amount(amount_str: &str) -> Result<Money> {
     Money::from_str(amount_str).map_err(|err| {

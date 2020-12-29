@@ -59,7 +59,7 @@ pub enum KeysSubCommands {
         /// Source SafeKey's secret key, or funds from the application's default SafeKey will be used
         #[structopt(long = "from")]
         from: Option<String>,
-        /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
+        /// The receiving Wallet/SafeKey URL or public key, otherwise pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
         /// The from secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
@@ -138,10 +138,9 @@ pub async fn key_commander(
             // TODO: don't connect if --from sk was passed
             connect(safe).await?;
 
-            //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(
                 to,
-                Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
+                Some("...awaiting destination Wallet/SafeKey URL, or public key, from STDIN stream..."),
             )?;
 
             let tx_id = safe

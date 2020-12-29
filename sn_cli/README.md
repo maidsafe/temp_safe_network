@@ -683,10 +683,10 @@ SafeKey's current balance: 15.342000000
 
 #### SafeKeys Transfer
 
-We now have a `SafeKey` with a positive balance, we can transfer `--from` a `SafeKey` (using its secret key), an `<amount>` of safecoins, `--to` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` can be passed as an argument with `--to`, or it will be read from `stdin`. If we omit the `--from` argument, the Account's default `SafeKey` will be used as the source of funds for the transfer.
+We now have a `SafeKey` with a positive balance, we can transfer `--from` a `SafeKey` (using its secret key), an `<amount>` of safecoins, `--to` another `Wallet`, `SafeKey`, or public key. The destination `Wallet`/`SafeKey`/public key can be passed as an argument with `--to`, or it will be read from `stdin`. If we omit the `--from` argument, the application's default `SafeKey` will be used as the source of funds for the transfer.
 
 ```shell
-$ safe keys transfer <amount> --from <source SafeKey secret key> --to <destination Wallet/SafeKey URL>
+$ safe keys transfer <amount> --from <source SafeKey secret key> --to <destination Wallet/SafeKey URL/public key>
 ```
 E.g.:
 ```shell
@@ -843,10 +843,10 @@ Spendable balance inserted with name 'my-default-balance' in Wallet located at "
 
 #### Wallet Transfer
 
-Once a `Wallet` contains some spendable balance/s, we can transfer `--from` a `Wallet` an `<amount>` of safecoins `--to` another `Wallet` or `SafeKey`. The destination `Wallet`/`SafeKey` can be passed as an argument with `--to`, or it will be read from `stdin`.
+Once a `Wallet` contains some spendable balance/s, we can transfer `--from` a `Wallet` an `<amount>` of safecoins `--to` another `Wallet`, `SafeKey`, or public key. The destination `Wallet`/`SafeKey`/public key can be passed as an argument with `--to`, or it will be read from `stdin`.
 
 ```shell
-$ safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL>
+$ safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL or public key>
 ```
 
 If the `Wallet` being provided either as the source or destination of a transfer has a _default_ spendable balance, we then only need to provide its URL, e.g.:

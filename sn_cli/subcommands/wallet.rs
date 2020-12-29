@@ -85,8 +85,8 @@ pub enum WalletSubCommands {
         amount: String,
         /// Source Wallet URL
         #[structopt(long = "from")]
-        from: Option<String>,
-        /// The receiving Wallet/SafeKey URL, or pulled from stdin if not provided
+        from: String,
+        /// The receiving Wallet/SafeKey URL or public key, otherwise pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
         /// The from secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
@@ -262,15 +262,12 @@ pub async fn wallet_commander(
             from_is_bls: _,
             to_is_bls: _,
         } => {
-            //TODO: if to starts without safe://, i.e. if it's a PK hex string.
             let destination = get_from_arg_or_stdin(
                 to,
-                Some("...awaiting destination Wallet/SafeKey URL from STDIN stream..."),
+                Some("...awaiting destination Wallet/SafeKey URL, or public key, from STDIN stream..."),
             )?;
 
-            let tx_id = safe
-                .wallet_transfer(&amount, from.as_deref(), &destination)
-                .await?;
+            let tx_id = safe.wallet_transfer(&amount, &from, &destination).await?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. TX_ID: {}", tx_id);
