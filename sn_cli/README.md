@@ -843,7 +843,7 @@ Spendable balance inserted with name 'my-default-balance' in Wallet located at "
 
 #### Wallet Transfer
 
-Once a `Wallet` contains some spendable balance/s, we can transfer `--from` a `Wallet` an `<amount>` of safecoins `--to` another `Wallet`, `SafeKey`, or public key. The destination `Wallet`/`SafeKey`/public key can be passed as an argument with `--to`, or it will be read from `stdin`.
+Once a `Wallet` contains some spendable balance/s, we can transfer `--from` a `Wallet` an `<amount>` of safecoins `--to` another `Wallet`, `SafeKey`, or public key. The destination `Wallet`/`SafeKey`/public key can be passed as an argument with `--to`, or it will be read from `stdin`. Currently only Ed25519 PublicKeys are supported.
 
 ```shell
 $ safe wallet transfer <amount> --from <source Wallet URL> --to <destination Wallet/SafeKey URL or public key>

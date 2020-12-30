@@ -77,8 +77,8 @@ jobs:
 
       - run: ls $HOME/.safe/cli
       - run: ls $HOME/.safe/authd
-      - run: echo "::add-path::$HOME/.safe/cli"
-      - run: echo "::add-path::$HOME/.safe/authd"
+      - run: echo "$HOME/.safe/cli" >> $GITHUB_PATH
+      - run: echo "$HOME/.safe/authd" >> $GITHUB_PATH
       - run: echo $PATH
       - run: chmod +x $HOME/.safe/authd/sn_authd
       - run: chmod +x $HOME/.safe/cli/safe

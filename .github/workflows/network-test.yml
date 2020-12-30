@@ -37,8 +37,8 @@ jobs:
           cp ./target/release/sn_authd $HOME/.safe/authd/
           ls $HOME/.safe/cli
           ls $HOME/.safe/authd
-          echo "::add-path::$HOME/.safe/cli"
-          echo "::add-path::$HOME/.safe/authd"
+          echo "$HOME/.safe/cli" >> $GITHUB_PATH
+          echo "$HOME/.safe/authd" >> $GITHUB_PATH
           echo $PATH
           chmod +x $HOME/.safe/authd/sn_authd
           chmod +x $HOME/.safe/cli/safe
@@ -83,8 +83,8 @@ jobs:
           cp ./target/release/sn_authd $HOME/.safe/authd/
           ls $HOME/.safe/cli
           ls $HOME/.safe/authd
-          echo "::add-path::$HOME/.safe/cli"
-          echo "::add-path::$HOME/.safe/authd"
+          echo "$HOME/.safe/cli" >> $GITHUB_PATH
+          echo "$HOME/.safe/authd" >> $GITHUB_PATH
           echo $PATH
           chmod +x $HOME/.safe/authd/sn_authd
           chmod +x $HOME/.safe/cli/safe

@@ -37,8 +37,9 @@ pub fn pk_to_hex(pk: &PublicKey) -> String {
 
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
     let pk_bytes = parse_hex(&hex_str);
-    let ed25519_pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes)
-        .map_err(|_| Error::InvalidInput(format!("Invalid public key bytes: {}", hex_str)))?;
+    let ed25519_pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes).map_err(|_| {
+        Error::InvalidInput(format!("Invalid Ed25519 public key bytes: {}", hex_str))
+    })?;
     Ok(PublicKey::Ed25519(ed25519_pk))
 }
 
