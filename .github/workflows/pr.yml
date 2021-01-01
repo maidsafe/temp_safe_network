@@ -43,7 +43,7 @@ jobs:
         run: cargo clippy --all-targets --all-features
 
   coverage:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    # if: ${{ github.repository_owner == 'maidsafe' }}
     name: Code coverage checks
     runs-on: ubuntu-latest
     if: false

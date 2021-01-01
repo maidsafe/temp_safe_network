@@ -12,7 +12,7 @@ env:
 
 jobs:
   build:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    # if: ${{ github.repository_owner == 'maidsafe' }}
     name: Build for benchmarking
     runs-on: ubuntu-latest
     if: false
@@ -40,7 +40,7 @@ jobs:
 
 
   benchmark:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    # if: ${{ github.repository_owner == 'maidsafe' }}
     name: Benchmarking ${{ matrix.benchmark }}
     needs: build
     runs-on: ubuntu-latest

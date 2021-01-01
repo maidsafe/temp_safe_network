@@ -12,7 +12,7 @@ env:
 
 jobs:
   network-test:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    # if: ${{ github.repository_owner == 'maidsafe' }}
     name: E2E against real baby
     runs-on: ubuntu-latest
     if: false
