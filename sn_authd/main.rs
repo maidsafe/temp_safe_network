@@ -26,9 +26,6 @@ use update::update_commander;
 #[macro_use]
 extern crate human_panic;
 
-#[macro_use]
-extern crate self_update;
-
 use operations::{restart_authd, start_authd, stop_authd};
 
 #[derive(StructOpt, Debug)]

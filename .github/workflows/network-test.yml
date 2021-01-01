@@ -12,6 +12,7 @@ env:
 
 jobs:
   network-test:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: E2E against real baby
     runs-on: ubuntu-latest
     if: false
@@ -58,6 +59,7 @@ jobs:
         run: tail $HOME/.safe/node/baby-fleming-nodes/*/*.log
 
   network-latest-node-test:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: E2E against real baby with latest non-released node
     runs-on: ubuntu-latest
     steps:

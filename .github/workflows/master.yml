@@ -12,6 +12,7 @@ env:
 
 jobs:
   build-cli-authd:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: Build Component
     runs-on: ${{ matrix.os }}
     strategy:
@@ -67,6 +68,7 @@ jobs:
 
   
   build-mac-cli-authd:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -133,6 +135,7 @@ jobs:
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
   # action.
   deploy:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: Deploy
     runs-on: ubuntu-latest
     needs: [build-cli-authd, build-mac-cli-authd]
@@ -282,6 +285,7 @@ jobs:
 
   # Automatic publish, triggered by a commit starting with "Version change".
   publish:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: Publish
     needs: deploy
     runs-on: ubuntu-latest

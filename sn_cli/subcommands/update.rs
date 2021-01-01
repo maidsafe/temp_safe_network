@@ -7,11 +7,20 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+#[cfg(feature = "self-update")]
 use log::debug;
 use std::error::Error;
 
+#[cfg(feature = "self-update")]
 const REPO_NAME: &str = "sn_api";
 
+#[cfg(not(feature = "self-update"))]
+pub fn update_commander() -> Result<(), Box<dyn Error>> {
+    println!("Self updates are disabled.");
+    Ok(())
+}
+
+#[cfg(feature = "self-update")]
 pub fn update_commander() -> Result<(), Box<dyn Error>> {
     let target = self_update::get_target();
     let releases = self_update::backends::github::ReleaseList::configure()
@@ -22,7 +31,7 @@ pub fn update_commander() -> Result<(), Box<dyn Error>> {
         .fetch()?;
 
     if releases.is_empty() {
-        println!("Current version is {}", cargo_crate_version!());
+        println!("Current version is {}", env!("CARGO_PKG_VERSION"));
         println!("No releases are available on GitHub to perform an update");
     } else {
         debug!("Found releases: {:#?}\n", releases);
@@ -37,7 +46,7 @@ pub fn update_commander() -> Result<(), Box<dyn Error>> {
             .target(&target)
             .bin_name(&bin_name)
             .show_download_progress(true)
-            .current_version(cargo_crate_version!())
+            .current_version(env!("CARGO_PKG_VERSION"))
             .build()?
             .update()?;
         println!("Update status: `{}`!", status.version());

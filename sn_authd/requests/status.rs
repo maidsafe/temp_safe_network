@@ -43,7 +43,7 @@ pub async fn process_req(
             notif_endpoints_list.len() as u32
         };
 
-        let authd_version = cargo_crate_version!().to_string();
+        let authd_version = env!("CARGO_PKG_VERSION").to_string();
 
         let status_report = AuthdStatus {
             safe_unlocked,

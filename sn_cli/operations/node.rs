@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+#[cfg(feature = "self-update")]
 use super::helpers::download_from_s3_and_install_bin;
 use log::debug;
 use rand::distributions::Alphanumeric;
@@ -57,6 +58,12 @@ fn run_safe_cmd(
     Ok(())
 }
 
+#[cfg(not(feature = "self-update"))]
+pub fn node_install(_vault_path: Option<PathBuf>) -> Result<(), String> {
+    Err("Self updates are disabled".to_string())
+}
+
+#[cfg(feature = "self-update")]
 pub fn node_install(node_path: Option<PathBuf>) -> Result<(), String> {
     let target_path = get_node_bin_path(node_path)?;
     let _ = download_from_s3_and_install_bin(

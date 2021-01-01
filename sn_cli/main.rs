@@ -22,9 +22,6 @@ extern crate prettytable;
 #[macro_use]
 extern crate human_panic;
 
-#[macro_use]
-extern crate self_update;
-
 const APP_ID: &str = "net.maidsafe.cli";
 #[allow(dead_code)]
 const APP_NAME: &str = "Safe CLI";

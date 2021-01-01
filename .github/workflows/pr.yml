@@ -11,6 +11,7 @@ env:
 
 jobs:
   clippy:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: Clippy, fmt & code coverage checks
     runs-on: ubuntu-latest
     steps:
@@ -42,42 +43,44 @@ jobs:
         run: cargo clippy --all-targets --all-features
 
   coverage:
-      name: Code coverage checks
-      runs-on: ubuntu-latest
-      if: false
-      steps:
-        - uses: actions/checkout@v1
-        - name: Install Rust and required components
-          uses: actions-rs/toolchain@v1
-          with:
-            profile: minimal
-            toolchain: stable
-            override: true
+    if: ${{ github.repository_owner == 'maidsafe' }}
+    name: Code coverage checks
+    runs-on: ubuntu-latest
+    if: false
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Rust and required components
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
 
-        # Cache.
-        - name: Cargo cache
-          uses: actions/cache@v2
-          with:
-            path: |
-              ~/.cargo/registry
-              ~/.cargo/git
-              target
-            key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      # Cache.
+      - name: Cargo cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
-        # Run cargo tarpaulin
-        - name: Code Coverage - sn_api
-          uses: actions-rs/tarpaulin@master
-          with:
-            args: '-v --manifest-path=sn_api/Cargo.toml --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
+      # Run cargo tarpaulin
+      - name: Code Coverage - sn_api
+        uses: actions-rs/tarpaulin@master
+        with:
+          args: '-v --manifest-path=sn_api/Cargo.toml --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
 
-        # Push tarpaulin results to coveralls.io
-        - name: Coveralls
-          uses: coverallsapp/github-action@master
-          with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            path-to-lcov: ./lcov.info
+      # Push tarpaulin results to coveralls.io
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./lcov.info
 
   test-component:
+    if: ${{ github.repository_owner == 'maidsafe' }}
     name: Test Component
     runs-on: ${{ matrix.os }}
     strategy:

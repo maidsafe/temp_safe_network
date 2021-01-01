@@ -26,7 +26,7 @@ pretty-hex = "~0.1.1"
 prettytable-rs = "~0.8"
 rand = "~0.7.3"
 relative-path = "~0.4.0"
-reqwest = { version = "~0.9.24", default-features=false, features = ["rustls-tls"] }
+reqwest = { version = "~0.9.24", default-features=false, features = ["rustls-tls"], optional = true }
 rpassword = "4.0.5"
 sn_launch_tool = "~0.0.5"
 serde = "1.0.91"
@@ -43,8 +43,9 @@ percent-encoding = "2.1.0"
 xor_name = "1"
 
 [features]
-default = ["simulated-payouts"]
+default = ["simulated-payouts", "self-update"]
 simulated-payouts = ["sn_api/simulated-payouts"]
+self-update = ["reqwest", "self_update"]
 
 
 [dependencies.sn_api]
@@ -56,6 +57,7 @@ features = ["app", "authd_client", "simulated-payouts"]
 version = "~0.15.0"
 default-features = false
 features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"]
+optional = true
 
 [dev-dependencies]
 anyhow = "1.0.36"

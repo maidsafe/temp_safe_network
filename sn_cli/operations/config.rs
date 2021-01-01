@@ -240,21 +240,26 @@ pub fn retrieve_conn_info(name: &str, location: &str) -> Result<Vec<u8>, String>
         name, location
     );
     if is_remote_location(location) {
-        // Fetch info from an HTTP/s location
-        let mut resp = reqwest::get(location).map_err(|err| {
-            format!(
-                "Failed to fetch connection information for network '{}' from '{}': {}",
-                name, location, err
-            )
-        })?;
+        #[cfg(feature = "self-update")]
+        {
+            // Fetch info from an HTTP/s location
+            let mut resp = reqwest::get(location).map_err(|err| {
+                format!(
+                    "Failed to fetch connection information for network '{}' from '{}': {}",
+                    name, location, err
+                )
+            })?;
 
-        let conn_info = resp.text().map_err(|err| {
-            format!(
-                "Failed to fetch connection information for network '{}' from '{}': {}",
-                name, location, err
-            )
-        })?;
-        Ok(conn_info.as_bytes().to_vec())
+            let conn_info = resp.text().map_err(|err| {
+                format!(
+                    "Failed to fetch connection information for network '{}' from '{}': {}",
+                    name, location, err
+                )
+            })?;
+            Ok(conn_info.as_bytes().to_vec())
+        }
+        #[cfg(not(feature = "self-update"))]
+        Err("Self updates are disabled".to_string())
     } else {
         // Fetch it from a local file then
         let conn_info = fs::read(location).map_err(|err| {

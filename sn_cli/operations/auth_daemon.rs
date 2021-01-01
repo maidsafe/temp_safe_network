@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+#[cfg(feature = "self-update")]
 use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
 use envy::from_env;
@@ -17,15 +18,18 @@ use sn_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
 use std::convert::From;
-use std::{fs::File, path::PathBuf};
+use std::fs::File;
+#[cfg(feature = "self-update")]
+use std::path::PathBuf;
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
+#[cfg(feature = "self-update")]
 const ENV_VAR_SN_AUTHD_PATH: &str = "SN_AUTHD_PATH";
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), feature = "self-update"))]
 const SN_AUTHD_EXECUTABLE: &str = "sn_authd";
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "self-update"))]
 const SN_AUTHD_EXECUTABLE: &str = "sn_authd.exe";
 
 #[derive(Deserialize, Debug)]
@@ -40,6 +44,12 @@ struct SafeSeed {
     pub password: String,
 }
 
+#[cfg(not(feature = "self-update"))]
+pub fn authd_install(_authd_path: Option<String>) -> Result<(), String> {
+    Err("Self updates are disabled".to_string())
+}
+
+#[cfg(feature = "self-update")]
 pub fn authd_install(authd_path: Option<String>) -> Result<(), String> {
     let target_path = get_authd_bin_path(authd_path)?;
     download_from_s3_and_install_bin(target_path, "sn-api", "sn_authd", SN_AUTHD_EXECUTABLE, None)?;
@@ -367,6 +377,7 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
     Ok(details)
 }
 
+#[cfg(feature = "self-update")]
 #[inline]
 fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
     match authd_path {
