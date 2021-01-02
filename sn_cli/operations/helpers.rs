@@ -147,7 +147,9 @@ fn set_exec_perms(file_path: PathBuf) -> Result<(), String> {
         .permissions();
 
     // set execution permissions bits for owner, group and others
-    perms.set_mode(perms.mode() | 0b000_0100_1001);
+    // Allow unusual bit grouping to clearly separate 3 bits parts
+    #[allow(clippy::unusual_byte_groupings)]
+    perms.set_mode(perms.mode() | 0b0_001_001_001);
     file.set_permissions(perms).map_err(|err| {
         format!(
             "Failed to set execution permissions to installed binary '{}': {}",
