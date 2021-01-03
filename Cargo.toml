@@ -1,0 +1,44 @@
+[package]
+authors = [ "MaidSafe Developers <dev@maidsafe.net>" ]
+description = "Safe Network Messaging"
+edition = "2018"
+homepage = "https://maidsafe.net"
+license = "MIT OR BSD-3-Clause"
+name = "sn_messaging"
+readme = "README.md"
+repository = "https://github.com/maidsafe/sn_messaging"
+version = "0.1.0"
+
+[dependencies]
+thiserror = "1.0.23"
+bincode = "1.2.1"
+multibase = "~0.8.0"
+hex_fmt = "~0.3.0"
+rand = "~0.7.3"
+crdts = "4.3.0"
+sha3 = "~0.8.2"
+threshold_crypto = "~0.4.0"
+tiny-keccak = "~1.5.0"
+xor_name = "1.1.0"
+ed25519 = "1.0.1"
+signature = "1.1.0"
+rand_core = "~0.5.1"
+# sn_data_types={path="../sn_data_types"}
+sn_data_types="~0.12.0"
+
+  [dependencies.ed25519-dalek]
+  version = "1.0.0-pre.4"
+  features = [ "serde" ]
+
+  [dependencies.serde]
+  version = "1.0.91"
+  features = [ "derive" ]
+
+[dev-dependencies]
+anyhow = "1.0.36"
+hex = "~0.3.2"
+rand_xorshift = "~0.2.0"
+proptest = "0.10.1"
+
+[features]
+simulated-payouts = [ ]
