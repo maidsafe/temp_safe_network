@@ -26,7 +26,7 @@ pretty-hex = "~0.1.1"
 prettytable-rs = "~0.8"
 rand = "~0.7.3"
 relative-path = "~0.4.0"
-reqwest = "~0.9.22"
+reqwest = { version = "~0.9.24", default-features=false, features = ["rustls-tls"] }
 rpassword = "4.0.5"
 sn_launch_tool = "~0.0.5"
 serde = "1.0.91"
