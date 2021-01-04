@@ -19,7 +19,7 @@ use crate::{
 };
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt, iter::FromIterator};
+use std::{collections::BTreeMap, fmt};
 
 type SubName = String;
 type DefinitionData = BTreeMap<String, String>;
@@ -93,7 +93,7 @@ impl NrsMap {
                     def_data.get(FAKE_RDF_PREDICATE_LINK)
                 }
                 DefaultRdf::ExistingRdf(sub_name) => {
-                    let sub_names = Vec::from_iter(sub_name.split('.').map(String::from));
+                    let sub_names = sub_name.split('.').map(String::from).collect::<Vec<_>>();
                     dereferenced_link = self.resolve_for_subnames(&sub_names)?;
                     Some(&dereferenced_link)
                 }
@@ -164,7 +164,7 @@ impl NrsMap {
             }
             DefaultRdf::OtherRdf(def_data) => def_data.get(FAKE_RDF_PREDICATE_LINK),
             DefaultRdf::ExistingRdf(sub_name) => {
-                let sub_names = Vec::from_iter(sub_name.split('.').map(String::from));
+                let sub_names = sub_name.split('.').map(String::from).collect::<Vec<_>>();
                 dereferenced_link = self.resolve_for_subnames(&sub_names).map_err(|_| Error::ContentError(
                     format!("Default found for resolvable map (set to sub names '{}') cannot be resolved.", sub_name),
                 ))?;
@@ -346,8 +346,10 @@ fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> R
         }
         Some(SubNameRDF::Definition(def_data)) => {
             // we need to add the new sub nrs tree but as a sibling
-            let mut new_nrs_map = NrsMap::default();
-            new_nrs_map.default = DefaultRdf::OtherRdf(def_data.clone());
+            let new_nrs_map = NrsMap {
+                default: DefaultRdf::OtherRdf(def_data.clone()),
+                ..Default::default()
+            };
             let updated_new_nrs_map = setup_nrs_tree(&new_nrs_map, sub_names, link)?;
             updated_nrs_map
                 .sub_names_map

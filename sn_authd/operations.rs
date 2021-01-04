@@ -258,10 +258,7 @@ fn launch_detached_process(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
     // If it failed to start already, we can get the error code from it,
     // otherwise we'll assume it started correctly
     if let Ok(Some(status)) = child.try_wait() {
-        let exit_code = match status.code() {
-            Some(code) => code,
-            None => 1,
-        };
+        let exit_code = status.code().unwrap_or(1);
 
         let error = Error::from_code(
             exit_code,

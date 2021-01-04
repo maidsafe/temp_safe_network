@@ -208,11 +208,10 @@ impl FileMeta {
 
     // returns false if a directory or symlink, true if anything else (a file).
     pub(crate) fn filetype_is_file(file_type: &str) -> bool {
-        match file_type {
-            MIMETYPE_FILESYSTEM_DIR => false,
-            MIMETYPE_FILESYSTEM_SYMLINK => false,
-            _ => true,
-        }
+        !matches!(
+            file_type,
+            MIMETYPE_FILESYSTEM_DIR | MIMETYPE_FILESYSTEM_SYMLINK
+        )
     }
 
     // returns false if a directory or symlink, true if anything else (a file).
