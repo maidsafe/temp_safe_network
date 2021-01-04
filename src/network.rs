@@ -7,11 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::Address;
+use crate::{Address, BlobWrite, Error, MsgSender, Result};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    Blob, BlobAddress, BlobWrite, DebitId, Error, MsgSender, PublicKey, ReplicaEvent, Result,
-    Signature, SignedTransfer, TransferAgreementProof, TransferValidated,
+    Blob, BlobAddress, DebitId, PublicKey, ReplicaEvent, Signature, SignedTransfer,
+    TransferAgreementProof, TransferValidated,
 };
 use std::collections::BTreeSet;
 use xor_name::XorName;

@@ -45,6 +45,15 @@ pub enum Error {
     /// Requested data not found
     #[error("Requested data not found")]
     NoSuchData,
+
+    /// No history found for PublicKey
+    #[error("No history found for PublicKey: {0}")]
+    NoHistoryForPublicKey(sn_data_types::PublicKey),
+
+    /// Failed to write file, likely due to a system Io error
+    #[error("Failed to write file")]
+    FailedToWriteFile,
+
     /// Provided data already exists on the network
     #[error("Data provided already exists")]
     DataExists,
@@ -57,12 +66,15 @@ pub enum Error {
     /// Key does not exist
     #[error("Key does not exist")]
     NoSuchKey,
+    /// Node NotEnoughSpace error
+    #[error("Node does not have sufficient space to store chunk")]
+    NotEnoughSpace,
     /// Duplicate Entries in this push
     #[error("Duplicate entries provided")]
     DuplicateEntryKeys,
     /// The list of owner keys is invalid
-    #[error("Invalid owner keys")]
-    InvalidOwners,
+    #[error("Invalid owner key: {0}")]
+    InvalidOwners(sn_data_types::PublicKey),
     /// No Policy has been set to the data
     #[error("No policy has been set for this data")]
     PolicyNotSet,
@@ -93,10 +105,10 @@ pub enum Error {
     /// Received a request with a duplicate MessageId
     #[error("Duplicate message id received")]
     DuplicateMessageId,
-    /// Network error occurring at Node level which has no bearing on clients, e.g. serialisation
-    /// failure or database failure
-    #[error("Network error: {0}")]
-    NetworkOther(String),
+    // /// Network error occurring at Node level which has no bearing on clients, e.g. serialisation
+    // /// failure or database failure
+    // #[error("Network error: {0}")]
+    // NetworkOther(String),
     /// While parsing, precision would be lost.
     #[error("Lost precision on the number of coins during parsing")]
     LossOfPrecision,
@@ -138,4 +150,18 @@ pub enum Error {
     /// Entry already exists. Contains the current entry Key.
     #[error("Entry already exists {0}")]
     EntryExists(u8),
+
+    /// Problem registering the payment at a node
+    #[error("Payment registration failed")]
+    PaymentFailed,
+
+    /// Node failed to delete the requested data for some reason.
+    #[error("Failed to delete requested data")]
+    FailedToDelete,
+
+    /// Node error that was not expected for message response
+    #[error("There was an unexpected error at the node: '{0}'")]
+    UnexpectedNodeError(String), // /// NetworkData error.
+                                 // #[error("Network data error:: {0}")]
+                                 // NetworkData(#[from] sn_data_types::Error)
 }
