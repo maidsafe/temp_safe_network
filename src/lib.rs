@@ -1,4 +1,4 @@
-// Copyright 2021MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // https://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -18,6 +18,7 @@ mod query;
 mod sender;
 mod sequence;
 mod transfer;
+mod wire_msg;
 
 pub use self::{
     blob::{BlobRead, BlobWrite},
@@ -36,6 +37,7 @@ pub use self::{
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
     sequence::{SequenceRead, SequenceWrite},
     transfer::{TransferCmd, TransferQuery},
+    wire_msg::{PayloadSerType, WireMsg},
 };
 use crate::errors::ErrorDebug;
 use serde::{Deserialize, Serialize};
@@ -56,7 +58,7 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
-    ///
+    /// The actual message payload
     pub message: Message,
     /// The source of the message.
     pub origin: MsgSender,
@@ -77,16 +79,24 @@ impl MsgEnvelope {
     /// So, needs some improvement..
     pub fn verify(&self) -> Result<bool> {
         let data = if self.proxies.is_empty() {
-            bincode::serialize(&self.message)
-                .map_err(|_| Error::Serialisation("Could not serialize message".to_string()))?
+            self.serialise()?
         } else {
             let mut msg = self.clone();
             let _ = msg.proxies.pop();
-            bincode::serialize(&msg)
-                .map_err(|_| Error::Serialisation("Could not serialize message".to_string()))?
+            msg.serialise()?
         };
         let sender = self.most_recent_sender();
         Ok(sender.verify(&data))
+    }
+
+    pub fn from(bytes: &[u8]) -> Result<Self> {
+        let wire_msg = WireMsg::from(bytes)?;
+        wire_msg.deserialise()
+    }
+
+    pub fn serialise(&self) -> Result<Vec<u8>> {
+        let wire_msg = WireMsg::new(self, PayloadSerType::Json)?;
+        Ok(wire_msg.serialise())
     }
 
     /// The proxy would first sign the MsgEnvelope,
@@ -325,6 +335,11 @@ impl Default for MessageId {
     }
 }
 
+impl fmt::Display for MessageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 ///
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum CmdError {
@@ -702,6 +717,34 @@ mod tests {
             Err(TryFromError::Response(e.clone())),
             Map::try_from(GetMap(Err(e)))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn serialisation() -> Result<()> {
+        let keypair = &gen_keypairs()[0];
+        let pk = keypair.public_key();
+        let signature = keypair.sign(b"blabla");
+
+        let random_xor = XorName::random();
+        let id = MessageId(random_xor);
+        let message = Message::Query {
+            query: Query::Transfer(TransferQuery::GetBalance(pk)),
+            id,
+        };
+
+        let msg_envelope = MsgEnvelope {
+            message,
+            origin: MsgSender::client(pk, signature)?,
+            proxies: vec![],
+        };
+
+        let serialised_msg = msg_envelope.serialise()?;
+        println!("TO STR: {:?}", serialised_msg);
+
+        let deserlised_msg = MsgEnvelope::from(&serialised_msg)?;
+        assert_eq!(deserlised_msg, msg_envelope);
+
         Ok(())
     }
 }
