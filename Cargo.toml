@@ -12,6 +12,7 @@ version = "1.2.0"
 [dependencies]
 cookie-factory = "0.3.1"
 thiserror = "1.0.23"
+rmp-serde = { git = "https://github.com/3Hren/msgpack-rust.git" }
 multibase = "~0.8.0"
 hex_fmt = "~0.3.0"
 rand = "~0.7.3"

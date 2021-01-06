@@ -37,8 +37,8 @@ pub use self::{
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
     sequence::{SequenceRead, SequenceWrite},
     transfer::{TransferCmd, TransferQuery},
-    wire_msg::{PayloadSerialisationType, WireMsg},
 };
+
 use crate::errors::ErrorDebug;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -52,9 +52,16 @@ use std::{
     convert::TryFrom,
     fmt,
 };
+use wire_msg::{PayloadSerialisationType, WireMsg};
 use xor_name::XorName;
 
-///
+/// Message envelope containing a Safe message payload, sender, and the list
+/// of proxies the message could have been gone through with their signatures.
+/// This struct also provides utilities to obtain the serialised bytes
+/// ready to send them over the wire. The serialised bytes contain information
+/// about messaging protocol version, serialisation style used for the payload (e.g. Json),
+/// and/or any other information required by the receiving end to either deserialise it,
+/// or detect any incompatibility.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
@@ -82,16 +89,24 @@ impl MsgEnvelope {
             let _ = msg.proxies.pop();
             msg.serialise()?
         };
+
         let sender = self.most_recent_sender();
         Ok(sender.verify(&data))
     }
 
+    /// Deserialise a MsgEnvelope from bytes received over the wire.
     pub fn from(bytes: &[u8]) -> Result<Self> {
-        WireMsg::from(bytes)?.deserialise()
+        WireMsg::deserialise_msg(bytes)
     }
 
+    /// Serialise this MsgEnvelope into bytes ready to be sent over the wire.
     pub fn serialise(&self) -> Result<Vec<u8>> {
         WireMsg::serialise_msg(self, PayloadSerialisationType::Json)
+    }
+
+    /// Serialise this MsgEnvelope into bytes ready to be sent over the wire.
+    pub fn serialise_with_msgpack(&self) -> Result<Vec<u8>> {
+        WireMsg::serialise_msg(self, PayloadSerialisationType::Msgpack)
     }
 
     /// The proxy would first sign the MsgEnvelope,
@@ -101,7 +116,8 @@ impl MsgEnvelope {
         self.proxies.push(proxy);
     }
 
-    ///
+    /// Return the most recent proxy this message passed through,
+    /// or the sender if it didn't go through any proxy.
     pub fn most_recent_sender(&self) -> &MsgSender {
         match self.proxies.last() {
             None => &self.origin,
@@ -109,7 +125,7 @@ impl MsgEnvelope {
         }
     }
 
-    ///
+    /// Return the final destination address for this message.
     pub fn destination(&self) -> Result<Address> {
         use Address::*;
         use Message::*;
@@ -127,6 +143,7 @@ impl MsgEnvelope {
         }
     }
 
+    // Private helper to calculate final destination of a Cmd message
     fn cmd_dst(&self, cmd: &Cmd) -> Result<Address> {
         use Address::*;
         use Cmd::*;
@@ -734,10 +751,15 @@ mod tests {
             proxies: vec![],
         };
 
-        let serialised_msg = msg_envelope.serialise()?;
+        // test json serialisation
+        let serialised_with_json = msg_envelope.serialise()?;
+        let deserialised_from_json = MsgEnvelope::from(&serialised_with_json)?;
+        assert_eq!(deserialised_from_json, msg_envelope);
 
-        let deserlised_msg = MsgEnvelope::from(&serialised_msg)?;
-        assert_eq!(deserlised_msg, msg_envelope);
+        // test msgpack serialisation
+        let serialised_with_msgpack = msg_envelope.serialise_with_msgpack()?;
+        let deserialised_from_msgpack = MsgEnvelope::from(&serialised_with_msgpack)?;
+        assert_eq!(deserialised_from_msgpack, msg_envelope);
 
         Ok(())
     }

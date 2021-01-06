@@ -36,6 +36,13 @@ impl<'a, T> Debug for ErrorDebug<'a, T> {
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
 pub enum Error {
+    /// Message read was built with an unsupported version.
+    #[error("Unsupported messaging protocol version: {0}")]
+    UnsupportedVersion(u16),
+    /// Message read contains a payload with an unsupported serialisation type.
+    #[error("Unsupported payload serialisation: {0}")]
+    UnsupportedSerialisation(u16),
+
     /// Access denied for supplied PublicKey
     #[error("Access denied for PublicKey: {0}")]
     AccessDenied(PublicKey),
