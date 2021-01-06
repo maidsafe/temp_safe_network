@@ -144,10 +144,10 @@ impl MsgEnvelope {
         use Address::*;
         use Cmd::*;
         match cmd {
-            // always to `Payment` section
+            // always to `Transfer` section
             Transfer(c) => Ok(Section(c.dst_address())),
             // Data dst (after reaching `Gateway`)
-            // is `Payment` and then `Metadata`.
+            // is `Transfer` and then `Metadata`.
             Data { cmd, payment } => {
                 let sender = self.most_recent_sender();
                 match sender.address() {
@@ -155,13 +155,12 @@ impl MsgEnvelope {
                     Client(xorname) => Ok(Section(xorname)),
                     Node(_) => {
                         match sender.duty() {
-                            // From `Gateway` to `Payment`.
+                            // From `Gateway` to `Transfer`.
                             Some(Duty::Elder(ElderDuties::Gateway)) => {
                                 Ok(Section(payment.sender().into()))
                             }
-                            // From `Payment` to `Metadata`.
-                            Some(Duty::Elder(ElderDuties::Payment))
-                            | Some(Duty::Elder(ElderDuties::Transfer))
+                            // From `Transfer` to `Metadata`.
+                            Some(Duty::Elder(ElderDuties::Transfer))
                             | Some(Duty::Elder(ElderDuties::Metadata)) => {
                                 Ok(Section(cmd.dst_address()))
                             }
@@ -172,10 +171,9 @@ impl MsgEnvelope {
                     Section(_) => {
                         match sender.duty() {
                             // Accumulated at `Metadata`.
-                            // I.e. this means we accumulated a section signature from `Payment` Elders.
+                            // I.e. this means we accumulated a section signature from `Transfer` Elders.
                             // (this is done at `Metadata` Elders, and the accumulated section is added to most recent sender)
-                            Some(Duty::Elder(ElderDuties::Payment))
-                            | Some(Duty::Elder(ElderDuties::Transfer))
+                            Some(Duty::Elder(ElderDuties::Transfer))
                             | Some(Duty::Elder(ElderDuties::Metadata)) => {
                                 Ok(Section(cmd.dst_address()))
                             }
@@ -671,7 +669,6 @@ mod tests {
         let bls_secret_key = threshold_crypto::SecretKeySet::random(1, &mut rng);
         vec![
             Keypair::new_ed25519(&mut rng),
-            Keypair::new_bls(&mut rng),
             Keypair::new_bls_share(
                 0,
                 bls_secret_key.secret_key_share(0),
