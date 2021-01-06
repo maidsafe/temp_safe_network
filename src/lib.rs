@@ -37,7 +37,7 @@ pub use self::{
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
     sequence::{SequenceRead, SequenceWrite},
     transfer::{TransferCmd, TransferQuery},
-    wire_msg::{PayloadSerType, WireMsg},
+    wire_msg::{PayloadSerialisationType, WireMsg},
 };
 use crate::errors::ErrorDebug;
 use serde::{Deserialize, Serialize};
@@ -73,10 +73,7 @@ impl MsgEnvelope {
         self.message.id()
     }
 
-    /// This is not quite good.
-    /// It does work for the cases we have,
-    /// but it does so without being clearly robust/flexible.
-    /// So, needs some improvement..
+    /// Verify the signature provided by the most recent sender is valid.
     pub fn verify(&self) -> Result<bool> {
         let data = if self.proxies.is_empty() {
             self.serialise()?
@@ -90,13 +87,11 @@ impl MsgEnvelope {
     }
 
     pub fn from(bytes: &[u8]) -> Result<Self> {
-        let wire_msg = WireMsg::from(bytes)?;
-        wire_msg.deserialise()
+        WireMsg::from(bytes)?.deserialise()
     }
 
     pub fn serialise(&self) -> Result<Vec<u8>> {
-        let wire_msg = WireMsg::new(self, PayloadSerType::Json)?;
-        Ok(wire_msg.serialise())
+        WireMsg::serialise_msg(self, PayloadSerialisationType::Json)
     }
 
     /// The proxy would first sign the MsgEnvelope,
@@ -740,7 +735,6 @@ mod tests {
         };
 
         let serialised_msg = msg_envelope.serialise()?;
-        println!("TO STR: {:?}", serialised_msg);
 
         let deserlised_msg = MsgEnvelope::from(&serialised_msg)?;
         assert_eq!(deserlised_msg, msg_envelope);
