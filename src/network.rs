@@ -11,7 +11,7 @@ use crate::{Address, BlobWrite, Error, MsgSender, Result};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     Blob, BlobAddress, DebitId, PublicKey, ReplicaEvent, Signature, SignedTransfer,
-    TransferAgreementProof, TransferValidated,
+    TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -115,7 +115,7 @@ pub enum NodeQuery {
 pub enum NodeRewardQuery {
     /// Sent by the new section to the
     /// old section after node relocation.
-    GetWalletId {
+    GetNodeWalletId {
         /// The id of the node
         /// in the old section.
         old_node_id: XorName,
@@ -128,8 +128,14 @@ pub enum NodeRewardQuery {
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeTransferQuery {
-    ///
-    GetSectionActorHistory(PublicKey),
+    /// A new Elder needs to query
+    /// network for its replicas' public key set
+    /// and the history of events of the wallet.
+    CatchUpWithSectionWallet(PublicKey),
+    /// On Elder change, all Elders neet to query
+    /// network for the new wallet's replicas' public key set
+    /// and the history of events of the wallet (which will be empty at that point..).
+    GetNewSectionWallet(PublicKey),
     /// Replicas starting up
     /// need to query for events of
     /// the existing Replicas.
@@ -172,15 +178,23 @@ pub enum NodeRewardQueryResponse {
     /// Returns the wallet address
     /// together with the new node id,
     /// that followed with the original query.
-    GetWalletId(Result<(PublicKey, XorName)>),
+    GetNodeWalletId(Result<(PublicKey, XorName)>),
 }
 
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeTransferQueryResponse {
-    /// Returns the history of the section actor.
-    GetSectionActorHistory(Result<Vec<ReplicaEvent>>),
+    /// A new Elder needs to query
+    /// network for its replicas' public key set
+    /// and the history of events of the wallet.
+    CatchUpWithSectionWallet(Result<WalletInfo>),
+    /// On Elder change, all Elders neet to query
+    /// network for the new wallet's replicas' public key set
+    /// and the history of events of the wallet (which will be empty at that point..).
+    GetNewSectionWallet(Result<WalletInfo>),
+    // /// Returns the history of the section actor.
+    // GetSectionWalletInfo(Result<Vec<ReplicaEvent>>),
     /// Replicas starting up
     /// need to query for events of
     /// the existing Replicas.
@@ -313,9 +327,10 @@ impl NodeQuery {
             },
             Transfers(transfer_query) => match transfer_query {
                 GetReplicaEvents(section_key) => Section((*section_key).into()),
-                GetSectionActorHistory(section_key) => Section((*section_key).into()),
+                GetNewSectionWallet(section_key) => Section((*section_key).into()),
+                CatchUpWithSectionWallet(section_key) => Section((*section_key).into()),
             },
-            Rewards(GetWalletId { old_node_id, .. }) => Section(*old_node_id),
+            Rewards(GetNodeWalletId { old_node_id, .. }) => Section(*old_node_id),
         }
     }
 }
