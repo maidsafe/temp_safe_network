@@ -10,7 +10,7 @@
 use crate::{Address, BlobWrite, Error, MsgSender, Result};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    Blob, BlobAddress, DebitId, PublicKey, ReplicaEvent, Signature, SignedTransfer,
+    Blob, BlobAddress, DebitId, PublicKey, ReplicaEvent, Signature, SignedTransferShare,
     TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use std::collections::BTreeSet;
@@ -56,7 +56,7 @@ pub enum NodeTransferCmd {
     ///
     PropagateTransfer(TransferAgreementProof),
     ///
-    ValidateSectionPayout(SignedTransfer),
+    ValidateSectionPayout(SignedTransferShare),
     ///
     RegisterSectionPayout(TransferAgreementProof),
 }
