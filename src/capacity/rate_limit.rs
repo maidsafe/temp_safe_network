@@ -120,4 +120,103 @@ mod test {
         assert!(last_split_coins > 0.0);
         Ok(())
     }
+
+    #[test]
+    #[ignore] // these tests fail with the current implementation
+    fn rate_limit_common_sense() -> Result<()> {
+        // setup
+        let one_mb_bytes = 1024 * 1024;
+        let prefix_len = 0;
+        let all_nodes = 8;
+        let full_nodes = 7;
+        let standard_rl = RateLimit::rate_limit(
+            one_mb_bytes,
+            full_nodes,
+            all_nodes,
+            prefix_len,
+        )
+        .as_nano();
+        // Test various different comparisons of the storecost.
+        // These tests are of the type 'all things being equal, then ...'
+        {
+            // smaller chunks cost less
+            let one_mb_less_one_byte = one_mb_bytes - 1;
+            let small = RateLimit::rate_limit(
+                one_mb_less_one_byte,
+                full_nodes,
+                all_nodes,
+                prefix_len,
+            )
+            .as_nano();
+            assert!(small <= standard_rl, "small chunks don't cost less, expect {} <= {}", small, standard_rl);
+        };
+        {
+            // large network is cheaper to store than smaller network
+            let big_prefix_len = prefix_len + 1;
+            let big = RateLimit::rate_limit(
+                one_mb_bytes,
+                full_nodes,
+                all_nodes,
+                big_prefix_len,
+            )
+            .as_nano();
+            assert!(big <= standard_rl, "larger network is not cheaper, expect {} <= {}", big, standard_rl);
+        };
+        {
+            // less full section is cheaper than more full section
+            let less_full_nodes = full_nodes - 1;
+            let empty = RateLimit::rate_limit(
+                one_mb_bytes,
+                less_full_nodes,
+                all_nodes,
+                prefix_len,
+            )
+            .as_nano();
+            assert!(empty <= standard_rl, "less full section is not cheaper, expect {} <= {}", empty, standard_rl);
+        };
+        {
+            // one big chunk is cheaper than the same bytes in many tiny chunks
+            let one_kb_bytes = 1024;
+            let reduced = RateLimit::rate_limit(
+                one_kb_bytes,
+                full_nodes,
+                all_nodes,
+                prefix_len,
+            )
+            .as_nano();
+            let combined = 1024 * reduced;
+            assert!(standard_rl <= combined, "one big chunk is not cheaper than many small ones, expect {} <= {}", standard_rl, combined);
+        };
+        {
+            // storage is never free even for most optimistic circumstances
+            let one_byte = 1;
+            let half_full_nodes = 99;
+            let big_section_node_count = 199;
+            let big_prefix_len = 256;
+            let endcost = RateLimit::rate_limit(
+                one_byte,
+                half_full_nodes,
+                big_section_node_count,
+                big_prefix_len,
+            )
+            .as_nano();
+            assert!(endcost > 0, "cost is not always greater than zero: cost is {}", endcost);
+        };
+        {
+            // the first chunk is a reasonable cost
+            let max_initial_cost = 1_000 * 1_000_000_000; // 1000 tokens
+            let zero_full_nodes = 0;
+            let minimum_section_nodes = 5;
+            let first_section_prefix = 0;
+            let startcost = RateLimit::rate_limit(
+                one_mb_bytes,
+                zero_full_nodes,
+                minimum_section_nodes,
+                first_section_prefix,
+            )
+            .as_nano();
+            assert!(startcost < max_initial_cost, "initial cost {} is above {}", startcost, max_initial_cost);
+        };
+        Ok(())
+    }
 }
