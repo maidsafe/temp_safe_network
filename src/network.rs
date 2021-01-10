@@ -240,6 +240,8 @@ pub enum NodeDataError {
 pub enum NodeTransferError {
     /// The error of propagation of TransferRegistered event.
     TransferPropagation(Error),
+    /// The error of registration of a section payout.
+    SectionPayoutRegistration(Error),
 }
 
 ///
