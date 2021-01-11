@@ -80,7 +80,8 @@ jobs:
           path-to-lcov: ./lcov.info
 
   test-component:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    # if: ${{ github.repository_owner == 'maidsafe' }} // re-enable this once these tests are run again
+    if: false
     name: Test Component
     runs-on: ${{ matrix.os }}
     strategy:

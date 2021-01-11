@@ -9,6 +9,4 @@ function run_api_tests() {
     cd -
 }
 
-# Temporarily disable running these tests as they currently
-# need refactoring to account for network sync up periods.
-# run_api_tests
+run_api_tests

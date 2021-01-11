@@ -69,8 +69,17 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: cargo build --release --manifest-path=${{ matrix.component }}/Cargo.toml
 
-      # Upload
-      - name: Upload
+      # Upload Ubuntu
+      - name: Upload Ubuntu Builds
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ matrix.output }}
+          path: target/x86_64-unknown-linux-musl/release/${{ matrix.target }}
+      
+      # Upload Windows
+      - name: Upload Windows Builds
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.output }}
