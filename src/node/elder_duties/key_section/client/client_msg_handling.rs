@@ -147,7 +147,7 @@ impl ClientMsgHandling {
                 let _ = self
                     .tracked_outgoing
                     .insert(correlation_id, message.clone());
-                return Ok(());
+                Ok(())
             }
         }
     }

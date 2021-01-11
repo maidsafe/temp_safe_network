@@ -7,14 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::{
-        node_duties::accumulation::Accumulation,
-        node_ops::{
-            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkReplicationCmd, ChunkReplicationDuty,
-            ChunkReplicationQuery, ChunkStoreDuty, ElderDuty, GatewayDuty, MetadataDuty,
-            NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd,
-            TransferDuty, TransferQuery,
-        },
+    node::node_ops::{
+        AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkReplicationCmd, ChunkReplicationDuty,
+        ChunkReplicationQuery, ChunkStoreDuty, ElderDuty, GatewayDuty, MetadataDuty,
+        NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd,
+        TransferDuty, TransferQuery,
     },
     Error, Network, Result,
 };
@@ -34,16 +31,12 @@ use xor_name::XorName;
 /// Evaluates remote msgs from the network,
 /// i.e. not msgs sent directly from a client.
 pub struct NetworkMsgAnalysis {
-    accumulation: Accumulation,
     routing: Network,
 }
 
 impl NetworkMsgAnalysis {
     pub fn new(routing: Network) -> Self {
-        Self {
-            accumulation: Accumulation::new(),
-            routing,
-        }
+        Self { routing }
     }
 
     pub async fn is_dst_for(&self, msg: &MsgEnvelope) -> Result<bool> {
@@ -70,16 +63,6 @@ impl NetworkMsgAnalysis {
     }
 
     pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Result<NodeOperation> {
-        let msg = if self.should_accumulate(msg).await? {
-            if let Some(msg) = self.accumulation.process_message_envelope(msg)? {
-                msg
-            } else {
-                return Ok(NodeOperation::NoOp);
-            }
-        } else {
-            msg.clone() // TODO remove this clone
-        };
-
         match self.try_messaging(&msg).await? {
             // Identified as an outbound msg, to be sent on the wire.
             NodeMessagingDuty::NoOp => (),
@@ -153,181 +136,12 @@ impl NetworkMsgAnalysis {
         if destined_for_network {
             Ok(NodeMessagingDuty::SendToSection {
                 msg: msg.clone(),
-                as_node: true,
+                as_node: msg.origin.is_any_node(),
             }) // Forwards without stamping the duty (was not processed).
         } else {
             Ok(NodeMessagingDuty::NoOp)
         }
     }
-
-    // ----  Accumulation ----
-
-    async fn should_accumulate(&self, msg: &MsgEnvelope) -> Result<bool> {
-        // Incoming msg from `Payment`!
-        let accumulate = self.should_accumulate_for_metadata_write(msg).await? // Metadata(DataSection) Elders accumulate the msgs from Payment Elders.
-            // Incoming msg from `Metadata`!
-            || self.should_accumulate_for_adult(msg).await? // Adults accumulate the msgs from Metadata Elders.
-            || self.should_accumulate_for_transfers(msg).await? // Transfer Elders accumulate GetSectionActorHistory from Rewards Elders
-            || self.should_accumulate_for_rewards(msg).await?; // Rewards Elders accumulate GetWalletId from other Rewards Elders
-
-        Ok(accumulate)
-    }
-
-    /// The individual Payment Elder nodes send their msgs
-    /// to Metadata section, where it is accumulated.
-    async fn should_accumulate_for_metadata_write(&self, msg: &MsgEnvelope) -> Result<bool> {
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(false);
-        };
-
-        let from_single_payment_elder = || {
-            msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
-        };
-        let is_data_cmd = || {
-            matches!(msg.message, Message::Cmd {
-                cmd: Cmd::Data { .. },
-                ..
-            })
-        };
-
-        let accumulate = is_data_cmd()
-            && from_single_payment_elder()
-            && self.is_dst_for(msg).await?
-            && self.is_elder().await;
-
-        Ok(accumulate)
-    }
-
-    async fn should_accumulate_for_transfers(&self, msg: &MsgEnvelope) -> Result<bool> {
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(false);
-        };
-        let from_single_transfer_elder = || {
-            msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
-        };
-        use NodeQueryResponse::Transfers as TransfersReponse;
-        use NodeTransferQueryResponse::GetReplicaEvents as GetReplicaEventsResponse;
-        let from_transfers_to_transfers = || {
-            matches!(msg.message, Message::NodeQueryResponse {
-                response:
-                    TransfersReponse(GetReplicaEventsResponse(_)),
-                ..
-            })
-        };
-
-        let from_transfers = || from_transfers_to_transfers() && from_single_transfer_elder();
-
-        let accumulate_for_transfers =
-            from_transfers() && self.is_dst_for(msg).await? && self.is_elder().await;
-
-        Ok(accumulate_for_transfers)
-    }
-
-    async fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> Result<bool> {
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(false);
-        };
-
-        use NodeQueryResponse::Rewards;
-        use NodeRewardQueryResponse::GetWalletId as GetWalletIdResponse;
-        let from_single_rewards_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Rewards));
-            info!("from single rewards elder: {:?}", res);
-            res
-        };
-        let from_rewards_to_rewards = || {
-            matches!(msg.message, Message::NodeQueryResponse {
-                response: Rewards(GetWalletIdResponse { .. }),
-                ..
-            })
-        };
-
-        use NodeQueryResponse::*;
-        use NodeTransferQueryResponse::*;
-        let from_single_transfer_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer));
-            info!("from single transfer elder: {:?}", res);
-            res
-        };
-        let from_transfers_to_rewards = || {
-            let res = matches!(msg.message, Message::NodeQueryResponse {
-                response:
-                    Transfers(GetSectionActorHistory(_)),
-                ..
-            });
-            info!(
-                "is accumulating transfer response (GetSectionActorHistory): {:?}",
-                res
-            );
-            res
-        };
-
-        let from_rewards = || from_rewards_to_rewards() && from_single_rewards_elder();
-        let from_transfers = || from_transfers_to_rewards() && from_single_transfer_elder();
-
-        let accumulate_for_rewards = (from_rewards() || from_transfers())
-            && self.is_dst_for(msg).await?
-            && self.is_elder().await;
-
-        Ok(accumulate_for_rewards)
-    }
-
-    /// Adults accumulate the write requests from Elders.
-    async fn should_accumulate_for_adult(&self, msg: &MsgEnvelope) -> Result<bool> {
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(false);
-        };
-        let from_single_metadata_elder = msg.most_recent_sender().is_elder()
-            && matches!(duty, Duty::Elder(ElderDuties::Metadata));
-
-        info!(
-            "from single metadata elder: {:?}",
-            from_single_metadata_elder
-        );
-
-        if !from_single_metadata_elder {
-            return Ok(false);
-        }
-
-        let is_chunk_msg = matches!(msg.message,
-        Message::NodeCmd {
-            cmd:
-                NodeCmd::Data(NodeDataCmd::Blob(_)),
-            ..
-        }
-        | Message::Query { // TODO: Should not accumulate queries, just pass them through.
-            query: Query::Data(DataQuery::Blob(_)),
-            ..
-        });
-        info!("is chunk msg: {:?}", is_chunk_msg);
-
-        let is_replication_msg = matches!(msg.message,
-        Message::NodeCmd { cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk { .. }), .. });
-        info!("is replication msg: {:?}", is_replication_msg);
-
-        if !(is_chunk_msg || is_replication_msg) {
-            return Ok(false);
-        }
-
-        let accumulate = self.is_dst_for(msg).await? && self.is_adult().await;
-        info!("Accumulating as Adult: {:?}", self.is_adult().await);
-        info!("Accumulating as Adult: {:?}", accumulate);
-        Ok(accumulate)
-    }
-
-    // ---- .... -----
 
     // todo: eval all msg types!
     async fn try_client_entry(&self, msg: &MsgEnvelope) -> Result<GatewayDuty> {
