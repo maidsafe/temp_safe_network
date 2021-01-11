@@ -3659,7 +3659,7 @@ dependencies = [
 
 [[package]]
 name = "sn_api"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -3700,7 +3700,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "cargo-husky",
  "cluFlock",

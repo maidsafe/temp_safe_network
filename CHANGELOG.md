@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.17.1](https://github.com/maidsafe/sn_api/compare/v0.17.0...v0.17.1) (2021-01-11)
+
+### Features
+
+* ***cli*** Control self_update by a cargo feature
+
+### Bug Fixes
+
+* ***api*** keypair API now returns a new randomly create Ed25519 key pair
+
+* ***api*** support transfers to Ed25519 public keys in addition to using a Wallet or SafeKey URLs
+
+* ***cli*** fix failing CLI build for MUSL targets
+
+
 ### 0.17.0 (2020-12-23)
 
 ### Features
