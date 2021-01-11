@@ -46,6 +46,8 @@
       - [Wallet Insert](#wallet-insert)
       - [Wallet Transfer](#wallet-transfer)
     - [Files](#files)
+      - [[ Warning: Underlying API to be deprecated ]](#-warning-underlying-api-to-be-deprecated-)
+      - [Files...](#files-1)
       - [Files Put](#files-put)
         - [Base path of files in a FilesContainer](#base-path-of-files-in-a-filescontainer)
       - [Files Sync](#files-sync)
@@ -342,7 +344,7 @@ Downloading and installing the Authenticator daemon is very simple:
 ```shell
 $ safe auth install
 Latest release found: sn_authd v0.0.3
-Downloading https://sn-api.s3.eu-west-2.amazonaws.com/sn_authd-0.0.3-x86_64-unknown-linux-gnu.tar.gz...
+Downloading https://sn-api.s3.eu-west-2.amazonaws.com/sn_authd-0.0.3-x86_64-unknown-linux-musl.tar.gz...
 [00:00:25] [========================================] 6.16MB/6.16MB (0s) Done
 Installing sn_authd binary at ~/.safe/authd ...
 Setting execution permissions to installed binary '~/.safe/authd/sn_authd'...

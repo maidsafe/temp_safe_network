@@ -55,12 +55,12 @@ The Safe Authenticator, which runs as a daemon or as a service in Windows platfo
 * [Safe Network Node](https://github.com/maidsafe/sn_node/releases/latest/)
 EOF
 
-s3_authd_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-unknown-linux-gnu.zip"
+s3_authd_linux_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-unknown-linux-musl.zip"
 s3_authd_win_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-pc-windows-msvc.zip"
 s3_authd_macos_deploy_url="https:\/\/sn-api.s3.amazonaws.com\/sn_authd-$authd_version-x86_64-apple-darwin.zip"
 
 zip_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-gnu.zip" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 zip_macos_checksum=$(sha256sum \
     "./deploy/prod/sn_cli-$cli_version-x86_64-apple-darwin.zip" | \
@@ -69,7 +69,7 @@ zip_win_checksum=$(sha256sum \
     "./deploy/prod/sn_cli-$cli_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-gnu.tar.gz" | \
+    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 tar_macos_checksum=$(sha256sum \
     "./deploy/prod/sn_cli-$cli_version-x86_64-apple-darwin.tar.gz" | \
@@ -79,7 +79,7 @@ tar_win_checksum=$(sha256sum \
     awk '{ print $1 }')
 
 zip_authd_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_authd-$authd_version-x86_64-unknown-linux-gnu.zip" | \
+    "./deploy/prod/sn_authd-$authd_version-x86_64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 zip_authd_macos_checksum=$(sha256sum \
     "./deploy/prod/sn_authd-$authd_version-x86_64-apple-darwin.zip" | \

@@ -98,7 +98,7 @@ sn_cli_profile_is_bash_or_zsh() {
 }
 
 sn_cli_install() {
-  platform="unknown-linux-gnu"
+  platform="unknown-linux-musl"
   sn_cli_exec="safe"
   uname_output=$(uname -a)
   case $uname_output in
