@@ -45,12 +45,8 @@ impl ChunkStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data, origin).await {
-            let message_error = match error {
-                Error::InvalidOwners(pk) => ErrorMessage::InvalidOwners(pk),
-                Error::DataExists => ErrorMessage::DataExists,
+            let message_error = convert_to_error_message(error);
 
-                error => ErrorMessage::UnexpectedNodeError(error.to_string()),
-            };
             return self
                 .wrapping
                 .error(CmdError::Data(message_error), msg_id, &origin.address())
@@ -77,12 +73,7 @@ impl ChunkStorage {
                 correlation_id: msg_id,
             },
             Err(error) => {
-                let message_error = match error {
-                    Error::InvalidOwners(pk) => ErrorMessage::InvalidOwners(pk),
-                    Error::DataExists => ErrorMessage::DataExists,
-
-                    error => ErrorMessage::UnexpectedNodeError(error.to_string()),
-                };
+                let message_error = convert_to_error_message(error);
 
                 Message::NodeCmdError {
                     id: MessageId::new(),

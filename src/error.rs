@@ -19,6 +19,7 @@ pub enum Error {
     /// The key balance already exists when it was expected to be empty (during section genesis)
     #[error("Balance already exists.")]
     BalanceExists,
+
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
@@ -108,6 +109,14 @@ pub enum Error {
 pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::Error {
     match error {
         Error::InvalidOperation => ErrorMessage::InvalidOperation,
+        Error::InvalidOwners(key) => ErrorMessage::InvalidOwners(key),
+        Error::InvalidSignedTransfer(dot) => ErrorMessage::InvalidSignature,
+        Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
+        Error::NoSuchChunk => ErrorMessage::NoSuchData,
+        Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
+        Error::BalanceExists => ErrorMessage::BalanceExists,
+        Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
+        Error::DataExists => ErrorMessage::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
         error => ErrorMessage::UnexpectedNodeError(error.to_string()),
     }
