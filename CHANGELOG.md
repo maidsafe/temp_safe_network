@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.5.0](https://github.com/maidsafe/sn_messaging/compare/v1.4.0...v1.5.0) (2021-01-12)
+
+
+### Features
+
+* **errrors:** remove unexpectedNode error. ([effc838](https://github.com/maidsafe/sn_messaging/commit/effc838d7ff1d3297eced4026a5584f0ac90291b))
+
 ## [1.4.0](https://github.com/maidsafe/sn_messaging/compare/v1.3.0...v1.4.0) (2021-01-12)
 
 
