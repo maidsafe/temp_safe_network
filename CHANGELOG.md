@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/maidsafe/sn_messaging/compare/v1.2.0...v1.3.0) (2021-01-12)
+
+
+### Features
+
+* **serialisation:** add a size field to the wire message header and support only Msgpack serialisation type for protocol v1 ([b9eb6d6](https://github.com/maidsafe/sn_messaging/commit/b9eb6d6db6148a1554cf2d42e2a177f7ac6e0db7))
+* **serialisation:** serialise to JSON with a wire message header ([806f3e4](https://github.com/maidsafe/sn_messaging/commit/806f3e4042c752cd69a3e0970e677e6affc37488))
+* **serialisation:** support Msgpack serialisation type ([74870b1](https://github.com/maidsafe/sn_messaging/commit/74870b11bbe4e35d7887304bccf3d3e81362ac38))
+
+
+### Bug Fixes
+
+* **serialisation:** minor refactor and fix to Msgpack deserialisation logic ([d7c84e6](https://github.com/maidsafe/sn_messaging/commit/d7c84e6e1dd4f594613dac54ed2cc0ae0e958849))
+
 ## [1.2.0](https://github.com/maidsafe/sn_messaging/compare/v1.1.0...v1.2.0) (2021-01-05)
 
 
