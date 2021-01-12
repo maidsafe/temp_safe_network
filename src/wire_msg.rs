@@ -23,17 +23,14 @@ pub(crate) struct WireMsg {
 impl WireMsg {
     pub fn new(msg: &MsgEnvelope, serialisation: PayloadSerialisationType) -> Result<WireMsg> {
         let payload = match serialisation {
-            PayloadSerialisationType::Json => {
-                let str = serde_json::to_string(msg).map_err(|err| {
-                    Error::Serialisation(format!(
-                        "Could not serialize message payload (id: {}) with Json: {}",
-                        msg.id(),
-                        err
-                    ))
-                })?;
-                str.as_bytes().to_vec()
-            }
-            PayloadSerialisationType::Msgpack => rmp_serde::to_vec(&msg).map_err(|err| {
+            PayloadSerialisationType::Json => serde_json::to_vec(msg).map_err(|err| {
+                Error::Serialisation(format!(
+                    "Could not serialize message payload (id: {}) with Json: {}",
+                    msg.id(),
+                    err
+                ))
+            })?,
+            PayloadSerialisationType::Msgpack => rmp_serde::to_vec_named(&msg).map_err(|err| {
                 Error::Serialisation(format!(
                     "Could not serialize message payload (id: {}) with Msgpack: {}",
                     msg.id(),
@@ -51,11 +48,12 @@ impl WireMsg {
     }
 
     pub fn from(bytes: &[u8]) -> Result<Self> {
+        let header_size = WireMsgHeader::size();
         // Deserialise the header bytes firstg
-        let header = WireMsgHeader::from(&bytes[..4])?;
+        let header = WireMsgHeader::from(&bytes[..header_size])?;
 
         // Read the bytes of the serialised payload now
-        let payload = bytes[4..].to_vec();
+        let payload = bytes[header_size..].to_vec();
 
         // We can now create a deserialised WireMsg using the read bytes
         Ok(Self { header, payload })
@@ -68,16 +66,17 @@ impl WireMsg {
         let mut buffer = vec![0u8; self.size()];
 
         // Let's write the serialisation protocol version bytes first
-        let (buf2, _) = gen(be_u16(self.header.version), &mut buffer[..]).map_err(|err| {
-            Error::Serialisation(format!(
-                "version field couldn't be serialised in header: {}",
-                err
-            ))
-        })?;
+        let (buf_at_ser_type, _) =
+            gen(be_u16(self.header.version), &mut buffer[..]).map_err(|err| {
+                Error::Serialisation(format!(
+                    "version field couldn't be serialised in header: {}",
+                    err
+                ))
+            })?;
         // ...then we write the type of serialisation used for the payload
-        let (buf3, _) = gen(
+        let (buf_at_payload, _) = gen(
             be_u16(self.header.payload_serialisation.into()),
-            &mut buf2[..],
+            &mut buf_at_ser_type[..],
         )
         .map_err(|err| {
             Error::Serialisation(format!(
@@ -87,7 +86,7 @@ impl WireMsg {
         })?;
 
         // ...and finally we write the bytes of the serialised payload
-        let (_, _) = gen(slice(self.payload.clone()), &mut buf3[..]).map_err(|err| {
+        let (_, _) = gen(slice(self.payload.clone()), &mut buf_at_payload[..]).map_err(|err| {
             Error::Serialisation(format!("message payload couldn't be serialised: {}", err))
         })?;
 
@@ -107,16 +106,12 @@ impl WireMsg {
     /// Deserialise the payload returning a MsgEnvelope instance
     pub fn deserialise(&self) -> Result<MsgEnvelope> {
         match self.header.payload_serialisation {
-            PayloadSerialisationType::Json => {
-                serde_json::from_str(std::str::from_utf8(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("message payload as Json: {}", err))
-                })?)
-                .map_err(|err| Error::FailedToParse(err.to_string()))
-            }
+            PayloadSerialisationType::Json => serde_json::from_slice(&self.payload)
+                .map_err(|err| Error::FailedToParse(format!("message payload as Json: {:?}", err))),
             PayloadSerialisationType::Msgpack => {
                 rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("message payload as Msgpack: {}", err))
-                })?
+                    Error::FailedToParse(format!("message payload as Msgpack: {:?}", err))
+                })
             }
         }
     }
@@ -142,6 +137,11 @@ struct WireMsgHeader {
 
 impl WireMsgHeader {
     pub fn from(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < Self::size() {
+            return Err(Error::FailedToParse(
+                "not enough bytes received to deserialise wire message header".to_string(),
+            ));
+        }
         // Let's read the serialisation protocol version bytes first
         let mut version_bytes = [0; 2];
         version_bytes[0..].copy_from_slice(&bytes[0..2]);
