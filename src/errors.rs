@@ -169,8 +169,4 @@ pub enum Error {
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
-
-    /// Node error that was not expected for message response
-    #[error("There was an unexpected error at the node: '{0}'")]
-    UnexpectedNodeError(String),
 }
