@@ -166,9 +166,11 @@ pub enum Error {
     #[error("Failed to delete requested data")]
     FailedToDelete,
 
+    /// The node hasn't left the section, and was not marked for relocation during reward operations
+    #[error("Node is not being relocated")]
+    NodeWasNotRelocated,
+
     /// Node error that was not expected for message response
     #[error("There was an unexpected error at the node: '{0}'")]
-    UnexpectedNodeError(String), // /// NetworkData error.
-                                 // #[error("Network data error:: {0}")]
-                                 // NetworkData(#[from] sn_data_types::Error)
+    UnexpectedNodeError(String),
 }
