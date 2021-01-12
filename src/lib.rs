@@ -40,6 +40,7 @@ pub use self::{
 };
 
 use crate::errors::ErrorDebug;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     AppPermissions, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, Money, PublicKey,
@@ -52,7 +53,7 @@ use std::{
     convert::TryFrom,
     fmt,
 };
-use wire_msg::{PayloadSerialisationType, WireMsg};
+use wire_msg::WireMsg;
 use xor_name::XorName;
 
 /// Message envelope containing a Safe message payload, sender, and the list
@@ -95,18 +96,13 @@ impl MsgEnvelope {
     }
 
     /// Deserialise a MsgEnvelope from bytes received over the wire.
-    pub fn from(bytes: &[u8]) -> Result<Self> {
+    pub fn from(bytes: Bytes) -> Result<Self> {
         WireMsg::deserialise_msg(bytes)
     }
 
     /// Serialise this MsgEnvelope into bytes ready to be sent over the wire.
-    pub fn serialise(&self) -> Result<Vec<u8>> {
-        WireMsg::serialise_msg(self, PayloadSerialisationType::Json)
-    }
-
-    /// Serialise this MsgEnvelope into bytes ready to be sent over the wire.
-    pub fn serialise_with_msgpack(&self) -> Result<Vec<u8>> {
-        WireMsg::serialise_msg(self, PayloadSerialisationType::Msgpack)
+    pub fn serialise(&self) -> Result<Bytes> {
+        WireMsg::serialise_msg(self)
     }
 
     /// The proxy would first sign the MsgEnvelope,
@@ -751,15 +747,10 @@ mod tests {
             proxies: vec![],
         };
 
-        // test json serialisation
-        let serialised_with_json = msg_envelope.serialise()?;
-        let deserialised_from_json = MsgEnvelope::from(&serialised_with_json)?;
-        assert_eq!(deserialised_from_json, msg_envelope);
-
         // test msgpack serialisation
-        let serialised_with_msgpack = msg_envelope.serialise_with_msgpack()?;
-        let deserialised_from_msgpack = MsgEnvelope::from(&serialised_with_msgpack)?;
-        assert_eq!(deserialised_from_msgpack, msg_envelope);
+        let serialised = msg_envelope.serialise()?;
+        let deserialised = MsgEnvelope::from(serialised)?;
+        assert_eq!(deserialised, msg_envelope);
 
         Ok(())
     }

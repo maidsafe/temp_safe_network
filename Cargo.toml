@@ -10,6 +10,7 @@ repository = "https://github.com/maidsafe/sn_messaging"
 version = "1.2.0"
 
 [dependencies]
+bytes = "1.0.1"
 cookie-factory = "0.3.1"
 thiserror = "1.0.23"
 rmp-serde = "~0.15.1"
@@ -24,8 +25,7 @@ xor_name = "1.1.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 rand_core = "~0.5.1"
-sn_data_types="~0.13.0"
-serde_json = "1.0.61"
+sn_data_types = "~0.13.0"
 
   [dependencies.ed25519-dalek]
   version = "1.0.0-pre.4"
