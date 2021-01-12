@@ -251,7 +251,7 @@ jobs:
       - uses: csexton/create-release@add-body
         id: create_release
         with:
-          tag_name: ${{ steps.versioning.outputs.cli_version }}
+          tag_name: v${{ steps.versioning.outputs.cli_version }}
           release_name: sn_cli
           draft: false
           prerelease: false
