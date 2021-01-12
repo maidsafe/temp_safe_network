@@ -45,7 +45,7 @@ impl ChunkStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data, origin).await {
-            let message_error = convert_to_error_message(error);
+            let message_error = convert_to_error_message(error)?;
 
             return self
                 .wrapping
@@ -73,7 +73,7 @@ impl ChunkStorage {
                 correlation_id: msg_id,
             },
             Err(error) => {
-                let message_error = convert_to_error_message(error);
+                let message_error = convert_to_error_message(error)?;
 
                 Message::NodeCmdError {
                     id: MessageId::new(),
@@ -169,7 +169,10 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
-        let result = self.chunks.get(&address).map_err(convert_to_error_message);
+        let result = match self.chunks.get(&address) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
 
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {

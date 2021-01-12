@@ -101,36 +101,40 @@ pub enum Error {
     #[error("Invalid operation")]
     InvalidOperation,
 
+    /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
+    #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
+    NoErrorMapping(String),
+
     /// Logic error.
     #[error("Logic error: {0}")]
     Logic(String),
 }
 
-pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::Error {
+pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::Error> {
     match error {
-        Error::InvalidOperation => ErrorMessage::InvalidOperation,
-        Error::InvalidOwners(key) => ErrorMessage::InvalidOwners(key),
-        Error::InvalidSignedTransfer(dot) => ErrorMessage::InvalidSignature,
-        Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
-        Error::NoSuchChunk => ErrorMessage::NoSuchData,
-        Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
-        Error::BalanceExists => ErrorMessage::BalanceExists,
-        Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
-        Error::DataExists => ErrorMessage::DataExists,
+        Error::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
+        Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
+        Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
+        Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
+        Error::NoSuchChunk => Ok(ErrorMessage::NoSuchData),
+        Error::NotEnoughSpace => Ok(ErrorMessage::NotEnoughSpace),
+        Error::BalanceExists => Ok(ErrorMessage::BalanceExists),
+        Error::TempDirCreationFailed(_) => Ok(ErrorMessage::FailedToWriteFile),
+        Error::DataExists => Ok(ErrorMessage::DataExists),
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        error => ErrorMessage::UnexpectedNodeError(error.to_string()),
+        error => Err(Error::NoErrorMapping(error.to_string())),
     }
 }
-pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> sn_messaging::Error {
+pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> Result<sn_messaging::Error> {
     match error {
-        DtError::InvalidOperation => ErrorMessage::InvalidOperation,
-        DtError::PolicyNotSet => ErrorMessage::PolicyNotSet,
-        DtError::NoSuchEntry => ErrorMessage::NoSuchEntry,
-        DtError::CrdtUnexpectedState => ErrorMessage::CrdtUnexpectedState,
-        DtError::OpNotCausallyReady => ErrorMessage::OpNotCausallyReady,
-        DtError::AccessDenied(pk) => ErrorMessage::AccessDenied(pk),
+        DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
+        DtError::PolicyNotSet => Ok(ErrorMessage::PolicyNotSet),
+        DtError::NoSuchEntry => Ok(ErrorMessage::NoSuchEntry),
+        DtError::CrdtUnexpectedState => Ok(ErrorMessage::CrdtUnexpectedState),
+        DtError::OpNotCausallyReady => Ok(ErrorMessage::OpNotCausallyReady),
+        DtError::AccessDenied(pk) => Ok(ErrorMessage::AccessDenied(pk)),
 
-        error => ErrorMessage::UnexpectedNodeError(error.to_string()),
+        error => Err(Error::NoErrorMapping(error.to_string())),
     }
 }
 

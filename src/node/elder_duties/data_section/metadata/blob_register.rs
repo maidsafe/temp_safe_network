@@ -152,16 +152,15 @@ impl BlobRegister {
             .await
     }
 
-    async fn delete(
-        &mut self,
-        address: BlobAddress,
+    async fn send_blob_cmd_error(
+        &self,
+        error: Error,
         msg_id: MessageId,
         origin: MsgSender,
-        proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let cmd_error = |error: Error| {
-            let message_error = convert_to_error_message(error);
-            self.wrapping.send_to_section(
+        let message_error = convert_to_error_message(error)?;
+        self.wrapping
+            .send_to_section(
                 Message::CmdError {
                     error: CmdError::Data(message_error),
                     id: MessageId::new(),
@@ -170,18 +169,32 @@ impl BlobRegister {
                 },
                 true,
             )
-        };
+            .await
+    }
 
+    async fn delete(
+        &mut self,
+        address: BlobAddress,
+        msg_id: MessageId,
+        origin: MsgSender,
+        proxies: Vec<MsgSender>,
+    ) -> Result<NodeMessagingDuty> {
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
-            Err(error) => return cmd_error(error).await,
+            Err(error) => return self.send_blob_cmd_error(error, msg_id, origin).await,
         };
 
         // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
             let pk = origin.id().public_key();
             if data_owner != pk {
-                return cmd_error(Error::NetworkData(DtError::AccessDenied(pk))).await;
+                return self
+                    .send_blob_cmd_error(
+                        Error::NetworkData(DtError::AccessDenied(pk)),
+                        msg_id,
+                        origin,
+                    )
+                    .await;
             }
         };
 
@@ -363,7 +376,7 @@ impl BlobRegister {
         proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
         let query_error = |error: Error| async {
-            let message_error = convert_to_error_message(error);
+            let message_error = convert_to_error_message(error)?;
             let err_msg = Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(message_error)),
                 id: MessageId::in_response_to(&msg_id),

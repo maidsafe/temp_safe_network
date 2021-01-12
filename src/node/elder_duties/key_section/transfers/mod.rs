@@ -306,11 +306,10 @@ impl Transfers {
 
     /// Get all the events of the Replica.
     async fn all_events(&self, msg_id: MessageId, origin: Address) -> Result<NodeMessagingDuty> {
-        let result = self
-            .replicas
-            .all_events()
-            .await
-            .map_err(convert_to_error_message);
+        let result = match self.replicas.all_events().await {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping
@@ -379,11 +378,10 @@ impl Transfers {
         debug!("Getting balance for {:?}", wallet_id);
 
         // validate signature
-        let result = self
-            .replicas
-            .balance(wallet_id)
-            .await
-            .map_err(convert_to_error_message);
+        let result = match self.replicas.balance(wallet_id).await {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
 
         self.wrapping
             .send_to_client(Message::QueryResponse {
@@ -405,11 +403,10 @@ impl Transfers {
         use NodeTransferQueryResponse::*;
         let wallet_id = self.section_wallet_id();
         // todo: validate signature
-        let result = self
-            .replicas
-            .history(wallet_id)
-            .await
-            .map_err(convert_to_error_message);
+        let result = match self.replicas.history(wallet_id).await {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetSectionActorHistory(result)),
@@ -464,7 +461,7 @@ impl Transfers {
                 correlation_id: msg_id,
             },
             Err(e) => {
-                let message_error = convert_to_error_message(e);
+                let message_error = convert_to_error_message(e)?;
                 Message::CmdError {
                     id: MessageId::new(),
                     error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
@@ -492,7 +489,7 @@ impl Transfers {
                 correlation_id: msg_id,
             },
             Err(e) => {
-                let message_error = convert_to_error_message(e);
+                let message_error = convert_to_error_message(e)?;
 
                 Message::NodeCmdError {
                     id: MessageId::new(),
@@ -530,7 +527,7 @@ impl Transfers {
                     .await
             }
             Err(e) => {
-                let message_error = convert_to_error_message(e);
+                let message_error = convert_to_error_message(e)?;
 
                 self.wrapping
                     .error(
@@ -566,7 +563,7 @@ impl Transfers {
                     .await
             }
             Err(e) => {
-                let message_error = convert_to_error_message(e);
+                let message_error = convert_to_error_message(e)?;
                 self.wrapping
                     .error(
                         CmdError::Transfer(TransferError::TransferRegistration(message_error)),
@@ -593,7 +590,7 @@ impl Transfers {
         let message = match self.replicas.receive_propagated(credit_proof).await {
             Ok(_) => return Ok(NodeMessagingDuty::NoOp),
             Err(Error::NetworkData(error)) => {
-                let message_error = convert_dt_error_to_error_message(error);
+                let message_error = convert_dt_error_to_error_message(error)?;
                 Message::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(message_error)),
                     id: MessageId::new(),
