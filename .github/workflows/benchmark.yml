@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     if: false
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -49,7 +49,7 @@ jobs:
       matrix:
         benchmark: [ keys, put ]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - run: mkdir -p ~/.safe/node
       - name: dl node

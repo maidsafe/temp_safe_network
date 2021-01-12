@@ -12,10 +12,10 @@ env:
 jobs:
   clippy:
     if: ${{ github.repository_owner == 'maidsafe' }}
-    name: Clippy, fmt & code coverage checks
+    name: Clippy & fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Install Rust and required components
         uses: actions-rs/toolchain@v1
         with:
@@ -23,10 +23,6 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
-
-      # Check if the code is formatted correctly.
-      - name: Check formatting
-        run: cargo fmt --all -- --check
 
       # Cache.
       - name: Cargo cache
@@ -38,6 +34,10 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
+      # Check if the code is formatted correctly.
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      
       # Run Clippy.
       - name: Clippy checks
         run: cargo clippy --all-targets --all-features
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     if: false
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Install Rust and required components
         uses: actions-rs/toolchain@v1
         with:
@@ -70,7 +70,7 @@ jobs:
       - name: Code Coverage - sn_api
         uses: actions-rs/tarpaulin@master
         with:
-          args: '-v --manifest-path=sn_api/Cargo.toml --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
+          args: '-v --manifest-path=sn_api/Cargo.toml --release --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
 
       # Push tarpaulin results to coveralls.io
       - name: Coveralls
@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: git config --global --add core.symlinks true
 
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:

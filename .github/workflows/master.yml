@@ -37,7 +37,7 @@ jobs:
             target: sn_authd.exe
             output: sn_authd-x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -110,7 +110,7 @@ jobs:
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_IDENTITY_AUTO_DISCOVERY : true
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -166,7 +166,7 @@ jobs:
 
     steps:
       # Checkout and get all the artifacts built in the previous jobs.
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       # cli
       - name: Download safe-x86_64-pc-windows-msvc release
         uses: actions/download-artifact@master
@@ -307,7 +307,7 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - shell: bash
         id: commit_message
         run: |
