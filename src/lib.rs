@@ -306,8 +306,7 @@ impl Message {
 
     /// Serialise this Message, ready for signing
     pub fn serialise(&self) -> Result<Bytes> {
-        let msg = self.clone();
-        let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
+        let payload_vec = rmp_serde::to_vec_named(&self).map_err(|err| {
             Error::Serialisation(format!(
                 "Could not serialize message payload (id: {}) with Msgpack: {}",
                 self.id(),
