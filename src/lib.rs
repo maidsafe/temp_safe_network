@@ -84,7 +84,7 @@ impl MsgEnvelope {
     /// Verify the signature provided by the most recent sender is valid.
     pub fn verify(&self) -> Result<bool> {
         let data = if self.proxies.is_empty() {
-            self.serialise()?
+            self.message.serialise()?
         } else {
             let mut msg = self.clone();
             let _ = msg.proxies.pop();
@@ -302,6 +302,20 @@ impl Message {
             | Self::NodeCmdError { id, .. }
             | Self::NodeQueryResponse { id, .. } => *id,
         }
+    }
+
+    /// Serialise this Message, ready for signing
+    pub fn serialise(&self) -> Result<Bytes> {
+        let msg = self.clone();
+        let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
+            Error::Serialisation(format!(
+                "Could not serialize message payload (id: {}) with Msgpack: {}",
+                self.id(),
+                err
+            ))
+        })?;
+
+        Ok(Bytes::from(payload_vec))
     }
 }
 
