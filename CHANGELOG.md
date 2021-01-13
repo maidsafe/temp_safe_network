@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.1](https://github.com/maidsafe/sn_messaging/compare/v1.5.0...v1.5.1) (2021-01-13)
+
+
+### Bug Fixes
+
+* **verification:** verification of message_env checks underlying message, not itself ([ee90aef](https://github.com/maidsafe/sn_messaging/commit/ee90aef0c3164db4d57aba0022a6b82b941eec1b))
+
 ## [1.5.0](https://github.com/maidsafe/sn_messaging/compare/v1.4.0...v1.5.0) (2021-01-12)
 
 
