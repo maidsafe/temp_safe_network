@@ -10,12 +10,12 @@
 use sn_data_types::Transfer;
 
 use crate::Result;
-use serde::export::Formatter;
 use sn_data_types::{
     Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer,
     TransferAgreementProof, TransferValidated,
 };
 use sn_messaging::{Address, MessageId, MsgEnvelope, MsgSender};
+use std::fmt::Formatter;
 
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;

@@ -8,7 +8,7 @@
 
 use crate::{
     node::node_ops::{GatewayDuty, NodeMessagingDuty, NodeOperation},
-    utils, Error, Network, Result,
+    Error, Network, Result,
 };
 use log::{error, info};
 use sn_messaging::{Address, MsgEnvelope};
@@ -57,7 +57,7 @@ impl NetworkSender {
 
         let result = self
             .network
-            .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg)?)
+            .send_message(SrcLocation::Node(name), dst, msg.serialise()?)
             .await;
 
         result.map_or_else(
@@ -81,7 +81,7 @@ impl NetworkSender {
         msg: &MsgEnvelope,
     ) -> Result<NodeOperation> {
         let name = self.network.name().await;
-        let bytes = utils::serialise(&msg)?;
+        let bytes = &msg.serialise()?;
         for target in targets {
             self.network
                 .send_message(
@@ -117,10 +117,7 @@ impl NetworkSender {
         } else {
             SrcLocation::Section(self.network.our_prefix().await)
         };
-        let result = self
-            .network
-            .send_message(src, dst, utils::serialise(&msg)?)
-            .await;
+        let result = self.network.send_message(src, dst, msg.serialise()?).await;
 
         result.map_or_else(
             |err| {

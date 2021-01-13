@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty, utils};
+use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
 use crate::{Error, Result};
 use log::info;
 use sn_data_types::Signature;
@@ -97,7 +97,7 @@ impl AdultMsgWrapping {
     ) -> Result<NodeMessagingDuty> {
         let (key, sig) = self
             .inner
-            .ed_key_sig(&utils::serialise(&message)?)
+            .ed_key_sig(&message.serialise()?)
             .await
             .ok_or_else(|| Error::Logic("Could not sign with Node key".to_string()))?;
         let origin = MsgSender::adult(key, duty, sig)?;

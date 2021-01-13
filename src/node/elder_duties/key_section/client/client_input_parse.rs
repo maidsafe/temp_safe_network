@@ -29,8 +29,8 @@ kinds of input; messages and handshake requests.
 /// client, in order to use the services
 /// of the network.
 
-pub fn try_deserialize_msg(bytes: &Bytes) -> Result<MsgEnvelope> {
-    let msg = match bincode::deserialize(&bytes) {
+pub fn try_deserialize_msg(bytes: Bytes) -> Result<MsgEnvelope> {
+    let msg = match MsgEnvelope::from(bytes) {
         Ok(
             msg
             @

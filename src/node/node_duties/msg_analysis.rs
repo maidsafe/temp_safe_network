@@ -16,7 +16,7 @@ use crate::{
             TransferDuty, TransferQuery,
         },
     },
-    utils, Error, Network, Result,
+    Error, Network, Result,
 };
 use log::{error, info};
 use sn_messaging::{
@@ -513,8 +513,7 @@ impl NetworkMsgAnalysis {
                 };
 
                 // Verify that the message was sent from the section
-                let verify_section_authority =
-                    section_authority.verify(&utils::serialise(&message)?);
+                let verify_section_authority = section_authority.verify(&message.serialise()?);
 
                 let given_section_pk = &section_authority
                     .id()

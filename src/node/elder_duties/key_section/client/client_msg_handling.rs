@@ -8,7 +8,6 @@
 
 pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
-use crate::utils;
 use crate::with_chaos;
 use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
@@ -134,7 +133,7 @@ impl ClientMsgHandling {
 
         match self.tracked_incoming.remove(&correlation_id) {
             Some((_, client_address)) => {
-                let bytes = utils::serialise(message)?;
+                let bytes = message.serialise()?;
 
                 trace!("will send message via qp2p");
                 self.onboarding.send_bytes_to(client_address, bytes).await
