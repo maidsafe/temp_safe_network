@@ -28,6 +28,7 @@ pub enum MapRead {
         /// Map address.
         address: Address,
         /// Key to get.
+        #[serde(with = "serde_bytes")]
         key: Vec<u8>,
     },
     /// Get Map shell.
