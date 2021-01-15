@@ -109,9 +109,10 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
-            .map_err(convert_to_error_message);
+        let result = match self.get_chunk(address, SequenceAction::Read, origin) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -176,14 +177,16 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
+        let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
                 sequence
                     .in_range(range.0, range.1, Some(origin.id().public_key()))?
                     .ok_or(Error::NetworkData(DtError::NoSuchEntry))
-            })
-            .map_err(convert_to_error_message);
+            }) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -203,7 +206,7 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
+        let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(
                 |sequence| match sequence.last_entry(Some(origin.id().public_key()))? {
@@ -213,8 +216,10 @@ impl SequenceStorage {
                     )),
                     None => Err(Error::NetworkData(DtError::NoSuchEntry)),
                 },
-            )
-            .map_err(convert_to_error_message);
+            ) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -234,7 +239,7 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
+        let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
                 if sequence.is_pub() {
@@ -244,8 +249,10 @@ impl SequenceStorage {
                     let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     Ok(policy.owner)
                 }
-            })
-            .map_err(convert_to_error_message);
+            }) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -266,14 +273,16 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
+        let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
                 sequence
                     .permissions(user, Some(origin.id().public_key()))
                     .map_err(|e| e.into())
-            })
-            .map_err(convert_to_error_message);
+            }) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -293,7 +302,7 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
+        let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
                 let res = if sequence.is_pub() {
@@ -303,8 +312,10 @@ impl SequenceStorage {
                     return Err(Error::NetworkData(DtError::CrdtUnexpectedState));
                 };
                 Ok(res)
-            })
-            .map_err(convert_to_error_message);
+            }) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -324,7 +335,7 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
+        let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
                 let res = if !sequence.is_pub() {
@@ -334,8 +345,10 @@ impl SequenceStorage {
                     return Err(Error::NetworkData(DtError::CrdtUnexpectedState));
                 };
                 Ok(res)
-            })
-            .map_err(convert_to_error_message);
+            }) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)?),
+        };
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -464,7 +477,7 @@ impl SequenceStorage {
             Ok(_) => return Ok(NodeMessagingDuty::NoOp),
             Err(error) => {
                 info!("Error on writing Sequence! {:?}", error);
-                convert_to_error_message(error)
+                convert_to_error_message(error)?
             }
         };
         self.wrapping

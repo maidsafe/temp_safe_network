@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Error, Result};
+use crate::{Error, Result};
 use log::{error, info};
 use sn_data_types::SignatureShare;
 use sn_messaging::{Duty, MessageId, MsgEnvelope, MsgSender, TransientSectionKey as SectionKey};
@@ -122,7 +122,7 @@ impl Accumulation {
                 )));
             }
         };
-        let signed_data = utils::serialise(&msg.message)?;
+        let signed_data = &msg.message.serialise()?;
         for sig in &signatures {
             if !public_key_set
                 .public_key_share(sig.index)
