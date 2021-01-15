@@ -39,16 +39,16 @@ pub enum Error {
     /// Message read was built with an unsupported version.
     #[error("Unsupported messaging protocol version: {0}")]
     UnsupportedVersion(u16),
-    /// Message read contains a payload with an unsupported serialisation type.
-    #[error("Unsupported payload serialisation: {0}")]
-    UnsupportedSerialisation(u16),
+    /// Message read contains a payload with an unsupported serialization type.
+    #[error("Unsupported payload serialization: {0}")]
+    UnsupportedSerialization(u16),
 
     /// Access denied for supplied PublicKey
     #[error("Access denied for PublicKey: {0}")]
     AccessDenied(PublicKey),
     /// Serialization error
-    #[error("Serialisation error: {0}")]
-    Serialisation(String),
+    #[error("Serialization error: {0}")]
+    Serialization(String),
     /// Requested data not found
     #[error("Requested data not found")]
     NoSuchData,
@@ -112,7 +112,7 @@ pub enum Error {
     /// Received a request with a duplicate MessageId
     #[error("Duplicate message id received")]
     DuplicateMessageId,
-    // /// Network error occurring at Node level which has no bearing on clients, e.g. serialisation
+    // /// Network error occurring at Node level which has no bearing on clients, e.g. serialization
     // /// failure or database failure
     // #[error("Network error: {0}")]
     // NetworkOther(String),

@@ -58,10 +58,10 @@ use xor_name::XorName;
 
 /// Message envelope containing a Safe message payload, sender, and the list
 /// of proxies the message could have been gone through with their signatures.
-/// This struct also provides utilities to obtain the serialised bytes
-/// ready to send them over the wire. The serialised bytes contain information
-/// about messaging protocol version, serialisation style used for the payload (e.g. Json),
-/// and/or any other information required by the receiving end to either deserialise it,
+/// This struct also provides utilities to obtain the serialized bytes
+/// ready to send them over the wire. The serialized bytes contain information
+/// about messaging protocol version, serialization style used for the payload (e.g. Json),
+/// and/or any other information required by the receiving end to either deserialize it,
 /// or detect any incompatibility.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -84,25 +84,25 @@ impl MsgEnvelope {
     /// Verify the signature provided by the most recent sender is valid.
     pub fn verify(&self) -> Result<bool> {
         let data = if self.proxies.is_empty() {
-            self.message.serialise()?
+            self.message.serialize()?
         } else {
             let mut msg = self.clone();
             let _ = msg.proxies.pop();
-            msg.serialise()?
+            msg.serialize()?
         };
 
         let sender = self.most_recent_sender();
         Ok(sender.verify(&data))
     }
 
-    /// Deserialise a MsgEnvelope from bytes received over the wire.
+    /// Deserialize a MsgEnvelope from bytes received over the wire.
     pub fn from(bytes: Bytes) -> Result<Self> {
-        WireMsg::deserialise_msg(bytes)
+        WireMsg::deserialize_msg(bytes)
     }
 
-    /// Serialise this MsgEnvelope into bytes ready to be sent over the wire.
-    pub fn serialise(&self) -> Result<Bytes> {
-        WireMsg::serialise_msg(self)
+    /// Serialize this MsgEnvelope into bytes ready to be sent over the wire.
+    pub fn serialize(&self) -> Result<Bytes> {
+        WireMsg::serialize_msg(self)
     }
 
     /// The proxy would first sign the MsgEnvelope,
@@ -304,10 +304,10 @@ impl Message {
         }
     }
 
-    /// Serialise this Message, ready for signing
-    pub fn serialise(&self) -> Result<Bytes> {
+    /// Serialize this Message, ready for signing
+    pub fn serialize(&self) -> Result<Bytes> {
         let payload_vec = rmp_serde::to_vec_named(&self).map_err(|err| {
-            Error::Serialisation(format!(
+            Error::Serialization(format!(
                 "Could not serialize message payload (id: {}) with Msgpack: {}",
                 self.id(),
                 err
@@ -742,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    fn serialisation() -> Result<()> {
+    fn serialization() -> Result<()> {
         let keypair = &gen_keypairs()[0];
         let pk = keypair.public_key();
         let signature = keypair.sign(b"blabla");
@@ -760,10 +760,10 @@ mod tests {
             proxies: vec![],
         };
 
-        // test msgpack serialisation
-        let serialised = msg_envelope.serialise()?;
-        let deserialised = MsgEnvelope::from(serialised)?;
-        assert_eq!(deserialised, msg_envelope);
+        // test msgpack serialization
+        let serialized = msg_envelope.serialize()?;
+        let deserialized = MsgEnvelope::from(serialized)?;
+        assert_eq!(deserialized, msg_envelope);
 
         Ok(())
     }
