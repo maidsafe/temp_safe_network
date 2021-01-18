@@ -10,7 +10,7 @@
 use super::ipc::IpcError;
 #[cfg(test)]
 use anyhow::{anyhow, Error as AnyHowError};
-use sn_client::ClientError;
+use sn_client::Error as ClientError;
 use sn_data_types::Error as DtError;
 use std::fmt;
 

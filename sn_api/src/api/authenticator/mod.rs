@@ -23,7 +23,7 @@ use rand_core::SeedableRng;
 use sha3::Sha3_256;
 use sn_client::{
     client::{bootstrap_config, Client},
-    ClientError,
+    Error as ClientError,
 };
 use sn_data_types::{
     Error::NoSuchEntry, Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
@@ -348,7 +348,7 @@ impl SafeAuthenticator {
 
         match ipc_req {
             IpcMsg::Req(IpcReq::Auth(app_auth_req)) => {
-                info!("Request was recognised as a general app auth request");
+                info!("Request was recognised as an application auth request");
                 debug!("Decoded request: {:?}", app_auth_req);
                 self.gen_auth_response(app_auth_req).await
             }
@@ -405,7 +405,7 @@ impl SafeAuthenticator {
 
                     keypair
                 }
-                Err(ClientError::DataError(NoSuchEntry)) => {
+                Err(ClientError::NetworkDataError(NoSuchEntry)) => {
                     // This is the first time this app is being authorised,
                     // thus let's generate a keypair for it
                     let mut rng = OsRng;

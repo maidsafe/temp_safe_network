@@ -14,7 +14,7 @@ use crate::{
 };
 
 use log::{debug, info};
-use sn_client::{Client, ClientError as SafeClientError};
+use sn_client::{Client, Error as ClientError, TransfersError};
 use sn_data_types::{
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicKey, SequenceAddress,
@@ -99,11 +99,13 @@ impl SafeAppClient {
     // === Money operations ===
     pub async fn read_balance_from_keypair(&self, id: Arc<Keypair>) -> Result<Money> {
         let temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
-        temp_client.get_balance().await.map_err(|err| match err {
-            SafeClientError::DataError(SafeNdError::NoSuchBalance) => {
+        temp_client.get_balance().await.map_err(|err| {
+            // FIXME: we need to match the appropriate error
+            // to map it to our Error::ContentNotFound
+            /*ClientError::NetworkDataError(??) => {
                 Error::ContentNotFound("No SafeKey found at specified location".to_string())
-            }
-            other => Error::NetDataError(format!("Failed to retrieve balance: {:?}", other)),
+            }*/
+            Error::NetDataError(format!("Failed to retrieve balance: {:?}", err))
         })
     }
 
@@ -160,13 +162,13 @@ impl SafeAppClient {
                 .send_money(to_pk, amount)
                 .await
                 .map_err(|err| match err {
-                    SafeClientError::DataError(SafeNdError::InsufficientBalance) => {
+                    ClientError::Transfer(TransfersError::InsufficientBalance) => {
                         Error::NotEnoughBalance(format!(
                             "Not enough balance at 'source' for the operation: {}",
                             amount
                         ))
                     }
-                    SafeClientError::DataError(SafeNdError::ExcessiveValue) => {
+                    ClientError::NetworkDataError(SafeNdError::ExcessiveValue) => {
                         Error::InvalidAmount(format!(
                             "The amount '{}' specified for the transfer is invalid",
                             amount
@@ -290,16 +292,18 @@ impl SafeAppClient {
             .get_map_value(address, key_vec)
             .await
             .map_err(|err| match err {
-                SafeClientError::DataError(SafeNdError::AccessDenied) => {
+                ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
                     Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
                 }
-                SafeClientError::DataError(SafeNdError::NoSuchData) => {
+                // FIXME: we need to match the appropriate error
+                // to map it to our Error::ContentNotFound
+                /*ClientError::NetworkDataError(??) => {
                     Error::ContentNotFound(format!(
                         "Sequenced Map not found at Xor name: {}",
                         xorname_to_hex(&name)
                     ))
-                }
-                SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
+                }*/
+                ClientError::NetworkDataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
                         "Entry not found in Sequenced Map found at Xor name: {}",
                         xorname_to_hex(&name)
@@ -319,20 +323,22 @@ impl SafeAppClient {
             .list_seq_map_entries(name, tag)
             .await
             .map_err(|err| match err {
-                SafeClientError::DataError(SafeNdError::AccessDenied) => {
+                ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
                     Error::AccessDenied(format!(
                         "Failed to get Sequenced Map at: {:?} (type tag: {})",
                         name, tag
                     ))
                 }
-                SafeClientError::DataError(SafeNdError::NoSuchData) => {
+                // FIXME: we need to match the appropriate error
+                // to map it to our Error::ContentNotFound
+                /*ClientError::NetworkDataError(??) => {
                     Error::ContentNotFound(format!(
                         "Sequenced Map not found at Xor name: {} (type tag: {})",
                         xorname_to_hex(&name),
                         tag
                     ))
-                }
-                SafeClientError::DataError(SafeNdError::NoSuchEntry) => {
+                }*/
+                ClientError::NetworkDataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
                         "Entry not found in Sequenced Map found at Xor name: {} (type tag: {})",
                         xorname_to_hex(&name),
@@ -357,7 +363,7 @@ impl SafeAppClient {
             .edit_map_entries(address, MapEntryActions::Seq(entry_actions))
             .await
             .map_err(|err| {
-                if let SafeClientError::DataError(SafeNdError::InvalidEntryActions(_)) = err {
+                if let ClientError::NetworkDataError(SafeNdError::InvalidEntryActions(_)) = err {
                     Error::EntryExists(format!("{}: {}", message, err))
                 } else {
                     Error::NetDataError(format!("{}: {}", message, err))
@@ -456,7 +462,7 @@ impl SafeAppClient {
             .get_sequence_last_entry(sequence_address)
             .await
             .map_err(|err| {
-                if let SafeClientError::DataError(SafeNdError::NoSuchEntry) = err {
+                if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
                     Error::EmptyContent(format!("Empty Sequence found at XoR name {}", name))
                 } else {
                     Error::NetDataError(format!(
@@ -495,7 +501,7 @@ impl SafeAppClient {
             .get_sequence_range(sequence_address, (start, end))
             .await
             .map_err(|err| {
-                if let SafeClientError::DataError(SafeNdError::NoSuchEntry) = err {
+                if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
                     Error::VersionNotFound(format!(
                         "Invalid version ({}) for Sequence found at XoR name {}",
                         index, name
