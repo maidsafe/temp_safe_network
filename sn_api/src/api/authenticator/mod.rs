@@ -24,10 +24,11 @@ use sha3::Sha3_256;
 use sn_client::{
     client::{bootstrap_config, Client},
     Error as ClientError,
+    ErrorMessage::NoSuchEntry,
 };
 use sn_data_types::{
-    Error::NoSuchEntry, Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
-    MapSeqEntryActions, MapValue, Money,
+    Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
+    MapValue, Money,
 };
 use std::{collections::BTreeMap, sync::Arc};
 use tiny_keccak::{sha3_256, sha3_512};
@@ -413,7 +414,7 @@ impl SafeAuthenticator {
 
                     keypair
                 }
-                Err(ClientError::NetworkDataError(NoSuchEntry)) => {
+                Err(ClientError::ErrorMessage(NoSuchEntry)) => {
                     // This is the first time this app is being authorised,
                     // thus let's generate a keypair for it
                     trace!(

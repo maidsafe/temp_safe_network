@@ -3823,9 +3823,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.44.16"
+version = "0.44.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd5e538aa2c579ac089c4bf0818fa7b01a274bf5a2d4eff3dc79c32c560b1fa5"
+checksum = "77f4f6dde85ecdcf568f054badc3abd1b48e3c93b16e1015c926d41750765588"
 dependencies = [
  "anyhow",
  "async-trait",
