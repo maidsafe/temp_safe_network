@@ -3481,9 +3481,9 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.19.5"
+version = "0.19.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fea0140c68ece7eadada3a7afaabdbcf6ed42dbcdc1d1796b8a79d8c45e2377"
+checksum = "3f5a05e41042ba17c5a8f5d91b36a3081fce4ae20588c53f28222a0273f40e1a"
 dependencies = [
  "aes",
  "async-trait",
@@ -3823,9 +3823,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.44.15"
+version = "0.44.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28de8b5b0a93e18643581ae65ac9b362c01e4dd55cc398a66bad85a740ee6886"
+checksum = "cd5e538aa2c579ac089c4bf0818fa7b01a274bf5a2d4eff3dc79c32c560b1fa5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3943,9 +3943,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1b47847eae8d33b55aeca9db7d4058e68bf19393d1a19cf117a76b60c99c98"
+checksum = "2d2b4db4ee6deffe534087af017f5a3ce312f2d40ddb8c1cbb63fcf62e7207a6"
 dependencies = [
  "bincode",
  "crdts",

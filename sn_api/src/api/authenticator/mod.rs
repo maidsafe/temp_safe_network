@@ -228,7 +228,7 @@ impl SafeAuthenticator {
             .map_err(|err| {
                 Error::AuthenticatorError(format!("Failed to store Safe on a Map: {}", err))
             })?;
-        debug!("Map stored successfully for new Safe at: {:?}", map_address);
+        debug!("Map stored successfully for new Safe!");
 
         self.safe = Some((client, map_address));
         Ok(())
@@ -370,11 +370,19 @@ impl SafeAuthenticator {
     /// If the app is found, then the `AuthGranted` struct is returned based on that information.
     /// If the app is not found in the Safe, then it will be authenticated.
     pub async fn authenticate(&self, auth_req: AuthReq) -> Result<AuthGranted> {
+        debug!(
+            "Retrieving/generating keypair for an application: {:?}",
+            auth_req
+        );
         if let Some((client, map_address)) = &self.safe {
             let app_id = auth_req.app_id.as_bytes().to_vec();
             let keypair = match client.get_map_value(*map_address, app_id.clone()).await {
                 Ok(value) => {
                     // This app already has its own keypair
+                    trace!(
+                        "The app ('{}') already has a Keypair in the Safe",
+                        auth_req.app_id
+                    );
 
                     // TODO: support for scenario when app was previously revoked,
                     // in which case we should generate a new keypair
@@ -408,6 +416,10 @@ impl SafeAuthenticator {
                 Err(ClientError::NetworkDataError(NoSuchEntry)) => {
                     // This is the first time this app is being authorised,
                     // thus let's generate a keypair for it
+                    trace!(
+                        "The app ('{}') was not assigned a Keypair yet in the Safe. Generating one for it...",
+                        auth_req.app_id
+                    );
                     let mut rng = OsRng;
                     let keypair = Keypair::new_ed25519(&mut rng);
 

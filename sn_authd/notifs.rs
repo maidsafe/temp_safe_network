@@ -8,7 +8,7 @@
 // Software.
 
 use super::shared::*;
-use log::info;
+use log::{error, info};
 use qjsonrpc::ClientEndpoint;
 use serde_json::json;
 use std::{collections::BTreeMap, time::Duration};
@@ -125,8 +125,8 @@ pub async fn monitor_pending_auth_reqs(
             if let Some(is_allowed) = response {
                 match incoming_auth_req.tx.try_send(is_allowed) {
                     Ok(_) => info!("Auth req decision ready to be sent back to the application"),
-                    Err(_) => {
-                        info!("Auth req decision couldn't be sent, and therefore already denied")
+                    Err(err) => {
+                        error!("Auth req decision couldn't be applied, and therefore denied. Failed to internally communicate decision: {}", err)
                     }
                 };
             }
