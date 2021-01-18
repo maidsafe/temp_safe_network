@@ -96,6 +96,8 @@ pub enum NodeEvent {
     },
     ///
     SectionPayoutValidated(TransferValidated),
+    ///
+    SectionPayoutRegistered { from: PublicKey, to: PublicKey },
 }
 
 ///
@@ -309,6 +311,7 @@ impl NodeEvent {
         match self {
             ReplicationCompleted { chunk, .. } => Section(*chunk.name()),
             SectionPayoutValidated(event) => Section(event.sender().into()),
+            SectionPayoutRegistered { from, .. } => Section((*from).into()),
         }
     }
 }
