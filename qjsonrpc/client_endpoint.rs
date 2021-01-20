@@ -11,7 +11,12 @@ use super::{jsonrpc::parse_jsonrpc_response, Error, JsonRpcRequest, Result, ALPN
 use crate::utils;
 use log::debug;
 use serde::de::DeserializeOwned;
-use std::{fs, path::PathBuf, str, sync::Arc, time::Instant};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Instant,
+};
 use url::Url;
 
 // JSON-RPC over QUIC client endpoint
@@ -23,7 +28,11 @@ impl ClientEndpoint {
     // cert_base_path: Base path where to locate custom certificate authority to trust, in DER format
     // idle_timeout: Optional number of millis before timing out an idle connection
     // keylog: Perform NSS-compatible TLS key logging to the file specified in `SSLKEYLOGFILE`
-    pub fn new(cert_base_path: &str, idle_timeout: Option<u64>, keylog: bool) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(
+        cert_base_path: P,
+        idle_timeout: Option<u64>,
+        keylog: bool,
+    ) -> Result<Self> {
         let mut client_config = quinn::ClientConfigBuilder::default();
         client_config.protocols(ALPN_QUIC_HTTP);
 
@@ -31,7 +40,9 @@ impl ClientEndpoint {
             client_config.enable_keylog();
         }
 
-        let ca_path = PathBuf::from(cert_base_path).join("cert.der");
+        let mut ca_path = PathBuf::new();
+        ca_path.push(cert_base_path);
+        ca_path.push("cert.der");
 
         let ca_certificate = fs::read(&ca_path).map_err(|err| {
             Error::ClientError(format!(

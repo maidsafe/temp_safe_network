@@ -13,7 +13,12 @@ use super::{
 use crate::utils;
 use futures::StreamExt;
 use log::{debug, info, warn};
-use std::{fs, io, net::SocketAddr, str, sync::Arc};
+use std::{
+    fs, io,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 // JSON-RPC over QUIC server endpoint
 pub struct Endpoint {
@@ -23,7 +28,7 @@ pub struct Endpoint {
 impl Endpoint {
     // cert_base_path: Base path where to locate custom certificate authority to trust, in DER format
     // idle_timeout: Optional number of millis before timing out an idle connection
-    pub fn new(cert_base_path: &str, idle_timeout: Option<u64>) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(cert_base_path: P, idle_timeout: Option<u64>) -> Result<Self> {
         let mut server_config = quinn::ServerConfig::default();
         if let Some(timeout) = idle_timeout {
             server_config.transport = Arc::new(utils::new_transport_cfg(timeout)?)
@@ -32,8 +37,14 @@ impl Endpoint {
         let mut server_config = quinn::ServerConfigBuilder::new(server_config);
         server_config.protocols(ALPN_QUIC_HTTP);
 
-        let cert_path = std::path::Path::new(&cert_base_path).join("cert.der");
-        let key_path = std::path::Path::new(&cert_base_path).join("key.der");
+        let mut cert_path = PathBuf::new();
+        cert_path.push(&cert_base_path);
+        cert_path.push("cert.der");
+
+        let mut key_path = PathBuf::new();
+        key_path.push(&cert_base_path);
+        key_path.push("key.der");
+
         let (cert, key) = match fs::read(&cert_path).and_then(|x| Ok((x, fs::read(&key_path)?))) {
             Ok(x) => x,
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
@@ -50,7 +61,7 @@ impl Endpoint {
                 let cert = cert.serialize_der().map_err(|err| {
                     Error::GeneralError(format!("Failed to serialise certificate: {}", err))
                 })?;
-                fs::create_dir_all(&std::path::Path::new(&cert_base_path)).map_err(|err| {
+                fs::create_dir_all(cert_base_path).map_err(|err| {
                     Error::GeneralError(format!("Failed to create certificate directory: {}", err))
                 })?;
                 fs::write(&cert_path, &cert).map_err(|err| {
