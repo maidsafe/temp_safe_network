@@ -22,7 +22,6 @@ mod xorurl_media_types;
 use super::{common, constants};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
-use sn_data_types::Keypair;
 use std::{sync::Arc, time::Duration};
 use xorurl::XorUrlBase;
 
@@ -36,6 +35,7 @@ pub mod xorurl;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_coins_amount;
 pub use nrs::ProcessedEntries;
+use sn_data_types::Keypair;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 // TODO: should we be cloning this?

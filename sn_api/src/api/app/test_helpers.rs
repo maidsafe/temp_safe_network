@@ -7,7 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Result, Safe};
+use crate::Safe;
+use anyhow::{Context, Result};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::env::var;
@@ -20,11 +21,19 @@ const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 pub async fn new_safe_instance() -> Result<Safe> {
     let mut safe = Safe::default();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
-        Ok(val) => val,
-        Err(_) => "fake-credentials-string".to_string(),
+        Ok(val) => {
+            let keypair = serde_json::from_str(&val).with_context(|| {
+                format!(
+                    "Failed to parse credentials read from {} env var",
+                    TEST_AUTH_CREDENTIALS
+                )
+            })?;
+            Some(keypair)
+        }
+        Err(_) => None,
     };
 
-    safe.connect(Some(&credentials)).await?;
+    safe.connect(credentials, None).await?;
     Ok(safe)
 }
 

@@ -44,7 +44,7 @@ pub enum KeysSubCommands {
         /// The target SafeKey's safe://xor-url to verify it matches/corresponds to the secret key provided. The corresponding secret key will be prompted if not provided with '--sk'
         #[structopt(long = "keyurl")]
         keyurl: Option<String>,
-        /// The secret key which corresponds to the target SafeKey. It will be prompted if not provided
+        /// The secret key which corresponds to the target SafeKey. CLI application's default SafeKey will be used by default, otherwise if the CLI has not been given a keypair (authorised), it will be prompted
         #[structopt(long = "sk")]
         secret: Option<String>,
         /// The secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
@@ -105,13 +105,29 @@ pub async fn key_commander(
             secret,
             is_bls,
         } => {
-            connect(safe).await?;
             let target = keyurl.unwrap_or_else(|| "".to_string());
-            let sk = get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
-            let sk = if is_bls {
-                SecretKey::from(bls_sk_from_hex(&sk)?)
-            } else {
-                SecretKey::Ed25519(ed_sk_from_hex(&sk)?)
+            let sk = match connect(safe).await? {
+                Some(keypair) if secret.is_none() => {
+                    // we then use the secret from CLI's given credentials
+                    println!("Checking balance of CLI's assigned keypair...");
+                    keypair.secret_key().map_err(|err| {
+                        format!(
+                            "Failed to obtain the secret key from app's assigned keypair: {}",
+                            err
+                        )
+                    })?
+                }
+                Some(_) | None => {
+                    // prompt the user for a SK
+                    let secret_key =
+                        get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
+
+                    if is_bls {
+                        SecretKey::from(bls_sk_from_hex(&secret_key)?)
+                    } else {
+                        SecretKey::Ed25519(ed_sk_from_hex(&secret_key)?)
+                    }
+                }
             };
 
             let sk = Arc::new(sk);

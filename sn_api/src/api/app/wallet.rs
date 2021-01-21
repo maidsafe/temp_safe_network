@@ -1251,7 +1251,7 @@ mod tests {
         .await?;
 
         let mut another_safe = Safe::default();
-        another_safe.connect(None).await?;
+        another_safe.connect(None, None).await?;
 
         // test fail to transfer from a not owned wallet in <from> argument
         match another_safe

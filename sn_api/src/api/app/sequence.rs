@@ -235,8 +235,8 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::api::app::test_helpers::new_safe_instance;
+    use anyhow::Result;
 
     #[tokio::test]
     async fn test_sequence_create() -> Result<()> {

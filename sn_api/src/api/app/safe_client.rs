@@ -8,10 +8,7 @@
 // Software.
 
 use super::{fetch::Range, helpers::xorname_to_hex};
-use crate::{
-    api::ipc::{IpcMsg, IpcResp},
-    Error, Result,
-};
+use crate::{api::ipc::BootstrapConfig, Error, Result};
 
 use log::{debug, info};
 use sn_client::{Client, Error as ClientError, TransfersError};
@@ -50,31 +47,17 @@ impl SafeAppClient {
         }
     }
 
-    // Connect to the SAFE Network using the provided auth credentials
-    pub async fn connect(&mut self, auth_credentials: Option<&str>) -> Result<()> {
+    // Connect to the SAFE Network using the keypair if provided. Contacts list
+    // are overriden if a 'bootstrap_config' is provided.
+    pub async fn connect(
+        &mut self,
+        app_keypair: Option<Arc<Keypair>>,
+        bootstrap_config: Option<BootstrapConfig>,
+    ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
-
-        let app_keypair = if let Some(auth_credentials) = auth_credentials {
-            match IpcMsg::from_string(auth_credentials)? {
-                IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted))) => {
-                    self.bootstrap_config = Some(auth_granted.bootstrap_config);
-                    Some(auth_granted.app_keypair)
-                }
-                IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_config))) => {
-                    // unregistered type used for returning bootstrap config for client
-                    self.bootstrap_config = Some(bootstrap_config);
-                    None
-                }
-                IpcMsg::Resp(IpcResp::Auth(Err(e)))
-                | IpcMsg::Resp(IpcResp::Unregistered(Err(e)))
-                | IpcMsg::Err(e) => return Err(Error::AuthError(format!("{:?}", e))),
-                IpcMsg::Req(req) => {
-                    return Err(Error::AuthError(format!("Invalid credentials: {:?}", req)))
-                }
-            }
-        } else {
-            None
-        };
+        if bootstrap_config.is_some() {
+            self.bootstrap_config = bootstrap_config;
+        }
 
         debug!(
             "Client to be instantiated with specific pk?: {:?}",
