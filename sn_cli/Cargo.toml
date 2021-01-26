@@ -28,7 +28,7 @@ rand = "~0.7.3"
 relative-path = "~0.4.0"
 reqwest = { version = "~0.9.24", default-features=false, features = ["rustls-tls"], optional = true }
 rpassword = "4.0.5"
-sn_launch_tool = "~0.0.9"
+sn_launch_tool = "~0.0.10"
 serde = "1.0.91"
 serde_json = "1.0.39"
 serde_yaml = "~0.8.11"
