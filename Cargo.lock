@@ -2322,9 +2322,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.0.9"
+version = "0.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12aaa302536398d4bc19d35d75963360c63302de71f5c68d4b2ba53d235c115"
+checksum = "432e1fda2a9a9feec18c3f78c1ddcb6dff0df43228f34064244b44ad6ff4da00"
 dependencies = [
  "directories",
  "env_logger",
@@ -2361,7 +2361,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.25.32"
+version = "0.25.35"
 dependencies = [
  "async-log",
  "base64 0.10.1",
