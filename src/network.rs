@@ -9,10 +9,7 @@
 
 use crate::{Address, BlobWrite, Error, MsgSender, Result};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{
-    Blob, BlobAddress, DebitId, PublicKey, ReplicaEvent, Signature, SignedTransferShare,
-    TransferAgreementProof, TransferValidated, WalletInfo,
-};
+use sn_data_types::{Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare, SignedCredit, SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -33,6 +30,22 @@ pub enum NodeCmd {
 /// Cmds related to the running of a node.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeSystemCmd {
+    /// When threshold Elders have been reached
+    /// in genesis section, they all propose genesis.
+    ProposeGenesis {
+        /// The genesis credit.
+        credit: Credit,
+        /// An individual Elder's sig share.
+        sig: SignatureShare,
+    },
+    /// When proposal has been agreed
+    /// in genesis section, they all accumulate genesis.
+    AccumulateGenesis {
+        /// The genesis credit.
+        signed_credit: SignedCredit,
+        /// An individual Elder's sig share.
+        sig: SignatureShare,
+    },
     /// Register a wallet for reward payouts.
     RegisterWallet {
         /// The wallet to which rewards will be paid out by the network.
@@ -286,6 +299,8 @@ impl NodeCmd {
         match self {
             System(NodeSystemCmd::RegisterWallet { section, .. }) => Section(*section),
             System(NodeSystemCmd::StorageFull { section, .. }) => Section(*section),
+            System(NodeSystemCmd::ProposeGenesis { credit, .. }) => Section(credit.recipient().into()),
+            System(NodeSystemCmd::AccumulateGenesis { signed_credit, .. }) => Section(signed_credit.recipient().into()),
             Data(cmd) => match cmd {
                 ReplicateChunk { new_holder, .. } => Node(*new_holder),
                 Blob(_write) => Node(XorName::default()), // todo: fix this!
