@@ -432,7 +432,7 @@ impl Safe {
         let xorurl_encoder = Safe::parse_url(url)?;
         if xorurl_encoder.content_version().is_some() {
             return Err(Error::InvalidInput(format!(
-                "The target URL cannot cannot contain a version: {}",
+                "The target URL cannot contain a version: {}",
                 url
             )));
         };
@@ -634,7 +634,7 @@ impl Safe {
         let xorurl_encoder = Safe::parse_url(url)?;
         if xorurl_encoder.content_version().is_some() {
             return Err(Error::InvalidInput(format!(
-                "The target URL cannot cannot contain a version: {}",
+                "The target URL cannot contain a version: {}",
                 url
             )));
         };
@@ -817,7 +817,7 @@ async fn validate_files_add_params(
     let xorurl_encoder = Safe::parse_url(url)?;
     if xorurl_encoder.content_version().is_some() {
         return Err(Error::InvalidInput(format!(
-            "The target URL cannot cannot contain a version: {}",
+            "The target URL cannot contain a version: {}",
             url
         )));
     };
@@ -2187,7 +2187,7 @@ mod tests {
                 assert_eq!(
                     err,
                     Error::InvalidInput(format!(
-                        "The target URL cannot cannot contain a version: {}",
+                        "The target URL cannot contain a version: {}",
                         versioned_xorurl
                     ))
                 );
