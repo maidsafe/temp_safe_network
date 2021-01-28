@@ -301,9 +301,10 @@ impl Safe {
 fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
     // validate no slashes in name.
     if name.find('/').is_some() {
-        let msg = "NRS name/subname cannot contain a slash".to_string();
+        let msg = "The NRS name/subname cannot contain a slash".to_string();
         return Err(Error::InvalidInput(msg));
     }
+    // parse the name into a url
     let sanitised_url = sanitised_url(name);
     let xorurl_encoder = Safe::parse_url(&sanitised_url)?;
     if xorurl_encoder.content_version().is_some() {
@@ -602,11 +603,14 @@ mod tests {
         let nrs_name = "name/with/slash";
         match validate_nrs_name(&nrs_name) {
             Ok(_) => Err(anyhow!(
-                "Unexpectedly validated nrs name with slashes{}",
+                "Unexpectedly validated nrs name with slashes {}",
                 nrs_name
             )),
             Err(Error::InvalidInput(msg)) => {
-                assert_eq!(msg, "NRS name/subname cannot contain a slash".to_string());
+                assert_eq!(
+                    msg,
+                    "The NRS name/subname cannot contain a slash".to_string()
+                );
                 Ok(())
             }
             Err(err) => Err(anyhow!("Error returned is not the expected one: {}", err)),
