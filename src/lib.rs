@@ -43,8 +43,8 @@ use crate::errors::ErrorDebug;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    AppPermissions, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, Money, PublicKey,
-    ReplicaEvent, ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry,
+    ActorHistory, AppPermissions, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues,
+    Money, PublicKey, ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry,
     SequencePermissions, SequencePrivatePolicy, SequencePublicPolicy, Signature,
     TransferAgreementProof, TransferValidated,
 };
@@ -473,7 +473,7 @@ pub enum QueryResponse {
     /// Get key balance.
     GetBalance(Result<Money>),
     /// Get key transfer history.
-    GetHistory(Result<Vec<ReplicaEvent>>),
+    GetHistory(Result<ActorHistory>),
     /// Get Store Cost.
     GetStoreCost(Result<Money>),
     //
@@ -576,7 +576,7 @@ try_from!(SequencePrivatePolicy, GetSequencePrivatePolicy);
 try_from!(SequencePermissions, GetSequenceUserPermissions);
 try_from!(Money, GetBalance);
 try_from!(ReplicaPublicKeySet, GetReplicaKeys);
-try_from!(Vec<ReplicaEvent>, GetHistory);
+try_from!(ActorHistory, GetHistory);
 try_from!(
     (BTreeMap<PublicKey, AppPermissions>, u64),
     ListAuthKeysAndVersion

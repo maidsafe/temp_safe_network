@@ -9,7 +9,10 @@
 
 use crate::{Address, BlobWrite, Error, MsgSender, Result};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare, SignedCredit, SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo};
+use sn_data_types::{
+    Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare,
+    SignedCredit, SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo,
+};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -28,6 +31,7 @@ pub enum NodeCmd {
 }
 
 /// Cmds related to the running of a node.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeSystemCmd {
     /// When threshold Elders have been reached
@@ -299,8 +303,12 @@ impl NodeCmd {
         match self {
             System(NodeSystemCmd::RegisterWallet { section, .. }) => Section(*section),
             System(NodeSystemCmd::StorageFull { section, .. }) => Section(*section),
-            System(NodeSystemCmd::ProposeGenesis { credit, .. }) => Section(credit.recipient().into()),
-            System(NodeSystemCmd::AccumulateGenesis { signed_credit, .. }) => Section(signed_credit.recipient().into()),
+            System(NodeSystemCmd::ProposeGenesis { credit, .. }) => {
+                Section(credit.recipient().into())
+            }
+            System(NodeSystemCmd::AccumulateGenesis { signed_credit, .. }) => {
+                Section(signed_credit.recipient().into())
+            }
             Data(cmd) => match cmd {
                 ReplicateChunk { new_holder, .. } => Node(*new_holder),
                 Blob(_write) => Node(XorName::default()), // todo: fix this!
