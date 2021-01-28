@@ -37,7 +37,7 @@ jobs:
       # Check if the code is formatted correctly.
       - name: Check formatting
         run: cargo fmt --all -- --check
-      
+
       # Run Clippy.
       - name: Clippy checks
         run: cargo clippy --all-targets --all-features

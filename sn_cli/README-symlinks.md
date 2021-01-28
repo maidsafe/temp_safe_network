@@ -119,7 +119,7 @@ returned, else an error will be generated.
 Windows since Vista supports native symlinks, however they are disabled by
 default. Writing symlinks to disk requires certain permissions (depends on the
 exact OS version), so `safe files get` may skip the symlink and issue a warning
-in this case. 
+in this case.
 
 Symlink support is enabled by choosing [run as
 administrator](https://www.howtogeek.com/howto/16226/complete-guide-to-symbolic-links-symlinks-on-windows-or-linux/)

@@ -76,7 +76,7 @@ jobs:
         with:
           name: ${{ matrix.output }}
           path: target/x86_64-unknown-linux-musl/release/${{ matrix.target }}
-      
+
       # Upload Windows
       - name: Upload Windows Builds
         if: matrix.os == 'windows-latest'
@@ -85,7 +85,7 @@ jobs:
           name: ${{ matrix.output }}
           path: target/release/${{ matrix.target }}
 
-  
+
   build-mac-cli-authd:
     if: ${{ github.repository_owner == 'maidsafe' }}
     runs-on: ${{ matrix.os }}
@@ -246,7 +246,7 @@ jobs:
       # Upload all the release archives to S3;
       - name: Upload prod to S3
         run: aws s3 sync deploy/prod s3://sn-api --size-only --acl public-read
-     
+
       # Create the release and attach sn_cli archives as assets.
       - uses: csexton/create-release@add-body
         id: create_release

@@ -38,7 +38,7 @@ All notable changes to this project will be documented in this file. See [standa
 ### Bug Fixes
 
 * ***api*** known issue in authorising CLI, as reported in last week's dev update, was solved: https://github.com/maidsafe/sn_api/pull/659
-  
+
 * ***cli*** fix `$ safe update` command as it was not looking up in the correct URL: https://github.com/maidsafe/sn_api/pull/660
 
 * ***cli*** install script had an issue for Mac users: https://github.com/maidsafe/sn_api/pull/661
