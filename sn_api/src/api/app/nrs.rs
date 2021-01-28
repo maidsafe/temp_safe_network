@@ -299,6 +299,11 @@ impl Safe {
 }
 
 fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
+    // validate no slashes in name.
+    if name.find('/').is_some() {
+        let msg = "NRS name/subname cannot contain a slash".to_string();
+        return Err(Error::InvalidInput(msg));
+    }
     let sanitised_url = sanitised_url(name);
     let xorurl_encoder = Safe::parse_url(&sanitised_url)?;
     if xorurl_encoder.content_version().is_some() {
@@ -582,5 +587,29 @@ mod tests {
         let url = Safe::parse_url(&site_name)?;
         assert_eq!(url.public_name(), site_name);
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_nrs_name() -> Result<()> {
+        let nrs_name = random_nrs_name();
+        let (_, nrs_url) = validate_nrs_name(&nrs_name)?;
+        assert_eq!(nrs_url, format!("safe://{}", nrs_name));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_validate_nrs_name_with_slash() -> Result<()> {
+        let nrs_name = "name/with/slash";
+        match validate_nrs_name(&nrs_name) {
+            Ok(_) => Err(anyhow!(
+                "Unexpectedly validated nrs name with slashes{}",
+                nrs_name
+            )),
+            Err(Error::InvalidInput(msg)) => {
+                assert_eq!(msg, "NRS name/subname cannot contain a slash".to_string());
+                Ok(())
+            }
+            Err(err) => Err(anyhow!("Error returned is not the expected one: {}", err)),
+        }
     }
 }
