@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.6.0](https://github.com/maidsafe/sn_messaging/compare/v1.5.5...v1.6.0) (2021-01-29)
+
+
+### Features
+
+* **genesis:** add msgs for genesis section init ([a808d3f](https://github.com/maidsafe/sn_messaging/commit/a808d3fbcf1ab10c8b21876ab177d97ffab47abc))
+* **node_transfers:** add section payout error ([86114a5](https://github.com/maidsafe/sn_messaging/commit/86114a53593786ced19def470ddf262821d927ba))
+* **nodeevents:** add SectionPayoutRegistered ([b782d19](https://github.com/maidsafe/sn_messaging/commit/b782d19cfa94a2d8b76cde714c3102dcfc9dc944))
+* **rewards:** use share for payout validation ([041330b](https://github.com/maidsafe/sn_messaging/commit/041330bec25561e350a4fe28cc36cba4eb5f4d51))
+
 ### [1.5.5](https://github.com/maidsafe/sn_messaging/compare/v1.5.4...v1.5.5) (2021-01-15)
 
 ### [1.5.4](https://github.com/maidsafe/sn_messaging/compare/v1.5.3...v1.5.4) (2021-01-15)
