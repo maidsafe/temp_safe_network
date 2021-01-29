@@ -1005,6 +1005,7 @@ mod tests {
     use sn_data_types::{Money, SequenceAction, SequencePrivatePermissions};
     use sn_messaging::Error as ErrorMessage;
     use std::str::FromStr;
+    use tokio::time::{delay_for, Duration};
     use unwrap::unwrap;
     use xor_name::XorName;
 
@@ -1024,6 +1025,7 @@ mod tests {
         while balance_before_delete == Money::from_str("0")?
             || balance_before_delete == Money::from_str("10")?
         {
+            delay_for(Duration::from_millis(500)).await;
             balance_before_delete = client.get_balance().await?;
         }
 
@@ -1032,6 +1034,7 @@ mod tests {
 
         // now let's ensure we've paid _something_
         while new_balance == balance_before_delete {
+            delay_for(Duration::from_millis(500)).await;
             new_balance = client.get_balance().await?;
         }
 
@@ -1058,6 +1061,8 @@ mod tests {
         let mut seq_res = client.get_sequence(address).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.get_sequence(address).await;
         }
 
@@ -1083,6 +1088,8 @@ mod tests {
         let mut seq_res = client.get_sequence(address).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.get_sequence(address).await;
         }
 
@@ -1113,6 +1120,8 @@ mod tests {
         let mut seq_res = client.get_sequence(address).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.get_sequence(address).await;
         }
 
@@ -1126,6 +1135,8 @@ mod tests {
             .await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_private_permissions_for_user(address, owner)
                 .await;
@@ -1141,6 +1152,8 @@ mod tests {
             .get_sequence_permissions(address, SequenceUser::Key(owner))
             .await;
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_permissions(address, SequenceUser::Key(owner))
                 .await;
@@ -1170,6 +1183,8 @@ mod tests {
             .await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_private_permissions_for_user(address, sim_client)
                 .await;
@@ -1185,6 +1200,8 @@ mod tests {
             .get_sequence_permissions(address, SequenceUser::Key(sim_client))
             .await;
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_permissions(address, SequenceUser::Key(sim_client))
                 .await;
@@ -1220,6 +1237,7 @@ mod tests {
         let mut seq_res = client.get_sequence(address).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.get_sequence(address).await;
         }
 
@@ -1233,6 +1251,7 @@ mod tests {
             .await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_pub_permissions_for_user(address, owner)
                 .await;
@@ -1248,6 +1267,7 @@ mod tests {
             .get_sequence_permissions(address, SequenceUser::Key(owner))
             .await;
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_permissions(address, SequenceUser::Key(owner))
                 .await;
@@ -1281,6 +1301,7 @@ mod tests {
             .await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_pub_permissions_for_user(address, sim_client)
                 .await;
@@ -1296,6 +1317,7 @@ mod tests {
             .get_sequence_permissions(address, SequenceUser::Key(sim_client))
             .await;
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_permissions(address, SequenceUser::Key(sim_client))
                 .await;
@@ -1333,6 +1355,7 @@ mod tests {
         let mut seq_res = client.append_to_sequence(address, b"VALUE1".to_vec()).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.append_to_sequence(address, b"VALUE1".to_vec()).await;
         }
 
@@ -1340,6 +1363,7 @@ mod tests {
         let mut seq_res = client.get_sequence_last_entry(address).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.get_sequence_last_entry(address).await;
         }
 
@@ -1352,6 +1376,7 @@ mod tests {
         let mut seq_res = client.append_to_sequence(address, b"VALUE2".to_vec()).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.append_to_sequence(address, b"VALUE2".to_vec()).await;
         }
 
@@ -1359,12 +1384,14 @@ mod tests {
         let mut seq_res = client.get_sequence_last_entry(address).await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client.get_sequence_last_entry(address).await;
         }
 
         let (mut index, mut data) = seq_res?;
         // we might still be getting old data here
         while index == 0 {
+            delay_for(Duration::from_millis(500)).await;
             let (i, d) = client.get_sequence_last_entry(address).await?;
             index = i;
             data = d;
@@ -1381,6 +1408,7 @@ mod tests {
             .await;
 
         while seq_res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             seq_res = client
                 .get_sequence_range(
                     address,
@@ -1428,6 +1456,7 @@ mod tests {
         // Assert that the data is stored.
         let mut res = client.get_sequence(address).await;
         while res.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             res = client.get_sequence(address).await;
         }
 
@@ -1437,6 +1466,7 @@ mod tests {
 
         let mut data = client.get_sequence(address).await?;
         while data.len(None)? == 0 {
+            delay_for(Duration::from_millis(500)).await;
             data = client.get_sequence(address).await?;
         }
 
@@ -1446,6 +1476,7 @@ mod tests {
 
         let mut data = client.get_sequence(address).await?;
         while data.len(None)? == 1 {
+            delay_for(Duration::from_millis(500)).await;
             data = client.get_sequence(address).await?;
         }
 
@@ -1462,6 +1493,7 @@ mod tests {
 
         let mut res = client.get_sequence_owner(address).await?;
         while res != sim_client {
+            delay_for(Duration::from_millis(500)).await;
             res = client.get_sequence_owner(address).await?;
         }
 
@@ -1485,6 +1517,7 @@ mod tests {
         let mut sequence = client.get_sequence(address).await;
 
         while sequence.is_err() {
+            delay_for(Duration::from_millis(500)).await;
             sequence = client.get_sequence(address).await;
         }
 
@@ -1495,6 +1528,7 @@ mod tests {
         let mut res = client.get_sequence(address).await;
 
         while res.is_ok() {
+            delay_for(Duration::from_millis(500)).await;
             res = client.get_sequence(address).await;
         }
 

@@ -362,6 +362,7 @@ mod tests {
     use rand::rngs::OsRng;
     use sn_data_types::Money;
     use std::str::FromStr;
+    use tokio::time::{delay_for, Duration};
 
     #[tokio::test]
     pub async fn transfer_actor_creation_hydration_for_nonexistant_balance() -> Result<()> {
@@ -382,11 +383,15 @@ mod tests {
             Ok(actor) => {
                 let mut bal = actor.get_balance().await;
                 while bal.is_err() {
+                    delay_for(Duration::from_millis(500)).await;
+
                     bal = actor.get_balance().await;
                 }
 
                 let mut money = bal?;
                 while  money != Money::from_str("10")? {
+                    delay_for(Duration::from_millis(500)).await;
+
                     money = actor.get_balance().await?;
 
                 }
@@ -421,6 +426,7 @@ mod tests {
 
         // loop until correct
         while new_balance != desired_balance {
+            delay_for(Duration::from_millis(500)).await;
             new_balance = client.get_balance().await?;
         }
 

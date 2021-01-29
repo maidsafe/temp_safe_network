@@ -92,6 +92,7 @@ mod tests {
 
     use super::*;
     use std::str::FromStr;
+    use tokio::time::{delay_for, Duration};
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
@@ -104,6 +105,7 @@ mod tests {
 
         let mut money = client.get_balance_from_network(None).await?;
         while money != Money::from_str("110")? {
+            delay_for(Duration::from_millis(500)).await;
             money = client.get_balance_from_network(None).await?;
         }
 
