@@ -9,7 +9,10 @@ keywords = ["quic"]
 edition = "2018"
 
 [lib]
-path = "lib.rs"
+path = "src/lib.rs"
+
+[[example]]
+name = "ping"
 
 [dependencies]
 dirs-next = "1.0.1"
@@ -21,3 +24,7 @@ serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 url = "2.1.1"
 quinn = {version = "~0.6.1", features=["tls-rustls"], default-features = false}
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "~0.2.21", features = ["rt-core", "macros"] }
