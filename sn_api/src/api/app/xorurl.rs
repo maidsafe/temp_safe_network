@@ -219,12 +219,6 @@ impl SafeUrlParts {
             return Err(Error::InvalidXorUrl(msg));
         }
 
-        // validate no spaces in name.
-        if public_name.find(' ').is_some() {
-            let msg = "name cannot contain a space".to_string();
-            return Err(Error::InvalidXorUrl(msg));
-        }
-
         // parse top_name and sub_names from name
         let names_vec: Vec<String> = public_name.split('.').map(String::from).collect();
         let top_name = names_vec[names_vec.len() - 1].to_string();
