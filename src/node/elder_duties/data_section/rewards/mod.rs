@@ -36,6 +36,7 @@ use xor_name::XorName;
 /// out of rewards to nodes for
 /// their work in the network.
 pub struct Rewards {
+    peer_replicas: PublicKey,
     node_rewards: DashMap<XorName, NodeRewards>,
     section_funds: SectionFunds,
     wrapping: ElderMsgWrapping,
@@ -66,9 +67,11 @@ impl Rewards {
         actor: TransferActor<Validator>,
         reward_calc: RewardCalc,
     ) -> Self {
+        let peer_replicas = elder_state.section_public_key();
         let wrapping = ElderMsgWrapping::new(elder_state, ElderDuties::Rewards);
         let section_funds = SectionFunds::new(actor, wrapping.clone());
         Self {
+            peer_replicas,
             node_rewards: Default::default(),
             section_funds,
             wrapping,
@@ -96,12 +99,11 @@ impl Rewards {
     pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
         info!("Rewards: Catching up with our Replicas (section actor history)!");
         // prepare actor init
-        let pub_key = self.section_funds.replicas(); // this can't be right?
         self.wrapping
             .send_to_section(
                 Message::NodeQuery {
                     query: NodeQuery::Transfers(NodeTransferQuery::CatchUpWithSectionWallet(
-                        pub_key,
+                        self.peer_replicas,
                     )),
                     id: MessageId::new(),
                 },
@@ -119,12 +121,6 @@ impl Rewards {
             .await
             .convert()
     }
-
-    // /// After Elder change, we transition to a new
-    // /// transfer actor, as there is now a new keypair for it.
-    // pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeOperation> {
-    //     Ok(self.section_funds.transition(to).await?.into())
-    // }
 
     pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Result<NodeOperation> {
         use RewardDuty::*;

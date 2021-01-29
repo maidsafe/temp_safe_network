@@ -44,7 +44,6 @@ pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
         debug!("Creating auto dump database at {}", db_path.display());
         fs::create_dir_all(db_dir)?;
         let _db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
-        //return Ok(db);
     }
     debug!(
         "Loading auto dump database at {}, init mode was {:?}",

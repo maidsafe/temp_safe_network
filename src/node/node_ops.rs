@@ -146,12 +146,15 @@ pub enum NodeDuty {
         /// The set of elders of our section.
         elders: BTreeSet<XorName>,
     },
-    ///
+    /// Finishes the multi-step process
+    /// of transitioning to a new elder constellation.
     FinishElderChange {
+        /// The previous section key.
         previous_key: PublicKey,
+        /// The new section key.
         new_key: PublicKey,
     },
-    ///
+    /// Initiates the section wallet.
     InitSectionWallet(WalletInfo),
     /// Sending messages on to the network.
     ProcessMessaging(NodeMessagingDuty),
