@@ -356,7 +356,7 @@ mod tests {
         let mut balance = client.get_balance().await?;
 
         while balance != Money::from_str("110")? {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
 
             balance = client.get_balance().await?;
         }
@@ -369,7 +369,7 @@ mod tests {
 
         // loop until correct
         while new_balance != desired_balance {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             new_balance = client.get_balance().await?;
         }
         // Assert that the receiver has been credited.
@@ -380,7 +380,7 @@ mod tests {
         // loop until correct
         while receiving_bal != target_money {
             let _ = receiving_client.get_history().await?;
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             receiving_bal = receiving_client.get_balance().await?;
 
             if receiving_bal > target_money {
@@ -435,7 +435,7 @@ mod tests {
 
         // loop until correct
         while new_balance != desired_balance {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             new_balance = client.get_balance().await?;
         }
 

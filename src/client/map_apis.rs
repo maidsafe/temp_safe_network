@@ -677,7 +677,7 @@ mod tests {
 
         let mut res: Result<u64> = Err(anyhow!("Timeout!".to_string()));
         while res.is_err() {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             res = match client
                 .get_map_version(MapAddress::Unseq { name, tag })
                 .await
@@ -734,7 +734,7 @@ mod tests {
 
         let mut res: Result<MapSeqEntries> = Err(anyhow!("Timeout!".to_string()));
         while res.is_err() {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             res = match client.list_seq_map_entries(name, tag).await {
                 Ok(res) => Ok(res),
                 Err(error) => Err(error.into()), // into anyhow error
@@ -780,7 +780,7 @@ mod tests {
 
         let mut res = client.get_map(address).await;
         while res.is_ok() {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             // Keep trying until it fails
             res = client.get_map(address).await;
         }
@@ -917,7 +917,7 @@ mod tests {
         // Assert that the data is stored.
         let mut res = client.get_map(address).await;
         while res.is_err() {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             res = client.get_map(address).await;
         }
 
@@ -935,7 +935,7 @@ mod tests {
             .list_map_user_permissions(MapAddress::Seq { name, tag }, user)
             .await?;
         while permissions.is_allowed(MapAction::Insert) {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             permissions = client
                 .list_map_user_permissions(MapAddress::Seq { name, tag }, user)
                 .await?;
@@ -954,7 +954,7 @@ mod tests {
             .list_map_permissions(MapAddress::Seq { name, tag })
             .await?;
         while permissions.len() != 1 {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             permissions = client
                 .list_map_permissions(MapAddress::Seq { name, tag })
                 .await?;
@@ -1004,7 +1004,7 @@ mod tests {
         // Assert that the data is stored.
         let mut res = client.get_map(address).await;
         while res.is_err() {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             res = client.get_map(address).await;
         }
         let fetched_entries = client.list_seq_map_entries(name, tag).await?;
@@ -1085,7 +1085,7 @@ mod tests {
         // Assert that the data is stored.
         let mut res = client.get_map(address).await;
         while res.is_err() {
-            delay_for(Duration::from_millis(500)).await;
+            delay_for(Duration::from_millis(200)).await;
             res = client.get_map(address).await;
         }
 
