@@ -219,8 +219,35 @@ impl SafeUrlParts {
             return Err(Error::InvalidXorUrl(msg));
         }
 
+        // validate overall name length
+        // 255 octets or less
+        // see https://www.ietf.org/rfc/rfc1035.txt
+        if public_name.len() > 255 {
+            let msg = format!(
+                "Name is {} chars, must be no more than 255",
+                public_name.len()
+            );
+            return Err(Error::InvalidInput(msg));
+        }
+
         // parse top_name and sub_names from name
         let names_vec: Vec<String> = public_name.split('.').map(String::from).collect();
+
+        // validate names length
+        // labels must be 63 characters or less.
+        // see https://www.ietf.org/rfc/rfc1035.txt
+        for name in &names_vec {
+            if name.len() > 63 {
+                let msg = format!(
+                    "Label is {} chars, must be no more than 63: {}",
+                    name.len(),
+                    name
+                );
+                return Err(Error::InvalidInput(msg));
+            }
+        }
+
+        // convert into top_name and sub_names
         let top_name = names_vec[names_vec.len() - 1].to_string();
         let sub_names_vec = (&names_vec[0..names_vec.len() - 1]).to_vec();
         let sub_names = sub_names_vec.join(".");
