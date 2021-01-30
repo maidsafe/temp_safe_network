@@ -8,8 +8,7 @@
 
 //! Utilities
 
-use crate::{config_handler::Config, ElderState, Error, Result};
-use bls::{self, serde_impl::SerdeSecret};
+use crate::{config_handler::Config, Error, Result};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
 use log::{debug, error};
@@ -17,7 +16,6 @@ use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
-use sn_data_types::{BlsKeypairShare, Keypair};
 use std::{fs, path::Path};
 use std::{io::Write, time::Duration};
 
@@ -112,21 +110,6 @@ pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Bytes> {
 #[allow(unused)]
 pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     bincode::deserialize(bytes).map_err(Error::Bincode)
-}
-
-// NB: needs to allow for nodes not having a key share yet?
-pub(crate) async fn key_pair(elder_state: ElderState) -> Result<Keypair> {
-    let index = elder_state.key_index();
-    let bls_secret_key = elder_state.secret_key_share();
-    let secret = SerdeSecret(bls_secret_key.clone());
-    let public = bls_secret_key.public_key_share();
-    let public_key_set = elder_state.public_key_set().clone();
-    Ok(Keypair::BlsShare(BlsKeypairShare {
-        index,
-        secret,
-        public,
-        public_key_set,
-    }))
 }
 
 /// Initialize logging

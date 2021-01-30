@@ -9,10 +9,11 @@
 use super::validator::Validator;
 use crate::{
     node::{
+        elder_duties::data_section::ElderSigning,
         msg_wrapping::ElderMsgWrapping,
         node_ops::{NodeMessagingDuty, NodeOperation},
     },
-    utils, ElderState, Error, Result,
+    ElderState, Error, Result,
 };
 use log::{error, info};
 use sn_data_types::{
@@ -21,17 +22,15 @@ use sn_data_types::{
 };
 use sn_messaging::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery};
 use sn_transfers::{ActorEvent, TransferActor};
-use std::{
-    collections::{BTreeSet, VecDeque},
-    sync::Arc,
-};
+use std::collections::{BTreeSet, VecDeque};
 use xor_name::XorName;
 use ActorEvent::*;
+type SectionActor = TransferActor<Validator, ElderSigning>;
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 pub(super) struct SectionFunds {
-    actor: TransferActor<Validator>,
+    actor: SectionActor,
     wrapping: ElderMsgWrapping,
     state: State,
 }
@@ -52,11 +51,11 @@ struct State {
     finished: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
     pending_actor: Option<ElderState>,
     /// While awaiting payout completion
-    next_actor: Option<TransferActor<Validator>>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
+    next_actor: Option<SectionActor>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
 }
 
 impl SectionFunds {
-    pub fn new(actor: TransferActor<Validator>, wrapping: ElderMsgWrapping) -> Self {
+    pub fn new(actor: SectionActor, wrapping: ElderMsgWrapping) -> Self {
         Self {
             actor,
             wrapping,
@@ -133,9 +132,8 @@ impl SectionFunds {
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
         if let Some(elder_state) = self.state.pending_actor.take() {
-            let new_keypair_share = utils::key_pair(elder_state.clone()).await?;
-            let actor =
-                TransferActor::from_info(Arc::new(new_keypair_share), new_wallet, Validator {})?;
+            let signing = ElderSigning::new(elder_state.clone());
+            let actor = TransferActor::from_info(signing, new_wallet, Validator {})?;
             let wallet_id = actor.id();
             self.state.next_actor = Some(actor);
             // When we have a payout in flight, we defer the transition.

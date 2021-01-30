@@ -264,11 +264,8 @@ impl MsgWrapping {
                     MsgSender::section(TransientSectionKey { bls_key }, duty)?
                 } else {
                     info!("Signing data as Elder.");
-                    if let Signature::BlsShare(sig) = elder_state.sign_as_elder(data)? {
-                        MsgSender::elder(elder_state.elder_key(), duty, sig.share)?
-                    } else {
-                        return Err(Error::InvalidOperation);
-                    }
+                    let sig = elder_state.sign_as_elder(data).await?;
+                    MsgSender::elder(elder_state.elder_key(), duty, sig.share)?
                 }
             }
             Duty::Node(_) => {

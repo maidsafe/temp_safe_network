@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::store::TransferStore;
-use crate::{utils::Init, Error, ReplicaInfo, Result};
+use super::{replica_signing::ReplicaSigning, store::TransferStore, ReplicaInfo};
+use crate::{utils::Init, Error, Result};
 use bls::PublicKeySet;
 use dashmap::DashMap;
 use futures::lock::Mutex;
@@ -34,15 +34,18 @@ use {
 type WalletLocks = DashMap<PublicKey, Arc<Mutex<TransferStore<ReplicaEvent>>>>;
 
 #[derive(Clone)]
-pub struct Replicas {
+pub struct Replicas<T>
+where
+    T: ReplicaSigning,
+{
     root_dir: PathBuf,
-    info: ReplicaInfo,
+    info: ReplicaInfo<T>,
     locks: WalletLocks,
     self_lock: Arc<Mutex<usize>>,
 }
 
-impl Replicas {
-    pub(crate) fn new(root_dir: PathBuf, info: ReplicaInfo) -> Result<Self> {
+impl<T: ReplicaSigning> Replicas<T> {
+    pub(crate) fn new(root_dir: PathBuf, info: ReplicaInfo<T>) -> Result<Self> {
         Ok(Self {
             root_dir,
             info,
@@ -181,7 +184,7 @@ impl Replicas {
     }
 
     ///
-    pub fn update_replica_info(&mut self, info: ReplicaInfo) {
+    pub fn update_replica_info(&mut self, info: ReplicaInfo<T>) {
         self.info = info;
     }
 
@@ -216,32 +219,24 @@ impl Replicas {
         let _ = result?;
         debug!("wallet valid");
         // signing will be serialised
-        if let Some((replica_debit_sig, replica_credit_sig)) = self
-            .info
-            .signing
-            .lock()
-            .await
-            .sign_transfer(&signed_transfer)?
-        {
-            // release lock and update state
-            let event = TransferValidated {
-                signed_credit: signed_transfer.credit,
-                signed_debit: signed_transfer.debit,
-                replica_debit_sig,
-                replica_credit_sig,
-                replicas: self.info.peer_replicas.clone(),
-            };
+        let (replica_debit_sig, replica_credit_sig) =
+            self.info.signing.sign_transfer(&signed_transfer).await?;
+        // release lock and update state
+        let event = TransferValidated {
+            signed_credit: signed_transfer.credit,
+            signed_debit: signed_transfer.debit,
+            replica_debit_sig,
+            replica_credit_sig,
+            replicas: self.info.peer_replicas.clone(),
+        };
 
-            // first store to disk
-            store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
-            let mut wallet = wallet;
-            // then apply to inmem state
-            wallet.apply(ReplicaEvent::TransferValidated(event.clone()))?;
+        // first store to disk
+        store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
+        let mut wallet = wallet;
+        // then apply to inmem state
+        wallet.apply(ReplicaEvent::TransferValidated(event.clone()))?;
 
-            Ok(event)
-        } else {
-            Err(Error::InvalidSignedTransfer(signed_transfer.id()))
-        }
+        Ok(event)
     }
 
     /// Step 2. Validation of agreement, and order at debit source.
@@ -315,28 +310,21 @@ impl Replicas {
 
         if propagation_result.is_ok() {
             // sign + update state
-            if let Some(crediting_replica_sig) = self
-                .info
-                .signing
-                .lock()
-                .await
-                .sign_credit_proof(credit_proof)?
-            {
-                let event = TransferPropagated {
-                    credit_proof: credit_proof.clone(),
-                    crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
-                    crediting_replica_sig,
-                };
-                // only add it locally if we don't know about it... (this prevents SimulatedPayouts being reapplied due to varied sigs.)
-                if propagation_result?.is_some() {
-                    // first store to disk
-                    store.try_insert(ReplicaEvent::TransferPropagated(event.clone()))?;
-                    let mut wallet = wallet;
-                    // then apply to inmem state
-                    wallet.apply(ReplicaEvent::TransferPropagated(event.clone()))?;
-                }
-                return Ok(event);
+            let crediting_replica_sig = self.info.signing.sign_credit_proof(credit_proof).await?;
+            let event = TransferPropagated {
+                credit_proof: credit_proof.clone(),
+                crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
+                crediting_replica_sig,
+            };
+            // only add it locally if we don't know about it... (this prevents SimulatedPayouts being reapplied due to varied sigs.)
+            if propagation_result?.is_some() {
+                // first store to disk
+                store.try_insert(ReplicaEvent::TransferPropagated(event.clone()))?;
+                let mut wallet = wallet;
+                // then apply to inmem state
+                wallet.apply(ReplicaEvent::TransferPropagated(event.clone()))?;
             }
+            return Ok(event);
         }
         Err(Error::InvalidPropagatedTransfer(credit_proof.clone()))
     }
@@ -411,7 +399,7 @@ impl Replicas {
     async fn create_genesis(&self) -> Result<CreditAgreementProof> {
         // This means we are the first node in the network.
         let balance = u32::MAX as u64 * 1_000_000_000;
-        let signed_credit = self.info.signing.lock().await.try_genesis(balance)?;
+        let signed_credit = self.info.signing.try_genesis(balance).await?;
         Ok(signed_credit)
     }
 
@@ -441,23 +429,15 @@ impl Replicas {
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
         let _ = wallet.genesis(credit_proof, past_key)?;
-        // .map_err(|e| Error::Transfer(e))?;
+
         // sign + update state
-        if let Some(crediting_replica_sig) = self
-            .info
-            .signing
-            .lock()
-            .await
-            .sign_credit_proof(credit_proof)?
-        {
-            // Q: are we locked on `info.signing` here? (we don't want to be)
-            store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
-                credit_proof: credit_proof.clone(),
-                crediting_replica_sig,
-                crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
-            }))?;
-        }
-        Ok(())
+        let crediting_replica_sig = self.info.signing.sign_credit_proof(credit_proof).await?;
+        // Q: are we locked on `info.signing` here? (we don't want to be)
+        store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
+            credit_proof: credit_proof.clone(),
+            crediting_replica_sig,
+            crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
+        }))
     }
 
     // ------------------------------------------------------------------
@@ -555,26 +535,19 @@ impl Replicas {
         let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
         let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
         // sign + update state
-        if let Some((replica_debit_sig, replica_credit_sig)) = self
-            .info
-            .signing
-            .lock()
-            .await
-            .sign_transfer(&signed_transfer)?
-        {
-            store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
-                signed_credit: signed_transfer.credit,
-                signed_debit: signed_transfer.debit,
-                replica_debit_sig,
-                replica_credit_sig,
-                replicas: self.info.peer_replicas.clone(),
-            }))?;
-        }
-        Ok(())
+        let (replica_debit_sig, replica_credit_sig) =
+            self.info.signing.sign_transfer(&signed_transfer).await?;
+        store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
+            signed_credit: signed_transfer.credit,
+            signed_debit: signed_transfer.debit,
+            replica_debit_sig,
+            replica_credit_sig,
+            replicas: self.info.peer_replicas.clone(),
+        }))
     }
 }
 
-impl Replicas {
+impl<T: ReplicaSigning> Replicas<T> {
     /// Used with multisig replicas.
     pub async fn propose_validation(
         &self,
@@ -597,26 +570,18 @@ impl Replicas {
             wallet.apply(event)?;
             // see if any agreement accumulated
             if let Some(agreed_transfer) = proposal.agreed_transfer {
-                if let Some((replica_debit_sig, replica_credit_sig)) = self
-                    .info
-                    .signing
-                    .lock()
-                    .await
-                    .sign_transfer(&agreed_transfer)?
-                {
-                    let event = TransferValidated {
-                        signed_credit: agreed_transfer.credit,
-                        signed_debit: agreed_transfer.debit,
-                        replica_debit_sig,
-                        replica_credit_sig,
-                        replicas: self.info.peer_replicas.clone(),
-                    };
-                    store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
-                    // return agreed_transfer to requesting _section_
-                    return Ok(Some(event));
-                } else {
-                    return Err(Error::Logic("what? problem".to_string()));
-                }
+                let (replica_debit_sig, replica_credit_sig) =
+                    self.info.signing.sign_transfer(&agreed_transfer).await?;
+                let event = TransferValidated {
+                    signed_credit: agreed_transfer.credit,
+                    signed_debit: agreed_transfer.debit,
+                    replica_debit_sig,
+                    replica_credit_sig,
+                    replicas: self.info.peer_replicas.clone(),
+                };
+                store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
+                // return agreed_transfer to requesting _section_
+                return Ok(Some(event));
             }
         }
         Ok(None)
@@ -625,13 +590,16 @@ impl Replicas {
 
 #[cfg(test)]
 mod test {
-    use super::Replicas;
-    use crate::{Error, ReplicaInfo, Result};
+    use super::{
+        super::{test_utils::*, ReplicaInfo},
+        Replicas,
+    };
+    use crate::{Error, Result};
     use bls::{PublicKeySet, SecretKeySet};
-    use futures::{executor::block_on as run, lock::Mutex};
-    use sn_data_types::{Keypair, Money, PublicKey, SignedTransferShare};
+    use futures::executor::block_on as run;
+    use sn_data_types::{Keypair, Money, PublicKey, Signature, SignedTransferShare};
     use sn_routing::SectionProofChain;
-    use sn_transfers::{ActorEvent, ReplicaValidator, TransferActor as Actor, Wallet, WalletOwner};
+    use sn_transfers::{ActorEvent, ActorSigning, TransferActor as Actor, Wallet, WalletOwner};
     use std::sync::Arc;
     use tempdir::TempDir;
 
@@ -776,7 +744,7 @@ mod test {
         TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 
-    type Section = Vec<(Replicas, Actor<Validator>)>;
+    type Section = Vec<(Replicas<TestReplicaSigning>, Actor<Validator, TestSigning>)>;
     fn get_section(count: u8) -> Result<(Section, PublicKeySet)> {
         let mut rng = rand::thread_rng();
         let threshold = count as usize - 1;
@@ -794,18 +762,17 @@ mod test {
     fn get_replica(
         key_index: usize,
         bls_secret_key: SecretKeySet,
-    ) -> Result<(Replicas, Actor<Validator>)> {
+    ) -> Result<(Replicas<TestReplicaSigning>, Actor<Validator, TestSigning>)> {
         let peer_replicas = bls_secret_key.public_keys();
         let secret_key_share = bls_secret_key.secret_key_share(key_index);
         let id = secret_key_share.public_key_share();
-        let signing =
-            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+        let signing = TestReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
         let info = ReplicaInfo {
             id,
             key_index,
             peer_replicas: peer_replicas.clone(),
             section_proof_chain: SectionProofChain::new(peer_replicas.public_key()),
-            signing: Arc::new(Mutex::new(signing)),
+            signing,
             initiating: true,
         };
         let root_dir = temp_dir()?;
@@ -815,21 +782,46 @@ mod test {
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());
         let owner = WalletOwner::Multi(peer_replicas.clone());
         let wallet = Wallet::new(owner);
-        let actor = Actor::from_snapshot(wallet, Arc::new(keypair), peer_replicas, Validator {});
+        let actor = Actor::from_snapshot(
+            wallet,
+            TestSigning {
+                keypair: Arc::new(keypair),
+            },
+            peer_replicas,
+            Validator {},
+        );
 
         Ok((replicas, actor))
     }
 
-    /// Should be validating
-    /// other replica groups, i.e.
-    /// make sure they are run at Elders
-    /// of sections we know of.
-    /// TBD.
-    pub struct Validator {}
+    #[derive(Debug, Clone)]
+    pub struct TestSigning {
+        pub keypair: Arc<Keypair>,
+    }
 
-    impl ReplicaValidator for Validator {
-        fn is_valid(&self, _replica_group: PublicKey) -> bool {
-            true
+    use sn_data_types::Error as DtError;
+    use sn_data_types::Result as DtResult;
+
+    impl ActorSigning for TestSigning {
+        fn id(&self) -> WalletOwner {
+            match self.keypair.as_ref() {
+                Keypair::Ed25519(pair) => WalletOwner::Single(PublicKey::Ed25519(pair.public)),
+                Keypair::BlsShare(share) => WalletOwner::Multi(share.public_key_set.clone()),
+            }
+        }
+
+        fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<Signature> {
+            let bytes =
+                bincode::serialize(data).map_err(|e| DtError::Serialisation(e.to_string()))?;
+            Ok(self.keypair.sign(&bytes))
+        }
+
+        fn verify<T: serde::Serialize>(&self, signature: &Signature, data: &T) -> bool {
+            let data = match bincode::serialize(data) {
+                Ok(data) => data,
+                Err(_) => return false,
+            };
+            self.keypair.public_key().verify(signature, data).is_ok()
         }
     }
 }

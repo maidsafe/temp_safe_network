@@ -47,8 +47,24 @@ impl Network {
 
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         let data = utils::serialise(data)?;
-        let sig = self.routing.lock().await.sign(&data).await;
+        let sig = self.routing.lock().await.sign_as_node(&data).await;
         Ok(Signature::Ed25519(sig))
+    }
+
+    pub async fn sign_as_elder<T: Serialize>(
+        &self,
+        data: &T,
+        public_key: &bls::PublicKey,
+    ) -> Result<bls::SignatureShare> {
+        let data = utils::serialise(data)?;
+        let share = self
+            .routing
+            .lock()
+            .await
+            .sign_as_elder(&data, public_key)
+            .await
+            .map_err(Error::Routing)?;
+        Ok(share)
     }
 
     pub async fn age(&self) -> u8 {
@@ -133,15 +149,6 @@ impl Network {
             .lock()
             .await
             .send_message_to_client(peer_addr, msg)
-            .await
-            .map_err(Error::Routing)
-    }
-
-    pub async fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
-        self.routing
-            .lock()
-            .await
-            .secret_key_share()
             .await
             .map_err(Error::Routing)
     }

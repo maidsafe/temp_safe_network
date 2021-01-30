@@ -13,20 +13,31 @@ mod transfers;
 use self::{
     client::ClientGateway,
     client_msg_analysis::ClientMsgAnalysis,
-    transfers::{replicas::Replicas, Transfers},
+    transfers::{replica_signing::ReplicaSigning, replicas::Replicas, Transfers},
 };
 use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NodeOperation},
-    node::NodeInfo,
-    ElderState, ReplicaInfo, Result,
+    ElderState, Result,
 };
-use futures::lock::Mutex;
 use log::{info, trace};
 use sn_data_types::{PublicKey, TransferPropagated};
 use sn_routing::Prefix;
-use std::path::PathBuf;
-use std::sync::Arc;
+use transfers::replica_signing::ReplicaSigningImpl;
+
+#[derive(Clone, Debug)]
+///
+pub struct ReplicaInfo<T>
+where
+    T: ReplicaSigning,
+{
+    id: bls::PublicKeyShare,
+    key_index: usize,
+    peer_replicas: bls::PublicKeySet,
+    section_proof_chain: sn_routing::SectionProofChain,
+    signing: T,
+    initiating: bool,
+}
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -44,13 +55,9 @@ pub struct KeySection {
 }
 
 impl KeySection {
-    pub async fn new(
-        info: &NodeInfo,
-        rate_limit: RateLimit,
-        elder_state: ElderState,
-    ) -> Result<Self> {
-        let gateway = ClientGateway::new(info, elder_state.clone()).await?;
-        let replicas = Self::transfer_replicas(info.root_dir.clone(), elder_state.clone())?;
+    pub async fn new(rate_limit: RateLimit, elder_state: ElderState) -> Result<Self> {
+        let gateway = ClientGateway::new(elder_state.clone()).await?;
+        let replicas = Self::transfer_replicas(elder_state.clone())?;
         let transfers = Transfers::new(elder_state.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(elder_state.clone());
 
@@ -91,24 +98,19 @@ impl KeySection {
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self, state: ElderState, rate_limit: RateLimit) {
+    pub fn elders_changed(&mut self, elder_state: ElderState, rate_limit: RateLimit) {
         // TODO: Query sn_routing for info for [new_section_key]
         // specifically (regardless of how far back that was) - i.e. not the current info!
-        let secret_key_share = state.secret_key_share();
-        let id = secret_key_share.public_key_share();
-        let key_index = state.key_index();
-        let peer_replicas = state.public_key_set().clone();
-        let signing = sn_transfers::ReplicaSigning::new(
-            secret_key_share.clone(),
-            key_index,
-            peer_replicas.clone(),
-        );
+        let id = elder_state.public_key_share();
+        let key_index = elder_state.key_index();
+        let peer_replicas = elder_state.public_key_set().clone();
+        let signing = ReplicaSigningImpl::new(elder_state.clone());
         let info = ReplicaInfo {
             id,
             key_index,
             peer_replicas,
-            section_proof_chain: state.section_proof_chain().clone(),
-            signing: Arc::new(Mutex::new(signing)),
+            section_proof_chain: elder_state.section_proof_chain().clone(),
+            signing,
             initiating: false,
         };
         self.transfers.update_replica_info(info, rate_limit);
@@ -131,19 +133,18 @@ impl KeySection {
         }
     }
 
-    fn transfer_replicas(root_dir: PathBuf, elder_state: ElderState) -> Result<Replicas> {
-        let secret_key_share = elder_state.secret_key_share().clone();
+    fn transfer_replicas(elder_state: ElderState) -> Result<Replicas<ReplicaSigningImpl>> {
+        let root_dir = elder_state.info().root_dir.clone();
+        let id = elder_state.public_key_share();
         let key_index = elder_state.key_index();
         let peer_replicas = elder_state.public_key_set().clone();
-        let id = secret_key_share.public_key_share();
-        let signing =
-            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+        let signing = ReplicaSigningImpl::new(elder_state.clone());
         let info = ReplicaInfo {
             id,
             key_index,
             peer_replicas,
             section_proof_chain: elder_state.section_proof_chain().clone(),
-            signing: Arc::new(Mutex::new(signing)),
+            signing,
             initiating: true,
         };
         let replica_manager = Replicas::new(root_dir, info)?;

@@ -33,7 +33,7 @@ impl ElderDuties {
         let info = state.info();
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs.clone()));
-        let key_section = KeySection::new(info, rate_limit, state.clone()).await?;
+        let key_section = KeySection::new(rate_limit, state.clone()).await?;
         let data_section = DataSection::new(info, dbs, wallet_info, state.clone()).await?;
         Ok(Self {
             state,

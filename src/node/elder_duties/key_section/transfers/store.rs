@@ -94,12 +94,12 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::super::test_utils::get_genesis;
     use super::*;
     use crate::Result;
     use bls::SecretKey;
     use bls::SecretKeySet;
     use sn_data_types::{PublicKey, ReplicaEvent, TransferPropagated};
-    use sn_transfers::get_genesis;
     use tempdir::TempDir;
 
     #[test]

@@ -17,7 +17,6 @@ use self::{
 };
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
-    node::NodeInfo,
     ElderState, Error, Result,
 };
 use log::{error, trace, warn};
@@ -34,7 +33,7 @@ pub struct ClientGateway {
 }
 
 impl ClientGateway {
-    pub async fn new(_info: &NodeInfo, elder_state: ElderState) -> Result<Self> {
+    pub async fn new(elder_state: ElderState) -> Result<Self> {
         let onboarding = Onboarding::new(elder_state.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 

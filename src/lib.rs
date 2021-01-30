@@ -50,20 +50,3 @@ pub use crate::{
     network_state::{AdultState, ElderState, NodeInfo, NodeState},
     node::Node,
 };
-
-#[derive(Clone, Debug)]
-///
-pub struct ReplicaInfo {
-    id: PublicKeyShare,
-    key_index: usize,
-    peer_replicas: PublicKeySet,
-    section_proof_chain: SectionProofChain,
-    signing: Arc<Mutex<ReplicaSigning>>,
-    initiating: bool,
-}
-
-use bls::{PublicKeySet, PublicKeyShare};
-use futures::lock::Mutex;
-use sn_routing::SectionProofChain;
-use sn_transfers::ReplicaSigning;
-use std::sync::Arc;

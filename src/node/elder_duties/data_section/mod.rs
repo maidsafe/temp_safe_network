@@ -17,14 +17,13 @@ use crate::{
     capacity::ChunkHolderDbs,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardCmd, RewardDuty},
     node::NodeInfo,
-    utils, ElderState, Result,
+    ElderState, Result,
 };
 use log::info;
-use sn_data_types::WalletInfo;
+use sn_data_types::{Result as DtResult, WalletInfo};
 use sn_messaging::{Address, MessageId};
 use sn_routing::Prefix;
-use sn_transfers::TransferActor;
-use std::sync::Arc;
+use sn_transfers::{ActorSigning, TransferActor};
 use xor_name::XorName;
 
 /// A DataSection is responsible for
@@ -41,6 +40,67 @@ pub struct DataSection {
     elder_state: ElderState,
 }
 
+pub struct ElderSigning {
+    id: sn_transfers::WalletOwner,
+    elder_state: ElderState,
+}
+
+impl ElderSigning {
+    pub fn new(elder_state: ElderState) -> Self {
+        Self {
+            id: sn_transfers::WalletOwner::Multi(elder_state.public_key_set().clone()),
+            elder_state,
+        }
+    }
+}
+
+impl ActorSigning for ElderSigning {
+    fn id(&self) -> sn_transfers::WalletOwner {
+        self.id.clone()
+    }
+
+    fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<sn_data_types::Signature> {
+        use sn_data_types::Error as DtError;
+        Ok(sn_data_types::Signature::BlsShare(
+            futures::executor::block_on(self.elder_state.sign_as_elder(data))
+                .map_err(|_| DtError::InvalidOperation)?,
+        ))
+    }
+
+    fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {
+        use sn_transfers::WalletOwner as Owner;
+        let data = match bincode::serialize(data) {
+            Ok(data) => data,
+            Err(_) => return false,
+        };
+        use sn_data_types::Signature::*;
+        match sig {
+            Bls(sig) => {
+                if let Owner::Multi(set) = self.id() {
+                    set.public_key().verify(&sig, data)
+                } else {
+                    false
+                }
+            }
+            Ed25519(_) => {
+                if let Owner::Single(public_key) = self.id() {
+                    public_key.verify(sig, data).is_ok()
+                } else {
+                    false
+                }
+            }
+            BlsShare(share) => {
+                if let Owner::Multi(set) = self.id() {
+                    let pubkey_share = set.public_key_share(share.index);
+                    pubkey_share.verify(&share.share, data)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
 impl DataSection {
     ///
     pub async fn new(
@@ -53,8 +113,8 @@ impl DataSection {
         let metadata = Metadata::new(info, dbs, elder_state.clone()).await?;
 
         // Rewards
-        let keypair = utils::key_pair(elder_state.clone()).await?;
-        let actor = TransferActor::from_info(Arc::new(keypair), wallet_info, Validator {})?;
+        let signing = ElderSigning::new(elder_state.clone());
+        let actor = TransferActor::from_info(signing, wallet_info, Validator {})?;
         let reward_calc = RewardCalc::new(*elder_state.prefix());
         let rewards = Rewards::new(elder_state.clone(), actor, reward_calc);
 

@@ -32,6 +32,9 @@ use sn_transfers::TransferActor;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
+use super::ElderSigning;
+type SectionActor = TransferActor<Validator, ElderSigning>;
+
 /// The accumulation and paying
 /// out of rewards to nodes for
 /// their work in the network.
@@ -62,11 +65,7 @@ pub enum NodeRewards {
 }
 
 impl Rewards {
-    pub fn new(
-        elder_state: ElderState,
-        actor: TransferActor<Validator>,
-        reward_calc: RewardCalc,
-    ) -> Self {
+    pub fn new(elder_state: ElderState, actor: SectionActor, reward_calc: RewardCalc) -> Self {
         let peer_replicas = elder_state.section_public_key();
         let wrapping = ElderMsgWrapping::new(elder_state, ElderDuties::Rewards);
         let section_funds = SectionFunds::new(actor, wrapping.clone());

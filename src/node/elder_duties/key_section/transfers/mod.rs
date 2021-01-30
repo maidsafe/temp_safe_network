@@ -6,10 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod genesis;
+pub mod replica_signing;
 pub mod replicas;
 pub mod store;
+mod test_utils;
 
 use self::replicas::Replicas;
+use super::ReplicaInfo;
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
@@ -18,9 +22,10 @@ use crate::{
         ElderDuty, IntoNodeOp, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty,
         TransferQuery,
     },
-    utils, ElderState, Error, ReplicaInfo, Result,
+    utils, ElderState, Error, Result,
 };
 use log::{debug, info, trace, warn};
+use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
@@ -65,13 +70,17 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
 pub struct Transfers {
-    replicas: Replicas,
+    replicas: Replicas<ReplicaSigningImpl>,
     rate_limit: RateLimit,
     wrapping: ElderMsgWrapping,
 }
 
 impl Transfers {
-    pub fn new(elder_state: ElderState, replicas: Replicas, rate_limit: RateLimit) -> Self {
+    pub fn new(
+        elder_state: ElderState,
+        replicas: Replicas<ReplicaSigningImpl>,
+        rate_limit: RateLimit,
+    ) -> Self {
         let wrapping = ElderMsgWrapping::new(elder_state, ElderDuties::Transfer);
         Self {
             replicas,
@@ -212,7 +221,11 @@ impl Transfers {
     }
 
     ///
-    pub fn update_replica_info(&mut self, info: ReplicaInfo, rate_limit: RateLimit) {
+    pub fn update_replica_info(
+        &mut self,
+        info: ReplicaInfo<ReplicaSigningImpl>,
+        rate_limit: RateLimit,
+    ) {
         self.rate_limit = rate_limit;
         self.replicas.update_replica_info(info);
     }

@@ -121,6 +121,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.8",
+ "syn 1.0.60",
+]
+
+[[package]]
 name = "attohttpc"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2384,6 +2395,7 @@ name = "sn_node"
 version = "0.25.40"
 dependencies = [
  "async-log",
+ "async-trait",
  "base64 0.10.1",
  "bincode",
  "bytes 1.0.1",
@@ -2427,8 +2439,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.41.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122e2139901f1608294e2a470dd2175f078edb71156fc2fefdeae52484cea5d4"
+source = "git+https://github.com/oetyng/sn_routing?branch=key-cache#d59ab246fee9285458671103bdc4f92b8ba19b34"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2455,8 +2466,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25c80c34f45d082a24d3b15e743aad9810c1d5cf45410adc690ddb1c69ea8298"
+source = "git+https://github.com/oetyng/sn_transfers?branch=refactor-signing#ee850f4269d7ed9db4cff36ca1a0bef6de505a23"
 dependencies = [
  "bincode",
  "crdts",

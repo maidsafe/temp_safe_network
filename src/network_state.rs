@@ -22,7 +22,7 @@
 // - ..
 
 use crate::{utils, Network, Result};
-use bls::{PublicKeySet, PublicKeyShare, SecretKeyShare};
+use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
 use serde::Serialize;
@@ -120,7 +120,6 @@ pub struct ElderState {
     node_id: Ed25519PublicKey,
     key_index: usize,
     public_key_set: PublicKeySet,
-    secret_key_share: SecretKeyShare,
     section_proof_chain: SectionProofChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
@@ -140,7 +139,6 @@ impl ElderState {
             node_id: network.public_key().await,
             key_index: network.our_index().await?,
             public_key_set: network.public_key_set().await?,
-            secret_key_share: network.secret_key_share().await?,
             section_proof_chain: network.our_history().await,
             elders: network.our_elder_addresses().await,
             adult_reader: AdultReader::new(network.clone()),
@@ -220,11 +218,6 @@ impl ElderState {
     }
 
     /// Static state
-    pub fn secret_key_share(&self) -> &SecretKeyShare {
-        &self.secret_key_share
-    }
-
-    /// Static state
     pub fn section_proof_chain(&self) -> &SectionProofChain {
         &self.section_proof_chain
     }
@@ -248,14 +241,15 @@ impl ElderState {
     }
 
     /// Creates a detached BLS signature share of `data` if the `self` holds a BLS keypair share.
-    pub fn sign_as_elder<T: Serialize>(&self, data: &T) -> Result<Signature> {
-        let data = utils::serialise(data)?;
-        let index = self.key_index();
-        let bls_secret_key = self.secret_key_share();
-        Ok(Signature::BlsShare(SignatureShare {
-            index,
-            share: bls_secret_key.sign(data),
-        }))
+    pub async fn sign_as_elder<T: Serialize>(&self, data: &T) -> Result<SignatureShare> {
+        let share = self
+            .node_signing
+            .sign_as_elder(data, &self.public_key_set().public_key())
+            .await?;
+        Ok(SignatureShare {
+            share,
+            index: self.key_index,
+        })
     }
 
     /// "Sort of" static; this is calling into routing layer
@@ -320,6 +314,15 @@ impl NodeSigning {
     // but the underlying keys will not change.
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         self.network.sign_as_node(&data).await
+    }
+
+    //
+    pub async fn sign_as_elder<T: Serialize>(
+        &self,
+        data: &T,
+        public_key: &bls::PublicKey,
+    ) -> Result<bls::SignatureShare> {
+        self.network.sign_as_elder(data, public_key).await
     }
 }
 

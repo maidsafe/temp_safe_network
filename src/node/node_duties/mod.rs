@@ -315,16 +315,6 @@ impl NodeDuties {
         } else if !self.node_info.genesis && matches!(self.stage, Stage::Infant) {
             return Err(Error::InvalidOperation);
         }
-        // if self.node_info.genesis {
-        //     return self
-        //         .finish_transition_to_elder(WalletInfo {
-        //             replicas: self.network_api.public_key_set().await?,
-        //             history: vec![],
-        //         }, None)
-        //         .await;
-        // } else if matches!(self.stage, Stage::Infant) {
-        //     return Err(Error::InvalidOperation);
-        // }
 
         let is_genesis_section = self.network_api.our_prefix().await.is_empty();
         let elder_count = self.network_api.our_elder_names().await.len();
@@ -348,9 +338,8 @@ impl NodeDuties {
                 msg: "genesis".to_string(),
             };
             let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-            let serialised_credit = bincode::serialize(&credit).map_err(Error::Bincode)?;
-            let credit_sig_share = elder_state.secret_key_share().sign(serialised_credit);
-            let _ = signatures.insert(elder_state.key_index(), credit_sig_share.clone());
+            let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
+            let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
             self.stage = Stage::ProposingGenesis(GenesisProposal {
                 elder_state: elder_state.clone(),
@@ -370,10 +359,7 @@ impl NodeDuties {
                     Message::NodeCmd {
                         cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
                             credit,
-                            sig: SignatureShare {
-                                index: elder_state.key_index(),
-                                share: credit_sig_share,
-                            },
+                            sig: credit_sig_share,
                         }),
                         id: MessageId::new(),
                     },
@@ -433,10 +419,8 @@ impl NodeDuties {
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
 
-                let key_index = elder_state.key_index();
-                let serialised_credit = bincode::serialize(&credit).map_err(Error::Bincode)?;
-                let credit_sig_share = elder_state.secret_key_share().sign(serialised_credit);
-                let _ = signatures.insert(key_index, credit_sig_share.clone());
+                let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
+                let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
                 let wrapping = NodeMsgWrapping::new(
                     NodeState::Elder(elder_state.clone()),
@@ -456,10 +440,7 @@ impl NodeDuties {
                         Message::NodeCmd {
                             cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
                                 credit,
-                                sig: SignatureShare {
-                                    index: key_index,
-                                    share: credit_sig_share,
-                                },
+                                sig: credit_sig_share,
                             }),
                             id: MessageId::new(),
                         },
@@ -475,16 +456,11 @@ impl NodeDuties {
                 let _ = bootstrap.add(sig)?;
                 if let Some(signed_credit) = &bootstrap.pending_agreement {
                     // replicas signatures over > signed_credit <
-                    let serialised_credit =
-                        bincode::serialize(signed_credit).map_err(Error::Bincode)?;
-
                     let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-                    let credit_sig_share = bootstrap
-                        .elder_state
-                        .secret_key_share()
-                        .sign(serialised_credit);
-                    let _ = signatures
-                        .insert(bootstrap.elder_state.key_index(), credit_sig_share.clone());
+                    let credit_sig_share =
+                        bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
+                    let _ =
+                        signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
                     let wrapping = NodeMsgWrapping::new(
                         NodeState::Elder(bootstrap.elder_state.clone()),
@@ -504,10 +480,7 @@ impl NodeDuties {
                             Message::NodeCmd {
                                 cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
                                     signed_credit: signed_credit.clone(),
-                                    sig: SignatureShare {
-                                        index: bootstrap.elder_state.key_index(),
-                                        share: credit_sig_share,
-                                    },
+                                    sig: credit_sig_share,
                                 }),
                                 id: MessageId::new(),
                             },
@@ -541,17 +514,11 @@ impl NodeDuties {
         match self.stage {
             Stage::ProposingGenesis(ref mut bootstrap) => {
                 // replicas signatures over > signed_credit <
-                let serialised_credit =
-                    bincode::serialize(&signed_credit).map_err(Error::Bincode)?;
-
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
 
-                let credit_sig_share = bootstrap
-                    .elder_state
-                    .secret_key_share()
-                    .sign(serialised_credit);
-                let _ = signatures.insert(bootstrap.elder_state.key_index(), credit_sig_share);
+                let credit_sig_share = bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
+                let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share);
 
                 self.stage = Stage::AccumulatingGenesis(GenesisAccumulation {
                     elder_state: bootstrap.elder_state.clone(),
@@ -566,17 +533,14 @@ impl NodeDuties {
                 let _ = bootstrap.add(sig)?;
                 if let Some(genesis) = bootstrap.pending_agreement.take() {
                     // TODO: do not take this? (in case of fail further blow)
-                    let serialised_genesis =
-                        bincode::serialize(&genesis).map_err(Error::Bincode)?;
+                    let credit_sig_share = bootstrap.elder_state.sign_as_elder(&genesis).await?;
+                    let _ = bootstrap
+                        .signatures
+                        .insert(credit_sig_share.index, credit_sig_share.share.clone());
+
                     let genesis = TransferPropagated {
                         credit_proof: genesis.clone(),
-                        crediting_replica_sig: SignatureShare {
-                            index: bootstrap.elder_state.key_index(),
-                            share: bootstrap
-                                .elder_state
-                                .secret_key_share()
-                                .sign(serialised_genesis),
-                        },
+                        crediting_replica_sig: credit_sig_share,
                         crediting_replica_keys: bootstrap.elder_state.section_public_key(),
                     };
                     return self
