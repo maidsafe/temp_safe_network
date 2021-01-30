@@ -817,11 +817,36 @@ mod test {
         }
 
         fn verify<T: serde::Serialize>(&self, signature: &Signature, data: &T) -> bool {
+            use sn_transfers::WalletOwner as Owner;
             let data = match bincode::serialize(data) {
                 Ok(data) => data,
                 Err(_) => return false,
             };
-            self.keypair.public_key().verify(signature, data).is_ok()
+            use sn_data_types::Signature::*;
+            match signature {
+                Bls(sig) => {
+                    if let Owner::Multi(set) = self.id() {
+                        set.public_key().verify(&sig, data)
+                    } else {
+                        false
+                    }
+                }
+                Ed25519(_) => {
+                    if let Owner::Single(public_key) = self.id() {
+                        public_key.verify(signature, data).is_ok()
+                    } else {
+                        false
+                    }
+                }
+                BlsShare(share) => {
+                    if let Owner::Multi(set) = self.id() {
+                        let pubkey_share = set.public_key_share(share.index);
+                        pubkey_share.verify(&share.share, data)
+                    } else {
+                        false
+                    }
+                }
+            }
         }
     }
 }
