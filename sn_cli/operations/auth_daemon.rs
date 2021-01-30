@@ -307,6 +307,7 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
         )
     })?;
 
+    // try to get SafeSeed from environment variable
     let mut the_passphrase = environment_details
         .safe_auth_passphrase
         .unwrap_or_else(|| String::from(""));
@@ -325,42 +326,45 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
         return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for creating/unlocking a Safe.".to_string());
     }
 
-    if the_passphrase.is_empty() || the_password.is_empty() {
-        if let Some(config_file_str) = config_file {
-            let file = match File::open(&config_file_str) {
-                Ok(file) => file,
-                Err(error) => {
-                    return Err(format!("Error reading config file: {}", error));
-                }
-            };
-
-            let json: SafeSeed = serde_json::from_reader(file).map_err(|err| {
-                format!(
-                    "Format of the config file is not valid and couldn't be parsed: {}",
-                    err
-                )
-            })?;
-
-            eprintln!("Warning! Storing your passphrase/password in plaintext in a config file is not secure." );
-
-            if json.passphrase.is_empty() {
-                return Err("The config files's passphrase field cannot be empty".to_string());
-            } else {
-                the_passphrase = json.passphrase;
+    // try to get SafeSeed from file specified by --config flag
+    if let Some(config_file_str) = config_file {
+        let file = match File::open(&config_file_str) {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(format!("Error reading config file: {}", error));
             }
+        };
 
-            if json.password.is_empty() {
-                return Err("The config files's password field cannot be empty".to_string());
-            } else {
-                the_password = json.password;
-            }
+        let json: SafeSeed = serde_json::from_reader(file).map_err(|err| {
+            format!(
+                "Format of the config file is not valid and couldn't be parsed: {}",
+                err
+            )
+        })?;
+
+        eprintln!("Warning! Storing your passphrase/password in plaintext in a config file is not secure." );
+
+        if json.passphrase.is_empty() {
+            return Err("The config files's passphrase field cannot be empty".to_string());
         } else {
-            // Prompt the user for the Safe's credentials
-            the_passphrase = prompt_sensitive(None, "Passphrase: ")
-                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
-            the_password = prompt_sensitive(None, "Password: ")
-                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+            the_passphrase = json.passphrase;
         }
+
+        if json.password.is_empty() {
+            return Err("The config files's password field cannot be empty".to_string());
+        } else {
+            the_password = json.password;
+        }
+    }
+
+    // try to get SafeSeed from prompt if neither environment variable or
+    // config file is specified
+    if the_passphrase.is_empty() || the_password.is_empty() {
+        // Prompt the user for the Safe's credentials
+        the_passphrase = prompt_sensitive(None, "Passphrase: ")
+            .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+        the_password = prompt_sensitive(None, "Password: ")
+            .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
     }
 
     if the_passphrase.is_empty() || the_password.is_empty() {
