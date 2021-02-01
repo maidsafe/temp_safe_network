@@ -2365,9 +2365,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2dc39fb2b48659dec140188d3578c99a42f9d024addad690fa8339780830109"
+checksum = "5b707e95e2bfd40d9ab56caf9191f8da622caf5e4b0c6662f27b2e1ad41de476"
 dependencies = [
  "bytes 1.0.1",
  "cookie-factory",
@@ -2466,8 +2466,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.2.11"
-source = "git+https://github.com/oetyng/sn_transfers?branch=refactor-signing#f0baa90c17b11ac67bc5cee644116fe9845ec416"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78e7e404916a2981a3c534fea25187c3114cb24d23b70e2b66367aa09dee70fa"
 dependencies = [
  "bincode",
  "crdts",
