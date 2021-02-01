@@ -2330,7 +2330,9 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.13.4"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79926ec0bd1d22ef3de73a1255d4b609a15184f48a0d6e3ca38a120754d8a895"
 dependencies = [
  "bincode",
  "crdts",
@@ -2364,6 +2366,8 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2dc39fb2b48659dec140188d3578c99a42f9d024addad690fa8339780830109"
 dependencies = [
  "bytes 1.0.1",
  "cookie-factory",
@@ -2434,8 +2438,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.41.5"
-source = "git+https://github.com/oetyng/sn_routing?branch=key-cache#0ce997440479bdfd8894a6f0913d7e1ca8e507cf"
+version = "0.41.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4fa47ac0c7a8a0a31528159bbdbf9b45b61e161ca29ccb14bebb61ea47a385e"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2462,6 +2467,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.11"
+source = "git+https://github.com/oetyng/sn_transfers?branch=refactor-signing#f0baa90c17b11ac67bc5cee644116fe9845ec416"
 dependencies = [
  "bincode",
  "crdts",

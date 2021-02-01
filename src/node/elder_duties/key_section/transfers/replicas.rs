@@ -600,7 +600,6 @@ mod test {
     use sn_data_types::{Keypair, Money, OwnerType, PublicKey, SignedTransferShare};
     use sn_routing::SectionProofChain;
     use sn_transfers::{ActorEvent, TransferActor as Actor, Wallet};
-    use std::sync::Arc;
     use tempdir::TempDir;
 
     #[test]
