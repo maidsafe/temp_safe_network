@@ -13,11 +13,11 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer,
+    ActorHistory, CreditAgreementProof, Money, OwnerType, PublicKey, ReplicaEvent, SignedTransfer,
     SignedTransferShare, TransferAgreementProof, TransferPropagated, TransferRegistered,
     TransferValidated,
 };
-use sn_transfers::{Error as TransfersError, WalletOwner, WalletReplica};
+use sn_transfers::{Error as TransfersError, WalletReplica};
 use std::path::PathBuf;
 use std::sync::Arc;
 use xor_name::Prefix;
@@ -145,7 +145,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             Err(_) => return Ok(Money::from_nano(0)),
         };
 
-        let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         Ok(wallet.balance())
     }
 
@@ -211,7 +211,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
 
         debug!("Wallet loaded");
         let result = wallet.validate(&signed_transfer.debit, &signed_transfer.credit);
@@ -250,7 +250,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         match wallet.register(transfer_proof, || {
             self.find_past_key(&transfer_proof.replica_keys())
         })? {
@@ -303,7 +303,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         let propagation_result = wallet.receive_propagated(credit_proof, || {
             self.find_past_key(&credit_proof.replica_keys())
         });
@@ -342,7 +342,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     async fn load_wallet(
         &self,
         store: &TransferStore<ReplicaEvent>,
-        id: WalletOwner,
+        id: OwnerType,
     ) -> Result<WalletReplica> {
         let events = store.get_all();
         let wallet = WalletReplica::from_history(
@@ -427,7 +427,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         let _ = wallet.genesis(credit_proof, past_key)?;
 
         // sign + update state
@@ -461,7 +461,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let store = self.get_load_or_create_store(id).await?;
         let mut store = store.lock().await;
 
-        let mut wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let mut wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
 
         debug!("wallet loaded");
         wallet.credit_without_proof(credit.clone())?;
@@ -517,7 +517,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let mut wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let mut wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         wallet.debit_without_proof(debit)?;
         Ok(())
     }
@@ -532,7 +532,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, WalletOwner::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
         // sign + update state
         let (replica_debit_sig, replica_credit_sig) =
@@ -555,7 +555,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     ) -> Result<Option<TransferValidated>> {
         debug!("MultisigReplica validating transfer: {:?}", signed_transfer);
         let id = signed_transfer.sender();
-        let actors = WalletOwner::Multi(signed_transfer.actors().clone());
+        let actors = OwnerType::Multi(signed_transfer.actors().clone());
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
         let mut store = key_lock.lock().await;
@@ -597,9 +597,9 @@ mod test {
     use crate::{Error, Result};
     use bls::{PublicKeySet, SecretKeySet};
     use futures::executor::block_on as run;
-    use sn_data_types::{Keypair, Money, PublicKey, Signature, SignedTransferShare};
+    use sn_data_types::{Keypair, Money, OwnerType, PublicKey, SignedTransferShare};
     use sn_routing::SectionProofChain;
-    use sn_transfers::{ActorEvent, ActorSigning, TransferActor as Actor, Wallet, WalletOwner};
+    use sn_transfers::{ActorEvent, TransferActor as Actor, Wallet};
     use std::sync::Arc;
     use tempdir::TempDir;
 
@@ -744,7 +744,7 @@ mod test {
         TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 
-    type Section = Vec<(Replicas<TestReplicaSigning>, Actor<Validator, TestSigning>)>;
+    type Section = Vec<(Replicas<TestReplicaSigning>, Actor<Validator, Keypair>)>;
     fn get_section(count: u8) -> Result<(Section, PublicKeySet)> {
         let mut rng = rand::thread_rng();
         let threshold = count as usize - 1;
@@ -762,7 +762,7 @@ mod test {
     fn get_replica(
         key_index: usize,
         bls_secret_key: SecretKeySet,
-    ) -> Result<(Replicas<TestReplicaSigning>, Actor<Validator, TestSigning>)> {
+    ) -> Result<(Replicas<TestReplicaSigning>, Actor<Validator, Keypair>)> {
         let peer_replicas = bls_secret_key.public_keys();
         let secret_key_share = bls_secret_key.secret_key_share(key_index);
         let id = secret_key_share.public_key_share();
@@ -780,73 +780,10 @@ mod test {
 
         let keypair =
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());
-        let owner = WalletOwner::Multi(peer_replicas.clone());
+        let owner = OwnerType::Multi(peer_replicas.clone());
         let wallet = Wallet::new(owner);
-        let actor = Actor::from_snapshot(
-            wallet,
-            TestSigning {
-                keypair: Arc::new(keypair),
-            },
-            peer_replicas,
-            Validator {},
-        );
+        let actor = Actor::from_snapshot(wallet, keypair, peer_replicas, Validator {});
 
         Ok((replicas, actor))
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct TestSigning {
-        pub keypair: Arc<Keypair>,
-    }
-
-    use sn_data_types::Error as DtError;
-    use sn_data_types::Result as DtResult;
-
-    impl ActorSigning for TestSigning {
-        fn id(&self) -> WalletOwner {
-            match self.keypair.as_ref() {
-                Keypair::Ed25519(pair) => WalletOwner::Single(PublicKey::Ed25519(pair.public)),
-                Keypair::BlsShare(share) => WalletOwner::Multi(share.public_key_set.clone()),
-            }
-        }
-
-        fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<Signature> {
-            let bytes =
-                bincode::serialize(data).map_err(|e| DtError::Serialisation(e.to_string()))?;
-            Ok(self.keypair.sign(&bytes))
-        }
-
-        fn verify<T: serde::Serialize>(&self, signature: &Signature, data: &T) -> bool {
-            use sn_transfers::WalletOwner as Owner;
-            let data = match bincode::serialize(data) {
-                Ok(data) => data,
-                Err(_) => return false,
-            };
-            use sn_data_types::Signature::*;
-            match signature {
-                Bls(sig) => {
-                    if let Owner::Multi(set) = self.id() {
-                        set.public_key().verify(&sig, data)
-                    } else {
-                        false
-                    }
-                }
-                Ed25519(_) => {
-                    if let Owner::Single(public_key) = self.id() {
-                        public_key.verify(signature, data).is_ok()
-                    } else {
-                        false
-                    }
-                }
-                BlsShare(share) => {
-                    if let Owner::Multi(set) = self.id() {
-                        let pubkey_share = set.public_key_share(share.index);
-                        pubkey_share.verify(&share.share, data)
-                    } else {
-                        false
-                    }
-                }
-            }
-        }
     }
 }

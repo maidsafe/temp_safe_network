@@ -20,10 +20,10 @@ use crate::{
     ElderState, Result,
 };
 use log::info;
-use sn_data_types::{Result as DtResult, WalletInfo};
+use sn_data_types::{OwnerType, Result as DtResult, Signing, WalletInfo};
 use sn_messaging::{Address, MessageId};
 use sn_routing::Prefix;
-use sn_transfers::{ActorSigning, TransferActor};
+use sn_transfers::TransferActor;
 use xor_name::XorName;
 
 /// A DataSection is responsible for
@@ -41,21 +41,21 @@ pub struct DataSection {
 }
 
 pub struct ElderSigning {
-    id: sn_transfers::WalletOwner,
+    id: OwnerType,
     elder_state: ElderState,
 }
 
 impl ElderSigning {
     pub fn new(elder_state: ElderState) -> Self {
         Self {
-            id: sn_transfers::WalletOwner::Multi(elder_state.public_key_set().clone()),
+            id: OwnerType::Multi(elder_state.public_key_set().clone()),
             elder_state,
         }
     }
 }
 
-impl ActorSigning for ElderSigning {
-    fn id(&self) -> sn_transfers::WalletOwner {
+impl Signing for ElderSigning {
+    fn id(&self) -> OwnerType {
         self.id.clone()
     }
 
@@ -68,7 +68,6 @@ impl ActorSigning for ElderSigning {
     }
 
     fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {
-        use sn_transfers::WalletOwner as Owner;
         let data = match bincode::serialize(data) {
             Ok(data) => data,
             Err(_) => return false,
@@ -76,21 +75,21 @@ impl ActorSigning for ElderSigning {
         use sn_data_types::Signature::*;
         match sig {
             Bls(sig) => {
-                if let Owner::Multi(set) = self.id() {
+                if let OwnerType::Multi(set) = self.id() {
                     set.public_key().verify(&sig, data)
                 } else {
                     false
                 }
             }
             Ed25519(_) => {
-                if let Owner::Single(public_key) = self.id() {
+                if let OwnerType::Single(public_key) = self.id() {
                     public_key.verify(sig, data).is_ok()
                 } else {
                     false
                 }
             }
             BlsShare(share) => {
-                if let Owner::Multi(set) = self.id() {
+                if let OwnerType::Multi(set) = self.id() {
                     let pubkey_share = set.public_key_share(share.index);
                     pubkey_share.verify(&share.share, data)
                 } else {
