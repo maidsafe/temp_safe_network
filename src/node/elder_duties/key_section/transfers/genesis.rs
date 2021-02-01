@@ -25,8 +25,6 @@ pub async fn get_genesis(balance: u64, elder_state: &ElderState) -> Result<Credi
     let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
     let _ = credit_sig_shares.insert(credit_sig_share.index, credit_sig_share.share);
 
-    println!("Aggregating actor signature..");
-
     // Combine shares to produce the main signature.
     let actor_signature = sn_data_types::Signature::Bls(
         elder_state
@@ -45,8 +43,6 @@ pub async fn get_genesis(balance: u64, elder_state: &ElderState) -> Result<Credi
     let mut credit_sig_shares = BTreeMap::new();
     let credit_sig_share = elder_state.sign_as_elder(&signed_credit).await?;
     let _ = credit_sig_shares.insert(credit_sig_share.index, credit_sig_share.share);
-
-    println!("Aggregating replica signature..");
 
     let debiting_replicas_sig = sn_data_types::Signature::Bls(
         elder_state

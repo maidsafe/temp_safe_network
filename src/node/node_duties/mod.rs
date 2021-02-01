@@ -73,7 +73,7 @@ impl GenesisProposal {
         let _ = self.signatures.insert(sig.index, sig.share);
         let min_count = 1 + self.elder_state.public_key_set().threshold();
         if self.signatures.len() >= min_count {
-            println!("Aggregating actor signature..");
+            info!("Aggregating actor signature..");
 
             // Combine shares to produce the main signature.
             let actor_signature = sn_data_types::Signature::Bls(
@@ -100,7 +100,7 @@ impl GenesisAccumulation {
         let _ = self.signatures.insert(sig.index, sig.share);
         let min_count = 1 + self.elder_state.public_key_set().threshold();
         if self.signatures.len() >= min_count {
-            println!("Aggregating replica signature..");
+            info!("Aggregating replica signature..");
             // Combine shares to produce the main signature.
             let debiting_replicas_sig = sn_data_types::Signature::Bls(
                 self.elder_state

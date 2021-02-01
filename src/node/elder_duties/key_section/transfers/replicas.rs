@@ -605,15 +605,9 @@ mod test {
     #[test]
     fn section_actor_transition() -> Result<()> {
         let (mut section, peer_replicas) = get_section(1)?;
-        println!("Got genesis section");
 
         let (genesis_replicas, mut genesis_actor) = section.remove(0);
         let _ = run(genesis_replicas.initiate(&[]))?;
-        println!("Genesis replica initiated");
-        println!(
-            "Genesis balance: {:?}",
-            run(genesis_replicas.balance(genesis_actor.id()))?
-        );
 
         let section_key = PublicKey::Bls(genesis_replicas.replicas_pk_set().public_key());
 
@@ -651,7 +645,6 @@ mod test {
         };
         // the new elder will not partake in this operation (hence only one doing it here)
         let _ = genesis_actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
-        println!("Transition to next actor initiated");
 
         let signed_transfer = SignedTransferShare::new(
             init.signed_debit.as_share()?,
@@ -667,7 +660,6 @@ mod test {
                 ))
             }
         };
-        println!("Transfer validation proposed and validated");
 
         // accumulate validations
         let event = match genesis_actor.receive(validation)? {
@@ -678,22 +670,14 @@ mod test {
                 ))
             }
         };
-        println!("Validation received");
         match event.proof {
             Some(transfer_proof) => {
                 let _registered = run(genesis_replicas.register(&transfer_proof))?;
-                println!("Validation registered");
                 let _propagated =
                     run(genesis_replicas.receive_propagated(&transfer_proof.credit_proof()))?;
-                println!("Validation propagated");
             }
             None => return Err(Error::Logic("We should have a proof here.".to_string())),
         }
-
-        println!(
-            "Genesis balance: {:?}",
-            run(genesis_replicas.balance(genesis_actor.id()))?
-        );
 
         let genesis_history = run(genesis_replicas.history(section_key))?;
         match genesis_actor.from_history(genesis_history)? {
@@ -734,7 +718,6 @@ mod test {
                 run(elder_replicas.balance(next_section_actor_share.id()))?
             );
         }
-        println!("FULL FLOW COMPLETED!");
 
         Ok(())
     }
