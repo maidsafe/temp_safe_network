@@ -43,7 +43,7 @@ pub enum ElderDuties {
     Gateway,
     /// Metadata management.
     Metadata,
-    /// Transfers of money.
+    /// Transfers of tokens.
     Transfer,
     /// Rewards for data storage etc.
     Rewards,

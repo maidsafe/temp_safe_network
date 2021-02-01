@@ -8,7 +8,7 @@
 // Software.
 
 use super::{
-    AuthorisationKind, CmdError, MiscAuthKind, MoneyAuthKind, QueryResponse, TransferError,
+    AuthorisationKind, CmdError, MiscAuthKind, QueryResponse, TokenAuthKind, TransferError,
 };
 use crate::Error;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use sn_data_types::{PublicKey, SignedTransfer, TransferAgreementProof};
 use std::fmt;
 use xor_name::XorName;
 
-/// Money cmd that is sent to network.
+/// Token cmd that is sent to network.
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum TransferCmd {
@@ -31,7 +31,7 @@ pub enum TransferCmd {
     RegisterTransfer(TransferAgreementProof),
 }
 
-/// Money query that is sent to network.
+/// Token query that is sent to network.
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum TransferQuery {
@@ -137,9 +137,9 @@ impl TransferQuery {
     pub fn authorisation_kind(&self) -> AuthorisationKind {
         use TransferQuery::*;
         match self {
-            GetBalance(_) => AuthorisationKind::Money(MoneyAuthKind::ReadBalance), // current state
+            GetBalance(_) => AuthorisationKind::Token(TokenAuthKind::ReadBalance), // current state
             GetReplicaKeys(_) => AuthorisationKind::None, // current replica keys
-            GetHistory { .. } => AuthorisationKind::Money(MoneyAuthKind::ReadHistory), // history of incoming transfers
+            GetHistory { .. } => AuthorisationKind::Token(TokenAuthKind::ReadHistory), // history of incoming transfers
             GetStoreCost { .. } => AuthorisationKind::None,                            // store cost
         }
     }

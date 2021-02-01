@@ -44,9 +44,9 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     ActorHistory, AppPermissions, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues,
-    Money, PublicKey, ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry,
-    SequencePermissions, SequencePrivatePolicy, SequencePublicPolicy, Signature,
-    TransferAgreementProof, TransferValidated,
+    PublicKey, ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry, SequencePermissions,
+    SequencePrivatePolicy, SequencePublicPolicy, Signature, Token, TransferAgreementProof,
+    TransferValidated,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -466,16 +466,16 @@ pub enum QueryResponse {
     /// Get Sequence permissions for a user.
     GetSequenceUserPermissions(Result<SequencePermissions>),
     //
-    // ===== Money =====
+    // ===== Tokens =====
     //
     /// Get replica keys
     GetReplicaKeys(Result<ReplicaPublicKeySet>),
     /// Get key balance.
-    GetBalance(Result<Money>),
+    GetBalance(Result<Token>),
     /// Get key transfer history.
     GetHistory(Result<ActorHistory>),
     /// Get Store Cost.
-    GetStoreCost(Result<Money>),
+    GetStoreCost(Result<Token>),
     //
     // ===== Account =====
     //
@@ -492,8 +492,8 @@ pub enum QueryResponse {
 pub enum AuthorisationKind {
     /// Authorisation for data requests.
     Data(DataAuthKind),
-    /// Authorisation for money requests.
-    Money(MoneyAuthKind),
+    /// Authorisation for token requests.
+    Token(TokenAuthKind),
     /// Miscellaneous authorisation kinds.
     /// NB: Not very well categorized yet
     Misc(MiscAuthKind),
@@ -511,13 +511,13 @@ pub enum DataAuthKind {
     Write,
 }
 
-/// Authorisation for money requests.
-pub enum MoneyAuthKind {
+/// Authorisation for token requests.
+pub enum TokenAuthKind {
     /// Request to get key balance.
     ReadBalance,
     /// Request to get key transfer history.
     ReadHistory,
-    /// Request to transfer money from key.
+    /// Request to transfer tokens from key.
     Transfer,
 }
 
@@ -526,7 +526,7 @@ pub enum MoneyAuthKind {
 pub enum MiscAuthKind {
     /// Request to manage app keys.
     ManageAppKeys,
-    /// Request to mutate and transfer money from key.
+    /// Request to mutate and transfer tokens from key.
     WriteAndTransfer,
 }
 
@@ -574,7 +574,7 @@ try_from!((u64, SequenceEntry), GetSequenceLastEntry);
 try_from!(SequencePublicPolicy, GetSequencePublicPolicy);
 try_from!(SequencePrivatePolicy, GetSequencePrivatePolicy);
 try_from!(SequencePermissions, GetSequenceUserPermissions);
-try_from!(Money, GetBalance);
+try_from!(Token, GetBalance);
 try_from!(ReplicaPublicKeySet, GetReplicaKeys);
 try_from!(ActorHistory, GetHistory);
 try_from!(
@@ -638,7 +638,7 @@ impl fmt::Debug for QueryResponse {
             GetSequenceOwner(res) => {
                 write!(f, "QueryResponse::GetSequenceOwner({:?})", ErrorDebug(res))
             }
-            // Money
+            // Tokens
             GetReplicaKeys(res) => {
                 write!(f, "QueryResponse::GetReplicaKeys({:?})", ErrorDebug(res))
             }
