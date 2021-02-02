@@ -315,7 +315,7 @@ impl WireMsgHeader {
     pub fn size() -> usize {
         // We don't use 'std::mem::size_of' since for the
         // 'MessageKind' enum it reports 2 bytes mem size,
-        // and we want to serialise that filed using 1 byte only.
+        // and we want to serialise that field using 1 byte only.
         5
     }
 }

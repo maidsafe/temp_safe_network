@@ -19,9 +19,14 @@ use std::fmt::{self, Debug, Formatter};
 // TODO: this is currently holding just bytes as a placeholder, next step
 // is to move all actual node messages structs and definitions within it.
 #[derive(Clone, Eq, Serialize, Deserialize)]
-pub struct NodeMessage(#[serde(with = "serde_bytes")] Vec<u8>);
+pub struct NodeMessage(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl NodeMessage {
+    /// Creates a new instance which wraps the provided node message bytes.
+    pub fn new(bytes: Bytes) -> Self {
+        Self(bytes.to_vec())
+    }
+
     /// Convinience function to deserialise a 'NodeMessage' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
