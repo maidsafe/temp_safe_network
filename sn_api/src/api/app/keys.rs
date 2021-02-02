@@ -28,7 +28,7 @@ impl Safe {
         Arc::new(keypair)
     }
 
-    // Create a SafeKey on the network, allocates money from current client's key onto it,
+    // Create a SafeKey on the network, allocates token from current client's key onto it,
     // and return the SafeKey's XOR-URL
     pub async fn keys_create_and_preload(
         &mut self,
@@ -301,7 +301,7 @@ mod tests {
             Err(err) => assert_eq!(
                 err,
                 Error::InvalidAmount(
-                    "Invalid safecoins amount '.45' (Can\'t parse Money units)".to_string()
+                    "Invalid safecoins amount '.45' (Can\'t parse Token units)".to_string()
                 )
             ),
             Ok(_) => {
@@ -318,7 +318,7 @@ mod tests {
             Err(err) => assert_eq!(
                 err,
                 Error::InvalidAmount(
-                    "Invalid safecoins amount '.003' (Can\'t parse Money units)".to_string()
+                    "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
                 )
             ),
             Ok(_) => {
@@ -335,7 +335,7 @@ mod tests {
             Err(err) => assert_eq!(
                 err,
                 Error::InvalidAmount(
-                    "Invalid safecoins amount '.003' (Can\'t parse Money units)".to_string()
+                    "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
                 )
             ),
             Ok(_) => {
@@ -583,7 +583,7 @@ mod tests {
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.06' (Can\'t parse Money units)"
+                "Invalid safecoins amount '.06' (Can\'t parse Token units)"
             ),
             Err(err) => {
                 bail!("Error returned is not the expected: {:?}", err)

@@ -28,7 +28,7 @@ use sn_client::{
 };
 use sn_data_types::{
     Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
-    MapValue, Money,
+    MapValue, Token,
 };
 use std::{collections::BTreeMap, sync::Arc};
 use tiny_keccak::{sha3_256, sha3_512};
@@ -194,14 +194,14 @@ impl SafeAuthenticator {
         // TODO: Use a more reliable test for existing data...
         let existing_balance = client.get_balance().await?;
 
-        if existing_balance != Money::from_nano(0) {
+        if existing_balance != Token::from_nano(0) {
             return Err(Error::AuthenticatorError(
                 "Client data already exists".to_string(),
             ));
         }
 
         client
-            .trigger_simulated_farming_payout(Money::from_nano(DEFAULT_TEST_COINS_AMOUNT))
+            .trigger_simulated_farming_payout(Token::from_nano(DEFAULT_TEST_COINS_AMOUNT))
             .await?;
 
         // Create Map data to store the list of keypairs generated for
@@ -444,7 +444,7 @@ impl SafeAuthenticator {
                     // or simply allocate testcoins as it's now.
                     let mut tmp_client = Client::new(Some(keypair.clone()), None).await?;
                     tmp_client
-                        .trigger_simulated_farming_payout(Money::from_nano(
+                        .trigger_simulated_farming_payout(Token::from_nano(
                             DEFAULT_TEST_COINS_AMOUNT,
                         ))
                         .await?;

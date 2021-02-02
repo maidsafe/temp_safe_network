@@ -59,7 +59,7 @@ Response: {
       "app_permissions": {
           "read_balance": true,
           "perform_mutations": true,
-          "transfer_money": true
+          "transfer_token": true
       },
       "containers": {},
       "id": "net.maidsafe.cli",
@@ -82,7 +82,7 @@ When `sn_authd` sends a notification to each of the subscribers it also uses JSO
       "app_permissions": {
           "read_balance": true,
           "perform_mutations": true,
-          "transfer_money": true
+          "transfer_token": true
       },
       "app_vendor": "MaidSafe.net Ltd",
       "containers": {},

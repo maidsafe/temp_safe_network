@@ -15,7 +15,7 @@ use crate::{
 };
 use log::debug;
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Keypair, MapValue, Money};
+use sn_data_types::{Keypair, MapValue, Token};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use xor_name::XorName;
@@ -136,7 +136,7 @@ impl Safe {
     // Check the total balance of a Wallet found at a given XOR-URL
     pub async fn wallet_balance(&mut self, url: &str) -> Result<String> {
         debug!("Finding total wallet balance for: {:?}", url);
-        let mut total_balance = Money::from_nano(0);
+        let mut total_balance = Token::from_nano(0);
 
         // Let's get the list of balances from the Wallet
         let (xorurl_encoder, nrs_xorurl_encoder) = self.parse_and_resolve_url(url).await?;
@@ -798,7 +798,7 @@ mod tests {
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.06' (Can\'t parse Money units)"
+                "Invalid safecoins amount '.06' (Can\'t parse Token units)"
             ),
             Err(err) => bail!("Error returned is not the expected: {:?}", err),
             Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),

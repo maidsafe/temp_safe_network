@@ -14,7 +14,7 @@ use log::{debug, info};
 use sn_client::{Client, Error as ClientError, TransfersError};
 use sn_data_types::{
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
-    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Money, PublicKey, SequenceAddress,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Token, PublicKey, SequenceAddress,
     SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
 };
 
@@ -79,8 +79,8 @@ impl SafeAppClient {
         Ok(())
     }
 
-    // === Money operations ===
-    pub async fn read_balance_from_keypair(&self, id: Arc<Keypair>) -> Result<Money> {
+    // === Token operations ===
+    pub async fn read_balance_from_keypair(&self, id: Arc<Keypair>) -> Result<Token> {
         let temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
         temp_client.get_balance().await.map_err(|err| {
             // FIXME: we need to match the appropriate error
@@ -95,7 +95,7 @@ impl SafeAppClient {
     #[cfg(feature = "simulated-payouts")]
     pub async fn trigger_simulated_farming_payout(
         &mut self,
-        amount: Money,
+        amount: Token,
         id: Option<Arc<Keypair>>,
     ) -> Result<()> {
         let mut client = if id.is_some() {
@@ -113,7 +113,7 @@ impl SafeAppClient {
         &self,
         from_id: Option<Arc<Keypair>>,
         to_xorname: XorName,
-        amount: Money,
+        amount: Token,
     ) -> Result<u64> {
         // Get pk from xorname. We assume Ed25519 key for now, which is
         // 32 bytes long, just like a xorname.
@@ -133,7 +133,7 @@ impl SafeAppClient {
         &self,
         from_id: Option<Arc<Keypair>>,
         to_pk: PublicKey,
-        amount: Money,
+        amount: Token,
     ) -> Result<u64> {
         let client = match from_id {
             Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
@@ -142,7 +142,7 @@ impl SafeAppClient {
 
         let (dot_counter, _dot_actor) =
             client
-                .send_money(to_pk, amount)
+                .send_token(to_pk, amount)
                 .await
                 .map_err(|err| match err {
                     ClientError::Transfer(TransfersError::InsufficientBalance) => {
