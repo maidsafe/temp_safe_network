@@ -7,14 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{AuthorisationKind, CmdError, DataAuthKind, QueryResponse};
+use super::{AuthorisationKind, CmdError, DataAuthKind, Error, QueryResponse};
 use sn_data_types::{
     Map, MapAddress as Address, MapEntryActions as Changes, MapPermissionSet as PermissionSet,
     PublicKey,
 };
 use xor_name::XorName;
 
-use crate::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

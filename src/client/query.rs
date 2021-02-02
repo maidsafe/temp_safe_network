@@ -7,8 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{data::DataQuery, transfer::TransferQuery, AuthorisationKind, QueryResponse};
-use crate::Error;
+use super::{data::DataQuery, transfer::TransferQuery, AuthorisationKind, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 

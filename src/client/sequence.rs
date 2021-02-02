@@ -7,8 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{AuthorisationKind, CmdError, DataAuthKind, QueryResponse};
-use crate::Error;
+use super::{AuthorisationKind, CmdError, DataAuthKind, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     PublicKey, Sequence, SequenceAddress as Address, SequenceDataWriteOp, SequenceEntry as Entry,

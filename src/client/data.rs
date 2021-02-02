@@ -11,12 +11,11 @@ use super::{
     blob::{BlobRead, BlobWrite},
     map::{MapRead, MapWrite},
     sequence::{SequenceRead, SequenceWrite},
-    AuthorisationKind, CmdError, QueryResponse,
+    AuthorisationKind, CmdError, Error, QueryResponse,
 };
 use sn_data_types::PublicKey;
 use xor_name::XorName;
 
-use crate::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

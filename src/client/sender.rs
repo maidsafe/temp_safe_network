@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{AdultDuties, Duty, ElderDuties};
+use super::{AdultDuties, Duty, ElderDuties};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use ed25519_dalek::Signature as Ed25519Signature;
 use hex_fmt::HexFmt;

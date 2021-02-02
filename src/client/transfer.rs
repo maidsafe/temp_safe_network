@@ -8,9 +8,8 @@
 // Software.
 
 use super::{
-    AuthorisationKind, CmdError, MiscAuthKind, QueryResponse, TokenAuthKind, TransferError,
+    AuthorisationKind, CmdError, Error, MiscAuthKind, QueryResponse, TokenAuthKind, TransferError,
 };
-use crate::Error;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;

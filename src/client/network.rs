@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Address, BlobWrite, Error, MsgSender, Result};
+use super::{Address, BlobWrite, Error, MsgSender, Result};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare,
