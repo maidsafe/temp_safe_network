@@ -51,7 +51,7 @@ impl SafeAppClient {
     // are overriden if a 'bootstrap_config' is provided.
     pub async fn connect(
         &mut self,
-        app_keypair: Option<Arc<Keypair>>,
+        app_keypair: Option<Keypair>,
         bootstrap_config: Option<BootstrapConfig>,
     ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
@@ -80,7 +80,7 @@ impl SafeAppClient {
     }
 
     // === Token operations ===
-    pub async fn read_balance_from_keypair(&self, id: Arc<Keypair>) -> Result<Token> {
+    pub async fn read_balance_from_keypair(&self, id: Keypair) -> Result<Token> {
         let temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
         temp_client.get_balance().await.map_err(|err| {
             // FIXME: we need to match the appropriate error
@@ -96,7 +96,7 @@ impl SafeAppClient {
     pub async fn trigger_simulated_farming_payout(
         &mut self,
         amount: Token,
-        id: Option<Arc<Keypair>>,
+        id: Option<Keypair>,
     ) -> Result<()> {
         let mut client = if id.is_some() {
             Client::new(id, self.bootstrap_config.clone()).await?
@@ -111,7 +111,7 @@ impl SafeAppClient {
 
     pub async fn safecoin_transfer_to_xorname(
         &self,
-        from_id: Option<Arc<Keypair>>,
+        from_id: Option<Keypair>,
         to_xorname: XorName,
         amount: Token,
     ) -> Result<u64> {
@@ -131,7 +131,7 @@ impl SafeAppClient {
 
     pub async fn safecoin_transfer_to_pk(
         &self,
-        from_id: Option<Arc<Keypair>>,
+        from_id: Option<Keypair>,
         to_pk: PublicKey,
         amount: Token,
     ) -> Result<u64> {

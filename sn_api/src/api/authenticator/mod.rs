@@ -61,20 +61,11 @@ fn create_ed25519_keypair_from_seed(seeder: &[u8]) -> Keypair {
     Keypair::new_ed25519(&mut rng)
 }
 
-/// Create a new BLS keypair from seed
-#[allow(dead_code)]
-fn create_bls_keypair_from_seed(seeder: &[u8]) -> Keypair {
-    let seed = sha3_256(seeder);
-    let mut rng = StdRng::from_seed(seed);
-
-    Keypair::new_bls(&mut rng)
-}
-
 /// Perform all derivations and seeding to deterministically obtain location and Keypair from input
 pub fn derive_location_and_keypair(
     passphrase: &str,
     password: &str,
-) -> Result<(XorName, Arc<Keypair>)> {
+) -> Result<(XorName, Keypair)> {
     let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
     let map_data_location = generate_network_address(&keyword, &salt)?;
@@ -398,7 +389,7 @@ impl SafeAuthenticator {
                                 .to_string(),
                         )
                     })?;
-                    let keypair: Arc<Keypair> =
+                    let keypair: Keypair =
                         Arc::new(serde_json::from_str(&keypair_str).map_err(|_err| {
                             Error::AuthError(
                                 "The Safe contains an invalid keypair associated to this app"
@@ -431,7 +422,6 @@ impl SafeAuthenticator {
                         ))
                     })?;
 
-                    let keypair = Arc::new(keypair);
                     debug!(
                         "New keypair generated for app ('{}') being authorised: {}",
                         auth_req.app_id,

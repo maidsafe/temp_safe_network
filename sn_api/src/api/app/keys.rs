@@ -22,10 +22,9 @@ use xor_name::XorName;
 
 impl Safe {
     // Generate a key pair without creating and/or storing a SafeKey on the network
-    pub fn generate_random_ed_keypair(&self) -> Arc<Keypair> {
+    pub fn generate_random_ed_keypair(&self) -> Keypair {
         let mut rng = OsRng;
-        let keypair = Keypair::new_ed25519(&mut rng);
-        Arc::new(keypair)
+        Keypair::new_ed25519(&mut rng)
     }
 
     // Create a SafeKey on the network, allocates token from current client's key onto it,
@@ -33,7 +32,7 @@ impl Safe {
     pub async fn keys_create_and_preload(
         &mut self,
         preload_amount: &str,
-    ) -> Result<(String, Arc<Keypair>)> {
+    ) -> Result<(String, Keypair)> {
         let amount = parse_coins_amount(preload_amount)?;
         let new_keypair = self.generate_random_ed_keypair();
 
@@ -54,7 +53,7 @@ impl Safe {
         &mut self,
         from: &str,
         preload_amount: &str,
-    ) -> Result<(String, Arc<Keypair>)> {
+    ) -> Result<(String, Keypair)> {
         let from_sk = match ed_sk_from_hex(&from) {
             Ok(sk) => sk,
             Err(_) => return Err(Error::InvalidInput(
@@ -84,11 +83,11 @@ impl Safe {
     pub async fn keys_create_preload_test_coins(
         &mut self,
         preload_amount: &str,
-    ) -> Result<(String, Arc<Keypair>)> {
+    ) -> Result<(String, Keypair)> {
         let amount = parse_coins_amount(preload_amount)?;
         let keypair = self.generate_random_ed_keypair();
         self.safe_client
-            .trigger_simulated_farming_payout(amount, Some(Arc::clone(&keypair)))
+            .trigger_simulated_farming_payout(amount, Some(keypair.clone()))
             .await?;
 
         let xorname = XorName::from(keypair.public_key());
@@ -99,10 +98,10 @@ impl Safe {
 
     // Check SafeKey's balance from the network from a given SecretKey string
     pub async fn keys_balance_from_sk(&self, secret_key: Arc<SecretKey>) -> Result<String> {
+        // let secret_key = &secret_key;
         let secret_key = Arc::as_ref(&secret_key);
 
         let keypair = match secret_key {
-            SecretKey::Bls(sk) => Keypair::from(sk),
             SecretKey::Ed25519(sk) => {
                 let bytes = sk.to_bytes();
                 let secret_key = ed25519_dalek::SecretKey::from_bytes(&bytes).map_err(|err| {
@@ -117,7 +116,6 @@ impl Safe {
             }
         };
 
-        let keypair = Arc::new(keypair);
         let balance = self.safe_client.read_balance_from_keypair(keypair).await?;
 
         Ok(balance.to_string())

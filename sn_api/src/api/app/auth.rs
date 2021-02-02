@@ -32,7 +32,7 @@ impl Safe {
         app_name: &str,
         app_vendor: &str,
         endpoint: Option<&str>,
-    ) -> Result<Arc<Keypair>> {
+    ) -> Result<Keypair> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
 
@@ -72,7 +72,7 @@ impl Safe {
     // Connect to the SAFE Network using the provided auth credentials
     pub async fn connect(
         &mut self,
-        app_keypair: Option<Arc<Keypair>>,
+        app_keypair: Option<Keypair>,
         bootstrap_config: Option<BootstrapConfig>,
     ) -> Result<()> {
         self.safe_client

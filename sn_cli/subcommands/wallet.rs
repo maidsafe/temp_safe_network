@@ -117,7 +117,7 @@ pub async fn wallet_commander(
         } => {
             // create wallet
             let wallet_xorurl = safe.wallet_create().await?;
-            let mut key_generated_output: (String, Option<Arc<Keypair>>, String) =
+            let mut key_generated_output: (String, Option<Keypair>, String) =
                 Default::default();
 
             if !no_balance {

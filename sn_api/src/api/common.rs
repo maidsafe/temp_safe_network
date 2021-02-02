@@ -53,13 +53,6 @@ pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     bytes
 }
 
-pub fn bls_sk_from_hex(hex_str: &str) -> Result<threshold_crypto::SecretKey> {
-    let sk_bytes = parse_hex(&hex_str);
-    bincode::deserialize(&sk_bytes).map_err(|_| {
-        Error::InvalidInput("Failed to deserialize provided BLS secret key".to_string())
-    })
-}
-
 pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
     let sk_bytes = parse_hex(&hex_str);
     ed25519_dalek::SecretKey::from_bytes(&sk_bytes).map_err(|_| {
@@ -71,7 +64,6 @@ pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
 pub fn sk_to_hex(sk: SecretKey) -> String {
     match sk {
         SecretKey::Ed25519(sk) => sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
-        SecretKey::Bls(sk) => sk.inner().reveal(), // FIXME
         SecretKey::BlsShare(sk) => sk.inner().reveal(), // FIXME
     }
 }

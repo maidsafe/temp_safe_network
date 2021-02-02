@@ -62,7 +62,7 @@ pub fn clear_credentials() -> Result<(), String> {
 // otherwise it creates a read only connection.
 // Returns the app's keypair if connection was succesfully made with credentials,
 // otherwise it returns 'None' if conneciton is read only.
-pub async fn connect(safe: &mut Safe) -> Result<Option<Arc<Keypair>>, String> {
+pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>, String> {
     debug!("Connecting...");
 
     let app_keypair = match get_credentials_file_path() {

@@ -3851,8 +3851,6 @@ dependencies = [
 [[package]]
 name = "sn_client"
 version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea64af9c75bad4334ecf808129ce2bcc32889ea549159b0a098c76d42ec096a7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3877,7 +3875,7 @@ dependencies = [
  "serde-value",
  "serde_json",
  "sha3",
- "sn_data_types 0.14.0",
+ "sn_data_types 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sn_messaging",
  "sn_transfers",
  "thiserror",
@@ -3911,6 +3909,27 @@ name = "sn_data_types"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79926ec0bd1d22ef3de73a1255d4b609a15184f48a0d6e3ca38a120754d8a895"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase 0.8.0",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha3",
+ "signature",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_data_types"
+version = "0.14.0"
 dependencies = [
  "bincode",
  "crdts",
@@ -3984,7 +4003,7 @@ dependencies = [
  "serde_bytes",
  "sha3",
  "signature",
- "sn_data_types 0.14.0",
+ "sn_data_types 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
@@ -4003,7 +4022,7 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types 0.14.0",
+ "sn_data_types 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
  "threshold_crypto",
  "xor_name",

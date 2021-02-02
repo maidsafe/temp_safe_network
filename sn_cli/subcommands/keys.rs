@@ -181,7 +181,7 @@ pub async fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     _pk: Option<String>,
-) -> Result<(String, Option<Arc<Keypair>>, String), String> {
+) -> Result<(String, Option<Keypair>, String), String> {
     if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = match preload {
@@ -229,7 +229,7 @@ pub async fn create_new_key(
 pub fn print_new_key_output(
     output_fmt: OutputFmt,
     xorurl: String,
-    key_pair: Option<Arc<Keypair>>,
+    key_pair: Option<Keypair>,
     amount: String,
     test_coins: bool,
 ) {

@@ -67,7 +67,7 @@ impl Safe {
     }
 
     /// Generate a new random Ed25519 keypair
-    pub fn keypair(&self) -> Arc<Keypair> {
+    pub fn keypair(&self) -> Keypair {
         let mut rng = OsRng;
         Arc::new(Keypair::new_ed25519(&mut rng))
     }

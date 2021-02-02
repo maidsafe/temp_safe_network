@@ -29,7 +29,7 @@ pub enum IpcResp {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct AuthGranted {
     /// The access keys.
-    pub app_keypair: Arc<Keypair>,
+    pub app_keypair: Keypair,
 
     /// Network bootstrap information.
     /// Useful to reuse bootstrap nodes and speed up access.
