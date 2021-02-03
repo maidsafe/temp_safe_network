@@ -41,11 +41,11 @@ pub enum GetSectionResponse {
 }
 
 impl Query {
-    /// Convinience function to deserialise a 'Query' from bytes received over the wire.
+    /// Convinience function to deserialize a 'Query' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to an infrastructure query.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
-        let deserialised = WireMsg::deserialise(bytes)?;
-        if let MessageType::InfrastructureQuery(query) = deserialised {
+        let deserialized = WireMsg::deserialize(bytes)?;
+        if let MessageType::InfrastructureQuery(query) = deserialized {
             Ok(query)
         } else {
             Err(crate::Error::FailedToParse(
@@ -54,8 +54,8 @@ impl Query {
         }
     }
 
-    /// Serialise this Query into bytes ready to be sent over the wire.
-    pub fn serialise(&self) -> crate::Result<Bytes> {
-        WireMsg::serialise_infrastructure_query(self)
+    /// serialize this Query into bytes ready to be sent over the wire.
+    pub fn serialize(&self) -> crate::Result<Bytes> {
+        WireMsg::serialize_infrastructure_query(self)
     }
 }

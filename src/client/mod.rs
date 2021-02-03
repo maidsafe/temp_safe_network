@@ -76,11 +76,11 @@ pub struct MsgEnvelope {
 }
 
 impl MsgEnvelope {
-    /// Convinience function to deserialise a 'MsgEnvelope' from bytes received over the wire.
+    /// Convinience function to deserialize a 'MsgEnvelope' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a client message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
-        let deserialised = WireMsg::deserialise(bytes)?;
-        if let MessageType::ClientMessage(msg) = deserialised {
+        let deserialized = WireMsg::deserialize(bytes)?;
+        if let MessageType::ClientMessage(msg) = deserialized {
             Ok(msg)
         } else {
             Err(crate::Error::FailedToParse(
@@ -89,9 +89,9 @@ impl MsgEnvelope {
         }
     }
 
-    /// Serialise this MsgEnvelope into bytes ready to be sent over the wire.
-    pub fn serialise(&self) -> crate::Result<Bytes> {
-        WireMsg::serialise_client_msg(self)
+    /// serialize this MsgEnvelope into bytes ready to be sent over the wire.
+    pub fn serialize(&self) -> crate::Result<Bytes> {
+        WireMsg::serialize_client_msg(self)
     }
 
     /// Gets the message ID.
@@ -102,11 +102,11 @@ impl MsgEnvelope {
     /// Verify the signature provided by the most recent sender is valid.
     pub fn verify(&self) -> Result<bool> {
         let data = if self.proxies.is_empty() {
-            self.message.serialise()?
+            self.message.serialize()?
         } else {
             let mut msg = self.clone();
             let _ = msg.proxies.pop();
-            WireMsg::serialise_client_msg(&msg)
+            WireMsg::serialize_client_msg(&msg)
                 .map_err(|err| Error::SignatureVerification(err.to_string()))?
         };
 
@@ -311,8 +311,8 @@ impl Message {
         }
     }
 
-    /// Serialise this Message, ready for signing
-    pub fn serialise(&self) -> Result<Bytes> {
+    /// serialize this Message, ready for signing
+    pub fn serialize(&self) -> Result<Bytes> {
         let payload_vec = rmp_serde::to_vec_named(&self).map_err(|err| {
             Error::Serialization(format!(
                 "Could not serialize message payload (id: {}) with Msgpack: {}",
@@ -723,7 +723,7 @@ mod tests {
         };
 
         // test msgpack serialization
-        let serialized = msg_envelope.serialise()?;
+        let serialized = msg_envelope.serialize()?;
         let deserialized = MsgEnvelope::from(serialized)?;
         assert_eq!(deserialized, msg_envelope);
 

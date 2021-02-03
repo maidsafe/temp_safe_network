@@ -28,13 +28,13 @@ pub enum MessageType {
 }
 
 impl MessageType {
-    /// Serialise the message type into bytes ready to be sent over the wire.
-    pub fn serialise(&self) -> Result<Bytes> {
+    /// serialize the message type into bytes ready to be sent over the wire.
+    pub fn serialize(&self) -> Result<Bytes> {
         match self {
-            Self::Ping => WireMsg::new_ping_msg().serialise(),
-            Self::InfrastructureQuery(query) => WireMsg::serialise_infrastructure_query(query),
-            Self::ClientMessage(msg) => WireMsg::serialise_client_msg(msg),
-            Self::NodeMessage(msg) => WireMsg::serialise_node_msg(msg),
+            Self::Ping => WireMsg::new_ping_msg().serialize(),
+            Self::InfrastructureQuery(query) => WireMsg::serialize_infrastructure_query(query),
+            Self::ClientMessage(msg) => WireMsg::serialize_client_msg(msg),
+            Self::NodeMessage(msg) => WireMsg::serialize_node_msg(msg),
         }
     }
 }

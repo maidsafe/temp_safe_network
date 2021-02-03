@@ -7,10 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod errors;
-
-pub use self::errors::{Error, Result};
-use crate::{MessageType, WireMsg};
+use crate::{Error, MessageType, Result, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
@@ -27,22 +24,20 @@ impl NodeMessage {
         Self(bytes.to_vec())
     }
 
-    /// Convinience function to deserialise a 'NodeMessage' from bytes received over the wire.
+    /// Convinience function to deserialize a 'NodeMessage' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node message.
-    pub fn from(bytes: Bytes) -> crate::Result<Self> {
-        let deserialised = WireMsg::deserialise(bytes)?;
-        if let MessageType::NodeMessage(msg) = deserialised {
+    pub fn from(bytes: Bytes) -> Result<Self> {
+        let deserialized = WireMsg::deserialize(bytes)?;
+        if let MessageType::NodeMessage(msg) = deserialized {
             Ok(msg)
         } else {
-            Err(crate::Error::FailedToParse(
-                "bytes as a node message".to_string(),
-            ))
+            Err(Error::FailedToParse("bytes as a node message".to_string()))
         }
     }
 
-    /// Serialise this NodeMessage into bytes ready to be sent over the wire.
-    pub fn serialise(&self) -> crate::Result<Bytes> {
-        WireMsg::serialise_node_msg(self)
+    /// serialize this NodeMessage into bytes ready to be sent over the wire.
+    pub fn serialize(&self) -> Result<Bytes> {
+        WireMsg::serialize_node_msg(self)
     }
 }
 
