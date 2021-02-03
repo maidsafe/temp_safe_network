@@ -307,27 +307,8 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
         )
     })?;
 
-    // try to get SafeSeed from environment variable
-    let mut the_passphrase = environment_details
-        .safe_auth_passphrase
-        .unwrap_or_else(|| String::from(""));
-    if !the_passphrase.is_empty() {
-        info!("Using passphrase from provided ENV var: SAFE_AUTH_PASSPHRASE")
-    }
-
-    let mut the_password = environment_details
-        .safe_auth_password
-        .unwrap_or_else(|| String::from(""));
-    if !the_password.is_empty() {
-        info!("Using password from provided ENV var: SAFE_AUTH_PASSWORD")
-    }
-
-    if the_passphrase.is_empty() ^ the_password.is_empty() {
-        return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for creating/unlocking a Safe.".to_string());
-    }
-
     // try to get SafeSeed from file specified by --config flag
-    if let Some(config_file_str) = config_file {
+    let (the_passphrase, the_password) = if let Some(config_file_str) = config_file {
         let file = match File::open(&config_file_str) {
             Ok(file) => file,
             Err(error) => {
@@ -346,26 +327,47 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
 
         if json.passphrase.is_empty() {
             return Err("The config files's passphrase field cannot be empty".to_string());
-        } else {
-            the_passphrase = json.passphrase;
         }
+        let the_passphrase = json.passphrase;
 
         if json.password.is_empty() {
             return Err("The config files's password field cannot be empty".to_string());
-        } else {
-            the_password = json.password;
         }
-    }
+        let the_password = json.password;
 
-    // try to get SafeSeed from prompt if neither environment variable or
-    // config file is specified
-    if the_passphrase.is_empty() || the_password.is_empty() {
-        // Prompt the user for the Safe's credentials
-        the_passphrase = prompt_sensitive(None, "Passphrase: ")
-            .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
-        the_password = prompt_sensitive(None, "Password: ")
-            .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
-    }
+        (the_passphrase, the_password)
+    } else {
+        // try to get SafeSeed from environment variables then
+        let mut the_passphrase = environment_details
+            .safe_auth_passphrase
+            .unwrap_or_else(|| String::from(""));
+        if !the_passphrase.is_empty() {
+            info!("Using passphrase from provided ENV var: SAFE_AUTH_PASSPHRASE")
+        }
+
+        let mut the_password = environment_details
+            .safe_auth_password
+            .unwrap_or_else(|| String::from(""));
+        if !the_password.is_empty() {
+            info!("Using password from provided ENV var: SAFE_AUTH_PASSWORD")
+        }
+
+        if the_passphrase.is_empty() ^ the_password.is_empty() {
+            return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for creating/unlocking a Safe.".to_string());
+        }
+
+        // try to prompt the user to enter the SafeSeed
+        // if it was not set in the environment variables
+        if the_passphrase.is_empty() || the_password.is_empty() {
+            // Prompt the user for the Safe's credentials
+            the_passphrase = prompt_sensitive(None, "Passphrase: ")
+                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+            the_password = prompt_sensitive(None, "Password: ")
+                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+        }
+
+        (the_passphrase, the_password)
+    };
 
     if the_passphrase.is_empty() || the_password.is_empty() {
         return Err(String::from(
