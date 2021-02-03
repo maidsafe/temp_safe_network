@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.0.0](https://github.com/maidsafe/sn_messaging/compare/v2.0.0...v3.0.0) (2021-02-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **types:** moving client messages to its own module and publis namespace.
+
+### Features
+
+* **types:** adding Ping, NodeMessage and InfrastructureQuery definitions and support in serialisation ([dcd6b32](https://github.com/maidsafe/sn_messaging/commit/dcd6b321154714000d67c38137d1155433c4672a))
+
 ## [2.0.0](https://github.com/maidsafe/sn_messaging/compare/v1.6.1...v2.0.0) (2021-02-01)
 
 
