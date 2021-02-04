@@ -22,7 +22,7 @@ mod xorurl_media_types;
 use super::{common, constants};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 use xorurl::XorUrlBase;
 
 // The following is what's meant to be the public API
@@ -69,6 +69,6 @@ impl Safe {
     /// Generate a new random Ed25519 keypair
     pub fn keypair(&self) -> Keypair {
         let mut rng = OsRng;
-        Arc::new(Keypair::new_ed25519(&mut rng))
+        Keypair::new_ed25519(&mut rng)
     }
 }

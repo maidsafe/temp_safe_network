@@ -14,7 +14,6 @@ use std::{
     fs::{create_dir_all, File},
     io::{Read, Write},
     path::PathBuf,
-    sync::Arc,
 };
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
@@ -79,7 +78,7 @@ pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>, String> {
                                 err
                             )
                         })?;
-                        Some(Arc::new(keypair))
+                        Some(keypair)
                     }
                     Err(err) => {
                         debug!(

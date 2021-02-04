@@ -15,7 +15,6 @@ use crate::{
     },
     Error, Result, SafeAuthReq,
 };
-
 use hmac::Hmac;
 use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
@@ -30,7 +29,7 @@ use sn_data_types::{
     Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
     MapValue, Token,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 use tiny_keccak::{sha3_256, sha3_512};
 use xor_name::{XorName, XOR_NAME_LEN};
 
@@ -62,17 +61,14 @@ fn create_ed25519_keypair_from_seed(seeder: &[u8]) -> Keypair {
 }
 
 /// Perform all derivations and seeding to deterministically obtain location and Keypair from input
-pub fn derive_location_and_keypair(
-    passphrase: &str,
-    password: &str,
-) -> Result<(XorName, Keypair)> {
+pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(XorName, Keypair)> {
     let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
     let map_data_location = generate_network_address(&keyword, &salt)?;
 
     let mut seed = password;
     seed.extend(salt.iter());
-    let keypair = Arc::new(create_ed25519_keypair_from_seed(&seed));
+    let keypair = create_ed25519_keypair_from_seed(&seed);
 
     Ok((map_data_location, keypair))
 }
@@ -389,13 +385,12 @@ impl SafeAuthenticator {
                                 .to_string(),
                         )
                     })?;
-                    let keypair: Keypair =
-                        Arc::new(serde_json::from_str(&keypair_str).map_err(|_err| {
-                            Error::AuthError(
-                                "The Safe contains an invalid keypair associated to this app"
-                                    .to_string(),
-                            )
-                        })?);
+                    let keypair: Keypair = serde_json::from_str(&keypair_str).map_err(|_err| {
+                        Error::AuthError(
+                            "The Safe contains an invalid keypair associated to this app"
+                                .to_string(),
+                        )
+                    })?;
 
                     debug!(
                         "Keypair for the app being authorised ('{}') retrieved from the Safe: {}",

@@ -13,8 +13,7 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use log::{debug, warn};
-use sn_api::{bls_sk_from_hex, ed_sk_from_hex, sk_to_hex, Keypair, PublicKey, Safe, SecretKey};
-use std::sync::Arc;
+use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, PublicKey, Safe, SecretKey};
 use structopt::StructOpt;
 
 const PRELOAD_DEFAULT_AMOUNT: &str = "0.000000001";
@@ -47,9 +46,6 @@ pub enum KeysSubCommands {
         /// The secret key which corresponds to the target SafeKey. CLI application's default SafeKey will be used by default, otherwise if the CLI has not been given a keypair (authorised), it will be prompted
         #[structopt(long = "sk")]
         secret: Option<String>,
-        /// The secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "bls")]
-        is_bls: bool,
     },
     #[structopt(name = "transfer")]
     /// Transfer safecoins from one SafeKey to another, or to a Wallet
@@ -62,13 +58,6 @@ pub enum KeysSubCommands {
         /// The receiving Wallet/SafeKey URL or public key, otherwise pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
-        /// The from secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "from-is-bls")]
-        from_is_bls: bool,
-        /// The target secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "to-is-bls")]
-        to_is_bls: bool,
-        // TODO: BlsShare when we have multisig
     },
 }
 
@@ -100,11 +89,7 @@ pub async fn key_commander(
 
             Ok(())
         }
-        KeysSubCommands::Balance {
-            keyurl,
-            secret,
-            is_bls,
-        } => {
+        KeysSubCommands::Balance { keyurl, secret } => {
             let target = keyurl.unwrap_or_else(|| "".to_string());
             let sk = match connect(safe).await? {
                 Some(keypair) if secret.is_none() => {
@@ -122,19 +107,14 @@ pub async fn key_commander(
                     let secret_key =
                         get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
 
-                    if is_bls {
-                        SecretKey::from(bls_sk_from_hex(&secret_key)?)
-                    } else {
-                        SecretKey::Ed25519(ed_sk_from_hex(&secret_key)?)
-                    }
+                    SecretKey::Ed25519(ed_sk_from_hex(&secret_key)?)
                 }
             };
 
-            let sk = Arc::new(sk);
             let current_balance = if target.is_empty() {
                 safe.keys_balance_from_sk(sk).await
             } else {
-                safe.keys_balance_from_url(&target, sk.clone()).await
+                safe.keys_balance_from_url(&target, sk).await
             }?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -144,13 +124,7 @@ pub async fn key_commander(
             }
             Ok(())
         }
-        KeysSubCommands::Transfer {
-            amount,
-            from,
-            to,
-            to_is_bls: _,
-            from_is_bls: _,
-        } => {
+        KeysSubCommands::Transfer { amount, from, to } => {
             // TODO: don't connect if --from sk was passed
             connect(safe).await?;
 

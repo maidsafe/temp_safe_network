@@ -14,12 +14,11 @@ use log::{debug, info};
 use sn_client::{Client, Error as ClientError, TransfersError};
 use sn_data_types::{
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
-    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, Token, PublicKey, SequenceAddress,
-    SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions, SequenceUser,
+    MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
+    SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
 };
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use std::{collections::HashSet, net::SocketAddr};
 use xor_name::XorName;
 
@@ -142,7 +141,7 @@ impl SafeAppClient {
 
         let (dot_counter, _dot_actor) =
             client
-                .send_token(to_pk, amount)
+                .send_tokens(to_pk, amount)
                 .await
                 .map_err(|err| match err {
                     ClientError::Transfer(TransfersError::InsufficientBalance) => {

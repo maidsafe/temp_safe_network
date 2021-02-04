@@ -15,8 +15,7 @@ use super::{
     OutputFmt,
 };
 use log::debug;
-use sn_api::{bls_sk_from_hex, ed_sk_from_hex, sk_to_hex, Keypair, Safe, SecretKey};
-use std::sync::Arc;
+use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, Safe, SecretKey};
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -40,9 +39,6 @@ pub enum WalletSubCommands {
         /// Set the inserted SafeKey as the default one in the target Wallet
         #[structopt(long = "default")]
         default: bool,
-        /// The secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "bls")]
-        is_bls: bool,
     },
     #[structopt(name = "balance")]
     /// Query a Wallet's total balance
@@ -74,9 +70,6 @@ pub enum WalletSubCommands {
         /// Preload with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
-        /// The secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "bls")]
-        is_bls: bool,
     },
     #[structopt(name = "transfer")]
     /// Transfer safecoins from one Wallet to another, or to a SafeKey
@@ -89,13 +82,6 @@ pub enum WalletSubCommands {
         /// The receiving Wallet/SafeKey URL or public key, otherwise pulled from stdin if not provided
         #[structopt(long = "to")]
         to: Option<String>,
-        /// The from secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "from-is-bls")]
-        from_is_bls: bool,
-        /// The target secret key is a BLS secret key. (Defaults to an ED25519 Secret Key)
-        #[structopt(long = "to-is-bls")]
-        to_is_bls: bool,
-        // TODO: BlsShare when we have multisig
     },
 }
 
@@ -113,12 +99,10 @@ pub async fn wallet_commander(
             name,
             pay_with,
             secret_key,
-            is_bls,
         } => {
             // create wallet
             let wallet_xorurl = safe.wallet_create().await?;
-            let mut key_generated_output: (String, Option<Keypair>, String) =
-                Default::default();
+            let mut key_generated_output: (String, Option<Keypair>, String) = Default::default();
 
             if !no_balance {
                 // get or create keypair
@@ -126,12 +110,9 @@ pub async fn wallet_commander(
                     Some(linked_key) => {
                         let sk_hex =
                             get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
-                        let sk = if is_bls {
-                            SecretKey::from(bls_sk_from_hex(&sk_hex)?)
-                        } else {
-                            SecretKey::Ed25519(ed_sk_from_hex(&sk_hex)?)
-                        };
-                        let _ = safe.validate_sk_for_url(Arc::new(sk), &linked_key).await?;
+                        let sk = SecretKey::Ed25519(ed_sk_from_hex(&sk_hex)?);
+
+                        let _ = safe.validate_sk_for_url(&sk, &linked_key).await?;
 
                         sk_hex
                     }
@@ -218,7 +199,6 @@ pub async fn wallet_commander(
             default,
             secret_key,
             pay_with,
-            is_bls,
         } => {
             if pay_with.is_some() {
                 println!("The '--pay-with' argument is being ignored for now as it's not supported yet for this command.");
@@ -227,13 +207,9 @@ pub async fn wallet_commander(
             let sk = match keyurl {
                 Some(linked_key) => {
                     let sk_hex = get_secret_key(&linked_key, secret_key, "the SafeKey to insert")?;
-                    let sk = if is_bls {
-                        SecretKey::from(bls_sk_from_hex(&sk_hex)?)
-                    } else {
-                        SecretKey::Ed25519(ed_sk_from_hex(&sk_hex)?)
-                    };
+                    let sk = SecretKey::Ed25519(ed_sk_from_hex(&sk_hex)?);
 
-                    let _ = safe.validate_sk_for_url(Arc::new(sk), &linked_key).await?;
+                    let _ = safe.validate_sk_for_url(&sk, &linked_key).await?;
 
                     sk_hex
                 }
@@ -255,13 +231,7 @@ pub async fn wallet_commander(
 
             Ok(())
         }
-        WalletSubCommands::Transfer {
-            amount,
-            from,
-            to,
-            from_is_bls: _,
-            to_is_bls: _,
-        } => {
+        WalletSubCommands::Transfer { amount, from, to } => {
             let destination = get_from_arg_or_stdin(
                 to,
                 Some("...awaiting destination Wallet/SafeKey URL, or public key, from STDIN stream..."),

@@ -19,7 +19,6 @@ use crate::{
 use log::{debug, info};
 use serde_json::json;
 use sn_data_types::Keypair;
-use std::sync::Arc;
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";

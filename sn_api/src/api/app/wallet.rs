@@ -17,7 +17,6 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Keypair, MapValue, Token};
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use xor_name::XorName;
 
 // Type tag used for the Wallet container
@@ -60,7 +59,7 @@ impl Safe {
     ) -> Result<String> {
         // TODO: we need URLs / hex indication of which keytype this is....
         let acutal_sk = ed_sk_from_hex(sk)?;
-        let keypair = Arc::new(Keypair::from(acutal_sk));
+        let keypair = Keypair::from(acutal_sk);
         let xorname = XorName::from(keypair.public_key());
         let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
 
@@ -191,7 +190,7 @@ impl Safe {
             debug!("Checking wallet of name: {:?}", name);
             let secret_key = ed_sk_from_hex(&balance.sk)?;
 
-            let id = Arc::new(Keypair::from(secret_key));
+            let id = Keypair::from(secret_key);
             let current_balance = self
                 .safe_client
                 .read_balance_from_keypair(id)
@@ -334,7 +333,7 @@ impl Safe {
         )
         .await?;
         let from_sk = ed_sk_from_hex(&from_spendable_balance.sk)?;
-        let from = Some(Arc::new(Keypair::from(from_sk)));
+        let from = Some(Keypair::from(from_sk));
 
         let result = if to.starts_with("safe://") {
             // Now check if the 'to_url' is a valid Wallet or a SafeKey URL
@@ -549,7 +548,6 @@ mod tests {
         common::sk_to_hex,
     };
     use anyhow::{anyhow, bail, Result};
-    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_wallet_create() -> Result<()> {
@@ -848,9 +846,7 @@ mod tests {
                     "4097.580000000", /* 4621.45 - 523.87 */
                     from_current_balance
                 );
-                let key_current_balance = safe
-                    .keys_balance_from_sk(Arc::new(keypair3.secret_key()?))
-                    .await?;
+                let key_current_balance = safe.keys_balance_from_sk(keypair3.secret_key()?).await?;
                 assert_eq!("533.870000000", key_current_balance);
                 Ok(())
             }
@@ -886,9 +882,7 @@ mod tests {
                     "565.060000000", /* 1122.98 - 557.92 */
                     from_current_balance
                 );
-                let key_current_balance = safe
-                    .keys_balance_from_sk(Arc::new(keypair2.secret_key()?))
-                    .await?;
+                let key_current_balance = safe.keys_balance_from_sk(keypair2.secret_key()?).await?;
                 assert_eq!(
                     "3789.920000000", /* 3232 + 557.92 */
                     key_current_balance
@@ -964,9 +958,7 @@ mod tests {
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_nrsurl).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-                let key_current_balance = safe
-                    .keys_balance_from_sk(Arc::new(keypair3.secret_key()?))
-                    .await?;
+                let key_current_balance = safe.keys_balance_from_sk(keypair3.secret_key()?).await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
                 Ok(())
             }

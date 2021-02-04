@@ -12,7 +12,6 @@ use super::{BootstrapConfig, IpcError};
 
 use serde::{Deserialize, Serialize};
 use sn_data_types::Keypair;
-use std::sync::Arc;
 
 /// IPC response.
 // TODO: `TransOwnership` variant

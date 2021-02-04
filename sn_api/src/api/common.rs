@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result, SecretKey};
+use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
 use log::info;
 use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
@@ -53,6 +53,14 @@ pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     bytes
 }
 
+#[allow(unused)]
+pub fn bls_sk_from_hex(hex_str: &str) -> Result<threshold_crypto::SecretKey> {
+    let sk_bytes = parse_hex(&hex_str);
+    bincode::deserialize(&sk_bytes).map_err(|_| {
+        Error::InvalidInput("Failed to deserialize provided BLS secret key".to_string())
+    })
+}
+
 pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
     let sk_bytes = parse_hex(&hex_str);
     ed25519_dalek::SecretKey::from_bytes(&sk_bytes).map_err(|_| {
@@ -61,10 +69,13 @@ pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
 }
 
 // Get hex string of a SecretKey
-pub fn sk_to_hex(sk: SecretKey) -> String {
+pub fn sk_to_hex(sk: sn_data_types::SecretKey) -> String {
     match sk {
-        SecretKey::Ed25519(sk) => sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
-        SecretKey::BlsShare(sk) => sk.inner().reveal(), // FIXME
+        sn_data_types::SecretKey::Ed25519(sk) => {
+            sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect()
+        }
+        //SecretKey::Bls(sk) => sk.inner().reveal(), // FIXME: it includes bls in the text
+        sn_data_types::SecretKey::BlsShare(sk) => sk.inner().reveal(), // FIXME: it includes bls in the text
     }
 }
 

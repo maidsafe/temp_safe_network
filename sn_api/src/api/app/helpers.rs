@@ -11,7 +11,7 @@
 use crate::{api::common::parse_hex, Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
-use sn_data_types::{Error as SafeNdError, Token, PublicKey};
+use sn_data_types::{Error as SafeNdError, PublicKey, Token};
 use std::str::{self, FromStr};
 use std::time;
 use xor_name::XorName;
