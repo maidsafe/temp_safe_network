@@ -10,30 +10,26 @@
 use crate::APP_ID;
 use log::debug;
 use sn_api::Safe;
+use anyhow::Result;
 
 pub async fn authorise_cli(
-    _mut safe: Safe,
+    _safe: Safe,
     _endpoint: Option<String>,
     _is_self_authing: bool,
-) -> Result<(), String> {
+) -> Result<()> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file or send authorisation request");
     Ok(())
 }
 
-pub fn clear_credentials() -> Result<(), String> {
+pub fn clear_credentials() -> Result<()> {
     debug!("Fake-auth is enabled so we don't try to clear the credentials file");
     Ok(())
 }
 
-pub async fn connect(mut safe: Safe) -> Result<(), String> {
+pub async fn connect(mut safe: Safe) -> Result<()> {
     debug!("Fake-auth is enabled so we don't try to read the credentials file");
 
     safe.connect(APP_ID, Some("fake-auth-credentials"))
         .await
-        .map_err(|err| {
-            format!(
-                "Unexpected error when trying to connect with fake auth/network: {}",
-                err
-            )
-        })
+        .context("Unexpected error when trying to connect with fake auth/network")
 }

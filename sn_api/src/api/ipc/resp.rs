@@ -6,15 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code)]
-
 use super::{BootstrapConfig, IpcError};
-
 use serde::{Deserialize, Serialize};
 use sn_data_types::Keypair;
 
 /// IPC response.
-// TODO: `TransOwnership` variant
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum IpcResp {

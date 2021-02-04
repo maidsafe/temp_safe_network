@@ -7,21 +7,26 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use serde::{Deserialize, Serialize};
-//use threshold_crypto::error::FromBytesError;
+use thiserror::Error;
 
-/// Ipc error.
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+/// Authd Ipc errors.
+#[derive(Debug, Error, Serialize, Eq, PartialEq, Deserialize)]
+#[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 pub enum IpcError {
     /// Authentication denied.
+    #[error("Authentication denied")]
     AuthDenied,
     /// Invalid IPC message.
+    #[error("Invalid IPC message")]
     InvalidMsg,
     /// Generic encoding / decoding failure.
+    #[error("Generic encoding / decoding failure")]
     EncodeDecodeError,
     /// App is already authorised.
+    #[error("App is already authorised")]
     AlreadyAuthorised,
     /// App is not registered.
+    #[error("App is not registered")]
     UnknownApp,
-    /// Unexpected error.
-    Unexpected(String),
 }

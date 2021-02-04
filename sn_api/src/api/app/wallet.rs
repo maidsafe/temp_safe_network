@@ -243,7 +243,7 @@ impl Safe {
         let default_data = match default {
             MapValue::Seq(value) => value.data,
             MapValue::Unseq(_) => {
-                return Err(Error::ClientError(
+                return Err(Error::ContentError(
                     "Wallet could not be parsed as wallet map is unsequenced.".to_string(),
                 ))
             }
@@ -483,7 +483,7 @@ async fn wallet_get_spendable_balance(
             })? {
             MapValue::Seq(data) => data,
             MapValue::Unseq(_) => {
-                return Err(Error::ClientError(
+                return Err(Error::ContentError(
                     "Wallet could not be parsed as wallet map is unsequenced.".to_string(),
                 ))
             }

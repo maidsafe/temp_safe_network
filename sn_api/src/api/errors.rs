@@ -8,113 +8,83 @@
 // Software.
 
 use super::ipc::IpcError;
-#[cfg(test)]
-use anyhow::{anyhow, Error as AnyHowError};
 use sn_client::Error as ClientError;
-use sn_data_types::Error as DtError;
-use std::fmt;
+use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Debug, PartialEq)]
+/// Error type returned by the API
+#[derive(Debug, Error)]
+#[allow(clippy::large_enum_variant)]
+#[non_exhaustive]
 pub enum Error {
+    /// AuthError
+    #[error("AuthError: {0}")]
     AuthError(String),
+    /// AuthIpcError
+    #[error("AuthIpcError: {0}")]
+    AuthIpcError(#[from] IpcError),
+    /// AuthdClientError
+    #[error("AuthdClientError: {0}")]
     AuthdClientError(String),
+    /// AuthdError
+    #[error("AuthdError: {0}")]
     AuthdError(String),
+    /// AuthdAlreadyStarted
+    #[error("AuthdAlreadyStarted: {0}")]
     AuthdAlreadyStarted(String),
+    /// AuthenticatorError
+    #[error("AuthenticatorError: {0}")]
     AuthenticatorError(String),
+    /// ConnectionError
+    #[error("ConnectionError: {0}")]
     ConnectionError(String),
+    /// NetDataError
+    #[error("NetDataError: {0}")]
     NetDataError(String),
+    /// ContentNotFound
+    #[error("ContentNotFound: {0}")]
     ContentNotFound(String),
+    /// ContentError
+    #[error("ContentError: {0}")]
     ContentError(String),
-    ClientError(String),
+    /// ClientError
+    #[error("ClientError: {0}")]
+    ClientError(#[from] ClientError),
+    /// EmptyContent
+    #[error("EmptyContent: {0}")]
     EmptyContent(String),
+    /// AccessDenied
+    #[error("AccessDenied: {0}")]
     AccessDenied(String),
+    /// VersionNotFound
+    #[error("VersionNotFound: {0}")]
     VersionNotFound(String),
+    /// EntryNotFound
+    #[error("EntryNotFound: {0}")]
     EntryNotFound(String),
+    /// EntryExists
+    #[error("EntryExists: {0}")]
     EntryExists(String),
-    InvalidInput(String),
+    /// InvalidAmount
+    #[error("InvalidAmount: {0}")]
     InvalidAmount(String),
+    /// InvalidXorUrl
+    #[error("InvalidXorUrl: {0}")]
     InvalidXorUrl(String),
+    /// InvalidInput
+    #[error("InvalidInput: {0}")]
+    InvalidInput(String),
+    /// InvalidMediaType
+    #[error("InvalidMediaType: {0}")]
     InvalidMediaType(String),
+    /// NotEnoughBalance
+    #[error("NotEnoughBalance: {0}")]
     NotEnoughBalance(String),
-    FileSystemError(String),
+    /// Serialisation
+    #[error("Serialisation: {0}")]
     Serialisation(String),
-}
-
-impl From<Error> for String {
-    fn from(error: Error) -> String {
-        error.to_string()
-    }
-}
-
-impl From<ClientError> for Error {
-    fn from(error: ClientError) -> Error {
-        Error::ClientError(error.to_string())
-    }
-}
-
-impl From<DtError> for Error {
-    fn from(error: DtError) -> Error {
-        Error::ContentError(error.to_string())
-    }
-}
-
-impl From<IpcError> for Error {
-    fn from(error: IpcError) -> Self {
-        Self::AuthError(format!("{:?}", error))
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Error::*;
-
-        let (error_type, error_msg) = match self {
-            AuthError(info) => ("AuthError", info),
-            AuthdClientError(info) => ("AuthdClientError", info),
-            AuthdError(info) => ("AuthdError", info),
-            AuthdAlreadyStarted(info) => ("AuthdAlreadyStarted", info),
-            AuthenticatorError(info) => ("AuthenticatorError", info),
-            ConnectionError(info) => ("ConnectionError", info),
-            NetDataError(info) => ("NetDataError", info),
-            ClientError(info) => ("ClientError", info),
-            ContentNotFound(info) => ("ContentNotFound", info),
-            VersionNotFound(info) => ("VersionNotFound", info),
-            ContentError(info) => ("ContentError", info),
-            EmptyContent(info) => ("EmptyContent", info),
-            AccessDenied(info) => ("AccessDenied", info),
-            EntryNotFound(info) => ("EntryNotFound", info),
-            EntryExists(info) => ("EntryExists", info),
-            InvalidInput(info) => ("InvalidInput", info),
-            InvalidAmount(info) => ("InvalidAmount", info),
-            InvalidXorUrl(info) => ("InvalidXorUrl", info),
-            InvalidMediaType(info) => ("InvalidMediaType", info),
-            NotEnoughBalance(info) => ("NotEnoughBalance", info),
-            FileSystemError(info) => ("FileSystemError", info),
-            Serialisation(info) => ("Serialisation", info),
-        };
-        let description = format!("[Error] {} - {}", error_type, error_msg);
-
-        write!(f, "{}", description)
-    }
-}
-
-#[cfg(test)]
-impl From<Error> for AnyHowError {
-    fn from(error: Error) -> Self {
-        anyhow!("{}", error)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn error_display() {
-        let err = Error::Serialisation("test error".to_string());
-        let s: String = err.into();
-        assert_eq!(s, "[Error] Serialisation - test error");
-    }
+    /// FileSystemError
+    #[error("FileSystemError: {0}")]
+    FileSystemError(String),
 }

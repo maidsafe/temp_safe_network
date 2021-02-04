@@ -10,6 +10,7 @@
 #[cfg(feature = "self-update")]
 use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
+use anyhow::{anyhow, bail, Context, Result};
 use envy::from_env;
 use log::info;
 use prettytable::Table;
@@ -17,10 +18,9 @@ use serde::Deserialize;
 use sn_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,
 };
-use std::convert::From;
-use std::fs::File;
 #[cfg(feature = "self-update")]
 use std::path::PathBuf;
+use std::{convert::From, fs::File};
 
 const AUTH_REQS_NOTIFS_ENDPOINT: &str = "https://localhost:33001";
 #[cfg(feature = "self-update")]
@@ -45,39 +45,39 @@ struct SafeSeed {
 }
 
 #[cfg(not(feature = "self-update"))]
-pub fn authd_install(_authd_path: Option<String>) -> Result<(), String> {
-    Err("Self updates are disabled".to_string())
+pub fn authd_install(_authd_path: Option<String>) -> Result<()> {
+    anyhow!("Self updates are disabled")
 }
 
 #[cfg(feature = "self-update")]
-pub fn authd_install(authd_path: Option<String>) -> Result<(), String> {
+pub fn authd_install(authd_path: Option<String>) -> Result<()> {
     let target_path = get_authd_bin_path(authd_path)?;
     download_from_s3_and_install_bin(target_path, "sn-api", "sn_authd", SN_AUTHD_EXECUTABLE, None)?;
     Ok(())
 }
 
-pub fn authd_update(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+pub fn authd_update(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<()> {
     sn_authd
         .update(authd_path.as_deref())
-        .map_err(|err| err.to_string())
+        .context("Failed to update authd")
 }
 
-pub fn authd_start(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+pub fn authd_start(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<()> {
     sn_authd
         .start(authd_path.as_deref())
-        .map_err(|err| err.to_string())
+        .context("Failed to start authd")
 }
 
-pub fn authd_stop(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+pub fn authd_stop(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<()> {
     sn_authd
         .stop(authd_path.as_deref())
-        .map_err(|err| err.to_string())
+        .context("Failed to stop authd")
 }
 
-pub fn authd_restart(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<(), String> {
+pub fn authd_restart(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<()> {
     sn_authd
         .restart(authd_path.as_deref())
-        .map_err(|err| err.to_string())
+        .context("Failed to restart authd")
 }
 
 pub async fn authd_create(
@@ -86,7 +86,7 @@ pub async fn authd_create(
     config_file_str: Option<String>,
     _sk: Option<String>,
     test_coins: bool,
-) -> Result<(), String> {
+) -> Result<()> {
     let safe_seed = get_safe_seed(config_file_str)?;
 
     if test_coins {
@@ -108,7 +108,9 @@ pub async fn authd_create(
         // println!("Secret Key = {}", sk);
         Ok(())
     } else {
-        Err("Please use --test-coins option, other options not implemented yet.".to_string())
+        Err(anyhow!(
+            "Please use --test-coins option, other options are not implemented yet"
+        ))
         // TODO: support generating a payment proof to be sent to authd, either
         // by using the provided SK to sign the payment request,
         // or by obtaining a signed request from the user for the payment request.
@@ -126,7 +128,7 @@ pub async fn authd_create(
 pub async fn authd_unlock(
     sn_authd: &mut SafeAuthdClient,
     config_file_str: Option<String>,
-) -> Result<(), String> {
+) -> Result<()> {
     let safe_seed = get_safe_seed(config_file_str)?;
     println!("Sending action request to authd to unlock the Safe...");
     sn_authd
@@ -136,14 +138,14 @@ pub async fn authd_unlock(
     Ok(())
 }
 
-pub async fn authd_lock(sn_authd: &mut SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_lock(sn_authd: &mut SafeAuthdClient) -> Result<()> {
     println!("Sending action request to authd to lock the Safe...");
     sn_authd.lock().await?;
     println!("Safe locked successfully");
     Ok(())
 }
 
-pub async fn authd_status(sn_authd: &mut SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_status(sn_authd: &mut SafeAuthdClient) -> Result<()> {
     println!("Sending request to authd to obtain a status report...");
     let status_report = sn_authd.status().await?;
     pretty_print_status_report(status_report);
@@ -151,7 +153,7 @@ pub async fn authd_status(sn_authd: &mut SafeAuthdClient) -> Result<(), String> 
     Ok(())
 }
 
-pub async fn authd_apps(sn_authd: &SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_apps(sn_authd: &SafeAuthdClient) -> Result<()> {
     println!("Requesting list of authorised apps from authd...");
     let authed_apps = sn_authd.authed_apps().await?;
     pretty_print_authed_apps(authed_apps);
@@ -159,28 +161,28 @@ pub async fn authd_apps(sn_authd: &SafeAuthdClient) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn authd_revoke(sn_authd: &SafeAuthdClient, app_id: String) -> Result<(), String> {
+pub async fn authd_revoke(sn_authd: &SafeAuthdClient, app_id: String) -> Result<()> {
     println!("Sending application revocation request to authd...");
     sn_authd.revoke_app(&app_id).await?;
     println!("Application revoked successfully");
     Ok(())
 }
 
-pub async fn authd_auth_reqs(sn_authd: &SafeAuthdClient) -> Result<(), String> {
+pub async fn authd_auth_reqs(sn_authd: &SafeAuthdClient) -> Result<()> {
     println!("Requesting list of pending authorisation requests from authd...");
     let auth_reqs = sn_authd.auth_reqs().await?;
     pretty_print_auth_reqs(auth_reqs, Some("Pending Authorisation requests"));
     Ok(())
 }
 
-pub async fn authd_allow(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
+pub async fn authd_allow(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<()> {
     println!("Sending request to authd to allow an authorisation request...");
     sn_authd.allow(req_id).await?;
     println!("Authorisation request was allowed");
     Ok(())
 }
 
-pub async fn authd_deny(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<(), String> {
+pub async fn authd_deny(sn_authd: &SafeAuthdClient, req_id: u32) -> Result<()> {
     println!("Sending request to authd to deny an authorisation request...");
     sn_authd.deny(req_id).await?;
     println!("Authorisation request was denied successfully");
@@ -191,7 +193,7 @@ pub async fn authd_subscribe(
     sn_authd: &mut SafeAuthdClient,
     notifs_endpoint: Option<String>,
     auth_allow_prompt: &'static AuthAllowPrompt,
-) -> Result<(), String> {
+) -> Result<()> {
     println!("Sending request to subscribe...");
     let endpoint = notifs_endpoint.unwrap_or_else(|| AUTH_REQS_NOTIFS_ENDPOINT.to_string());
     sn_authd
@@ -205,7 +207,7 @@ pub async fn authd_subscribe(
 pub async fn authd_subscribe_url(
     sn_authd: &SafeAuthdClient,
     notifs_endpoint: String,
-) -> Result<(), String> {
+) -> Result<()> {
     println!("Sending request to subscribe URL...");
     sn_authd.subscribe_url(&notifs_endpoint).await?;
     println!("URL subscribed successfully");
@@ -215,7 +217,7 @@ pub async fn authd_subscribe_url(
 pub async fn authd_unsubscribe(
     sn_authd: &mut SafeAuthdClient,
     notifs_endpoint: Option<String>,
-) -> Result<(), String> {
+) -> Result<()> {
     println!("Sending request to unsubscribe...");
     let endpoint = notifs_endpoint.unwrap_or_else(|| AUTH_REQS_NOTIFS_ENDPOINT.to_string());
     sn_authd.unsubscribe(&endpoint).await?;
@@ -290,48 +292,34 @@ fn boolean_to_string(boolean: bool) -> &'static str {
     }
 }
 
-fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String, String> {
+fn prompt_sensitive(arg: Option<String>, msg: &str) -> Result<String> {
     if let Some(str) = arg {
         Ok(str)
     } else {
-        rpassword::read_password_from_tty(Some(msg))
-            .map_err(|err| format!("Failed reading string from input: {}", err))
+        rpassword::read_password_from_tty(Some(msg)).context("Failed reading string from input")
     }
 }
 
-fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
-    let environment_details = from_env::<Environment>().map_err(|err| {
-        format!(
-            "Failed when attempting to read Safe seed from env vars: {}",
-            err
-        )
-    })?;
+fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed> {
+    let environment_details = from_env::<Environment>()
+        .context("Failed when attempting to read Safe seed from env vars")?;
 
     // try to get SafeSeed from file specified by --config flag
     let (the_passphrase, the_password) = if let Some(config_file_str) = config_file {
-        let file = match File::open(&config_file_str) {
-            Ok(file) => file,
-            Err(error) => {
-                return Err(format!("Error reading config file: {}", error));
-            }
-        };
+        let file = File::open(&config_file_str).context("Error reading config file")?;
 
-        let json: SafeSeed = serde_json::from_reader(file).map_err(|err| {
-            format!(
-                "Format of the config file is not valid and couldn't be parsed: {}",
-                err
-            )
-        })?;
+        let json: SafeSeed = serde_json::from_reader(file)
+            .context("Format of the config file is not valid and couldn't be parsed")?;
 
         eprintln!("Warning! Storing your passphrase/password in plaintext in a config file is not secure." );
 
         if json.passphrase.is_empty() {
-            return Err("The config files's passphrase field cannot be empty".to_string());
+            bail!("The config files's passphrase field cannot be empty");
         }
         let the_passphrase = json.passphrase;
 
         if json.password.is_empty() {
-            return Err("The config files's password field cannot be empty".to_string());
+            bail!("The config files's password field cannot be empty");
         }
         let the_password = json.password;
 
@@ -353,7 +341,7 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
         }
 
         if the_passphrase.is_empty() ^ the_password.is_empty() {
-            return Err("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for creating/unlocking a Safe.".to_string());
+            bail!("Both the passphrase (SAFE_AUTH_PASSPHRASE) and password (SAFE_AUTH_PASSWORD) environment variables must be set for creating/unlocking a Safe");
         }
 
         // try to prompt the user to enter the SafeSeed
@@ -361,18 +349,16 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
         if the_passphrase.is_empty() || the_password.is_empty() {
             // Prompt the user for the Safe's credentials
             the_passphrase = prompt_sensitive(None, "Passphrase: ")
-                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+                .context("Failed reading 'passphrase' string from input")?;
             the_password = prompt_sensitive(None, "Password: ")
-                .map_err(|err| format!("Failed reading 'passphrase' string from input: {}", err))?;
+                .context("Failed reading 'passphrase' string from input")?;
         }
 
         (the_passphrase, the_password)
     };
 
     if the_passphrase.is_empty() || the_password.is_empty() {
-        return Err(String::from(
-            "Neither the passphrase nor password can be empty.",
-        ));
+        bail!("Neither the passphrase nor password can be empty");
     }
 
     let details = SafeSeed {
@@ -384,8 +370,7 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed, String> {
 }
 
 #[cfg(feature = "self-update")]
-#[inline]
-fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
+fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf> {
     match authd_path {
         Some(p) => Ok(PathBuf::from(p)),
         None => {
@@ -394,7 +379,7 @@ fn get_authd_bin_path(authd_path: Option<String>) -> Result<PathBuf, String> {
                 Ok(PathBuf::from(authd_path))
             } else {
                 let mut path = dirs_next::home_dir()
-                    .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+                    .ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
 
                 path.push(".safe");
                 path.push("authd");

@@ -339,7 +339,7 @@ fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
-    use anyhow::{anyhow, Result};
+    use anyhow::{anyhow, bail, Result};
 
     #[tokio::test]
     async fn test_nrs_map_container_create() -> Result<()> {
@@ -452,13 +452,14 @@ mod tests {
                     "NRS map add was unexpectedly successful".to_string(),
                 ))
             }
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidInput(format!(
+            Err(Error::InvalidInput(msg)) => assert_eq!(
+                msg,
+                format!(
                     "The NRS name/subname URL cannot contain a version: {}",
                     versioned_sitename
-                ))
+                )
             ),
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         match safe
@@ -468,16 +469,20 @@ mod tests {
             Ok(_) => Err(anyhow!(
                 "NRS map remove was unexpectedly successful".to_string(),
             )),
-            Err(err) => {
+            Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
-                    err,
-                    Error::InvalidInput(format!(
+                    msg,
+                    format!(
                         "The NRS name/subname URL cannot contain a version: {}",
                         versioned_sitename
-                    ))
+                    )
                 );
                 Ok(())
             }
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
         }
     }
 

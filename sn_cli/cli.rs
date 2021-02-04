@@ -7,9 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use log::debug;
-use structopt::StructOpt;
-
 use crate::{
     operations::safe_net::connect,
     shell,
@@ -31,7 +28,10 @@ use crate::{
         OutputFmt, SubCommands,
     },
 };
+use anyhow::{anyhow, Result};
+use log::debug;
 use sn_api::{xorurl::XorUrlBase, Safe};
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 /// Interact with the Safe Network
@@ -60,16 +60,16 @@ pub struct CmdArgs {
     pub endpoint: Option<String>,
 }
 
-pub async fn run() -> Result<(), String> {
+pub async fn run() -> Result<()> {
     let mut safe = Safe::default();
     run_with(None, &mut safe).await
 }
 
-pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), String> {
+pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> {
     // Let's first get all the arguments passed in, either as function's args, or CLI args
     let args = match cmd_args {
         None => CmdArgs::from_args(),
-        Some(cmd_args) => CmdArgs::from_iter_safe(cmd_args).map_err(|err| err.to_string())?,
+        Some(cmd_args) => CmdArgs::from_iter_safe(cmd_args)?,
     };
 
     let prev_base = safe.xorurl_base;
@@ -111,11 +111,11 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
             let handler = std::thread::spawn(|| {
-                update_commander().map_err(|err| format!("Error performing update: {}", err))
+                update_commander().map_err(|err| anyhow!("Error performing update: {}", err))
             });
             handler
                 .join()
-                .map_err(|err| format!("Failed to run self update: {:?}", err))?
+                .map_err(|err| anyhow!("Failed to run self update: {:?}", err))?
         }
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
         Some(SubCommands::Xorurl {
@@ -139,7 +139,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<(), 
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, safe).await,
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, safe).await,
                 SubCommands::Seq(cmd) => seq_commander(cmd, output_fmt, safe).await,
-                _ => Err("Unknown safe subcommand".to_string()),
+                _ => Err(anyhow!("Unknown safe subcommand")),
             }
         }
         None => shell::shell_run(), // then enter in interactive shell

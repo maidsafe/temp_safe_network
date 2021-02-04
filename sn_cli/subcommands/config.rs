@@ -11,6 +11,7 @@ use crate::operations::config::{
     add_network_to_config, config_file_path, print_networks_settings, remove_network_from_config,
     write_config_settings, ConfigSettings,
 };
+use anyhow::Result;
 use log::debug;
 use structopt::StructOpt;
 
@@ -59,7 +60,7 @@ pub enum SettingRemoveCmd {
     // },
 }
 
-pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<(), String> {
+pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
     match cmd {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,

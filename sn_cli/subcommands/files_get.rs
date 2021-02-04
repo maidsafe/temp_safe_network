@@ -11,6 +11,7 @@ use super::{
     helpers::{div_or, pluralize, prompt_user},
     OutputFmt,
 };
+use anyhow::{anyhow, bail, Context, Result};
 use console::Term;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, TickTimeLimit};
 use log::{debug, info, trace, warn};
@@ -19,13 +20,14 @@ use sn_api::{
     fetch::SafeData,
     files::{FilesMap, GetAttr, ProcessedFiles},
     xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
-    Error, Result as ApiResult, Safe,
+    Result as ApiResult, Safe,
 };
-use std::fs;
-use std::io::BufWriter;
-use std::io::Write;
-use std::path::Path;
-use std::time::Duration;
+use std::{
+    fs,
+    io::{BufWriter, Write},
+    path::Path,
+    time::Duration,
+};
 
 /// # Retrieval/write status for current file and overall transfer.
 #[derive(Debug, Clone)]
@@ -128,7 +130,7 @@ pub async fn process_get_command(
     progress: ProgressIndicator,
     _preserve: bool,
     _output_fmt: OutputFmt,
-) -> Result<(), String> {
+) -> Result<()> {
     let str_path = dest.unwrap_or_else(|| ".".to_string());
     let path = Path::new(&str_path);
 
@@ -171,9 +173,8 @@ pub async fn process_get_command(
                             filepath.display(),
                             status.path_local.display()
                         );
-                        let err = Error::FileSystemError(msg.clone());
 
-                        warn!("Skipping file \"{}\". {}", status.path_local.display(), err);
+                        warn!("Skipping file \"{}\". {}", status.path_local.display(), msg);
                         if isatty::stderr_isatty() {
                             eprintln!("Warning: {}", msg);
                         }
@@ -216,10 +217,10 @@ pub async fn process_get_command(
         .await?;
 
     if processed_files.is_empty() && preserves == 0 {
-        return Err("Path not found".to_string());
-    } else {
-        print_results(&processed_files, path, overwrites, preserves);
+        bail!("Path '{}' not found", path.display());
     }
+
+    print_results(&processed_files, path, overwrites, preserves);
 
     Ok(())
 }
@@ -386,16 +387,9 @@ fn prompt_yes_no(prompt_msg: &str, default: &str) -> bool {
     let yes_no = "[Y/n]";
     let msg = format!("{}{}: ", prompt_msg, yes_no);
     loop {
-        let result = prompt_user(&msg, "");
-        let choice = match result {
+        let choice = match prompt_user(&msg, "") {
             Ok(input) => input.to_uppercase(),
-            Err(input) => {
-                if input.is_empty() {
-                    default.to_string()
-                } else {
-                    input
-                }
-            }
+            Err(_) => default.to_string(),
         };
         match choice.as_str() {
             "Y" => {
@@ -422,7 +416,7 @@ async fn files_container_get_files(
     url: &str,
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> Result<(u64, ProcessedFiles), String> {
+) -> Result<(u64, ProcessedFiles)> {
     debug!("Getting files in container {:?}", url);
     let (version, files_map) = match safe.fetch(url, None).await? {
         SafeData::FilesContainer {
@@ -435,13 +429,12 @@ async fn files_container_get_files(
                 (0, files_map)
             } else {
                 // TODO: support it even if no stats are shown of the file being downloaded
-                return Err(
-                    "You can target files only by providing a FilesContainer with the file's path."
-                        .to_string(),
+                bail!(
+                    "You can target files only by providing a FilesContainer with the file's path"
                 );
             }
         }
-        _other_type => return Err("Make sure the URL targets a FilesContainer.".to_string()),
+        _other_type => bail!("Make sure the URL targets a FilesContainer"),
     };
 
     // Todo: This test will need to be modified once we support empty directories.
@@ -487,47 +480,38 @@ testdata   | file      | /tmp/newname              | Y           | dir       | /
 testdata   | file      | /tmp/newname              | Y           | file      | /tmp/newname
 testdata   | file      | /tmp/newname              | N           | --        | /tmp/newname
 */
-#[allow(clippy::collapsible_if)]
-fn find_root_path(
-    destpath: &str,
-    sourcepath: &str,
-    source_is_single_file: bool,
-) -> ApiResult<String> {
+fn find_root_path(destpath: &str, sourcepath: &str, source_is_single_file: bool) -> Result<String> {
     // Note: The if+else clauses could be combined to be more
     // compact, but I am leaving it in expanded form to be more easily
     // understood in context of the path matrix in the fn comment.
 
     let mut root = Path::new(destpath).to_path_buf();
-    if source_is_single_file {
-        if root.exists() {
-            if root.is_dir() {
-                let p = Path::new(sourcepath);
-                if let Some(fname) = p.file_name() {
-                    root.push(fname);
-                }
+    if source_is_single_file && root.exists() {
+        if root.is_dir() {
+            let p = Path::new(sourcepath);
+            if let Some(fname) = p.file_name() {
+                root.push(fname);
             }
         }
-    } else {
-        if root.exists() {
-            if root.is_dir() {
-                let p = Path::new(sourcepath);
-                if let Some(fname) = p.file_name() {
-                    root.push(fname);
-                }
-            } else {
-                let msg = format!(
-                    "cannot overwrite non-directory '{}' with a directory",
-                    destpath
-                );
-                return Err(Error::FileSystemError(msg));
+    } else if root.exists() {
+        if root.is_dir() {
+            let p = Path::new(sourcepath);
+            if let Some(fname) = p.file_name() {
+                root.push(fname);
             }
+        } else {
+            let msg = format!(
+                "cannot overwrite non-directory '{}' with a directory",
+                destpath
+            );
+            bail!(msg);
         }
     }
     Ok(root.display().to_string())
 }
 
 // Verifies that parent directory of a given path exists.
-fn ensure_parent_dir_exists(path: &str) -> ApiResult<()> {
+fn ensure_parent_dir_exists(path: &str) -> Result<()> {
     let p = Path::new(path);
 
     // a relative path such as '.' or 'somedir' or 'somefile'
@@ -538,19 +522,17 @@ fn ensure_parent_dir_exists(path: &str) -> ApiResult<()> {
 
     if let Some(pa) = p.parent() {
         if pa.is_dir() {
-            return Ok(());
+            Ok(())
         } else {
-            return Err(Error::FileSystemError(format!(
-                "No such directory: \"{}\"",
-                pa.display()
-            )));
+            bail!("No such directory: \"{}\"", pa.display());
         }
+    } else {
+        // This should never happen.
+        Err(anyhow!(
+            "Parent directory not found for: \"{}\"",
+            p.display()
+        ))
     }
-    // This should never happen.
-    Err(Error::FileSystemError(format!(
-        "Parent directory not found for: \"{}\"",
-        p.display()
-    )))
 }
 
 /// # Downloads files within a FilesMap and writes them to disk, preserving paths.
@@ -561,7 +543,7 @@ async fn files_map_get_files(
     files_map: &FilesMap,
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
-) -> Result<ProcessedFiles, String> {
+) -> Result<ProcessedFiles> {
     trace!("Fetching files from FilesMap");
 
     let dpath = Path::new(dirpath);
@@ -589,7 +571,7 @@ async fn files_map_get_files(
         let size_str = details.getattr("size")?;
         let size: u64 = size_str
             .parse()
-            .map_err(|err| format!("Invalid file size: {} for {}.  {:?}", size_str, path, err))?;
+            .context(format!("Invalid file size: {} for {}", size_str, path))?;
 
         // Setup status to notify our caller of progress in callback.
         let mut status = FilesGetStatus {
@@ -750,7 +732,7 @@ async fn download_file_from_net(
     size: u64,
     //Path, file_size, file_bytes_written, bytes_written.  return false to cancel download.
     mut callback: impl FnMut(&Path, u64, u64, u64) -> bool,
-) -> ApiResult<u64> {
+) -> Result<u64> {
     debug!("downloading file {} to {}", xorurl, path.display());
 
     // chunk_size based on https://stackoverflow.com/questions/8803515/optimal-buffer-size-for-write2
@@ -802,82 +784,62 @@ async fn download_file_from_net(
 }
 
 // syncs file to filesystem.
-fn file_sync_all(f: &fs::File, path: &Path) -> ApiResult<()> {
-    f.sync_all().map_err(|err| {
-        Error::FileSystemError(format!(
-            "Error syncing file: \"{}\" {:?}",
-            path.display(),
-            err
-        ))
-    })
+fn file_sync_all(f: &fs::File, path: &Path) -> Result<()> {
+    f.sync_all()
+        .with_context(|| format!("Error syncing file: \"{}\"", path.display(),))
 }
 
 // causes BufWriter to flush() file.
-fn bufwriter_into_inner<W: Write>(w: BufWriter<W>, path: &Path) -> ApiResult<W> {
-    w.into_inner().map_err(|err| {
-        Error::FileSystemError(format!(
-            "Error flushing file: \"{}\" {}",
+fn bufwriter_into_inner<W: Write>(w: BufWriter<W>, path: &Path) -> Result<W> {
+    match w.into_inner() {
+        Ok(inner) => Ok(inner),
+        Err(err) => Err(anyhow!(
+            "Error flushing file \"{}\": {}",
             path.display(),
-            err.to_string()
-        ))
-    })
+            err
+        )),
+    }
 }
 
 // Writes data to a file/stream.
-fn stream_write(writer: &mut dyn Write, data: &[u8], path: &Path) -> ApiResult<usize> {
-    writer.write(&data).map_err(|err| {
-        Error::FileSystemError(format!(
-            "Error writing to file: \"{}\" {:?}",
-            path.display(),
-            err
-        ))
-    })
+fn stream_write(writer: &mut dyn Write, data: &[u8], path: &Path) -> Result<usize> {
+    writer
+        .write(&data)
+        .with_context(|| format!("Error writing to file: \"{}\"", path.display(),))
 }
 
 // Creates a file, ready for writing.
-fn file_create(path: &Path) -> ApiResult<fs::File> {
-    fs::File::create(path).map_err(|err| {
-        Error::FileSystemError(format!(
-            "Couldn't create file: \"{}\" {:?}",
-            path.display(),
-            err
-        ))
-    })
+fn file_create(path: &Path) -> Result<fs::File> {
+    fs::File::create(path).with_context(|| format!("Couldn't create file: \"{}\"", path.display(),))
 }
 
 // create all directories in path if possible.
-fn create_dir_all(dir_path: &Path) -> ApiResult<()> {
+fn create_dir_all(dir_path: &Path) -> Result<()> {
     if dir_path.is_file() {
-        return Err(Error::FileSystemError(format!(
-            "cannot overwrite non-directory '{}' with a directory.",
+        bail!(
+            "cannot overwrite non-directory '{}' with a directory",
             dir_path.display()
-        )));
+        );
     }
-    fs::create_dir_all(&dir_path).map_err(|err| {
-        Error::FileSystemError(format!(
-            "Couldn't create path: \"{}\" {:?}",
-            dir_path.display(),
-            err
-        ))
-    })
+    fs::create_dir_all(&dir_path)
+        .with_context(|| format!("Couldn't create path: \"{}\"", dir_path.display(),))
 }
 
 /// # Get Private Blob
 /// Get private immutable data blobs from the network.
-///
-async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> ApiResult<Vec<u8>> {
+async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Result<Vec<u8>> {
     unimplemented!();
 }
 
 /// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
-///
-pub async fn files_get_blob(mut safe: Safe, url: &str, range: Range) -> ApiResult<Vec<u8>> {
+pub async fn files_get_blob(mut safe: Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match XorUrlEncoder::from_url(&url)?.data_type() {
-        SafeDataType::PublicBlob => safe.files_get_public_blob(&url, range).await,
+        SafeDataType::PublicBlob => {
+            let pub_blob = safe.files_get_public_blob(&url, range).await?;
+            Ok(pub_blob)
+        }
         SafeDataType::PrivateBlob => files_get_private_blob(&safe, &url, range).await,
-        _ => Err(Error::InvalidInput(
-            "URL target is not immutable data.".to_string(),
-        )),
+        _ => Err(anyhow!("URL target is not immutable data")),
     }
 }

@@ -2183,16 +2183,20 @@ mod tests {
             .await
         {
             Ok(_) => Err(anyhow!("Sync was unexpectedly successful".to_string(),)),
-            Err(err) => {
+            Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
-                    err,
-                    Error::InvalidInput(format!(
+                    msg,
+                    format!(
                         "The target URL cannot contain a version: {}",
                         versioned_xorurl
-                    ))
+                    )
                 );
                 Ok(())
             }
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
         }
     }
 
@@ -2280,15 +2284,17 @@ mod tests {
             .await
         {
             Ok(_) => Err(anyhow!("Sync was unexpectedly successful".to_string(),)),
-            Err(err) => {
+            Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
-                    err,
-                    Error::InvalidInput(
-                        "'delete' is not allowed if 'recursive' is not set".to_string()
-                    )
+                    msg,
+                    "'delete' is not allowed if 'recursive' is not set".to_string()
                 );
                 Ok(())
             }
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
         }
     }
 
@@ -2310,16 +2316,20 @@ mod tests {
             Ok(_) => Err(anyhow!(
                 "NRS create was unexpectedly successful".to_string(),
             )),
-            Err(err) => {
+            Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
-                err,
-                Error::InvalidInput(format!(
+                msg,
+                format!(
                     "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a version: \"{}\"",
                     unversioned_link
-                ))
+                )
             );
                 Ok(())
             }
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
         }
     }
 
@@ -2343,16 +2353,18 @@ mod tests {
             .await
         {
             Ok(_) => Err(anyhow!("Sync was unexpectedly successful".to_string(),)),
-            Err(err) => {
+            Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
-                    err,
-                    Error::InvalidInput(
-                        "'update-nrs' is not allowed since the URL provided is not an NRS URL"
-                            .to_string()
-                    )
+                    msg,
+                    "'update-nrs' is not allowed since the URL provided is not an NRS URL"
+                        .to_string()
                 );
                 Ok(())
             }
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
         }
     }
 

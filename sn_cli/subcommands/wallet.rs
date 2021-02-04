@@ -7,15 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use structopt::StructOpt;
-
 use super::{
     helpers::{get_from_arg_or_stdin, get_secret_key, serialise_output},
     keys::{create_new_key, print_new_key_output},
     OutputFmt,
 };
+use anyhow::{anyhow, Result};
 use log::debug;
 use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, Safe, SecretKey};
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
@@ -89,7 +89,7 @@ pub async fn wallet_commander(
     cmd: WalletSubCommands,
     output_fmt: OutputFmt,
     safe: &mut Safe,
-) -> Result<(), String> {
+) -> Result<()> {
     match cmd {
         WalletSubCommands::Create {
             preload,
@@ -124,10 +124,8 @@ pub async fn wallet_commander(
                             let unwrapped_key_pair = key_generated_output
                                 .1
                                 .clone()
-                                .ok_or("Failed to read the generated key pair")?;
-                            let sk = unwrapped_key_pair
-                                .secret_key()
-                                .map_err(|e| format!("{:?}", e))?;
+                                .ok_or_else(|| anyhow!("Failed to read the generated key pair"))?;
+                            let sk = unwrapped_key_pair.secret_key()?;
 
                             sk_to_hex(sk)
                         }

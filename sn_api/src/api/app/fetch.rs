@@ -958,22 +958,23 @@ mod tests {
             Ok(c) => {
                 bail!("Unxpected fetched content: {:?}", c)
             }
-            Err(msg) => assert_eq!(
-                msg,
-                Error::ContentError("Data type 'PrivateBlob' not supported yet".to_string())
-            ),
+            Err(Error::ContentError(msg)) => {
+                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string())
+            }
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         match safe.inspect(&xorurl).await {
-            Ok(c) => {
-                bail!("Unxpected fetched content: {:?}", c)
+            Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
+            Err(Error::ContentError(msg)) => {
+                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string());
+                Ok(())
             }
-            Err(msg) => assert_eq!(
-                msg,
-                Error::ContentError("Data type 'PrivateBlob' not supported yet".to_string())
-            ),
-        };
-        Ok(())
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
+        }
     }
 
     #[tokio::test]
@@ -999,22 +1000,23 @@ mod tests {
             Ok(c) => {
                 bail!("Unxpected fetched content: {:?}", c)
             }
-            Err(msg) => assert_eq!(
-                msg,
-                Error::ContentError("Data type 'PrivateBlob' not supported yet".to_string())
-            ),
+            Err(Error::ContentError(msg)) => {
+                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string())
+            }
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         match safe.inspect(&xorurl).await {
-            Ok(c) => {
-                bail!("Unxpected fetched content: {:?}", c)
+            Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
+            Err(Error::ContentError(msg)) => {
+                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string());
+                Ok(())
             }
-            Err(msg) => assert_eq!(
-                msg,
-                Error::ContentError("Data type 'PrivateBlob' not supported yet".to_string())
-            ),
-        };
-        Ok(())
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
+        }
     }
 
     #[tokio::test]
@@ -1030,13 +1032,11 @@ mod tests {
             Ok(c) => {
                 bail!("Unxpected fetched content: {:?}", c)
             }
-            Err(msg) => assert_eq!(
+            Err(Error::ContentError(msg)) => assert_eq!(
                 msg,
-                Error::ContentError(format!(
-                    "Cannot get relative path of Immutable Data \"{}\"",
-                    path
-                ))
+                format!("Cannot get relative path of Immutable Data \"{}\"", path)
             ),
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         // test the same but a file with some media type
@@ -1048,17 +1048,18 @@ mod tests {
         xorurl_encoder.set_path("/some_relative_filepath");
         let url_with_path = xorurl_encoder.to_string();
         match safe.fetch(&url_with_path, None).await {
-            Ok(c) => {
-                bail!("Unxpected fetched content: {:?}", c)
+            Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
+            Err(Error::ContentError(msg)) => {
+                assert_eq!(
+                    msg,
+                    format!("Cannot get relative path of Immutable Data \"{}\"", path)
+                );
+                Ok(())
             }
-            Err(msg) => assert_eq!(
-                msg,
-                Error::ContentError(format!(
-                    "Cannot get relative path of Immutable Data \"{}\"",
-                    path
-                ))
-            ),
-        };
-        Ok(())
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
+        }
     }
 }

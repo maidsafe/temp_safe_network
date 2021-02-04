@@ -13,6 +13,7 @@ use super::{
     },
     OutputFmt,
 };
+use anyhow::Result;
 use sn_api::Safe;
 use structopt::StructOpt;
 
@@ -51,7 +52,7 @@ pub async fn seq_commander(
     cmd: SeqSubCommands,
     output_fmt: OutputFmt,
     safe: &mut Safe,
-) -> Result<(), String> {
+) -> Result<()> {
     match cmd {
         SeqSubCommands::Store {
             data,

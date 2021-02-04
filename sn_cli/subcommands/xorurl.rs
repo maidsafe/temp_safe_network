@@ -12,6 +12,7 @@ use super::{
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
+use anyhow::Result;
 use sn_api::{xorurl::SafeUrl, Safe};
 use structopt::StructOpt;
 
@@ -33,7 +34,7 @@ pub async fn xorurl_commander(
     follow_symlinks: bool,
     output_fmt: OutputFmt,
     safe: &mut Safe,
-) -> Result<(), String> {
+) -> Result<()> {
     match cmd {
         Some(XorurlSubCommands::Decode { xorurl }) => {
             let url = get_from_arg_or_stdin(xorurl, Some("...awaiting XOR-URL from stdin"))?;

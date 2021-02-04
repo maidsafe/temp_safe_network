@@ -15,13 +15,14 @@ use crate::{
         SubCommands,
     },
 };
+use anyhow::Result;
 use async_std::task;
 use shrust::{Shell, ShellIO};
 use sn_api::{AuthReq, Safe, SafeAuthdClient};
 use std::io::{stdout, Write};
 use structopt::StructOpt;
 
-pub fn shell_run() -> Result<(), String> {
+pub fn shell_run() -> Result<()> {
     let safe = Safe::default();
     let sn_authd_client = SafeAuthdClient::new(None);
     let mut shell = Shell::new((safe, sn_authd_client));

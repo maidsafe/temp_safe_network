@@ -9,9 +9,9 @@
 
 #[cfg(feature = "self-update")]
 use super::helpers::download_from_s3_and_install_bin;
+use anyhow::{anyhow, bail, Context, Result};
 use log::debug;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_launch_tool::{join_with, run_with};
 use std::{
     collections::HashMap,
@@ -34,7 +34,7 @@ fn run_safe_cmd(
     envs: Option<HashMap<String, String>>,
     ignore_errors: bool,
     verbosity: u8,
-) -> Result<(), String> {
+) -> Result<()> {
     let env: HashMap<String, String> = envs.unwrap_or_else(HashMap::default);
 
     let msg = format!("Running 'safe' with args {:?} ...", args);
@@ -53,18 +53,18 @@ fn run_safe_cmd(
             Stdio::inherit()
         })
         .spawn()
-        .map_err(|err| format!("Failed to run 'safe' with args '{:?}': {}", args, err))?;
+        .with_context(|| format!("Failed to run 'safe' with args '{:?}'", args))?;
 
     Ok(())
 }
 
 #[cfg(not(feature = "self-update"))]
-pub fn node_install(_vault_path: Option<PathBuf>) -> Result<(), String> {
-    Err("Self updates are disabled".to_string())
+pub fn node_install(_vault_path: Option<PathBuf>) -> Result<()> {
+    anyhow!("Self updates are disabled")
 }
 
 #[cfg(feature = "self-update")]
-pub fn node_install(node_path: Option<PathBuf>) -> Result<(), String> {
+pub fn node_install(node_path: Option<PathBuf>) -> Result<()> {
     let target_path = get_node_bin_path(node_path)?;
     let _ = download_from_s3_and_install_bin(
         target_path,
@@ -88,7 +88,7 @@ pub fn node_run(
     num_of_nodes: &str,
     ip: Option<String>,
     test: bool,
-) -> Result<(), String> {
+) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
     let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
@@ -97,12 +97,8 @@ pub fn node_run(
     let nodes_dir = node_path.join(nodes_dir);
     if !nodes_dir.exists() {
         println!("Creating '{}' folder", nodes_dir.display());
-        create_dir_all(nodes_dir.clone()).map_err(|err| {
-            format!(
-                "Couldn't create target path to store nodes' generated data: {}",
-                err
-            )
-        })?;
+        create_dir_all(nodes_dir.clone())
+            .context("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_nodes_dir = nodes_dir.display().to_string();
     println!("Storing nodes' generated data at {}", arg_nodes_dir);
@@ -145,7 +141,7 @@ pub fn node_run(
 
     // We can now call the tool with the args
     println!("Launching local Safe network...");
-    run_with(Some(&sn_launch_tool_args))?;
+    run_with(Some(&sn_launch_tool_args)).map_err(|err| anyhow!(err))?;
 
     let interval_duration = Duration::from_secs(interval_as_int * 15);
     thread::sleep(interval_duration);
@@ -197,7 +193,7 @@ pub fn node_join(
     node_data_dir: &str,
     verbosity: u8,
     contacts: &str,
-) -> Result<(), String> {
+) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
     let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
@@ -206,12 +202,8 @@ pub fn node_join(
     let node_data_dir = node_path.join(node_data_dir);
     if !node_data_dir.exists() {
         println!("Creating '{}' folder", node_data_dir.display());
-        create_dir_all(node_data_dir.clone()).map_err(|err| {
-            format!(
-                "Couldn't create target path to store nodes' generated data: {}",
-                err
-            )
-        })?;
+        create_dir_all(node_data_dir.clone())
+            .context("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_nodes_dir = node_data_dir.display().to_string();
     println!("Storing nodes' generated data at {}", arg_nodes_dir);
@@ -244,28 +236,28 @@ pub fn node_join(
 
     // We can now call the tool with the args
     println!("Starting a node to join a Safe network...");
-    join_with(Some(&sn_launch_tool_args))?;
+    join_with(Some(&sn_launch_tool_args)).map_err(|err| anyhow!(err))?;
     Ok(())
 }
 
-pub fn node_shutdown(node_path: Option<PathBuf>) -> Result<(), String> {
+pub fn node_shutdown(node_path: Option<PathBuf>) -> Result<()> {
     let node_exec_name = match node_path {
         Some(ref path) => {
             let filepath = path.as_path();
             if filepath.is_file() {
                 match filepath.file_name() {
                     Some(filename) => match filename.to_str() {
-                        Some(name) => Ok(name),
-                        None => Err(format!("Node path provided ({}) contains invalid unicode chars", filepath.display())),
+                        Some(name) => name,
+                        None => bail!("Node path provided ({}) contains invalid unicode chars", filepath.display()),
                     }
-                    None => Err(format!("Node path provided ({}) is invalid as it doens't include the executable filename", filepath.display())),
+                    None => bail!("Node path provided ({}) is invalid as it doens't include the executable filename", filepath.display()),
                 }
             } else {
-                Err(format!("Node path provided ({}) is invalid as it doens't include the executable filename", filepath.display()))
+                bail!("Node path provided ({}) is invalid as it doens't include the executable filename", filepath.display())
             }
         }
-        None => Ok(SN_NODE_EXECUTABLE),
-    }?;
+        None => SN_NODE_EXECUTABLE,
+    };
 
     debug!(
         "Killing all running nodes launched with {}...",
@@ -274,12 +266,12 @@ pub fn node_shutdown(node_path: Option<PathBuf>) -> Result<(), String> {
     kill_nodes(node_exec_name)
 }
 
-fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
+fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
     match node_path {
         Some(p) => Ok(p),
         None => {
             let mut path = dirs_next::home_dir()
-                .ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+                .ok_or_else(|| anyhow!("Failed to obtain user's home path"))?;
 
             path.push(".safe");
             path.push("node");
@@ -289,14 +281,14 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn kill_nodes(exec_name: &str) -> Result<(), String> {
+fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("killall")
         .arg(exec_name)
         .output()
-        .map_err(|err| {
+        .with_context(|| {
             format!(
-                "Error when atempting to stop nodes ({}) processes: {}",
-                exec_name, err
+                "Error when atempting to stop nodes ({}) processes",
+                exec_name
             )
         })?;
 
@@ -307,7 +299,7 @@ fn kill_nodes(exec_name: &str) -> Result<(), String> {
         );
         Ok(())
     } else {
-        Err(format!(
+        Err(anyhow!(
             "Failed to stop nodes ({}) processes: {}",
             exec_name,
             String::from_utf8_lossy(&output.stderr)
@@ -316,14 +308,14 @@ fn kill_nodes(exec_name: &str) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn kill_nodes(exec_name: &str) -> Result<(), String> {
+fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("taskkill")
         .args(&["/F", "/IM", exec_name])
         .output()
-        .map_err(|err| {
+        .with_context(|| {
             format!(
-                "Error when atempting to stop nodes ({}) processes: {}",
-                exec_name, err
+                "Error when atempting to stop nodes ({}) processes",
+                exec_name
             )
         })?;
 
@@ -334,7 +326,7 @@ fn kill_nodes(exec_name: &str) -> Result<(), String> {
         );
         Ok(())
     } else {
-        Err(format!(
+        Err(anyhow!(
             "Failed to stop nodes ({}) processes: {}",
             exec_name,
             String::from_utf8_lossy(&output.stderr)
@@ -342,7 +334,7 @@ fn kill_nodes(exec_name: &str) -> Result<(), String> {
     }
 }
 
-pub fn node_update(node_path: Option<PathBuf>) -> Result<(), String> {
+pub fn node_update(node_path: Option<PathBuf>) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
     let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
@@ -351,19 +343,19 @@ pub fn node_update(node_path: Option<PathBuf>) -> Result<(), String> {
     let child = Command::new(&arg_node_path)
         .args(vec!["--update-only"])
         .spawn()
-        .map_err(|err| format!("Failed to update node at '{}': {}", arg_node_path, err))?;
+        .with_context(|| format!("Failed to update node at '{}'", arg_node_path))?;
 
     let output = child
         .wait_with_output()
-        .map_err(|err| format!("Failed to update node at '{}': {}", arg_node_path, err))?;
+        .with_context(|| format!("Failed to update node at '{}'", arg_node_path))?;
 
     if output.status.success() {
         io::stdout()
             .write_all(&output.stdout)
-            .map_err(|err| format!("Failed to output stdout: {}", err))?;
+            .context("Failed to output stdout")?;
         Ok(())
     } else {
-        Err(format!(
+        Err(anyhow!(
             "Failed when invoking node executable from '{}':\n{}",
             arg_node_path,
             String::from_utf8_lossy(&output.stderr)

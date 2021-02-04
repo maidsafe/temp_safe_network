@@ -11,6 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, notice_dry_run, serialise_output},
     OutputFmt,
 };
+use anyhow::Result;
 use prettytable::{format::FormatBuilder, Table};
 use sn_api::{xorurl::XorUrl, Safe};
 use std::collections::BTreeMap;
@@ -58,7 +59,7 @@ pub async fn nrs_commander(
     output_fmt: OutputFmt,
     dry_run: bool,
     safe: &mut Safe,
-) -> Result<(), String> {
+) -> Result<()> {
     match cmd {
         NrsSubCommands::Create {
             name,

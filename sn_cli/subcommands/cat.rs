@@ -11,6 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output},
     OutputFmt,
 };
+use anyhow::{Context, Result};
 use log::debug;
 use prettytable::Table;
 use sn_api::{fetch::SafeData, Safe};
@@ -26,11 +27,7 @@ pub struct CatCommands {
     hexdump: bool,
 }
 
-pub async fn cat_commander(
-    cmd: CatCommands,
-    output_fmt: OutputFmt,
-    safe: &mut Safe,
-) -> Result<(), String> {
+pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut Safe) -> Result<()> {
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &url);
 
@@ -70,9 +67,9 @@ pub async fn cat_commander(
                 println!("{}", pretty_hex::pretty_hex(data));
             } else {
                 // Render Blob file
-                io::stdout().write_all(data).map_err(|err| {
-                    format!("Failed to print out the content of the file: {}", err)
-                })?
+                io::stdout()
+                    .write_all(data)
+                    .context("Failed to print out the content of the file")?;
             }
         }
         SafeData::Wallet { balances, .. } => {
@@ -115,9 +112,9 @@ pub async fn cat_commander(
                     println!("{}", pretty_hex::pretty_hex(data));
                 } else {
                     // Render Sequence content
-                    io::stdout().write_all(data).map_err(|err| {
-                        format!("Failed to print out the content of the file: {}", err)
-                    })?
+                    io::stdout()
+                        .write_all(data)
+                        .context("Failed to print out the content of the file")?;
                 }
             } else {
                 println!("{}", serialise_output(&(url, data), output_fmt));
@@ -131,9 +128,9 @@ pub async fn cat_commander(
                     println!("{}", pretty_hex::pretty_hex(data));
                 } else {
                     // Render Sequence content
-                    io::stdout().write_all(data).map_err(|err| {
-                        format!("Failed to print out the content of the file: {}", err)
-                    })?
+                    io::stdout()
+                        .write_all(data)
+                        .context("Failed to print out the content of the file")?
                 }
             } else {
                 println!("{}", serialise_output(&(url, data), output_fmt));

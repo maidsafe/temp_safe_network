@@ -12,9 +12,9 @@ mod operations;
 mod shell;
 mod subcommands;
 
+use anyhow::Result;
 use cli::run;
-use log::{debug, error};
-use std::process;
+use log::debug;
 
 #[macro_use]
 extern crate prettytable;
@@ -29,13 +29,10 @@ const APP_NAME: &str = "Safe CLI";
 const APP_VENDOR: &str = "MaidSafe.net Ltd";
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     setup_panic!();
     env_logger::init();
     debug!("Starting Safe CLI...");
 
-    if let Err(e) = run().await {
-        error!("sn_cli error: {}", e);
-        process::exit(1);
-    }
+    run().await
 }

@@ -11,6 +11,7 @@ use crate::operations::config::{
     read_config_settings, read_current_network_conn_info, retrieve_conn_info,
 };
 use crate::operations::node::*;
+use anyhow::{anyhow, Context, Result};
 use log::debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -84,7 +85,7 @@ pub enum NodeSubCommands {
     },
 }
 
-pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
+pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
     match cmd {
         Some(NodeSubCommands::Install { node_path }) => {
             // We run this command in a separate thread to overcome a conflict with
@@ -92,7 +93,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
             let handler = std::thread::spawn(|| node_install(node_path));
             handler
                 .join()
-                .map_err(|err| format!("Failed to run self update: {:?}", err))?
+                .map_err(|err| anyhow!("Failed to run self update: {:?}", err))?
         }
         Some(NodeSubCommands::Join {
             network_name,
@@ -100,9 +101,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
             verbosity,
             hard_coded_contacts,
         }) => {
-            let network_contacts: Result<String, String> = if let Some(contacts) =
-                hard_coded_contacts
-            {
+            let network_contacts: Result<String> = if let Some(contacts) = hard_coded_contacts {
                 let msg = format!("Joining network with contacts {}...", contacts);
                 debug!("{}", msg);
                 println!("{}", msg);
@@ -115,7 +114,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
                     println!("{}", msg);
                     match settings.networks.get(&name) {
                         Some(config_location) => retrieve_conn_info(&name, config_location),
-                        None => Err(format!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name))
+                        None => Err(anyhow!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name))
                     }
                 } else {
                     let (_, contacts) = read_current_network_conn_info()?;
@@ -123,12 +122,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
                 }?;
 
                 let mut contacts_str = std::str::from_utf8(&contacts)
-                    .map_err(|err| {
-                        format!(
-                            "Failed to parse network contact information from the config: {}",
-                            err
-                        )
-                    })?
+                    .context("Failed to parse network contact information from the config")?
                     .to_string();
 
                 contacts_str = contacts_str.replace("\"", "");
@@ -159,6 +153,6 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<(), String> {
         ),
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
         Some(NodeSubCommands::Update { node_path }) => node_update(node_path),
-        None => Err("Missing note subcommand".to_string()),
+        None => Err(anyhow!("Missing node subcommand")),
     }
 }

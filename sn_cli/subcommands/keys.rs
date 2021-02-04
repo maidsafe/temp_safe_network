@@ -12,6 +12,7 @@ use super::{
     OutputFmt,
 };
 use crate::operations::safe_net::connect;
+use anyhow::{bail, Context, Result};
 use log::{debug, warn};
 use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, PublicKey, Safe, SecretKey};
 use structopt::StructOpt;
@@ -65,7 +66,7 @@ pub async fn key_commander(
     cmd: KeysSubCommands,
     output_fmt: OutputFmt,
     safe: &mut Safe,
-) -> Result<(), String> {
+) -> Result<()> {
     match cmd {
         KeysSubCommands::Create {
             preload,
@@ -77,7 +78,7 @@ pub async fn key_commander(
             // TODO: support pk argument
             if test_coins && (pk.is_some() | pay_with.is_some()) {
                 // We don't support these args with --test-coins
-                return Err("When passing '--test-coins' argument only the '--preload' argument can be also provided".to_string());
+                bail!("When passing '--test-coins' argument only the '--preload' argument can be also provided");
             } else if !test_coins {
                 // We need to connect with an authorised app since we are not creating a SafeKey with test-coins
                 connect(safe).await?;
@@ -95,12 +96,9 @@ pub async fn key_commander(
                 Some(keypair) if secret.is_none() => {
                     // we then use the secret from CLI's given credentials
                     println!("Checking balance of CLI's assigned keypair...");
-                    keypair.secret_key().map_err(|err| {
-                        format!(
-                            "Failed to obtain the secret key from app's assigned keypair: {}",
-                            err
-                        )
-                    })?
+                    keypair
+                        .secret_key()
+                        .context("Failed to obtain the secret key from app's assigned keypair")?
                 }
                 Some(_) | None => {
                     // prompt the user for a SK
@@ -155,7 +153,7 @@ pub async fn create_new_key(
     pay_with: Option<String>,
     preload: Option<String>,
     _pk: Option<String>,
-) -> Result<(String, Option<Keypair>, String), String> {
+) -> Result<(String, Option<Keypair>, String)> {
     if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = match preload {
@@ -236,7 +234,7 @@ pub fn print_new_key_output(
     }
 }
 
-pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String), String> {
+pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String)> {
     let pk_hex = match keypair.public_key() {
         PublicKey::Ed25519(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
         PublicKey::Bls(pk) => pk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect(),
@@ -246,7 +244,7 @@ pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String), Str
     let sk_hex = sk_to_hex(
         keypair
             .secret_key()
-            .map_err(|err| format!("Failed to obtain secret key: {}", err))?,
+            .context("Failed to obtain secret key")?,
     );
 
     Ok((pk_hex, sk_hex))

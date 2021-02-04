@@ -13,10 +13,11 @@ pub mod resp;
 
 mod errors;
 
-pub use self::errors::IpcError;
-pub use self::req::{AuthReq, IpcReq};
-pub use self::resp::{AuthGranted, IpcResp};
-
+pub use self::{
+    errors::IpcError,
+    req::{AuthReq, IpcReq},
+    resp::{AuthGranted, IpcResp},
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr, u32};
 

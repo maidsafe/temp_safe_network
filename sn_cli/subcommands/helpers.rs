@@ -9,6 +9,7 @@
 
 use super::OutputFmt;
 use ansi_term::Style;
+use anyhow::{anyhow, bail, Context, Result};
 use log::debug;
 use num_traits::Float;
 use prettytable::{format::FormatBuilder, Table};
@@ -33,9 +34,9 @@ pub fn xorname_to_hex(xorname: &XorName) -> String {
 }
 
 // Converts a hex encoded string to XOR name bytes
-pub fn hex_to_xorname(hex_str: &str) -> Result<XorName, String> {
+pub fn hex_to_xorname(hex_str: &str) -> Result<XorName> {
     if hex_str.len() != XOR_NAME_LEN {
-        Err("Invalid hex encoded XorName string".to_string())
+        bail!("Invalid hex encoded XorName string".to_string())
     } else {
         let mut xorname = XorName::default();
         xorname
@@ -46,12 +47,12 @@ pub fn hex_to_xorname(hex_str: &str) -> Result<XorName, String> {
 }
 
 // Read the argument string from the STDIN if is not an arg provided
-pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Result<String, String> {
+pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Result<String> {
     match arg {
         Some(ref t) if t.is_empty() => {
             let val = get_from_stdin(message)?;
             Ok(String::from_utf8(val).map_err(|err| {
-                format!(
+                anyhow!(
                     "String read from STDIN contains invalid UTF-8 characters: {}",
                     err
                 )
@@ -61,7 +62,7 @@ pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Resu
         None => {
             let val = get_from_stdin(message)?;
             Ok(String::from_utf8(val).map_err(|err| {
-                format!(
+                anyhow!(
                     "String read from STDIN contains invalid UTF-8 characters: {}",
                     err
                 )
@@ -70,11 +71,11 @@ pub fn get_from_arg_or_stdin(arg: Option<String>, message: Option<&str>) -> Resu
     }
 }
 
-pub fn read_stdin_response() -> Result<String, String> {
+pub fn read_stdin_response() -> Result<String> {
     let mut user_input = String::new();
     stdin()
         .read_line(&mut user_input)
-        .map_err(|_| "".to_string())?;
+        .with_context(|| "Error occurred when attempting to get input from stdin".to_string())?;
     if let Some('\n') = user_input.chars().next_back() {
         user_input.pop();
     }
@@ -85,7 +86,7 @@ pub fn read_stdin_response() -> Result<String, String> {
 }
 
 // Outputs a message and then reads from stdin
-pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>, String> {
+pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>> {
     let the_message = message.unwrap_or("...awaiting data from STDIN stream...");
     println!("{}", &the_message);
     let mut buffer = Vec::new();
@@ -94,24 +95,24 @@ pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>, String> {
             debug!("Read ({} bytes) from STDIN", size);
             Ok(buffer)
         }
-        Err(_) => Err("Failed to read from STDIN stream".to_string()),
+        Err(_) => bail!("Failed to read from STDIN stream".to_string()),
     }
 }
 
 // Prompt the user with the message provided
-pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String, String> {
+pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String> {
     print!("{}", prompt_msg);
     let _ = stdout().flush();
     let buf = read_stdin_response()?;
     if buf.is_empty() {
-        Err(error_msg.to_string())
+        Err(anyhow!(error_msg.to_string()))
     } else {
         Ok(buf)
     }
 }
 
 // Unwrap secret key string provided, otherwise prompt user to provide it
-pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result<String, String> {
+pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result<String> {
     let mut sk = sk.unwrap_or_else(|| String::from(""));
 
     if sk.is_empty() {

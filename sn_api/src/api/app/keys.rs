@@ -288,15 +288,14 @@ mod tests {
     async fn test_keys_create_preload_invalid_amounts() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         match safe.keys_create_preload_test_coins(".45").await {
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidAmount(
-                    "Invalid safecoins amount '.45' (Can\'t parse Token units)".to_string()
-                )
-            ),
             Ok(_) => {
                 bail!("Key with test-coins was created unexpectedly".to_string(),)
             }
+            Err(Error::InvalidAmount(msg)) => assert_eq!(
+                msg,
+                "Invalid safecoins amount '.45' (Can\'t parse Token units)".to_string()
+            ),
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         let (_, keypair) = safe.keys_create_preload_test_coins("12").await?;
@@ -305,15 +304,14 @@ mod tests {
             .keys_create_and_preload_from_sk_string(&sk_hex, ".003")
             .await
         {
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidAmount(
-                    "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
-                )
-            ),
             Ok(_) => {
                 bail!("Key was created unexpectedly".to_string(),)
             }
+            Err(Error::InvalidAmount(msg)) => assert_eq!(
+                msg,
+                "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
+            ),
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         // test it fails with corrupted secret key
@@ -322,15 +320,14 @@ mod tests {
             .keys_create_and_preload_from_sk_string(&sk_hex, ".003")
             .await
         {
-            Err(err) => assert_eq!(
-                err,
-                Error::InvalidAmount(
-                    "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
-                )
-            ),
             Ok(_) => {
                 bail!("Key was created unexpectedly".to_string(),)
             }
+            Err(Error::InvalidAmount(msg)) => assert_eq!(
+                msg,
+                "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
+            ),
+            other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
         // test it fails to preload with more than available balance in source (which has only 12 coins)
@@ -339,17 +336,21 @@ mod tests {
             .keys_create_and_preload_from_sk_string(&sk_hex, amount)
             .await
         {
-            Err(err) => {
+            Ok(_) => Err(anyhow!("Key was created unexpectedly".to_string(),)),
+            Err(Error::NotEnoughBalance(msg)) => {
                 assert_eq!(
-                    err,
-                    Error::NotEnoughBalance(format!(
+                    msg,
+                    format!(
                         "Not enough balance at 'source' for the operation: {}",
                         amount
-                    ))
+                    )
                 );
                 Ok(())
             }
-            Ok(_) => Err(anyhow!("Key was created unexpectedly".to_string(),)),
+            other => Err(anyhow!(
+                "Error returned is not the expected one: {:?}",
+                other
+            )),
         }
     }
 

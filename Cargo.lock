@@ -3768,6 +3768,7 @@ dependencies = [
  "sha3",
  "sn_client",
  "sn_data_types",
+ "thiserror",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "tokio 0.2.25",
@@ -3932,9 +3933,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.0.13"
+version = "0.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48db13997cd6990811e645ac719e517feebd5fc8470ee7181ddff541e58dcd83"
+checksum = "1e666ada91d4aa126d8a6d16b877e8ab9f29b28ba67decdf1e83d9208760a904"
 dependencies = [
  "directories",
  "env_logger 0.7.1",

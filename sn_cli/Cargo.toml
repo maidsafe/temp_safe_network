@@ -28,12 +28,13 @@ rand = "~0.7.3"
 relative-path = "~0.4.0"
 reqwest = { version = "~0.9.24", default-features=false, features = ["rustls-tls"], optional = true }
 rpassword = "4.0.5"
-sn_launch_tool = "~0.0.10"
+sn_launch_tool = "~0.0.14"
 serde = "1.0.91"
 serde_json = "1.0.39"
 serde_yaml = "~0.8.11"
 shrust = "~0.0.7"
 structopt = "~0.3.5"
+anyhow = "1.0.36"
 tokio = { version = "~0.2.21", features = ["macros"] }
 isatty = "~0.1"
 num-traits = "~0.2"
@@ -60,7 +61,6 @@ features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compr
 optional = true
 
 [dev-dependencies]
-anyhow = "1.0.36"
 assert_cmd = "~0.11.1"
 duct = "~0.12.0"
 predicates = "1.0.0"

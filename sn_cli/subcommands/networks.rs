@@ -12,6 +12,7 @@ use crate::operations::config::{
     read_current_network_conn_info, remove_network_from_config, retrieve_conn_info,
     write_current_network_conn_info,
 };
+use anyhow::{bail, Result};
 use log::debug;
 use structopt::StructOpt;
 
@@ -42,7 +43,7 @@ pub enum NetworksSubCommands {
     },
 }
 
-pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String> {
+pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
     match cmd {
         Some(NetworksSubCommands::Switch { network_name }) => {
             let (settings, _) = read_config_settings()?;
@@ -56,7 +57,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<(), String
                     println!("Successfully switched to '{}' network in your system!", network_name);
                     println!("If you need write access to the '{}' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again", network_name);
                 },
-                None => return Err(format!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", network_name))
+                None => bail!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", network_name)
             }
         }
         Some(NetworksSubCommands::Check {}) => {

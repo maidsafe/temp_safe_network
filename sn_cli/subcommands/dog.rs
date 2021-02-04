@@ -11,6 +11,7 @@ use super::{
     helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output, xorname_to_hex},
     OutputFmt,
 };
+use anyhow::Result;
 use log::debug;
 use sn_api::{
     fetch::{SafeContentType, SafeData},
@@ -25,11 +26,7 @@ pub struct DogCommands {
     location: Option<String>,
 }
 
-pub async fn dog_commander(
-    cmd: DogCommands,
-    output_fmt: OutputFmt,
-    safe: &mut Safe,
-) -> Result<(), String> {
+pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut Safe) -> Result<()> {
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running dog for: {:?}", &url);
 

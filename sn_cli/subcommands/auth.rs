@@ -8,6 +8,7 @@
 // Software.
 
 use crate::{operations::auth_daemon::*, operations::safe_net::*, APP_ID, APP_NAME, APP_VENDOR};
+use anyhow::{bail, Result};
 use log::debug;
 use sn_api::{AuthReq, Safe, SafeAuthdClient};
 use structopt::StructOpt;
@@ -125,7 +126,7 @@ pub async fn auth_commander(
     cmd: Option<AuthSubCommands>,
     endpoint: Option<String>,
     safe: &mut Safe,
-) -> Result<(), String> {
+) -> Result<()> {
     match cmd {
         Some(AuthSubCommands::Create {
             config_file_str,
@@ -176,7 +177,7 @@ pub async fn auth_commander(
             authd_deny(&sn_authd, req_id).await
         }
         Some(AuthSubCommands::Subscribe { notifs_endpoint }) => match notifs_endpoint {
-            None => Err("The endpoint URL needs to be provided. If you subscribe within the interactive shell the URL is then optional".to_string()),
+            None => bail!("The endpoint URL needs to be provided. If you subscribe within the interactive shell the URL is then optional"),
             Some(notif_endpoint) => {
                 let sn_authd = SafeAuthdClient::new(endpoint);
                 authd_subscribe_url(&sn_authd, notif_endpoint).await
@@ -209,10 +210,7 @@ pub async fn auth_commander(
     }
 }
 
-async fn self_authorise(
-    endpoint: Option<String>,
-    mut sn_authd: SafeAuthdClient,
-) -> Result<(), String> {
+async fn self_authorise(endpoint: Option<String>, mut sn_authd: SafeAuthdClient) -> Result<()> {
     debug!("Let's subscribe so we can automatically allow our own auth request...");
     sn_authd
         .subscribe(
