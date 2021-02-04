@@ -1,6 +1,6 @@
 [package]
 name = "sn_authd"
-version = "0.0.15"
+version = "0.1.0"
 description = "Safe Authenticator (daemon)"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 publish = false
