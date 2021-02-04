@@ -1184,9 +1184,9 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "encoding_rs"
-version = "0.8.26"
+version = "0.8.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "801bbab217d7f79c0062f4f7205b5d4427c6d1a7bd7aafdd1475f7c59d62b283"
+checksum = "b4dc76421b40af2cd5c644c55206e78a4961c693c8facdde2ae34c3bb8428efa"
 dependencies = [
  "cfg-if 1.0.0",
 ]
@@ -3851,8 +3851,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.46.1"
-source = "git+https://github.com/bochaco/sn_client.git?branch=chore-adapt-to-new-sn-messaging-api#0cbe93c78ca93fa2cc582effb1a0c70769a10057"
+version = "0.46.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0422a675b6200b66e373234fa5c208d2a3a5b270fe0d940964a99cd43c0f00d"
 dependencies = [
  "anyhow",
  "async-trait",
