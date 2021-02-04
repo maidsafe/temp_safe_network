@@ -51,8 +51,8 @@ impl WireMsg {
         })
     }
 
-    /// Creates a new instance keeping a (serialized) copy of the client 'MsgEnvelope' message provided.
-    pub fn new_client_msg(msg: &client::MsgEnvelope) -> Result<WireMsg> {
+    /// Creates a new instance keeping a (serialized) copy of the client 'Message' message provided.
+    pub fn new_client_msg(msg: &client::Message) -> Result<WireMsg> {
         let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize client message payload (id: {}) with Msgpack: {}",
@@ -94,7 +94,7 @@ impl WireMsg {
     }
 
     /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
-    /// followed by the payload bytes, i.e. the serialized MsgEnvelope.
+    /// followed by the payload bytes, i.e. the serialized Message.
     pub fn serialize(&self) -> Result<Bytes> {
         // First we create a buffer with the exact size
         // needed to serialize the wire msg
@@ -126,8 +126,8 @@ impl WireMsg {
                 Ok(MessageType::InfrastructureMessage(query))
             }
             MessageKind::ClientMessage => {
-                let client_msg: client::MsgEnvelope = rmp_serde::from_slice(&self.payload)
-                    .map_err(|err| {
+                let client_msg: client::Message =
+                    rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!(
                             "Client message payload as Msgpack: {}",
                             err
@@ -166,8 +166,8 @@ impl WireMsg {
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
-    /// MsgEnvelope, returning the serialized WireMsg.
-    pub fn serialize_client_msg(msg: &client::MsgEnvelope) -> Result<Bytes> {
+    /// Message, returning the serialized WireMsg.
+    pub fn serialize_client_msg(msg: &client::Message) -> Result<Bytes> {
         Self::new_client_msg(msg)?.serialize()
     }
 

@@ -56,27 +56,11 @@ use std::{
 };
 use xor_name::XorName;
 
-/// Message envelope containing a Safe message payload, sender, and the list
-/// of proxies the message could have been gone through with their signatures.
+/// Message envelope containing a Safe message payload,
 /// This struct also provides utilities to obtain the serialized bytes
-/// ready to send them over the wire. The serialized bytes contain information
-/// about messaging protocol version, serialization style used for the payload (e.g. Json),
-/// and/or any other information required by the receiving end to either deserialize it,
-/// or detect any incompatibility.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MsgEnvelope {
-    /// The actual message payload
-    pub message: Message,
-    /// The source of the message.
-    pub origin: MsgSender,
-    /// Intermediate actors, so far, on the path of this message.
-    /// Every new actor handling this message, would add itself here.
-    pub proxies: Vec<MsgSender>, // or maybe enough with just option of `proxy` (leaning heavily towards it now)
-}
-
-impl MsgEnvelope {
-    /// Convinience function to deserialize a 'MsgEnvelope' from bytes received over the wire.
+/// ready to send them over the wire.
+impl Message {
+    /// Convinience function to deserialize a 'Message' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a client message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
@@ -89,116 +73,10 @@ impl MsgEnvelope {
         }
     }
 
-    /// serialize this MsgEnvelope into bytes ready to be sent over the wire.
-    pub fn serialize(&self) -> crate::Result<Bytes> {
-        WireMsg::serialize_client_msg(self)
-    }
-
-    /// Gets the message ID.
-    pub fn id(&self) -> MessageId {
-        self.message.id()
-    }
-
-    /// Verify the signature provided by the most recent sender is valid.
-    pub fn verify(&self) -> Result<bool> {
-        let data = if self.proxies.is_empty() {
-            self.message.serialize()?
-        } else {
-            let mut msg = self.clone();
-            let _ = msg.proxies.pop();
-            WireMsg::serialize_client_msg(&msg)
-                .map_err(|err| Error::SignatureVerification(err.to_string()))?
-        };
-
-        let sender = self.most_recent_sender();
-        Ok(sender.verify(&data))
-    }
-
-    /// Get Message target section's expected PublicKey
-    pub fn target_section_pk(&self) -> Option<PublicKey> {
-        self.message.target_section_pk()
-    }
-
-    /// The proxy would first sign the MsgEnvelope,
-    /// and then call this method to add itself
-    /// (public key + the signature) to the envelope.
-    pub fn add_proxy(&mut self, proxy: MsgSender) {
-        self.proxies.push(proxy);
-    }
-
-    /// Return the most recent proxy this message passed through,
-    /// or the sender if it didn't go through any proxy.
-    pub fn most_recent_sender(&self) -> &MsgSender {
-        match self.proxies.last() {
-            None => &self.origin,
-            Some(proxy) => proxy,
-        }
-    }
-
-    /// Return the final destination address for this message.
-    pub fn destination(&self) -> Result<Address> {
-        use Address::*;
-        use Message::*;
-        match &self.message {
-            Cmd { cmd, .. } => self.cmd_dst(cmd),
-            Query { query, .. } => Ok(Section(query.dst_address())),
-            Event { event, .. } => Ok(Client(event.dst_address())), // TODO: needs the correct client address
-            QueryResponse { query_origin, .. } => Ok(query_origin.clone()),
-            CmdError { cmd_origin, .. } => Ok(cmd_origin.clone()),
-            NodeCmd { cmd, .. } => Ok(cmd.dst_address()),
-            NodeEvent { event, .. } => Ok(event.dst_address()),
-            NodeQuery { query, .. } => Ok(query.dst_address()),
-            NodeCmdError { cmd_origin, .. } => Ok(cmd_origin.clone()),
-            NodeQueryResponse { query_origin, .. } => Ok(query_origin.clone()),
-        }
-    }
-
-    // Private helper to calculate final destination of a Cmd message
-    fn cmd_dst(&self, cmd: &Cmd) -> Result<Address> {
-        use Address::*;
-        use Cmd::*;
-        match cmd {
-            // always to `Transfer` section
-            Transfer(c) => Ok(Section(c.dst_address())),
-            // Data dst (after reaching `Gateway`)
-            // is `Transfer` and then `Metadata`.
-            Data { cmd, payment } => {
-                let sender = self.most_recent_sender();
-                match sender.address() {
-                    // From `Client` to `Gateway`.
-                    Client(xorname) => Ok(Section(xorname)),
-                    Node(_) => {
-                        match sender.duty() {
-                            // From `Gateway` to `Transfer`.
-                            Some(Duty::Elder(ElderDuties::Gateway)) => {
-                                Ok(Section(payment.sender().into()))
-                            }
-                            // From `Transfer` to `Metadata`.
-                            Some(Duty::Elder(ElderDuties::Transfer))
-                            | Some(Duty::Elder(ElderDuties::Metadata)) => {
-                                Ok(Section(cmd.dst_address()))
-                            }
-                            // As it reads; simply no such recipient ;)
-                            _ => Err(Error::NoSuchRecipient),
-                        }
-                    }
-                    Section(_) => {
-                        match sender.duty() {
-                            // Accumulated at `Metadata`.
-                            // I.e. this means we accumulated a section signature from `Transfer` Elders.
-                            // (this is done at `Metadata` Elders, and the accumulated section is added to most recent sender)
-                            Some(Duty::Elder(ElderDuties::Transfer))
-                            | Some(Duty::Elder(ElderDuties::Metadata)) => {
-                                Ok(Section(cmd.dst_address()))
-                            }
-                            // As it reads; simply no such recipient ;)
-                            _ => Err(Error::NoSuchRecipient),
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // /// serialize this Message into bytes ready to be sent over the wire.
+    // pub fn serialize(&self) -> crate::Result<Bytes> {
+    //     WireMsg::serialize_client_msg(self)
+    // }
 }
 
 ///
@@ -768,7 +646,6 @@ mod tests {
     fn serialization() -> Result<()> {
         let keypair = &gen_keypairs()[0];
         let pk = keypair.public_key();
-        let signature = keypair.sign(b"blabla");
 
         let random_xor = XorName::random();
         let id = MessageId(random_xor);
@@ -778,16 +655,10 @@ mod tests {
             target_section_pk: None,
         };
 
-        let msg_envelope = MsgEnvelope {
-            message,
-            origin: MsgSender::client(pk, signature)?,
-            proxies: vec![],
-        };
-
         // test msgpack serialization
-        let serialized = msg_envelope.serialize()?;
-        let deserialized = MsgEnvelope::from(serialized)?;
-        assert_eq!(deserialized, msg_envelope);
+        let serialized = message.serialize()?;
+        let deserialized = Message::from(serialized)?;
+        assert_eq!(deserialized, message);
 
         Ok(())
     }
