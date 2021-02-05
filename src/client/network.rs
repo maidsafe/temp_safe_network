@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{Address, BlobWrite, Error, MsgSender, Result};
+use super::{Address, BlobWrite, Error, Result};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare,
@@ -172,7 +172,7 @@ pub enum NodeDataQuery {
         address: BlobAddress,
         /// Details of the section that authorised the replication.
         /// (This is the accumulated sig over the `ReplicateChunk` cmd.)
-        section_authority: MsgSender,
+        //section_authority: MsgSender,
         /// Current holders.
         current_holders: BTreeSet<XorName>,
     },
