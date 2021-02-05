@@ -58,7 +58,7 @@ pub enum NodeSubCommands {
         #[structopt(short = "i", long, default_value = "1")]
         interval: u64,
         /// Number of nodes to be launched
-        #[structopt(short = "n", long = "nodes", default_value = "11")]
+        #[structopt(long = "nodes", default_value = "11")]
         num_of_nodes: u8,
         /// IP to be used to launch the local nodes.
         #[structopt(long = "ip")]
