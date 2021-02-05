@@ -9,16 +9,21 @@
 use crate::{
     chunk_store::BlobChunkStore,
     error::convert_to_error_message,
-    node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty, Error},
+    node::{
+        msg_wrapping::AdultMsgWrapping,
+        node_ops::{Msg, NodeMessagingDuty},
+        Error,
+    },
     AdultState, NodeInfo, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress, Signature};
 use sn_messaging::client::{
-    Address, AdultDuties, CmdError, Error as ErrorMessage, Message, MessageId, MsgSender,
-    NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent, NodeQuery,
-    NodeQueryResponse, QueryResponse,
+    Address, AdultDuties, CmdError, Error as ErrorMessage, Message, MessageId, NodeCmdError,
+    NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
+    QueryResponse,
 };
+use sn_routing::DstLocation;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -42,14 +47,14 @@ impl ChunkStorage {
         &mut self,
         data: &Blob,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data, origin).await {
             let message_error = convert_to_error_message(error)?;
 
             return self
                 .wrapping
-                .error(CmdError::Data(message_error), msg_id, &origin.address())
+                .error(CmdError::Data(message_error), msg_id, origin)
                 .await;
         }
         Ok(NodeMessagingDuty::NoOp)
@@ -60,10 +65,10 @@ impl ChunkStorage {
         &mut self,
         data: &Blob,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
         accumulated_signature: &Signature,
     ) -> Result<NodeMessagingDuty> {
-        let message = match self.try_store(data, origin).await {
+        let msg = match self.try_store(data, origin).await {
             Ok(()) => Message::NodeEvent {
                 event: NodeEvent::ReplicationCompleted {
                     chunk: *data.address(),
@@ -74,7 +79,6 @@ impl ChunkStorage {
             },
             Err(error) => {
                 let message_error = convert_to_error_message(error)?;
-
                 Message::NodeCmdError {
                     id: MessageId::new(),
                     error: NodeCmdError::Data(NodeDataError::ChunkReplication {
@@ -82,25 +86,29 @@ impl ChunkStorage {
                         error: message_error,
                     }),
                     correlation_id: msg_id,
-                    cmd_origin: origin.address(),
+                    cmd_origin: Address::Node(origin),
                 }
             }
         };
-        self.wrapping.send_to_node(message).await
+        self.wrapping
+            .send_to_node(Msg {
+                msg,
+                dst: DstLocation::Node(origin),
+            })
+            .await
     }
 
-    async fn try_store(&mut self, data: &Blob, origin: &MsgSender) -> Result<()> {
+    async fn try_store(&mut self, data: &Blob, origin: XorName) -> Result<()> {
         info!("TRYING TO STORE BLOB");
-        let id = origin.id().public_key();
-
         if data.is_unpub() {
-            let data_owner = *data.owner().ok_or(Error::InvalidOwners(id))?;
+            let data_owner = *data.owner().ok_or(Error::InvalidOperation)?; // Error::InvalidOwners(origin)
+            let owner: XorName = data_owner.into();
             info!("Blob is unpub");
-            info!("DATA OWNER: {:?}", data_owner);
-            info!("ID OWNER: {:?}", id);
-            if data_owner != id {
+            info!("DATA OWNER: {:?}", owner);
+            info!("ORIGIN: {:?}", origin);
+            if owner != origin {
                 info!("INVALID OWNER! Returning error");
-                return Err(Error::InvalidOwners(id));
+                return Err(Error::InvalidOwners(data_owner)); // should be origin here..
             }
         }
 
@@ -119,20 +127,22 @@ impl ChunkStorage {
         &self,
         address: &BlobAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .chunks
             .get(address)
             .map_err(|_| ErrorMessage::NoSuchData);
-        // .map_err(|error| error.to_string());
         self.wrapping
             .send_to_section(
-                Message::QueryResponse {
-                    id: MessageId::in_response_to(&msg_id),
-                    response: QueryResponse::GetBlob(result),
-                    correlation_id: msg_id,
-                    query_origin: origin.address(),
+                Msg {
+                    msg: Message::QueryResponse {
+                        id: MessageId::in_response_to(&msg_id),
+                        response: QueryResponse::GetBlob(result),
+                        correlation_id: msg_id,
+                        query_origin: Address::Client(origin),
+                    },
+                    dst: DstLocation::Client(origin),
                 },
                 true,
             )
@@ -143,13 +153,13 @@ impl ChunkStorage {
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-        section_authority: MsgSender,
-        _msg_id: MessageId,
-        _origin: MsgSender,
+        //section_authority: MsgSender,
+        //_msg_id: MessageId,
+        //_origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let message = Message::NodeQuery {
             query: NodeQuery::Data(NodeDataQuery::GetChunk {
-                section_authority,
+                //section_authority,
                 address,
                 new_holder: self.wrapping.name(),
                 current_holders: current_holders.clone(),
@@ -167,7 +177,7 @@ impl ChunkStorage {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: Address,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
@@ -175,11 +185,14 @@ impl ChunkStorage {
         };
 
         self.wrapping
-            .send_to_node(Message::NodeQueryResponse {
-                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin,
+            .send_to_node(Msg {
+                msg: Message::NodeQueryResponse {
+                    response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: Address::Node(origin),
+                },
+                dst: DstLocation::Node(origin),
             })
             .await
     }
@@ -207,7 +220,7 @@ impl ChunkStorage {
     // pub(crate) fn get_for_duplciation(
     //     &self,
     //     address: BlobAddress,
-    //     msg: &MsgEnvelope,
+    //     msg: &Message,
     // ) -> Result<NodeMessagingDuty> {
 
     //     match self.chunks.get(&address) {
@@ -231,7 +244,7 @@ impl ChunkStorage {
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
@@ -240,14 +253,14 @@ impl ChunkStorage {
 
         let result = match self.chunks.get(&address) {
             Ok(Blob::Private(data)) => {
-                let pk = origin.id().public_key();
-                if *data.owner() == pk {
+                let data_owner: XorName = (*data.owner()).into();
+                if data_owner == origin {
                     self.chunks
                         .delete(&address)
                         .await
                         .map_err(|_error| ErrorMessage::FailedToDelete)
                 } else {
-                    Err(ErrorMessage::InvalidOwners(pk))
+                    Err(ErrorMessage::InvalidOwners(*data.owner())) // should be origin...
                 }
             }
             Ok(_) => {
@@ -258,13 +271,12 @@ impl ChunkStorage {
                 Err(ErrorMessage::InvalidOperation)
             }
             _ => Err(ErrorMessage::NoSuchKey),
-            //err @ Err(_) => err.map_err(|error| error.to_string().into()),
         };
 
         if let Err(error) = result {
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address())
+                .error(CmdError::Data(error), msg_id, origin)
                 .await;
         }
         Ok(NodeMessagingDuty::NoOp)

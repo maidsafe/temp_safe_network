@@ -45,7 +45,11 @@ impl AdultDuties {
         let result: Result<NodeOperation> = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk(msg) | WriteChunk(msg) => {
-                    let first: Result<NodeOperation> = self.chunks.receive_msg(msg).await.convert();
+                    let first: Result<NodeOperation> = self
+                        .chunks
+                        .receive_msg(msg.msg, *msg.src.to_dst().name().unwrap())
+                        .await
+                        .convert();
                     let second = self.chunks.check_storage().await;
                     Ok(vec![first, second].into())
                 }
@@ -70,7 +74,7 @@ impl AdultDuties {
                         self.chunks.store_replicated_chunk(blob).await.convert()
                     }
                     ReplicateChunk {
-                        section_authority,
+                        //section_authority,
                         address,
                         current_holders,
                     } => self
@@ -78,9 +82,9 @@ impl AdultDuties {
                         .replicate_chunk(
                             address,
                             current_holders,
-                            section_authority,
+                            //section_authority,
                             msg_id,
-                            origin,
+                            //origin,
                         )
                         .await
                         .convert(),

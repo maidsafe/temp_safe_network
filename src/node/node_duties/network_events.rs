@@ -6,25 +6,25 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
+use super::msg_analysis::ReceivedMsgAnalysis;
+use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation, ReceivedMsg};
 use crate::{Error, Network, Result};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace};
 use sn_data_types::PublicKey;
-use sn_messaging::client::MsgEnvelope;
-use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use sn_messaging::client::Message;
+use sn_routing::{DstLocation, Event as RoutingEvent, NodeElderChange, SrcLocation, MIN_AGE};
 use xor_name::XorName;
 
 /// Maps events from the transport layer
 /// into domain messages for the various modules.
 pub struct NetworkEvents {
-    analysis: NetworkMsgAnalysis,
+    analysis: ReceivedMsgAnalysis,
 }
 
 impl NetworkEvents {
-    pub fn new(analysis: NetworkMsgAnalysis) -> Self {
+    pub fn new(analysis: ReceivedMsgAnalysis) -> Self {
         Self { analysis }
     }
 
@@ -97,7 +97,7 @@ impl NetworkEvents {
                     src,
                     dst
                 );
-                self.evaluate_msg(content).await
+                self.evaluate_msg(content, src, dst).await
             }
             RoutingEvent::EldersChanged {
                 key,
@@ -139,19 +139,24 @@ impl NetworkEvents {
         }
     }
 
-    async fn evaluate_msg(&mut self, content: Bytes) -> Result<NodeOperation> {
-        match MsgEnvelope::from(content) {
+    async fn evaluate_msg(
+        &mut self,
+        content: Bytes,
+        src: SrcLocation,
+        dst: DstLocation,
+    ) -> Result<NodeOperation> {
+        match Message::from(content) {
             Ok(msg) => {
                 info!("Message Envelope received. Contents: {:?}", &msg);
-                self.analysis.evaluate(&msg).await
+                self.analysis.evaluate(ReceivedMsg { msg, src, dst }).await
             }
             Err(e) => {
                 error!(
-                    "Error deserializing received network message into MsgEnvelope type: {:?}",
+                    "Error deserializing received network message into Message type: {:?}",
                     e
                 );
                 Err(Error::Logic(format!(
-                    "Error deserializing network msg into MsgEnvelope: {:?}",
+                    "Error deserializing network msg into Message: {:?}",
                     e
                 )))
             }

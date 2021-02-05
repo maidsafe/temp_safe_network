@@ -15,10 +15,10 @@ use sn_data_types::{
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::client::{Address, MessageId, MsgEnvelope, MsgSender};
+use sn_messaging::client::{Message, MessageId};
 use std::fmt::Formatter;
 
-use sn_routing::{Event as RoutingEvent, Prefix};
+use sn_routing::{DstLocation, Event as RoutingEvent, Prefix, SrcLocation};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
@@ -194,26 +194,51 @@ impl Debug for NodeDuty {
 
 // --------------- Messaging ---------------
 
+#[derive(Debug, Clone)]
+pub struct ReceivedMsg {
+    pub msg: Message,
+    pub src: SrcLocation,
+    pub dst: DstLocation,
+}
+
+impl ReceivedMsg {
+    pub fn id(&self) -> MessageId {
+        self.msg.id()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Msg {
+    pub msg: Message,
+    pub dst: DstLocation,
+}
+
+impl Msg {
+    pub fn id(&self) -> MessageId {
+        self.msg.id()
+    }
+}
+
 /// This duty is at the border of infrastructural
 /// and domain duties. Messaging is such a fundamental
 /// part of the system, that it can be considered domain.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeMessagingDuty {
     /// Send to client
-    SendToClient(MsgEnvelope),
+    SendToClient(Msg),
     /// Send to a single node.
-    SendToNode(MsgEnvelope),
+    SendToNode(Msg),
     /// Send to a section.
     SendToSection {
         /// Msg to be sent
-        msg: MsgEnvelope,
+        msg: Msg,
         /// Send as a Node.(send as Section if set to false)
         as_node: bool,
     },
     /// Send the same request to each individual Adult.
     SendToAdults {
         targets: BTreeSet<XorName>,
-        msg: MsgEnvelope,
+        msg: Message,
     },
     // No operation
     NoOp,
@@ -326,7 +351,10 @@ pub enum KeySectionDuty {
     /// Incoming client msgs
     /// are to be evaluated and
     /// sent to their respective module.
-    EvaluateClientMsg(MsgEnvelope),
+    EvaluateClientMsg {
+        msg: Message,
+        client: XorName,
+    },
     /// As a Gateway, the node interfaces with
     /// clients, interpreting handshakes and msgs,
     /// and also correlating network msgs (such as cmd errors
@@ -378,7 +406,7 @@ pub enum GatewayDuty {
     /// such as query responses, events and errors,
     /// are piped through the Gateway, to find the
     /// connection info to the client.
-    FindClientFor(MsgEnvelope),
+    FindClientFor(Msg),
     /// Incoming events from clients are parsed
     /// at the Gateway, and forwarded to other modules.
     ProcessClientEvent(RoutingEvent),
@@ -409,9 +437,15 @@ impl Into<NodeOperation> for GatewayDuty {
 #[derive(Debug)]
 pub enum MetadataDuty {
     /// Reads.
-    ProcessRead(MsgEnvelope),
+    ProcessRead {
+        msg: Message,
+        origin: XorName,
+    },
     /// Writes.
-    ProcessWrite(MsgEnvelope),
+    ProcessWrite {
+        msg: Message,
+        origin: XorName,
+    },
     NoOp,
 }
 
@@ -435,9 +469,9 @@ impl Into<NodeOperation> for MetadataDuty {
 #[derive(Debug)]
 pub enum ChunkStoreDuty {
     /// Reads.
-    ReadChunk(MsgEnvelope),
+    ReadChunk(ReceivedMsg),
     /// Writes.
-    WriteChunk(MsgEnvelope),
+    WriteChunk(ReceivedMsg),
     NoOp,
 }
 
@@ -449,16 +483,16 @@ pub enum ChunkReplicationDuty {
         cmd: ChunkReplicationCmd,
         ///
         msg_id: MessageId,
-        ///
-        origin: MsgSender,
+        // ///
+        origin: XorName,
     },
     ///
     ProcessQuery {
         query: ChunkReplicationQuery,
         ///
         msg_id: MessageId,
-        ///
-        origin: Address,
+        // ///
+        origin: XorName,
     },
     NoOp,
 }
@@ -482,8 +516,8 @@ pub enum ChunkReplicationCmd {
         current_holders: BTreeSet<XorName>,
         ///
         address: BlobAddress,
-        ///
-        section_authority: MsgSender,
+        // ///
+        // section_authority: MsgSender,
     },
     StoreReplicatedBlob(Blob),
 }
@@ -503,16 +537,16 @@ pub enum RewardDuty {
         query: RewardQuery,
         ///
         msg_id: MessageId,
-        ///
-        origin: Address,
+        // ///
+        origin: XorName,
     },
     ///
     ProcessCmd {
         cmd: RewardCmd,
         ///
         msg_id: MessageId,
-        ///
-        origin: Address,
+        // ///
+        origin: XorName,
     },
     NoOp,
 }
@@ -602,16 +636,16 @@ pub enum TransferDuty {
         query: TransferQuery,
         ///
         msg_id: MessageId,
-        ///
-        origin: Address,
+        // ///
+        origin: XorName,
     },
     ///
     ProcessCmd {
         cmd: TransferCmd,
         ///
         msg_id: MessageId,
-        ///
-        origin: Address,
+        // ///
+        origin: XorName,
     },
     NoOp,
 }
@@ -666,7 +700,7 @@ pub enum TransferCmd {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     InitiateReplica(Vec<ReplicaEvent>),
-    ProcessPayment(MsgEnvelope),
+    ProcessPayment(Message),
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout
     SimulatePayout(Transfer),

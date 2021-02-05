@@ -24,17 +24,20 @@ use crate::{
     AdultState, ElderState, Error, Network, NodeState, Result,
 };
 use log::{debug, info, trace};
-use msg_analysis::NetworkMsgAnalysis;
+use msg_analysis::ReceivedMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{
     ActorHistory, Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
     TransferPropagated, WalletInfo,
 };
 use sn_messaging::client::{
-    Address, Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
+    Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
     NodeTransferQuery,
 };
+use sn_routing::DstLocation;
 use std::collections::{BTreeMap, VecDeque};
+
+use super::node_ops::Msg;
 
 const GENESIS_ELDER_COUNT: usize = 5;
 
@@ -147,7 +150,7 @@ pub struct NodeDuties {
 
 impl NodeDuties {
     pub async fn new(node_info: NodeInfo, network_api: Network) -> Self {
-        let msg_analysis = NetworkMsgAnalysis::new(network_api.clone());
+        let msg_analysis = ReceivedMsgAnalysis::new(network_api.clone());
         let network_events = NetworkEvents::new(msg_analysis);
 
         let messaging = Messaging::new(network_api.clone());
@@ -255,12 +258,15 @@ impl NodeDuties {
         let node_id = PublicKey::from(self.network_api.public_key().await);
         wrapping
             .send_to_section(
-                Message::NodeCmd {
-                    cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
-                        section: node_id.into(),
-                        node_id,
-                    }),
-                    id: MessageId::new(),
+                Msg {
+                    msg: Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+                            section: node_id.into(),
+                            node_id,
+                        }),
+                        id: MessageId::new(),
+                    },
+                    dst: DstLocation::Section(node_id.into()),
                 },
                 true,
             )
@@ -274,12 +280,15 @@ impl NodeDuties {
         let wrapping = NodeMsgWrapping::new(node_state.clone(), MsgNodeDuties::NodeConfig);
         wrapping
             .send_to_section(
-                Message::NodeCmd {
-                    cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
-                        wallet,
-                        section: PublicKey::Ed25519(node_state.node_id()).into(),
-                    }),
-                    id: MessageId::new(),
+                Msg {
+                    msg: Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
+                            wallet,
+                            section: PublicKey::Ed25519(node_state.node_id()).into(),
+                        }),
+                        id: MessageId::new(),
+                    },
+                    dst: DstLocation::Section(wallet.into()),
                 },
                 true,
             )
@@ -351,15 +360,18 @@ impl NodeDuties {
                 NodeState::Elder(elder_state.clone()),
                 MsgNodeDuties::NodeConfig,
             );
-
+            let dst = DstLocation::Section(credit.recipient.into());
             return wrapping
                 .send_to_section(
-                    Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
-                            credit,
-                            sig: credit_sig_share,
-                        }),
-                        id: MessageId::new(),
+                    Msg {
+                        msg: Message::NodeCmd {
+                            cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
+                                credit,
+                                sig: credit_sig_share,
+                            }),
+                            id: MessageId::new(),
+                        },
+                        dst,
                     },
                     true,
                 )
@@ -385,9 +397,12 @@ impl NodeDuties {
             use NodeTransferQuery::CatchUpWithSectionWallet;
             return wrapping
                 .send_to_section(
-                    Message::NodeQuery {
-                        query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
-                        id: MessageId::new(),
+                    Msg {
+                        msg: Message::NodeQuery {
+                            query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
+                            id: MessageId::new(),
+                        },
+                        dst: DstLocation::Section(wallet_id.into()),
                     },
                     true,
                 )
@@ -398,6 +413,7 @@ impl NodeDuties {
         Ok(NodeOperation::NoOp)
     }
 
+    // TODO: validate the credit...
     async fn receive_genesis_proposal(
         &mut self,
         credit: Credit,
@@ -424,6 +440,7 @@ impl NodeDuties {
                     MsgNodeDuties::NodeConfig,
                 );
 
+                let dst = DstLocation::Section(elder_state.section_public_key().into());
                 let stage = Stage::ProposingGenesis(GenesisProposal {
                     elder_state,
                     proposal: credit.clone(),
@@ -431,15 +448,17 @@ impl NodeDuties {
                     pending_agreement: None,
                     queued_ops: queued_ops.drain(..).collect(),
                 });
-
                 let cmd = wrapping
                     .send_to_section(
-                        Message::NodeCmd {
-                            cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
-                                credit,
-                                sig: credit_sig_share,
-                            }),
-                            id: MessageId::new(),
+                        Msg {
+                            msg: Message::NodeCmd {
+                                cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
+                                    credit,
+                                    sig: credit_sig_share,
+                                }),
+                                id: MessageId::new(),
+                            },
+                            dst,
                         },
                         true,
                     )
@@ -474,12 +493,17 @@ impl NodeDuties {
 
                     let cmd = wrapping
                         .send_to_section(
-                            Message::NodeCmd {
-                                cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
-                                    signed_credit: signed_credit.clone(),
-                                    sig: credit_sig_share,
-                                }),
-                                id: MessageId::new(),
+                            Msg {
+                                msg: Message::NodeCmd {
+                                    cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
+                                        signed_credit: signed_credit.clone(),
+                                        sig: credit_sig_share,
+                                    }),
+                                    id: MessageId::new(),
+                                },
+                                dst: DstLocation::Section(
+                                    bootstrap.elder_state.section_public_key().into(),
+                                ),
                             },
                             true,
                         )
@@ -614,7 +638,7 @@ impl NodeDuties {
             RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(node_id),
                 msg_id: MessageId::new(),
-                origin: Address::Node(node_id),
+                origin: node_id,
             }
             .into(),
         );
@@ -627,7 +651,7 @@ impl NodeDuties {
                     wallet_id: self.node_info.reward_key,
                 },
                 msg_id: MessageId::new(),
-                origin: Address::Node(node_id),
+                origin: node_id,
             }
             .into(),
         );

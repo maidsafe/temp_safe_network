@@ -2329,6 +2329,28 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
+version = "0.14.3"
+source = "git+https://github.com/oetyng/sn_data_types?branch=remove-msgenvelope#1b2a0e655b61bcff544d5d4deddd4fcc64f439c1"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha3",
+ "signature",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_data_types"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87535ae947d2a2f6d54b8ec2c8ee3525846b8857c9936b3f3a777153bffbfaad"
@@ -2366,8 +2388,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "3.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5e53fcef94eec176c9831782f5e95f9e48e66814d2c7639304f605fca55565f"
+source = "git+https://github.com/oetyng/sn_messaging?branch=all-accumulation-in-routing#2aec3a6e6a353b65157808514143b200a139ec4a"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2384,7 +2405,32 @@ dependencies = [
  "serde_bytes",
  "sha3",
  "signature",
- "sn_data_types",
+ "sn_data_types 0.14.3",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 2.0.2",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_messaging"
+version = "4.0.2"
+dependencies = [
+ "bincode",
+ "bytes 1.0.1",
+ "cookie-factory",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "signature",
+ "sn_data_types 0.14.3",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2393,7 +2439,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.26.14"
+version = "0.26.16"
 dependencies = [
  "async-log",
  "async-trait",
@@ -2423,9 +2469,9 @@ dependencies = [
  "serde_json",
  "sha2 0.8.2",
  "signature",
- "sn_data_types",
+ "sn_data_types 0.14.4",
  "sn_launch_tool",
- "sn_messaging",
+ "sn_messaging 4.0.2",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2438,9 +2484,8 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.43.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a678fb86120bc2da686b833c94fe6febb0d40a2a69b1f1b343db6b83ef7eeefe"
+version = "0.43.1"
+source = "git+https://github.com/oetyng/sn_routing?branch=all-accumulation-in-routing#cc9cd223c8643756f700a43b8d9a6629320521d4"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2456,7 +2501,8 @@ dependencies = [
  "rand_chacha 0.2.2",
  "resource_proof",
  "serde",
- "sn_messaging",
+ "sn_data_types 0.14.3",
+ "sn_messaging 3.0.2",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2477,7 +2523,7 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types",
+ "sn_data_types 0.14.4",
  "thiserror",
  "threshold_crypto",
  "xor_name",

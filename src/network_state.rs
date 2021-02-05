@@ -27,7 +27,7 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
-use sn_messaging::client::{MsgEnvelope, TransientElderKey};
+use sn_messaging::client::{Message, TransientElderKey};
 use sn_routing::SectionProofChain;
 use std::{
     collections::BTreeSet,
@@ -139,7 +139,7 @@ impl ElderState {
     }
 
     /// Use routing to send a message to a client peer address
-    pub async fn send_to_client(&self, peer_addr: SocketAddr, envelope: MsgEnvelope) -> Result<()> {
+    pub async fn send_to_client(&self, peer_addr: SocketAddr, envelope: Message) -> Result<()> {
         self.interaction.send_to_client(peer_addr, envelope).await
     }
 
@@ -324,7 +324,7 @@ impl NodeInteraction {
     }
 
     /// Use routing to send a message to a client peer address
-    pub async fn send_to_client(&self, peer_addr: SocketAddr, envelope: MsgEnvelope) -> Result<()> {
+    pub async fn send_to_client(&self, peer_addr: SocketAddr, envelope: Message) -> Result<()> {
         self.network
             .send_message_to_client(peer_addr, envelope)
             .await?;

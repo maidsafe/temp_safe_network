@@ -115,6 +115,7 @@ impl SectionFunds {
                     query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(new_wallet)),
                     id: MessageId::new(),
                 },
+                new_wallet.into(),
                 true,
             )
             .await
@@ -188,6 +189,7 @@ impl SectionFunds {
                                 )?)),
                                 id: MessageId::new(),
                             },
+                            self.actor.id().into(),
                             true,
                         )
                         .await
@@ -236,6 +238,7 @@ impl SectionFunds {
                             )?)),
                             id: MessageId::new(),
                         },
+                        self.actor.id().into(),
                         true,
                     )
                     .await
@@ -289,6 +292,7 @@ impl SectionFunds {
                         cmd: Transfers(RegisterSectionPayout(proof)),
                         id: MessageId::new(),
                     },
+                    self.actor.id().into(),
                     true,
                 )
                 .await?

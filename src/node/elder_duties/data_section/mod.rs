@@ -21,7 +21,7 @@ use crate::{
 };
 use log::info;
 use sn_data_types::{OwnerType, Result as DtResult, Signing, WalletInfo};
-use sn_messaging::client::{Address, MessageId};
+use sn_messaging::client::MessageId;
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use xor_name::XorName;
@@ -139,7 +139,9 @@ impl DataSection {
     /// Issues query to Elders of the section
     /// as to catch up with the current state of the replicas.
     pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
-        self.rewards.catchup_with_replicas().await
+        self.rewards
+            .catchup_with_replicas(self.elder_state.prefix().name())
+            .await
     }
 
     /// Transition the section funds account to the new key.
@@ -180,7 +182,7 @@ impl DataSection {
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(id),
                 msg_id: MessageId::new(),
-                origin: Address::Node(self.elder_state.node_name()),
+                origin: self.elder_state.node_name(),
             })
             .await
     }
@@ -203,7 +205,7 @@ impl DataSection {
                     age,
                 },
                 msg_id: MessageId::new(),
-                origin: Address::Node(self.elder_state.node_name()),
+                origin: self.elder_state.node_name(),
             })
             .await
     }
@@ -218,7 +220,7 @@ impl DataSection {
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::DeactivateNode(node_id),
                 msg_id: MessageId::new(),
-                origin: Address::Node(self.elder_state.node_name()),
+                origin: self.elder_state.node_name(),
             })
             .await;
         let second = self.metadata.trigger_chunk_replication(node_id).await;

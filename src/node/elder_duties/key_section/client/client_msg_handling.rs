@@ -13,7 +13,7 @@ use dashmap::{mapref::entry::Entry, DashMap};
 #[cfg(features = "chaos")]
 use log::debug;
 use log::{error, info, trace, warn};
-use sn_messaging::client::{Address, Message, MessageId, MsgEnvelope};
+use sn_messaging::client::{Message, MessageId};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -24,7 +24,7 @@ use std::{
 pub struct ClientMsgHandling {
     elder_state: ElderState,
     tracked_incoming: DashMap<MessageId, SocketAddr>,
-    tracked_outgoing: DashMap<MessageId, MsgEnvelope>,
+    tracked_outgoing: DashMap<MessageId, Message>,
 }
 
 impl ClientMsgHandling {
@@ -73,27 +73,27 @@ impl ClientMsgHandling {
         Ok(())
     }
 
-    pub async fn match_outgoing(&self, msg: &MsgEnvelope) -> Result<()> {
+    pub async fn match_outgoing(&self, msg: &Message) -> Result<()> {
         let msg_id = msg.id();
 
         trace!("Matching outgoing message {:?}", msg_id);
 
-        match msg.destination()? {
-            Address::Client { .. } => (),
-            _ => {
-                error!("{} for message-id {:?}, Invalid destination.", self, msg_id);
-                return Err(Error::InvalidMessage(
-                    msg_id,
-                    "Address::Client was expected".to_string(),
-                ));
-            }
-        };
+        // match msg.destination()? {
+        //     Address::Client { .. } => (),
+        //     _ => {
+        //         error!("{} for message-id {:?}, Invalid destination.", self, msg_id);
+        //         return Err(Error::InvalidMessage(
+        //             msg_id,
+        //             "Address::Client was expected".to_string(),
+        //         ));
+        //     }
+        // };
 
         self.send_message_to_client(&msg).await
     }
 
-    async fn send_message_to_client(&self, message: &MsgEnvelope) -> Result<()> {
-        let correlation_id = match message.message {
+    async fn send_message_to_client(&self, message: &Message) -> Result<()> {
+        let correlation_id = match message {
             Message::Event { correlation_id, .. }
             | Message::CmdError { correlation_id, .. }
             | Message::QueryResponse { correlation_id, .. } => correlation_id,
@@ -112,7 +112,7 @@ impl ClientMsgHandling {
 
         trace!("Message outgoing, correlates to {:?}", correlation_id);
 
-        match self.tracked_incoming.remove(&correlation_id) {
+        match self.tracked_incoming.remove(correlation_id) {
             Some((_, client_address)) => {
                 trace!("will send message via qp2p");
                 self.elder_state
@@ -127,7 +127,7 @@ impl ClientMsgHandling {
 
                 let _ = self
                     .tracked_outgoing
-                    .insert(correlation_id, message.clone());
+                    .insert(*correlation_id, message.clone());
                 Ok(())
             }
         }

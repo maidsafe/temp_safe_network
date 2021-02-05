@@ -18,8 +18,9 @@ use sn_data_types::{
     SequencePublicPolicy, SequenceUser,
 };
 use sn_messaging::client::{
-    CmdError, Message, MessageId, MsgSender, QueryResponse, SequenceRead, SequenceWrite,
+    Address, CmdError, Message, MessageId, QueryResponse, SequenceRead, SequenceWrite,
 };
+use sn_routing::XorName;
 
 use std::fmt::{self, Display, Formatter};
 
@@ -40,20 +41,20 @@ impl SequenceStorage {
         &self,
         read: &SequenceRead,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         use SequenceRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, &origin).await,
-            GetRange { address, range } => self.get_range(*address, *range, msg_id, &origin).await,
-            GetLastEntry(address) => self.get_last_entry(*address, msg_id, &origin).await,
-            GetOwner(address) => self.get_owner(*address, msg_id, &origin).await,
+            Get(address) => self.get(*address, msg_id, origin).await,
+            GetRange { address, range } => self.get_range(*address, *range, msg_id, origin).await,
+            GetLastEntry(address) => self.get_last_entry(*address, msg_id, origin).await,
+            GetOwner(address) => self.get_owner(*address, msg_id, origin).await,
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, &origin)
+                self.get_user_permissions(*address, *user, msg_id, origin)
                     .await
             }
-            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, &origin).await,
-            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, &origin).await,
+            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, origin).await,
+            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, origin).await,
         }
     }
 
@@ -61,7 +62,7 @@ impl SequenceStorage {
         &mut self,
         write: SequenceWrite,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         use SequenceWrite::*;
         info!("Matching Sequence Write");
@@ -86,21 +87,21 @@ impl SequenceStorage {
         &mut self,
         data: &Sequence,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
             Err(Error::DataExists)
         } else {
             self.chunks.put(&data).await
         };
-        self.ok_or_error(result, msg_id, &origin).await
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn get(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self.get_chunk(address, SequenceAction::Read, origin) {
             Ok(res) => Ok(res),
@@ -111,9 +112,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequence(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -123,11 +125,10 @@ impl SequenceStorage {
         &self,
         address: SequenceAddress,
         action: SequenceAction,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<Sequence> {
         let data = self.chunks.get(&address)?;
-
-        data.check_permission(action, Some(origin.id().public_key()), None)?;
+        data.check_permission(action, Some(origin), None)?;
         Ok(data)
     }
 
@@ -135,7 +136,7 @@ impl SequenceStorage {
         &mut self,
         address: SequenceAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self.chunks.get(&address).and_then(|sequence| {
             // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
@@ -160,7 +161,7 @@ impl SequenceStorage {
             Err(error) => Err(error),
         };
 
-        self.ok_or_error(result, msg_id, &origin).await
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn get_range(
@@ -168,7 +169,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         range: (SequenceIndex, SequenceIndex),
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
@@ -185,9 +186,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceRange(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -197,7 +199,7 @@ impl SequenceStorage {
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
@@ -218,9 +220,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceLastEntry(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -230,7 +233,7 @@ impl SequenceStorage {
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
@@ -251,9 +254,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceOwner(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -264,7 +268,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         user: SequenceUser,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
@@ -281,9 +285,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequenceUserPermissions(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -293,7 +298,7 @@ impl SequenceStorage {
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
@@ -314,9 +319,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequencePublicPolicy(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -326,7 +332,7 @@ impl SequenceStorage {
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
@@ -347,9 +353,10 @@ impl SequenceStorage {
                 Message::QueryResponse {
                     response: QueryResponse::GetSequencePrivatePolicy(result),
                     id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
+                    query_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -359,7 +366,7 @@ impl SequenceStorage {
         &mut self,
         write_op: SequencePolicyWriteOp<SequencePublicPolicy>,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let address = write_op.address;
         let result = self
@@ -373,14 +380,14 @@ impl SequenceStorage {
                 },
             )
             .await;
-        self.ok_or_error(result, msg_id, &origin).await
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn set_private_permissions(
         &mut self,
         write_op: SequencePolicyWriteOp<SequencePrivatePolicy>,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let address = write_op.address;
         let result = self
@@ -401,7 +408,7 @@ impl SequenceStorage {
     //     &mut self,
     //     write_op: SequenceDataWriteOp<SequenceOwner>,
     //     msg_id: MessageId,
-    //     origin: &MsgSender,
+    //     origin: XorName,
     // ) -> Result<NodeMessagingDuty> {
     //     let address = write_op.address;
     //     let result = self.edit_chunk(
@@ -413,14 +420,14 @@ impl SequenceStorage {
     //             Ok(sequence)
     //         },
     //     );
-    //     self.ok_or_error(result, msg_id, &origin)
+    //     self.ok_or_error(result, msg_id, origin)
     // }
 
     async fn edit(
         &mut self,
         write_op: SequenceDataWriteOp<SequenceEntry>,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let address = write_op.address;
         info!("Editing Sequence chunk");
@@ -447,7 +454,7 @@ impl SequenceStorage {
         &mut self,
         address: SequenceAddress,
         action: SequenceAction,
-        origin: &MsgSender,
+        origin: XorName,
         write_fn: F,
     ) -> Result<()>
     where
@@ -464,7 +471,7 @@ impl SequenceStorage {
         &self,
         result: Result<T>,
         msg_id: MessageId,
-        origin: &MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let error = match result {
             Ok(_) => return Ok(NodeMessagingDuty::NoOp),
@@ -479,8 +486,9 @@ impl SequenceStorage {
                     id: MessageId::new(),
                     error: CmdError::Data(error),
                     correlation_id: msg_id,
-                    cmd_origin: origin.address(),
+                    cmd_origin: Address::Client(origin),
                 },
+                origin,
                 false,
             )
             .await

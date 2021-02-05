@@ -95,7 +95,7 @@ impl Rewards {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
+    pub async fn catchup_with_replicas(&self, section: XorName) -> Result<NodeOperation> {
         info!("Rewards: Catching up with our Replicas (section actor history)!");
         // prepare actor init
         self.wrapping
@@ -106,6 +106,7 @@ impl Rewards {
                     )),
                     id: MessageId::new(),
                 },
+                section,
                 true,
             )
             .await
@@ -142,7 +143,7 @@ impl Rewards {
         &mut self,
         cmd: RewardCmd,
         _msg_id: MessageId,
-        _origin: Address,
+        _origin: XorName,
     ) -> Result<NodeOperation> {
         use RewardCmd::*;
         let result = match cmd {
@@ -183,7 +184,7 @@ impl Rewards {
         &self,
         query: RewardQuery,
         msg_id: MessageId,
-        origin: Address,
+        origin: XorName,
     ) -> Result<NodeOperation> {
         use RewardQuery::*;
         let result = match query {
@@ -191,7 +192,7 @@ impl Rewards {
                 old_node_id,
                 new_node_id,
             } => self
-                .get_wallet_id(old_node_id, new_node_id, msg_id, &origin)
+                .get_wallet_id(old_node_id, new_node_id, msg_id, origin)
                 .await?
                 .into(),
         };
@@ -301,6 +302,7 @@ impl Rewards {
                     }),
                     id: MessageId::new(),
                 },
+                old_node_id,
                 true,
             )
             .await
@@ -404,7 +406,7 @@ impl Rewards {
         old_node_id: XorName,
         new_node_id: XorName,
         msg_id: MessageId,
-        origin: &Address,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let entry = match self.node_rewards.get(&old_node_id) {
             Some(entry) => entry.clone(),
@@ -420,12 +422,17 @@ impl Rewards {
                 // (Could be a case for lazy messaging..)
                 return self
                     .wrapping
-                    .send_to_node(Message::NodeQueryResponse {
-                        response: Rewards(GetNodeWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
-                        id: MessageId::in_response_to(&msg_id),
-                        correlation_id: msg_id,
-                        query_origin: origin.clone(),
-                    })
+                    .send_to_node(
+                        Message::NodeQueryResponse {
+                            response: Rewards(GetNodeWalletId(Err(
+                                ErrorMessage::NodeWasNotRelocated,
+                            ))),
+                            id: MessageId::in_response_to(&msg_id),
+                            correlation_id: msg_id,
+                            query_origin: Address::Node(origin),
+                        },
+                        origin,
+                    )
                     .await;
             }
         };
@@ -440,12 +447,15 @@ impl Rewards {
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
         self.wrapping
-            .send_to_node(Message::NodeQueryResponse {
-                response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                query_origin: origin.clone(),
-            })
+            .send_to_node(
+                Message::NodeQueryResponse {
+                    response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    query_origin: Address::Node(origin),
+                },
+                origin,
+            )
             .await
     }
 }

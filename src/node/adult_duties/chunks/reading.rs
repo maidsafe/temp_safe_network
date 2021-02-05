@@ -8,49 +8,50 @@
 
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
-use crate::{Error, Result};
-use log::error;
-use sn_data_types::Error as DtError;
-use sn_messaging::client::{Address, BlobRead, MsgEnvelope};
+use crate::Result;
+use sn_messaging::client::{BlobRead, MessageId};
+use sn_routing::XorName;
 
 /// Read operations on data chunks.
 
 pub(super) async fn get_result(
     read: &BlobRead,
-    msg: MsgEnvelope,
+    msg_id: MessageId,
+    origin: XorName,
     storage: &ChunkStorage,
 ) -> Result<NodeMessagingDuty> {
     let BlobRead::Get(address) = read;
-    if let Address::Section(_) = msg.most_recent_sender().address() {
-        let verification = msg.verify();
-        if let Ok(true) = verification {
-            storage.get(address, msg.id(), &msg.origin).await
-        } else {
-            error!(
-                "Accumulated signature is invalid! Verification: {:?}",
-                verification
-            );
-            Err(Error::NetworkData(DtError::InvalidSignature))
-        }
-    // } else if matches!(self.requester, PublicId::Node(_)) {
-    //     if self.verify(&address) {
-    //         storage.get(
-    //             self.src,
-    //             *address,
-    //             &self.requester,
-    //             self.message_id,
-    //             self.request.clone(),
-    //             self.accumulated_signature.as_ref(),
-    //         )
+    storage.get(address, msg_id, origin).await
+    // if let Address::Section(_) = msg.most_recent_sender().address() {
+    //     let verification = msg.verify();
+    //     if let Ok(true) = verification {
+    //         storage.get(address, msg.id(), &msg.origin).await
     //     } else {
-    //         error!("Accumulated signature is invalid!");
-    //         None
+    //         error!(
+    //             "Accumulated signature is invalid! Verification: {:?}",
+    //             verification
+    //         );
+    //         Err(Error::NetworkData(DtError::InvalidSignature))
     //     }
-    } else {
-        // only receiving these requests from sections
-        Err(Error::Logic(format!(
-            "{:?}: Can only receive requests from sections",
-            msg.id()
-        )))
-    }
+    // // } else if matches!(self.requester, PublicId::Node(_)) {
+    // //     if self.verify(&address) {
+    // //         storage.get(
+    // //             self.src,
+    // //             *address,
+    // //             &self.requester,
+    // //             self.message_id,
+    // //             self.request.clone(),
+    // //             self.accumulated_signature.as_ref(),
+    // //         )
+    // //     } else {
+    // //         error!("Accumulated signature is invalid!");
+    // //         None
+    // //     }
+    // } else {
+    //     // only receiving these requests from sections
+    //     Err(Error::Logic(format!(
+    //         "{:?}: Can only receive requests from sections",
+    //         msg.id()
+    //     )))
+    // }
 }

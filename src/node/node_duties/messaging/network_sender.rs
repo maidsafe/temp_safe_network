@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::node_ops::{GatewayDuty, NodeMessagingDuty, NodeOperation},
+    node::node_ops::{GatewayDuty, Msg, NodeOperation},
     Error, Network, Result,
 };
 use log::error;
-use sn_messaging::client::{Address, MsgEnvelope};
+use sn_messaging::client::Message;
 use sn_routing::{DstLocation, SrcLocation};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -26,43 +26,34 @@ impl NetworkSender {
         Self { network }
     }
 
-    pub async fn send_to_client(
-        &mut self,
-        msg: MsgEnvelope,
-        as_node: bool,
-    ) -> Result<NodeOperation> {
-        let dst = match msg.destination()? {
-            Address::Client(xorname) => xorname,
-            Address::Node(_) => return Ok(NodeMessagingDuty::SendToNode(msg).into()),
-            Address::Section(_) => {
-                return Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
-            }
-        };
-        if self.network.matches_our_prefix(dst).await {
-            Ok(GatewayDuty::FindClientFor(msg).into())
-        } else {
-            Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
-        }
+    pub async fn send_to_client(&mut self, msg: Msg, as_node: bool) -> Result<NodeOperation> {
+        Ok(GatewayDuty::FindClientFor(msg).into())
+        // let dst = match msg.destination()? {
+        //     Address::Client(xorname) => xorname,
+        //     Address::Node(_) => return Ok(NodeMessagingDuty::SendToNode(msg).into()),
+        //     Address::Section(_) => {
+        //         return Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
+        //     }
+        // };
+        // if self.network.matches_our_prefix(dst).await {
+        //     Ok(GatewayDuty::FindClientFor(msg).into())
+        // } else {
+        //     Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
+        // }
     }
 
-    pub async fn send_to_node(&mut self, msg: MsgEnvelope, as_node: bool) -> Result<NodeOperation> {
+    pub async fn send_to_node(&mut self, msg: Msg, as_node: bool) -> Result<NodeOperation> {
         let name = self.network.our_name().await;
-        let dst = match msg.destination()? {
-            Address::Node(xorname) => DstLocation::Node(xorname),
-            Address::Section(_) => {
-                return Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
-            }
-            Address::Client(_) => return self.send_to_client(msg, as_node).await,
-        };
+        let dst = msg.dst; // DstLocation::Node(msg.dst.name());
 
         let result = self
             .network
-            .send_message(SrcLocation::Node(name), dst, msg.serialize()?)
+            .send_message(SrcLocation::Node(name), dst, msg.msg.serialize()?)
             .await;
 
         result.map_or_else(
             |err| {
-                error!("Unable to send MsgEnvelope to Peer: {:?}", err);
+                error!("Unable to send Message to Peer: {:?}", err);
                 Err(Error::Logic(format!(
                     "{:?}: Unable to send Msg to Peer",
                     msg.id()
@@ -75,7 +66,7 @@ impl NetworkSender {
     pub async fn send_to_nodes(
         &mut self,
         targets: BTreeSet<XorName>,
-        msg: &MsgEnvelope,
+        msg: &Message,
     ) -> Result<NodeOperation> {
         let name = self.network.our_name().await;
         let bytes = &msg.serialize()?;
@@ -89,7 +80,7 @@ impl NetworkSender {
                 .await
                 .map_or_else(
                     |err| {
-                        error!("Unable to send MsgEnvelope to Peer: {:?}", err);
+                        error!("Unable to send Message to Peer: {:?}", err);
                     },
                     |()| {},
                 );
@@ -99,19 +90,21 @@ impl NetworkSender {
 
     pub async fn send_to_network(
         &mut self,
-        msg: MsgEnvelope,
+        msg: Msg,
+        // msg: Message,
+        // location: XorName,
         as_node: bool,
     ) -> Result<NodeOperation> {
-        let dst = match msg.destination()? {
-            Address::Node(xorname) => DstLocation::Node(xorname),
-            Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(xorname),
-        };
+        let dst = msg.dst; //DstLocation::Section(location);
         let src = if as_node {
             SrcLocation::Node(self.network.our_name().await)
         } else {
             SrcLocation::Section(self.network.our_prefix().await)
         };
-        let result = self.network.send_message(src, dst, msg.serialize()?).await;
+        let result = self
+            .network
+            .send_message(src, dst, msg.msg.serialize()?)
+            .await;
 
         result.map_or_else(
             |err| {

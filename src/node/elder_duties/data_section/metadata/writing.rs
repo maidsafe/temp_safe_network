@@ -13,42 +13,35 @@ use super::{
 use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, NodeOperation};
 use crate::{Error, Result};
 use log::info;
-use sn_messaging::client::{
-    BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender, SequenceWrite,
-};
+use sn_messaging::client::{BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, SequenceWrite};
+use sn_routing::XorName;
 
 pub(super) async fn get_result(
-    msg: MsgEnvelope,
+    msg: Message,
+    origin: XorName,
     stores: &mut ElderStores,
 ) -> Result<NodeOperation> {
     use DataCmd::*;
     let msg_id = msg.id();
-    let msg_origin = msg.origin;
-    let proxies = msg.proxies;
+    // let msg_origin = msg.origin;
+    // let proxies = msg.proxies;
     info!("Writing Data");
-    let result = match msg.message {
+    let result = match msg {
         Message::Cmd {
             cmd: Cmd::Data { cmd: data_cmd, .. },
             ..
         } => match data_cmd {
             Blob(write) => {
                 info!("Writing Blob");
-                blob(
-                    write,
-                    stores.blob_register_mut(),
-                    msg_id,
-                    msg_origin,
-                    proxies,
-                )
-                .await
+                blob(write, stores.blob_register_mut(), msg_id, origin).await
             }
             Map(write) => {
                 info!("Writing Map");
-                map(write, stores.map_storage_mut(), msg_id, msg_origin).await
+                map(write, stores.map_storage_mut(), msg_id, origin).await
             }
             Sequence(write) => {
                 info!("Writing Sequence");
-                sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await
+                sequence(write, stores.sequence_storage_mut(), msg_id, origin).await
             }
         },
         _ => Err(Error::Logic(
@@ -65,26 +58,25 @@ async fn blob(
     write: BlobWrite,
     register: &mut BlobRegister,
     msg_id: MessageId,
-    origin: MsgSender,
-    proxies: Vec<MsgSender>,
+    origin: XorName,
 ) -> Result<NodeMessagingDuty> {
-    register.write(write, msg_id, origin, proxies).await
+    register.write(write, msg_id, origin).await
 }
 
 async fn map(
     write: MapWrite,
     storage: &mut MapStorage,
     msg_id: MessageId,
-    origin: MsgSender,
+    origin: XorName,
 ) -> Result<NodeMessagingDuty> {
-    storage.write(write, msg_id, &origin).await
+    storage.write(write, msg_id, origin).await
 }
 
 async fn sequence(
     write: SequenceWrite,
     storage: &mut SequenceStorage,
     msg_id: MessageId,
-    origin: MsgSender,
+    origin: XorName,
 ) -> Result<NodeMessagingDuty> {
-    storage.write(write, msg_id, &origin).await
+    storage.write(write, msg_id, origin).await
 }

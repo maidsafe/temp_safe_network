@@ -17,9 +17,7 @@ use crate::{
 use chunk_storage::ChunkStorage;
 use log::{info, trace};
 use sn_data_types::{Blob, BlobAddress};
-use sn_messaging::client::{
-    Address, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, Query,
-};
+use sn_messaging::client::{DataQuery, Message, MessageId, NodeCmd, NodeDataCmd, Query};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -40,22 +38,25 @@ impl Chunks {
         })
     }
 
-    pub async fn receive_msg(&mut self, msg: MsgEnvelope) -> Result<NodeMessagingDuty> {
+    pub async fn receive_msg(
+        &mut self,
+        msg: Message,
+        origin: XorName,
+    ) -> Result<NodeMessagingDuty> {
         trace!(
-            "{}: Received ({:?} from src {:?}",
+            "{}: Received ({:?} from src [..]", // {:?}
             self,
             msg.id(),
-            msg.most_recent_sender().address(),
         );
-        match &msg.message {
+        match &msg {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(ref read)),
                 ..
-            } => reading::get_result(read, msg.clone(), &self.chunk_storage).await,
+            } => reading::get_result(read, msg.id(), origin, &self.chunk_storage).await,
             Message::NodeCmd {
                 cmd: NodeCmd::Data(NodeDataCmd::Blob(write)),
                 ..
-            } => writing::get_result(write, msg.clone(), &mut self.chunk_storage).await,
+            } => writing::get_result(write, msg.clone(), origin, &mut self.chunk_storage).await,
             _ => Err(Error::Logic(format!(
                 "{:?}: Could not receive msg as Adult",
                 msg.id()
@@ -77,13 +78,13 @@ impl Chunks {
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-        section_authority: MsgSender,
+        //section_authority: MsgSender,
         msg_id: MessageId,
-        origin: MsgSender,
+        //origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        info!("Creating new MsgEnvelope for acquiring chunk from current_holders");
+        info!("Creating new Message for acquiring chunk from current_holders");
         self.chunk_storage
-            .replicate_chunk(address, current_holders, section_authority, msg_id, origin)
+            .replicate_chunk(address, current_holders)//section_authority, msg_id, origin)
             .await
     }
 
@@ -92,7 +93,7 @@ impl Chunks {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: Address,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         info!("Send blob for replication to the new holder.");
         self.chunk_storage

@@ -6,17 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::Result;
 use crate::{node::node_ops::NodeMessagingDuty, AdultState, ElderState, NodeState};
-use crate::{Error, Result};
-use log::{info, warn};
-use serde::Serialize;
-use sn_data_types::Signature;
+use log::info;
 use sn_messaging::client::{
-    Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeDuties, TransientSectionKey,
+    Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, NodeDuties,
 };
+use sn_routing::DstLocation;
 use std::collections::BTreeSet;
 use xor_name::XorName;
+
+use super::node_ops::Msg;
 
 /// Wrapping of msgs sent by Elders.
 #[derive(Clone)]
@@ -52,12 +52,8 @@ impl NodeMsgWrapping {
         Self { inner }
     }
 
-    pub async fn send_to_section(
-        &self,
-        message: Message,
-        as_node: bool,
-    ) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_section(message, as_node).await
+    pub async fn send_to_section(&self, msg: Msg, as_node: bool) -> Result<NodeMessagingDuty> {
+        self.inner.send_to_section(msg, as_node).await
     }
 
     // pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
@@ -75,38 +71,32 @@ impl AdultMsgWrapping {
         self.inner.name()
     }
 
-    pub async fn send_to_section(
-        &self,
-        message: Message,
-        as_node: bool,
-    ) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_section(message, as_node).await
+    pub async fn send_to_section(&self, msg: Msg, as_node: bool) -> Result<NodeMessagingDuty> {
+        self.inner.send_to_section(msg, as_node).await
     }
 
-    pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_node(message).await
+    pub async fn send_to_node(&self, msg: Msg) -> Result<NodeMessagingDuty> {
+        self.inner.send_to_node(msg).await
     }
 
     pub async fn send_to_adults(
         &self,
-        message: Message,
+        msg: Message,
         targets: BTreeSet<XorName>,
         duty: AdultDuties,
     ) -> Result<NodeMessagingDuty> {
-        let (key, sig) = self.inner.ed_key_sig(&message.serialize()?).await?;
-        let origin = MsgSender::adult(key, duty, sig)?;
-        self.inner
-            .send_to_adults(targets, message, false, origin, vec![])
-            .await
+        // let (key, sig) = self.inner.ed_key_sig(&message.serialize()?).await?;
+        // let origin = MsgSender::adult(key, duty, sig)?;
+        self.inner.send_to_adults(targets, msg, false).await
     }
 
     pub async fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: &Address,
+        cmd_origin: XorName,
     ) -> Result<NodeMessagingDuty> {
-        self.inner.error(error, msg_id, origin).await
+        self.inner.error(error, msg_id, cmd_origin).await
     }
 }
 
@@ -116,50 +106,67 @@ impl ElderMsgWrapping {
         Self { inner }
     }
 
-    pub async fn forward(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
-        let msg = self.inner.set_proxy(&msg, true).await?;
+    pub async fn forward(&self, msg: Msg) -> Result<NodeMessagingDuty> {
+        //let msg = self.inner.set_proxy(&msg, true).await?;
         Ok(NodeMessagingDuty::SendToSection {
-            msg,
+            msg: msg.clone(),
             as_node: false,
         })
     }
 
-    pub async fn send_to_client(&self, message: Message) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_client(message).await
+    pub async fn send_to_client(&self, msg: Message, client: XorName) -> Result<NodeMessagingDuty> {
+        self.inner
+            .send_to_client(Msg {
+                msg,
+                dst: DstLocation::Client(client),
+            })
+            .await
     }
 
     pub async fn send_to_section(
         &self,
-        message: Message,
+        msg: Message,
+        location: XorName,
         as_node: bool,
     ) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_section(message, as_node).await
+        self.inner
+            .send_to_section(
+                Msg {
+                    msg,
+                    dst: DstLocation::Section(location),
+                },
+                as_node,
+            )
+            .await
     }
 
-    pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_node(message).await
+    pub async fn send_to_node(&self, msg: Message, node: XorName) -> Result<NodeMessagingDuty> {
+        self.inner
+            .send_to_node(Msg {
+                msg,
+                dst: DstLocation::Node(node),
+            })
+            .await
     }
 
     pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        message: Message,
+        msg: Message,
         as_section: bool,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        //origin: MsgSender,
+        //proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        self.inner
-            .send_to_adults(targets, message, as_section, origin, proxies)
-            .await
+        self.inner.send_to_adults(targets, msg, as_section).await
     }
 
     pub async fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: &Address,
+        cmd_origin: XorName,
     ) -> Result<NodeMessagingDuty> {
-        self.inner.error(error, msg_id, origin).await
+        self.inner.error(error, msg_id, cmd_origin).await
     }
 }
 
@@ -175,54 +182,50 @@ impl MsgWrapping {
         }
     }
 
-    pub async fn send_to_client(&self, message: Message) -> Result<NodeMessagingDuty> {
-        let origin = self.sign(&message, true).await?;
-        let msg = MsgEnvelope {
-            message,
-            origin,
-            proxies: Default::default(),
-        };
+    pub async fn send_to_client(&self, msg: Msg) -> Result<NodeMessagingDuty> {
+        // let origin = self.sign(&message, true).await?;
+        // let msg = Message {
+        //     message,
+        //     origin,
+        //     proxies: Default::default(),
+        // };
         Ok(NodeMessagingDuty::SendToClient(msg))
     }
 
-    pub async fn send_to_node(&self, message: Message) -> Result<NodeMessagingDuty> {
-        let origin = self.sign(&message, false).await?;
-        let msg = MsgEnvelope {
-            message,
-            origin,
-            proxies: Default::default(),
-        };
+    pub async fn send_to_node(&self, msg: Msg) -> Result<NodeMessagingDuty> {
+        // let origin = self.sign(&message, false).await?;
+        // let msg = Message {
+        //     message,
+        //     origin,
+        //     proxies: Default::default(),
+        // };
         Ok(NodeMessagingDuty::SendToNode(msg))
     }
 
-    pub async fn send_to_section(
-        &self,
-        message: Message,
-        as_node: bool,
-    ) -> Result<NodeMessagingDuty> {
-        let origin = self.sign(&message, !as_node).await?;
-        let msg = MsgEnvelope {
-            message,
-            origin,
-            proxies: Default::default(),
-        };
+    pub async fn send_to_section(&self, msg: Msg, as_node: bool) -> Result<NodeMessagingDuty> {
+        // let origin = self.sign(&message, !as_node).await?;
+        // let msg = Message {
+        //     message,
+        //     origin,
+        //     proxies: Default::default(),
+        // };
         Ok(NodeMessagingDuty::SendToSection { msg, as_node })
     }
 
     pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        message: Message,
+        msg: Message,
         as_section: bool,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        //origin: MsgSender,
+        //proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let msg_envelope = MsgEnvelope {
-            message,
-            origin,
-            proxies,
-        };
-        let msg = self.set_proxy(&msg_envelope, as_section).await?;
+        // let msg_envelope = Message {
+        //     message,
+        //     origin,
+        //     proxies,
+        // };
+        // let msg = self.set_proxy(&msg_envelope, as_section).await?;
         Ok(NodeMessagingDuty::SendToAdults { targets, msg })
     }
 
@@ -230,82 +233,21 @@ impl MsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        origin: &Address,
+        cmd_origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         info!("Error {:?}", error);
         self.send_to_section(
-            Message::CmdError {
-                id: MessageId::new(),
-                error,
-                correlation_id: msg_id,
-                cmd_origin: origin.clone(),
+            Msg {
+                msg: Message::CmdError {
+                    id: MessageId::new(),
+                    error,
+                    correlation_id: msg_id,
+                    cmd_origin: Address::Client(cmd_origin.into()),
+                },
+                dst: DstLocation::Section(cmd_origin.into()),
             },
             true,
         )
         .await
-    }
-
-    async fn sign<T: Serialize>(&self, data: &T, as_section: bool) -> Result<MsgSender> {
-        let sender = match self.duty {
-            Duty::Adult(duty) => {
-                info!("Signing data as Adult.");
-                let (key, sig) = self.ed_key_sig(data).await?;
-                MsgSender::adult(key, duty, sig)?
-            }
-            Duty::Elder(duty) => {
-                let elder_state = match &self.node_state {
-                    NodeState::Adult(_) => return Err(Error::InvalidOperation),
-                    NodeState::Elder(state) => state,
-                };
-                if as_section {
-                    warn!("Creating section sender!");
-                    info!("Signing data as Section.");
-                    let bls_key = elder_state.public_key_set().public_key();
-                    MsgSender::section(TransientSectionKey { bls_key }, duty)?
-                } else {
-                    info!("Signing data as Elder.");
-                    let sig = elder_state.sign_as_elder(data).await?;
-                    MsgSender::elder(elder_state.elder_key(), duty, sig.share)?
-                }
-            }
-            Duty::Node(_) => {
-                info!("Signing data as Node.");
-                let (key, sig) = self.ed_key_sig(data).await?;
-                MsgSender::any_node(key, self.duty, sig)?
-            }
-        };
-
-        Ok(sender)
-    }
-
-    async fn ed_key_sig<T: Serialize>(
-        &self,
-        data: &T,
-    ) -> Result<(ed25519_dalek::PublicKey, ed25519_dalek::Signature)> {
-        match &self.node_state {
-            NodeState::Adult(state) => {
-                let key = state.node_id();
-                match state.sign_as_node(data).await {
-                    Ok(Signature::Ed25519(sig)) => Ok((key, sig)),
-                    Err(e) => Err(e),
-                    _ => Err(Error::InvalidOperation),
-                }
-            }
-            NodeState::Elder(state) => {
-                let key = state.node_id();
-                match state.sign_as_node(data).await {
-                    Ok(Signature::Ed25519(sig)) => Ok((key, sig)),
-                    Err(e) => Err(e),
-                    _ => Err(Error::InvalidOperation),
-                }
-            }
-        }
-    }
-
-    async fn set_proxy(&self, msg: &MsgEnvelope, as_section: bool) -> Result<MsgEnvelope> {
-        // origin signs the message, while proxies sign the envelope
-        let mut msg = msg.clone();
-        msg.add_proxy(self.sign(&msg.message, as_section).await?);
-        Ok(msg)
     }
 }

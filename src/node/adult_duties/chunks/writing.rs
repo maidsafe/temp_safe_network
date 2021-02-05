@@ -10,42 +10,19 @@
 
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
-use crate::{Error, Result};
-use log::error;
-use sn_data_types::Error as DtError;
-use sn_messaging::client::{BlobWrite, MsgEnvelope};
+use crate::Result;
+use sn_messaging::client::{BlobWrite, Message};
+use sn_routing::XorName;
 
 pub(super) async fn get_result(
     write: &BlobWrite,
-    msg: MsgEnvelope,
+    msg: Message,
+    origin: XorName,
     storage: &mut ChunkStorage,
 ) -> Result<NodeMessagingDuty> {
     use BlobWrite::*;
-    let verification = msg.verify();
     match &write {
-        New(data) => {
-            if let Ok(true) = verification {
-                storage.store(&data, msg.id(), &msg.origin).await
-            } else {
-                error!(
-                    "Accumulated signature for {:?} is invalid! Verification: {:?}",
-                    &msg.id(),
-                    verification
-                );
-                Err(Error::NetworkData(DtError::InvalidSignature))
-            }
-        }
-        DeletePrivate(address) => {
-            if let Ok(true) = verification {
-                // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
-                storage.delete(*address, msg.id(), &msg.origin).await
-            } else {
-                error!(
-                    "Accumulated signature is invalid! Verification: {:?}",
-                    verification
-                );
-                Err(Error::NetworkData(DtError::InvalidSignature))
-            }
-        }
+        New(data) => storage.store(&data, msg.id(), origin).await,
+        DeletePrivate(address) => storage.delete(*address, msg.id(), origin).await, // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
     }
 }

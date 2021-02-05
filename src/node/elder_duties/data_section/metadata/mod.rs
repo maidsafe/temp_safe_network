@@ -24,7 +24,7 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
-use sn_messaging::client::{ElderDuties, Message, MsgEnvelope};
+use sn_messaging::client::{ElderDuties, Message};
 
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -61,15 +61,19 @@ impl Metadata {
     pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NodeOperation> {
         use MetadataDuty::*;
         match duty {
-            ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg).await,
+            ProcessRead { msg, origin } | ProcessWrite { msg, origin } => {
+                self.process_msg(msg, origin).await
+            }
             NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
-    async fn process_msg(&mut self, msg: MsgEnvelope) -> Result<NodeOperation> {
-        match &msg.message {
-            Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
-            Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.convert(),
+    async fn process_msg(&mut self, msg: Message, origin: XorName) -> Result<NodeOperation> {
+        match &msg {
+            Message::Cmd { .. } => writing::get_result(msg, origin, &mut self.elder_stores).await,
+            Message::Query { .. } => reading::get_result(msg, origin, &self.elder_stores)
+                .await
+                .convert(),
             _ => Err(Error::Logic(
                 "Only Queries and Cmds from client can be handled at Metadata".to_string(),
             )), // only Queries and Cmds from client is handled at Metadata

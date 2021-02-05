@@ -10,12 +10,10 @@ mod client_msg_handling;
 
 use self::client_msg_handling::ClientMsgHandling;
 use crate::{
-    node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
+    node::node_ops::{GatewayDuty, KeySectionDuty, Msg, NodeMessagingDuty, NodeOperation},
     ElderState, Error, Result,
 };
-use log::{error, trace, warn};
-use sn_data_types::Error as DtError;
-use sn_messaging::client::{Address, MsgEnvelope};
+use log::{error, trace};
 use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
@@ -48,12 +46,12 @@ impl ClientGateway {
         }
     }
 
-    async fn try_find_client(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
+    async fn try_find_client(&self, msg: &Msg) -> Result<NodeOperation> {
         trace!("trying to find client...");
-        if let Address::Client(xorname) = &msg.destination()? {
+        if let Some(xorname) = msg.dst.name() {
             if self.elder_state.prefix().matches(xorname) {
                 trace!("Message matches gateway prefix");
-                self.client_msg_handling.match_outgoing(msg).await?;
+                self.client_msg_handling.match_outgoing(&msg.msg).await?;
                 return Ok(NodeOperation::NoOp);
             }
         }
@@ -69,18 +67,22 @@ impl ClientGateway {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived { content, src, .. } => {
-                trace!("Deserialized client msg is {:?}", content.message);
+                trace!("Deserialized client msg is {:?}", content);
 
-                if !validate_client_sig(&content) {
-                    return Err(Error::NetworkData(DtError::InvalidSignature));
-                }
+                // if !validate_client_sig(&content) {
+                //     return Err(Error::NetworkData(DtError::InvalidSignature));
+                // }
 
                 match self
                     .client_msg_handling
-                    .track_incoming_message(&content.message, src)
+                    .track_incoming_message(&content, src)
                     .await
                 {
-                    Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(*content).into()),
+                    Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg {
+                        msg: *content,
+                        client: sn_routing::XorName::default(),
+                    }
+                    .into()),
                     Err(e) => Err(e),
                 }
             }
@@ -94,23 +96,23 @@ impl ClientGateway {
     }
 }
 
-fn validate_client_sig(msg: &MsgEnvelope) -> bool {
-    if !msg.origin.is_client() {
-        return false;
-    }
-    let verification = msg.verify();
-    if let Ok(true) = verification {
-        true
-    } else {
-        warn!(
-            "Msg {:?} from {:?} is invalid. Verification: {:?}",
-            msg.message.id(),
-            msg.origin.address().xorname(),
-            verification
-        );
-        false
-    }
-}
+// fn validate_client_sig(msg: &Message) -> bool {
+//     if !msg.origin.is_client() {
+//         return false;
+//     }
+//     let verification = msg.verify();
+//     if let Ok(true) = verification {
+//         true
+//     } else {
+//         warn!(
+//             "Msg {:?} from {:?} is invalid. Verification: {:?}",
+//             msg.id(),
+//             msg.origin.address().xorname(),
+//             verification
+//         );
+//         false
+//     }
+// }
 
 impl Display for ClientGateway {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {

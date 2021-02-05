@@ -17,7 +17,7 @@ use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as NdResult};
 use sn_messaging::client::{
-    BlobRead, BlobWrite, CmdError, DataQuery, Error as ErrorMessage, Message, MessageId, MsgSender,
+    Address, BlobRead, BlobWrite, CmdError, DataQuery, Error as ErrorMessage, Message, MessageId,
     NodeCmd, NodeDataCmd, Query, QueryResponse,
 };
 
@@ -65,13 +65,12 @@ impl BlobRegister {
         &mut self,
         write: BlobWrite,
         msg_id: MessageId,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin, proxies).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin, proxies).await,
+            New(data) => self.store(data, msg_id, origin).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin).await,
         }
     }
 
@@ -79,8 +78,7 @@ impl BlobRegister {
         &mut self,
         data: Blob,
         msg_id: MessageId,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
@@ -96,9 +94,10 @@ impl BlobRegister {
                             Message::CmdError {
                                 error: CmdError::Data(ErrorMessage::DataExists),
                                 id: MessageId::new(),
-                                cmd_origin: origin.address(),
+                                cmd_origin: Address::Client(origin),
                                 correlation_id: msg_id,
                             },
+                            origin,
                             true,
                         )
                         .await;
@@ -133,7 +132,7 @@ impl BlobRegister {
 
         let results: Vec<_> = (&target_holders)
             .iter()
-            .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin.id().public_key()))
+            .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin))
             .filter(|res| res.is_err())
             .collect();
         if !results.is_empty() {
@@ -143,12 +142,8 @@ impl BlobRegister {
             cmd: NodeCmd::Data(NodeDataCmd::Blob(BlobWrite::New(data))),
             id: msg_id,
         };
-        //     ,
-        //     origin,
-        //     proxies,
-        // };
         self.wrapping
-            .send_to_adults(target_holders, message, true, origin, proxies)
+            .send_to_adults(target_holders, message, true)
             .await
     }
 
@@ -156,7 +151,7 @@ impl BlobRegister {
         &self,
         error: Error,
         msg_id: MessageId,
-        origin: MsgSender,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let message_error = convert_to_error_message(error)?;
         self.wrapping
@@ -164,9 +159,10 @@ impl BlobRegister {
                 Message::CmdError {
                     error: CmdError::Data(message_error),
                     id: MessageId::new(),
-                    cmd_origin: origin.address(),
+                    cmd_origin: Address::Client(origin),
                     correlation_id: msg_id,
                 },
+                origin,
                 true,
             )
             .await
@@ -176,8 +172,7 @@ impl BlobRegister {
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
@@ -186,11 +181,11 @@ impl BlobRegister {
 
         // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
-            let pk = origin.id().public_key();
-            if data_owner != pk {
+            let owner: XorName = data_owner.into();
+            if owner != origin {
                 return self
                     .send_blob_cmd_error(
-                        Error::NetworkData(DtError::AccessDenied(pk)),
+                        Error::NetworkData(DtError::AccessDenied(data_owner)), // should probably be origin here..
                         msg_id,
                         origin,
                     )
@@ -209,7 +204,7 @@ impl BlobRegister {
             id: msg_id,
         };
         self.wrapping
-            .send_to_adults(metadata.holders, message, true, origin, proxies)
+            .send_to_adults(metadata.holders, message, true)
             .await
     }
 
@@ -217,7 +212,7 @@ impl BlobRegister {
         &mut self,
         blob_address: BlobAddress,
         holder: XorName,
-        origin: PublicKey,
+        origin: XorName,
     ) -> Result<()> {
         // TODO -
         // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
@@ -228,7 +223,8 @@ impl BlobRegister {
         let db_key = blob_address.to_db_key()?;
         let mut metadata = self.get_metadata_for(blob_address).unwrap_or_default();
         if blob_address.is_unpub() {
-            metadata.owner = Some(origin);
+            // TODO: FIX THIS:
+            //metadata.owner = Some(origin);
         }
 
         let _ = metadata.holders.insert(holder);
@@ -336,20 +332,26 @@ impl BlobRegister {
             .map(|new_holder| {
                 let message_id = MessageId::combine(vec![*address.name(), new_holder]);
                 info!("Sending replicate-chunk cmd to NewHolder {:?}", new_holder);
-                Message::NodeCmd {
-                    cmd: Data(ReplicateChunk {
-                        new_holder,
-                        address,
-                        current_holders: current_holders.clone(),
-                    }),
-                    id: message_id,
-                }
+                (
+                    Message::NodeCmd {
+                        cmd: Data(ReplicateChunk {
+                            new_holder,
+                            address,
+                            current_holders: current_holders.clone(),
+                        }),
+                        id: message_id,
+                    },
+                    new_holder,
+                )
             })
             .collect::<Vec<_>>();
-        for message in messages {
-            match self.wrapping.send_to_node(message.clone()).await {
+        for (msg, dst) in messages {
+            match self.wrapping.send_to_node(msg, dst).await {
                 Ok(op) => node_ops.push(op.into()),
-                Err(e) => warn!("Error: {}. Failed to send msg to node: {:?}", e, message),
+                Err(e) => warn!(
+                    "Error: {}. Failed to send replication cmd (for chunk {:?}) to node {}",
+                    e, address, dst
+                ),
             }
         }
         node_ops
@@ -359,12 +361,11 @@ impl BlobRegister {
         &self,
         read: &BlobRead,
         msg_id: MessageId,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         use BlobRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin, proxies).await,
+            Get(address) => self.get(*address, msg_id, origin).await,
         }
     }
 
@@ -372,23 +373,23 @@ impl BlobRegister {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        origin: XorName,
     ) -> Result<NodeMessagingDuty> {
         let query_error = |error: Error| async {
             let message_error = convert_to_error_message(error)?;
             let err_msg = Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(message_error)),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: origin.address(),
+                query_origin: Address::Client(origin),
                 correlation_id: msg_id,
             };
-            // short circuit sending the response directly to client if there are no intermediaries
-            if proxies.is_empty() && origin.is_client() {
-                self.wrapping.send_to_client(err_msg).await
-            } else {
-                self.wrapping.send_to_section(err_msg, false).await
-            }
+            self.wrapping.send_to_client(err_msg, origin).await
+            // // short circuit sending the response directly to client if there are no intermediaries
+            // if proxies.is_empty() && origin.is_client() {
+            //     self.wrapping.send_to_client(err_msg, origin).await
+            // } else {
+            //     self.wrapping.send_to_section(err_msg, false).await
+            // }
         };
 
         let metadata = match self.get_metadata_for(address) {
@@ -397,9 +398,10 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != origin.id().public_key() {
+            let owner: XorName = data_owner.into();
+            if owner != origin {
                 return query_error(Error::NetworkData(DtError::AccessDenied(
-                    origin.id().public_key(),
+                    data_owner, // probably should be the origin here...
                 )))
                 .await;
             }
@@ -409,7 +411,7 @@ impl BlobRegister {
             id: msg_id,
         };
         self.wrapping
-            .send_to_adults(metadata.holders, message, true, origin, proxies)
+            .send_to_adults(metadata.holders, message, true)
             .await
     }
 
