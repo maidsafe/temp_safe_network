@@ -17,6 +17,12 @@ const AUTH_REQ_NOTIFS_ENDPOINT: &str = "https://localhost:33002";
 
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
+    /// Shows the version of the Authenticator binary
+    Version {
+        #[structopt(long = "authd-path")]
+        /// Path of sn_authd executable (default ~/.safe/authd/)
+        authd_path: Option<String>,
+    },
     #[structopt(name = "clear")]
     /// Clear Safe CLI authorisation credentials from local file
     Clear {},
@@ -128,6 +134,10 @@ pub async fn auth_commander(
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
+        Some(AuthSubCommands::Version {authd_path}) => {
+            let sn_authd = SafeAuthdClient::new(endpoint);
+            authd_version(&sn_authd, authd_path)
+        }
         Some(AuthSubCommands::Create {
             config_file_str,
             sk,

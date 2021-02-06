@@ -56,6 +56,11 @@ pub fn authd_install(authd_path: Option<String>) -> Result<()> {
     Ok(())
 }
 
+pub fn authd_version(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<()> {
+    sn_authd.version(authd_path.as_deref())?;
+    Ok(())
+}
+
 pub fn authd_update(sn_authd: &SafeAuthdClient, authd_path: Option<String>) -> Result<()> {
     sn_authd
         .update(authd_path.as_deref())

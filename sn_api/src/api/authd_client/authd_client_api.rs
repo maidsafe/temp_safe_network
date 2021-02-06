@@ -143,6 +143,11 @@ impl SafeAuthdClient {
         }
     }
 
+    // Print out the version of the Authenticator binary
+    pub fn version(&self, authd_path: Option<&str>) -> Result<()> {
+        authd_run_cmd(authd_path, &["--version"])
+    }
+
     // Update the Authenticator binary to a new released version
     pub fn update(&self, authd_path: Option<&str>) -> Result<()> {
         authd_run_cmd(authd_path, &[SN_AUTHD_CMD_UPDATE])
