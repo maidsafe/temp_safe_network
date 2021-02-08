@@ -46,8 +46,8 @@ jobs:
           override: true
 
       # Cache.
-      - name: Cargo cache
-        uses: actions/cache@v2
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -119,8 +119,8 @@ jobs:
           override: true
 
       # Cache.
-      - name: Cargo cache
-        uses: actions/cache@v2
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
