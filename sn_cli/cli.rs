@@ -31,11 +31,11 @@ use crate::{
 use anyhow::{anyhow, Result};
 use log::debug;
 use sn_api::{xorurl::XorUrlBase, Safe};
-use structopt::StructOpt;
+use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 
 #[derive(StructOpt, Debug)]
 /// Interact with the Safe Network
-#[structopt(global_settings(&[structopt::clap::AppSettings::ColoredHelp]))]
+#[structopt(global_settings(&[ColoredHelp]))]
 pub struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]

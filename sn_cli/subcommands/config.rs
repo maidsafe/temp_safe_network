@@ -9,7 +9,7 @@
 
 use crate::operations::config::{
     add_network_to_config, config_file_path, print_networks_settings, remove_network_from_config,
-    write_config_settings, ConfigSettings,
+    write_config_settings, ConfigSettings, NetworkInfo,
 };
 use anyhow::Result;
 use log::debug;
@@ -65,7 +65,9 @@ pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
             config_location,
-        })) => add_network_to_config(&network_name, config_location)?,
+        })) => {
+            add_network_to_config(&network_name, config_location.map(NetworkInfo::ConnInfoUrl))?;
+        }
         // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
         Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {
             remove_network_from_config(&network_name)?

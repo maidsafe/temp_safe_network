@@ -7,13 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::config::{
-    read_config_settings, read_current_network_conn_info, retrieve_conn_info,
+use crate::operations::{
+    config::{
+        read_config_settings, read_current_network_conn_info, retrieve_conn_info, NetworkInfo,
+    },
+    node::*,
 };
-use crate::operations::node::*;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use log::debug;
-use std::path::PathBuf;
+use std::{collections::HashSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
 
 const NODES_DATA_FOLDER: &str = "baby-fleming-nodes";
@@ -44,7 +46,7 @@ pub enum NodeSubCommands {
         verbosity: u8,
         /// Hardcoded contacts (endpoints) to be used to bootstrap to an already running network (this overrides any value passed as 'network_name').
         #[structopt(short = "h", long = "hcc")]
-        hard_coded_contacts: Option<String>,
+        hard_coded_contacts: Vec<SocketAddr>,
     },
     #[structopt(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
@@ -101,39 +103,30 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
             verbosity,
             hard_coded_contacts,
         }) => {
-            let network_contacts: Result<String> = if let Some(contacts) = hard_coded_contacts {
-                let msg = format!("Joining network with contacts {}...", contacts);
-                debug!("{}", msg);
-                println!("{}", msg);
-                Ok(contacts)
-            } else {
-                let contacts = if let Some(name) = network_name {
+            let network_contacts = if hard_coded_contacts.is_empty() {
+                if let Some(name) = network_name {
                     let (settings, _) = read_config_settings()?;
                     let msg = format!("Joining the '{}' network...", name);
                     debug!("{}", msg);
                     println!("{}", msg);
                     match settings.networks.get(&name) {
-                        Some(config_location) => retrieve_conn_info(&name, config_location),
-                        None => Err(anyhow!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name))
+                        Some(NetworkInfo::ConnInfoUrl(config_location)) => retrieve_conn_info(&name, config_location)?,
+                        Some(NetworkInfo::Addresses(addresses)) => addresses.clone(),
+                        None => bail!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name)
                     }
                 } else {
                     let (_, contacts) = read_current_network_conn_info()?;
-                    Ok(contacts)
-                }?;
-
-                let mut contacts_str = std::str::from_utf8(&contacts)
-                    .context("Failed to parse network contact information from the config")?
-                    .to_string();
-
-                contacts_str = contacts_str.replace("\"", "");
-                let len_withoutcrlf = contacts_str.trim_end().len();
-                contacts_str.truncate(len_withoutcrlf);
-                debug!("Joining network with contacts {}...", contacts_str);
-
-                Ok(contacts_str)
+                    contacts
+                }
+            } else {
+                HashSet::from_iter(hard_coded_contacts)
             };
 
-            node_join(node_path, LOCAL_NODE_DIR, verbosity, &network_contacts?)
+            let msg = format!("Joining network with contacts {:?}...", network_contacts);
+            debug!("{}", msg);
+            println!("{}", msg);
+
+            node_join(node_path, LOCAL_NODE_DIR, verbosity, &network_contacts)
         }
         Some(NodeSubCommands::Run {
             node_path,

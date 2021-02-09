@@ -14,9 +14,10 @@ use log::debug;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_launch_tool::{join_with, run_with};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::create_dir_all,
     io::{self, Write},
+    net::SocketAddr,
     path::PathBuf,
     process::{Command, Stdio},
     thread,
@@ -192,7 +193,7 @@ pub fn node_join(
     node_path: Option<PathBuf>,
     node_data_dir: &str,
     verbosity: u8,
-    contacts: &str,
+    contacts: &HashSet<SocketAddr>,
 ) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
@@ -227,7 +228,12 @@ pub fn node_join(
     }
 
     sn_launch_tool_args.push("--hard-coded-contacts");
-    sn_launch_tool_args.push(contacts);
+    let contacts_list = contacts
+        .iter()
+        .map(|c| c.to_string())
+        .collect::<Vec<String>>()
+        .join(" ");
+    sn_launch_tool_args.push(&contacts_list);
 
     debug!(
         "Running network launch tool with args: {:?}",
