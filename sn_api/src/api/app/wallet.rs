@@ -543,7 +543,7 @@ mod tests {
     use crate::api::{
         app::{
             helpers::pk_to_hex,
-            test_helpers::{new_safe_instance, random_nrs_name},
+            test_helpers::{new_read_only_safe_instance, new_safe_instance, random_nrs_name},
         },
         common::sk_to_hex,
     };
@@ -1242,11 +1242,10 @@ mod tests {
         )
         .await?;
 
-        let mut another_safe = Safe::default();
-        another_safe.connect(None, None).await?;
+        let mut read_only_safe = new_read_only_safe_instance().await?;
 
         // test fail to transfer from a not owned wallet in <from> argument
-        match another_safe
+        match read_only_safe
             .wallet_transfer("0.2", &source_wallet_xorurl, &key_xorurl)
             .await
         {

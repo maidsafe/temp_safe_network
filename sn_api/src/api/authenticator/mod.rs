@@ -506,12 +506,9 @@ impl SafeAuthenticator {
 
     // Helper function to generate an unregistered authorisation response
     fn gen_unreg_auth_response(&self) -> Result<String> {
-        let bootstrap_contacts =
-            self.bootstrap_contacts
-                .clone()
-                .ok_or(Error::AuthenticatorError(format!(
-                    "Bootstrap contacts information not available",
-                )))?;
+        let bootstrap_contacts = self.bootstrap_contacts.clone().ok_or_else(|| {
+            Error::AuthenticatorError("Bootstrap contacts information not available".to_string())
+        })?;
 
         debug!("Encoding response... {:?}", bootstrap_contacts);
         let resp =
