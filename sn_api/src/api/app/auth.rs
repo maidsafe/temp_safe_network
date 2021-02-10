@@ -19,6 +19,7 @@ use crate::{
 use log::{debug, info};
 use serde_json::json;
 use sn_data_types::Keypair;
+use std::path::Path;
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
@@ -72,10 +73,11 @@ impl Safe {
     pub async fn connect(
         &mut self,
         app_keypair: Option<Keypair>,
+        config_path: Option<&Path>,
         bootstrap_config: Option<BootstrapConfig>,
     ) -> Result<()> {
         self.safe_client
-            .connect(app_keypair, bootstrap_config)
+            .connect(app_keypair, config_path, bootstrap_config)
             .await
     }
 }

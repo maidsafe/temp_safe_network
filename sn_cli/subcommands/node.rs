@@ -8,12 +8,10 @@
 // Software.
 
 use crate::operations::{
-    config::{
-        read_config_settings, read_current_network_conn_info, retrieve_conn_info, NetworkInfo,
-    },
+    config::{read_config_settings, read_current_network_conn_info},
     node::*,
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use log::debug;
 use std::{collections::HashSet, iter::FromIterator, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
@@ -109,11 +107,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
                     let msg = format!("Joining the '{}' network...", name);
                     debug!("{}", msg);
                     println!("{}", msg);
-                    match settings.networks.get(&name) {
-                        Some(NetworkInfo::ConnInfoUrl(config_location)) => retrieve_conn_info(&name, config_location)?,
-                        Some(NetworkInfo::Addresses(addresses)) => addresses.clone(),
-                        None => bail!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name)
-                    }
+                    settings.get_net_info(&name)?
                 } else {
                     let (_, contacts) = read_current_network_conn_info()?;
                     contacts

@@ -28,5 +28,5 @@ pub struct AuthGranted {
 
     /// Network bootstrap information.
     /// Useful to reuse bootstrap nodes and speed up access.
-    pub bootstrap_config: BootstrapConfig,
+    pub bootstrap_config: Option<BootstrapConfig>,
 }

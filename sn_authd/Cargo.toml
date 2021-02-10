@@ -13,6 +13,7 @@ name = "sn_authd"
 path = "main.rs"
 
 [dependencies]
+anyhow = "1.0.36"
 cluFlock = "1.2.5"
 dirs-next = "1.0.1"
 flexi_logger = "~0.15.2"

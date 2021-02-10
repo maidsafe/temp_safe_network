@@ -20,16 +20,16 @@ use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
 use sha3::Sha3_256;
-use sn_client::{
-    client::{bootstrap_config, Client},
-    Error as ClientError,
-    ErrorMessage::NoSuchEntry,
-};
+use sn_client::{client::Client, Error as ClientError, ErrorMessage::NoSuchEntry};
 use sn_data_types::{
     Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
     MapValue, Token,
 };
-use std::collections::BTreeMap;
+use std::{
+    collections::{BTreeMap, HashSet},
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 use tiny_keccak::{sha3_256, sha3_512};
 use xor_name::{XorName, XOR_NAME_LEN};
 
@@ -102,15 +102,22 @@ pub struct SafeAuthenticator {
     // We keep the client instantiated with the derived keypair, along
     // with the address of the Map which holds its Safe on the network.
     safe: Option<(Client, MapAddress)>,
+    config_path: Option<PathBuf>,
+    bootstrap_contacts: Option<HashSet<SocketAddr>>,
 }
 
 impl SafeAuthenticator {
-    pub fn new(config_dir_path: Option<&str>) -> Self {
-        if let Some(path) = config_dir_path {
-            sn_client::config_handler::set_config_dir_path(path);
-        }
+    pub fn new(
+        config_dir_path: Option<&Path>,
+        bootstrap_contacts: Option<HashSet<SocketAddr>>,
+    ) -> Self {
+        let config_path = config_dir_path.map(|p| p.to_path_buf());
 
-        Self { safe: None }
+        Self {
+            safe: None,
+            config_path,
+            bootstrap_contacts,
+        }
     }
 
     /// # Create Safe
@@ -174,7 +181,12 @@ impl SafeAuthenticator {
 
         debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
 
-        let mut client = Client::new(Some(keypair), None).await?;
+        let mut client = Client::new(
+            Some(keypair),
+            self.config_path.as_deref(),
+            self.bootstrap_contacts.clone(),
+        )
+        .await?;
         trace!("Client instantiated properly!");
 
         // check if client data already exists
@@ -273,7 +285,12 @@ impl SafeAuthenticator {
             keypair.public_key()
         );
 
-        let client = Client::new(Some(keypair), None).await?;
+        let client = Client::new(
+            Some(keypair),
+            self.config_path.as_deref(),
+            self.bootstrap_contacts.clone(),
+        )
+        .await?;
         trace!("Client instantiated properly!");
 
         let map_address = MapAddress::Seq {
@@ -427,7 +444,12 @@ impl SafeAuthenticator {
                     // TODO: we may want to allow different options here, either accept
                     // a proof of payment from the requester, transfer from the Safe's balance,
                     // or simply allocate testcoins as it's now.
-                    let mut tmp_client = Client::new(Some(keypair.clone()), None).await?;
+                    let mut tmp_client = Client::new(
+                        Some(keypair.clone()),
+                        self.config_path.as_deref(),
+                        self.bootstrap_contacts.clone(),
+                    )
+                    .await?;
                     tmp_client
                         .trigger_simulated_farming_payout(Token::from_nano(
                             DEFAULT_TEST_COINS_AMOUNT,
@@ -454,7 +476,7 @@ impl SafeAuthenticator {
 
             Ok(AuthGranted {
                 app_keypair: keypair,
-                bootstrap_config: bootstrap_config()?,
+                bootstrap_config: self.bootstrap_contacts.clone(),
             })
         } else {
             Err(Error::AuthenticatorError(
@@ -484,18 +506,19 @@ impl SafeAuthenticator {
 
     // Helper function to generate an unregistered authorisation response
     fn gen_unreg_auth_response(&self) -> Result<String> {
-        let bootstrap_cfg = bootstrap_config().map_err(|err| {
-            Error::AuthenticatorError(format!(
-                "Failed to obtain bootstrap info for response: {}",
-                err
-            ))
-        })?;
+        let bootstrap_contacts =
+            self.bootstrap_contacts
+                .clone()
+                .ok_or(Error::AuthenticatorError(format!(
+                    "Bootstrap contacts information not available",
+                )))?;
 
-        debug!("Encoding response... {:?}", bootstrap_cfg);
-        let resp = serde_json::to_string(&IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_cfg))))
-            .map_err(|err| {
-            Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
-        })?;
+        debug!("Encoding response... {:?}", bootstrap_contacts);
+        let resp =
+            serde_json::to_string(&IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_contacts))))
+                .map_err(|err| {
+                    Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
+                })?;
 
         debug!("Returning unregistered auth response generated: {:?}", resp);
         Ok(resp)

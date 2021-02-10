@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use log::debug;
 use prettytable::Table;
 use serde::{Deserialize, Serialize};
@@ -30,17 +30,46 @@ pub enum NetworkInfo {
     ConnInfoUrl(String),
 }
 
+impl fmt::Display for NetworkInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Addresses(addresses) => write!(f, "{:?}", addresses),
+            Self::ConnInfoUrl(url) => write!(f, "{}", url),
+        }
+    }
+}
+
+impl NetworkInfo {
+    pub fn matches(&self, conn_info: &HashSet<SocketAddr>) -> bool {
+        match self {
+            Self::Addresses(addresses) => addresses == conn_info,
+            Self::ConnInfoUrl(config_location) => match retrieve_conn_info(config_location) {
+                Ok(info) => info == *conn_info,
+                Err(_) => false,
+            },
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Serialize, Default)]
 pub struct ConfigSettings {
     pub networks: BTreeMap<String, NetworkInfo>,
     // pub contacts: BTreeMap<String, String>,
 }
 
-impl fmt::Display for NetworkInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Addresses(addresses) => write!(f, "{:?}", addresses),
-            Self::ConnInfoUrl(url) => write!(f, "{}", url),
+impl ConfigSettings {
+    pub fn get_net_info(&self, name: &str) -> Result<HashSet<SocketAddr>> {
+        match self.networks.get(name) {
+            Some(NetworkInfo::ConnInfoUrl(config_location)) => {
+                println!(
+                    "Fetching '{}' network connection information from '{}' ...",
+                    name, config_location
+                );
+
+                retrieve_conn_info(config_location)
+            },
+            Some(NetworkInfo::Addresses(addresses)) => Ok(addresses.clone()),
+            None => bail!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name)
         }
     }
 }
@@ -222,41 +251,36 @@ pub fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Re
 pub fn print_networks_settings() -> Result<()> {
     let mut table = Table::new();
     table.add_row(row![bFg->"Networks"]);
-    table.add_row(row![bFg->"Network name", bFg->"Connection info"]);
+    table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
+    let (_, current_conn_info) = read_current_network_conn_info()?;
 
     let (settings, _) = read_config_settings()?;
     settings
         .networks
         .iter()
-        .for_each(|(network_name, config_location)| {
-            table.add_row(row![network_name, config_location,]);
+        .for_each(|(network_name, net_info)| {
+            let current = if net_info.matches(&current_conn_info) {
+                "*"
+            } else {
+                ""
+            };
+            table.add_row(row![current, network_name, net_info]);
         });
     table.printstd();
     Ok(())
 }
 
-pub fn retrieve_conn_info(name: &str, location: &str) -> Result<HashSet<SocketAddr>> {
-    println!(
-        "Fetching '{}' network connection information from '{}' ...",
-        name, location
-    );
-
+pub fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
     let contacts_bytes = if is_remote_location(location) {
         #[cfg(feature = "self-update")]
         {
             // Fetch info from an HTTP/s location
             let mut resp = reqwest::get(location).with_context(|| {
-                format!(
-                    "Failed to fetch connection information for network '{}' from '{}'",
-                    name, location
-                )
+                format!("Failed to fetch connection information from '{}'", location)
             })?;
 
             let conn_info = resp.text().with_context(|| {
-                format!(
-                    "Failed to fetch connection information for network '{}' from '{}'",
-                    name, location
-                )
+                format!("Failed to fetch connection information from '{}'", location)
             })?;
 
             conn_info.as_bytes().to_vec()

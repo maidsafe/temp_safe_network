@@ -9,7 +9,6 @@
 
 use super::{fetch::Range, helpers::xorname_to_hex};
 use crate::{api::ipc::BootstrapConfig, Error, Result};
-
 use log::{debug, info};
 use sn_client::{Client, Error as ClientError, TransfersError};
 use sn_data_types::{
@@ -17,9 +16,11 @@ use sn_data_types::{
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
     SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
 };
-
-use std::collections::BTreeMap;
-use std::{collections::HashSet, net::SocketAddr};
+use std::{
+    collections::{BTreeMap, HashSet},
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 use xor_name::XorName;
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
@@ -28,6 +29,7 @@ const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 pub struct SafeAppClient {
     safe_client: Option<Client>,
     pub(crate) bootstrap_config: Option<HashSet<SocketAddr>>,
+    config_path: Option<PathBuf>,
 }
 
 impl SafeAppClient {
@@ -43,6 +45,7 @@ impl SafeAppClient {
         Self {
             safe_client: None,
             bootstrap_config: None,
+            config_path: None,
         }
     }
 
@@ -51,12 +54,15 @@ impl SafeAppClient {
     pub async fn connect(
         &mut self,
         app_keypair: Option<Keypair>,
+        config_path: Option<&Path>,
         bootstrap_config: Option<BootstrapConfig>,
     ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
         if bootstrap_config.is_some() {
             self.bootstrap_config = bootstrap_config;
         }
+
+        self.config_path = config_path.map(|p| p.to_path_buf());
 
         debug!(
             "Client to be instantiated with specific pk?: {:?}",
@@ -66,11 +72,15 @@ impl SafeAppClient {
             "Bootstrap contacts list set to: {:?}",
             self.bootstrap_config
         );
-        let client = Client::new(app_keypair, self.bootstrap_config.clone())
-            .await
-            .map_err(|err| {
-                Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
-            })?;
+        let client = Client::new(
+            app_keypair,
+            self.config_path.as_deref(),
+            self.bootstrap_config.clone(),
+        )
+        .await
+        .map_err(|err| {
+            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+        })?;
 
         self.safe_client = Some(client);
 
@@ -80,7 +90,12 @@ impl SafeAppClient {
 
     // === Token operations ===
     pub async fn read_balance_from_keypair(&self, id: Keypair) -> Result<Token> {
-        let temp_client = Client::new(Some(id), self.bootstrap_config.clone()).await?;
+        let temp_client = Client::new(
+            Some(id),
+            self.config_path.as_deref(),
+            self.bootstrap_config.clone(),
+        )
+        .await?;
         temp_client.get_balance().await.map_err(|err| {
             // FIXME: we need to match the appropriate error
             // to map it to our Error::ContentNotFound
@@ -98,7 +113,12 @@ impl SafeAppClient {
         id: Option<Keypair>,
     ) -> Result<()> {
         let mut client = if id.is_some() {
-            Client::new(id, self.bootstrap_config.clone()).await?
+            Client::new(
+                id,
+                self.config_path.as_deref(),
+                self.bootstrap_config.clone(),
+            )
+            .await?
         } else {
             self.get_safe_client()?
         };
@@ -135,7 +155,14 @@ impl SafeAppClient {
         amount: Token,
     ) -> Result<u64> {
         let client = match from_id {
-            Some(id) => Client::new(Some(id), self.bootstrap_config.clone()).await?,
+            Some(id) => {
+                Client::new(
+                    Some(id),
+                    self.config_path.as_deref(),
+                    self.bootstrap_config.clone(),
+                )
+                .await?
+            }
             None => self.get_safe_client()?,
         };
 

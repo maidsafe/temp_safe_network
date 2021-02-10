@@ -11,10 +11,17 @@ use super::{
     notifs::monitor_pending_auth_reqs, requests::process_jsonrpc_request, shared::*, Error, Result,
 };
 use futures::{lock::Mutex, TryFutureExt};
-use log::{error, info};
+use log::{debug, error, info};
 use qjsonrpc::{Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponseStream};
 use sn_api::SafeAuthenticator;
-use std::{collections::BTreeMap, str, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+    net::SocketAddr,
+    path::Path,
+    str,
+    sync::Arc,
+};
 use url::Url;
 
 // Number of milliseconds to allow an idle connection before closing it
@@ -22,11 +29,14 @@ const CONNECTION_IDLE_TIMEOUT: u64 = 120_000;
 
 pub async fn run(
     listen: &str,
-    cert_base_path: Option<&str>,
-    config_dir_path: Option<&str>,
+    cert_base_path: Option<&Path>,
+    config_dir_path: Option<&Path>,
 ) -> Result<()> {
-    let safe_auth_handle: SharedSafeAuthenticatorHandle =
-        Arc::new(Mutex::new(SafeAuthenticator::new(config_dir_path)));
+    let bootstrap_contacts = get_current_network_conn_info()?;
+    info!("Bootstrapping with contacts: {:?}", bootstrap_contacts);
+    let safe_auth_handle: SharedSafeAuthenticatorHandle = Arc::new(Mutex::new(
+        SafeAuthenticator::new(config_dir_path, Some(bootstrap_contacts)),
+    ));
 
     // We keep a queue for all the authorisation requests
     let auth_reqs_handle = Arc::new(Mutex::new(AuthReqsList::new()));
@@ -39,14 +49,14 @@ pub async fn run(
             Some(mut path) => {
                 path.push(".safe");
                 path.push("authd");
-                Ok(path.display().to_string())
+                Ok(path)
             }
             None => Err(Error::GeneralError(
                 "Failed to obtain local project directory where to write certificate from"
                     .to_string(),
             )),
         },
-        |path| Ok(path.to_string()),
+        |path| Ok(path.to_path_buf()),
     )?;
 
     start_listening(
@@ -62,9 +72,38 @@ pub async fn run(
 
 // Private helpers
 
+fn get_current_network_conn_info() -> Result<HashSet<SocketAddr>> {
+    let mut conn_info_path = dirs_next::home_dir()
+        .ok_or_else(|| Error::GeneralError("Failed to obtain user's home path".to_string()))?;
+
+    conn_info_path.push(".safe");
+    conn_info_path.push("node");
+    conn_info_path.push("node_connection_info.config");
+
+    // Fetch it from a local file then
+    debug!(
+        "Reading network connection information from {} ...",
+        conn_info_path.display()
+    );
+    let bytes = fs::read(&conn_info_path).map_err(|err| {
+        Error::GeneralError(format!(
+            "Unable to read connection information from '{}': {}",
+            conn_info_path.display(),
+            err
+        ))
+    })?;
+
+    serde_json::from_slice(&bytes).map_err(|err| {
+        Error::GeneralError(format!(
+            "Format of the contacts addresses is not valid and couldn't be parsed: {}",
+            err
+        ))
+    })
+}
+
 async fn start_listening(
     listen: &str,
-    cert_base_path: &str,
+    cert_base_path: &Path,
     idle_timeout: Option<u64>,
     safe_auth_handle: SharedSafeAuthenticatorHandle,
     auth_reqs_handle: SharedAuthReqsHandle,

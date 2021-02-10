@@ -9,10 +9,10 @@
 
 use crate::operations::config::{
     add_network_to_config, print_networks_settings, read_config_settings,
-    read_current_network_conn_info, remove_network_from_config, retrieve_conn_info,
-    write_current_network_conn_info, NetworkInfo,
+    read_current_network_conn_info, remove_network_from_config, write_current_network_conn_info,
+    NetworkInfo,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use log::debug;
 use std::{collections::HashSet, iter::FromIterator, net::SocketAddr};
 use structopt::StructOpt;
@@ -59,11 +59,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             let msg = format!("Switching to '{}' network...", network_name);
             debug!("{}", msg);
             println!("{}", msg);
-            let contacts = match settings.networks.get(&network_name) {
-                Some(NetworkInfo::ConnInfoUrl(config_location)) => retrieve_conn_info(&network_name, config_location)?,
-                Some(NetworkInfo::Addresses(addresses)) => addresses.clone(),
-                None => bail!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", network_name)
-            };
+            let contacts = settings.get_net_info(&network_name)?;
 
             write_current_network_conn_info(&contacts)?;
             println!(
@@ -78,23 +74,12 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             let (conn_info_file_path, current_conn_info) = read_current_network_conn_info()?;
             let mut matched_network = None;
             for (network_name, network_info) in settings.networks.iter() {
-                match network_info {
-                    NetworkInfo::Addresses(addresses) => {
-                        println!("TODO: {:?}", addresses);
-                    }
-                    NetworkInfo::ConnInfoUrl(config_location) => {
-                        match retrieve_conn_info(&network_name, config_location) {
-                            Ok(conn_info) => {
-                                if current_conn_info == conn_info {
-                                    matched_network = Some(network_name);
-                                    break;
-                                }
-                            }
-                            Err(err) => println!("Ignoring '{}' network: {}", network_name, err),
-                        }
-                    }
+                if network_info.matches(&current_conn_info) {
+                    matched_network = Some(network_name);
+                    break;
                 }
             }
+
             println!();
             match matched_network {
                 Some(name) => println!("'{}' network matched. Current set network connection information at '{}' matches '{}' network as per current config", name, conn_info_file_path.display(), name),
