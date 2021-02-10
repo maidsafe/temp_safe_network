@@ -10,8 +10,7 @@ use super::validator::Validator;
 use crate::{
     node::{
         elder_duties::data_section::ElderSigning,
-        msg_wrapping::ElderMsgWrapping,
-        node_ops::{NodeMessagingDuty, NodeOperation},
+        node_ops::{NodeMessagingDuty, NodeOperation, OutgoingMsg},
     },
     ElderState, Error, Result,
 };
@@ -20,8 +19,9 @@ use sn_data_types::{
     ActorHistory, CreditAgreementProof, PublicKey, SignedTransferShare, Token, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::client::{
-    Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery,
+use sn_messaging::{
+    client::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery},
+    DstLocation,
 };
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
@@ -33,7 +33,6 @@ type SectionActor = TransferActor<Validator, ElderSigning>;
 /// via the usage of a distributed AT2 Actor.
 pub(super) struct SectionFunds {
     actor: SectionActor,
-    wrapping: ElderMsgWrapping,
     state: State,
 }
 
@@ -57,10 +56,9 @@ struct State {
 }
 
 impl SectionFunds {
-    pub fn new(actor: SectionActor, wrapping: ElderMsgWrapping) -> Self {
+    pub fn new(actor: SectionActor) -> Self {
         Self {
             actor,
-            wrapping,
             state: State {
                 queued_payouts: Default::default(),
                 payout_in_flight: None,
@@ -109,16 +107,14 @@ impl SectionFunds {
         let new_wallet = elder_state.section_public_key();
         self.state.pending_actor = Some(elder_state);
 
-        self.wrapping
-            .send_to_section(
-                Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(new_wallet)),
-                    id: MessageId::new(),
-                },
-                new_wallet.into(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQuery {
+                query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(new_wallet)),
+                id: MessageId::new(),
+            },
+            dst: DstLocation::Section(new_wallet.into()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Wallet transition, step 2.
@@ -135,7 +131,7 @@ impl SectionFunds {
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
         if let Some(elder_state) = self.state.pending_actor.take() {
-            let signing = ElderSigning::new(elder_state.clone());
+            let signing = ElderSigning::new(elder_state);
             let actor = TransferActor::from_info(signing, new_wallet, Validator {})?;
             let wallet_id = actor.id();
             self.state.next_actor = Some(actor);
@@ -179,20 +175,18 @@ impl SectionFunds {
                     self.apply(TransferInitiated(event.clone()))?;
                     info!("Section actor transition transfer is being requested of the replicas..");
                     // We ask of our Replicas to validate this transfer.
-                    self.wrapping
-                        .send_to_section(
-                            Message::NodeCmd {
-                                cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
-                                    event.signed_debit.as_share()?,
-                                    event.signed_credit.as_share()?,
-                                    self.actor.owner().public_key_set()?,
-                                )?)),
-                                id: MessageId::new(),
-                            },
-                            self.actor.id().into(),
-                            true,
-                        )
-                        .await
+                    Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                        msg: Message::NodeCmd {
+                            cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
+                                event.signed_debit.as_share()?,
+                                event.signed_credit.as_share()?,
+                                self.actor.owner().public_key_set()?,
+                            )?)),
+                            id: MessageId::new(),
+                        },
+                        dst: DstLocation::Section(self.actor.id().into()),
+                        to_be_aggregated: false,
+                    }))
                 }
             }
         } else {
@@ -228,20 +222,18 @@ impl SectionFunds {
                 // We now have a payout in flight.
                 self.state.payout_in_flight = Some(payout);
                 // We ask of our Replicas to validate this transfer.
-                self.wrapping
-                    .send_to_section(
-                        Message::NodeCmd {
-                            cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
-                                event.signed_debit.as_share()?,
-                                event.signed_credit.as_share()?,
-                                self.actor.owner().public_key_set()?,
-                            )?)),
-                            id: MessageId::new(),
-                        },
-                        self.actor.id().into(),
-                        true,
-                    )
-                    .await
+                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeCmd {
+                        cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
+                            event.signed_debit.as_share()?,
+                            event.signed_credit.as_share()?,
+                            self.actor.owner().public_key_set()?,
+                        )?)),
+                        id: MessageId::new(),
+                    },
+                    dst: DstLocation::Section(self.actor.id().into()),
+                    to_be_aggregated: false,
+                }))
             }
         }
     }
@@ -285,18 +277,15 @@ impl SectionFunds {
             }
 
             // We ask of our Replicas to register this transfer.
-            let reg_op = self
-                .wrapping
-                .send_to_section(
-                    Message::NodeCmd {
-                        cmd: Transfers(RegisterSectionPayout(proof)),
-                        id: MessageId::new(),
-                    },
-                    self.actor.id().into(),
-                    true,
-                )
-                .await?
-                .into();
+            let reg_op = NodeMessagingDuty::Send(OutgoingMsg {
+                msg: Message::NodeCmd {
+                    cmd: Transfers(RegisterSectionPayout(proof)),
+                    id: MessageId::new(),
+                },
+                dst: DstLocation::Section(self.actor.id().into()),
+                to_be_aggregated: true, // not needed, but makes sn_node<logs less chatty..
+            })
+            .into();
 
             // First register the transfer, then
             // carry out the first queued payout.

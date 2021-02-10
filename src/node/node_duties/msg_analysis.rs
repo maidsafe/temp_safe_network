@@ -9,12 +9,12 @@
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
-        ChunkStoreDuty, ElderDuty, GatewayDuty, MetadataDuty, NodeDuty, NodeOperation, ReceivedMsg,
-        RewardCmd, RewardDuty, RewardQuery, TransferCmd, TransferDuty, TransferQuery,
+        ChunkStoreDuty, ElderDuty, MetadataDuty, NodeDuty, NodeOperation, ReceivedMsg, RewardCmd,
+        RewardDuty, RewardQuery, TransferCmd, TransferDuty, TransferQuery,
     },
     AdultState, ElderState, Error, NodeState, Result,
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, info};
 use sn_messaging::{
     client::{
         Cmd, DataQuery, Message, MessageId, NodeCmd, NodeDataCmd, NodeDataQuery,
@@ -22,10 +22,8 @@ use sn_messaging::{
         NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd, NodeTransferQuery,
         NodeTransferQueryResponse, Query,
     },
-    DstLocation, SrcLocation,
+    DstLocation,
 };
-
-use sn_routing::Prefix;
 
 // NB: This approach is not entirely good, so will need to be improved.
 
@@ -40,100 +38,57 @@ impl ReceivedMsgAnalysis {
         Self { state }
     }
 
-    pub async fn is_dst_for(&self, msg: &ReceivedMsg) -> Result<bool> {
-        let are_we_dst = if let DstLocation::Node(name) = msg.dst {
-            name == self.state.node_name()
-        } else {
-            false
-        };
-        let are_we_origin = self.are_we_origin(&msg).await;
-        let is_genesis_node_msg_to_self = are_we_origin && self.is_genesis_request().await;
-        let are_we_handler_for_dst = self.self_is_handler_for(&msg.dst);
-        let is_genesis_section_msg_to_section =
-            msg.dst.is_section() && self.is_elder() && self.prefix().is_empty();
+    // pub async fn is_dst_for(&self, msg: &ReceivedMsg) -> Result<bool> {
+    //     let are_we_dst = if let DstLocation::Node(name) = msg.dst {
+    //         name == self.state.node_name()
+    //     } else {
+    //         false
+    //     };
+    //     let are_we_origin = self.are_we_origin(&msg).await;
+    //     let is_genesis_node_msg_to_self = are_we_origin && self.is_genesis_request().await;
+    //     let are_we_handler_for_dst = self.self_is_handler_for(&msg.dst);
+    //     let is_genesis_section_msg_to_section =
+    //         msg.dst.is_section() && self.is_elder() && self.prefix().is_empty();
 
-        let is_dst = are_we_dst
-            || (are_we_handler_for_dst && !are_we_origin)
-            || is_genesis_node_msg_to_self
-            || is_genesis_section_msg_to_section;
-        debug!("is_dst: {}", is_dst);
-        Ok(is_dst)
-    }
+    //     let is_dst = are_we_dst
+    //         || (are_we_handler_for_dst && !are_we_origin)
+    //         || is_genesis_node_msg_to_self
+    //         || is_genesis_section_msg_to_section;
+    //     debug!("is_dst: {}", is_dst);
+    //     Ok(is_dst)
+    // }
 
-    async fn is_genesis_request(&self) -> bool {
-        if let Ok(state) = self.elder_state() {
-            let elders = state.elder_names();
-            if elders.len() == 1 {
-                return elders.contains(&state.node_name());
-            }
-        }
+    // async fn is_genesis_request(&self) -> bool {
+    //     if let Ok(state) = self.elder_state() {
+    //         let elders = state.elder_names();
+    //         if elders.len() == 1 {
+    //             return elders.contains(&state.node_name());
+    //         }
+    //     }
 
-        false
-    }
+    //     false
+    // }
 
-    async fn are_we_origin(&self, msg: &ReceivedMsg) -> bool {
-        if let SrcLocation::Node(origin) = msg.src {
-            origin == self.state.node_name()
-        } else {
-            false
-        }
-    }
+    // async fn are_we_origin(&self, msg: &ReceivedMsg) -> bool {
+    //     if let SrcLocation::Node(origin) = msg.src {
+    //         origin == self.state.node_name()
+    //     } else {
+    //         false
+    //     }
+    // }
 
     pub async fn evaluate(&self, msg: &ReceivedMsg) -> Result<NodeOperation> {
         use AdultDuty::*;
         use ChunkStoreDuty::*;
         use DstLocation::*;
-
+        debug!("Evaluating received msg..");
         //let origin = msg.dst.name();
 
         let res = match &msg.dst {
             Direct => unimplemented!(),
             Node(_name) => {
+                debug!("Evaluating received msg for Node: {:?}", msg);
                 match &msg.msg {
-                    //
-                    // ------ system cmd ------
-                    Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
-                        ..
-                    } => ElderDuty::StorageFull { node_id: *node_id }.into(),
-                    //
-                    // ------ node duties ------
-                    Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
-                        ..
-                    } => NodeDuty::ReceiveGenesisProposal {
-                        credit: credit.clone(),
-                        sig: sig.clone(),
-                    }
-                    .into(),
-                    Message::NodeCmd {
-                        cmd:
-                            NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
-                        ..
-                    } => NodeDuty::ReceiveGenesisAccumulation {
-                        signed_credit: signed_credit.clone(),
-                        sig: sig.clone(),
-                    }
-                    .into(),
-                    Message::NodeQueryResponse {
-                        response:
-                            NodeQueryResponse::Transfers(
-                                NodeTransferQueryResponse::CatchUpWithSectionWallet(Ok(info)),
-                            ),
-                        ..
-                    } => {
-                        info!("We have a CatchUpWithSectionWallet query response!");
-                        NodeDuty::InitSectionWallet(info.clone()).into()
-                    }
-                    Message::NodeEvent {
-                        event: NodeEvent::SectionPayoutRegistered { from, to },
-                        ..
-                    } => NodeDuty::FinishElderChange {
-                        previous_key: *from,
-                        new_key: *to,
-                    }
-                    .into(),
-
                     //
                     // ------ adult ------
                     Message::Query {
@@ -203,13 +158,13 @@ impl ReceivedMsgAnalysis {
                         ..
                     } => {
                         info!("Verifying GetChunk query!");
-                        let proof_chain = self.adult_state()?.section_proof_chain();
+                        let _proof_chain = self.adult_state()?.section_proof_chain();
 
                         // Recreate original MessageId from Section
                         let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
 
                         // Recreate cmd that was sent by the section.
-                        let message = Message::NodeCmd {
+                        let _message = Message::NodeCmd {
                             cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk {
                                 new_holder: *new_holder,
                                 address: *address,
@@ -226,21 +181,6 @@ impl ReceivedMsgAnalysis {
                         })
                         .into()
                     }
-                    //
-                    // ------ wallet register ------
-                    Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
-                        id,
-                        ..
-                    } => RewardDuty::ProcessCmd {
-                        cmd: RewardCmd::SetNodeWallet {
-                            wallet_id: *wallet,
-                            node_id: msg.src.to_dst().name().unwrap(),
-                        },
-                        msg_id: *id,
-                        origin: msg.src,
-                    }
-                    .into(),
                     //
                     // ------ nonacc rewards ------
                     Message::NodeQuery {
@@ -422,13 +362,82 @@ impl ReceivedMsgAnalysis {
                     //     origin: msg.src,
                     // }
                     // .into(),
-                    _ => unimplemented!(),
+                    _ => {
+                        debug!("No match for received msg for Node: {:?}", msg);
+                        unimplemented!()
+                    }
                 }
             }
             Section(_name) => {
-                unimplemented!()
+                debug!("Evaluating received msg for Section: {:?}", msg);
+                match &msg.msg {
+                    //
+                    // ------ wallet register ------
+                    Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
+                        id,
+                        ..
+                    } => RewardDuty::ProcessCmd {
+                        cmd: RewardCmd::SetNodeWallet {
+                            wallet_id: *wallet,
+                            node_id: msg.src.to_dst().name().unwrap(),
+                        },
+                        msg_id: *id,
+                        origin: msg.src,
+                    }
+                    .into(),
+                    //
+                    // ------ system cmd ------
+                    Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
+                        ..
+                    } => ElderDuty::StorageFull { node_id: *node_id }.into(),
+                    //
+                    // ------ node duties ------
+                    Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
+                        ..
+                    } => NodeDuty::ReceiveGenesisProposal {
+                        credit: credit.clone(),
+                        sig: sig.clone(),
+                    }
+                    .into(),
+                    Message::NodeCmd {
+                        cmd:
+                            NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
+                        ..
+                    } => NodeDuty::ReceiveGenesisAccumulation {
+                        signed_credit: signed_credit.clone(),
+                        sig: sig.clone(),
+                    }
+                    .into(),
+                    Message::NodeQueryResponse {
+                        response:
+                            NodeQueryResponse::Transfers(
+                                NodeTransferQueryResponse::CatchUpWithSectionWallet(Ok(info)),
+                            ),
+                        ..
+                    } => {
+                        info!("We have a CatchUpWithSectionWallet query response!");
+                        NodeDuty::InitSectionWallet(info.clone()).into()
+                    }
+                    Message::NodeEvent {
+                        event: NodeEvent::SectionPayoutRegistered { from, to },
+                        ..
+                    } => NodeDuty::FinishElderChange {
+                        previous_key: *from,
+                        new_key: *to,
+                    }
+                    .into(),
+
+                    _ => {
+                        debug!("No match for received msg for Section: {:?}", msg);
+                        unimplemented!()
+                    }
+                }
             }
             User(user) => {
+                debug!("Evaluating received msg for User: {:?}", msg);
                 match &msg.msg {
                     //
                     // ------ metadata ------
@@ -449,7 +458,10 @@ impl ReceivedMsgAnalysis {
                     }
                     .into(),
 
-                    _ => unimplemented!(),
+                    _ => {
+                        debug!("No match for received msg for User: {:?}", msg);
+                        unimplemented!()
+                    }
                 }
             }
         };
@@ -471,21 +483,21 @@ impl ReceivedMsgAnalysis {
     //     }
     // }
 
-    fn self_is_handler_for(&self, dst: &DstLocation) -> bool {
-        if let Some(name) = dst.name() {
-            self.is_elder() && self.prefix().matches(&name)
-        } else {
-            false
-        }
-    }
+    // fn self_is_handler_for(&self, dst: &DstLocation) -> bool {
+    //     if let Some(name) = dst.name() {
+    //         self.is_elder() && self.prefix().matches(&name)
+    //     } else {
+    //         false
+    //     }
+    // }
 
-    fn is_elder(&self) -> bool {
-        matches!(self.state, NodeState::Elder(_))
-    }
+    // fn is_elder(&self) -> bool {
+    //     matches!(self.state, NodeState::Elder(_))
+    // }
 
-    fn is_adult(&self) -> bool {
-        matches!(self.state, NodeState::Adult(_))
-    }
+    // fn is_adult(&self) -> bool {
+    //     matches!(self.state, NodeState::Adult(_))
+    // }
 
     // fn no_of_elders(&self) -> Result<usize> {
     //     if let NodeState::Elder(state) = self.state {
@@ -519,10 +531,10 @@ impl ReceivedMsgAnalysis {
     //     }
     // }
 
-    fn prefix(&self) -> &Prefix {
-        match &self.state {
-            NodeState::Elder(state) => state.prefix(),
-            NodeState::Adult(_state) => unimplemented!(), // state.prefix(),
-        }
-    }
+    // fn prefix(&self) -> &Prefix {
+    //     match &self.state {
+    //         NodeState::Elder(state) => state.prefix(),
+    //         NodeState::Infant(_) | NodeState::Adult(_) => unimplemented!(), // state.prefix(),
+    //     }
+    // }
 }

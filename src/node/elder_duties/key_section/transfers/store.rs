@@ -118,8 +118,6 @@ mod test {
         )?;
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
             credit_proof: genesis_credit_proof.clone(),
-            crediting_replica_keys: get_random_pk(),
-            crediting_replica_sig: dummy_sig(),
         }))?;
 
         let events = store.get_all();
@@ -142,16 +140,5 @@ mod test {
 
     fn get_random_pk() -> PublicKey {
         PublicKey::from(SecretKey::random().public_key())
-    }
-
-    use bls::SecretKeyShare;
-    use sn_data_types::SignatureShare;
-    fn dummy_sig() -> SignatureShare {
-        let dummy_shares = SecretKeyShare::default();
-        let dummy_sig = dummy_shares.sign("DUMMY MSG");
-        SignatureShare {
-            index: 0,
-            share: dummy_sig,
-        }
     }
 }

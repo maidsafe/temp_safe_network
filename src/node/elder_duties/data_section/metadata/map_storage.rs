@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::MapChunkStore, error::convert_to_error_message,
-    node::msg_wrapping::ElderMsgWrapping, node::node_ops::NodeMessagingDuty, node::NodeInfo, Error,
-    Result,
+chunk_store::MapChunkStore, error::convert_to_error_message,
+    node::node_ops::{NodeMessagingDuty, OutgoingMsg},
+    node::NodeInfo,
+    Error, Result,
 };
 use log::info;
 use sn_data_types::{
@@ -19,7 +20,7 @@ use sn_data_types::{
 use sn_messaging::{
     client::{CmdError, MapRead, MapWrite, Message, MessageId, QueryResponse},
     location::User,
-    SrcLocation,
+    DstLocation, SrcLocation,
 };
 
 use std::fmt::{self, Display, Formatter};
@@ -27,13 +28,12 @@ use std::fmt::{self, Display, Formatter};
 /// Operations over the data type Map.
 pub(super) struct MapStorage {
     chunks: MapChunkStore,
-    wrapping: ElderMsgWrapping,
 }
 
 impl MapStorage {
-    pub(super) async fn new(node_info: &NodeInfo, wrapping: ElderMsgWrapping) -> Result<Self> {
+pub(super) async fn new(node_info: &NodeInfo) -> Result<Self> {
         let chunks = MapChunkStore::new(node_info.path(), node_info.used_space.clone()).await?;
-        Ok(Self { chunks, wrapping })
+        Ok(Self { chunks })
     }
 
     pub(super) async fn read(
@@ -224,18 +224,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetMap(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetMap(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map shell.
@@ -253,18 +251,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetMapShell(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetMapShell(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map version.
@@ -282,18 +278,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetMapVersion(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetMapVersion(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map value.
@@ -321,18 +315,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetMapValue(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetMapValue(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map keys.
@@ -350,18 +342,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::ListMapKeys(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::ListMapKeys(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map values.
@@ -380,18 +370,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::ListMapValues(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::ListMapValues(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map entries.
@@ -410,18 +398,16 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::ListMapEntries(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::ListMapEntries(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map permissions.
@@ -438,18 +424,17 @@ impl MapStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::ListMapPermissions(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::ListMapPermissions(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     /// Get Map user permissions.
@@ -470,18 +455,17 @@ impl MapStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::ListMapUserPermissions(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                true,
-            )
-            .await
+
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::ListMapUserPermissions(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn ok_or_error(
@@ -493,13 +477,17 @@ impl MapStorage {
         if let Err(error) = result {
             let messaging_error = convert_to_error_message(error)?;
             info!("MapStorage: Writing chunk FAILED!");
-            self.wrapping
-                .error(
-                    CmdError::Data(messaging_error),
-                    msg_id,
-                    SrcLocation::User(origin),
-                )
-                .await
+
+            Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                msg: Message::CmdError {
+                    error: CmdError::Data(messaging_error),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    cmd_origin: SrcLocation::User(origin),
+                },
+                dst: DstLocation::Section(origin.name()),
+                to_be_aggregated: true, // this needs more consideration...
+            }))
         } else {
             info!("MapStorage: Writing chunk PASSED!");
             Ok(NodeMessagingDuty::NoOp)

@@ -16,9 +16,8 @@ use crate::{
     node::{
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
-        msg_wrapping::NodeMsgWrapping,
         node_duties::messaging::Messaging,
-        node_ops::{ElderDuty, IntoNodeOp, NodeDuty, NodeOperation, RewardCmd, RewardDuty},
+        node_ops::{ElderDuty, NodeDuty, NodeOperation, OutgoingMsg, RewardCmd, RewardDuty},
         NodeInfo,
     },
     AdultState, ElderState, Error, Network, NodeState, Result,
@@ -31,15 +30,12 @@ use sn_data_types::{
     TransferPropagated, WalletInfo,
 };
 use sn_messaging::{
-    client::{
-        Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
-        NodeTransferQuery,
-    },
+    client::{Message, MessageId, NodeCmd, NodeQuery, NodeSystemCmd, NodeTransferQuery},
     DstLocation, SrcLocation,
 };
 use std::collections::{BTreeMap, VecDeque};
 
-use super::node_ops::Msg;
+use super::node_ops::NodeMessagingDuty;
 
 const GENESIS_ELDER_COUNT: usize = 5;
 
@@ -201,12 +197,12 @@ impl NodeDuties {
         }
     }
 
-    fn adult_state(&mut self) -> Result<AdultState> {
-        Ok(match self.adult_duties() {
-            Some(duties) => duties.state().clone(),
-            None => return Err(Error::InvalidOperation),
-        })
-    }
+    // fn adult_state(&mut self) -> Result<AdultState> {
+    //     Ok(match self.adult_duties() {
+    //         Some(duties) => duties.state().clone(),
+    //         None => return Err(Error::InvalidOperation),
+    //     })
+    // }
 
     fn node_state(&mut self) -> Result<NodeState> {
         Ok(match self.elder_duties() {
@@ -253,51 +249,36 @@ impl NodeDuties {
     }
 
     async fn notify_section_of_our_storage(&mut self) -> Result<NodeOperation> {
-        let adult_state = match self.adult_duties() {
-            Some(duties) => duties.state().clone(),
-            None => return Err(Error::InvalidOperation),
-        };
-        let wrapping =
-            NodeMsgWrapping::new(NodeState::Adult(adult_state), MsgNodeDuties::NodeConfig);
         let node_id = PublicKey::from(self.network_api.public_key().await);
-        wrapping
-            .send_to_section(
-                Msg {
-                    msg: Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
-                            section: node_id.into(),
-                            node_id,
-                        }),
-                        id: MessageId::new(),
-                    },
-                    dst: DstLocation::Section(node_id.into()),
-                },
-                true,
-            )
-            .await
-            .convert()
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+                    section: node_id.into(),
+                    node_id,
+                }),
+                id: MessageId::new(),
+            },
+            dst: DstLocation::Section(node_id.into()),
+            to_be_aggregated: false,
+        })
+        .into())
     }
 
     async fn register_wallet(&mut self, wallet: PublicKey) -> Result<NodeOperation> {
         let node_state = self.node_state()?;
         info!("Registering wallet: {}", wallet);
-        let wrapping = NodeMsgWrapping::new(node_state.clone(), MsgNodeDuties::NodeConfig);
-        wrapping
-            .send_to_section(
-                Msg {
-                    msg: Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
-                            wallet,
-                            section: PublicKey::Ed25519(node_state.node_id()).into(),
-                        }),
-                        id: MessageId::new(),
-                    },
-                    dst: DstLocation::Section(wallet.into()),
-                },
-                true,
-            )
-            .await
-            .convert()
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
+                    wallet,
+                    section: PublicKey::Ed25519(node_state.node_id()).into(),
+                }),
+                id: MessageId::new(),
+            },
+            dst: DstLocation::Section(wallet.into()),
+            to_be_aggregated: false,
+        })
+        .into())
     }
 
     async fn assume_adult_duties(&mut self) -> Result<NodeOperation> {
@@ -361,27 +342,19 @@ impl NodeDuties {
                 queued_ops: VecDeque::new(),
             });
 
-            let wrapping = NodeMsgWrapping::new(
-                NodeState::Elder(elder_state.clone()),
-                MsgNodeDuties::NodeConfig,
-            );
             let dst = DstLocation::Section(credit.recipient.into());
-            return wrapping
-                .send_to_section(
-                    Msg {
-                        msg: Message::NodeCmd {
-                            cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
-                                credit,
-                                sig: credit_sig_share,
-                            }),
-                            id: MessageId::new(),
-                        },
-                        dst,
-                    },
-                    true,
-                )
-                .await
-                .convert();
+            return Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                msg: Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
+                        credit,
+                        sig: credit_sig_share,
+                    }),
+                    id: MessageId::new(),
+                },
+                dst,
+                to_be_aggregated: false,
+            })
+            .into());
         } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT {
             debug!("AwaitingGenesisThreshold!");
             self.stage = Stage::AwaitingGenesisThreshold(VecDeque::new());
@@ -392,27 +365,19 @@ impl NodeDuties {
 
         if let Some(wallet_id) = self.network_api.section_public_key().await {
             trace!("Beginning transition to Elder duties.");
-            let wrapping = NodeMsgWrapping::new(
-                NodeState::Adult(self.adult_state()?),
-                sn_messaging::client::NodeDuties::NodeConfig,
-            );
             // must get the above wrapping instance before overwriting stage
             self.stage = Stage::AssumingElderDuties(VecDeque::new());
 
             use NodeTransferQuery::CatchUpWithSectionWallet;
-            return wrapping
-                .send_to_section(
-                    Msg {
-                        msg: Message::NodeQuery {
-                            query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
-                            id: MessageId::new(),
-                        },
-                        dst: DstLocation::Section(wallet_id.into()),
-                    },
-                    true,
-                )
-                .await
-                .convert();
+            return Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                msg: Message::NodeQuery {
+                    query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
+                    id: MessageId::new(),
+                },
+                dst: DstLocation::Section(wallet_id.into()),
+                to_be_aggregated: false,
+            })
+            .into());
         }
 
         Ok(NodeOperation::NoOp)
@@ -440,11 +405,6 @@ impl NodeDuties {
                 let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
                 let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
-                let wrapping = NodeMsgWrapping::new(
-                    NodeState::Elder(elder_state.clone()),
-                    MsgNodeDuties::NodeConfig,
-                );
-
                 let dst = DstLocation::Section(elder_state.section_public_key().into());
                 let stage = Stage::ProposingGenesis(GenesisProposal {
                     elder_state,
@@ -453,22 +413,18 @@ impl NodeDuties {
                     pending_agreement: None,
                     queued_ops: queued_ops.drain(..).collect(),
                 });
-                let cmd = wrapping
-                    .send_to_section(
-                        Msg {
-                            msg: Message::NodeCmd {
-                                cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
-                                    credit,
-                                    sig: credit_sig_share,
-                                }),
-                                id: MessageId::new(),
-                            },
-                            dst,
-                        },
-                        true,
-                    )
-                    .await
-                    .convert();
+                let cmd = Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
+                            credit,
+                            sig: credit_sig_share,
+                        }),
+                        id: MessageId::new(),
+                    },
+                    dst,
+                    to_be_aggregated: false,
+                })
+                .into());
 
                 (stage, cmd)
             }
@@ -483,11 +439,6 @@ impl NodeDuties {
                     let _ =
                         signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
-                    let wrapping = NodeMsgWrapping::new(
-                        NodeState::Elder(bootstrap.elder_state.clone()),
-                        MsgNodeDuties::NodeConfig,
-                    );
-
                     let stage = Stage::AccumulatingGenesis(GenesisAccumulation {
                         elder_state: bootstrap.elder_state.clone(),
                         agreed_proposal: signed_credit.clone(),
@@ -496,24 +447,20 @@ impl NodeDuties {
                         queued_ops: bootstrap.queued_ops.drain(..).collect(),
                     });
 
-                    let cmd = wrapping
-                        .send_to_section(
-                            Msg {
-                                msg: Message::NodeCmd {
-                                    cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
-                                        signed_credit: signed_credit.clone(),
-                                        sig: credit_sig_share,
-                                    }),
-                                    id: MessageId::new(),
-                                },
-                                dst: DstLocation::Section(
-                                    bootstrap.elder_state.section_public_key().into(),
-                                ),
-                            },
-                            true,
-                        )
-                        .await
-                        .convert();
+                    let cmd = Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                        msg: Message::NodeCmd {
+                            cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
+                                signed_credit: signed_credit.clone(),
+                                sig: credit_sig_share,
+                            }),
+                            id: MessageId::new(),
+                        },
+                        dst: DstLocation::Section(
+                            bootstrap.elder_state.section_public_key().into(),
+                        ),
+                        to_be_aggregated: false,
+                    })
+                    .into());
 
                     (stage, cmd)
                 } else {
@@ -566,8 +513,8 @@ impl NodeDuties {
 
                     let genesis = TransferPropagated {
                         credit_proof: genesis.clone(),
-                        crediting_replica_sig: credit_sig_share,
-                        crediting_replica_keys: bootstrap.elder_state.section_public_key(),
+                        //crediting_replica_sig: credit_sig_share,
+                        //crediting_replica_keys: bootstrap.elder_state.section_public_key(),
                     };
                     return self
                         .finish_transition_to_elder(

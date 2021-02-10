@@ -212,12 +212,13 @@ impl ReceivedMsg {
 }
 
 #[derive(Debug, Clone)]
-pub struct Msg {
+pub struct OutgoingMsg {
     pub msg: Message,
     pub dst: DstLocation,
+    pub to_be_aggregated: bool,
 }
 
-impl Msg {
+impl OutgoingMsg {
     pub fn id(&self) -> MessageId {
         self.msg.id()
     }
@@ -228,17 +229,8 @@ impl Msg {
 /// part of the system, that it can be considered domain.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeMessagingDuty {
-    /// Send to client
-    SendToClient(Msg),
-    /// Send to a single node.
-    SendToNode(Msg),
-    /// Send to a section.
-    SendToSection {
-        /// Msg to be sent
-        msg: Msg,
-        /// Send as a Node.(send as Section if set to false)
-        as_node: bool,
-    },
+    /// Send a message to the specified dst.
+    Send(OutgoingMsg),
     /// Send the same request to each individual Adult.
     SendToAdults {
         targets: BTreeSet<XorName>,
@@ -264,12 +256,10 @@ impl From<NodeMessagingDuty> for NodeOperation {
 impl Debug for NodeMessagingDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
             Self::SendToAdults { targets, msg } => {
-                write!(f, "SendToAdults [ target: {:?}, msg: {:?} ]", targets, msg)
+                write!(f, "SendToAdults [ targets: {:?}, msg: {:?} ]", targets, msg)
             }
-            Self::SendToClient(msg) => write!(f, "SendToClient [ msg: {:?} ]", msg),
-            Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
-            Self::SendToSection { msg, .. } => write!(f, "SendToSection [ msg: {:?} ]", msg),
             Self::NoOp => write!(f, "No op."),
         }
     }
@@ -359,12 +349,6 @@ pub enum KeySectionDuty {
         msg: Message,
         user: User,
     },
-    /// As a Gateway, the node interfaces with
-    /// clients, interpreting handshakes and msgs,
-    /// and also correlating network msgs (such as cmd errors
-    /// and query responses) with earlier client
-    /// msgs, as to route them to the correct client.
-    RunAsGateway(GatewayDuty),
     /// Transfers of tokens between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
     NoOp,
@@ -399,36 +383,6 @@ pub enum DataSectionDuty {
     /// carrying out operations on those.
     RunAsRewards(RewardDuty),
     NoOp,
-}
-
-// --------------- Gateway ---------------
-
-/// Gateway duties imply interfacing with clients.
-#[derive(Debug)]
-pub enum GatewayDuty {
-    /// Messages from network to client
-    /// such as query responses, events and errors,
-    /// are piped through the Gateway, to find the
-    /// connection info to the client.
-    FindClientFor(Msg),
-    /// Incoming events from clients are parsed
-    /// at the Gateway, and forwarded to other modules.
-    ProcessClientEvent(RoutingEvent),
-    NoOp,
-}
-
-impl Into<NodeOperation> for GatewayDuty {
-    fn into(self) -> NodeOperation {
-        use ElderDuty::*;
-        use KeySectionDuty::*;
-        use NetworkDuty::*;
-        use NodeOperation::*;
-        if matches!(self, GatewayDuty::NoOp) {
-            NodeOperation::NoOp
-        } else {
-            Single(RunAsElder(RunAsKeySection(RunAsGateway(self))))
-        }
-    }
 }
 
 // --------------- Metadata ---------------

@@ -40,6 +40,8 @@ use xor_name::{Prefix, XorName};
 ///
 pub enum NodeState {
     ///
+    Infant(Ed25519PublicKey),
+    ///
     Adult(AdultState),
     ///
     Elder(ElderState),
@@ -49,11 +51,13 @@ impl NodeState {
     /// Static state
     pub fn node_id(&self) -> Ed25519PublicKey {
         match self {
+            Self::Infant(id) => *id,
             Self::Adult(state) => state.node_id,
             Self::Elder(state) => state.node_id,
         }
     }
 
+    ///
     pub fn node_name(&self) -> XorName {
         PublicKey::Ed25519(self.node_id()).into()
     }

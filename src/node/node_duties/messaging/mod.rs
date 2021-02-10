@@ -30,11 +30,7 @@ impl Messaging {
     ) -> Result<NodeOperation> {
         use NodeMessagingDuty::*;
         match duty {
-            SendToClient(msg) => self.network_sender.send_to_client(msg, true).await,
-            SendToNode(msg) => self.network_sender.send_to_node(msg, true).await,
-            SendToSection { msg, as_node } => {
-                self.network_sender.send_to_network(msg, as_node).await
-            }
+            Send(msg) => self.network_sender.send(msg).await,
             SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg).await,
             NoOp => Ok(NodeOperation::NoOp),
         }

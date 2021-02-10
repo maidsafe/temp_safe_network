@@ -9,8 +9,7 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeMessagingDuty, NodeOperation},
+    node::node_ops::{NodeMessagingDuty, NodeOperation, OutgoingMsg},
     ElderState, Error, Result, ToDbKey,
 };
 use log::{info, trace, warn};
@@ -49,19 +48,16 @@ struct HolderMetadata {
 pub(super) struct BlobRegister {
     dbs: ChunkHolderDbs,
     elder_state: ElderState,
-    wrapping: ElderMsgWrapping,
 }
 
 impl BlobRegister {
     pub(super) fn new(
         dbs: ChunkHolderDbs,
-        wrapping: ElderMsgWrapping,
         elder_state: ElderState,
     ) -> Self {
         Self {
             dbs,
             elder_state,
-            wrapping,
         }
     }
 
@@ -92,19 +88,16 @@ impl BlobRegister {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
                     return Ok(NodeMessagingDuty::NoOp);
                 } else {
-                    return self
-                        .wrapping
-                        .send_to_section(
-                            Message::CmdError {
-                                error: CmdError::Data(ErrorMessage::DataExists),
-                                id: MessageId::new(),
-                                cmd_origin: SrcLocation::User(origin),
-                                correlation_id: msg_id,
-                            },
-                            origin.name(),
-                            true,
-                        )
-                        .await;
+                    return Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                        msg: Message::CmdError {
+                            error: CmdError::Data(ErrorMessage::DataExists),
+                            id: MessageId::new(),
+                            cmd_origin: SrcLocation::User(origin),
+                            correlation_id: msg_id,
+                        },
+                        dst: DstLocation::Section(origin.name()),
+                        to_be_aggregated: false,
+                    }));
                 }
             } else {
                 let mut existing_holders = metadata.holders;
@@ -142,13 +135,14 @@ impl BlobRegister {
         if !results.is_empty() {
             info!("Results is not empty!");
         }
-        let message = Message::NodeCmd {
+        let msg = Message::NodeCmd {
             cmd: NodeCmd::Data(NodeDataCmd::Blob(BlobWrite::New(data))),
             id: msg_id,
         };
-        self.wrapping
-            .send_to_adults(target_holders, message, true)
-            .await
+        Ok(NodeMessagingDuty::SendToAdults {
+            targets: target_holders,
+            msg,
+        })
     }
 
     async fn send_blob_cmd_error(
@@ -158,18 +152,16 @@ impl BlobRegister {
         origin: User,
     ) -> Result<NodeMessagingDuty> {
         let message_error = convert_to_error_message(error)?;
-        self.wrapping
-            .send_to_section(
-                Message::CmdError {
-                    error: CmdError::Data(message_error),
-                    id: MessageId::new(),
-                    cmd_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::CmdError {
+                error: CmdError::Data(message_error),
+                id: MessageId::new(),
+                cmd_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn delete(
@@ -202,13 +194,14 @@ impl BlobRegister {
             .collect();
         if !results.is_empty() {}
 
-        let message = Message::NodeCmd {
+        let msg = Message::NodeCmd {
             cmd: NodeCmd::Data(NodeDataCmd::Blob(BlobWrite::DeletePrivate(address))),
             id: msg_id,
         };
-        self.wrapping
-            .send_to_adults(metadata.holders, message, true)
-            .await
+        Ok(NodeMessagingDuty::SendToAdults {
+            targets: metadata.holders,
+            msg,
+        })
     }
 
     fn set_chunk_holder(
@@ -348,17 +341,14 @@ impl BlobRegister {
             })
             .collect::<Vec<_>>();
         for (msg, dst) in messages {
-            match self
-                .wrapping
-                .send_to_node(msg, DstLocation::Node(dst))
-                .await
-            {
-                Ok(op) => node_ops.push(op.into()),
-                Err(e) => warn!(
-                    "Error: {}. Failed to send replication cmd (for chunk {:?}) to node {}",
-                    e, address, dst
-                ),
-            }
+            node_ops.push(
+                NodeMessagingDuty::Send(OutgoingMsg {
+                    msg,
+                    dst: DstLocation::Node(dst),
+                    to_be_aggregated: false,
+                })
+                .into(),
+            );
         }
         node_ops
     }
@@ -389,15 +379,11 @@ impl BlobRegister {
                 query_origin: SrcLocation::User(origin),
                 correlation_id: msg_id,
             };
-            self.wrapping
-                .send_to_client(err_msg, DstLocation::User(origin))
-                .await
-            // // short circuit sending the response directly to client if there are no intermediaries
-            // if proxies.is_empty() && origin.is_client() {
-            //     self.wrapping.send_to_client(err_msg, origin).await
-            // } else {
-            //     self.wrapping.send_to_section(err_msg, false).await
-            // }
+            Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                msg: err_msg,
+                dst: DstLocation::User(origin),
+                to_be_aggregated: true,
+            }))
         };
 
         let metadata = match self.get_metadata_for(address) {
@@ -410,13 +396,14 @@ impl BlobRegister {
                 return query_error(Error::NetworkData(DtError::AccessDenied(*origin.id()))).await;
             }
         };
-        let message = Message::Query {
+        let msg = Message::Query {
             query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
             id: msg_id,
         };
-        self.wrapping
-            .send_to_adults(metadata.holders, message, true)
-            .await
+        Ok(NodeMessagingDuty::SendToAdults {
+            targets: metadata.holders,
+            msg,
+        })
     }
 
     #[allow(unused)]

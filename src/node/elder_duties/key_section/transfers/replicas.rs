@@ -25,10 +25,10 @@ use xor_name::Prefix;
 #[cfg(feature = "simulated-payouts")]
 use {
     crate::node::node_ops::NodeMessagingDuty,
-    bls::{SecretKey, SecretKeySet, SecretKeyShare},
+    bls::{SecretKey, SecretKeySet},
     log::debug,
     rand::thread_rng,
-    sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
+    sn_data_types::{Signature, SignedCredit, SignedDebit, Transfer},
 };
 
 type WalletLocks = DashMap<PublicKey, Arc<Mutex<TransferStore<ReplicaEvent>>>>;
@@ -305,12 +305,9 @@ impl<T: ReplicaSigning> Replicas<T> {
         });
 
         if propagation_result.is_ok() {
-            // sign + update state
-            let crediting_replica_sig = self.info.signing.sign_credit_proof(credit_proof).await?;
+            // update state
             let event = TransferPropagated {
                 credit_proof: credit_proof.clone(),
-                crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
-                crediting_replica_sig,
             };
             // only add it locally if we don't know about it... (this prevents SimulatedPayouts being reapplied due to varied sigs.)
             if propagation_result?.is_some() {
@@ -426,13 +423,10 @@ impl<T: ReplicaSigning> Replicas<T> {
         let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         let _ = wallet.genesis(credit_proof, past_key)?;
 
-        // sign + update state
-        let crediting_replica_sig = self.info.signing.sign_credit_proof(credit_proof).await?;
+        // update state
         // Q: are we locked on `info.signing` here? (we don't want to be)
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
             credit_proof: credit_proof.clone(),
-            crediting_replica_sig,
-            crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
         }))
     }
 
@@ -473,10 +467,6 @@ impl<T: ReplicaSigning> Replicas<T> {
         let sec_key_set = SecretKeySet::random(7, &mut rng);
         let replica_keys = sec_key_set.public_keys();
         let sec_key = SecretKey::random();
-        let pub_key = sec_key.public_key();
-        let dummy_shares = SecretKeyShare::default();
-
-        let dummy_sig = dummy_shares.sign(dummy_msg);
         let sig = sec_key.sign(dummy_msg);
         let transfer_proof = TransferAgreementProof {
             signed_credit: SignedCredit {
@@ -494,11 +484,6 @@ impl<T: ReplicaSigning> Replicas<T> {
 
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
             credit_proof: transfer_proof.credit_proof(),
-            crediting_replica_keys: PublicKey::from(pub_key),
-            crediting_replica_sig: SignatureShare {
-                index: 0,
-                share: dummy_sig,
-            },
         }))?;
 
         Ok(NodeMessagingDuty::NoOp)

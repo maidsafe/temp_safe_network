@@ -15,7 +15,6 @@ mod writing;
 
 use crate::{
     capacity::ChunkHolderDbs,
-    node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{IntoNodeOp, MetadataDuty, NodeOperation},
     node::NodeInfo,
     ElderState, Error, Result,
@@ -24,10 +23,7 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
-use sn_messaging::{
-    client::{ElderDuties, Message},
-    location::User,
-};
+use sn_messaging::{client::Message, location::User};
 
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -40,8 +36,6 @@ use xor_name::XorName;
 /// all underlying data being chunks stored at `Adults`.
 pub struct Metadata {
     elder_stores: ElderStores,
-    #[allow(unused)]
-    wrapping: ElderMsgWrapping,
 }
 
 impl Metadata {
@@ -50,15 +44,11 @@ impl Metadata {
         dbs: ChunkHolderDbs,
         elder_state: ElderState,
     ) -> Result<Self> {
-        let wrapping = ElderMsgWrapping::new(elder_state.clone(), ElderDuties::Metadata);
-        let blob_register = BlobRegister::new(dbs, wrapping.clone(), elder_state);
-        let map_storage = MapStorage::new(node_info, wrapping.clone()).await?;
-        let sequence_storage = SequenceStorage::new(node_info, wrapping.clone()).await?;
+        let blob_register = BlobRegister::new(dbs, elder_state);
+        let map_storage = MapStorage::new(node_info).await?;
+        let sequence_storage = SequenceStorage::new(node_info).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
-        Ok(Self {
-            elder_stores,
-            wrapping,
-        })
+        Ok(Self { elder_stores })
     }
 
     pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NodeOperation> {

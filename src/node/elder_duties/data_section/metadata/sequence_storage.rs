@@ -8,8 +8,9 @@
 
 use crate::{
     chunk_store::SequenceChunkStore, error::convert_to_error_message,
-    node::msg_wrapping::ElderMsgWrapping, node::node_ops::NodeMessagingDuty, node::NodeInfo, Error,
-    Result,
+    node::node_ops::{NodeMessagingDuty, OutgoingMsg},
+    node::NodeInfo,
+    Error, Result,
 };
 use log::info;
 use sn_data_types::{
@@ -20,7 +21,7 @@ use sn_data_types::{
 use sn_messaging::{
     client::{CmdError, Message, MessageId, QueryResponse, SequenceRead, SequenceWrite},
     location::User,
-    SrcLocation,
+    DstLocation, SrcLocation,
 };
 
 use std::fmt::{self, Display, Formatter};
@@ -28,14 +29,13 @@ use std::fmt::{self, Display, Formatter};
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
     chunks: SequenceChunkStore,
-    wrapping: ElderMsgWrapping,
 }
 
 impl SequenceStorage {
-    pub(super) async fn new(node_info: &NodeInfo, wrapping: ElderMsgWrapping) -> Result<Self> {
+    pub(super) async fn new(node_info: &NodeInfo) -> Result<Self> {
         let chunks =
             SequenceChunkStore::new(node_info.path(), node_info.used_space.clone()).await?;
-        Ok(Self { chunks, wrapping })
+            Ok(Self { chunks })
     }
 
     pub(super) async fn read(
@@ -108,18 +108,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequence(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequence(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     fn get_chunk(
@@ -177,18 +175,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequenceRange(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceRange(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn get_last_entry(
@@ -206,18 +202,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequenceLastEntry(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceLastEntry(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn get_owner(
@@ -240,18 +234,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequenceOwner(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceOwner(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn get_user_permissions(
@@ -271,18 +263,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequenceUserPermissions(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceUserPermissions(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn get_public_policy(
@@ -305,18 +295,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequencePublicPolicy(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequencePublicPolicy(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn get_private_policy(
@@ -339,18 +327,16 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        self.wrapping
-            .send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetSequencePrivatePolicy(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: SrcLocation::User(origin),
-                    correlation_id: msg_id,
-                },
-                origin.name(),
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequencePrivatePolicy(result),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: SrcLocation::User(origin),
+                correlation_id: msg_id,
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: false,
+        }))
     }
 
     async fn set_public_permissions(
@@ -471,18 +457,16 @@ impl SequenceStorage {
                 convert_to_error_message(error)?
             }
         };
-        self.wrapping
-            .send_to_section(
-                Message::CmdError {
-                    id: MessageId::new(),
-                    error: CmdError::Data(error),
-                    correlation_id: msg_id,
-                    cmd_origin: SrcLocation::User(origin),
-                },
-                origin.name(),
-                false,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::CmdError {
+                id: MessageId::new(),
+                error: CmdError::Data(error),
+                correlation_id: msg_id,
+                cmd_origin: SrcLocation::User(origin),
+            },
+            dst: DstLocation::Section(origin.name()),
+            to_be_aggregated: true,
+        }))
     }
 }
 

@@ -13,9 +13,9 @@ mod validator;
 use self::section_funds::{Payout, SectionFunds};
 pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
-    node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
-        IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery,
+        IntoNodeOp, NodeMessagingDuty, NodeOperation, OutgoingMsg, RewardCmd, RewardDuty,
+        RewardQuery,
     },
     ElderState,
 };
@@ -25,10 +25,10 @@ use log::{debug, error, info, warn};
 use sn_data_types::{Error as DtError, PublicKey, Token};
 use sn_messaging::{
     client::{
-        ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
+        Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        NodeRewardQueryResponse, NodeTransferQuery,
     },
-    SrcLocation,
+    DstLocation, SrcLocation,
 };
 
 use sn_transfers::TransferActor;
@@ -45,7 +45,6 @@ pub struct Rewards {
     peer_replicas: PublicKey,
     node_rewards: DashMap<XorName, NodeRewards>,
     section_funds: SectionFunds,
-    wrapping: ElderMsgWrapping,
     reward_calc: RewardCalc,
 }
 
@@ -70,13 +69,11 @@ pub enum NodeRewards {
 impl Rewards {
     pub fn new(elder_state: ElderState, actor: SectionActor, reward_calc: RewardCalc) -> Self {
         let peer_replicas = elder_state.section_public_key();
-        let wrapping = ElderMsgWrapping::new(elder_state, ElderDuties::Rewards);
-        let section_funds = SectionFunds::new(actor, wrapping.clone());
+        let section_funds = SectionFunds::new(actor);
         Self {
             peer_replicas,
             node_rewards: Default::default(),
             section_funds,
-            wrapping,
             reward_calc,
         }
     }
@@ -101,19 +98,17 @@ impl Rewards {
     pub async fn catchup_with_replicas(&self, section: XorName) -> Result<NodeOperation> {
         info!("Rewards: Catching up with our Replicas (section actor history)!");
         // prepare actor init
-        self.wrapping
-            .send_to_section(
-                Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::CatchUpWithSectionWallet(
-                        self.peer_replicas, // consider removing this
-                    )),
-                    id: MessageId::new(),
-                },
-                section,
-                true,
-            )
-            .await
-            .convert()
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQuery {
+                query: NodeQuery::Transfers(NodeTransferQuery::CatchUpWithSectionWallet(
+                    self.peer_replicas, // consider removing this
+                )),
+                id: MessageId::new(),
+            },
+            dst: DstLocation::Section(section),
+            to_be_aggregated: false,
+        })
+        .into())
     }
 
     /// After Elder change, we transition to a new
@@ -296,19 +291,17 @@ impl Rewards {
         let state = AwaitingActivation(age);
         let _ = self.node_rewards.insert(new_node_id, state);
 
-        self.wrapping
-            .send_to_section(
-                Message::NodeQuery {
-                    query: Rewards(GetNodeWalletId {
-                        old_node_id,
-                        new_node_id,
-                    }),
-                    id: MessageId::new(),
-                },
-                old_node_id,
-                true,
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQuery {
+                query: Rewards(GetNodeWalletId {
+                    old_node_id,
+                    new_node_id,
+                }),
+                id: MessageId::new(),
+            },
+            dst: DstLocation::Section(old_node_id),
+            to_be_aggregated: false,
+        }))
     }
 
     /// 3. The old section will send back the wallet id, which allows us to activate it.
@@ -423,20 +416,16 @@ impl Rewards {
                 // ..means the node has not left, and was not
                 // marked as relocating..
                 // (Could be a case for lazy messaging..)
-                return self
-                    .wrapping
-                    .send_to_node(
-                        Message::NodeQueryResponse {
-                            response: Rewards(GetNodeWalletId(Err(
-                                ErrorMessage::NodeWasNotRelocated,
-                            ))),
-                            id: MessageId::in_response_to(&msg_id),
-                            correlation_id: msg_id,
-                            query_origin: origin,
-                        },
-                        origin.to_dst(),
-                    )
-                    .await;
+                return Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeQueryResponse {
+                        response: Rewards(GetNodeWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
+                        id: MessageId::in_response_to(&msg_id),
+                        correlation_id: msg_id,
+                        query_origin: origin,
+                    },
+                    dst: origin.to_dst(),
+                    to_be_aggregated: true,
+                }));
             }
         };
 
@@ -449,16 +438,15 @@ impl Rewards {
         // will pay out rewards to the wallet.
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
-        self.wrapping
-            .send_to_node(
-                Message::NodeQueryResponse {
-                    response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    query_origin: origin,
-                },
-                origin.to_dst(),
-            )
-            .await
+        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQueryResponse {
+                response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: origin,
+            },
+            dst: origin.to_dst(),
+            to_be_aggregated: true,
+        }))
     }
 }

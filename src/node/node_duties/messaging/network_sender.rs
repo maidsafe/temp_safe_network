@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::node_ops::{GatewayDuty, Msg, NodeOperation},
+    node::node_ops::{NodeOperation, OutgoingMsg},
     Error, Network, Result,
 };
 use log::error;
@@ -25,38 +25,21 @@ impl NetworkSender {
         Self { network }
     }
 
-    pub async fn send_to_client(&mut self, msg: Msg, _as_node: bool) -> Result<NodeOperation> {
-        Ok(GatewayDuty::FindClientFor(msg).into())
-        // let dst = match msg.destination()? {
-        //     Address::Client(xorname) => xorname,
-        //     Address::Node(_) => return Ok(NodeMessagingDuty::SendToNode(msg).into()),
-        //     Address::Section(_) => {
-        //         return Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
-        //     }
-        // };
-        // if self.network.matches_our_prefix(dst).await {
-        //     Ok(GatewayDuty::FindClientFor(msg).into())
-        // } else {
-        //     Ok(NodeMessagingDuty::SendToSection { msg, as_node }.into())
-        // }
-    }
-
-    pub async fn send_to_node(&mut self, msg: Msg, _as_node: bool) -> Result<NodeOperation> {
-        let name = self.network.our_name().await;
-        let dst = msg.dst; // DstLocation::Node(msg.dst.name());
-
+    pub async fn send(&mut self, msg: OutgoingMsg) -> Result<NodeOperation> {
+        let src = if msg.to_be_aggregated {
+            SrcLocation::Section(self.network.our_prefix().await)
+        } else {
+            SrcLocation::Node(self.network.our_name().await)
+        };
         let result = self
             .network
-            .send_message(SrcLocation::Node(name), dst, msg.msg.serialize()?)
+            .send_message(src, msg.dst, msg.msg.serialize()?)
             .await;
 
         result.map_or_else(
             |err| {
-                error!("Unable to send Message to Peer: {:?}", err);
-                Err(Error::Logic(format!(
-                    "{:?}: Unable to send Msg to Peer",
-                    msg.id()
-                )))
+                error!("Unable to send msg: {:?}", err);
+                Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
             },
             |()| Ok(NodeOperation::NoOp),
         )
@@ -85,35 +68,5 @@ impl NetworkSender {
                 );
         }
         Ok(NodeOperation::NoOp)
-    }
-
-    pub async fn send_to_network(
-        &mut self,
-        msg: Msg,
-        // msg: Message,
-        // location: XorName,
-        as_node: bool,
-    ) -> Result<NodeOperation> {
-        let dst = msg.dst; //DstLocation::Section(location);
-        let src = if as_node {
-            SrcLocation::Node(self.network.our_name().await)
-        } else {
-            SrcLocation::Section(self.network.our_prefix().await)
-        };
-        let result = self
-            .network
-            .send_message(src, dst, msg.msg.serialize()?)
-            .await;
-
-        result.map_or_else(
-            |err| {
-                error!("Unable to send to section: {:?}", err);
-                Err(Error::Logic(format!(
-                    "{:?}: Unable to send to section",
-                    msg.id()
-                )))
-            },
-            |()| Ok(NodeOperation::NoOp),
-        )
     }
 }

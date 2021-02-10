@@ -6,12 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod client;
 mod client_msg_analysis;
 mod transfers;
 
 use self::{
-    client::ClientGateway,
     client_msg_analysis::ClientMsgAnalysis,
     transfers::{replica_signing::ReplicaSigning, replicas::Replicas, Transfers},
 };
@@ -48,7 +46,6 @@ where
 /// Payments deals with the payment for data writes,
 /// while transfers deals with sending tokens between keys.
 pub struct KeySection {
-    gateway: ClientGateway,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
     elder_state: ElderState,
@@ -60,13 +57,11 @@ impl KeySection {
         node_info: &NodeInfo,
         elder_state: ElderState,
     ) -> Result<Self> {
-        let gateway = ClientGateway::new(elder_state.clone()).await?;
         let replicas = Self::transfer_replicas(node_info, elder_state.clone());
-        let transfers = Transfers::new(elder_state.clone(), replicas, rate_limit);
+        let transfers = Transfers::new(replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(elder_state.clone());
 
         Ok(Self {
-            gateway,
             transfers,
             msg_analysis,
             elder_state,
@@ -131,7 +126,6 @@ impl KeySection {
         use KeySectionDuty::*;
         match duty {
             EvaluateUserMsg { msg, user } => self.msg_analysis.evaluate(msg, user).await,
-            RunAsGateway(duty) => self.gateway.process_as_gateway(duty).await,
             RunAsTransfers(duty) => self.transfers.process_transfer_duty(&duty).await,
             NoOp => Ok(NodeOperation::NoOp),
         }

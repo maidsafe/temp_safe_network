@@ -8,7 +8,6 @@
 
 mod adult_duties;
 mod elder_duties;
-mod msg_wrapping;
 mod node_duties;
 mod node_ops;
 pub mod state_db;
@@ -17,7 +16,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::{
         node_duties::NodeDuties,
-        node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
+        node_ops::{NetworkDuty, NodeDuty, NodeOperation},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
     Config, Error, Network, NodeInfo, Result,
@@ -30,6 +29,8 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+
+use self::node_ops::KeySectionDuty;
 
 /// Main node struct.
 pub struct Node {
@@ -141,9 +142,12 @@ impl Node {
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
-            let duty = if let Event::ClientMessageReceived { .. } = event {
-                info!("Event from client peer: {:?}", event);
-                GatewayDuty::ProcessClientEvent(event).into()
+            let duty = if let Event::ClientMessageReceived { content, user, .. } = event {
+                KeySectionDuty::EvaluateUserMsg {
+                    msg: *content,
+                    user,
+                }
+                .into()
             } else {
                 NodeDuty::ProcessNetworkEvent(event).into()
             };
