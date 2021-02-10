@@ -20,6 +20,7 @@
         - [Run a local network for testing: `--test`](#run-a-local-network-for-testing---test)
       - [Connect to a shared network](#connect-to-a-shared-network)
       - [Switch networks](#switch-networks)
+      - [Set network bootstrap address](#set-network-bootstrap-address)
       - [Node update](#node-update)
     - [Auth](#auth)
       - [The Authenticator daemon (authd)](#the-authenticator-daemon-authd)
@@ -190,12 +191,17 @@ Done!
 At the current state of the Safe project, a single-section Safe network can be launched locally in our system. If the Safe Network node was installed in the system using the CLI as described in the previous section we can then launch it with a simple command:
 ```shell
 $ safe node run-baby-fleming
+Creating '~/.safe/node/baby-fleming-nodes' folder
 Storing nodes' generated data at ~/.safe/node/baby-fleming-nodes
 Launching local Safe network...
 Launching with node executable from: ~/.safe/node/sn_node
-Network size: 8 nodes
+Version: sn_node 0.26.8
+Network size: 11 nodes
 Launching genesis node (#1)...
-Genesis node contact info: ["127.0.0.1:55851"]
+Connection info directory: ~/.safe/node/node_connection_info.config
+Genesis node contact info: ["127.0.0.1:12000"]
+Common node args for launching the network: ["-vv", "--idle-timeout-msec", "5500", "--keep-alive-interval-msec", "4000", "--local"]
+No RUST_LOG override provided
 Launching node #2...
 Launching node #3...
 Launching node #4...
@@ -203,10 +209,13 @@ Launching node #5...
 Launching node #6...
 Launching node #7...
 Launching node #8...
+Launching node #9...
+Launching node #10...
+Launching node #11...
 Done!
 ```
 
-Once the local network is running, the connection configuration file will be already in the correct place for your applications (including the CLI) to connect to it. Thus from this point on, you can simply use the CLI or any application to connect to your local network. Note that depending on the application, you may need to restart it so it uses the new connection information for your local network.
+Once the local network is running, the connection configuration file will be already in the correct place for the CLI to connect to it. Thus from this point on, you can simply use the CLI to connect to your local network.
 
 In order to shutdown a running local network, the following CLI command can be invoked to kill all running sn_node processes:
 ```shell
@@ -216,7 +225,7 @@ Success, all processes instances of sn_node were stopped!
 
 ##### Run a local network for testing: `--test`
 
-The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new Safe and authorise the CLI for test purposes. This requires that the `node`, `authd` and `cli` themselves be installed in the correct locations on the system
+The `run-baby-fleming` command accepts a `--test` or `-t` flag to automatically create a new Safe and authorise the CLI for test purposes. This requires that the `sn_node`, `sn_authd` and CLI themselves be installed in the correct locations on the system
 
 #### Connect to a shared network
 
@@ -224,41 +233,43 @@ Ready to play your part in a shared network by adding your node from home to a s
 
 MaidSafe are currently hosting some bootstrap nodes on Digital Ocean to kickstart a single section, you can bootstrap using these nodes as hardcoded contacts, then watch the logs as your node joins the network, progresses to Adult status, and plays its part in hosting Immutable Data Chunks. Of course you will also be able to create a Safe on this network, unlock it, upload data, create keys and wallets, and all the other commands described in this user guide. This guide will take you through connecting to this MaidSafe started network, but of course it can be applied to connecting to any shared section, hosted by anyone.
 
-You will need the network configuration containing the details of the hardcoded contacts that will bootstrap you to the shared section. If you have connected to this or previous iterations of the MaidSafe shared section then you may already have a `shared-section` network profile saved on your machine. You can confirm this and update it to the latest configuration using `safe networks check`:
+You will need the network configuration containing the details of the hardcoded contacts that will bootstrap you to the shared section. If you have connected to this or previous iterations of the MaidSafe shared section then you may already have a `maidsafe-testnet` network profile saved on your machine. You can confirm this and update it to the latest configuration using `safe networks check`:
 ```shell
 $ safe networks check
 Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
-Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
 
-'shared-section' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'shared-section' network as per current config
+'maidsafe-testnet' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
 ```
 
-If you don't have a configuration in your results which points to the exact [S3 location](https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config) listed in the results above, you can add using `safe networks add`:
+If you don't have a configuration in your results which points to the exact [S3 location](https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config) listed in the results above, you can add using `safe networks add`:
 ```shell
-$ safe networks add shared-section https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config
-Network 'shared-section' was added to the list
+$ safe networks add maidsafe-testnet https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config
+Network 'maidsafe-testnet' was added to the list. Connection information is located at 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config'
 ```
 
-Now you need to ensure you are set to use this `shared-section` configuration that we have updated/added, we can use `safe networks switch shared-section` for this:
+Now you need to ensure you are set to use this `maidsafe-testnet` configuration that we have updated/added, we can use `safe networks switch maidsafe-testnet` for this:
 ```shell
-$ safe networks switch shared-section
-Switching to 'shared-section' network...
-Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
-Successfully switched to 'shared-section' network in your system!
-If you need write access to the 'shared-section' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
+$ safe networks switch maidsafe-testnet
+Switching to 'maidsafe-testnet' network...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
+Successfully switched to 'maidsafe-testnet' network in your system!
+If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
 ```
 
 We're now ready to launch our node and add it as a node. This is achieved using `safe node join` as follows:
 ```shell
 $ safe node join
-Creating '/Users/maidsafe/.safe/node/local-node' folder
-Storing nodes' generated data at /Users/maidsafe/.safe/node/local-node
+Joining network with contacts {161.35.36.185:12000}...
+Creating '~/.safe/node/local-node' folder
+Storing nodes' generated data at ~/.safe/node/local-node
 Starting a node to join a Safe network...
-Launching with node executable from: /Users/maidsafe/.safe/node/sn_node
-Node started with hardcoded contact: 161.35.36.185:12000
+Launching with node executable from: ~/.safe/node/sn_node
+Version: sn_node 0.26.8
+Node to be started with contact(s): ["161.35.36.185:12000"]
 Launching node...
-Node logs are being stored at: /Users/maidsafe/.safe/node/local-node/sn_node.log
+Node logs are being stored at: ~/.safe/node/local-node/sn_node.log
 ```
 
 Your node will now launch and attempt to connect to the shared network. You can keep an eye on its progress via its logs, which can be found at `~/.safe/node/local-node/sn_node.log`.
@@ -267,7 +278,7 @@ Note that at the time of writing nodes from home is being restricted to those wi
 
 #### Switch networks
 
-MaidSafe currently hosts a single-section network for those who don't want to run a local network but still have a go at using the CLI and client applications. It's very common for users testing and experimenting with CLI and Safe applications to have a local network running, but switching to use the MaidSafe hosted network, back and forth, is also quite common.
+MaidSafe currently hosts a test network for those who don't want to run a local network but still have a go at using the CLI and client applications. It's very common for users testing and experimenting with CLI and Safe applications to have a local network running, but switching to use the MaidSafe hosted network, back and forth, is also quite common.
 
 The CLI allows you to set up a list of networks in its config settings for easily switching to connect to them. If you just launched a local network, you can keep current connection information as a configured network on CLI with the following command:
 ```shell
@@ -278,44 +289,76 @@ Network 'my-network' was added to the list. Connection information is located at
 
 If you also would like to connect to the MaidSafe hosted test network, you would need to set it up in CLI settings as another network, specifying the URL where to fetch latest connection information from:
 ```shell
-$ safe networks add shared-section https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config
-Network 'shared-section' was added to the list
+$ safe networks add maidsafe-testnet https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config
+Network 'maidsafe-testnet' was added to the list
 ```
 
 We can also retrieve the list of the different networks that were set up in the CLI config:
 ```shell
 $ safe networks
-+----------------+--------------------------------------------------------------------------------------------------+
-| Networks       |                                                                                                  |
-+----------------+--------------------------------------------------------------------------------------------------+
-| Network name   | Connection info location                                                                         |
-+----------------+--------------------------------------------------------------------------------------------------+
-| my-network     | ~/.config/sn_cli/networks/my-network_node_connection_info.config                              |
-+----------------+--------------------------------------------------------------------------------------------------+
-| shared-section | https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config |
-+----------------+--------------------------------------------------------------------------------------------------+
++----------+------------------+------------------------------------------------------------------------------------------------+
+| Networks |                  |                                                                                                |
++----------+------------------+------------------------------------------------------------------------------------------------+
+| Current  | Network name     | Connection info                                                                                |
++----------+------------------+------------------------------------------------------------------------------------------------+
+|          | maidsafe-testnet | https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config |
++----------+------------------+------------------------------------------------------------------------------------------------+
+| *        | my-network       | ~/.safe/cli/networks/my-network_node_connection_info.config                                    |
++----------+------------------+------------------------------------------------------------------------------------------------+
 ```
 
-Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it at the right location in the system for Safe applications to connect to the selected network. E.g. let's switch to the 'shared-section' network we previously configured:
+Once we have them in the CLI settings, we can use the CLI to automatically fetch the connection information data using the configured location, and place it at the right location in the system for Safe applications to connect to the selected network. E.g. let's switch to the 'maidsafe-testnet' network we previously configured:
 ```shell
-$ safe networks switch shared-section
-Switching to 'shared-section' network...
-Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
-Successfully switched to 'shared-section' network in your system!
-If you need write access to the 'shared-section' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
+$ safe networks switch maidsafe-testnet
+Switching to 'maidsafe-testnet' network...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
+Successfully switched to 'maidsafe-testnet' network in your system!
+If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
 ```
 
-Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the shared network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your current setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
+Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the test network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your current setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
 ```shell
 $ safe networks check
 Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
-Fetching 'shared-section' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/shared-section/node_connection_info.config' ...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
 
-'shared-section' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'shared-section' network as per current config
+'maidsafe-testnet' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
 ```
 
-Note that in the scenario that your current network is set to be the MaidSafe shared network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
+Note that in the scenario that your current network is set to be the MaidSafe test network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
+
+#### Set network bootstrap address
+
+Another way to add a network to the CLI config settings is by directly mapping a network name to its bootstrapping address/es (IPs and ports). This can be achieved by using the `networks set` subcommand:
+```shell
+$ safe networks set community-network 161.35.36.112:15000
+Network 'community-network' was added to the list. Contacts: '{161.35.36.112:15000}'
+```
+
+And as we did before, we could then switch to use this network using its name:
+```shell
+$ safe networks switch community-network
+Switching to 'community-network' network...
+Successfully switched to 'community-network' network in your system!
+If you need write access to the 'community-network' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
+```
+
+If now check the list of networks we have in the CLI config settings we can see the 'community-network' is listed as the one currently set:
+```shell
+$ safe networks
++----------+-------------------+------------------------------------------------------------------------------------------------+
+| Networks |                   |                                                                                                |
++----------+-------------------+------------------------------------------------------------------------------------------------+
+| Current  | Network name      | Connection info                                                                                |
++----------+-------------------+------------------------------------------------------------------------------------------------+
+| *        | community-network | {161.35.36.112:15000}                                                                          |
++----------+-------------------+------------------------------------------------------------------------------------------------+
+|          | maidsafe-testnet  | https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config |
++----------+-------------------+------------------------------------------------------------------------------------------------+
+|          | my-network        | ~/.safe/cli/networks/my-network_node_connection_info.config                                    |
++----------+-------------------+------------------------------------------------------------------------------------------------+
+```
 
 #### Node update
 
