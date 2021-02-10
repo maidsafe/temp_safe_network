@@ -40,7 +40,7 @@ pub use self::{
     transfer::{TransferCmd, TransferQuery},
 };
 
-use crate::{MessageType, WireMsg};
+use crate::{MessageType, SrcLocation, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -54,7 +54,6 @@ use std::{
     convert::TryFrom,
     fmt,
 };
-use xor_name::XorName;
 
 /// Message envelope containing a Safe message payload,
 /// This struct also provides utilities to obtain the serialized bytes
@@ -123,7 +122,7 @@ pub enum Message {
         /// ID of causing query.
         correlation_id: MessageId,
         /// The sender of the causing query.
-        query_origin: Address,
+        query_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -136,7 +135,7 @@ pub enum Message {
         /// ID of causing cmd.
         correlation_id: MessageId,
         /// The sender of the causing cmd.
-        cmd_origin: Address,
+        cmd_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -158,7 +157,7 @@ pub enum Message {
         /// ID of causing cmd.
         correlation_id: MessageId,
         /// The sender of the causing cmd.
-        cmd_origin: Address,
+        cmd_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -191,7 +190,7 @@ pub enum Message {
         /// ID of causing query.
         correlation_id: MessageId,
         /// The sender of the causing query.
-        query_origin: Address,
+        query_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -291,9 +290,6 @@ pub enum TransferError {
 pub enum Event {
     /// The transfer was validated by a Replica instance.
     TransferValidated {
-        /// This is the client id.
-        /// A client can fhave any number of accounts.
-        client: XorName,
         /// This is the validation of the transfer
         /// requested by the client for an account.
         event: TransferValidated,
@@ -304,23 +300,9 @@ pub enum Event {
     /// SignatureAccumulation has been broken out
     /// to its own crate, and can be used at client.
     TransferAgreementReached {
-        /// This is the client id.
-        /// A client can fhave any number of accounts.
-        client: XorName,
         /// The accumulated proof.
         proof: TransferAgreementProof,
     },
-}
-
-impl Event {
-    /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> XorName {
-        use Event::*;
-        match self {
-            TransferValidated { client, .. } => *client,
-            TransferAgreementReached { client, .. } => *client,
-        }
-    }
 }
 
 /// Query responses from the network.
@@ -647,7 +629,7 @@ mod tests {
         let keypair = &gen_keypairs()[0];
         let pk = keypair.public_key();
 
-        let random_xor = XorName::random();
+        let random_xor = xor_name::XorName::random();
         let id = MessageId(random_xor);
         let message = Message::Query {
             query: Query::Transfer(TransferQuery::GetBalance(pk)),

@@ -10,13 +10,17 @@
 pub mod client;
 mod errors;
 pub mod infrastructure;
+pub mod location;
 #[cfg(not(feature = "client-only"))]
 pub mod node;
 mod serialisation;
 
+pub use self::{
+    errors::{Error, Result},
+    location::{DstLocation, SrcLocation, User},
+    serialisation::WireMsg,
+};
 use bytes::Bytes;
-pub use errors::{Error, Result};
-pub use serialisation::WireMsg;
 
 /// Type of message.
 /// Note this is part of this crate's public API but this enum is

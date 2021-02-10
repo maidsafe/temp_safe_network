@@ -101,7 +101,7 @@ impl SequenceRead {
             | GetPrivatePolicy(address)
             | GetUserPermissions { address, .. }
             | GetOwner(address) => {
-                if address.is_pub() {
+                if address.is_public() {
                     AuthorisationKind::Data(DataAuthKind::PublicRead)
                 } else {
                     AuthorisationKind::Data(DataAuthKind::PrivateRead)
