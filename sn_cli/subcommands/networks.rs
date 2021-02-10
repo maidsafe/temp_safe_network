@@ -12,7 +12,7 @@ use crate::operations::config::{
     read_current_network_conn_info, remove_network_from_config, write_current_network_conn_info,
     NetworkInfo,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use log::debug;
 use std::{collections::HashSet, iter::FromIterator, net::SocketAddr};
 use structopt::StructOpt;
@@ -82,7 +82,10 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
 
             println!();
             match matched_network {
-                Some(name) => println!("'{}' network matched. Current set network connection information at '{}' matches '{}' network as per current config", name, conn_info_file_path.display(), name),
+                Some(name) => {
+                    println!("'{}' network matched!", name);
+                    println!("Current set network connection information at '{}' matches '{}' network as per current config", conn_info_file_path.display(), name);
+                },
                 None => println!("Current network setup in your system doesn't match any of your networks in the CLI config. Use 'networks switch' command to switch to any of them")
             }
         }
@@ -103,6 +106,9 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             network_name,
             addresses,
         }) => {
+            if addresses.is_empty() {
+                bail!("Please provide the bootstrapping address/es");
+            }
             let addresses = HashSet::from_iter(addresses);
             let net_info =
                 add_network_to_config(&network_name, Some(NetworkInfo::Addresses(addresses)))?;

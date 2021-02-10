@@ -178,7 +178,12 @@ pub fn read_current_network_conn_info() -> Result<(PathBuf, HashSet<SocketAddr>)
         )
     )?;
 
-    let contacts = deserialise_contacts(&current_conn_info)?;
+    let contacts = deserialise_contacts(&current_conn_info).with_context(|| {
+        format!(
+            "Unable to read current network connection information from '{}'",
+            file_path.display()
+        )
+    })?;
 
     Ok((file_path, contacts))
 }
@@ -252,18 +257,22 @@ pub fn print_networks_settings() -> Result<()> {
     let mut table = Table::new();
     table.add_row(row![bFg->"Networks"]);
     table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
-    let (_, current_conn_info) = read_current_network_conn_info()?;
+    let current_conn_info = match read_current_network_conn_info() {
+        Ok((_, current_conn_info)) => Some(current_conn_info),
+        Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
+    };
 
     let (settings, _) = read_config_settings()?;
     settings
         .networks
         .iter()
         .for_each(|(network_name, net_info)| {
-            let current = if net_info.matches(&current_conn_info) {
-                "*"
-            } else {
-                ""
-            };
+            let mut current = "";
+            if let Some(conn_info) = &current_conn_info {
+                if net_info.matches(conn_info) {
+                    current = "*";
+                }
+            }
             table.add_row(row![current, network_name, net_info]);
         });
     table.printstd();

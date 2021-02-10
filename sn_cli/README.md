@@ -240,7 +240,8 @@ Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
 Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
 
-'maidsafe-testnet' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
+'maidsafe-testnet' network matched!
+Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
 ```
 
 If you don't have a configuration in your results which points to the exact [S3 location](https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config) listed in the results above, you can add using `safe networks add`:
@@ -323,7 +324,8 @@ Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
 Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
 
-'maidsafe-testnet' network matched. Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
+'maidsafe-testnet' network matched!
+Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
 ```
 
 Note that in the scenario that your current network is set to be the MaidSafe test network, and that is restarted by MaidSafe (which causes new connection information to be published at the same URL), you then only need to re-run the `networks switch` command with the corresponding network name to update your system with the new connection information.
