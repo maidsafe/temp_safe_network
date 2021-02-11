@@ -11,7 +11,7 @@ use crate::{
     chunk_store::BlobChunkStore,
     error::convert_to_error_message,
     node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty, Error},
-    AdultState, Result,
+    AdultState, NodeInfo, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress, Signature};
@@ -33,9 +33,8 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(adult_state: AdultState) -> Result<Self> {
-        let node_info = adult_state.info();
-        let chunks = BlobChunkStore::new(node_info.path(), node_info.used_space.clone()).await?;
+    pub(crate) async fn new(node_info: &NodeInfo, adult_state: AdultState) -> Result<Self> {
+        let chunks = BlobChunkStore::new(&node_info.root_dir, node_info.used_space.clone()).await?;
         let wrapping = AdultMsgWrapping::new(adult_state, AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
     }

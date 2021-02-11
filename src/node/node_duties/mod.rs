@@ -292,8 +292,8 @@ impl NodeDuties {
             return Ok(NodeOperation::NoOp);
         }
         info!("Assuming Adult duties..");
-        let state = AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
-        let duties = AdultDuties::new(state).await?;
+        let state = AdultState::new(self.network_api.clone()).await?;
+        let duties = AdultDuties::new(&self.node_info, state).await?;
         self.stage = Stage::Adult(duties);
         info!("Adult duties assumed.");
         // NB: This is wrong, shouldn't write to disk here,
@@ -652,8 +652,8 @@ impl NodeDuties {
             Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::Adult(_old_state) => {
                 let state =
-                    AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
-                let duties = AdultDuties::new(state).await?;
+                    AdultState::new(self.network_api.clone()).await?;
+                let duties = AdultDuties::new(&self.node_info, state).await?;
                 self.stage = Stage::Adult(duties);
                 Ok(NodeOperation::NoOp)
             }

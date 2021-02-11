@@ -12,7 +12,7 @@ mod writing;
 
 use crate::{
     node::node_ops::{NodeDuty, NodeMessagingDuty, NodeOperation},
-    AdultState, Error, Result,
+    AdultState, Error, NodeInfo, Result,
 };
 use chunk_storage::ChunkStorage;
 use log::{info, trace};
@@ -34,9 +34,9 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub async fn new(adult_state: AdultState) -> Result<Self> {
+    pub async fn new(node_info: &NodeInfo, adult_state: AdultState) -> Result<Self> {
         Ok(Self {
-            chunk_storage: ChunkStorage::new(adult_state).await?,
+            chunk_storage: ChunkStorage::new(&node_info, adult_state).await?,
         })
     }
 
