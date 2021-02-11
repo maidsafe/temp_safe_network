@@ -31,7 +31,6 @@ use sn_routing::Prefix;
 
 ///
 pub struct ElderConstellation {
-    info: NodeInfo,
     network: Network,
     duties: ElderDuties,
     pending_changes: Vec<ConstellationChange>,
@@ -44,9 +43,8 @@ struct ConstellationChange {
 
 impl ElderConstellation {
     ///
-    pub fn new(info: NodeInfo, duties: ElderDuties, network: Network) -> Self {
+    pub fn new(duties: ElderDuties, network: Network) -> Self {
         Self {
-            info,
             network,
             duties,
             pending_changes: vec![],
@@ -97,6 +95,7 @@ impl ElderConstellation {
     ///
     pub async fn finish_elder_change(
         &mut self,
+        node_info: &NodeInfo,
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
@@ -124,7 +123,7 @@ impl ElderConstellation {
         // 3. And update key section with it.
         let _ = self
             .duties
-            .finish_elder_change(&self.info, new_elder_state.clone())
+            .finish_elder_change(node_info, new_elder_state.clone())
             .await?;
 
         debug!("Key section completed elder change update.");

@@ -29,7 +29,11 @@ pub struct ElderDuties {
 }
 
 impl ElderDuties {
-    pub async fn new(wallet_info: WalletInfo, node_info: &NodeInfo, state: ElderState) -> Result<Self> {
+    pub async fn new(
+        wallet_info: WalletInfo,
+        node_info: &NodeInfo,
+        state: ElderState,
+    ) -> Result<Self> {
         let dbs = ChunkHolderDbs::new(node_info.path())?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs.clone()));
         let key_section = KeySection::new(rate_limit, node_info, state.clone()).await?;
@@ -131,7 +135,11 @@ impl ElderDuties {
     }
 
     ///
-    pub async fn finish_elder_change(&mut self, node_info: &NodeInfo, state: ElderState) -> Result<()> {
+    pub async fn finish_elder_change(
+        &mut self,
+        node_info: &NodeInfo,
+        state: ElderState,
+    ) -> Result<()> {
         // 2. Then we must update key section..
         let dbs = ChunkHolderDbs::new(node_info.path())?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs));

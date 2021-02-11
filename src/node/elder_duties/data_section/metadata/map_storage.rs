@@ -7,12 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::MapChunkStore,
-    error::convert_to_error_message,
-    node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::NodeMessagingDuty,
-    node::NodeInfo,
-    Error, Result,
+    chunk_store::MapChunkStore, error::convert_to_error_message,
+    node::msg_wrapping::ElderMsgWrapping, node::node_ops::NodeMessagingDuty, node::NodeInfo, Error,
+    Result,
 };
 use log::info;
 use sn_data_types::{

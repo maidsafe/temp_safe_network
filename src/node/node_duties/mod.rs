@@ -410,8 +410,7 @@ impl NodeDuties {
 
         let (stage, cmd) = match self.stage {
             Stage::AwaitingGenesisThreshold(ref mut queued_ops) => {
-                let elder_state =
-                    ElderState::new(self.network_api.clone()).await?;
+                let elder_state = ElderState::new(self.network_api.clone()).await?;
 
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
@@ -597,11 +596,7 @@ impl NodeDuties {
         }
 
         // 3. Set new stage
-        self.stage = Stage::Elder(ElderConstellation::new(
-            self.node_info.clone(),
-            duties,
-            self.network_api.clone(),
-        ));
+        self.stage = Stage::Elder(ElderConstellation::new(duties, self.network_api.clone()));
 
         // NB: This is wrong, shouldn't write to disk here,
         // let it be upper layer resp.
@@ -651,8 +646,7 @@ impl NodeDuties {
             Stage::ProposingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::Adult(_old_state) => {
-                let state =
-                    AdultState::new(self.network_api.clone()).await?;
+                let state = AdultState::new(self.network_api.clone()).await?;
                 let duties = AdultDuties::new(&self.node_info, state).await?;
                 self.stage = Stage::Adult(duties);
                 Ok(NodeOperation::NoOp)
@@ -673,7 +667,11 @@ impl NodeDuties {
             Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp),
             Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // Should be unreachable?
             Stage::Infant | Stage::Adult(_) => Ok(NodeOperation::NoOp),
-            Stage::Elder(elder) => elder.finish_elder_change(previous_key, new_key).await,
+            Stage::Elder(elder) => {
+                elder
+                    .finish_elder_change(&self.node_info, previous_key, new_key)
+                    .await
+            }
         }
     }
 }
