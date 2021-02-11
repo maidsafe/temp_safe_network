@@ -358,8 +358,6 @@ pub struct NodeInfo {
     ///
     pub genesis: bool,
     ///
-    pub node_id: PublicKey,
-    ///
     pub root_dir: PathBuf,
     /// Upper limit in bytes for allowed network storage on this node.
     /// An Adult would be using the space for chunks,

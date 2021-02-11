@@ -76,7 +76,6 @@ impl Node {
 
         let node_info = NodeInfo {
             genesis: config.is_first(),
-            node_id: PublicKey::Ed25519(network_api.public_key().await),
             root_dir: root_dir_buf,
             /// Upper limit in bytes for allowed network storage on this node.
             /// An Adult would be using the space for chunks,

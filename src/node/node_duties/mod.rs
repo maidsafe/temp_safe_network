@@ -252,7 +252,7 @@ impl NodeDuties {
         };
         let wrapping =
             NodeMsgWrapping::new(NodeState::Adult(adult_state), MsgNodeDuties::NodeConfig);
-        let node_id = self.node_info.node_id;
+        let node_id = PublicKey::from(self.network_api.public_key().await);
         wrapping
             .send_to_section(
                 Message::NodeCmd {
