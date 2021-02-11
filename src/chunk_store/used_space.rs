@@ -43,6 +43,12 @@ impl UsedSpace {
         }
     }
 
+    /// Clears the entire storage and sets total_value back to zero
+    /// while removing all local stores
+    pub async fn reset(&self) {
+        inner::UsedSpace::reset(self.inner.clone()).await
+    }
+
     /// Returns the maximum capacity (e.g. the maximum
     /// value that total() can return)
     pub async fn max_capacity(&self) -> u64 {
@@ -126,6 +132,15 @@ mod inner {
                 local_stores: HashMap::new(),
                 next_id: 0u64,
             }
+        }
+
+        /// Clears the storage, setting total value ot zero
+        /// and dropping local stores, but leaves
+        /// the capacity and next_id unchanged
+        pub async fn reset(used_space: Arc<Mutex<UsedSpace>>) {
+            let mut used_space_lock = used_space.lock().await;
+            used_space_lock.total_value = 0;
+            used_space_lock.local_stores.clear();
         }
 
         /// Returns the maximum capacity (e.g. the maximum

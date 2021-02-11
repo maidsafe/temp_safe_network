@@ -294,6 +294,7 @@ impl NodeDuties {
         info!("Assuming Adult duties..");
         let state = AdultState::new(self.network_api.clone()).await?;
         let duties = AdultDuties::new(&self.node_info, state).await?;
+        self.node_info.used_space.reset().await;
         self.stage = Stage::Adult(duties);
         info!("Adult duties assumed.");
         // NB: This is wrong, shouldn't write to disk here,
@@ -596,6 +597,7 @@ impl NodeDuties {
         }
 
         // 3. Set new stage
+        self.node_info.used_space.reset().await;
         self.stage = Stage::Elder(ElderConstellation::new(duties, self.network_api.clone()));
 
         // NB: This is wrong, shouldn't write to disk here,

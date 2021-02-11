@@ -21,8 +21,7 @@
 // What things do we _need_ to access most current state of?
 // - ..
 
-use crate::chunk_store::UsedSpace;
-use crate::{Network, Result};
+use crate::{chunk_store::UsedSpace, Network, Result};
 use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
