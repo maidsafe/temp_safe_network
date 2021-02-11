@@ -244,7 +244,7 @@ pub async fn files_commander(
                 }
                 table.printstd();
             } else {
-                print_serialized_output(files_container_xorurl, 0, processed_files, output_fmt)?;
+                print_serialized_output(files_container_xorurl, 0, processed_files, output_fmt);
             }
 
             Ok(())
@@ -302,7 +302,7 @@ pub async fn files_commander(
                     println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
                 }
             } else {
-                print_serialized_output(target, version, processed_files, output_fmt)?;
+                print_serialized_output(target, version, processed_files, output_fmt);
             }
             Ok(())
         }
@@ -338,7 +338,7 @@ pub async fn files_commander(
                 };
 
             // Now let's just print out a list of the files synced/processed
-            output_processed_files_list(output_fmt, processed_files, version, target_url)?;
+            output_processed_files_list(output_fmt, processed_files, version, target_url);
             Ok(())
         }
         FilesSubCommands::Rm {
@@ -359,7 +359,7 @@ pub async fn files_commander(
                 .await?;
 
             // Now let's just print out a list of the files removed
-            output_processed_files_list(output_fmt, processed_files, version, target_url)?;
+            output_processed_files_list(output_fmt, processed_files, version, target_url);
             Ok(())
         }
         FilesSubCommands::Ls { target } => {
@@ -478,7 +478,7 @@ fn print_serialized_output(
     version: u64,
     processed_files: BTreeMap<String, (String, String)>,
     output_fmt: OutputFmt,
-) -> Result<()> {
+) {
     let url = match XorUrlEncoder::from_url(&xorurl) {
         Ok(mut xorurl_encoder) => {
             xorurl_encoder.set_content_version(Some(version));
@@ -487,17 +487,14 @@ fn print_serialized_output(
         Err(_) => xorurl,
     };
     println!("{}", serialise_output(&(url, processed_files), output_fmt));
-
-    Ok(())
 }
 
 fn output_processed_files_list(
     output_fmt: OutputFmt,
     processed_files: ProcessedFiles,
-
     version: u64,
     target_url: String,
-) -> Result<()> {
+) {
     if OutputFmt::Pretty == output_fmt {
         let (table, success_count) = gen_processed_files_table(&processed_files, true);
         if success_count > 0 {
@@ -525,10 +522,8 @@ fn output_processed_files_list(
             );
         }
     } else {
-        print_serialized_output(target_url, version, processed_files, output_fmt)?;
+        print_serialized_output(target_url, version, processed_files, output_fmt);
     }
-
-    Ok(())
 }
 
 // Builds a file-system tree (hierarchy) from a single file path, split into its parts.

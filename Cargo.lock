@@ -3567,9 +3567,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.16"
+version = "0.8.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdd2af560da3c1fdc02cb80965289254fc35dff869810061e2d8290ee48848ae"
+checksum = "15654ed4ab61726bf918a39cb8d98a2e2995b002387807fa6ba58fdf7f59bb23"
 dependencies = [
  "dtoa",
  "linked-hash-map",
@@ -3759,8 +3759,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.46.7"
-source = "git+https://github.com/bochaco/sn_client.git?branch=feat-config-file-path#c1bc7dcabfd56eed6fd6fd3860924872d8c26a06"
+version = "0.46.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f54514976d4df67fee1c94ffcc41ae815dc253a5f8e8884524c1f730e5e8299a"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3780,7 +3781,6 @@ dependencies = [
  "self_encryption",
  "serde",
  "serde_json",
- "sha3",
  "sn_data_types",
  "sn_messaging",
  "sn_transfers",

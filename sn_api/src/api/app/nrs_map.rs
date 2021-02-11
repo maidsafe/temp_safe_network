@@ -216,7 +216,7 @@ impl NrsMap {
         // Set (top level) default if was requested
         if default {
             debug!("Setting {:?} as default for NrsMap", &name);
-            let definition_data = create_public_name_description(link)?;
+            let definition_data = create_public_name_description(link);
             if hard_link || sub_names.is_empty() {
                 self.default = DefaultRdf::OtherRdf(definition_data);
             } else {
@@ -258,13 +258,14 @@ impl NrsMap {
     }
 }
 
-fn create_public_name_description(link: &str) -> Result<DefinitionData> {
+fn create_public_name_description(link: &str) -> DefinitionData {
     let now = gen_timestamp_secs();
     let mut public_name = DefinitionData::new();
     public_name.insert(FAKE_RDF_PREDICATE_LINK.to_string(), link.to_string());
     public_name.insert(FAKE_RDF_PREDICATE_MODIFIED.to_string(), now.clone());
     public_name.insert(FAKE_RDF_PREDICATE_CREATED.to_string(), now);
-    Ok(public_name)
+
+    public_name
 }
 
 fn sub_names_vec_to_str(sub_names: &[SubName]) -> String {
@@ -330,7 +331,7 @@ fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> R
     let curr_sub_name = match sub_names.pop() {
         Some(sub_name) => sub_name,
         None => {
-            let definition_data = create_public_name_description(link)?;
+            let definition_data = create_public_name_description(link);
             updated_nrs_map.default = DefaultRdf::OtherRdf(definition_data);
             return Ok(updated_nrs_map);
         }

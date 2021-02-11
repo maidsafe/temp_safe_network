@@ -868,7 +868,7 @@ fn normalise_path_separator(from: &str) -> String {
 
 // From the location path and the destination path chosen by the user, calculate
 // the destination path considering ending '/' in both the  location and dest path
-fn get_base_paths(location: &str, dest_path: Option<&str>) -> Result<(String, String)> {
+fn get_base_paths(location: &str, dest_path: Option<&str>) -> (String, String) {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
     let location_base_path = if location == "." {
         "./".to_string()
@@ -902,7 +902,7 @@ fn get_base_paths(location: &str, dest_path: Option<&str>) -> Result<(String, St
         format!("{}/", new_dest_path)
     };
 
-    Ok((location_base_path, dest_base_path))
+    (location_base_path, dest_base_path)
 }
 
 // Generate a FileItem for a file which can then be added to a FilesMap
@@ -1030,7 +1030,7 @@ async fn files_map_sync(
     compare_file_content: bool,
     follow_links: bool,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
-    let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
+    let (location_base_path, dest_base_path) = get_base_paths(location, dest_path);
     let mut updated_files_map = FilesMap::new();
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
@@ -1590,7 +1590,7 @@ async fn files_map_create(
 ) -> Result<FilesMap> {
     let mut files_map = FilesMap::default();
 
-    let (location_base_path, dest_base_path) = get_base_paths(location, dest_path)?;
+    let (location_base_path, dest_base_path) = get_base_paths(location, dest_path);
 
     // We want to iterate over the BTreeMap and also modify it.
     // We DON'T want to clone/dup the whole thing, might be very big.

@@ -278,7 +278,7 @@ impl SafeUrlParts {
         };
 
         // validate no empty sub names in name.
-        if public_name.find("..").is_some() {
+        if public_name.contains("..") {
             let msg = "name contains empty subname".to_string();
             return Err(Error::InvalidXorUrl(msg));
         }
@@ -339,7 +339,7 @@ impl SafeUrlParts {
         // double-slash is allowed but discouraged in regular URLs.
         // We don't allow them in Safe URLs.
         // See https://stackoverflow.com/questions/20523318/is-a-url-with-in-the-path-section-valid
-        if path.find("//").is_some() {
+        if path.contains("//") {
             let msg = "path contains empty component".to_string();
             return Err(Error::InvalidXorUrl(msg));
         }
@@ -501,7 +501,7 @@ impl SafeUrl {
                 // Validate that nrs_name hash matches xor_name
                 let tmpurl = format!("{}{}", SAFE_URL_PROTOCOL, nh);
                 let parts = SafeUrlParts::parse(&tmpurl)?;
-                let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name)?;
+                let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
                 if hashed_name != xor_name {
                     let msg = format!(
                         "input mis-match. nrs_name `{}` does not hash to xor_name `{}`",
@@ -605,7 +605,7 @@ impl SafeUrl {
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
         let parts = SafeUrlParts::parse(&nrsurl)?;
 
-        let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name)?;
+        let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
 
         let x = Self::new(
             hashed_name,
@@ -1389,11 +1389,11 @@ impl SafeUrl {
         }
     }
 
-    fn xor_name_from_nrs_string(name: &str) -> Result<XorName> {
+    fn xor_name_from_nrs_string(name: &str) -> XorName {
         let vec_hash = sha3_256(&name.to_string().into_bytes());
         let xor_name = XorName(vec_hash);
         debug!("Resulting XorName for NRS \"{}\" is: {}", name, xor_name);
-        Ok(xor_name)
+        xor_name
     }
 }
 
@@ -1999,7 +1999,7 @@ mod tests {
     }
 
     #[test]
-    fn test_safeurl_from_url_validation() -> Result<()> {
+    fn test_safeurl_from_url_validation() {
         // Tests basic URL syntax errors that are common to
         // both ::from_xorurl() and ::from_nrsurl()
 
@@ -2056,8 +2056,6 @@ mod tests {
         // tbd: if we want to disallow.
         let _result =
             SafeUrl::from_nrsurl("safe://name/single%percent/in/path").expect(should_work);
-
-        Ok(())
     }
 
     #[test]

@@ -157,6 +157,7 @@ pub fn remove_network_from_config(network_name: &str) -> Result<()> {
             }
         }
         Some(NetworkInfo::Addresses(_)) => {
+            write_config_settings(&file_path, settings)?;
             debug!("Network {} removed from settings", network_name);
             println!("Network '{}' was removed from the list", network_name);
         }
