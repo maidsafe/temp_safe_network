@@ -90,7 +90,7 @@ impl ElderConstellation {
         // 1. First we must update data section..
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(&self.info, self.network.clone()).await?;
+        let new_elder_state = ElderState::new(self.network.clone()).await?;
         self.duties.initiate_elder_change(new_elder_state).await
     }
 
@@ -120,11 +120,11 @@ impl ElderConstellation {
         // 2. We must load _current_ elder state..
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(&self.info, self.network.clone()).await?;
+        let new_elder_state = ElderState::new(self.network.clone()).await?;
         // 3. And update key section with it.
         let _ = self
             .duties
-            .finish_elder_change(new_elder_state.clone())
+            .finish_elder_change(&self.info, new_elder_state.clone())
             .await?;
 
         debug!("Key section completed elder change update.");

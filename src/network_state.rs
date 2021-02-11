@@ -108,7 +108,6 @@ impl AdultState {
 #[derive(Clone)]
 ///
 pub struct ElderState {
-    info: NodeInfo,
     prefix: Prefix,
     node_name: XorName,
     node_id: Ed25519PublicKey,
@@ -125,9 +124,8 @@ impl ElderState {
     /// Takes a snapshot of current state
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
-    pub async fn new(info: &NodeInfo, network: Network) -> Result<Self> {
+    pub async fn new(network: Network) -> Result<Self> {
         Ok(Self {
-            info: info.clone(),
             prefix: network.our_prefix().await,
             node_name: network.our_name().await,
             node_id: network.public_key().await,
@@ -170,11 +168,6 @@ impl ElderState {
     // ---------------------------------------------------
     // ----------------- STATIC STATE --------------------
     // ---------------------------------------------------
-
-    /// Static state
-    pub fn info(&self) -> &NodeInfo {
-        &self.info
-    }
 
     /// Static state
     pub fn prefix(&self) -> &Prefix {

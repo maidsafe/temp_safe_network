@@ -13,7 +13,7 @@ use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     node::node_ops::{ElderDuty, NodeOperation},
-    ElderState, Result,
+    ElderState, NodeInfo, Result,
 };
 use log::trace;
 use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
@@ -29,12 +29,11 @@ pub struct ElderDuties {
 }
 
 impl ElderDuties {
-    pub async fn new(wallet_info: WalletInfo, state: ElderState) -> Result<Self> {
-        let info = state.info();
-        let dbs = ChunkHolderDbs::new(info.path())?;
+    pub async fn new(wallet_info: WalletInfo, node_info: &NodeInfo, state: ElderState) -> Result<Self> {
+        let dbs = ChunkHolderDbs::new(node_info.path())?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs.clone()));
-        let key_section = KeySection::new(rate_limit, state.clone()).await?;
-        let data_section = DataSection::new(info, dbs, wallet_info, state.clone()).await?;
+        let key_section = KeySection::new(rate_limit, node_info, state.clone()).await?;
+        let data_section = DataSection::new(node_info, dbs, wallet_info, state.clone()).await?;
         Ok(Self {
             state,
             key_section,
@@ -132,10 +131,9 @@ impl ElderDuties {
     }
 
     ///
-    pub async fn finish_elder_change(&mut self, state: ElderState) -> Result<()> {
+    pub async fn finish_elder_change(&mut self, node_info: &NodeInfo, state: ElderState) -> Result<()> {
         // 2. Then we must update key section..
-        let info = state.info();
-        let dbs = ChunkHolderDbs::new(info.path())?;
+        let dbs = ChunkHolderDbs::new(node_info.path())?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs));
         self.key_section.elders_changed(state, rate_limit);
         Ok(())

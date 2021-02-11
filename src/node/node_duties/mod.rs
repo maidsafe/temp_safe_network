@@ -326,7 +326,7 @@ impl NodeDuties {
             // this is the case when we are the GENESIS_ELDER_COUNT-th Elder!
             debug!("threshold reached; proposing genesis!");
 
-            let elder_state = ElderState::new(&self.node_info, self.network_api.clone()).await?;
+            let elder_state = ElderState::new(self.network_api.clone()).await?;
             let genesis_balance = u32::MAX as u64 * 1_000_000_000;
             let credit = Credit {
                 id: Default::default(),
@@ -411,7 +411,7 @@ impl NodeDuties {
         let (stage, cmd) = match self.stage {
             Stage::AwaitingGenesisThreshold(ref mut queued_ops) => {
                 let elder_state =
-                    ElderState::new(&self.node_info, self.network_api.clone()).await?;
+                    ElderState::new(self.network_api.clone()).await?;
 
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
@@ -584,8 +584,8 @@ impl NodeDuties {
         trace!("Finishing transition to Elder..");
 
         let mut ops: Vec<NodeOperation> = vec![];
-        let state = ElderState::new(&self.node_info, self.network_api.clone()).await?;
-        let mut duties = ElderDuties::new(wallet_info, state.clone()).await?;
+        let state = ElderState::new(self.network_api.clone()).await?;
+        let mut duties = ElderDuties::new(wallet_info, &self.node_info, state.clone()).await?;
 
         // 1. Initiate duties.
         ops.push(duties.initiate(genesis).await?);
