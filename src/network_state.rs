@@ -21,6 +21,7 @@
 // What things do we _need_ to access most current state of?
 // - ..
 
+use crate::chunk_store::UsedSpace;
 use crate::{Network, Result};
 use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
@@ -359,10 +360,8 @@ pub struct NodeInfo {
     pub genesis: bool,
     ///
     pub root_dir: PathBuf,
-    /// Upper limit in bytes for allowed network storage on this node.
-    /// An Adult would be using the space for chunks,
-    /// while an Elder uses it for metadata.
-    pub max_storage_capacity: u64,
+    ///
+    pub used_space: UsedSpace,
     /// The key used by the node to receive earned rewards.
     pub reward_key: PublicKey,
 }
