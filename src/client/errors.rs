@@ -9,7 +9,7 @@
 
 use crate::infrastructure::InfrastructureInformation;
 use serde::{Deserialize, Serialize};
-use sn_data_types::{PublicKey};
+use sn_data_types::PublicKey;
 use std::{
     fmt::{self, Debug, Formatter},
     result,
@@ -176,7 +176,7 @@ pub enum Error {
     TargetSectionInfoOutdated(InfrastructureInformation),
 
     /// Target section is undergoing churn, a new key set will be agreed upon shortly
-    #[error("Target section key is not current")]
+    #[error("DKG is in process. New key set will be agreed upon shortly.")]
     DkgInProgress,
 
     /// Target section is unrecognized

@@ -9,9 +9,9 @@
 use crate::{MessageType, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use sn_data_types::ReplicaPublicKeySet;
 use std::{collections::BTreeMap, net::SocketAddr};
 use xor_name::{Prefix, XorName};
-use sn_data_types::ReplicaPublicKeySet;
 /// Message to query the network infrastructure.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Query {

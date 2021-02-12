@@ -115,7 +115,7 @@ impl MsgEnvelope {
     }
 
     /// Get Message target section's expected PublicKey
-    pub fn target_target_section_pk(&self) -> Option<PublicKey> {
+    pub fn target_section_pk(&self) -> Option<PublicKey> {
         self.message.target_section_pk()
     }
 
