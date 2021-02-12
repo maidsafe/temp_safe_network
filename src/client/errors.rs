@@ -8,7 +8,7 @@
 // Software.
 
 use serde::{Deserialize, Serialize};
-use sn_data_types::PublicKey;
+use sn_data_types::{PublicKey, ReplicaPublicKeySet};
 use std::{
     fmt::{self, Debug, Formatter},
     result,
@@ -169,4 +169,16 @@ pub enum Error {
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
+
+    /// Target section key provided with message is out of date. Current PK Set is provided in error
+    #[error("Target section key is not current")]
+    TargetSectionKeyIsNotCurrent(ReplicaPublicKeySet),
+
+    /// Target section is undergoing churn, a new key set will be agreed upon shortly
+    #[error("Target section key is not current")]
+    DkgInProgress,
+
+    /// Target section is unrecognized
+    #[error("Target section key provided is unrecognized")]
+    UnrecognizedSectionKey
 }
