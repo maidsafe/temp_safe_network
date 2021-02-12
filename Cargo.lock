@@ -3676,7 +3676,7 @@ dependencies = [
  "sn_data_types",
  "thiserror",
  "threshold_crypto",
- "tiny-keccak 1.5.0",
+ "tiny-keccak 2.0.2",
  "tokio 0.2.25",
  "uhttp_uri",
  "url 2.2.0",
@@ -3751,7 +3751,6 @@ dependencies = [
  "sn_data_types",
  "sn_launch_tool",
  "structopt 0.3.21",
- "tiny-keccak 1.5.0",
  "tokio 0.2.25",
  "walkdir",
  "xor_name",
@@ -3804,7 +3803,7 @@ dependencies = [
  "serde_json",
  "sn_api",
  "sn_data_types",
- "tiny-keccak 1.5.0",
+ "tiny-keccak 2.0.2",
  "walkdir",
 ]
 

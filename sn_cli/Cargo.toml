@@ -68,7 +68,6 @@ pretty_assertions = "~0.6.1"
 sn_data_types = "~0.14.3"
 criterion = "~0.3"
 walkdir = "2.3.1"
-tiny-keccak = "1.5.0"
 multibase = "~0.6.0"
 sn_cmd_test_utilities = { path = "../sn_cmd_test_utilities" }
 xor_name = "1"

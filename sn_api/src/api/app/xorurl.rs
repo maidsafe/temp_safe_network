@@ -17,7 +17,7 @@ use log::{debug, info, trace, warn};
 use multibase::{decode, encode, Base};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use tiny_keccak::sha3_256;
+use tiny_keccak::{Hasher, Sha3};
 use uhttp_uri::HttpUri;
 use url::Url;
 use xor_name::{XorName, XOR_NAME_LEN}; // for parsing raw path
@@ -1390,7 +1390,11 @@ impl SafeUrl {
     }
 
     fn xor_name_from_nrs_string(name: &str) -> XorName {
-        let vec_hash = sha3_256(&name.to_string().into_bytes());
+        let name_bytes = name.as_bytes();
+        let mut hasher = Sha3::v256();
+        let mut vec_hash = [0; 32];
+        hasher.update(&name_bytes);
+        hasher.finalize(&mut vec_hash);
         let xor_name = XorName(vec_hash);
         debug!("Resulting XorName for NRS \"{}\" is: {}", name, xor_name);
         xor_name

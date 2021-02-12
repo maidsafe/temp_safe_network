@@ -30,7 +30,7 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
 };
-use tiny_keccak::{sha3_256, sha3_512};
+use tiny_keccak::{Hasher, Sha3};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 const SHA3_512_HASH_LEN: usize = 64;
@@ -41,30 +41,45 @@ const SAFE_TYPE_TAG: u64 = 1_300;
 // Number of testcoins (in nano) for any new keypair when simulated-payouts is enabled.
 const DEFAULT_TEST_COINS_AMOUNT: u64 = 777_000_000_000;
 
-/// Derive Password, Keyword and PIN (in order).
+/// Derive Passphrase, Password and Salt (in order).
 pub fn derive_secrets(acc_passphrase: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let passphrase_hash = sha3_512(acc_passphrase);
+    let mut passphrase_hasher = Sha3::v512();
+    let mut passphrase_hash = [0; SHA3_512_HASH_LEN];
+    passphrase_hasher.update(&acc_passphrase);
+    passphrase_hasher.finalize(&mut passphrase_hash);
+    let passphrase = passphrase_hash.to_vec();
 
-    // what is the PIN for here?
-    let pin = sha3_512(&passphrase_hash[SHA3_512_HASH_LEN / 2..]).to_vec();
-    let keyword = passphrase_hash.to_vec();
-    let password = sha3_512(acc_password).to_vec();
+    let mut salt_hasher = Sha3::v512();
+    let mut salt_hash = [0; SHA3_512_HASH_LEN];
+    let salt_bytes = &passphrase_hash[SHA3_512_HASH_LEN / 2..];
+    salt_hasher.update(&salt_bytes);
+    salt_hasher.finalize(&mut salt_hash);
+    let salt = salt_hash.to_vec();
 
-    (password, keyword, pin)
+    let mut password_hasher = Sha3::v512();
+    let mut password_hash = [0; SHA3_512_HASH_LEN];
+    password_hasher.update(&acc_password);
+    password_hasher.finalize(&mut password_hash);
+    let password = password_hash.to_vec();
+
+    (passphrase, password, salt)
 }
 
 /// Create a new Ed25519 keypair from seed
 fn create_ed25519_keypair_from_seed(seeder: &[u8]) -> Keypair {
-    let seed = sha3_256(seeder);
+    let mut hasher = Sha3::v256();
+    let mut seed = [0; 32];
+    hasher.update(&seeder);
+    hasher.finalize(&mut seed);
     let mut rng = StdRng::from_seed(seed);
     Keypair::new_ed25519(&mut rng)
 }
 
 /// Perform all derivations and seeding to deterministically obtain location and Keypair from input
 pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(XorName, Keypair)> {
-    let (password, keyword, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
+    let (passphrase, password, salt) = derive_secrets(passphrase.as_bytes(), password.as_bytes());
 
-    let map_data_location = generate_network_address(&keyword, &salt)?;
+    let map_data_location = generate_network_address(&passphrase, &salt)?;
 
     let mut seed = password;
     seed.extend(salt.iter());
@@ -73,25 +88,14 @@ pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(
     Ok((map_data_location, keypair))
 }
 
-// /// use password based crypto
-// fn derive_key(output: &mut [u8], input: &[u8], user_salt: &[u8]) {
-//     const ITERATIONS: usize = 10000;
-
-//     let salt = sha3_256(user_salt);
-//     pbkdf2::pbkdf2::<Hmac<Sha3_256>>(input, &salt, ITERATIONS, output)
-// }
-
 /// Generates User's Identity for the network using supplied credentials in
 /// a deterministic way.  This is similar to the username in various places.
-pub fn generate_network_address(keyword: &[u8], pin: &[u8]) -> Result<XorName> {
+pub fn generate_network_address(passphrase: &[u8], salt: &[u8]) -> Result<XorName> {
     let mut id = XorName([0; XOR_NAME_LEN]);
 
     const ITERATIONS: usize = 10000;
 
-    let _salt = sha3_256(pin);
-    pbkdf2::pbkdf2::<Hmac<Sha3_256>>(keyword, &pin, ITERATIONS, &mut id.0[..]);
-
-    // Self::derive_key(&mut id.0[..], keyword, pin);
+    pbkdf2::pbkdf2::<Hmac<Sha3_256>>(passphrase, &salt, ITERATIONS, &mut id.0[..]);
 
     Ok(id)
 }
