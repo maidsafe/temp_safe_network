@@ -115,7 +115,7 @@ impl MsgEnvelope {
     }
 
     /// Get Message target section's expected PublicKey
-    pub fn target_target_section_pk(&self) -> PublicKey {
+    pub fn target_target_section_pk(&self) -> Option<PublicKey> {
         self.message.target_section_pk()
     }
 
@@ -214,7 +214,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// Queries is a read-only operation.
     Query {
@@ -223,7 +223,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// An Event is a fact about something that happened.
     Event {
@@ -234,7 +234,7 @@ pub enum Message {
         /// ID of causing cmd.
         correlation_id: MessageId,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// The response to a query, containing the query result.
     QueryResponse {
@@ -247,7 +247,7 @@ pub enum Message {
         /// The sender of the causing query.
         query_origin: Address,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// Cmd error.
     CmdError {
@@ -260,7 +260,7 @@ pub enum Message {
         /// The sender of the causing cmd.
         cmd_origin: Address,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// Cmds only sent internally in the network.
     NodeCmd {
@@ -269,7 +269,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// An error of a NodeCmd.
     NodeCmdError {
@@ -282,7 +282,7 @@ pub enum Message {
         /// The sender of the causing cmd.
         cmd_origin: Address,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// Events only sent internally in the network.
     NodeEvent {
@@ -293,7 +293,7 @@ pub enum Message {
         /// ID of causing cmd.
         correlation_id: MessageId,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// Queries is a read-only operation.
     NodeQuery {
@@ -302,7 +302,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
     /// The response to a query, containing the query result.
     NodeQueryResponse {
@@ -315,7 +315,7 @@ pub enum Message {
         /// The sender of the causing query.
         query_origin: Address,
         /// Target section's current PublicKey
-        target_section_pk: PublicKey,
+        target_section_pk: Option<PublicKey>,
     },
 }
 
@@ -337,7 +337,7 @@ impl Message {
     }
 
     /// Gets the message's expected section PublicKey.
-    pub fn target_section_pk(&self) -> PublicKey {
+    pub fn target_section_pk(&self) -> Option<PublicKey> {
         match self {
             Self::Cmd {
                 target_section_pk, ..
