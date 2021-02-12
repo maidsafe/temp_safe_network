@@ -7,8 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use crate::infrastructure::InfrastructureInformation;
 use serde::{Deserialize, Serialize};
-use sn_data_types::{PublicKey, ReplicaPublicKeySet};
+use sn_data_types::{PublicKey};
 use std::{
     fmt::{self, Debug, Formatter},
     result,
@@ -171,8 +172,8 @@ pub enum Error {
     NodeWasNotRelocated,
 
     /// Target section key provided with message is out of date. Current PK Set is provided in error
-    #[error("Target section key is not current")]
-    TargetSectionKeyIsNotCurrent(ReplicaPublicKeySet),
+    #[error("Target section's public key is outdated. New information has been provided.")]
+    TargetSectionInfoOutdated(InfrastructureInformation),
 
     /// Target section is undergoing churn, a new key set will be agreed upon shortly
     #[error("Target section key is not current")]
@@ -180,5 +181,5 @@ pub enum Error {
 
     /// Target section is unrecognized
     #[error("Target section key provided is unrecognized")]
-    UnrecognizedSectionKey
+    UnrecognizedSectionKey,
 }

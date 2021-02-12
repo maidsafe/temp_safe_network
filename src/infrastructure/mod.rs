@@ -10,9 +10,8 @@ use crate::{MessageType, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, net::SocketAddr};
-use threshold_crypto::PublicKey;
 use xor_name::{Prefix, XorName};
-
+use sn_data_types::ReplicaPublicKeySet;
 /// Message to query the network infrastructure.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Query {
@@ -21,20 +20,23 @@ pub enum Query {
     /// Response to `GetSectionRequest`.
     GetSectionResponse(GetSectionResponse),
 }
+/// All the info a client needs about their section
+#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
+pub struct InfrastructureInformation {
+    /// Prefix of the section.
+    pub prefix: Prefix,
+    /// Public key set of the section.
+    pub pk_set: ReplicaPublicKeySet,
+    /// Section elders.
+    pub elders: BTreeMap<XorName, SocketAddr>,
+}
 
 /// Information about a section.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum GetSectionResponse {
     /// Successful response to `GetSectionRequest`. Contains information about the requested
     /// section.
-    Success {
-        /// Prefix of the section.
-        prefix: Prefix,
-        /// Public key of the section.
-        key: PublicKey,
-        /// Section elders.
-        elders: BTreeMap<XorName, SocketAddr>,
-    },
+    Success(InfrastructureInformation),
     /// Response to `GetSectionRequest` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<SocketAddr>),
