@@ -775,6 +775,7 @@ mod tests {
         let message = Message::Query {
             query: Query::Transfer(TransferQuery::GetBalance(pk)),
             id,
+            target_section_pk: None,
         };
 
         let msg_envelope = MsgEnvelope {
