@@ -12,12 +12,14 @@ use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;
 use xor_name::{Prefix, XorName};
 
+/// An EndUser is repreented by a PublicKey.
+/// It uses 1-n clients to access the network.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub enum User {
-    /// An EndUser is repreented by a PublicKey.
-    EndUser(PublicKey),
-    /// An EndUser can instantiate multiple Clients
-    /// using the same PublicKey but different SocketAddr.
+pub enum EndUser {
+    /// All clients of this end user.
+    AllClients(PublicKey),
+    /// An EndUser can instantiate multiple Clients.
+    /// The Clients use the same PublicKey, but different SocketAddr.
     Client {
         /// The EndUser PublicKey
         public_key: PublicKey,
@@ -26,12 +28,12 @@ pub enum User {
     },
 }
 
-impl User {
+impl EndUser {
     /// Returns the name of this location, or `None` if it is `Direct`.
     pub fn id(&self) -> &PublicKey {
         match self {
             Self::Client { public_key, .. } => public_key,
-            Self::EndUser(public_key) => public_key,
+            Self::AllClients(public_key) => public_key,
         }
     }
 
@@ -43,7 +45,7 @@ impl User {
     pub fn contains(&self, name: &XorName) -> bool {
         match self {
             Self::Client { public_key, .. } => name == &(*public_key).into(),
-            Self::EndUser(public_key) => name == &(*public_key).into(),
+            Self::AllClients(public_key) => name == &(*public_key).into(),
         }
     }
 }
@@ -51,8 +53,8 @@ impl User {
 /// Message source location.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub enum SrcLocation {
-    /// EndUser / Client
-    User(User),
+    /// An EndUser uses one or more Clients.
+    EndUser(EndUser),
     /// A single node with the given name.
     Node(XorName),
     /// A section with the given prefix.
@@ -67,13 +69,13 @@ impl SrcLocation {
 
     /// Returns whether this location is a section.
     pub fn is_user(&self) -> bool {
-        matches!(self, Self::User(_))
+        matches!(self, Self::EndUser(_))
     }
 
     /// Returns whether the given name is part of this location
     pub fn contains(&self, name: &XorName) -> bool {
         match self {
-            Self::User(user) => user.contains(name),
+            Self::EndUser(user) => user.contains(name),
             Self::Node(self_name) => name == self_name,
             Self::Section(self_prefix) => self_prefix.matches(name),
         }
@@ -82,7 +84,7 @@ impl SrcLocation {
     /// Returns this location as `DstLocation`
     pub fn to_dst(&self) -> DstLocation {
         match self {
-            Self::User(user) => DstLocation::User(*user),
+            Self::EndUser(user) => DstLocation::EndUser(*user),
             Self::Node(name) => DstLocation::Node(*name),
             Self::Section(prefix) => DstLocation::Section(prefix.name()),
         }
@@ -92,8 +94,8 @@ impl SrcLocation {
 /// Message destination location.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub enum DstLocation {
-    /// EndUser / Client.
-    User(User),
+    /// An EndUser uses one or more Clients.
+    EndUser(EndUser),
     /// Destination is a single node with the given name.
     Node(XorName),
     /// Destination are the nodes of the section whose prefix matches the given name.
@@ -117,7 +119,7 @@ impl DstLocation {
         }
 
         match self {
-            Self::User(user) => user.contains(name),
+            Self::EndUser(user) => user.contains(name),
             Self::Node(self_name) => name == self_name,
             Self::Section(self_name) => prefix.matches(self_name),
             Self::Direct => true,
@@ -127,7 +129,7 @@ impl DstLocation {
     /// Returns the name of this location, or `None` if it is `Direct`.
     pub fn name(&self) -> Option<XorName> {
         match self {
-            Self::User(user) => Some((*user.id()).into()),
+            Self::EndUser(user) => Some((*user.id()).into()),
             Self::Node(name) => Some(*name),
             Self::Section(name) => Some(*name),
             Self::Direct => None,

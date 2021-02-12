@@ -9,7 +9,7 @@
 
 use crate::{
     client::{DataCmd as NodeDataCmd, DataQuery as NodeDataQuery, Error, Result},
-    User,
+    EndUser,
 };
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -26,7 +26,7 @@ use xor_name::XorName;
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
     ///
-    Data { cmd: NodeDataCmd, origin: User },
+    Data { cmd: NodeDataCmd, origin: EndUser },
     ///
     Transfers(NodeTransferCmd),
     /// Cmds related to the running of a node.
@@ -116,7 +116,10 @@ pub enum NodeEvent {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQuery {
     ///
-    Data { query: NodeDataQuery, origin: User },
+    Data {
+        query: NodeDataQuery,
+        origin: EndUser,
+    },
     ///
     Rewards(NodeRewardQuery),
     ///
