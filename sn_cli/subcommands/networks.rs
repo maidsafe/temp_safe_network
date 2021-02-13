@@ -7,11 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::config::{
-    add_network_to_config, print_networks_settings, read_config_settings,
-    read_current_network_conn_info, remove_network_from_config, write_current_network_conn_info,
-    NetworkInfo,
-};
+use crate::operations::config::{read_current_network_conn_info, Config, NetworkInfo};
 use anyhow::{bail, Result};
 use log::debug;
 use std::{collections::HashSet, iter::FromIterator, net::SocketAddr};
@@ -53,15 +49,13 @@ pub enum NetworksSubCommands {
 }
 
 pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
+    let mut config = Config::read()?;
     match cmd {
         Some(NetworksSubCommands::Switch { network_name }) => {
-            let (settings, _) = read_config_settings()?;
             let msg = format!("Switching to '{}' network...", network_name);
             debug!("{}", msg);
             println!("{}", msg);
-            let contacts = settings.get_net_info(&network_name)?;
-
-            write_current_network_conn_info(&contacts)?;
+            config.switch_to_network(&network_name)?;
             println!(
                 "Successfully switched to '{}' network in your system!",
                 network_name
@@ -69,11 +63,10 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             println!("If you need write access to the '{}' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again", network_name);
         }
         Some(NetworksSubCommands::Check {}) => {
-            let (settings, _) = read_config_settings()?;
             println!("Checking current setup network connection information...");
             let (conn_info_file_path, current_conn_info) = read_current_network_conn_info()?;
             let mut matched_network = None;
-            for (network_name, network_info) in settings.networks.iter() {
+            for (network_name, network_info) in config.networks_iter() {
                 if network_info.matches(&current_conn_info) {
                     matched_network = Some(network_name);
                     break;
@@ -93,10 +86,8 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             network_name,
             config_location,
         }) => {
-            let net_info = add_network_to_config(
-                &network_name,
-                config_location.map(NetworkInfo::ConnInfoUrl),
-            )?;
+            let net_info =
+                config.add_network(&network_name, config_location.map(NetworkInfo::ConnInfoUrl))?;
             println!(
                 "Network '{}' was added to the list. Connection information is located at '{}'",
                 network_name, net_info
@@ -111,16 +102,16 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             }
             let addresses = HashSet::from_iter(addresses);
             let net_info =
-                add_network_to_config(&network_name, Some(NetworkInfo::Addresses(addresses)))?;
+                config.add_network(&network_name, Some(NetworkInfo::Addresses(addresses)))?;
             println!(
                 "Network '{}' was added to the list. Contacts: '{}'",
                 network_name, net_info
             );
         }
         Some(NetworksSubCommands::Remove { network_name }) => {
-            remove_network_from_config(&network_name)?
+            config.remove_network(&network_name)?
         }
-        None => print_networks_settings()?,
+        None => config.print_networks(),
     }
 
     Ok(())

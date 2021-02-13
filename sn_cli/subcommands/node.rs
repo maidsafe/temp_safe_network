@@ -8,7 +8,7 @@
 // Software.
 
 use crate::operations::{
-    config::{read_config_settings, read_current_network_conn_info},
+    config::{read_current_network_conn_info, Config},
     node::*,
 };
 use anyhow::{anyhow, Result};
@@ -103,11 +103,11 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
         }) => {
             let network_contacts = if hard_coded_contacts.is_empty() {
                 if let Some(name) = network_name {
-                    let (settings, _) = read_config_settings()?;
+                    let config = Config::read()?;
                     let msg = format!("Joining the '{}' network...", name);
                     debug!("{}", msg);
                     println!("{}", msg);
-                    settings.get_net_info(&name)?
+                    config.get_network_info(&name)?
                 } else {
                     let (_, contacts) = read_current_network_conn_info()?;
                     contacts

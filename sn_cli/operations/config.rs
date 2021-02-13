@@ -52,122 +52,207 @@ impl NetworkInfo {
 }
 
 #[derive(Deserialize, Debug, Serialize, Default)]
-pub struct ConfigSettings {
-    pub networks: BTreeMap<String, NetworkInfo>,
-    // pub contacts: BTreeMap<String, String>,
+pub struct Settings {
+    networks: BTreeMap<String, NetworkInfo>,
+    // contacts: BTreeMap<String, String>,
 }
 
-impl ConfigSettings {
-    pub fn get_net_info(&self, name: &str) -> Result<HashSet<SocketAddr>> {
-        match self.networks.get(name) {
+#[derive(Debug)]
+pub struct Config {
+    settings: Settings,
+    file_path: PathBuf,
+}
+
+impl Config {
+    pub fn read() -> Result<Self> {
+        let file_path = config_file_path()?;
+
+        let config = if !file_path.exists() {
+            let empty_config = Self {
+                settings: Settings::default(),
+                file_path: file_path.clone(),
+            };
+            empty_config.write_settings_to_file().with_context(|| {
+                format!("Unable to create config at '{}'", file_path.display(),)
+            })?;
+            debug!("Empty config file created at '{}'", file_path.display(),);
+            empty_config
+        } else {
+            let file = fs::File::open(&file_path).with_context(|| {
+                format!("Error opening config file from '{}'", file_path.display(),)
+            })?;
+
+            let settings: Settings = serde_json::from_reader(file).with_context(|| {
+                format!(
+                    "Format of the config file at '{}' is not valid and couldn't be parsed",
+                    file_path.display()
+                )
+            })?;
+
+            debug!(
+                "Config settings retrieved from '{}': {:?}",
+                file_path.display(),
+                settings
+            );
+
+            Self {
+                settings,
+                file_path,
+            }
+        };
+
+        Ok(config)
+    }
+
+    pub fn get_network_info(&self, name: &str) -> Result<HashSet<SocketAddr>> {
+        match self.settings.networks.get(name) {
             Some(NetworkInfo::ConnInfoUrl(config_location)) => {
                 println!(
                     "Fetching '{}' network connection information from '{}' ...",
                     name, config_location
                 );
 
-                retrieve_conn_info(config_location)
+                retrieve_conn_info(&config_location)
             },
             Some(NetworkInfo::Addresses(addresses)) => Ok(addresses.clone()),
-            None => bail!("No network with name '{}' was found in the config. Please use the 'networks add' command to add it", name)
+            None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
         }
     }
-}
 
-pub fn read_config_settings() -> Result<(ConfigSettings, PathBuf)> {
-    let file_path = config_file_path()?;
-    let file = fs::File::open(&file_path)
-        .with_context(|| format!("Error reading config file from '{}'", file_path.display(),))?;
+    pub fn networks_iter(&self) -> impl Iterator<Item = (&String, &NetworkInfo)> {
+        self.settings.networks.iter()
+    }
 
-    let settings: ConfigSettings = serde_json::from_reader(file)
-        .context("Format of the config file is not valid and couldn't be parsed")?;
+    pub fn add_network(
+        &mut self,
+        name: &str,
+        net_info: Option<NetworkInfo>,
+    ) -> Result<NetworkInfo> {
+        let net_info = if let Some(info) = net_info {
+            info
+        } else {
+            // Cache current network connection info
+            let (_, conn_info) = read_current_network_conn_info()?;
+            let cache_path = cache_conn_info(name, &conn_info)?;
+            println!(
+                "Caching current network connection information into '{}'",
+                cache_path.display()
+            );
+            NetworkInfo::ConnInfoUrl(cache_path.display().to_string())
+        };
 
-    debug!(
-        "Config settings retrieved from {}: {:?}",
-        file_path.display(),
-        settings
-    );
-    Ok((settings, file_path))
-}
+        self.settings
+            .networks
+            .insert(name.to_string(), net_info.clone());
 
-pub fn write_config_settings(file_path: &PathBuf, settings: ConfigSettings) -> Result<()> {
-    let serialised_settings =
-        serde_json::to_string(&settings).context("Failed to add config to file")?;
+        self.write_settings_to_file()?;
 
-    fs::write(&file_path, serialised_settings.as_bytes())
-        .with_context(|| format!("Unable to write config in {}", file_path.display()))?;
+        debug!("Network '{}' added to settings: {}", name, net_info);
+        Ok(net_info)
+    }
 
-    debug!(
-        "Config settings at {} updated with: {:?}",
-        file_path.display(),
-        settings
-    );
-
-    Ok(())
-}
-
-pub fn add_network_to_config(
-    network_name: &str,
-    net_info: Option<NetworkInfo>,
-) -> Result<NetworkInfo> {
-    let net_info = if let Some(info) = net_info {
-        info
-    } else {
-        // Cache current network connection info
-        let (_, conn_info) = read_current_network_conn_info()?;
-        let cache_path = cache_conn_info(network_name, &conn_info)?;
-        println!(
-            "Caching current network connection information into: {}",
-            cache_path.display()
-        );
-        NetworkInfo::ConnInfoUrl(cache_path.display().to_string())
-    };
-
-    let (mut settings, file_path) = read_config_settings()?;
-    settings
-        .networks
-        .insert(network_name.to_string(), net_info.clone());
-
-    write_config_settings(&file_path, settings)?;
-
-    debug!("Network {} - {} added to settings", network_name, net_info);
-    Ok(net_info)
-}
-
-pub fn remove_network_from_config(network_name: &str) -> Result<()> {
-    let (mut settings, file_path) = read_config_settings()?;
-    match settings.networks.remove(network_name) {
-        Some(NetworkInfo::ConnInfoUrl(location)) => {
-            write_config_settings(&file_path, settings)?;
-            debug!("Network {} removed from settings", network_name);
-            println!("Network '{}' was removed from the list", network_name);
-            let mut config_local_path = get_cli_config_path()?;
-            config_local_path.push(CONFIG_NETWORKS_DIRNAME);
-            if PathBuf::from(&location).starts_with(config_local_path) {
-                println!(
-                    "Removing cached network connection information from {}",
-                    location
-                );
-                remove_file(&location).with_context(|| {
-                    format!(
-                        "Failed to remove cached network connection information from {}",
+    pub fn remove_network(&mut self, name: &str) -> Result<()> {
+        match self.settings.networks.remove(name) {
+            Some(NetworkInfo::ConnInfoUrl(location)) => {
+                self.write_settings_to_file()?;
+                debug!("Network '{}' removed from config", name);
+                println!("Network '{}' was removed from the config", name);
+                let mut config_local_path = get_cli_config_path()?;
+                config_local_path.push(CONFIG_NETWORKS_DIRNAME);
+                if PathBuf::from(&location).starts_with(config_local_path) {
+                    println!(
+                        "Removing cached network connection information from '{}'",
                         location
-                    )
-                })?;
+                    );
+
+                    if let Err(err) = remove_file(&location) {
+                        println!(
+                            "Failed to remove cached network connection information from '{}': {}",
+                            location, err
+                        );
+                    }
+                }
             }
+            Some(NetworkInfo::Addresses(_)) => {
+                self.write_settings_to_file()?;
+                debug!("Network '{}' removed from config", name);
+                println!("Network '{}' was removed from the config", name);
+            }
+            None => println!("No network with name '{}' was found in config", name),
         }
-        Some(NetworkInfo::Addresses(_)) => {
-            write_config_settings(&file_path, settings)?;
-            debug!("Network {} removed from settings", network_name);
-            println!("Network '{}' was removed from the list", network_name);
-        }
-        None => println!(
-            "No network with name '{}' was found in config",
-            network_name
-        ),
+
+        Ok(())
     }
 
-    Ok(())
+    pub fn clear(&mut self) -> Result<()> {
+        self.settings = Settings::default();
+        self.write_settings_to_file()
+    }
+
+    pub fn switch_to_network(&self, name: &str) -> Result<()> {
+        let (base_path, file_path) = get_current_network_conn_info_path()?;
+
+        if !base_path.exists() {
+            println!(
+                "Creating '{}' folder for network connection info",
+                base_path.display()
+            );
+            create_dir_all(&base_path)
+                .context("Couldn't create folder for network connection info")?;
+        }
+
+        let contacts = self.get_network_info(&name)?;
+        let conn_info = serialise_contacts(&contacts)?;
+        fs::write(&file_path, conn_info).with_context(|| {
+            format!(
+                "Unable to write network connection info in '{}'",
+                base_path.display(),
+            )
+        })
+    }
+
+    pub fn print_networks(&self) {
+        let mut table = Table::new();
+        table.add_row(row![bFg->"Networks"]);
+        table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
+        let current_conn_info = match read_current_network_conn_info() {
+            Ok((_, current_conn_info)) => Some(current_conn_info),
+            Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
+        };
+
+        self.networks_iter().for_each(|(network_name, net_info)| {
+            let mut current = "";
+            if let Some(conn_info) = &current_conn_info {
+                if net_info.matches(conn_info) {
+                    current = "*";
+                }
+            }
+            table.add_row(row![current, network_name, net_info]);
+        });
+        table.printstd();
+    }
+
+    // Private helpers
+
+    fn write_settings_to_file(&self) -> Result<()> {
+        let serialised_settings =
+            serde_json::to_string(&self.settings).context("Failed to serialise config settings")?;
+
+        fs::write(&self.file_path, serialised_settings.as_bytes()).with_context(|| {
+            format!(
+                "Unable to write config settings to '{}'",
+                self.file_path.display()
+            )
+        })?;
+
+        debug!(
+            "Config settings at '{}' updated with: {:?}",
+            self.file_path.display(),
+            self.settings
+        );
+
+        Ok(())
+    }
 }
 
 pub fn read_current_network_conn_info() -> Result<(PathBuf, HashSet<SocketAddr>)> {
@@ -189,27 +274,7 @@ pub fn read_current_network_conn_info() -> Result<(PathBuf, HashSet<SocketAddr>)
     Ok((file_path, contacts))
 }
 
-pub fn write_current_network_conn_info(contacts: &HashSet<SocketAddr>) -> Result<()> {
-    let (base_path, file_path) = get_current_network_conn_info_path()?;
-
-    if !base_path.exists() {
-        println!(
-            "Creating '{}' folder for network connection info",
-            base_path.display()
-        );
-        create_dir_all(&base_path).context("Couldn't create folder for network connection info")?;
-    }
-
-    let conn_info = serialise_contacts(contacts)?;
-    fs::write(&file_path, conn_info).with_context(|| {
-        format!(
-            "Unable to write network connection info in {}",
-            base_path.display(),
-        )
-    })
-}
-
-pub fn config_file_path() -> Result<PathBuf> {
+fn config_file_path() -> Result<PathBuf> {
     let config_local_path = get_cli_config_path()?;
     let file_path = config_local_path.join(CONFIG_FILENAME);
     if !config_local_path.exists() {
@@ -221,16 +286,10 @@ pub fn config_file_path() -> Result<PathBuf> {
             .context("Couldn't create project's local config folder")?;
     }
 
-    if !file_path.exists() {
-        let empty_settings = ConfigSettings::default();
-        write_config_settings(&file_path, empty_settings)
-            .with_context(|| format!("Unable to create config in {}", file_path.display(),))?;
-    }
-
     Ok(file_path)
 }
 
-pub fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result<PathBuf> {
+fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result<PathBuf> {
     let mut file_path = get_cli_config_path()?;
     file_path.push(CONFIG_NETWORKS_DIRNAME);
     if !file_path.exists() {
@@ -246,7 +305,7 @@ pub fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Re
     let conn_info = serialise_contacts(contacts)?;
     fs::write(&file_path, conn_info).with_context(|| {
         format!(
-            "Unable to cache connection information in {}",
+            "Unable to cache connection information in '{}'",
             file_path.display(),
         )
     })?;
@@ -254,34 +313,9 @@ pub fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Re
     Ok(file_path)
 }
 
-pub fn print_networks_settings() -> Result<()> {
-    let mut table = Table::new();
-    table.add_row(row![bFg->"Networks"]);
-    table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
-    let current_conn_info = match read_current_network_conn_info() {
-        Ok((_, current_conn_info)) => Some(current_conn_info),
-        Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
-    };
-
-    let (settings, _) = read_config_settings()?;
-    settings
-        .networks
-        .iter()
-        .for_each(|(network_name, net_info)| {
-            let mut current = "";
-            if let Some(conn_info) = &current_conn_info {
-                if net_info.matches(conn_info) {
-                    current = "*";
-                }
-            }
-            table.add_row(row![current, network_name, net_info]);
-        });
-    table.printstd();
-    Ok(())
-}
-
-pub fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
-    let contacts_bytes = if is_remote_location(location) {
+fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
+    let is_remote_location = location.starts_with("http");
+    let contacts_bytes = if is_remote_location {
         #[cfg(feature = "self-update")]
         {
             // Fetch info from an HTTP/s location
@@ -313,11 +347,6 @@ fn deserialise_contacts(bytes: &[u8]) -> Result<HashSet<SocketAddr>> {
 
 pub fn serialise_contacts(contacts: &HashSet<SocketAddr>) -> Result<String> {
     serde_json::to_string(contacts).with_context(|| "Failed to serialise network connection info")
-}
-
-#[inline]
-fn is_remote_location(location: &str) -> bool {
-    location.starts_with("http")
 }
 
 fn get_current_network_conn_info_path() -> Result<(PathBuf, PathBuf)> {

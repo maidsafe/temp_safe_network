@@ -7,10 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::operations::config::{
-    add_network_to_config, config_file_path, print_networks_settings, remove_network_from_config,
-    write_config_settings, ConfigSettings, NetworkInfo,
-};
+use crate::operations::config::{Config, NetworkInfo};
 use anyhow::Result;
 use log::debug;
 use structopt::StructOpt;
@@ -61,25 +58,24 @@ pub enum SettingRemoveCmd {
 }
 
 pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
+    let mut config = Config::read()?;
     match cmd {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
             config_location,
         })) => {
-            add_network_to_config(&network_name, config_location.map(NetworkInfo::ConnInfoUrl))?;
+            config.add_network(&network_name, config_location.map(NetworkInfo::ConnInfoUrl))?;
         }
         // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
         Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {
-            remove_network_from_config(&network_name)?
+            config.remove_network(&network_name)?
         }
         // Some(ConfigSubCommands::Remove(SettingRemoveCmd::Contact { name })) => {}
         Some(ConfigSubCommands::Clear) => {
-            let file_path = config_file_path()?;
-            let empty_settings = ConfigSettings::default();
-            write_config_settings(&file_path, empty_settings)?;
+            config.clear()?;
             debug!("Config settings cleared out");
         }
-        None => print_networks_settings()?,
+        None => config.print_networks(),
     }
 
     Ok(())
