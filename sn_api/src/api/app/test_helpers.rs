@@ -66,7 +66,7 @@ fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
         Err(_) => {
             // we default to this address as that's what we
             // normally use in local test network as the genesis node address
-            vec!["127.0.0.1:12001".parse()?].into_iter().collect()
+            vec!["127.0.0.1:12000".parse()?].into_iter().collect()
         }
     };
 
