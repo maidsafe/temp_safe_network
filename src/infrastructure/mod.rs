@@ -8,7 +8,7 @@
 
 mod errors;
 
-use crate::{MessageType, WireMsg};
+use crate::{client::Error as ClientError, client::MessageId, MessageType, WireMsg};
 use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
@@ -18,14 +18,15 @@ use xor_name::{Prefix, XorName};
 
 /// Message to query the network infrastructure.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub enum Query {
+pub enum Message {
     /// Message to request information about the section that matches the given name.
     GetSectionRequest(XorName),
     /// Response to `GetSectionRequest`.
     GetSectionResponse(GetSectionResponse),
+    /// Error related to section infrastructure
+    InfrastructureError(ErrorResponse),
 }
 
-// pub enum Error(Error);
 /// All the info a client needs about their section
 #[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
 pub struct InfrastructureInformation {
@@ -35,6 +36,14 @@ pub struct InfrastructureInformation {
     pub pk_set: ReplicaPublicKeySet,
     /// Section elders.
     pub elders: BTreeMap<XorName, SocketAddr>,
+}
+// Infrastructure error wrapper to add correltion info for triggering message
+#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
+pub struct ErrorResponse {
+    /// Optional correlation id if this messge is in response to some non infra query/cmd
+    pub correlation_id: MessageId,
+    /// Section data error message
+    pub error: Error,
 }
 
 /// Information about a section.
@@ -46,16 +55,16 @@ pub enum GetSectionResponse {
     /// Response to `GetSectionRequest` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<SocketAddr>),
-    /// Error related to section infrastructure
+    /// Request could not be fulfilled due to error related to section infrastructure
     SectionInfrastructureError(Error),
 }
 
-impl Query {
+impl Message {
     /// Convinience function to deserialize a 'Query' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to an infrastructure query.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::InfrastructureQuery(query) = deserialized {
+        if let MessageType::InfrastructureMessage(query) = deserialized {
             Ok(query)
         } else {
             Err(crate::Error::FailedToParse(
@@ -66,6 +75,6 @@ impl Query {
 
     /// serialize this Query into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> crate::Result<Bytes> {
-        WireMsg::serialize_infrastructure_query(self)
+        WireMsg::serialize_infrastructure_msg(self)
     }
 }

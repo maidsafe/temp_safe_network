@@ -21,4 +21,8 @@ pub enum Error {
     /// Target section is unrecognized
     #[error("Target section key provided is unrecognized")]
     UnrecognizedSectionKey,
+
+    /// No PublicKeySet found at this section
+    #[error("No PublicKey found at this section")]
+    NoSectionPkSet,
 }

@@ -22,7 +22,7 @@ pub use serialisation::WireMsg;
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
     Ping,
-    InfrastructureQuery(infrastructure::Query),
+    InfrastructureMessage(infrastructure::Message),
     ClientMessage(client::MsgEnvelope),
     NodeMessage(node::NodeMessage),
 }
@@ -32,7 +32,7 @@ impl MessageType {
     pub fn serialize(&self) -> Result<Bytes> {
         match self {
             Self::Ping => WireMsg::new_ping_msg().serialize(),
-            Self::InfrastructureQuery(query) => WireMsg::serialize_infrastructure_query(query),
+            Self::InfrastructureMessage(query) => WireMsg::serialize_infrastructure_msg(query),
             Self::ClientMessage(msg) => WireMsg::serialize_client_msg(msg),
             Self::NodeMessage(msg) => WireMsg::serialize_node_msg(msg),
         }

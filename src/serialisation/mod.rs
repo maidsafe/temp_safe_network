@@ -34,8 +34,8 @@ impl WireMsg {
         }
     }
 
-    /// Creates a new instance keeping a (serialized) copy of the 'InfrastructureQuery' message provided.
-    pub fn new_infrastructure_query(query: &infrastructure::Query) -> Result<WireMsg> {
+    /// Creates a new instance keeping a (serialized) copy of the 'InfrastructureMessage' message provided.
+    pub fn new_infrastructure_query(query: &infrastructure::Message) -> Result<WireMsg> {
         let payload_vec = rmp_serde::to_vec_named(&query).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize infrastructure query payload with Msgpack: {}",
@@ -44,7 +44,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::InfrastructureQuery),
+            header: WireMsgHeader::new(MessageKind::InfrastructureMessage),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -112,15 +112,15 @@ impl WireMsg {
     pub fn to_message(&self) -> Result<MessageType> {
         match self.header.kind() {
             MessageKind::Ping => Ok(MessageType::Ping),
-            MessageKind::InfrastructureQuery => {
-                let query: infrastructure::Query =
+            MessageKind::InfrastructureMessage => {
+                let query: infrastructure::Message =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!(
                             "Client message payload as Msgpack: {:?}",
                             err
                         ))
                     })?;
-                Ok(MessageType::InfrastructureQuery(query))
+                Ok(MessageType::InfrastructureMessage(query))
             }
             MessageKind::ClientMessage => {
                 let client_msg: client::MsgEnvelope = rmp_serde::from_slice(&self.payload)
@@ -153,7 +153,7 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary WireMsg from the provided
     /// MsgEnvelope, returning the serialized WireMsg.
-    pub fn serialize_infrastructure_query(query: &infrastructure::Query) -> Result<Bytes> {
+    pub fn serialize_infrastructure_msg(query: &infrastructure::Message) -> Result<Bytes> {
         Self::new_infrastructure_query(query)?.serialize()
     }
 
@@ -196,14 +196,14 @@ mod tests {
     #[test]
     fn serialisation_infrastructure_query() -> Result<()> {
         let random_xor = XorName::random();
-        let query = infrastructure::Query::GetSectionRequest(random_xor);
+        let query = infrastructure::Message::GetSectionRequest(random_xor);
         let wire_msg = WireMsg::new_infrastructure_query(&query)?;
         let serialized = wire_msg.serialize()?;
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
         assert_eq!(
             wire_msg.to_message()?,
-            MessageType::InfrastructureQuery(query)
+            MessageType::InfrastructureMessage(query)
         );
 
         Ok(())
