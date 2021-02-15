@@ -96,8 +96,13 @@ pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
     }
 
     let (_, bootstrap_contacts) = read_current_network_conn_info()?;
+    let client_cfg = client_config_path();
     match safe
-        .connect(app_keypair.clone(), None, Some(bootstrap_contacts.clone()))
+        .connect(
+            app_keypair.clone(),
+            client_cfg.as_deref(),
+            Some(bootstrap_contacts.clone()),
+        )
         .await
     {
         Err(_) if found_app_keypair => {
@@ -139,4 +144,13 @@ fn create_credentials_file() -> Result<(File, PathBuf)> {
         .with_context(|| format!("Unable to open credentials file at {}", file_path.display()))?;
 
     Ok((file, file_path))
+}
+
+fn client_config_path() -> Option<PathBuf> {
+    let mut client_cfg_path = dirs_next::home_dir()?;
+    client_cfg_path.push(".safe");
+    client_cfg_path.push("client");
+    client_cfg_path.push("sn_client.config");
+
+    Some(client_cfg_path)
 }

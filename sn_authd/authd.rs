@@ -19,6 +19,7 @@ use std::{
     fs,
     net::SocketAddr,
     path::Path,
+    path::PathBuf,
     str,
     sync::Arc,
 };
@@ -27,15 +28,12 @@ use url::Url;
 // Number of milliseconds to allow an idle connection before closing it
 const CONNECTION_IDLE_TIMEOUT: u64 = 120_000;
 
-pub async fn run(
-    listen: &str,
-    cert_base_path: Option<&Path>,
-    config_dir_path: Option<&Path>,
-) -> Result<()> {
+pub async fn run(listen: &str, cert_base_path: Option<&Path>) -> Result<()> {
     let bootstrap_contacts = get_current_network_conn_info()?;
+    let client_config_path = client_config_path();
     info!("Bootstrapping with contacts: {:?}", bootstrap_contacts);
     let safe_auth_handle: SharedSafeAuthenticatorHandle = Arc::new(Mutex::new(
-        SafeAuthenticator::new(config_dir_path, Some(bootstrap_contacts)),
+        SafeAuthenticator::new(client_config_path.as_deref(), Some(bootstrap_contacts)),
     ));
 
     // We keep a queue for all the authorisation requests
@@ -99,6 +97,15 @@ fn get_current_network_conn_info() -> Result<HashSet<SocketAddr>> {
             err
         ))
     })
+}
+
+fn client_config_path() -> Option<PathBuf> {
+    let mut client_cfg_path = dirs_next::home_dir()?;
+    client_cfg_path.push(".safe");
+    client_cfg_path.push("client");
+    client_cfg_path.push("sn_client.config");
+
+    Some(client_cfg_path)
 }
 
 async fn start_listening(

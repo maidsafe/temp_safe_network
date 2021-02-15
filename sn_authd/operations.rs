@@ -176,7 +176,7 @@ async fn run_in_foreground(listen: &str, log_dir: Option<PathBuf>) -> Result<()>
             })?;
 
             info!("Initialising SAFE Authenticator services...");
-            authd_run(listen, None, None).await?;
+            authd_run(listen, None).await?;
 
             // Release PID file lock (this is done automatically anyways if process is killed)
             drop(pid_file);
