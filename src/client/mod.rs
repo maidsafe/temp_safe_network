@@ -13,7 +13,6 @@ mod data;
 mod duty;
 mod errors;
 mod map;
-mod msg_id;
 mod network;
 mod query;
 mod sender;
@@ -27,12 +26,11 @@ pub use self::{
     duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
     errors::{Error, ErrorDebug, Result},
     map::{MapRead, MapWrite},
-    msg_id::MessageId,
     network::{
-        NodeCmd, NodeCmdError, NodeDataCmd, NodeDataError, NodeDataQuery, NodeDataQueryResponse,
-        NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardError, NodeRewardQuery,
-        NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd, NodeTransferError,
-        NodeTransferQuery, NodeTransferQueryResponse,
+        NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
+        NodeQueryResponse, NodeRewardError, NodeRewardQuery, NodeRewardQueryResponse,
+        NodeSystemCmd, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+        NodeTransferQueryResponse,
     },
     query::Query,
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
@@ -40,7 +38,7 @@ pub use self::{
     transfer::{TransferCmd, TransferQuery},
 };
 
-use crate::{MessageType, SrcLocation, WireMsg};
+use crate::{MessageId, MessageType, SrcLocation, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{

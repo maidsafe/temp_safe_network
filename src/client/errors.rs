@@ -43,7 +43,6 @@ pub enum Error {
     /// Message read contains a payload with an unsupported serialization type.
     #[error("Unsupported payload serialization: {0}")]
     UnsupportedSerialization(u16),
-
     /// Access denied for supplied PublicKey
     #[error("Access denied for PublicKey: {0}")]
     AccessDenied(PublicKey),
@@ -56,15 +55,12 @@ pub enum Error {
     /// Requested data not found
     #[error("Requested data not found")]
     NoSuchData,
-
     /// No history found for PublicKey
     #[error("No history found for PublicKey: {0}")]
     NoHistoryForPublicKey(sn_data_types::PublicKey),
-
     /// Failed to write file, likely due to a system Io error
     #[error("Failed to write file")]
     FailedToWriteFile,
-
     /// Provided data already exists on the network
     #[error("Data provided already exists")]
     DataExists,
@@ -158,15 +154,12 @@ pub enum Error {
     /// Entry already exists. Contains the current entry Key.
     #[error("Entry already exists {0}")]
     EntryExists(u8),
-
     /// Problem registering the payment at a node
     #[error("Payment registration failed")]
     PaymentFailed,
-
     /// Node failed to delete the requested data for some reason.
     #[error("Failed to delete requested data")]
     FailedToDelete,
-
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
