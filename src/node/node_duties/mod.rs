@@ -252,7 +252,7 @@ impl NodeDuties {
         };
         let wrapping =
             NodeMsgWrapping::new(NodeState::Adult(adult_state), MsgNodeDuties::NodeConfig);
-        let node_id = self.node_info.node_id;
+        let node_id = PublicKey::from(self.network_api.public_key().await);
         wrapping
             .send_to_section(
                 Message::NodeCmd {
@@ -292,8 +292,9 @@ impl NodeDuties {
             return Ok(NodeOperation::NoOp);
         }
         info!("Assuming Adult duties..");
-        let state = AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
-        let duties = AdultDuties::new(state).await?;
+        let state = AdultState::new(self.network_api.clone()).await?;
+        let duties = AdultDuties::new(&self.node_info, state).await?;
+        self.node_info.used_space.reset().await;
         self.stage = Stage::Adult(duties);
         info!("Adult duties assumed.");
         // NB: This is wrong, shouldn't write to disk here,
@@ -326,7 +327,7 @@ impl NodeDuties {
             // this is the case when we are the GENESIS_ELDER_COUNT-th Elder!
             debug!("threshold reached; proposing genesis!");
 
-            let elder_state = ElderState::new(&self.node_info, self.network_api.clone()).await?;
+            let elder_state = ElderState::new(self.network_api.clone()).await?;
             let genesis_balance = u32::MAX as u64 * 1_000_000_000;
             let credit = Credit {
                 id: Default::default(),
@@ -410,8 +411,7 @@ impl NodeDuties {
 
         let (stage, cmd) = match self.stage {
             Stage::AwaitingGenesisThreshold(ref mut queued_ops) => {
-                let elder_state =
-                    ElderState::new(&self.node_info, self.network_api.clone()).await?;
+                let elder_state = ElderState::new(self.network_api.clone()).await?;
 
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
@@ -584,8 +584,8 @@ impl NodeDuties {
         trace!("Finishing transition to Elder..");
 
         let mut ops: Vec<NodeOperation> = vec![];
-        let state = ElderState::new(&self.node_info, self.network_api.clone()).await?;
-        let mut duties = ElderDuties::new(wallet_info, state.clone()).await?;
+        let state = ElderState::new(self.network_api.clone()).await?;
+        let mut duties = ElderDuties::new(wallet_info, &self.node_info, state.clone()).await?;
 
         // 1. Initiate duties.
         ops.push(duties.initiate(genesis).await?);
@@ -597,11 +597,8 @@ impl NodeDuties {
         }
 
         // 3. Set new stage
-        self.stage = Stage::Elder(ElderConstellation::new(
-            self.node_info.clone(),
-            duties,
-            self.network_api.clone(),
-        ));
+        self.node_info.used_space.reset().await;
+        self.stage = Stage::Elder(ElderConstellation::new(duties, self.network_api.clone()));
 
         // NB: This is wrong, shouldn't write to disk here,
         // let it be upper layer resp.
@@ -651,9 +648,8 @@ impl NodeDuties {
             Stage::ProposingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::Adult(_old_state) => {
-                let state =
-                    AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
-                let duties = AdultDuties::new(state).await?;
+                let state = AdultState::new(self.network_api.clone()).await?;
+                let duties = AdultDuties::new(&self.node_info, state).await?;
                 self.stage = Stage::Adult(duties);
                 Ok(NodeOperation::NoOp)
             }
@@ -673,7 +669,11 @@ impl NodeDuties {
             Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp),
             Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // Should be unreachable?
             Stage::Infant | Stage::Adult(_) => Ok(NodeOperation::NoOp),
-            Stage::Elder(elder) => elder.finish_elder_change(previous_key, new_key).await,
+            Stage::Elder(elder) => {
+                elder
+                    .finish_elder_change(&self.node_info, previous_key, new_key)
+                    .await
+            }
         }
     }
 }

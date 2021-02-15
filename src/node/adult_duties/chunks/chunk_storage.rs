@@ -6,12 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//pub use crate::chunk_store::UsedSpace;
 use crate::{
-    chunk_store::{BlobChunkStore, UsedSpace},
+    chunk_store::BlobChunkStore,
     error::convert_to_error_message,
     node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty, Error},
-    AdultState, Result,
+    AdultState, NodeInfo, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress, Signature};
@@ -33,10 +32,8 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(adult_state: AdultState) -> Result<Self> {
-        let node_info = adult_state.info();
-        let used_space = UsedSpace::new(node_info.max_storage_capacity);
-        let chunks = BlobChunkStore::new(node_info.path(), used_space).await?;
+    pub(crate) async fn new(node_info: &NodeInfo, adult_state: AdultState) -> Result<Self> {
+        let chunks = BlobChunkStore::new(&node_info.root_dir, node_info.used_space.clone()).await?;
         let wrapping = AdultMsgWrapping::new(adult_state, AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
     }

@@ -14,7 +14,7 @@ use crate::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
         ChunkStoreDuty, IntoNodeOp, NodeOperation,
     },
-    AdultState, Result,
+    AdultState, NodeInfo, Result,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -26,8 +26,8 @@ pub struct AdultDuties {
 }
 
 impl AdultDuties {
-    pub async fn new(state: AdultState) -> Result<Self> {
-        let chunks = Chunks::new(state.clone()).await?;
+    pub async fn new(node_info: &NodeInfo, state: AdultState) -> Result<Self> {
+        let chunks = Chunks::new(node_info, state.clone()).await?;
         Ok(Self { state, chunks })
     }
 

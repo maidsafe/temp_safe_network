@@ -14,6 +14,7 @@ mod node_ops;
 pub mod state_db;
 
 use crate::{
+    chunk_store::UsedSpace,
     node::{
         node_duties::NodeDuties,
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
@@ -76,12 +77,8 @@ impl Node {
 
         let node_info = NodeInfo {
             genesis: config.is_first(),
-            node_id: PublicKey::Ed25519(network_api.public_key().await),
             root_dir: root_dir_buf,
-            /// Upper limit in bytes for allowed network storage on this node.
-            /// An Adult would be using the space for chunks,
-            /// while an Elder uses it for metadata.
-            max_storage_capacity: config.max_capacity(),
+            used_space: UsedSpace::new(config.max_capacity()),
             reward_key,
         };
 

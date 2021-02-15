@@ -21,7 +21,7 @@
 // What things do we _need_ to access most current state of?
 // - ..
 
-use crate::{Network, Result};
+use crate::{chunk_store::UsedSpace, Network, Result};
 use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
@@ -58,7 +58,6 @@ impl NodeState {
 #[derive(Clone)]
 ///
 pub struct AdultState {
-    info: NodeInfo,
     prefix: Prefix,
     node_name: XorName,
     node_id: Ed25519PublicKey,
@@ -72,9 +71,8 @@ impl AdultState {
     /// Takes a snapshot of current state
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
-    pub async fn new(info: NodeInfo, network: Network) -> Result<Self> {
+    pub async fn new(network: Network) -> Result<Self> {
         Ok(Self {
-            info,
             prefix: network.our_prefix().await,
             node_name: network.our_name().await,
             node_id: network.public_key().await,
@@ -88,11 +86,6 @@ impl AdultState {
     // ---------------------------------------------------
     // ----------------- STATIC STATE --------------------
     // ---------------------------------------------------
-
-    /// Static state
-    pub fn info(&self) -> &NodeInfo {
-        &self.info
-    }
 
     /// Static state
     pub fn node_name(&self) -> XorName {
@@ -114,7 +107,6 @@ impl AdultState {
 #[derive(Clone)]
 ///
 pub struct ElderState {
-    info: NodeInfo,
     prefix: Prefix,
     node_name: XorName,
     node_id: Ed25519PublicKey,
@@ -131,9 +123,8 @@ impl ElderState {
     /// Takes a snapshot of current state
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
-    pub async fn new(info: &NodeInfo, network: Network) -> Result<Self> {
+    pub async fn new(network: Network) -> Result<Self> {
         Ok(Self {
-            info: info.clone(),
             prefix: network.our_prefix().await,
             node_name: network.our_name().await,
             node_id: network.public_key().await,
@@ -176,11 +167,6 @@ impl ElderState {
     // ---------------------------------------------------
     // ----------------- STATIC STATE --------------------
     // ---------------------------------------------------
-
-    /// Static state
-    pub fn info(&self) -> &NodeInfo {
-        &self.info
-    }
 
     /// Static state
     pub fn prefix(&self) -> &Prefix {
@@ -358,13 +344,9 @@ pub struct NodeInfo {
     ///
     pub genesis: bool,
     ///
-    pub node_id: PublicKey,
-    ///
     pub root_dir: PathBuf,
-    /// Upper limit in bytes for allowed network storage on this node.
-    /// An Adult would be using the space for chunks,
-    /// while an Elder uses it for metadata.
-    pub max_storage_capacity: u64,
+    ///
+    pub used_space: UsedSpace,
     /// The key used by the node to receive earned rewards.
     pub reward_key: PublicKey,
 }

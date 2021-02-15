@@ -31,7 +31,6 @@ use sn_routing::Prefix;
 
 ///
 pub struct ElderConstellation {
-    info: NodeInfo,
     network: Network,
     duties: ElderDuties,
     pending_changes: Vec<ConstellationChange>,
@@ -44,9 +43,8 @@ struct ConstellationChange {
 
 impl ElderConstellation {
     ///
-    pub fn new(info: NodeInfo, duties: ElderDuties, network: Network) -> Self {
+    pub fn new(duties: ElderDuties, network: Network) -> Self {
         Self {
-            info,
             network,
             duties,
             pending_changes: vec![],
@@ -90,13 +88,14 @@ impl ElderConstellation {
         // 1. First we must update data section..
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(&self.info, self.network.clone()).await?;
+        let new_elder_state = ElderState::new(self.network.clone()).await?;
         self.duties.initiate_elder_change(new_elder_state).await
     }
 
     ///
     pub async fn finish_elder_change(
         &mut self,
+        node_info: &NodeInfo,
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
@@ -120,11 +119,11 @@ impl ElderConstellation {
         // 2. We must load _current_ elder state..
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(&self.info, self.network.clone()).await?;
+        let new_elder_state = ElderState::new(self.network.clone()).await?;
         // 3. And update key section with it.
         let _ = self
             .duties
-            .finish_elder_change(new_elder_state.clone())
+            .finish_elder_change(node_info, new_elder_state.clone())
             .await?;
 
         debug!("Key section completed elder change update.");
