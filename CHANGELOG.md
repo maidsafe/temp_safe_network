@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [4.0.0](https://github.com/maidsafe/sn_messaging/compare/v3.0.2...v4.0.0) (2021-02-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* adds more infrastructure information to bootstrap and on section key errors
+* Adds pk to messages and helper on MsgEnvelope
+
+### Features
+
+* add infrastructure information. ([9ca78b7](https://github.com/maidsafe/sn_messaging/commit/9ca78b78a8acf0cc3f6d9b9195a1483c66934d49))
+* error messages related to target pk ([08d31d3](https://github.com/maidsafe/sn_messaging/commit/08d31d3f694bf92562499a498bc0b7dd903ff61c))
+* make infra error its own type, use that in client::Error. ([122bc07](https://github.com/maidsafe/sn_messaging/commit/122bc0755078602a65275d4b7ccf2e8d759c8ef9))
+* require a section key PK to be passed with all messages ([60f5240](https://github.com/maidsafe/sn_messaging/commit/60f5240ac8242d04e970773cdccfcb7ccd4a9e3e))
+
 ### [3.0.2](https://github.com/maidsafe/sn_messaging/compare/v3.0.1...v3.0.2) (2021-02-08)
 
 ### [3.0.1](https://github.com/maidsafe/sn_messaging/compare/v3.0.0...v3.0.1) (2021-02-08)
