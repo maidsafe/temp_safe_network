@@ -154,7 +154,6 @@ impl KeySection {
             signing,
             initiating: true,
         };
-        let replica_manager = Replicas::new(root_dir, info)?;
-        Ok(replica_manager)
+        Replicas::new(root_dir, info)
     }
 }
