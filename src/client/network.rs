@@ -29,6 +29,8 @@ pub enum NodeCmd {
     Data { cmd: NodeDataCmd, origin: User },
     ///
     Transfers(NodeTransferCmd),
+    /// Cmds related to the running of a node.
+    System(NodeSystemCmd),
 }
 
 /// Cmds related to the running of a node.
@@ -64,6 +66,15 @@ pub enum NodeSystemCmd {
         node_id: PublicKey,
         /// Section to which the message needs to be sent to. (NB: this is the section of the node id).
         section: XorName,
+    },
+    /// Replicate a given chunk at another Adult
+    ReplicateChunk {
+        /// New holders's name.
+        new_holder: XorName,
+        /// Address of the blob to be replicated.
+        address: BlobAddress,
+        /// Current holders.
+        current_holders: BTreeSet<XorName>,
     },
 }
 
@@ -110,6 +121,8 @@ pub enum NodeQuery {
     Rewards(NodeRewardQuery),
     ///
     Transfers(NodeTransferQuery),
+    ///
+    System(NodeSystemQuery),
 }
 
 /// Reward query that is sent between sections.
@@ -126,23 +139,23 @@ pub enum NodeRewardQuery {
         /// in the new section.
         new_node_id: XorName,
     },
+    /// A new Section Actor share (i.e. a new Elder) needs to query
+    /// its peer Elders for the replicas' public key set
+    /// and the history of events of the section wallet.
+    GetSectionWalletHistory,
 }
 
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeTransferQuery {
-    /// A new Elder needs to query
-    /// network for its replicas' public key set
-    /// and the history of events of the wallet.
-    CatchUpWithSectionWallet(PublicKey),
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
     GetNewSectionWallet(PublicKey),
     /// Replicas starting up
     /// need to query for events of
-    /// the existing Replicas.
-    GetReplicaEvents(PublicKey),
+    /// the existing Replicas. (Sent to the other Elders).
+    GetReplicaEvents,
 }
 
 ///
@@ -179,16 +192,14 @@ pub enum NodeRewardQueryResponse {
     /// together with the new node id,
     /// that followed with the original query.
     GetNodeWalletId(Result<(PublicKey, XorName)>),
+    /// Returns the history of the section wallet.
+    GetSectionWalletHistory(WalletInfo),
 }
 
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeTransferQueryResponse {
-    /// A new Elder needs to query
-    /// network for its replicas' public key set
-    /// and the history of events of the wallet.
-    CatchUpWithSectionWallet(Result<WalletInfo>),
     /// On Elder change, all Elders neet to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
