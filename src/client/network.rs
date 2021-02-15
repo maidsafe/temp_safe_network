@@ -7,7 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{Address, BlobWrite, Error, Result};
+use crate::{
+    client::{DataCmd as NodeDataCmd, DataQuery as NodeDataQuery, Error, Result},
+    User,
+};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare,
@@ -22,10 +25,8 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
-    /// Cmds related to the running of a node.
-    System(NodeSystemCmd),
     ///
-    Data(NodeDataCmd),
+    Data { cmd: NodeDataCmd, origin: User },
     ///
     Transfers(NodeTransferCmd),
 }
@@ -78,23 +79,6 @@ pub enum NodeTransferCmd {
     RegisterSectionPayout(TransferAgreementProof),
 }
 
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataCmd {
-    /// Replicate a given chunk at another Adult
-    ReplicateChunk {
-        /// New holders's name.
-        new_holder: XorName,
-        /// Address of the blob to be replicated.
-        address: BlobAddress,
-        /// Current holders.
-        current_holders: BTreeSet<XorName>,
-    },
-    /// Elder-to-Adult cmd.
-    Blob(BlobWrite),
-}
-
 // -------------- Node Events --------------
 
 ///
@@ -121,7 +105,7 @@ pub enum NodeEvent {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQuery {
     ///
-    Data(NodeDataQuery),
+    Data { query: NodeDataQuery, origin: User },
     ///
     Rewards(NodeRewardQuery),
     ///
@@ -151,7 +135,7 @@ pub enum NodeTransferQuery {
     /// network for its replicas' public key set
     /// and the history of events of the wallet.
     CatchUpWithSectionWallet(PublicKey),
-    /// On Elder change, all Elders neet to query
+    /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
     GetNewSectionWallet(PublicKey),
@@ -163,16 +147,13 @@ pub enum NodeTransferQuery {
 
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataQuery {
+pub enum NodeSystemQuery {
     /// Acquire the chunk from current holders for replication.
     GetChunk {
         /// New Holder's name.
         new_holder: XorName,
         /// Address of the blob to be replicated.
         address: BlobAddress,
-        /// Details of the section that authorised the replication.
-        /// (This is the accumulated sig over the `ReplicateChunk` cmd.)
-        //section_authority: MsgSender,
         /// Current holders.
         current_holders: BTreeSet<XorName>,
     },
@@ -291,74 +272,4 @@ pub enum NodeRewardError {
         ///
         error: Error,
     },
-}
-
-impl NodeCmd {
-    /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> Address {
-        use Address::*;
-        use NodeCmd::*;
-        use NodeDataCmd::*;
-        use NodeTransferCmd::*;
-        match self {
-            System(NodeSystemCmd::RegisterWallet { section, .. }) => Section(*section),
-            System(NodeSystemCmd::StorageFull { section, .. }) => Section(*section),
-            System(NodeSystemCmd::ProposeGenesis { credit, .. }) => {
-                Section(credit.recipient().into())
-            }
-            System(NodeSystemCmd::AccumulateGenesis { signed_credit, .. }) => {
-                Section(signed_credit.recipient().into())
-            }
-            Data(cmd) => match cmd {
-                ReplicateChunk { new_holder, .. } => Node(*new_holder),
-                Blob(_write) => Node(XorName::default()), // todo: fix this!
-            },
-            Transfers(cmd) => match cmd {
-                ValidateSectionPayout(signed_debit) => Section(signed_debit.sender().into()),
-                RegisterSectionPayout(transfer_agreement) => {
-                    Section(transfer_agreement.sender().into())
-                }
-                PropagateTransfer(transfer_agreement) => {
-                    Section(transfer_agreement.recipient().into())
-                }
-            },
-        }
-    }
-}
-
-impl NodeEvent {
-    /// Returns the address of the destination for `request`.
-    pub fn dst_address(&self) -> Address {
-        use Address::*;
-        use NodeEvent::*;
-        match self {
-            ReplicationCompleted { chunk, .. } => Section(*chunk.name()),
-            SectionPayoutValidated(event) => Section(event.sender().into()),
-            SectionPayoutRegistered { from, .. } => Section((*from).into()),
-        }
-    }
-}
-
-impl NodeQuery {
-    /// Returns the address of the destination for the query.
-    pub fn dst_address(&self) -> Address {
-        use Address::*;
-        use NodeDataQuery::*;
-        use NodeQuery::*;
-        use NodeRewardQuery::*;
-        use NodeTransferQuery::*;
-        match self {
-            Data(data_query) => match data_query {
-                GetChunk {
-                    current_holders, ..
-                } => Node(*current_holders.iter().next().unwrap_or(&XorName::random())),
-            },
-            Transfers(transfer_query) => match transfer_query {
-                GetReplicaEvents(section_key) => Section((*section_key).into()),
-                GetNewSectionWallet(section_key) => Section((*section_key).into()),
-                CatchUpWithSectionWallet(section_key) => Section((*section_key).into()),
-            },
-            Rewards(GetNodeWalletId { old_node_id, .. }) => Section(*old_node_id),
-        }
-    }
 }
