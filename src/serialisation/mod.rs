@@ -10,7 +10,9 @@
 mod wire_msg_header;
 
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
-use super::{client, infrastructure, node, Error, MessageType, Result};
+#[cfg(not(feature = "client-only"))]
+use super::node;
+use super::{client, infrastructure, Error, MessageType, Result};
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen};
 use std::fmt::Debug;
@@ -66,6 +68,7 @@ impl WireMsg {
     }
 
     /// Creates a new instance keeping a (serialized) copy of the node 'Message' message provided.
+    #[cfg(not(feature = "client-only"))]
     pub fn new_node_msg(msg: &node::NodeMessage) -> Result<WireMsg> {
         let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
             Error::Serialisation(format!(
@@ -116,7 +119,7 @@ impl WireMsg {
                 let query: infrastructure::Message =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!(
-                            "Client message payload as Msgpack: {:?}",
+                            "Client message payload as Msgpack: {}",
                             err
                         ))
                     })?;
@@ -126,16 +129,21 @@ impl WireMsg {
                 let client_msg: client::MsgEnvelope = rmp_serde::from_slice(&self.payload)
                     .map_err(|err| {
                         Error::FailedToParse(format!(
-                            "Client message payload as Msgpack: {:?}",
+                            "Client message payload as Msgpack: {}",
                             err
                         ))
                     })?;
                 Ok(MessageType::ClientMessage(client_msg))
             }
+            #[cfg(feature = "client-only")]
+            MessageKind::NodeMessage => {
+                Err(Error::FailedToParse("Message payload is a Node message which is not supported when feature 'client-only' is set".to_string()))
+            }
+            #[cfg(not(feature = "client-only"))]
             MessageKind::NodeMessage => {
                 let node_msg: node::NodeMessage =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Node message payload as Msgpack: {:?}", err))
+                        Error::FailedToParse(format!("Node message payload as Msgpack: {}", err))
                     })?;
                 Ok(MessageType::NodeMessage(node_msg))
             }
@@ -165,6 +173,7 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary WireMsg from the provided
     /// node::Messsage, returning the serialized WireMsg.
+    #[cfg(not(feature = "client-only"))]
     pub fn serialize_node_msg(msg: &node::NodeMessage) -> Result<Bytes> {
         Self::new_node_msg(msg)?.serialize()
     }

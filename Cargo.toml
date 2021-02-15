@@ -46,3 +46,4 @@ rand_xorshift = "~0.2.0"
 
 [features]
 simulated-payouts = [ "sn_data_types/simulated-payouts" ]
+client-only = []

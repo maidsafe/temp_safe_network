@@ -10,6 +10,7 @@
 pub mod client;
 mod errors;
 pub mod infrastructure;
+#[cfg(not(feature = "client-only"))]
 pub mod node;
 mod serialisation;
 
@@ -17,13 +18,16 @@ use bytes::Bytes;
 pub use errors::{Error, Result};
 pub use serialisation::WireMsg;
 
-/// Type of message
+/// Type of message.
+/// Note this is part of this crate's public API but this enum is
+/// never serialised or even part of the message that is sent over the wire.
 #[derive(PartialEq, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
     Ping,
     InfrastructureMessage(infrastructure::Message),
     ClientMessage(client::MsgEnvelope),
+    #[cfg(not(feature = "client-only"))]
     NodeMessage(node::NodeMessage),
 }
 
@@ -34,6 +38,7 @@ impl MessageType {
             Self::Ping => WireMsg::new_ping_msg().serialize(),
             Self::InfrastructureMessage(query) => WireMsg::serialize_infrastructure_msg(query),
             Self::ClientMessage(msg) => WireMsg::serialize_client_msg(msg),
+            #[cfg(not(feature = "client-only"))]
             Self::NodeMessage(msg) => WireMsg::serialize_node_msg(msg),
         }
     }
