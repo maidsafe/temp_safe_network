@@ -61,7 +61,7 @@ impl KeySection {
         elder_state: ElderState,
     ) -> Result<Self> {
         let gateway = ClientGateway::new(elder_state.clone()).await?;
-        let replicas = Self::transfer_replicas(node_info, elder_state.clone())?;
+        let replicas = Self::transfer_replicas(node_info, elder_state.clone());
         let transfers = Transfers::new(elder_state.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(elder_state.clone());
 
@@ -140,7 +140,7 @@ impl KeySection {
     fn transfer_replicas(
         node_info: &NodeInfo,
         elder_state: ElderState,
-    ) -> Result<Replicas<ReplicaSigningImpl>> {
+    ) -> Replicas<ReplicaSigningImpl> {
         let root_dir = node_info.root_dir.clone();
         let id = elder_state.public_key_share();
         let key_index = elder_state.key_index();
