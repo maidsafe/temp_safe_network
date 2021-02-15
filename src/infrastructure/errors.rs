@@ -1,10 +1,5 @@
 use crate::infrastructure::InfrastructureInformation;
 use serde::{Deserialize, Serialize};
-// use sn_data_types::PublicKey;
-// use std::{
-//     fmt::Debug
-//     result,
-// };
 use thiserror::Error;
 
 #[derive(Error, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]

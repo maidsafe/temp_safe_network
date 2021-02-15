@@ -23,8 +23,8 @@ pub enum Message {
     GetSectionRequest(XorName),
     /// Response to `GetSectionRequest`.
     GetSectionResponse(GetSectionResponse),
-    /// Error related to section infrastructure
-    InfrastructureError(ErrorResponse),
+    /// Updated info related to section infrastructure
+    InfrastructureUpdate(ErrorResponse),
 }
 
 /// All the info a client needs about their section
@@ -55,8 +55,8 @@ pub enum GetSectionResponse {
     /// Response to `GetSectionRequest` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<SocketAddr>),
-    /// Request could not be fulfilled due to error related to section infrastructure
-    SectionInfrastructureError(Error),
+    /// Request could not be fulfilled due to section infrastructure updates
+    SectionInfrastructureUpdate(Error),
 }
 
 impl Message {
