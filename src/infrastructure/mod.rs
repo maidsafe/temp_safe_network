@@ -8,7 +8,7 @@
 
 mod errors;
 
-use crate::{ MessageType, WireMsg};
+use crate::{MessageType, WireMsg};
 use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
