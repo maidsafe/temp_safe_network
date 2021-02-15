@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::infrastructure::InfrastructureInformation;
+use crate::infrastructure::Error as InfrastructureError;
 use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;
 use std::{
@@ -171,15 +171,7 @@ pub enum Error {
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
 
-    /// Target section key provided with message is out of date. Current PK Set is provided in error
-    #[error("Target section's public key is outdated. New information has been provided.")]
-    TargetSectionInfoOutdated(InfrastructureInformation),
-
-    /// Target section is undergoing churn, a new key set will be agreed upon shortly
-    #[error("DKG is in process. New key set will be agreed upon shortly.")]
-    DkgInProgress,
-
-    /// Target section is unrecognized
-    #[error("Target section key provided is unrecognized")]
-    UnrecognizedSectionKey,
+    /// There was an error in the routing infrastructure layer. Probably related to section keys.
+    #[error("Infrastructure error")]
+    Infrastructure(#[from] InfrastructureError),
 }

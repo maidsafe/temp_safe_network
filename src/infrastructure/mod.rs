@@ -6,12 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{MessageType, WireMsg};
+mod errors;
+
+use crate::{ MessageType, WireMsg};
 use bytes::Bytes;
+pub use errors::Error;
 use serde::{Deserialize, Serialize};
 use sn_data_types::ReplicaPublicKeySet;
 use std::{collections::BTreeMap, net::SocketAddr};
 use xor_name::{Prefix, XorName};
+
 /// Message to query the network infrastructure.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Query {
@@ -20,6 +24,8 @@ pub enum Query {
     /// Response to `GetSectionRequest`.
     GetSectionResponse(GetSectionResponse),
 }
+
+// pub enum Error(Error);
 /// All the info a client needs about their section
 #[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
 pub struct InfrastructureInformation {
@@ -40,6 +46,8 @@ pub enum GetSectionResponse {
     /// Response to `GetSectionRequest` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<SocketAddr>),
+    /// Error related to section infrastructure
+    SectionInfrastructureError(Error),
 }
 
 impl Query {
