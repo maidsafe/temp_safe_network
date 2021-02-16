@@ -29,7 +29,7 @@ pub use self::{
     network::{
         NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
         NodeQueryResponse, NodeRewardError, NodeRewardQuery, NodeRewardQueryResponse,
-        NodeSystemCmd, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+        NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
         NodeTransferQueryResponse,
     },
     query::Query,
@@ -42,10 +42,9 @@ use crate::{MessageId, MessageType, SrcLocation, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    ActorHistory, AppPermissions, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues,
-    PublicKey, ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry, SequencePermissions,
-    SequencePrivatePolicy, SequencePublicPolicy, Signature, Token, TransferAgreementProof,
-    TransferValidated,
+    ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
+    ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry, SequencePermissions,
+    SequencePrivatePolicy, SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -361,16 +360,6 @@ pub enum QueryResponse {
     GetHistory(Result<ActorHistory>),
     /// Get Store Cost.
     GetStoreCost(Result<Token>),
-    //
-    // ===== Account =====
-    //
-    /// Get an encrypted account.
-    GetAccount(Result<(Vec<u8>, Signature)>),
-    //
-    // ===== Client auth =====
-    //
-    /// Get a list of authorised keys and the version of the auth keys container from Elders.
-    ListAuthKeysAndVersion(Result<(BTreeMap<PublicKey, AppPermissions>, u64)>),
 }
 
 /// The kind of authorisation needed for a request.
@@ -462,11 +451,6 @@ try_from!(SequencePermissions, GetSequenceUserPermissions);
 try_from!(Token, GetBalance);
 try_from!(ReplicaPublicKeySet, GetReplicaKeys);
 try_from!(ActorHistory, GetHistory);
-try_from!(
-    (BTreeMap<PublicKey, AppPermissions>, u64),
-    ListAuthKeysAndVersion
-);
-try_from!((Vec<u8>, Signature), GetAccount);
 
 impl fmt::Debug for QueryResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -530,14 +514,6 @@ impl fmt::Debug for QueryResponse {
             GetBalance(res) => write!(f, "QueryResponse::GetBalance({:?})", ErrorDebug(res)),
             GetHistory(res) => write!(f, "QueryResponse::GetHistory({:?})", ErrorDebug(res)),
             GetStoreCost(res) => write!(f, "QueryResponse::GetStoreCost({:?})", ErrorDebug(res)),
-            // Account
-            GetAccount(res) => write!(f, "QueryResponse::GetAccount({:?})", ErrorDebug(res)),
-            // Client Auth
-            ListAuthKeysAndVersion(res) => write!(
-                f,
-                "QueryResponse::ListAuthKeysAndVersion({:?})",
-                ErrorDebug(res)
-            ),
         }
     }
 }

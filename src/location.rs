@@ -114,7 +114,7 @@ impl DstLocation {
     pub fn is_user(&self) -> bool {
         matches!(self, Self::EndUser(_))
     }
-    
+
     /// Returns whether the given name of the given prefix is part of this location.
     ///
     /// Returns None if `prefix` does not match `name`.
