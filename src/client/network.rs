@@ -19,15 +19,19 @@ use sn_data_types::{
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
+use super::{BlobRead, BlobWrite};
+
 // -------------- Node Cmds --------------
 
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
-    ///
-    Data { cmd: NodeDataCmd, origin: EndUser },
-    ///
+    /// Metadata is handled by Elders
+    Metadata { cmd: NodeDataCmd, origin: EndUser },
+    /// Chunks are handled by Adults
+    Chunks { cmd: BlobWrite, origin: EndUser },
+    /// Transfers are handled by Elders
     Transfers(NodeTransferCmd),
     /// Cmds related to the running of a node.
     System(NodeSystemCmd),
@@ -115,16 +119,18 @@ pub enum NodeEvent {
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQuery {
-    ///
-    Data {
+    /// Metadata is handled by Elders
+    Metadata {
         query: NodeDataQuery,
         origin: EndUser,
     },
-    ///
+    /// Chunks are handled by Adults
+    Chunks { query: BlobRead, origin: EndUser },
+    /// Rewards handled by Elders
     Rewards(NodeRewardQuery),
-    ///
+    /// Transfers handled by Elders
     Transfers(NodeTransferQuery),
-    ///
+    /// Related to the running of a node
     System(NodeSystemQuery),
 }
 
