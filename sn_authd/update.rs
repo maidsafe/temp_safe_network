@@ -63,6 +63,7 @@ pub fn update_commander() -> Result<(), Box<dyn (::std::error::Error)>> {
 }
 
 #[cfg(all(windows, feature = "self-update"))]
+#[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn set_exec_perms(_file_path: PathBuf) -> Result<(), String> {
     // no need to set execution permissions on Windows

@@ -103,6 +103,7 @@ fn download_and_install_bin(
 }
 
 #[cfg(target_os = "windows")]
+#[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn set_exec_perms(_file_path: PathBuf) -> Result<()> {
     // no need to set execution permissions on Windows
