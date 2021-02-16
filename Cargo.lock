@@ -3654,7 +3654,6 @@ dependencies = [
  "cargo-husky",
  "chrono",
  "dirs-next 1.0.2",
- "ed25519",
  "ed25519-dalek",
  "env_logger 0.6.2",
  "futures 0.3.12",
