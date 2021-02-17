@@ -14,7 +14,7 @@ use sn_client::{Client, Error as ClientError, TransfersError};
 use sn_data_types::{
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
-    SequenceIndex, SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
+    SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
 };
 use std::{
     collections::{BTreeMap, HashSet},
@@ -503,11 +503,9 @@ impl SafeAppClient {
         } else {
             SequenceAddress::Public { name, tag }
         };
-        let start = SequenceIndex::FromStart(index);
-        let end = SequenceIndex::FromStart(index + 1);
 
-        let res = client
-            .get_sequence_range(sequence_address, (start, end))
+        let entry = client
+            .get_sequence_entry(sequence_address, index)
             .await
             .map_err(|err| {
                 if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
@@ -522,13 +520,6 @@ impl SafeAppClient {
                     ))
                 }
             })?;
-
-        let entry = res.get(0).ok_or_else(|| {
-            Error::EmptyContent(format!(
-                "Empty Sequence found at Xor name {}",
-                xorname_to_hex(&name)
-            ))
-        })?;
 
         Ok(entry.to_vec())
     }
