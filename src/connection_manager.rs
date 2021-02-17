@@ -17,9 +17,9 @@ use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
 use sn_data_types::{HandshakeRequest, Keypair, TransferValidated};
 use sn_messaging::{
+    client::{Event, Message, QueryResponse},
+    network_info::{GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo},
     MessageId,
-    client::{Event, Message, MsgSender, QueryResponse},
-    infrastructure::{GetSectionResponse, Query},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -455,23 +455,23 @@ impl ConnectionManager {
         trace!("Sending handshake request to bootstrapped node...");
         let public_key = self.keypair.public_key();
         let xorname = XorName::from(public_key);
-        let msg = Query::GetSectionRequest(xorname).serialize()?;
+        let msg = NetworkInfoMsg::GetSectionQuery(xorname).serialize()?;
 
         let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
         endpoint.send_message(msg, &bootstrapped_peer).await?;
 
         if let Some((_src, message)) = incoming_messages.next().await {
-            match Query::from(message) {
-                Ok(Query::GetSectionResponse(GetSectionResponse::Redirect(
+            match NetworkInfoMsg::from(message) {
+                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(
                     addresses,
                 ))) => {
                     trace!("GetSectionResponse::Redirect, trying with provided elders");
                     Ok(addresses)
                 }
-                Ok(Query::GetSectionResponse(GetSectionResponse::Success {
+                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(NetworkInfo {
                     elders,
                     ..
-                })) => {
+                }))) => {
                     trace!("HandshakeResponse::Join Elders: ({:?})", elders);
                     // Obtain the addresses of the Elders
                     let elders_addrs = elders
@@ -481,10 +481,11 @@ impl ConnectionManager {
                     self.listen_to_incoming_messages(incoming_messages).await?;
                     Ok(elders_addrs)
                 }
-                Ok(Query::GetSectionRequest(xorname)) => Err(Error::UnexpectedMessageOnJoin(
-                    format!("bootstrapping failed since an invalid response (Query::GetSectionRequest({})) was received", xorname)
+                Ok(NetworkInfoMsg::GetSectionQuery(xorname)) => Err(Error::UnexpectedMessageOnJoin(
+                    format!("bootstrapping failed since an invalid response (NetworkInfoMsg::GetSectionQuery({})) was received", xorname)
                 )),
                 Err(e) => Err(e.into()),
+                _ => unimplemented!("bootstrap_and_handshake: Don't know all the missing match arms here. To be done.."),
             }
         } else {
             Err(Error::NotBootstrapped)

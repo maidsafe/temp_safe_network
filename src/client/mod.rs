@@ -41,8 +41,8 @@ use qp2p::Config as QuicP2pConfig;
 use rand::rngs::OsRng;
 use sn_data_types::{Keypair, PublicKey, Token};
 use sn_messaging::{
+    client::{Cmd, DataCmd, Message, Query, QueryResponse},
     MessageId,
-    client::{Cmd, DataCmd, Message, Query, QueryResponse}
 };
 use std::{
     path::Path,
@@ -244,6 +244,7 @@ impl Client {
         Message::Cmd {
             cmd: msg_contents,
             id,
+            target_section_pk: None,
         }
     }
 
@@ -256,6 +257,7 @@ impl Client {
         Message::Query {
             query: msg_contents,
             id,
+            target_section_pk: None,
         }
     }
 
