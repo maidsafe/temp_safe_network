@@ -12,7 +12,7 @@ mod wire_msg_header;
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
 #[cfg(not(feature = "client-only"))]
 use super::node;
-use super::{client, infrastructure, Error, MessageType, Result};
+use super::{client, network_info, Error, MessageType, Result};
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen};
 use std::fmt::Debug;
@@ -36,17 +36,17 @@ impl WireMsg {
         }
     }
 
-    /// Creates a new instance keeping a (serialized) copy of the 'InfrastructureMessage' message provided.
-    pub fn new_infrastructure_query(query: &infrastructure::Message) -> Result<WireMsg> {
+    /// Creates a new instance keeping a (serialized) copy of the 'NetworkInfo' message provided.
+    pub fn new_networkinfo_msg(query: &network_info::Message) -> Result<WireMsg> {
         let payload_vec = rmp_serde::to_vec_named(&query).map_err(|err| {
             Error::Serialisation(format!(
-                "could not serialize infrastructure query payload with Msgpack: {}",
+                "could not serialize network info payload with Msgpack: {}",
                 err
             ))
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::InfrastructureMessage),
+            header: WireMsgHeader::new(MessageKind::NetworkInfo),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -115,15 +115,15 @@ impl WireMsg {
     pub fn to_message(&self) -> Result<MessageType> {
         match self.header.kind() {
             MessageKind::Ping => Ok(MessageType::Ping),
-            MessageKind::InfrastructureMessage => {
-                let query: infrastructure::Message =
+            MessageKind::NetworkInfo => {
+                let query: network_info::Message =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!(
                             "Client message payload as Msgpack: {}",
                             err
                         ))
                     })?;
-                Ok(MessageType::InfrastructureMessage(query))
+                Ok(MessageType::NetworkInfo(query))
             }
             MessageKind::ClientMessage => {
                 let client_msg: client::Message =
@@ -150,7 +150,7 @@ impl WireMsg {
         }
     }
 
-    // The following functions are just for convinience, which allow users to
+    // The following functions are just for convenience, which allow users to
     // not needing to create an instance of WireMsg beforehand.
 
     /// Convenience function which creates a temporary WireMsg from the provided
@@ -161,8 +161,8 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary WireMsg from the provided
     /// MsgEnvelope, returning the serialized WireMsg.
-    pub fn serialize_infrastructure_msg(query: &infrastructure::Message) -> Result<Bytes> {
-        Self::new_infrastructure_query(query)?.serialize()
+    pub fn serialize_networkinfo_msg(query: &network_info::Message) -> Result<Bytes> {
+        Self::new_networkinfo_msg(query)?.serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
@@ -203,17 +203,14 @@ mod tests {
     }
 
     #[test]
-    fn serialisation_infrastructure_query() -> Result<()> {
+    fn serialisation_networkinfo_query() -> Result<()> {
         let random_xor = XorName::random();
-        let query = infrastructure::Message::GetSectionRequest(random_xor);
-        let wire_msg = WireMsg::new_infrastructure_query(&query)?;
+        let query = network_info::Message::GetSectionQuery(random_xor);
+        let wire_msg = WireMsg::new_networkinfo_msg(&query)?;
         let serialized = wire_msg.serialize()?;
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
-        assert_eq!(
-            wire_msg.to_message()?,
-            MessageType::InfrastructureMessage(query)
-        );
+        assert_eq!(wire_msg.to_message()?, MessageType::NetworkInfo(query));
 
         Ok(())
     }

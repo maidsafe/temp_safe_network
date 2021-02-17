@@ -56,7 +56,7 @@ use std::{
 /// This struct also provides utilities to obtain the serialized bytes
 /// ready to send them over the wire.
 impl Message {
-    /// Convinience function to deserialize a 'Message' from bytes received over the wire.
+    /// Convenience function to deserialize a 'Message' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a client message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;

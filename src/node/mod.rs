@@ -24,7 +24,7 @@ impl NodeMessage {
         Self(bytes.to_vec())
     }
 
-    /// Convinience function to deserialize a 'NodeMessage' from bytes received over the wire.
+    /// Convenience function to deserialize a 'NodeMessage' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node message.
     pub fn from(bytes: Bytes) -> Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;

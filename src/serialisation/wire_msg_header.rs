@@ -144,7 +144,7 @@ impl WireMsgHeader {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum MessageKind {
     Ping,
-    InfrastructureMessage,
+    NetworkInfo,
     ClientMessage,
     NodeMessage,
 }
@@ -155,7 +155,7 @@ impl TryFrom<u8> for MessageKind {
     fn try_from(input: u8) -> Result<Self, Self::Error> {
         match input {
             0 => Ok(Self::Ping),
-            1 => Ok(Self::InfrastructureMessage),
+            1 => Ok(Self::NetworkInfo),
             2 => Ok(Self::ClientMessage),
             3 => Ok(Self::NodeMessage),
             other => Err(Error::UnsupportedMessageKind(other)),
@@ -167,7 +167,7 @@ impl From<MessageKind> for u8 {
     fn from(kind: MessageKind) -> u8 {
         match kind {
             MessageKind::Ping => 0,
-            MessageKind::InfrastructureMessage => 1,
+            MessageKind::NetworkInfo => 1,
             MessageKind::ClientMessage => 2,
             MessageKind::NodeMessage => 3,
         }
@@ -183,7 +183,7 @@ mod tests {
     fn message_kind_from_u8() -> Result<()> {
         for &(kind, byte) in &[
             (MessageKind::Ping, 0),
-            (MessageKind::InfrastructureMessage, 1),
+            (MessageKind::NetworkInfo, 1),
             (MessageKind::ClientMessage, 2),
             (MessageKind::NodeMessage, 3),
         ] {

@@ -16,20 +16,20 @@ use sn_data_types::ReplicaPublicKeySet;
 use std::{collections::BTreeMap, fmt, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
-/// Message to query the network infrastructure.
+/// Messages for exchanging network info, specifically on a target section for a msg.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Message {
     /// Message to request information about the section that matches the given name.
-    GetSectionRequest(XorName),
-    /// Response to `GetSectionRequest`.
+    GetSectionQuery(XorName),
+    /// Response to `GetSectionQuery`.
     GetSectionResponse(GetSectionResponse),
-    /// Updated info related to section infrastructure
-    InfrastructureUpdate(ErrorResponse),
+    /// Updated info related to section
+    NetworkInfoUpdate(ErrorResponse),
 }
 
 /// All the info a client needs about their section
 #[derive(Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
-pub struct InfrastructureInformation {
+pub struct NetworkInfo {
     /// Prefix of the section.
     pub prefix: Prefix,
     /// Public key set of the section.
@@ -49,10 +49,11 @@ impl fmt::Debug for InfrastructureInformation {
         )
     }
 }
+
 // Infrastructure error wrapper to add correltion info for triggering message
 #[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
 pub struct ErrorResponse {
-    /// Optional correlation id if this messge is in response to some non infra query/cmd
+    /// Optional correlation id if this messge is in response to some non network info query/cmd
     pub correlation_id: MessageId,
     /// Section data error message
     pub error: Error,
@@ -61,32 +62,32 @@ pub struct ErrorResponse {
 /// Information about a section.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum GetSectionResponse {
-    /// Successful response to `GetSectionRequest`. Contains information about the requested
+    /// Successful response to `GetSectionQuery`. Contains information about the requested
     /// section.
-    Success(InfrastructureInformation),
-    /// Response to `GetSectionRequest` containing addresses of nodes that are closer to the
+    Success(NetworkInfo),
+    /// Response to `GetSectionQuery` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<SocketAddr>),
-    /// Request could not be fulfilled due to section infrastructure updates
-    SectionInfrastructureUpdate(Error),
+    /// Request could not be fulfilled due to section constellation updates
+    SectionNetworkInfoUpdate(Error),
 }
 
 impl Message {
-    /// Convinience function to deserialize a 'Query' from bytes received over the wire.
-    /// It returns an error if the bytes don't correspond to an infrastructure query.
+    /// Convenience function to deserialize a 'Query' from bytes received over the wire.
+    /// It returns an error if the bytes don't correspond to a network info query.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::InfrastructureMessage(query) = deserialized {
+        if let MessageType::NetworkInfo(query) = deserialized {
             Ok(query)
         } else {
             Err(crate::Error::FailedToParse(
-                "bytes as an infrastructure query message".to_string(),
+                "bytes as a network info message".to_string(),
             ))
         }
     }
 
     /// serialize this Query into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> crate::Result<Bytes> {
-        WireMsg::serialize_infrastructure_msg(self)
+        WireMsg::serialize_networkinfo_msg(self)
     }
 }

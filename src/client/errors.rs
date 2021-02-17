@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::infrastructure::Error as InfrastructureError;
+use crate::network_info::Error as TargetSectionError;
 use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;
 use std::{
@@ -163,8 +163,7 @@ pub enum Error {
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
-
-    /// There was an error in the routing infrastructure layer. Probably related to section keys.
-    #[error("Infrastructure error")]
-    Infrastructure(#[from] InfrastructureError),
+    /// There was an error in the target section of a message. Probably related to section keys.
+    #[error("Target section error")]
+    TargetSection(#[from] TargetSectionError),
 }
