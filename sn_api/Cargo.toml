@@ -50,7 +50,7 @@ authenticator = []
 authd_client = []
 app = []
 simulated-payouts = ["sn_client/simulated-payouts"]
-default = ["simulated-payouts","authenticator", "authd_client", "app"]
+default = ["simulated-payouts", "authenticator", "authd_client", "app"]
 
 [dev-dependencies]
 anyhow = "1.0.38"

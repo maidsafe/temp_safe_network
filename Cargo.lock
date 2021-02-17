@@ -3166,7 +3166,6 @@ dependencies = [
  "cargo-husky",
  "chrono",
  "dirs-next 2.0.0",
- "ed25519",
  "ed25519-dalek",
  "env_logger 0.8.3",
  "futures",
@@ -3321,9 +3320,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.14.4"
+version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87535ae947d2a2f6d54b8ec2c8ee3525846b8857c9936b3f3a777153bffbfaad"
+checksum = "f913e538a14bdc345043d60d62e9ebe051372ef97a2d1175d033b89b84625da9"
 dependencies = [
  "bincode",
  "crdts",
@@ -3334,11 +3333,10 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
- "sha3 0.8.2",
  "signature",
  "thiserror",
  "threshold_crypto",
- "tiny-keccak 1.5.0",
+ "tiny-keccak 2.0.2",
  "xor_name",
 ]
 
