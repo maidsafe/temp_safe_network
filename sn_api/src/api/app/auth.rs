@@ -25,8 +25,8 @@ use std::path::Path;
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
 
 impl Safe {
-    // Generate an authorisation request string and send it to a SAFE Authenticator.
-    // It returns the credentials necessary to connect to the network, encoded in a single string.
+    /// Generate an authorisation request string and send it to a SAFE Authenticator.
+    /// It returns the credentials necessary to connect to the network, encoded in a single string.
     pub async fn auth_app(
         app_id: &str,
         app_name: &str,
@@ -69,7 +69,7 @@ impl Safe {
         }
     }
 
-    // Connect to the SAFE Network using the provided auth credentials
+    /// Connect to the SAFE Network using the provided auth credentials
     pub async fn connect(
         &mut self,
         app_keypair: Option<Keypair>,

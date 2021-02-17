@@ -85,7 +85,7 @@ pub enum NodeSubCommands {
     },
 }
 
-pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
+pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
     match cmd {
         Some(NodeSubCommands::Install { node_path }) => {
             // We run this command in a separate thread to overcome a conflict with
@@ -107,7 +107,7 @@ pub fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
                     let msg = format!("Joining the '{}' network...", name);
                     debug!("{}", msg);
                     println!("{}", msg);
-                    config.get_network_info(&name)?
+                    config.get_network_info(&name).await?
                 } else {
                     let (_, contacts) = read_current_network_conn_info()?;
                     contacts

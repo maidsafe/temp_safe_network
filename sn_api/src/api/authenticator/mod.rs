@@ -93,7 +93,7 @@ pub fn derive_location_and_keypair(passphrase: &str, password: &str) -> Result<(
 pub fn generate_network_address(passphrase: &[u8], salt: &[u8]) -> Result<XorName> {
     let mut id = XorName([0; XOR_NAME_LEN]);
 
-    const ITERATIONS: usize = 10000;
+    const ITERATIONS: u32 = 10_000u32;
 
     pbkdf2::pbkdf2::<Hmac<Sha3_256>>(passphrase, &salt, ITERATIONS, &mut id.0[..]);
 

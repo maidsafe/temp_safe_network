@@ -13,7 +13,10 @@ jobs:
   clippy:
     if: ${{ github.repository_owner == 'maidsafe' }}
     name: Clippy & fmt
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust and required components
@@ -50,7 +53,7 @@ jobs:
     - uses: maidsafe/pr_size_checker@v1.1
       with:
         max_lines_changed: 200
-  
+
   coverage:
     # if: ${{ github.repository_owner == 'maidsafe' }}
     name: Code coverage checks

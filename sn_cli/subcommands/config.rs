@@ -57,7 +57,7 @@ pub enum SettingRemoveCmd {
     // },
 }
 
-pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
+pub async fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
     let mut config = Config::read()?;
     match cmd {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
@@ -75,7 +75,7 @@ pub fn config_commander(cmd: Option<ConfigSubCommands>) -> Result<()> {
             config.clear()?;
             debug!("Config settings cleared out");
         }
-        None => config.print_networks(),
+        None => config.print_networks().await,
     }
 
     Ok(())

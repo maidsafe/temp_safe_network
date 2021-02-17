@@ -40,10 +40,10 @@ impl fmt::Display for NetworkInfo {
 }
 
 impl NetworkInfo {
-    pub fn matches(&self, conn_info: &HashSet<SocketAddr>) -> bool {
+    pub async fn matches(&self, conn_info: &HashSet<SocketAddr>) -> bool {
         match self {
             Self::Addresses(addresses) => addresses == conn_info,
-            Self::ConnInfoUrl(config_location) => match retrieve_conn_info(config_location) {
+            Self::ConnInfoUrl(config_location) => match retrieve_conn_info(config_location).await {
                 Ok(info) => info == *conn_info,
                 Err(_) => false,
             },
@@ -104,7 +104,7 @@ impl Config {
         Ok(config)
     }
 
-    pub fn get_network_info(&self, name: &str) -> Result<HashSet<SocketAddr>> {
+    pub async fn get_network_info(&self, name: &str) -> Result<HashSet<SocketAddr>> {
         match self.settings.networks.get(name) {
             Some(NetworkInfo::ConnInfoUrl(config_location)) => {
                 println!(
@@ -112,7 +112,7 @@ impl Config {
                     name, config_location
                 );
 
-                retrieve_conn_info(&config_location)
+                retrieve_conn_info(&config_location).await
             },
             Some(NetworkInfo::Addresses(addresses)) => Ok(addresses.clone()),
             None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
@@ -189,7 +189,7 @@ impl Config {
         self.write_settings_to_file()
     }
 
-    pub fn switch_to_network(&self, name: &str) -> Result<()> {
+    pub async fn switch_to_network(&self, name: &str) -> Result<()> {
         let (base_path, file_path) = get_current_network_conn_info_path()?;
 
         if !base_path.exists() {
@@ -201,7 +201,7 @@ impl Config {
                 .context("Couldn't create folder for network connection info")?;
         }
 
-        let contacts = self.get_network_info(&name)?;
+        let contacts = self.get_network_info(&name).await?;
         let conn_info = serialise_contacts(&contacts)?;
         fs::write(&file_path, conn_info).with_context(|| {
             format!(
@@ -211,7 +211,7 @@ impl Config {
         })
     }
 
-    pub fn print_networks(&self) {
+    pub async fn print_networks(&self) {
         let mut table = Table::new();
         table.add_row(row![bFg->"Networks"]);
         table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
@@ -220,15 +220,16 @@ impl Config {
             Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
         };
 
-        self.networks_iter().for_each(|(network_name, net_info)| {
+        for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
             if let Some(conn_info) = &current_conn_info {
-                if net_info.matches(conn_info) {
+                if net_info.matches(conn_info).await {
                     current = "*";
                 }
             }
             table.add_row(row![current, network_name, net_info]);
-        });
+        }
+
         table.printstd();
     }
 
@@ -313,17 +314,17 @@ fn cache_conn_info(network_name: &str, contacts: &HashSet<SocketAddr>) -> Result
     Ok(file_path)
 }
 
-fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
+async fn retrieve_conn_info(location: &str) -> Result<HashSet<SocketAddr>> {
     let is_remote_location = location.starts_with("http");
     let contacts_bytes = if is_remote_location {
         #[cfg(feature = "self-update")]
         {
             // Fetch info from an HTTP/s location
-            let mut resp = reqwest::get(location).with_context(|| {
+            let resp = reqwest::get(location).await.with_context(|| {
                 format!("Failed to fetch connection information from '{}'", location)
             })?;
 
-            let conn_info = resp.text().with_context(|| {
+            let conn_info = resp.text().await.with_context(|| {
                 format!("Failed to fetch connection information from '{}'", location)
             })?;
 

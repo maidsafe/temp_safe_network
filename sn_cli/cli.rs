@@ -89,8 +89,8 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
-        Some(SubCommands::Config { cmd }) => config_commander(cmd),
-        Some(SubCommands::Networks { cmd }) => networks_commander(cmd),
+        Some(SubCommands::Config { cmd }) => config_commander(cmd).await,
+        Some(SubCommands::Networks { cmd }) => networks_commander(cmd).await,
         Some(SubCommands::Keypair {}) => {
             let key_pair = safe.keypair();
             if OutputFmt::Pretty == output_fmt {
@@ -124,7 +124,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             recursive,
             follow_links,
         }) => xorurl_commander(cmd, location, recursive, follow_links, output_fmt, safe).await,
-        Some(SubCommands::Node { cmd }) => node_commander(cmd),
+        Some(SubCommands::Node { cmd }) => node_commander(cmd).await,
         Some(SubCommands::Auth { cmd }) => auth_commander(cmd, args.endpoint, safe).await,
         Some(other) => {
             // We treat these separatelly since we use the credentials if they are available to

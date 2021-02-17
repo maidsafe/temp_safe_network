@@ -20,7 +20,7 @@ use log::debug;
 use log::error;
 use std::path::PathBuf;
 use std::process;
-use structopt::{self, StructOpt};
+use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use update::update_commander;
 
 #[macro_use]
@@ -30,7 +30,7 @@ use operations::{restart_authd, start_authd, stop_authd};
 
 #[derive(StructOpt, Debug)]
 /// SAFE Authenticator daemon subcommands
-#[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
+#[structopt(global_settings(&[ColoredHelp]))]
 enum CmdArgs {
     /// Start the sn_authd daemon
     #[structopt(name = "start")]

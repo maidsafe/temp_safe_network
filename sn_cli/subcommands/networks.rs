@@ -48,14 +48,14 @@ pub enum NetworksSubCommands {
     },
 }
 
-pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
+pub async fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
     let mut config = Config::read()?;
     match cmd {
         Some(NetworksSubCommands::Switch { network_name }) => {
             let msg = format!("Switching to '{}' network...", network_name);
             debug!("{}", msg);
             println!("{}", msg);
-            config.switch_to_network(&network_name)?;
+            config.switch_to_network(&network_name).await?;
             println!(
                 "Successfully switched to '{}' network in your system!",
                 network_name
@@ -67,7 +67,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
             let (conn_info_file_path, current_conn_info) = read_current_network_conn_info()?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
-                if network_info.matches(&current_conn_info) {
+                if network_info.matches(&current_conn_info).await {
                     matched_network = Some(network_name);
                     break;
                 }
@@ -111,7 +111,7 @@ pub fn networks_commander(cmd: Option<NetworksSubCommands>) -> Result<()> {
         Some(NetworksSubCommands::Remove { network_name }) => {
             config.remove_network(&network_name)?
         }
-        None => config.print_networks(),
+        None => config.print_networks().await,
     }
 
     Ok(())
