@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.19.0](https://github.com/maidsafe/sn_api/compare/v0.18.0...v0.19.0) (2021-02-17)
+
+### Features
+
+* ***cli*** add auth version subcommand which prints out the authd binary version
+
+* ***cli*** command to configure networks in the config by providing a list of IP and ports
+
+* ***cli*** have CLI and authd to set client config path to ~/.safe/client/sn_client.config
+
+### Bug Fixes
+
+* ***cli*** remove short option used for dry run
+
+* ***cli*** ignore error when listing networks and current network is not set in the system
+
+
 ### [0.18.0](https://github.com/maidsafe/sn_api/compare/v0.17.2...v0.18.0) (2021-02-04)
 
 ### Features
