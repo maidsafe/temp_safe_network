@@ -32,7 +32,7 @@ use bytes::Bytes;
 pub enum MessageType {
     Ping,
     InfrastructureMessage(infrastructure::Message),
-    ClientMessage(client::MsgEnvelope),
+    ClientMessage(client::Message),
     #[cfg(not(feature = "client-only"))]
     NodeMessage(node::NodeMessage),
 }

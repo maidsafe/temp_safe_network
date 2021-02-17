@@ -69,10 +69,10 @@ impl Message {
         }
     }
 
-    // /// serialize this Message into bytes ready to be sent over the wire.
-    // pub fn serialize(&self) -> crate::Result<Bytes> {
-    //     WireMsg::serialize_client_msg(self)
-    // }
+    /// serialize this Message into bytes ready to be sent over the wire.
+    pub fn serialize(&self) -> crate::Result<Bytes> {
+        WireMsg::serialize_client_msg(self)
+    }
 }
 
 ///
@@ -244,19 +244,6 @@ impl Message {
                 target_section_pk, ..
             } => *target_section_pk,
         }
-    }
-
-    /// serialize this Message, ready for signing
-    pub fn serialize(&self) -> Result<Bytes> {
-        let payload_vec = rmp_serde::to_vec_named(&self).map_err(|err| {
-            Error::Serialization(format!(
-                "Could not serialize message payload (id: {}) with Msgpack: {}",
-                self.id(),
-                err
-            ))
-        })?;
-
-        Ok(Bytes::from(payload_vec))
     }
 }
 
