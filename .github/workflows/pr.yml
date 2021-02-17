@@ -10,6 +10,24 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  cargo-udeps:
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      # Install and run cargo udeps to find unused cargo dependencies
+      - name: cargo-udeps unused dependency check
+        run: |
+          cargo install cargo-udeps --locked
+          cargo +nightly udeps --all-targets
+
   clippy:
     if: ${{ github.repository_owner == 'maidsafe' }}
     name: Clippy & fmt

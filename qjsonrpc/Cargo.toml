@@ -15,7 +15,6 @@ path = "src/lib.rs"
 name = "ping"
 
 [dependencies]
-dirs-next = "2.0.0"
 futures = "~0.3.12"
 log = "~0.4.14"
 rand = "~0.7.3"

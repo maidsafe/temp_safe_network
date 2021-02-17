@@ -41,11 +41,6 @@ default-features = false
 features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"]
 optional = true
 
-[dev-dependencies.cargo-husky]
-version = "1"
-default-features = false
-features = ["precommit-hook","user-hooks"]
-
 [features]
 default = ["simulated-payouts", "self-update"]
 simulated-payouts = ["sn_api/simulated-payouts"]

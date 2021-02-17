@@ -525,12 +525,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "631ae5198c9be5e753e5cc215e1bd73c2b466a3565173db433f52bb9d3e66dba"
 
 [[package]]
-name = "cargo-husky"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b02b629252fe8ef6460461409564e2c21d0c8e77e0944f3d189ff06c4e932ad"
-
-[[package]]
 name = "cast"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -714,20 +708,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd01a6eb3daaafa260f6fc94c3a6c36390abc2080e38e3e34ced87393fb77d80"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-epoch",
- "crossbeam-queue",
- "crossbeam-utils",
-]
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -760,16 +740,6 @@ dependencies = [
  "lazy_static",
  "memoffset",
  "scopeguard",
-]
-
-[[package]]
-name = "crossbeam-queue"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f6cb3c7f5b8e51bc3ebb73a2327ad4abdbd119dc13223f14f961d2f38486756"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils",
 ]
 
 [[package]]
@@ -2105,15 +2075,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "output_vt100"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53cdc5b785b7a58c5aad8216b3dfa114df64b0b06ae6e1501cef91df2fbdf8f9"
-dependencies = [
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "pairing"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2330,18 +2291,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5c99d529f0d30937f6f4b8a86d988047327bb88d04d2c4afc356de74722131"
 
 [[package]]
-name = "pretty_assertions"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f81e1644e1b54f5a68959a29aa86cde704219254669da328ecfdf6a1f09d427"
-dependencies = [
- "ansi_term 0.11.0",
- "ctor",
- "difference",
- "output_vt100",
-]
-
-[[package]]
 name = "prettytable-rs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2424,7 +2373,6 @@ dependencies = [
 name = "qjsonrpc"
 version = "0.1.0"
 dependencies = [
- "dirs-next 2.0.0",
  "futures",
  "log",
  "quinn",
@@ -3160,10 +3108,8 @@ name = "sn_api"
 version = "0.18.0"
 dependencies = [
  "anyhow",
- "async-std",
  "async-trait",
  "bincode",
- "cargo-husky",
  "chrono",
  "dirs-next 2.0.0",
  "ed25519-dalek",
@@ -3201,7 +3147,6 @@ name = "sn_authd"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cargo-husky",
  "cluFlock",
  "dirs-next 2.0.0",
  "flexi_logger",
@@ -3229,10 +3174,8 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "async-std",
- "cargo-husky",
  "console",
  "criterion",
- "crossbeam",
  "dirs-next 2.0.0",
  "duct",
  "env_logger 0.8.3",
@@ -3246,7 +3189,6 @@ dependencies = [
  "percent-encoding",
  "predicates",
  "pretty-hex",
- "pretty_assertions",
  "prettytable-rs",
  "rand 0.7.3",
  "relative-path",

@@ -1431,12 +1431,18 @@ mod tests {
     use super::*;
     use anyhow::{anyhow, bail, Result};
 
+    macro_rules! verify_expected_result {
+        ($result:expr, $pattern:pat $(if $cond:expr)?) => {
+            match $result {
+                $pattern $(if $cond)? => Ok(()),
+                other => Err(anyhow!("Expecting {}, got {:?}", stringify!($pattern), other)),
+            }
+        }
+    }
+
     #[test]
     fn test_safeurl_new_validation() -> Result<()> {
         // Tests some errors when calling Self::new()
-
-        let msg = "Expected error";
-        let wrong_err = "Wrong error type";
 
         let xor_name = XorName(*b"12345678901234567890123456789012");
 
@@ -1452,12 +1458,8 @@ mod tests {
             None,
             None,
             None,
-        )
-        .expect_err(msg);
-        match result {
-            Error::InvalidMediaType(e) => assert!(e.contains("You can use 'SafeContentType::Raw'")),
-            _ => bail!(wrong_err.to_string()),
-        }
+        );
+        verify_expected_result!(result, Err(Error::InvalidMediaType(err)) if err.contains("You can use 'SafeContentType::Raw'"))?;
 
         // test: "nrs_name cannot be empty string."
         let result = SafeUrl::new(
@@ -1471,12 +1473,8 @@ mod tests {
             None,
             None,
             None,
-        )
-        .expect_err(msg);
-        match result {
-            Error::InvalidInput(e) => assert!(e.contains("nrs_name cannot be empty string.")),
-            _ => panic!(wrong_err),
-        }
+        );
+        verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("nrs_name cannot be empty string."))?;
 
         // test: "input mis-match. nrs_name `{}` does not hash to xor_name `{}`"
         let result = SafeUrl::new(
@@ -1490,12 +1488,8 @@ mod tests {
             None,
             None,
             None,
-        )
-        .expect_err(msg);
-        match result {
-            Error::InvalidInput(e) => assert!(e.contains("does not hash to xor_name")),
-            _ => panic!(wrong_err),
-        }
+        );
+        verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("does not hash to xor_name"))?;
 
         // test: "Host contains empty subname" (in nrs name)
         let result = SafeUrl::new(
@@ -1509,12 +1503,8 @@ mod tests {
             None,
             None,
             None,
-        )
-        .expect_err(msg);
-        match result {
-            Error::InvalidXorUrl(e) => assert!(e.contains("name contains empty subname")),
-            _ => panic!(wrong_err),
-        }
+        );
+        verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("name contains empty subname"))?;
 
         // test: "empty subname" (in xorurl sub_names)
         let result = SafeUrl::new(
@@ -1528,12 +1518,8 @@ mod tests {
             None,
             None,
             None,
-        )
-        .expect_err(msg);
-        match result {
-            Error::InvalidInput(e) => assert!(e.contains("empty subname")),
-            _ => panic!(wrong_err),
-        }
+        );
+        verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("empty subname"))?;
 
         Ok(())
     }
@@ -2003,63 +1989,42 @@ mod tests {
     }
 
     #[test]
-    fn test_safeurl_from_url_validation() {
+    fn test_safeurl_from_url_validation() -> Result<()> {
         // Tests basic URL syntax errors that are common to
         // both ::from_xorurl() and ::from_nrsurl()
 
-        let msg = "Expected error";
-        let wrong_err = "Wrong error type";
-        let should_work = "should work";
+        let result = SafeUrl::from_url("withoutscheme");
+        verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("relative URL without a base"))?;
 
-        let result = SafeUrl::from_url("withoutscheme").expect_err(msg);
-        match result {
-            Error::InvalidXorUrl(e) => assert!(e.contains("relative URL without a base")),
-            _ => panic!(wrong_err),
-        }
+        let result = SafeUrl::from_url("http://badscheme");
+        verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("invalid scheme"))?;
 
-        let result = SafeUrl::from_url("http://badscheme").expect_err(msg);
-        match result {
-            Error::InvalidXorUrl(e) => assert!(e.contains("invalid scheme")),
-            _ => panic!(wrong_err),
-        }
+        let result = SafeUrl::from_url("safe:///emptyname");
+        verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("missing name"))?;
 
-        let result = SafeUrl::from_url("safe:///emptyname").expect_err(msg);
-        match result {
-            Error::InvalidXorUrl(e) => assert!(e.contains("missing name")),
-            _ => panic!(wrong_err),
-        }
+        let result = SafeUrl::from_url("safe://space in name");
+        verify_expected_result!(result, Err(Error::InvalidInput(err)) if err.contains("The URL cannot contain whitespace"))?;
 
-        let result = SafeUrl::from_url("safe://space in name").expect_err(msg);
-        match result {
-            Error::InvalidInput(e) => assert!(e.contains("The URL cannot contain whitespace")),
-            _ => panic!(wrong_err),
-        }
+        let result = SafeUrl::from_url("safe://my.sub..name");
+        verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("name contains empty subname"))?;
 
-        let result = SafeUrl::from_url("safe://my.sub..name").expect_err(msg);
-        match result {
-            Error::InvalidXorUrl(e) => assert!(e.contains("name contains empty subname")),
-            _ => panic!(wrong_err),
-        }
-
-        let result = SafeUrl::from_url("safe://name//").expect_err(msg);
-        match result {
-            Error::InvalidXorUrl(e) => assert!(e.contains("path contains empty component")),
-            _ => panic!(wrong_err),
-        }
+        let result = SafeUrl::from_url("safe://name//");
+        verify_expected_result!(result, Err(Error::InvalidXorUrl(err)) if err.contains("path contains empty component"))?;
 
         // note: ?? is actually ok in a standard url.  I suppose no harm in allowing for safe
         // see:  https://stackoverflow.com/questions/2924160/is-it-valid-to-have-more-than-one-question-mark-in-a-url
-        let _result = SafeUrl::from_url("safe://name??foo=bar").expect(should_work);
+        SafeUrl::from_url("safe://name??foo=bar")?;
 
         // note: ## and #frag1#frag2 are accepted by rust URL parser.
         // tbd: if we want to disallow.
         // see: https://stackoverflow.com/questions/10850781/multiple-hash-signs-in-url
-        let _result = SafeUrl::from_url("safe://name?foo=bar##fragment").expect(should_work);
+        SafeUrl::from_url("safe://name?foo=bar##fragment")?;
 
         // note: single%percent/in/path is accepted by rust URL parser.
         // tbd: if we want to disallow.
-        let _result =
-            SafeUrl::from_nrsurl("safe://name/single%percent/in/path").expect(should_work);
+        SafeUrl::from_nrsurl("safe://name/single%percent/in/path")?;
+
+        Ok(())
     }
 
     #[test]
