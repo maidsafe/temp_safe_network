@@ -601,7 +601,7 @@ impl Client {
         // TODO: perhaps we want to grab it directly from the network and update local replica
         let sequence = self.get_sequence(address).await?;
 
-        let owner = if sequence.is_pub() {
+        let owner = if sequence.is_public() {
             sequence.public_policy()?.owner
         } else {
             // TODO: do we need to query with some specific PK?
@@ -1126,7 +1126,7 @@ mod tests {
 
         let sequence = seq_res?;
 
-        assert!(sequence.is_pub());
+        assert!(sequence.is_public());
         assert_eq!(*sequence.name(), name);
         assert_eq!(sequence.tag(), tag);
         assert_eq!(sequence.policy_version(None)?, Some(0));
@@ -1592,7 +1592,7 @@ mod tests {
             sequence = client.get_sequence(address).await;
         }
 
-        assert!(sequence?.is_pub());
+        assert!(sequence?.is_public());
 
         client.delete_sequence(address).await?;
 

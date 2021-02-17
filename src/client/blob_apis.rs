@@ -67,7 +67,7 @@ impl Client {
         trace!("Fetch Blob");
 
         let data = self.fetch_blob_from_network(address).await?;
-        let published = address.is_pub();
+        let published = address.is_public();
         let data_map = self.unpack(data).await?;
 
         let raw_data = self
@@ -220,7 +220,7 @@ impl Client {
 
     /// Uses self_encryption to generated an encrypted blob serialized data map, without writing to the network
     pub async fn generate_data_map(&self, the_blob: &Blob) -> Result<DataMap, Error> {
-        let blob_storage = BlobStorageDryRun::new(self.clone(), the_blob.is_pub());
+        let blob_storage = BlobStorageDryRun::new(self.clone(), the_blob.is_public());
 
         let self_encryptor =
             SelfEncryptor::new(blob_storage, DataMap::None).map_err(Error::SelfEncryption)?;
@@ -310,7 +310,7 @@ impl Client {
     /// the process repeats itself until it obtains the root data map.
     async fn unpack(&self, mut data: Blob) -> Result<DataMap, Error> {
         loop {
-            let published = data.is_pub();
+            let published = data.is_public();
             match deserialize(data.value())? {
                 DataMapLevel::Root(data_map) => {
                     return Ok(data_map);

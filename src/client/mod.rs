@@ -40,7 +40,10 @@ use log::{debug, info, trace, warn};
 use qp2p::Config as QuicP2pConfig;
 use rand::rngs::OsRng;
 use sn_data_types::{Keypair, PublicKey, Token};
-use sn_messaging::client::{Cmd, DataCmd, Message, MessageId, Query, QueryResponse};
+use sn_messaging::{
+    MessageId,
+    client::{Cmd, DataCmd, Message, Query, QueryResponse}
+};
 use std::{
     path::Path,
     str::FromStr,

@@ -17,7 +17,8 @@ use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
 use sn_data_types::{HandshakeRequest, Keypair, TransferValidated};
 use sn_messaging::{
-    client::{Event, Message, MessageId, MsgEnvelope, MsgSender, QueryResponse},
+    MessageId,
+    client::{Event, Message, MsgSender, QueryResponse},
     infrastructure::{GetSectionResponse, Query},
 };
 use std::{
@@ -109,7 +110,7 @@ impl ConnectionManager {
             "Sending (from {}) command message {:?} w/ id: {:?}",
             src_addr, msg, msg_id
         );
-        let msg_bytes = self.serialize_in_envelope(msg)?;
+        let msg_bytes = msg.serialize()?;
 
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
@@ -170,7 +171,7 @@ impl ConnectionManager {
             msg,
             msg.id()
         );
-        let msg_bytes = self.serialize_in_envelope(msg)?;
+        let msg_bytes = msg.serialize()?;
 
         let msg_id = msg.id();
         {
@@ -210,7 +211,7 @@ impl ConnectionManager {
     /// Send a Query `Message` to the network awaiting for the response.
     pub async fn send_query(&mut self, msg: &Message) -> Result<QueryResponse, Error> {
         info!("sending query message {:?} w/ id: {:?}", msg, msg.id());
-        let msg_bytes = self.serialize_in_envelope(&msg)?;
+        let msg_bytes = msg.serialize()?;
 
         // We send the same message to all Elders concurrently,
         // and we try to find a majority on the responses
@@ -438,21 +439,6 @@ impl ConnectionManager {
 
     // Private helpers
 
-    // Put a `Message` in an envelope so it can be sent to the network
-    fn serialize_in_envelope(&self, message: &Message) -> Result<Bytes, Error> {
-        trace!("Putting message in envelope: {:?}", message);
-        let sign = self.keypair.sign(&message.serialize()?);
-
-        let envelope = MsgEnvelope {
-            message: message.clone(),
-            origin: MsgSender::client(self.keypair.public_key(), sign)?,
-            proxies: Default::default(),
-        };
-
-        let bytes = envelope.serialize()?;
-        Ok(bytes)
-    }
-
     // Bootstrap to the network to obtaining the list of
     // nodes we should establish connections with
     async fn bootstrap_and_handshake(&mut self) -> Result<Vec<SocketAddr>, Error> {
@@ -616,13 +602,13 @@ impl ConnectionManager {
         let _ = tokio::spawn(async move {
             while let Some((src, message)) = incoming_messages.next().await {
                 warn!("Message received in qp2p listener from {}", &src);
-                match MsgEnvelope::from(message) {
-                    Ok(envelope) => {
+                match Message::from(message) {
+                    Ok(message) => {
                         warn!(
                             "Message received at listener for {:?}: {:?}",
-                            &src, &envelope.message
+                            &src, &message
                         );
-                        match envelope.message.clone() {
+                        match message.clone() {
                             Message::QueryResponse {
                                 response,
                                 correlation_id,
