@@ -92,11 +92,10 @@ impl ConnectionManager {
 
         // Bootstrap and send a handshake request to receive
         // the list of Elders we can then connect to
-        let (elders_addrs, mut incoming_messages) = self.bootstrap_and_handshake().await?;
+        let (elders_addrs, incoming_messages) = self.bootstrap_and_handshake().await?;
 
         // Let's now connect to all Elders
-        self.connect_to_elders(elders_addrs, &mut incoming_messages)
-            .await?;
+        self.connect_to_elders(elders_addrs).await?;
 
         self.listen_to_incoming_messages(incoming_messages).await?;
 
@@ -470,18 +469,15 @@ impl ConnectionManager {
 
         if let Some((_src, message)) = incoming_messages.next().await {
             match NetworkInfoMsg::from(message) {
-                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(
-                    addresses,
-                ))) => {
+                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses))) => {
                     trace!("GetSectionResponse::Redirect, trying with provided elders");
                     Ok((addresses, incoming_messages))
                 }
-                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(NetworkInfo {
-                    elders,
-                    ..
-                }))) => {
+                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(
+                    NetworkInfo { elders, .. },
+                ))) => {
                     trace!("GetSectionResponse::Success Elders: ({:?})", elders);
-                    // 2. When we get the section info, we 
+                    // 2. When we get the section info, we
                     // Obtain the addresses of the Elders
                     let elders_addrs = elders
                         .into_iter()
@@ -489,11 +485,11 @@ impl ConnectionManager {
                         .collect();
                     Ok((elders_addrs, incoming_messages))
                 }
-                Ok(NetworkInfoMsg::GetSectionQuery(xorname)) => Err(Error::UnexpectedMessageOnJoin(
-                    format!("bootstrapping failed since an invalid response (NetworkInfoMsg::GetSectionQuery({})) was received", xorname)
-                )),
+                Ok(msg) => Err(Error::UnexpectedMessageOnJoin(format!(
+                    "bootstrapping failed since an invalid response ({:?}) was received",
+                    msg
+                ))),
                 Err(e) => Err(e.into()),
-                _ => unimplemented!("bootstrap_and_handshake: Don't know all the missing match arms here. To be done.."),
             }
         } else {
             Err(Error::NotBootstrapped)
@@ -506,11 +502,7 @@ impl ConnectionManager {
 
     // Connect to a set of Elders nodes which will be
     // the receipients of our messages on the network.
-    async fn connect_to_elders(
-        &mut self,
-        elders_addrs: Vec<SocketAddr>,
-        incoming_messages: &mut IncomingMessages,
-    ) -> Result<(), Error> {
+    async fn connect_to_elders(&mut self, elders_addrs: Vec<SocketAddr>) -> Result<(), Error> {
         // Connect to all Elders concurrently
         // We spawn a task per each node to connect to
         let mut tasks = Vec::default();
@@ -598,20 +590,6 @@ impl ConnectionManager {
         }
 
         trace!("Connected to {} Elders.", self.elders.len());
-
-        if let Some((_src, message)) = incoming_messages.next().await {
-            match NetworkInfoMsg::from(message) {
-                Ok(NetworkInfoMsg::BootstrapError(e)) => {
-                    trace!(
-                        "NetworkInfoMsg::BootstrapError({:?}), trying with provided elders",
-                        e
-                    );
-                    return Err(Error::NotBootstrapped);
-                }
-                Err(e) => return Err(e.into()),
-                Ok(msg) => trace!("NetworkInfoMsg::({:?})", msg),
-            }
-        }
 
         Ok(())
     }
