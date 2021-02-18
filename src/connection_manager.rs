@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,20 +8,20 @@
 
 use crate::Error;
 use bincode::serialize;
-use bytes::Bytes;
 use futures::{
     future::{join_all, select_all},
     lock::Mutex,
 };
 use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
-use sn_data_types::{HandshakeRequest, Keypair, TransferValidated};
+use sn_data_types::{Keypair, TransferValidated};
 use sn_messaging::{
     client::{Event, Message, QueryResponse},
     network_info::{GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo},
     MessageId,
 };
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
     net::SocketAddr,
     sync::Arc,
@@ -92,10 +92,13 @@ impl ConnectionManager {
 
         // Bootstrap and send a handshake request to receive
         // the list of Elders we can then connect to
-        let elders_addrs = self.bootstrap_and_handshake().await?;
+        let (elders_addrs, mut incoming_messages) = self.bootstrap_and_handshake().await?;
 
         // Let's now connect to all Elders
-        self.connect_to_elders(elders_addrs).await?;
+        self.connect_to_elders(elders_addrs, &mut incoming_messages)
+            .await?;
+
+        self.listen_to_incoming_messages(incoming_messages).await?;
 
         Ok(())
     }
@@ -443,7 +446,9 @@ impl ConnectionManager {
 
     // Bootstrap to the network to obtaining the list of
     // nodes we should establish connections with
-    async fn bootstrap_and_handshake(&mut self) -> Result<Vec<SocketAddr>, Error> {
+    async fn bootstrap_and_handshake(
+        &mut self,
+    ) -> Result<(Vec<SocketAddr>, IncomingMessages), Error> {
         trace!("Bootstrapping with contacts...");
         let (
             endpoint,
@@ -454,6 +459,7 @@ impl ConnectionManager {
         ) = self.qp2p.bootstrap().await?;
         self.endpoint = Some(endpoint);
 
+        // 1. We query the network for section info.
         trace!("Sending handshake request to bootstrapped node...");
         let public_key = self.keypair.public_key();
         let xorname = XorName::from(public_key);
@@ -468,20 +474,20 @@ impl ConnectionManager {
                     addresses,
                 ))) => {
                     trace!("GetSectionResponse::Redirect, trying with provided elders");
-                    Ok(addresses)
+                    Ok((addresses, incoming_messages))
                 }
                 Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(NetworkInfo {
                     elders,
                     ..
                 }))) => {
-                    trace!("HandshakeResponse::Join Elders: ({:?})", elders);
+                    trace!("GetSectionResponse::Success Elders: ({:?})", elders);
+                    // 2. When we get the section info, we 
                     // Obtain the addresses of the Elders
                     let elders_addrs = elders
                         .into_iter()
                         .map(|(_, socket_addr)| socket_addr)
                         .collect();
-                    self.listen_to_incoming_messages(incoming_messages).await?;
-                    Ok(elders_addrs)
+                    Ok((elders_addrs, incoming_messages))
                 }
                 Ok(NetworkInfoMsg::GetSectionQuery(xorname)) => Err(Error::UnexpectedMessageOnJoin(
                     format!("bootstrapping failed since an invalid response (NetworkInfoMsg::GetSectionQuery({})) was received", xorname)
@@ -500,30 +506,36 @@ impl ConnectionManager {
 
     // Connect to a set of Elders nodes which will be
     // the receipients of our messages on the network.
-    async fn connect_to_elders(&mut self, elders_addrs: Vec<SocketAddr>) -> Result<(), Error> {
+    async fn connect_to_elders(
+        &mut self,
+        elders_addrs: Vec<SocketAddr>,
+        incoming_messages: &mut IncomingMessages,
+    ) -> Result<(), Error> {
         // Connect to all Elders concurrently
         // We spawn a task per each node to connect to
         let mut tasks = Vec::default();
 
         let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
-        for peer_addr in elders_addrs {
-            let keypair = self.keypair.clone();
+        let socketaddr_sig = self
+            .keypair
+            .sign(&serialize(&endpoint.borrow().socket_addr())?);
+        let msg = NetworkInfoMsg::BootstrapCmd {
+            end_user: self.keypair.public_key(),
+            socketaddr_sig,
+        }
+        .serialize()?;
 
+        for peer_addr in elders_addrs {
             let endpoint = endpoint.clone();
+            let msg = msg.clone();
             let task_handle = tokio::spawn(async move {
                 let mut result = Err(Error::ElderConnection);
                 let mut connected = false;
                 let mut attempts: usize = 0;
                 while !connected && attempts <= NUMBER_OF_RETRIES {
-                    let public_key = keypair.public_key();
                     attempts += 1;
                     endpoint.connect_to(&peer_addr).await?;
-
-                    let handshake = HandshakeRequest::Join(public_key);
-                    let msg = Bytes::from(serialize(&handshake)?);
-
-                    endpoint.send_message(msg, &peer_addr).await?;
-
+                    endpoint.send_message(msg.clone(), &peer_addr).await?;
                     connected = true;
 
                     debug!(
@@ -586,6 +598,21 @@ impl ConnectionManager {
         }
 
         trace!("Connected to {} Elders.", self.elders.len());
+
+        if let Some((_src, message)) = incoming_messages.next().await {
+            match NetworkInfoMsg::from(message) {
+                Ok(NetworkInfoMsg::BootstrapError(e)) => {
+                    trace!(
+                        "NetworkInfoMsg::BootstrapError({:?}), trying with provided elders",
+                        e
+                    );
+                    return Err(Error::NotBootstrapped);
+                }
+                Err(e) => return Err(e.into()),
+                Ok(msg) => trace!("NetworkInfoMsg::({:?})", msg),
+            }
+        }
+
         Ok(())
     }
 
