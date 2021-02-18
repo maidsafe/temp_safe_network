@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -30,7 +30,7 @@ pub use self::transfer_actor::{ClientTransferValidator, SafeTransferActor};
 
 pub use blob_storage::{BlobStorage, BlobStorageDryRun};
 
-use crate::config_handler::Config;
+use crate::{config_handler::Config, connection_manager::{Session, Signer}};
 use crate::connection_manager::ConnectionManager;
 use crate::errors::Error;
 
@@ -285,19 +285,17 @@ impl Client {
 pub async fn attempt_bootstrap(
     qp2p_config: QuicP2pConfig,
     keypair: Keypair,
-    notification_sender: UnboundedSender<Error>,
-) -> Result<ConnectionManager, Error> {
+    notifier: UnboundedSender<Error>,
+) -> Result<Session, Error> {
     let mut attempts: u32 = 0;
+    
+    let signer = Signer::new(keypair);
+    
+    let session = Session::new(qp2p_config, signer, notifier)?;
     loop {
-        let mut connection_manager = ConnectionManager::new(
-            qp2p_config.clone(),
-            keypair.clone(),
-            notification_sender.clone(),
-        )
-        .await?;
-        let res = connection_manager.bootstrap().await;
+        let res = ConnectionManager::bootstrap(session.clone()).await;
         match res {
-            Ok(()) => return Ok(connection_manager),
+            Ok(session) => return Ok(session),
             Err(err) => {
                 attempts += 1;
                 if attempts < 3 {

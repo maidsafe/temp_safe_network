@@ -14,20 +14,13 @@ use futures::{
 };
 use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
-use sn_data_types::{Keypair, PublicKey, TransferValidated};
+use sn_data_types::{Keypair, PublicKey, Signature, TransferValidated};
 use sn_messaging::{
     client::{Event, Message, QueryResponse},
     network_info::{GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo},
     MessageId, MessageType, WireMsg,
 };
-use std::{
-    borrow::Borrow,
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    sync::Arc,
-    time::Duration,
-};
-use tiny_keccak::{Hasher, Sha3};
+use std::{borrow::Borrow, collections::{HashMap, HashSet}, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender, UnboundedSender},
     task::JoinHandle,
@@ -87,22 +80,20 @@ impl ConnectionManager {
     }
 
     /// Bootstrap to the network maintaining connections to several nodes.
-    pub async fn bootstrap(session: Session) -> Result<(), Error> { // &'static 
+    pub async fn bootstrap(session: Session) -> Result<Session, Error> { // &'static 
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
-            session.public_key
+            session.public_key().await
         );
 
         // Bootstrap and send a handshake request to
-        let (endpoint, mut incoming_messages) = Self::get_section(session.clone()).await?;
+        let (session, mut incoming_messages) = Self::get_section(session).await?;
         // Receive the list of Elders we can then connect to
         let elder_addresses = Self::get_elders(&mut incoming_messages).await?;
         // Let's now connect to all Elders
-        Self::connect_to_elders(endpoint, elder_addresses, session.clone()).await?;
+        let session = Self::connect_to_elders(session).await?;
 
-        Self::listen_to_incoming_messages(session.clone(), incoming_messages).await?;
-
-        Ok(())
+        session.listen_to_incoming_messages(incoming_messages).await
     }
 
     async fn get_elders(
@@ -480,7 +471,7 @@ impl ConnectionManager {
 
     // Bootstrap to the network to obtaining the list of
     // nodes we should establish connections with
-    async fn get_section(session: Session) -> Result<(Endpoint, IncomingMessages), Error> {
+    async fn get_section(mut session: Session) -> Result<(Session, IncomingMessages), Error> {
         trace!("Bootstrapping with contacts...");
         let (
             endpoint,
@@ -493,12 +484,12 @@ impl ConnectionManager {
 
         // 1. We query the network for section info.
         trace!("Querying for section info from bootstrapped node...");
-        let msg = NetworkInfoMsg::GetSectionQuery(XorName::from(session.public_key)).serialize()?;
+        let msg = NetworkInfoMsg::GetSectionQuery(XorName::from(session.public_key().await)).serialize()?;
 
-        let endpoint = endpoint.clone();
-        endpoint.send_message(msg, &bootstrapped_peer).await?;
+        session.endpoint = Some(endpoint);
+        session.endpoint().await?.send_message(msg, &bootstrapped_peer).await?;
 
-        Ok((endpoint, incoming_messages))
+        Ok((session, incoming_messages))
     }
 
     pub fn number_of_connected_elders(&self) -> usize {
@@ -507,21 +498,23 @@ impl ConnectionManager {
 
     // Connect to a set of Elders nodes which will be
     // the receipients of our messages on the network.
-    async fn connect_to_elders(endpoint: Endpoint, elders_addrs: Vec<SocketAddr>, session: Session) -> Result<Vec<SocketAddr>, Error> {
+    async fn connect_to_elders(mut session: Session) -> Result<Session, Error> {
         // Connect to all Elders concurrently
         // We spawn a task per each node to connect to
         let mut tasks = Vec::default();
 
-        let socketaddr_sig = self
-            .keypair
-            .sign(&serialize(&endpoint.borrow().socket_addr())?);
+        let endpoint = session.endpoint().await?;
+
+        let socketaddr_sig = session
+            .signer
+            .sign(&serialize(&endpoint.socket_addr())?).await?;
         let msg = NetworkInfoMsg::BootstrapCmd {
-            end_user: session.public_key,
+            end_user: session.public_key().await,
             socketaddr_sig,
         }
         .serialize()?;
-
-        for peer_addr in elders_addrs {
+        let peers = session.elders_addrs.clone();
+        for peer_addr in peers {
             let endpoint = endpoint.clone();
             let msg = msg.clone();
             let task_handle = tokio::spawn(async move {
@@ -551,7 +544,7 @@ impl ConnectionManager {
         let mut has_sufficent_connections = false;
 
         let mut todo = tasks;
-        let mut elders = Default::default();
+        let mut elders = HashSet::new();
 
         while !has_sufficent_connections {
             if todo.is_empty() {
@@ -596,12 +589,13 @@ impl ConnectionManager {
 
         trace!("Connected to {} Elders.", elders.len());
 
-        Ok(elders)
+        session.elders_addrs = elders.into_iter().collect();
+
+        Ok(session)
     }
 
     /// Listen for incoming messages on a connection
     async fn listen_to_incoming_messages(
-        endpoint: Endpoint,
         session: Session,
         mut incoming_messages: IncomingMessages,
     ) -> Result<(), Error> { // &'static 
@@ -613,13 +607,14 @@ impl ConnectionManager {
                 let message_type = WireMsg::deserialize(message)?;
                 warn!("Message received at listener from {:?}", &src);
 
-                match message_type {
-                    MessageType::NetworkInfo(msg) => Self::handle_networkinfo_msg(msg, endpoint, session).await?,
-                    MessageType::ClientMessage(msg) => Self::handle_client_msg(msg, src, session).await,
+                let session = match message_type {
+                    MessageType::NetworkInfo(msg) => Self::handle_networkinfo_msg(msg, session.clone()).await?,
+                    MessageType::ClientMessage(msg) => Self::handle_client_msg(msg, src, session.clone()).await,
                     msg_type => {
                         warn!("Unexpected message type received: {:?}", msg_type);
+                        session.clone()
                     }
-                }
+                };
             }
             info!("IncomingMessages listener is closing now");
             Ok::<(), Error>(())
@@ -630,7 +625,7 @@ impl ConnectionManager {
     }
 
     /// Handle received network info messages
-    async fn handle_networkinfo_msg(msg: NetworkInfoMsg, endpoint: Endpoint, session: Session) -> Result<Vec<SocketAddr>, Error> {
+    async fn handle_networkinfo_msg(msg: NetworkInfoMsg, mut session: Session) -> Result<Session, Error> {
         match &msg {
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
                 let elders = &info.elders;
@@ -642,30 +637,30 @@ impl ConnectionManager {
                     .map(|(_, socket_addr)| socket_addr)
                     .copied()
                     .collect();
+                session.elders_addrs = elders_addrs;
 
                 // clear existing elder list.
                 //self.elders = Default::default();
-                Self::connect_to_elders(endpoint, elders_addrs, session).await
+                Self::connect_to_elders(session).await
             }
             NetworkInfoMsg::BootstrapError(error)
             | NetworkInfoMsg::GetSectionResponse(GetSectionResponse::SectionNetworkInfoUpdate(
                 error,
             )) => {
                 error!("Message {:?} was interrupted due to {:?}. This will most likely need to be sent again.", msg, error);
-                Ok(vec![])
+                Ok(session)
             }
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
                 trace!("GetSectionResponse::Redirect, trying with provided elders");
 
                 // Continually try and bootstrap against new elders while we're getting rediret
-                Self::get_section(session).await?;
-
-                Ok(vec![])
+                let (session, _) = Self::get_section(session).await?;
+                Ok(session)
             }
             NetworkInfoMsg::NetworkInfoUpdate(update) => {
                 let correlation_id = update.correlation_id;
                 error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again.", correlation_id);
-                Ok(vec![])
+                Ok(session)
             }
             NetworkInfoMsg::BootstrapCmd { .. } | NetworkInfoMsg::GetSectionQuery(_) => {
                 Err(Error::UnexpectedMessageOnJoin(format!(
@@ -677,9 +672,9 @@ impl ConnectionManager {
     }
 
     /// Handle messages intended for client consumption (re: queries + commands)
-    async fn handle_client_msg(msg: Message, src: SocketAddr, session: Session) {
+    async fn handle_client_msg(msg: Message, src: SocketAddr, session: Session) -> Session {
         //let pending_transfer_validations = Arc::clone(&self.pending_transfer_validations);
-        let notifier = session.notification_sender.clone();
+        let notifier = session.notifier.clone();
 
         //let pending_queries = self.pending_query_responses.clone();
 
@@ -744,15 +739,100 @@ impl ConnectionManager {
             msg => {
                 warn!("another message type received {:?}", msg);
             }
-        }
+        };
+        session
     }
 }
 
 #[derive(Clone)]
-struct Session {
-    qp2p: QuicP2p,
-    public_key: PublicKey,
-    notification_sender: UnboundedSender<Error>,
-    pending_queries: PendingQueryResponses, 
-    pending_transfers: PendingTransferValidations
+pub struct Session {
+    pub qp2p: QuicP2p,
+    pub notifier: UnboundedSender<Error>,
+    pub pending_queries: PendingQueryResponses, 
+    pub pending_transfers: PendingTransferValidations,
+    pub endpoint: Option<Endpoint>, 
+    pub elders_addrs: HashSet<SocketAddr>,
+    pub signer: Signer,
+}
+
+impl Session {
+    pub fn new(qp2p_config: QuicP2pConfig, signer: Signer, notifier: UnboundedSender<Error>) -> Result<Self, Error> {
+        qp2p_config.local_port = Some(0); // Make sure we always use a random port for client connections.
+        qp2p_config.idle_timeout_msec = Some(5500);
+        qp2p_config.keep_alive_interval_msec = Some(4000);
+        let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), false)?;
+        Ok(Session {
+            qp2p,
+            notifier,
+            pending_queries: Arc::new(Mutex::new(HashMap::default())),
+            pending_transfers: Arc::new(Mutex::new(HashMap::default())),
+            endpoint: None,
+            elders_addrs: HashSet::default(),
+            signer,
+        })
+    }
+
+    pub async fn public_key(&self) -> PublicKey {
+        self.signer.public_key().await
+    }
+
+    pub async fn endpoint(&self) -> Result<&Endpoint, Error> {
+        match self.endpoint.borrow() {
+            Some(endpoint) => Ok(endpoint),
+            None => return Err(Error::NotBootstrapped),
+        }
+    }
+
+    /// Listen for incoming messages on a connection
+    pub async fn listen_to_incoming_messages(
+        self,
+        mut incoming_messages: IncomingMessages,
+    ) -> Result<Session, Error> { // &'static 
+        debug!("Adding IncomingMessages listener");
+
+        let session = self.clone();
+        // Spawn a thread
+        let _ = tokio::spawn(async move {
+            while let Some((src, message)) = incoming_messages.next().await {
+                let message_type = WireMsg::deserialize(message)?;
+                warn!("Message received at listener from {:?}", &src);
+
+                let session = match message_type {
+                    MessageType::NetworkInfo(msg) => ConnectionManager::handle_networkinfo_msg(msg, self.clone()).await?,
+                    MessageType::ClientMessage(msg) => ConnectionManager::handle_client_msg(msg, src, self.clone()).await,
+                    msg_type => {
+                        warn!("Unexpected message type received: {:?}", msg_type);
+                        self.clone()
+                    }
+                };
+            }
+            info!("IncomingMessages listener is closing now");
+            Ok::<(), Error>(())
+        });
+
+        // Some or None, not super important if this existed before...
+        Ok(session)
+    }
+}
+
+
+#[derive(Clone)]
+pub struct Signer {
+    keypair: Arc<Mutex<Keypair>>,
+}
+
+impl Signer {
+    pub fn new(keypair: Keypair) -> Self {
+        Self {
+            keypair: Arc::new(Mutex::new(keypair))
+        }
+    }
+
+    pub async fn public_key(&self) -> PublicKey {
+        self.keypair.lock().await.public_key()
+    }
+
+    pub async fn sign<T: serde::Serialize>(&self, data: &T) -> Result<Signature, Error> {
+        Ok(self.keypair.lock().await.sign(&serialize(data)?))
+    }
 }
