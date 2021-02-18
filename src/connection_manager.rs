@@ -18,7 +18,7 @@ use sn_data_types::{Keypair, TransferValidated};
 use sn_messaging::{
     client::{Event, Message, QueryResponse},
     network_info::{GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo},
-    MessageId,
+    MessageId, MessageType, WireMsg,
 };
 use std::{
     borrow::Borrow,
@@ -84,22 +84,55 @@ impl ConnectionManager {
     }
 
     /// Bootstrap to the network maintaining connections to several nodes.
-    pub async fn bootstrap(&mut self) -> Result<(), Error> {
+    pub async fn bootstrap(&'static mut self) -> Result<(), Error> {
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
             self.keypair.public_key()
         );
 
-        // Bootstrap and send a handshake request to receive
-        // the list of Elders we can then connect to
-        let (elders_addrs, incoming_messages) = self.bootstrap_and_handshake().await?;
-
+        // Bootstrap and send a handshake request to
+        let mut incoming_messages = self.get_section().await?;
+        // Receive the list of Elders we can then connect to
+        let elder_addresses = self.get_elders(&mut incoming_messages).await?;
         // Let's now connect to all Elders
-        self.connect_to_elders(elders_addrs).await?;
+        self.connect_to_elders(elder_addresses).await?;
 
         self.listen_to_incoming_messages(incoming_messages).await?;
 
         Ok(())
+    }
+
+    async fn get_elders(
+        &self,
+        incoming_messages: &mut IncomingMessages,
+    ) -> Result<Vec<SocketAddr>, Error> {
+        if let Some((_src, message)) = incoming_messages.next().await {
+            match NetworkInfoMsg::from(message) {
+                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses))) => {
+                    trace!("GetSectionResponse::Redirect, trying with provided elders");
+                    Ok(addresses)
+                }
+                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(
+                    NetworkInfo { elders, .. },
+                ))) => {
+                    trace!("GetSectionResponse::Success Elders: ({:?})", elders);
+                    // 2. When we get the section info, we
+                    // Obtain the addresses of the Elders
+                    let elders_addrs = elders
+                        .into_iter()
+                        .map(|(_, socket_addr)| socket_addr)
+                        .collect();
+                    Ok(elders_addrs)
+                }
+                Ok(msg) => Err(Error::UnexpectedMessageOnJoin(format!(
+                    "bootstrapping failed since an invalid response ({:?}) was received",
+                    msg
+                ))),
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            Err(Error::NotBootstrapped)
+        }
     }
 
     /// Send a `Message` to the network without awaiting for a response.
@@ -445,14 +478,12 @@ impl ConnectionManager {
 
     // Bootstrap to the network to obtaining the list of
     // nodes we should establish connections with
-    async fn bootstrap_and_handshake(
-        &mut self,
-    ) -> Result<(Vec<SocketAddr>, IncomingMessages), Error> {
+    async fn get_section(&mut self) -> Result<IncomingMessages, Error> {
         trace!("Bootstrapping with contacts...");
         let (
             endpoint,
             _incoming_connections,
-            mut incoming_messages,
+            incoming_messages,
             _disconnections,
             bootstrapped_peer,
         ) = self.qp2p.bootstrap().await?;
@@ -467,33 +498,7 @@ impl ConnectionManager {
         let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
         endpoint.send_message(msg, &bootstrapped_peer).await?;
 
-        if let Some((_src, message)) = incoming_messages.next().await {
-            match NetworkInfoMsg::from(message) {
-                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses))) => {
-                    trace!("GetSectionResponse::Redirect, trying with provided elders");
-                    Ok((addresses, incoming_messages))
-                }
-                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(
-                    NetworkInfo { elders, .. },
-                ))) => {
-                    trace!("GetSectionResponse::Success Elders: ({:?})", elders);
-                    // 2. When we get the section info, we
-                    // Obtain the addresses of the Elders
-                    let elders_addrs = elders
-                        .into_iter()
-                        .map(|(_, socket_addr)| socket_addr)
-                        .collect();
-                    Ok((elders_addrs, incoming_messages))
-                }
-                Ok(msg) => Err(Error::UnexpectedMessageOnJoin(format!(
-                    "bootstrapping failed since an invalid response ({:?}) was received",
-                    msg
-                ))),
-                Err(e) => Err(e.into()),
-            }
-        } else {
-            Err(Error::NotBootstrapped)
-        }
+        Ok(incoming_messages)
     }
 
     pub fn number_of_connected_elders(&self) -> usize {
@@ -596,88 +601,24 @@ impl ConnectionManager {
 
     /// Listen for incoming messages on a connection
     pub async fn listen_to_incoming_messages(
-        &mut self,
+        &'static mut self,
         mut incoming_messages: IncomingMessages,
     ) -> Result<(), Error> {
         debug!("Adding IncomingMessages listener");
 
-        let pending_transfer_validations = Arc::clone(&self.pending_transfer_validations);
-        let notifier = self.notification_sender.clone();
-
-        let pending_queries = self.pending_query_responses.clone();
-
         // Spawn a thread
         let _ = tokio::spawn(async move {
             while let Some((src, message)) = incoming_messages.next().await {
-                warn!("Message received in qp2p listener from {}", &src);
-                match Message::from(message) {
-                    Ok(message) => {
-                        warn!(
-                            "Message received at listener for {:?}: {:?}",
-                            &src, &message
-                        );
-                        match message.clone() {
-                            Message::QueryResponse {
-                                response,
-                                correlation_id,
-                                ..
-                            } => {
-                                trace!("Query response in: {:?}", response);
+                let message_type = WireMsg::deserialize(message)?;
+                warn!("Message received at listener from {:?}", &src);
 
-                                if let Some(mut sender) =
-                                    pending_queries.lock().await.remove(&(src, correlation_id))
-                                {
-                                    trace!("Sender channel found for query response");
-                                    let _ = sender.send(Ok(response)).await;
-                                } else {
-                                    warn!("No matching pending query found for elder {:?}  and message {:?}", src, correlation_id);
-                                }
-                            }
-                            Message::Event {
-                                event,
-                                correlation_id,
-                                ..
-                            } => {
-                                if let Event::TransferValidated { event, .. } = event {
-                                    if let Some(sender) = pending_transfer_validations
-                                        .lock()
-                                        .await
-                                        .get_mut(&correlation_id)
-                                    {
-                                        info!("Accumulating SignatureShare");
-                                        let _ = sender.send(Ok(event)).await;
-                                    } else {
-                                        warn!("No matching transfer validation event listener found for elder {:?} and message {:?}", src, correlation_id);
-                                        warn!("It may be that this transfer is complete and the listener cleaned up already.");
-                                        trace!("Event received was {:?}", event);
-                                    }
-                                }
-                            }
-                            Message::CmdError {
-                                error,
-                                correlation_id,
-                                ..
-                            } => {
-                                if let Some(sender) = pending_transfer_validations
-                                    .lock()
-                                    .await
-                                    .get_mut(&correlation_id)
-                                {
-                                    debug!("Cmd Error was received, sending on channel to caller");
-                                    let _ = sender.send(Err(Error::from(error.clone()))).await;
-                                } else {
-                                    warn!("No sender subscribing and listening for errors relating to message {:?}. Error returned is: {:?}", correlation_id, error)
-                                }
-
-                                let _ = notifier.send(Error::from(error));
-                            }
-                            msg => {
-                                warn!("another message type received {:?}", msg);
-                            }
-                        }
+                match message_type {
+                    MessageType::NetworkInfo(msg) => self.handle_networkinfo_msg(msg).await?,
+                    MessageType::ClientMessage(envelope) => {
+                        self.handle_client_msg(envelope, src).await;
                     }
-                    Err(error) => {
-                        info!("Could not deserialize MessageEnvelope: {}", error);
+                    msg_type => {
+                        warn!("Unexpected message type received: {:?}", msg_type);
                     }
                 }
             }
@@ -686,7 +627,124 @@ impl ConnectionManager {
         });
 
         // Some or None, not super important if this existed before...
-
         Ok(())
+    }
+
+    /// Handle received network info messages
+    async fn handle_networkinfo_msg(&mut self, msg: NetworkInfoMsg) -> Result<(), Error> {
+        match &msg {
+            NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
+                let elders = &info.elders;
+                let pk_set = &info.pk_set;
+                trace!("GetSectionResponse Success! Elders: ({:?})", elders);
+                // Obtain the addresses of the Elders
+                let elders_addrs = elders
+                    .into_iter()
+                    .map(|(_, socket_addr)| socket_addr)
+                    .copied()
+                    .collect();
+
+                // clear existing elder lsit.
+                self.elders = Default::default();
+                self.connect_to_elders(elders_addrs).await
+            }
+            NetworkInfoMsg::BootstrapError(error)
+            | NetworkInfoMsg::GetSectionResponse(GetSectionResponse::SectionNetworkInfoUpdate(
+                error,
+            )) => {
+                error!("Message {:?} was interrupted due to {:?}. This will most likely need to be sent again.", msg, error);
+                Ok(())
+            }
+            NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
+                trace!("GetSectionResponse::Redirect, trying with provided elders");
+
+                // Continually try and bootstrap against new elders while we're getting rediret
+                self.get_section().await?;
+
+                Ok(())
+            }
+            NetworkInfoMsg::NetworkInfoUpdate(update) => {
+                let correlation_id = update.correlation_id;
+                error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again.", correlation_id);
+                Ok(())
+            }
+            NetworkInfoMsg::BootstrapCmd { .. } | NetworkInfoMsg::GetSectionQuery(_) => {
+                Err(Error::UnexpectedMessageOnJoin(format!(
+                    "bootstrapping failed since an invalid response ({:?}) was received",
+                    msg
+                )))
+            }
+        }
+    }
+
+    /// Handle messages intended for client consumption (re: queries + commands)
+    async fn handle_client_msg(&self, message: Message, src: SocketAddr) {
+        let pending_transfer_validations = Arc::clone(&self.pending_transfer_validations);
+        let notifier = self.notification_sender.clone();
+
+        let pending_queries = self.pending_query_responses.clone();
+
+        match message.clone() {
+            Message::QueryResponse {
+                response,
+                correlation_id,
+                ..
+            } => {
+                trace!("Query response in: {:?}", response);
+
+                if let Some(mut sender) =
+                    pending_queries.lock().await.remove(&(src, correlation_id))
+                {
+                    trace!("Sender channel found for query response");
+                    let _ = sender.send(Ok(response)).await;
+                } else {
+                    warn!(
+                        "No matching pending query found for elder {:?}  and message {:?}",
+                        src, correlation_id
+                    );
+                }
+            }
+            Message::Event {
+                event,
+                correlation_id,
+                ..
+            } => {
+                if let Event::TransferValidated { event, .. } = event {
+                    if let Some(sender) = pending_transfer_validations
+                        .lock()
+                        .await
+                        .get_mut(&correlation_id)
+                    {
+                        info!("Accumulating SignatureShare");
+                        let _ = sender.send(Ok(event)).await;
+                    } else {
+                        warn!("No matching transfer validation event listener found for elder {:?} and message {:?}", src, correlation_id);
+                        warn!("It may be that this transfer is complete and the listener cleaned up already.");
+                        trace!("Event received was {:?}", event);
+                    }
+                }
+            }
+            Message::CmdError {
+                error,
+                correlation_id,
+                ..
+            } => {
+                if let Some(sender) = pending_transfer_validations
+                    .lock()
+                    .await
+                    .get_mut(&correlation_id)
+                {
+                    debug!("Cmd Error was received, sending on channel to caller");
+                    let _ = sender.send(Err(Error::from(error.clone()))).await;
+                } else {
+                    warn!("No sender subscribing and listening for errors relating to message {:?}. Error returned is: {:?}", correlation_id, error)
+                }
+
+                let _ = notifier.send(Error::from(error));
+            }
+            msg => {
+                warn!("another message type received {:?}", msg);
+            }
+        }
     }
 }
