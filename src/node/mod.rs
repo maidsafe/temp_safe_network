@@ -50,8 +50,8 @@ impl PartialEq for NodeMessage {
 impl Debug for NodeMessage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter
-            .debug_struct("NodeMessage")
-            .field("bytes", &self.0)
+            .debug_tuple("NodeMessage")
+            .field(&format_args!("{:10}", hex_fmt::HexFmt(&self.0)))
             .finish()
     }
 }
