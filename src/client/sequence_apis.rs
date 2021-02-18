@@ -232,7 +232,7 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
 
         let _ = self
             .connection_manager
@@ -680,7 +680,7 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
         let _ = self
             .connection_manager
             .lock()
@@ -939,7 +939,7 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
         let _ = self
             .connection_manager
             .lock()
@@ -1019,7 +1019,7 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
         let _ = self
             .connection_manager
             .lock()

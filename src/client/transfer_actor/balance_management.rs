@@ -74,7 +74,7 @@ impl Client {
 
         let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let message = Self::create_query_message(msg_contents);
+        let message = self.create_query_message(msg_contents);
 
         match self
             .connection_manager
@@ -153,7 +153,7 @@ impl Client {
         let dot = signed_transfer.id();
         let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
 
         self.transfer_actor
             .lock()
@@ -170,7 +170,7 @@ impl Client {
         // Register the transfer on the network.
         let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(transfer_proof.clone()));
 
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
         trace!(
             "Transfer proof received and to be sent in RegisterTransfer req: {:?}",
             transfer_proof

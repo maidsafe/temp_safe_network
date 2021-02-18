@@ -39,7 +39,7 @@ use futures::lock::Mutex;
 use log::{debug, info, trace, warn};
 use qp2p::Config as QuicP2pConfig;
 use rand::rngs::OsRng;
-use sn_data_types::{Keypair, PublicKey, Token};
+use sn_data_types::{Keypair, PublicKey, ReplicaPublicKeySet, Token};
 use sn_messaging::{
     client::{Cmd, DataCmd, Message, Query, QueryResponse},
     MessageId,
@@ -227,7 +227,7 @@ impl Client {
 
         debug!("Sending QueryRequest: {:?}", query);
 
-        let message = Self::create_query_message(query);
+        let message = self.create_query_message(query);
         self.connection_manager
             .lock()
             .await
@@ -236,7 +236,7 @@ impl Client {
     }
 
     // Build and sign Cmd Message Envelope
-    pub(crate) fn create_cmd_message(msg_contents: Cmd) -> Message {
+    pub(crate) fn create_cmd_message(&self, msg_contents: Cmd) -> Message {
         let random_xor = XorName::random();
         let id = MessageId(random_xor);
         trace!("Creating cmd message with id: {:?}", id);
@@ -244,20 +244,19 @@ impl Client {
         Message::Cmd {
             cmd: msg_contents,
             id,
-            target_section_pk: None,
+            target_section_pk: Some(PublicKey::Bls(self.replicas_pk_set.public_key())),
         }
     }
 
     // Build and sign Query Message Envelope
-    pub(crate) fn create_query_message(msg_contents: Query) -> Message {
+    pub(crate) fn create_query_message(&self, msg_contents: Query) -> Message {
         let random_xor = XorName::random();
         let id = MessageId(random_xor);
         trace!("Creating query message with id : {:?}", id);
-
         Message::Query {
             query: msg_contents,
             id,
-            target_section_pk: None,
+            target_section_pk: Some(PublicKey::Bls(self.replicas_pk_set.public_key())),
         }
     }
 
@@ -272,7 +271,7 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = Self::create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents);
         let _ = self
             .connection_manager
             .lock()

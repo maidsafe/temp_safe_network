@@ -1007,14 +1007,15 @@ mod tests {
                 version: 0,
             },
         );
-
         let owner = client.public_key().await;
+
         let address = client
             .store_seq_map(name, tag, owner, Some(entries.clone()), Some(permissions))
             .await?;
 
         // Assert that the data is stored.
         let mut res = client.get_map(address).await;
+
         while res.is_err() {
             delay_for(Duration::from_millis(200)).await;
             res = client.get_map(address).await;

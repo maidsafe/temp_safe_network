@@ -7,6 +7,8 @@ use sn_data_types::{
 use sn_messaging::client::{
     Cmd, DataCmd, Message, Query, QueryResponse, TransferCmd, TransferQuery,
 };
+use sn_messaging::MessageId;
+
 use sn_transfers::{ActorEvent, ReplicaValidator, TransferInitiated};
 use threshold_crypto::PublicKeySet;
 use tokio::sync::mpsc::channel;
@@ -23,7 +25,7 @@ pub use sn_transfers::TransferActor as SafeTransferActor;
 
 use crate::client::{Client, ConnectionManager};
 use crate::errors::Error;
-
+use xor_name::XorName;
 /// Simple client side validations
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClientTransferValidator {}
@@ -134,7 +136,7 @@ impl Client {
             since_version: 0,
         });
 
-        let message = Self::create_query_message(msg_contents);
+        let message = self.create_query_message(msg_contents);
 
         // This is a normal response manager request. We want quorum on this for now...
         let res = self
@@ -187,7 +189,7 @@ impl Client {
             bytes,
         });
 
-        let message = Self::create_query_message(msg_contents);
+        let message = self.create_query_message(msg_contents);
 
         // This is a normal response manager request. We want quorum on this for now...
         let res = self
@@ -234,7 +236,7 @@ impl Client {
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
-        let transfer_message = Self::create_cmd_message(command);
+        let transfer_message = self.create_cmd_message(command);
 
         self.transfer_actor
             .lock()
@@ -261,7 +263,15 @@ impl Client {
         let pk = keypair.public_key();
         let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(pk));
 
-        let message = Self::create_query_message(keys_query_msg);
+        let random_xor = XorName::random();
+        let id = MessageId(random_xor);
+        trace!("Creating query message with id : {:?}", id);
+        let message = Message::Query {
+            query: keys_query_msg,
+            id,
+            // the only msg which doesnt know our PKset
+            target_section_pk: None,
+        };
 
         let res = cm.send_query(&message).await?;
 

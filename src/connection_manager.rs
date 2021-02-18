@@ -106,9 +106,11 @@ impl ConnectionManager {
 
         let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
         let src_addr = endpoint.socket_addr();
-        info!(
+        trace!(
             "Sending (from {}) command message {:?} w/ id: {:?}",
-            src_addr, msg, msg_id
+            src_addr,
+            msg,
+            msg_id
         );
         let msg_bytes = msg.serialize()?;
 
