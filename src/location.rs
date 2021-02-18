@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::net::SocketAddr;
-
 use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;
 use xor_name::{Prefix, XorName};
+
+type SocketId = XorName;
 
 /// An EndUser is repreented by a PublicKey.
 /// It uses 1-n clients to access the network.
@@ -23,8 +23,8 @@ pub enum EndUser {
     Client {
         /// The EndUser PublicKey
         public_key: PublicKey,
-        /// TODO: A random hash that maps to a SocketAddr
-        socket_id: SocketAddr,
+        /// A random hash that maps to a SocketAddr.
+        socket_id: SocketId,
     },
 }
 
