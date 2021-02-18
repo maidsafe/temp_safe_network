@@ -25,7 +25,6 @@ pub use sn_transfers::TransferActor as SafeTransferActor;
 
 use crate::client::{Client, ConnectionManager};
 use crate::errors::Error;
-use xor_name::XorName;
 /// Simple client side validations
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClientTransferValidator {}
@@ -263,8 +262,7 @@ impl Client {
         let pk = keypair.public_key();
         let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(pk));
 
-        let random_xor = XorName::random();
-        let id = MessageId(random_xor);
+        let id = MessageId::new();
         trace!("Creating query message with id : {:?}", id);
         let message = Message::Query {
             query: keys_query_msg,

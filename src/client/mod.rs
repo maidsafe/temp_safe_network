@@ -51,7 +51,6 @@ use std::{
 };
 use threshold_crypto::PublicKeySet;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use xor_name::XorName;
 
 /// Elder size
 pub const ELDER_SIZE: usize = 5;
@@ -237,8 +236,7 @@ impl Client {
 
     // Build and sign Cmd Message Envelope
     pub(crate) fn create_cmd_message(&self, msg_contents: Cmd) -> Message {
-        let random_xor = XorName::random();
-        let id = MessageId(random_xor);
+        let id = MessageId::new();
         trace!("Creating cmd message with id: {:?}", id);
 
         Message::Cmd {
@@ -250,8 +248,7 @@ impl Client {
 
     // Build and sign Query Message Envelope
     pub(crate) fn create_query_message(&self, msg_contents: Query) -> Message {
-        let random_xor = XorName::random();
-        let id = MessageId(random_xor);
+        let id = MessageId::new();
         trace!("Creating query message with id : {:?}", id);
         Message::Query {
             query: msg_contents,
