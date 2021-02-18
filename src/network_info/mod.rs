@@ -12,15 +12,30 @@ use crate::{MessageId, MessageType, WireMsg};
 use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
-use sn_data_types::ReplicaPublicKeySet;
+use sn_data_types::{PublicKey, ReplicaPublicKeySet, Signature};
 use std::{collections::BTreeMap, fmt, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
 /// Messages for exchanging network info, specifically on a target section for a msg.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Message {
     /// Message to request information about the section that matches the given name.
     GetSectionQuery(XorName),
+    /// An EndUser that wants to interact with the network,
+    /// would send this bootstrap cmd to the elders received
+    /// in the GetSectionResponse.
+    BootstrapCmd {
+        /// The end user public key.
+        end_user: PublicKey,
+        /// A sig over the socketaddr from which
+        /// this request is made, by the secret key
+        /// corresponding to the end_user public key.
+        socketaddr_sig: Signature,
+    },
+    /// If the sig over the sender socketaddr
+    /// cannot be verified by the provided public key.
+    BootstrapError(Error),
     /// Response to `GetSectionQuery`.
     GetSectionResponse(GetSectionResponse),
     /// Updated info related to section

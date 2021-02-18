@@ -25,4 +25,7 @@ pub enum Error {
     /// No PublicKeySet found at this section
     #[error("No PublicKey found at this section")]
     NoSectionPkSet,
+    /// Invalid data in the bootstrap cmd
+    #[error("Invalid data in the bootstrap cmd")]
+    InvalidBootstrap,
 }
