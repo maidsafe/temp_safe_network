@@ -711,13 +711,13 @@ pub struct Session {
 
 impl Session {
     pub fn new(
-        mut qp2p_config: QuicP2pConfig,
+        qp2p_config: QuicP2pConfig,
         signer: Signer,
         notifier: UnboundedSender<Error>,
     ) -> Result<Self, Error> {
-        qp2p_config.local_port = Some(0); // Make sure we always use a random port for client connections.
-        qp2p_config.idle_timeout_msec = Some(5500);
-        qp2p_config.keep_alive_interval_msec = Some(4000);
+        // qp2p_config.local_port = Some(0); // Make sure we always use a random port for client connections.
+        // qp2p_config.idle_timeout_msec = Some(5500);
+        // qp2p_config.keep_alive_interval_msec = Some(4000);
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), false)?;
         Ok(Session {
             qp2p,
