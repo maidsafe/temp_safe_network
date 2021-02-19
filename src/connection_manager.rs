@@ -78,11 +78,11 @@ impl ConnectionManager {
                 Ok(msg) => {
                     ConnectionManager::handle_networkinfo_msg(msg, session).await
                 }
+                Err(e) => Err(e.into()),
                 _msg => {
                     error!("Unexpected message at this stage of bootstrap");
                     Err(Error::UnexpectedMessageOnJoin("NetworkInfoMessage was expected".to_string()))
                 }
-                Err(e) => Err(e.into()),
             }
         } else {
             Err(Error::NotBootstrapped)
@@ -601,7 +601,18 @@ impl ConnectionManager {
             }
             NetworkInfoMsg::NetworkInfoUpdate(update) => {
                 let correlation_id = update.correlation_id;
-                error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again.", correlation_id);
+                error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again. Update was : {:?}", correlation_id, update);
+                // session = ConnectionManager::update_session_info(session.clone(), update.error).await?;
+                match update.clone().error {
+                    NetworkInfoError::TargetSectionInfoOutdated(info) => {
+                        trace!("Updated network info: ({:?})", info);
+
+                        session = ConnectionManager::update_session_info(session.clone(), &info).await?;
+                    }
+                    _ => {
+                        // do nothing
+                    }
+                };
                 Ok(session)
             }
             NetworkInfoMsg::BootstrapCmd { .. } | NetworkInfoMsg::GetSectionQuery(_) => {
