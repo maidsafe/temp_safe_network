@@ -27,5 +27,5 @@ pub enum Error {
     NoSectionPkSet,
     /// Invalid data in the bootstrap cmd
     #[error("Invalid data in the bootstrap cmd")]
-    InvalidBootstrap,
+    InvalidBootstrap(String),
 }
