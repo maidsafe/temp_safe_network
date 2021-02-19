@@ -65,6 +65,8 @@ impl ConnectionManager {
         let session = Self::connect_to_elders(session).await?;
 
         session.listen_to_incoming_messages(incoming_messages).await
+
+
     }
 
     async fn get_elders(
@@ -73,28 +75,13 @@ impl ConnectionManager {
     ) -> Result<Session, Error> {
         if let Some((_src, message)) = incoming_messages.next().await {
             match NetworkInfoMsg::from(message) {
-                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses))) => {
-                    trace!("GetSectionResponse::Redirect, trying with provided elders");
-                    session.elders = addresses.into_iter().collect();
-                    Ok(session)
+                Ok(msg) => {
+                    ConnectionManager::handle_networkinfo_msg(msg, session).await
                 }
-                Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(
-                    NetworkInfo { elders, .. },
-                ))) => {
-                    trace!("GetSectionResponse::Success Elders: ({:?})", elders);
-                    // 2. When we get the section info, we
-                    // Obtain the addresses of the Elders
-                    let elders_addrs = elders
-                        .into_iter()
-                        .map(|(_, socket_addr)| socket_addr)
-                        .collect();
-                    session.elders = elders_addrs;
-                    Ok(session)
+                _msg => {
+                    error!("Unexpected message at this stage of bootstrap");
+                    Err(Error::UnexpectedMessageOnJoin("NetworkInfoMessage was expected".to_string()))
                 }
-                Ok(msg) => Err(Error::UnexpectedMessageOnJoin(format!(
-                    "bootstrapping failed since an invalid response ({:?}) was received",
-                    msg
-                ))),
                 Err(e) => Err(e.into()),
             }
         } else {
@@ -582,6 +569,7 @@ impl ConnectionManager {
         msg: NetworkInfoMsg,
         mut session: Session,
     ) -> Result<Session, Error> {
+        debug!("Handling network info message");
         match &msg {
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
                 trace!("GetSectionResponse Success! Elders: ({:?})", info.elders);
