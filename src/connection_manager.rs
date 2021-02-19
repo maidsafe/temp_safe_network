@@ -267,31 +267,41 @@ impl ConnectionManager {
                                 msg.clone(),
                                 &socket
                             );
+
+                            if let Some (res) = receiver.recv().await {
+                                return Ok(res?)
+                            }
+                            else {
+                                error!("Error from query response, non received");
+                                return Err(Error::QueryReceiverError)
+                            }
+                            
                             // TODO: receive response here.
-                            result = match timeout(
-                                Duration::from_secs(RESPONSE_WAIT_TIME),
-                                receiver.recv(),
-                            )
-                            .await
-                            {
-                                Ok(Some(result)) => match result {
-                                    Ok(response) => Ok(response),
-                                    Err(_) => Err(Error::ReceivingQuery),
-                                },
-                                Ok(None) => Err(Error::ReceivingQuery),
-                                Err(err) => {
-                                    warn!("{}", err);
-                                    // Timeout while waiting for response.
-                                    // Terminate all connections to the peer
-                                    endpoint.disconnect_from(&socket)?;
-                                    Err(Error::ReceivingQuery)
-                                }
-                            };
+                            // result = match timeout(
+                            //     Duration::from_secs(RESPONSE_WAIT_TIME),
+                            //     receiver.recv(),
+                            // )
+                            // .await
+                            // {
+                            //     Ok(Some(result)) => match result {
+                            //         Ok(response) => Ok(response),
+                            //         Err(_) => Err(Error::ReceivingQuery),
+                            //     },
+                            //     Ok(None) => Err(Error::ReceivingQuery),
+                            //     Err(err) => {
+                            //         warn!("Timout: {}", err);
+                            //         // Timeout while waiting for response.
+                            //         // Terminate all connections to the peer
+                            //         endpoint.disconnect_from(&socket)?;
+                            //         Err(Error::ReceivingQuery)
+                            //     }
+                            // };
                         }
                         Err(_error) => {
                             result = {
+                                error!("Error sending query message");
                                 // TODO: remove it from the pending_query_responses then
-                                Err(Error::ReceivingQuery)
+                                Err(Error::SendingQuery)
                             }
                         }
                     };

@@ -53,6 +53,14 @@ pub enum Error {
     #[error("Problem receiving query via qp2p")]
     ReceivingQuery,
 
+    /// Could not send query to elder.
+    #[error("Problem sending query via qp2p")]
+    SendingQuery,
+
+    /// Could not query elder.
+    #[error("Problem receiving query internally in sn_client")]
+    QueryReceiverError,
+
     /// Could not query elder.
     #[error("Failed to obtain a response")]
     NoResponse,
