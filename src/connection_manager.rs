@@ -192,9 +192,7 @@ impl ConnectionManager {
         let msg_bytes = msg.serialize()?;
 
         let msg_id = msg.id();
-        {
-            let _ = pending_transfers.lock().await.insert(msg_id, sender);
-        }
+        let _ = pending_transfers.lock().await.insert(msg_id, sender);
 
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
@@ -236,13 +234,11 @@ impl ConnectionManager {
         // and we try to find a majority on the responses
         let mut tasks = Vec::default();
 
-        //let elders_addrs: Vec<SocketAddr> = session.elders.iter().cloned().collect();
-
         for socket in elders.clone() {
-            let msg_bytes_clone = msg_bytes.clone();
             // Create a new stream here to not have to worry about filtering replies
             let msg_id = msg.id();
-
+            let msg = msg.clone();
+            let msg_bytes_clone = msg_bytes.clone();
             let pending_queries = pending_queries.clone();
             let mut endpoint = endpoint.clone();
             endpoint.connect_to(&socket).await?;
@@ -257,18 +253,20 @@ impl ConnectionManager {
                     let msg_bytes_clone = msg_bytes_clone.clone();
 
                     let (sender, mut receiver) = channel::<Result<QueryResponse, Error>>(7);
-                    {
-                        let _ = pending_queries
-                            .lock()
-                            .await
-                            .insert((socket, msg_id), sender);
-                    }
+                    let _ = pending_queries
+                        .lock()
+                        .await
+                        .insert((socket, msg_id), sender);
 
                     // TODO: we need to remove the msg_id from
                     // pending_queries upon any failure below
                     match endpoint.send_message(msg_bytes_clone, &socket).await {
                         Ok(()) => {
-                            trace!("Message sent to {}. Waiting for response...", &socket);
+                            trace!(
+                                "Message {:?} sent to {}. Waiting for response...",
+                                msg.clone(),
+                                &socket
+                            );
                             // TODO: receive response here.
                             result = match timeout(
                                 Duration::from_secs(RESPONSE_WAIT_TIME),
@@ -330,7 +328,6 @@ impl ConnectionManager {
 
         // Let's await for all responses
         let mut has_elected_a_response = false;
-
         let mut todo = tasks;
 
         while !has_elected_a_response {
@@ -494,6 +491,11 @@ impl ConnectionManager {
         let endpoint = session.endpoint()?;
         let msg = session.bootstrap_cmd().await?;
         let peers = session.elders.clone();
+        debug!(
+            "Sending bootstrap cmd from {} to {} peers..",
+            endpoint.socket_addr(),
+            peers.len()
+        );
 
         for peer_addr in peers {
             let endpoint = endpoint.clone();
@@ -583,7 +585,7 @@ impl ConnectionManager {
                 trace!("GetSectionResponse Success! Elders: ({:?})", elders);
                 // Obtain the addresses of the Elders
                 let elders_addrs = elders
-                    .into_iter()
+                    .iter()
                     .map(|(_, socket_addr)| socket_addr)
                     .copied()
                     .collect();
@@ -823,7 +825,7 @@ impl Signer {
         self.public_key
     }
 
-    pub async fn sign<T: serde::Serialize>(&self, data: &T) -> Result<Signature, Error> {
-        Ok(self.keypair.lock().await.sign(&serialize(data)?))
+    pub async fn sign(&self, data: &[u8]) -> Result<Signature, Error> {
+        Ok(self.keypair.lock().await.sign(data))
     }
 }
