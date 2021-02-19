@@ -15,7 +15,13 @@ use futures::{
 use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
 use sn_data_types::{Keypair, PublicKey, Signature, TransferValidated};
-use sn_messaging::{MessageId, MessageType, WireMsg, client::{Event, Message, QueryResponse}, network_info::{self, Error as NetworkInfoError, GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo}};
+use sn_messaging::{
+    client::{Event, Message, QueryResponse},
+    network_info::{
+        Error as NetworkInfoError, GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo,
+    },
+    MessageId, MessageType, WireMsg,
+};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -65,24 +71,16 @@ impl ConnectionManager {
         let session = Self::connect_to_elders(session).await?;
 
         session.listen_to_incoming_messages(incoming_messages).await
-
-
     }
 
     async fn get_elders(
-        mut session: Session,
+        session: Session,
         incoming_messages: &mut IncomingMessages,
     ) -> Result<Session, Error> {
         if let Some((_src, message)) = incoming_messages.next().await {
             match NetworkInfoMsg::from(message) {
-                Ok(msg) => {
-                    ConnectionManager::handle_networkinfo_msg(msg, session).await
-                }
+                Ok(msg) => ConnectionManager::handle_networkinfo_msg(msg, session).await,
                 Err(e) => Err(e.into()),
-                _msg => {
-                    error!("Unexpected message at this stage of bootstrap");
-                    Err(Error::UnexpectedMessageOnJoin("NetworkInfoMessage was expected".to_string()))
-                }
             }
         } else {
             Err(Error::NotBootstrapped)
@@ -220,7 +218,7 @@ impl ConnectionManager {
             let msg = msg.clone();
             let msg_bytes_clone = msg_bytes.clone();
             let pending_queries = pending_queries.clone();
-            let mut endpoint = endpoint.clone();
+            let endpoint = endpoint.clone();
             endpoint.connect_to(&socket).await?;
 
             let task_handle = tokio::spawn(async move {
@@ -248,34 +246,12 @@ impl ConnectionManager {
                                 &socket
                             );
 
-                            if let Some (res) = receiver.recv().await {
-                                return Ok(res?)
-                            }
-                            else {
+                            if let Some(res) = receiver.recv().await {
+                                return Ok(res?);
+                            } else {
                                 error!("Error from query response, non received");
-                                return Err(Error::QueryReceiverError)
+                                return Err(Error::QueryReceiverError);
                             }
-                            
-                            // TODO: receive response here.
-                            // result = match timeout(
-                            //     Duration::from_secs(RESPONSE_WAIT_TIME),
-                            //     receiver.recv(),
-                            // )
-                            // .await
-                            // {
-                            //     Ok(Some(result)) => match result {
-                            //         Ok(response) => Ok(response),
-                            //         Err(_) => Err(Error::ReceivingQuery),
-                            //     },
-                            //     Ok(None) => Err(Error::ReceivingQuery),
-                            //     Err(err) => {
-                            //         warn!("Timout: {}", err);
-                            //         // Timeout while waiting for response.
-                            //         // Terminate all connections to the peer
-                            //         endpoint.disconnect_from(&socket)?;
-                            //         Err(Error::ReceivingQuery)
-                            //     }
-                            // };
                         }
                         Err(_error) => {
                             result = {
@@ -580,16 +556,10 @@ impl ConnectionManager {
                 error,
             )) => {
                 error!("Message {:?} was interrupted due to {:?}. This will most likely need to be sent again.", msg, error);
-                match error {
-                    NetworkInfoError::TargetSectionInfoOutdated(info) => {
-                        trace!("Updated network info: ({:?})", info);
-
-                        session = ConnectionManager::update_session_info(session.clone(), info).await?;
-                    }
-                    _ => {
-                        // do nothing
-                    }
-                };
+                if let NetworkInfoError::TargetSectionInfoOutdated(info) = error {
+                    trace!("Updated network info: ({:?})", info);
+                    session = ConnectionManager::update_session_info(session.clone(), info).await?;
+                }
                 Ok(session)
             }
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
@@ -602,17 +572,11 @@ impl ConnectionManager {
             NetworkInfoMsg::NetworkInfoUpdate(update) => {
                 let correlation_id = update.correlation_id;
                 error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again. Update was : {:?}", correlation_id, update);
-                // session = ConnectionManager::update_session_info(session.clone(), update.error).await?;
-                match update.clone().error {
-                    NetworkInfoError::TargetSectionInfoOutdated(info) => {
-                        trace!("Updated network info: ({:?})", info);
-
-                        session = ConnectionManager::update_session_info(session.clone(), &info).await?;
-                    }
-                    _ => {
-                        // do nothing
-                    }
-                };
+                if let NetworkInfoError::TargetSectionInfoOutdated(info) = update.clone().error {
+                    trace!("Updated network info: ({:?})", info);
+                    session =
+                        ConnectionManager::update_session_info(session.clone(), &info).await?;
+                }
                 Ok(session)
             }
             NetworkInfoMsg::BootstrapCmd { .. } | NetworkInfoMsg::GetSectionQuery(_) => {
@@ -625,7 +589,10 @@ impl ConnectionManager {
     }
 
     /// Apply updated info to a network session, and trigger connections
-    async fn update_session_info(mut session: Session, info: &NetworkInfo ) -> Result<Session, Error> {
+    async fn update_session_info(
+        mut session: Session,
+        info: &NetworkInfo,
+    ) -> Result<Session, Error> {
         let elders = &info.elders;
         session.section_key_set = Some(info.pk_set.clone());
         trace!("GetSectionResponse Success! Elders: ({:?})", elders);
@@ -635,9 +602,8 @@ impl ConnectionManager {
             .map(|(_, socket_addr)| socket_addr)
             .copied()
             .collect();
-        session.elders = elders_addrs;
-
         // clear existing elder list.
+        session.elders = elders_addrs;
         Self::connect_to_elders(session).await
     }
 
@@ -733,7 +699,6 @@ impl Session {
         signer: Signer,
         notifier: UnboundedSender<Error>,
     ) -> Result<Self, Error> {
-
         debug!("QP2p config: {:?}", qp2p_config);
 
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), false)?;
@@ -804,10 +769,11 @@ impl Session {
 
                 session = match message_type {
                     MessageType::NetworkInfo(msg) => {
-                        match ConnectionManager::handle_networkinfo_msg(msg, session.clone()).await {
+                        match ConnectionManager::handle_networkinfo_msg(msg, session.clone()).await
+                        {
                             Ok(_) => {
                                 // do nothing
-                            },
+                            }
                             Err(error) => {
                                 error!("Error handling network info message: {:?}", error);
                                 // that's enough

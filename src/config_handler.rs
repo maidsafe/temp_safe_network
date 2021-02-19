@@ -50,7 +50,6 @@ impl Config {
             debug!("Bootstrapping contacts overriden with: {:?}", contacts);
             qp2p.hard_coded_contacts = contacts;
         }
-        
 
         Self { qp2p }
     }
