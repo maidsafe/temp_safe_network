@@ -83,6 +83,7 @@ impl ConnectionManager {
                 Err(e) => Err(e.into()),
             }
         } else {
+            trace!("incoming_messages.next().await was None");
             Err(Error::NotBootstrapped)
         }
     }
@@ -721,21 +722,30 @@ impl Session {
     pub fn endpoint(&self) -> Result<&Endpoint, Error> {
         match self.endpoint.borrow() {
             Some(endpoint) => Ok(endpoint),
-            None => Err(Error::NotBootstrapped),
+            None => {
+                trace!("self.endpoint.borrow() was None");
+                Err(Error::NotBootstrapped)
+            }
         }
     }
 
     pub fn section_key(&self) -> Result<PublicKey, Error> {
         match self.section_key_set.borrow() {
             Some(section_key_set) => Ok(PublicKey::Bls(section_key_set.public_key())),
-            None => Err(Error::NotBootstrapped),
+            None => {
+                trace!("self.section_key_set.borrow() was None");
+                Err(Error::NotBootstrapped)
+            }
         }
     }
 
     pub async fn section_key_set(&self) -> Result<&PublicKeySet, Error> {
         match self.section_key_set.borrow() {
             Some(section_key_set) => Ok(section_key_set),
-            None => return Err(Error::NotBootstrapped),
+            None => {
+                trace!("self.section_key_set.borrow() was None");
+                Err(Error::NotBootstrapped)
+            }
         }
     }
 
@@ -749,7 +759,7 @@ impl Session {
             socketaddr_sig,
         }
         .serialize()
-        .map_err(|_| Error::NotBootstrapped)
+        .map_err(|e| Error::MessagingProtocol(e))
     }
 
     /// Listen for incoming messages on a connection
