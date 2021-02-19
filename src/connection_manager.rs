@@ -15,28 +15,21 @@ use futures::{
 use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
 use sn_data_types::{Keypair, PublicKey, Signature, TransferValidated};
-use sn_messaging::{
-    client::{Event, Message, QueryResponse},
-    network_info::{GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo},
-    MessageId, MessageType, WireMsg,
-};
+use sn_messaging::{MessageId, MessageType, WireMsg, client::{Event, Message, QueryResponse}, network_info::{self, Error as NetworkInfoError, GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo}};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     net::SocketAddr,
     sync::Arc,
-    time::Duration,
 };
 use threshold_crypto::PublicKeySet;
 use tokio::{
     sync::mpsc::{channel, Sender, UnboundedSender},
     task::JoinHandle,
-    time::timeout,
 };
 use xor_name::XorName;
 
 static NUMBER_OF_RETRIES: usize = 3;
-static RESPONSE_WAIT_TIME: u64 = 30;
 pub static STANDARD_ELDERS_COUNT: usize = 5;
 
 /// Simple map for correlating a response with votes from various elder responses.
@@ -591,26 +584,24 @@ impl ConnectionManager {
     ) -> Result<Session, Error> {
         match &msg {
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
-                let elders = &info.elders;
-                session.section_key_set = Some(info.pk_set.clone());
-                trace!("GetSectionResponse Success! Elders: ({:?})", elders);
-                // Obtain the addresses of the Elders
-                let elders_addrs = elders
-                    .iter()
-                    .map(|(_, socket_addr)| socket_addr)
-                    .copied()
-                    .collect();
-                session.elders = elders_addrs;
-
-                // clear existing elder list.
-                //self.elders = Default::default();
-                Self::connect_to_elders(session).await
+                trace!("GetSectionResponse Success! Elders: ({:?})", info.elders);
+                ConnectionManager::update_session_info(session, info).await
             }
             NetworkInfoMsg::BootstrapError(error)
             | NetworkInfoMsg::GetSectionResponse(GetSectionResponse::SectionNetworkInfoUpdate(
                 error,
             )) => {
                 error!("Message {:?} was interrupted due to {:?}. This will most likely need to be sent again.", msg, error);
+                match error {
+                    NetworkInfoError::TargetSectionInfoOutdated(info) => {
+                        trace!("Updated network info: ({:?})", info);
+
+                        session = ConnectionManager::update_session_info(session.clone(), info).await?;
+                    }
+                    _ => {
+                        // do nothing
+                    }
+                };
                 Ok(session)
             }
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
@@ -632,6 +623,23 @@ impl ConnectionManager {
                 )))
             }
         }
+    }
+
+    /// Apply updated info to a network session, and trigger connections
+    async fn update_session_info(mut session: Session, info: &NetworkInfo ) -> Result<Session, Error> {
+        let elders = &info.elders;
+        session.section_key_set = Some(info.pk_set.clone());
+        trace!("GetSectionResponse Success! Elders: ({:?})", elders);
+        // Obtain the addresses of the Elders
+        let elders_addrs = elders
+            .iter()
+            .map(|(_, socket_addr)| socket_addr)
+            .copied()
+            .collect();
+        session.elders = elders_addrs;
+
+        // clear existing elder list.
+        Self::connect_to_elders(session).await
     }
 
     /// Handle messages intended for client consumption (re: queries + commands)
@@ -726,9 +734,9 @@ impl Session {
         signer: Signer,
         notifier: UnboundedSender<Error>,
     ) -> Result<Self, Error> {
-        // qp2p_config.local_port = Some(0); // Make sure we always use a random port for client connections.
-        // qp2p_config.idle_timeout_msec = Some(5500);
-        // qp2p_config.keep_alive_interval_msec = Some(4000);
+
+        debug!("QP2p config: {:?}", qp2p_config);
+
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), false)?;
         Ok(Session {
             qp2p,

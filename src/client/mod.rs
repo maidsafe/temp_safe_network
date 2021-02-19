@@ -134,7 +134,7 @@ impl Client {
 
         let simulated_farming_payout_dot = Dot::new(random_payment_pk, 0);
 
-        let _ = Self::get_replica_keys(session.clone()).await?;
+        // let _ = Self::get_replica_keys(session.clone()).await?;
 
         let validator = ClientTransferValidator {};
 

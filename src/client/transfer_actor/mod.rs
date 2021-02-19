@@ -261,34 +261,34 @@ impl Client {
         Ok(payment_proof)
     }
 
-    /// Get our replica instance PK set
-    pub(crate) async fn get_replica_keys(mut session: Session) -> Result<(), Error> {
-        let client_pk = session.client_public_key();
-        trace!("Getting replica keys for client_pk: {:?}", client_pk);
+    // /// Get our replica instance PK set
+    // pub(crate) async fn get_replica_keys(mut session: Session) -> Result<(), Error> {
+    //     let client_pk = session.client_public_key();
+    //     trace!("Getting replica keys for client_pk: {:?}", client_pk);
 
-        let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(client_pk));
-        let id = MessageId::new();
-        trace!("Creating query message with id : {:?}", id);
-        let message = Message::Query {
-            query: keys_query_msg,
-            id,
-            // the only msg which doesnt know our PKset
-            target_section_pk: None,
-        };
+    //     let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(client_pk));
+    //     let id = MessageId::new();
+    //     trace!("Creating query message with id : {:?}", id);
+    //     let message = Message::Query {
+    //         query: keys_query_msg,
+    //         id,
+    //         // the only msg which doesnt know our PKset
+    //         target_section_pk: None,
+    //     };
 
-        let endpoint = session.endpoint()?.clone();
-        let elders = session.elders.iter().cloned().collect();
-        let pending_queries = session.pending_queries.clone();
-        let res =
-            ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await?;
+    //     let endpoint = session.endpoint()?.clone();
+    //     let elders = session.elders.iter().cloned().collect();
+    //     let pending_queries = session.pending_queries.clone();
+    //     let res =
+    //         ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await?;
 
-        if let QueryResponse::GetReplicaKeys(Ok(pk_set)) = res {
-            session.section_key_set = Some(pk_set);
-            Ok(())
-        } else {
-            Err(Error::UnexpectedReplicaKeysResponse(client_pk))
-        }
-    }
+    //     if let QueryResponse::GetReplicaKeys(Ok(pk_set)) = res {
+    //         session.section_key_set = Some(pk_set);
+    //         Ok(())
+    //     } else {
+    //         Err(Error::UnexpectedReplicaKeysResponse(client_pk))
+    //     }
+    // }
 
     /// Send message and await validation and constructing of TransferAgreementProof
     async fn await_validation(
