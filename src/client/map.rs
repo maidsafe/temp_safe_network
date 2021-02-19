@@ -144,7 +144,7 @@ impl fmt::Debug for MapRead {
         use MapRead::*;
         write!(
             formatter,
-            "Request::{}",
+            "MapRead::{}",
             match *self {
                 Get(_) => "GetMap",
                 GetValue { .. } => "GetMapValue",
@@ -198,7 +198,7 @@ impl fmt::Debug for MapWrite {
         use MapWrite::*;
         write!(
             formatter,
-            "Request::{}",
+            "MapWrite::{}",
             match *self {
                 New(_) => "NewMap",
                 Delete(_) => "DeleteMap",

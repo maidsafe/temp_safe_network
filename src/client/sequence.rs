@@ -130,7 +130,7 @@ impl fmt::Debug for SequenceRead {
         use SequenceRead::*;
         write!(
             formatter,
-            "Request::{}",
+            "SequenceRead::{}",
             match *self {
                 Get(_) => "GetSequence",
                 GetRange { .. } => "GetSequenceRange",
@@ -183,7 +183,7 @@ impl fmt::Debug for SequenceWrite {
         use SequenceWrite::*;
         write!(
             formatter,
-            "Request::{}",
+            "SequenceWrite::{}",
             match *self {
                 New(_) => "NewSequence",
                 Delete(_) => "DeleteSequence",
