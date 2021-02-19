@@ -473,6 +473,7 @@ impl ConnectionManager {
             .serialize()?;
 
         session.endpoint = Some(endpoint);
+
         session
             .endpoint()?
             .send_message(msg, &bootstrapped_peer)
@@ -786,7 +787,17 @@ impl Session {
 
                 session = match message_type {
                     MessageType::NetworkInfo(msg) => {
-                        ConnectionManager::handle_networkinfo_msg(msg, session.clone()).await?
+                        match ConnectionManager::handle_networkinfo_msg(msg, session.clone()).await {
+                            Ok(_) => {
+                                // do nothing
+                            },
+                            Err(error) => {
+                                error!("Error handling network info message: {:?}", error);
+                                // that's enough
+                            }
+                        };
+
+                        session.clone()
                     }
                     MessageType::ClientMessage(msg) => {
                         ConnectionManager::handle_client_msg(msg, src, session.clone()).await
