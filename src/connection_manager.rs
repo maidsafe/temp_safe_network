@@ -559,7 +559,7 @@ impl ConnectionManager {
                 error!("Message {:?} was interrupted due to {:?}. This will most likely need to be sent again.", msg, error);
                 if let NetworkInfoError::TargetSectionInfoOutdated(info) = error {
                     trace!("Updated network info: ({:?})", info);
-                    session = ConnectionManager::update_session_info(session.clone(), info).await?;
+                    session = ConnectionManager::update_session_info(session, info).await?;
                 }
                 Ok(session)
             }
@@ -575,8 +575,7 @@ impl ConnectionManager {
                 error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again. Update was : {:?}", correlation_id, update);
                 if let NetworkInfoError::TargetSectionInfoOutdated(info) = update.clone().error {
                     trace!("Updated network info: ({:?})", info);
-                    session =
-                        ConnectionManager::update_session_info(session.clone(), &info).await?;
+                    session = ConnectionManager::update_session_info(session, &info).await?;
                 }
                 Ok(session)
             }
@@ -759,7 +758,7 @@ impl Session {
             socketaddr_sig,
         }
         .serialize()
-        .map_err(|e| Error::MessagingProtocol(e))
+        .map_err(Error::MessagingProtocol)
     }
 
     /// Listen for incoming messages on a connection
@@ -776,28 +775,25 @@ impl Session {
             while let Some((src, message)) = incoming_messages.next().await {
                 let message_type = WireMsg::deserialize(message)?;
                 warn!("Message received at listener from {:?}", &src);
-
+                let session_clone = session.clone();
                 session = match message_type {
                     MessageType::NetworkInfo(msg) => {
-                        match ConnectionManager::handle_networkinfo_msg(msg, session.clone()).await
-                        {
-                            Ok(_) => {
-                                // do nothing
-                            }
+                        match ConnectionManager::handle_networkinfo_msg(msg, session).await {
+                            Ok(session) => session,
                             Err(error) => {
                                 error!("Error handling network info message: {:?}", error);
                                 // that's enough
+                                // go back to using a clone of session before the error
+                                session_clone
                             }
-                        };
-
-                        session.clone()
+                        }
                     }
                     MessageType::ClientMessage(msg) => {
-                        ConnectionManager::handle_client_msg(msg, src, session.clone()).await
+                        ConnectionManager::handle_client_msg(msg, src, session).await
                     }
                     msg_type => {
                         warn!("Unexpected message type received: {:?}", msg_type);
-                        session.clone()
+                        session
                     }
                 };
             }
