@@ -1,8 +1,20 @@
-use crate::connection_manager::STANDARD_ELDERS_COUNT;
+// Copyright 2021 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
+use crate::{
+    client::Client,
+    connection_manager::{ConnectionManager, Session, STANDARD_ELDERS_COUNT},
+    errors::Error,
+};
 use bincode::serialize;
 use log::{debug, error, info, trace, warn};
 use sn_data_types::{
-    DebitId, Keypair, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
+    DebitId, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
 };
 use sn_messaging::client::{
     Cmd, DataCmd, Message, Query, QueryResponse, TransferCmd, TransferQuery,
@@ -10,7 +22,6 @@ use sn_messaging::client::{
 use sn_messaging::MessageId;
 
 use sn_transfers::{ActorEvent, ReplicaValidator, TransferInitiated};
-use threshold_crypto::PublicKeySet;
 use tokio::sync::mpsc::channel;
 
 /// Module for token balance management
@@ -23,8 +34,6 @@ pub mod write_apis;
 /// Actual Transfer Actor
 pub use sn_transfers::TransferActor as SafeTransferActor;
 
-use crate::client::{Client, ConnectionManager};
-use crate::errors::Error;
 /// Simple client side validations
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClientTransferValidator {}
@@ -135,15 +144,14 @@ impl Client {
             since_version: 0,
         });
 
-        let message = self.create_query_message(msg_contents);
+        let message = self.create_query_message(msg_contents)?;
 
         // This is a normal response manager request. We want quorum on this for now...
-        let res = self
-            .connection_manager
-            .lock()
-            .await
-            .send_query(&message)
-            .await?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let pending_queries = self.session.pending_queries.clone();
+        let res =
+            ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await?;
 
         let history = match res {
             QueryResponse::GetHistory(history) => history.map_err(Error::from),
@@ -188,15 +196,15 @@ impl Client {
             bytes,
         });
 
-        let message = self.create_query_message(msg_contents);
+        let message = self.create_query_message(msg_contents)?;
 
         // This is a normal response manager request. We want quorum on this for now...
-        let res = self
-            .connection_manager
-            .lock()
-            .await
-            .send_query(&message)
-            .await?;
+
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let pending_queries = self.session.pending_queries.clone();
+        let res =
+            ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await?;
 
         match res {
             QueryResponse::GetStoreCost(cost) => cost.map_err(Error::ErrorMessage),
@@ -216,7 +224,7 @@ impl Client {
 
         self.get_history().await?;
 
-        let section_key = PublicKey::Bls(self.replicas_pk_set.public_key());
+        let section_key = self.session.section_key()?;
 
         let cost_of_put = self.get_store_cost(bytes).await?;
 
@@ -235,7 +243,7 @@ impl Client {
 
         debug!("Transfer to be sent: {:?}", &signed_transfer);
 
-        let transfer_message = self.create_cmd_message(command);
+        let transfer_message = self.create_cmd_message(command)?;
 
         self.transfer_actor
             .lock()
@@ -254,14 +262,11 @@ impl Client {
     }
 
     /// Get our replica instance PK set
-    pub(crate) async fn get_replica_keys(
-        keypair: Keypair,
-        cm: &mut ConnectionManager,
-    ) -> Result<PublicKeySet, Error> {
-        trace!("Getting replica keys for {:?}", keypair);
-        let pk = keypair.public_key();
-        let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(pk));
+    pub(crate) async fn get_replica_keys(mut session: Session) -> Result<(), Error> {
+        let client_pk = session.client_public_key();
+        trace!("Getting replica keys for client_pk: {:?}", client_pk);
 
+        let keys_query_msg = Query::Transfer(TransferQuery::GetReplicaKeys(client_pk));
         let id = MessageId::new();
         trace!("Creating query message with id : {:?}", id);
         let message = Message::Query {
@@ -271,29 +276,42 @@ impl Client {
             target_section_pk: None,
         };
 
-        let res = cm.send_query(&message).await?;
+        let endpoint = session.endpoint()?.clone();
+        let elders = session.elders.iter().cloned().collect();
+        let pending_queries = session.pending_queries.clone();
+        let res =
+            ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await?;
 
-        match res {
-            QueryResponse::GetReplicaKeys(pk_set) => Ok(pk_set?),
-            _ => Err(Error::UnexpectedReplicaKeysResponse(pk)),
+        if let QueryResponse::GetReplicaKeys(Ok(pk_set)) = res {
+            session.section_key_set = Some(pk_set);
+            Ok(())
+        } else {
+            Err(Error::UnexpectedReplicaKeysResponse(client_pk))
         }
     }
 
     /// Send message and await validation and constructing of TransferAgreementProof
     async fn await_validation(
         &self,
-        message: &Message,
+        msg: &Message,
         _id: DebitId,
     ) -> Result<TransferAgreementProof, Error> {
         info!("Awaiting transfer validation");
 
         let (sender, mut receiver) = channel::<Result<TransferValidated, Error>>(7);
 
-        self.connection_manager
-            .lock()
-            .await
-            .send_transfer_validation(&message, sender)
-            .await?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let pending_transfers = self.session.pending_transfers.clone();
+
+        let _ = ConnectionManager::send_transfer_validation(
+            &msg,
+            sender,
+            endpoint,
+            elders,
+            pending_transfers,
+        )
+        .await?;
 
         let mut returned_errors = vec![];
         let mut response_count = 0;
@@ -311,11 +329,13 @@ impl Client {
                                     ))?;
                                     info!("Transfer successfully validated.");
                                     if let Some(dap) = validation.proof {
-                                        self.connection_manager
-                                            .lock()
-                                            .await
-                                            .remove_pending_transfer_sender(&message.id())
-                                            .await?;
+                                        let pending_transfers =
+                                            self.session.pending_transfers.clone();
+                                        let _ = ConnectionManager::remove_pending_transfer_sender(
+                                            &msg.id(),
+                                            pending_transfers,
+                                        )
+                                        .await?;
                                         return Ok(dap);
                                     }
                                 } else {
@@ -333,13 +353,12 @@ impl Client {
                         if returned_errors.len() > STANDARD_ELDERS_COUNT / 2 {
                             // TODO: Check + handle that errors are the same
                             let error = returned_errors.remove(0);
-
-                            if let Err(e) = self
-                                .connection_manager
-                                .lock()
-                                .await
-                                .remove_pending_transfer_sender(&message.id())
-                                .await
+                            let pending_transfers = self.session.pending_transfers.clone();
+                            if let Err(e) = ConnectionManager::remove_pending_transfer_sender(
+                                &msg.id(),
+                                pending_transfers,
+                            )
+                            .await
                             {
                                 return Err(e);
                             } else {
@@ -356,11 +375,10 @@ impl Client {
             // at any point if we've had enough responses in, let's clean up
             if response_count >= STANDARD_ELDERS_COUNT {
                 // remove pending listener
-                self.connection_manager
-                    .lock()
-                    .await
-                    .remove_pending_transfer_sender(&message.id())
-                    .await?;
+                let pending_transfers = self.session.pending_transfers.clone();
+                let _ =
+                    ConnectionManager::remove_pending_transfer_sender(&msg.id(), pending_transfers)
+                        .await?;
             }
         }
     }
@@ -372,7 +390,6 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::utils::test_utils::{create_test_client, create_test_client_with};
     use anyhow::{anyhow, Result};
     use rand::rngs::OsRng;
@@ -382,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn transfer_actor_creation_hydration_for_nonexistant_balance() -> Result<()> {
-        let keypair = Keypair::new_ed25519(&mut OsRng);
+        let keypair = sn_data_types::Keypair::new_ed25519(&mut OsRng);
 
         match create_test_client_with(Some(keypair)).await {
             Ok(actor) => {
@@ -420,7 +437,7 @@ mod tests {
         // small delay for starting this test, which seems to have a problem when nodes are under stress..
         // delay_for(Duration::from_millis(200)).await;
 
-        let keypair = Keypair::new_ed25519(&mut OsRng);
+        let keypair = sn_data_types::Keypair::new_ed25519(&mut OsRng);
 
         {
             let mut initial_actor = create_test_client_with(Some(keypair.clone())).await?;

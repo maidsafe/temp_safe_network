@@ -1,3 +1,11 @@
+// Copyright 2021 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use sn_data_types::Token;
 
 #[cfg(feature = "simulated-payouts")]
@@ -6,8 +14,7 @@ use sn_data_types::Transfer;
 #[cfg(feature = "simulated-payouts")]
 use sn_messaging::client::{Cmd, TransferCmd};
 
-use crate::client::Client;
-use crate::errors::Error;
+use crate::{client::Client, connection_manager::ConnectionManager, errors::Error};
 
 #[cfg(feature = "simulated-payouts")]
 use log::info;
@@ -66,14 +73,12 @@ impl Client {
         let simluated_farming_cmd =
             Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
-        let message = self.create_cmd_message(simluated_farming_cmd);
+        let message = self.create_cmd_message(simluated_farming_cmd)?;
 
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         // If we're getting the payout for our own actor, update it here
         info!("Applying simulated payout locally, via query for history...");

@@ -1,9 +1,16 @@
+// Copyright 2021 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use sn_data_types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
 use sn_messaging::client::{Cmd, Event, Query, QueryResponse, TransferCmd, TransferQuery};
 use sn_transfers::{ActorEvent, TransferInitiated};
 
-use crate::client::Client;
-use crate::errors::Error;
+use crate::{client::Client, connection_manager::ConnectionManager, errors::Error};
 
 use log::{debug, info, trace};
 
@@ -74,15 +81,14 @@ impl Client {
 
         let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let message = self.create_query_message(msg_contents);
+        let message = self.create_query_message(msg_contents)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let pending_queries = self.session.pending_queries.clone();
+        let res =
+            ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await?;
 
-        match self
-            .connection_manager
-            .lock()
-            .await
-            .send_query(&message)
-            .await?
-        {
+        match res {
             QueryResponse::GetBalance(balance) => balance.map_err(Error::from),
             another_response => Err(Error::UnexpectedQueryResponse(another_response)),
         }
@@ -153,7 +159,7 @@ impl Client {
         let dot = signed_transfer.id();
         let msg_contents = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
 
-        let message = self.create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents)?;
 
         self.transfer_actor
             .lock()
@@ -170,18 +176,15 @@ impl Client {
         // Register the transfer on the network.
         let msg_contents = Cmd::Transfer(TransferCmd::RegisterTransfer(transfer_proof.clone()));
 
-        let message = self.create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents)?;
         trace!(
             "Transfer proof received and to be sent in RegisterTransfer req: {:?}",
             transfer_proof
         );
 
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         let mut actor = self.transfer_actor.lock().await;
         // First register with local actor, then reply.

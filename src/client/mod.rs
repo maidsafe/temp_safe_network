@@ -30,10 +30,11 @@ pub use self::transfer_actor::{ClientTransferValidator, SafeTransferActor};
 
 pub use blob_storage::{BlobStorage, BlobStorageDryRun};
 
-use crate::{config_handler::Config, connection_manager::{Session, Signer}};
-use crate::connection_manager::ConnectionManager;
-use crate::errors::Error;
-
+use crate::{
+    config_handler::Config,
+    connection_manager::{ConnectionManager, Session, Signer},
+    errors::Error,
+};
 use crdts::Dot;
 use futures::lock::Mutex;
 use log::{debug, info, trace, warn};
@@ -49,7 +50,6 @@ use std::{
     str::FromStr,
     {collections::HashSet, net::SocketAddr, sync::Arc},
 };
-use threshold_crypto::PublicKeySet;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Elder size
@@ -67,9 +67,9 @@ pub struct Client {
     keypair: Keypair,
     /// Sequence CRDT replica
     transfer_actor: Arc<Mutex<SafeTransferActor<ClientTransferValidator, Keypair>>>,
-    replicas_pk_set: PublicKeySet,
+    //replicas_pk_set: PublicKeySet,
     simulated_farming_payout_dot: Dot<PublicKey>,
-    connection_manager: Arc<Mutex<ConnectionManager>>,
+    session: Session,
     notification_receiver: Arc<Mutex<UnboundedReceiver<Error>>>,
 }
 
@@ -126,8 +126,7 @@ impl Client {
         let qp2p_config = Config::new(config_file_path, bootstrap_config).qp2p;
 
         // Create the connection manager
-        let mut connection_manager =
-            attempt_bootstrap(qp2p_config, keypair.clone(), notification_sender).await?;
+        let session = attempt_bootstrap(qp2p_config, keypair.clone(), notification_sender).await?;
 
         // random PK used for from payment
         let random_payment_id = Keypair::new_ed25519(&mut rng);
@@ -135,22 +134,20 @@ impl Client {
 
         let simulated_farming_payout_dot = Dot::new(random_payment_pk, 0);
 
-        let replicas_pk_set =
-            Self::get_replica_keys(keypair.clone(), &mut connection_manager).await?;
+        let _ = Self::get_replica_keys(session.clone()).await?;
 
         let validator = ClientTransferValidator {};
 
         let transfer_actor = Arc::new(Mutex::new(SafeTransferActor::new(
             keypair.clone(),
-            replicas_pk_set.clone(),
+            session.section_key_set().await?.clone(),
             validator,
         )));
 
-        let mut full_client = Self {
-            connection_manager: Arc::new(Mutex::new(connection_manager)),
+        let mut client = Self {
+            session,
             keypair,
             transfer_actor,
-            replicas_pk_set,
             simulated_farming_payout_dot,
             notification_receiver: Arc::new(Mutex::new(notification_receiver)),
         };
@@ -160,7 +157,7 @@ impl Client {
             if is_random_client {
                 debug!("Attempting to trigger simulated payout");
                 // we're testing, and currently a lot of tests expect 10 token to start
-                let _ = full_client
+                let _ = client
                     .trigger_simulated_farming_payout(Token::from_str("10")?)
                     .await?;
             } else {
@@ -168,7 +165,7 @@ impl Client {
             }
         }
 
-        match full_client.get_history().await {
+        match client.get_history().await {
             Ok(_) => {}
             Err(error) => {
                 let err = error.to_string();
@@ -176,7 +173,7 @@ impl Client {
             }
         };
 
-        Ok(full_client)
+        Ok(client)
     }
 
     /// Return the client's FullId.
@@ -226,35 +223,39 @@ impl Client {
 
         debug!("Sending QueryRequest: {:?}", query);
 
-        let message = self.create_query_message(query);
-        self.connection_manager
-            .lock()
-            .await
-            .send_query(&message)
-            .await
+        let message = self.create_query_message(query)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let pending_queries = self.session.pending_queries.clone();
+        ConnectionManager::send_query(&message, endpoint, elders, pending_queries).await
     }
 
     // Build and sign Cmd Message Envelope
-    pub(crate) fn create_cmd_message(&self, msg_contents: Cmd) -> Message {
+    pub(crate) fn create_cmd_message(&self, msg_contents: Cmd) -> Result<Message, Error> {
         let id = MessageId::new();
         trace!("Creating cmd message with id: {:?}", id);
 
-        Message::Cmd {
+        let target_section_pk = Some(self.session.section_key()?);
+
+        Ok(Message::Cmd {
             cmd: msg_contents,
             id,
-            target_section_pk: Some(PublicKey::Bls(self.replicas_pk_set.public_key())),
-        }
+            target_section_pk,
+        })
     }
 
-    // Build and sign Query Message Envelope
-    pub(crate) fn create_query_message(&self, msg_contents: Query) -> Message {
+    // Build a Query
+    pub(crate) fn create_query_message(&self, msg_contents: Query) -> Result<Message, Error> {
         let id = MessageId::new();
         trace!("Creating query message with id : {:?}", id);
-        Message::Query {
+
+        let target_section_pk = Some(self.session.section_key()?);
+
+        Ok(Message::Query {
             query: msg_contents,
             id,
-            target_section_pk: Some(PublicKey::Bls(self.replicas_pk_set.public_key())),
-        }
+            target_section_pk,
+        })
     }
 
     // Private helper to obtain payment proof for a data command, send it to the network,
@@ -268,13 +269,10 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = self.create_cmd_message(msg_contents);
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let message = self.create_cmd_message(msg_contents)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }
@@ -288,9 +286,9 @@ pub async fn attempt_bootstrap(
     notifier: UnboundedSender<Error>,
 ) -> Result<Session, Error> {
     let mut attempts: u32 = 0;
-    
+
     let signer = Signer::new(keypair);
-    
+
     let session = Session::new(qp2p_config, signer, notifier)?;
     loop {
         let res = ConnectionManager::bootstrap(session.clone()).await;

@@ -20,7 +20,14 @@ use sn_messaging::{
     network_info::{GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo},
     MessageId, MessageType, WireMsg,
 };
-use std::{borrow::Borrow, collections::{HashMap, HashSet}, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
+use threshold_crypto::PublicKeySet;
 use tokio::{
     sync::mpsc::{channel, Sender, UnboundedSender},
     task::JoinHandle,
@@ -39,57 +46,28 @@ type VoteMap = HashMap<[u8; 32], (QueryResponse, usize)>;
 type TransferValidationSender = Sender<Result<TransferValidated, Error>>;
 type QueryResponseSender = Sender<Result<QueryResponse, Error>>;
 
-type ElderConnectionMap = HashSet<SocketAddr>;
+//type ElderConnectionMap = HashSet<SocketAddr>;
 
 type PendingTransferValidations = Arc<Mutex<HashMap<MessageId, TransferValidationSender>>>;
 type PendingQueryResponses = Arc<Mutex<HashMap<(SocketAddr, MessageId), QueryResponseSender>>>;
 
 /// Initialises `QuicP2p` instance which can bootstrap to the network, establish
 /// connections and send messages to several nodes, as well as await responses from them.
-pub struct ConnectionManager {
-    keypair: Keypair,
-    qp2p: QuicP2p,
-    elders: ElderConnectionMap,
-    endpoint: Option<Endpoint>,
-    pending_transfer_validations: PendingTransferValidations,
-    pending_query_responses: PendingQueryResponses,
-    notification_sender: UnboundedSender<Error>,
-}
+pub struct ConnectionManager {}
 
 impl ConnectionManager {
-    /// Create a new connection manager.
-    pub async fn new(
-        mut config: QuicP2pConfig,
-        keypair: Keypair,
-        notification_sender: UnboundedSender<Error>,
-    ) -> Result<Self, Error> {
-        config.local_port = Some(0); // Make sure we always use a random port for client connections.
-        config.idle_timeout_msec = Some(5500);
-        config.keep_alive_interval_msec = Some(4000);
-        let qp2p = QuicP2p::with_config(Some(config), Default::default(), false)?;
-
-        Ok(Self {
-            keypair,
-            qp2p,
-            elders: HashSet::default(),
-            endpoint: None,
-            pending_transfer_validations: Arc::new(Mutex::new(HashMap::default())),
-            pending_query_responses: Arc::new(Mutex::new(HashMap::default())),
-            notification_sender,
-        })
-    }
-
     /// Bootstrap to the network maintaining connections to several nodes.
-    pub async fn bootstrap(session: Session) -> Result<Session, Error> { // &'static 
+    pub async fn bootstrap(session: Session) -> Result<Session, Error> {
+        // &'static
         trace!(
             "Trying to bootstrap to the network with public_key: {:?}",
-            session.public_key().await
+            session.client_public_key()
         );
 
         // Bootstrap and send a handshake request to
         let (session, mut incoming_messages) = Self::get_section(session).await?;
         // Receive the list of Elders we can then connect to
-        let elder_addresses = Self::get_elders(&mut incoming_messages).await?;
+        let session = Self::get_elders(session, &mut incoming_messages).await?;
         // Let's now connect to all Elders
         let session = Self::connect_to_elders(session).await?;
 
@@ -97,13 +75,15 @@ impl ConnectionManager {
     }
 
     async fn get_elders(
+        mut session: Session,
         incoming_messages: &mut IncomingMessages,
-    ) -> Result<Vec<SocketAddr>, Error> {
+    ) -> Result<Session, Error> {
         if let Some((_src, message)) = incoming_messages.next().await {
             match NetworkInfoMsg::from(message) {
                 Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses))) => {
                     trace!("GetSectionResponse::Redirect, trying with provided elders");
-                    Ok(addresses)
+                    session.elders = addresses.into_iter().collect();
+                    Ok(session)
                 }
                 Ok(NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(
                     NetworkInfo { elders, .. },
@@ -115,7 +95,8 @@ impl ConnectionManager {
                         .into_iter()
                         .map(|(_, socket_addr)| socket_addr)
                         .collect();
-                    Ok(elders_addrs)
+                    session.elders = elders_addrs;
+                    Ok(session)
                 }
                 Ok(msg) => Err(Error::UnexpectedMessageOnJoin(format!(
                     "bootstrapping failed since an invalid response ({:?}) was received",
@@ -129,10 +110,14 @@ impl ConnectionManager {
     }
 
     /// Send a `Message` to the network without awaiting for a response.
-    pub async fn send_cmd(&mut self, msg: &Message) -> Result<(), Error> {
+    pub async fn send_cmd(
+        msg: &Message,
+        endpoint: Endpoint,
+        elders: Vec<SocketAddr>,
+    ) -> Result<(), Error> {
         let msg_id = msg.id();
 
-        let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
+        let endpoint = endpoint.clone();
         let src_addr = endpoint.socket_addr();
         trace!(
             "Sending (from {}) command message {:?} w/ id: {:?}",
@@ -145,11 +130,11 @@ impl ConnectionManager {
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
 
-        let elders_addrs: Vec<SocketAddr> = self.elders.iter().cloned().collect();
+        //let elders_addrs: Vec<SocketAddr> = elders.iter().cloned().collect();
         // clone elders as we want to update them in this process
-        for socket in elders_addrs {
+        for socket in elders {
             let msg_bytes_clone = msg_bytes.clone();
-            let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
+            let endpoint = endpoint.clone();
             let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
                 trace!("About to send cmd message {:?} to {:?}", msg_id, &socket);
                 endpoint.connect_to(&socket).await?;
@@ -179,22 +164,25 @@ impl ConnectionManager {
     }
 
     /// Remove a pending transfer sender from the listener map
-    pub async fn remove_pending_transfer_sender(&self, msg_id: &MessageId) -> Result<(), Error> {
+    pub async fn remove_pending_transfer_sender(
+        msg_id: &MessageId,
+        pending_transfers: PendingTransferValidations,
+    ) -> Result<(), Error> {
         trace!("Removing pending transfer sender");
-        let mut listeners = self.pending_transfer_validations.lock().await;
-
+        let mut listeners = pending_transfers.lock().await;
         let _ = listeners
             .remove(msg_id)
             .ok_or(Error::NoTransferValidationListener)?;
-
         Ok(())
     }
 
     /// Send a transfer validation message to all Elder without awaiting for a response.
     pub async fn send_transfer_validation(
-        &self,
         msg: &Message,
         sender: Sender<Result<TransferValidated, Error>>,
+        endpoint: Endpoint,
+        elders: Vec<SocketAddr>,
+        pending_transfers: PendingTransferValidations,
     ) -> Result<(), Error> {
         info!(
             "Sending transfer validation command {:?} w/ id: {:?}",
@@ -205,20 +193,16 @@ impl ConnectionManager {
 
         let msg_id = msg.id();
         {
-            let _ = self
-                .pending_transfer_validations
-                .lock()
-                .await
-                .insert(msg_id, sender);
+            let _ = pending_transfers.lock().await.insert(msg_id, sender);
         }
 
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
-        for socket in self.elders.iter() {
+        for socket in elders.iter() {
             let msg_bytes_clone = msg_bytes.clone();
             let socket = *socket;
 
-            let endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
+            let endpoint = endpoint.clone();
 
             let task_handle = tokio::spawn(async move {
                 endpoint.connect_to(&socket).await?;
@@ -239,7 +223,12 @@ impl ConnectionManager {
     }
 
     /// Send a Query `Message` to the network awaiting for the response.
-    pub async fn send_query(&mut self, msg: &Message) -> Result<QueryResponse, Error> {
+    pub async fn send_query(
+        msg: &Message,
+        endpoint: Endpoint,
+        elders: Vec<SocketAddr>,
+        pending_queries: PendingQueryResponses,
+    ) -> Result<QueryResponse, Error> {
         info!("sending query message {:?} w/ id: {:?}", msg, msg.id());
         let msg_bytes = msg.serialize()?;
 
@@ -247,15 +236,15 @@ impl ConnectionManager {
         // and we try to find a majority on the responses
         let mut tasks = Vec::default();
 
-        let elders_addrs: Vec<SocketAddr> = self.elders.iter().cloned().collect();
-        for socket in elders_addrs {
+        //let elders_addrs: Vec<SocketAddr> = session.elders.iter().cloned().collect();
+
+        for socket in elders.clone() {
             let msg_bytes_clone = msg_bytes.clone();
             // Create a new stream here to not have to worry about filtering replies
             let msg_id = msg.id();
 
-            let pending_query_responses = self.pending_query_responses.clone();
-
-            let mut endpoint = self.endpoint.clone().ok_or(Error::NotBootstrapped)?;
+            let pending_queries = pending_queries.clone();
+            let mut endpoint = endpoint.clone();
             endpoint.connect_to(&socket).await?;
 
             let task_handle = tokio::spawn(async move {
@@ -269,14 +258,14 @@ impl ConnectionManager {
 
                     let (sender, mut receiver) = channel::<Result<QueryResponse, Error>>(7);
                     {
-                        let _ = pending_query_responses
+                        let _ = pending_queries
                             .lock()
                             .await
                             .insert((socket, msg_id), sender);
                     }
 
                     // TODO: we need to remove the msg_id from
-                    // pending_query_responses upon any failure below
+                    // pending_queries upon any failure below
                     match endpoint.send_message(msg_bytes_clone, &socket).await {
                         Ok(()) => {
                             trace!("Message sent to {}. Waiting for response...", &socket);
@@ -334,7 +323,7 @@ impl ConnectionManager {
         let mut received_errors = 0;
 
         // 2/3 of known elders
-        let threshold: usize = (self.elders.len() as f32 / 2_f32).ceil() as usize;
+        let threshold: usize = (elders.len() as f32 / 2_f32).ceil() as usize;
 
         trace!("Vote threshold is: {:?}", threshold);
         let mut winner: (Option<QueryResponse>, usize) = (None, threshold);
@@ -387,7 +376,7 @@ impl ConnectionManager {
 
             // Second, let's handle no winner if we have > threshold responses.
             if !has_elected_a_response {
-                winner = self.select_best_of_the_rest_response(
+                winner = Self::select_best_of_the_rest_response(
                     winner,
                     threshold,
                     &vote_map,
@@ -407,7 +396,6 @@ impl ConnectionManager {
 
     /// Choose the best response when no single responses passes the threshold
     fn select_best_of_the_rest_response(
-        &self,
         current_winner: (Option<QueryResponse>, usize),
         threshold: usize,
         vote_map: &VoteMap,
@@ -484,16 +472,16 @@ impl ConnectionManager {
 
         // 1. We query the network for section info.
         trace!("Querying for section info from bootstrapped node...");
-        let msg = NetworkInfoMsg::GetSectionQuery(XorName::from(session.public_key().await)).serialize()?;
+        let msg = NetworkInfoMsg::GetSectionQuery(XorName::from(session.client_public_key()))
+            .serialize()?;
 
         session.endpoint = Some(endpoint);
-        session.endpoint().await?.send_message(msg, &bootstrapped_peer).await?;
+        session
+            .endpoint()?
+            .send_message(msg, &bootstrapped_peer)
+            .await?;
 
         Ok((session, incoming_messages))
-    }
-
-    pub fn number_of_connected_elders(&self) -> usize {
-        self.elders.len()
     }
 
     // Connect to a set of Elders nodes which will be
@@ -503,17 +491,10 @@ impl ConnectionManager {
         // We spawn a task per each node to connect to
         let mut tasks = Vec::default();
 
-        let endpoint = session.endpoint().await?;
+        let endpoint = session.endpoint()?;
+        let msg = session.bootstrap_cmd().await?;
+        let peers = session.elders.clone();
 
-        let socketaddr_sig = session
-            .signer
-            .sign(&serialize(&endpoint.socket_addr())?).await?;
-        let msg = NetworkInfoMsg::BootstrapCmd {
-            end_user: session.public_key().await,
-            socketaddr_sig,
-        }
-        .serialize()?;
-        let peers = session.elders_addrs.clone();
         for peer_addr in peers {
             let endpoint = endpoint.clone();
             let msg = msg.clone();
@@ -542,7 +523,6 @@ impl ConnectionManager {
 
         // TODO: Do we need a timeout here to check sufficient time has passed + or sufficient connections?
         let mut has_sufficent_connections = false;
-
         let mut todo = tasks;
         let mut elders = HashSet::new();
 
@@ -553,7 +533,6 @@ impl ConnectionManager {
             }
 
             let (res, _idx, remaining_futures) = select_all(todo.into_iter()).await;
-
             if remaining_futures.is_empty() {
                 has_sufficent_connections = true;
             }
@@ -577,11 +556,9 @@ impl ConnectionManager {
             if elders.len() >= STANDARD_ELDERS_COUNT {
                 has_sufficent_connections = true;
             }
-
             if elders.len() < STANDARD_ELDERS_COUNT {
                 warn!("Connected to only {:?} elders.", elders.len());
             }
-
             if elders.len() < STANDARD_ELDERS_COUNT - 2 && has_sufficent_connections {
                 return Err(Error::InsufficientElderConnections);
             }
@@ -589,47 +566,20 @@ impl ConnectionManager {
 
         trace!("Connected to {} Elders.", elders.len());
 
-        session.elders_addrs = elders.into_iter().collect();
+        session.elders = elders;
 
         Ok(session)
     }
 
-    /// Listen for incoming messages on a connection
-    async fn listen_to_incoming_messages(
-        session: Session,
-        mut incoming_messages: IncomingMessages,
-    ) -> Result<(), Error> { // &'static 
-        debug!("Adding IncomingMessages listener");
-
-        // Spawn a thread
-        let _ = tokio::spawn(async move {
-            while let Some((src, message)) = incoming_messages.next().await {
-                let message_type = WireMsg::deserialize(message)?;
-                warn!("Message received at listener from {:?}", &src);
-
-                let session = match message_type {
-                    MessageType::NetworkInfo(msg) => Self::handle_networkinfo_msg(msg, session.clone()).await?,
-                    MessageType::ClientMessage(msg) => Self::handle_client_msg(msg, src, session.clone()).await,
-                    msg_type => {
-                        warn!("Unexpected message type received: {:?}", msg_type);
-                        session.clone()
-                    }
-                };
-            }
-            info!("IncomingMessages listener is closing now");
-            Ok::<(), Error>(())
-        });
-
-        // Some or None, not super important if this existed before...
-        Ok(())
-    }
-
     /// Handle received network info messages
-    async fn handle_networkinfo_msg(msg: NetworkInfoMsg, mut session: Session) -> Result<Session, Error> {
+    async fn handle_networkinfo_msg(
+        msg: NetworkInfoMsg,
+        mut session: Session,
+    ) -> Result<Session, Error> {
         match &msg {
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
                 let elders = &info.elders;
-                let pk_set = &info.pk_set;
+                session.section_key_set = Some(info.pk_set.clone());
                 trace!("GetSectionResponse Success! Elders: ({:?})", elders);
                 // Obtain the addresses of the Elders
                 let elders_addrs = elders
@@ -637,7 +587,7 @@ impl ConnectionManager {
                     .map(|(_, socket_addr)| socket_addr)
                     .copied()
                     .collect();
-                session.elders_addrs = elders_addrs;
+                session.elders = elders_addrs;
 
                 // clear existing elder list.
                 //self.elders = Default::default();
@@ -652,7 +602,7 @@ impl ConnectionManager {
             }
             NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
                 trace!("GetSectionResponse::Redirect, trying with provided elders");
-
+                session.elders = addresses.iter().copied().collect();
                 // Continually try and bootstrap against new elders while we're getting rediret
                 let (session, _) = Self::get_section(session).await?;
                 Ok(session)
@@ -673,11 +623,7 @@ impl ConnectionManager {
 
     /// Handle messages intended for client consumption (re: queries + commands)
     async fn handle_client_msg(msg: Message, src: SocketAddr, session: Session) -> Session {
-        //let pending_transfer_validations = Arc::clone(&self.pending_transfer_validations);
         let notifier = session.notifier.clone();
-
-        //let pending_queries = self.pending_query_responses.clone();
-
         match msg.clone() {
             Message::QueryResponse {
                 response,
@@ -686,8 +632,11 @@ impl ConnectionManager {
             } => {
                 trace!("Query response in: {:?}", response);
 
-                if let Some(mut sender) =
-                    session.pending_queries.lock().await.remove(&(src, correlation_id))
+                if let Some(mut sender) = session
+                    .pending_queries
+                    .lock()
+                    .await
+                    .remove(&(src, correlation_id))
                 {
                     trace!("Sender channel found for query response");
                     let _ = sender.send(Ok(response)).await;
@@ -704,7 +653,8 @@ impl ConnectionManager {
                 ..
             } => {
                 if let Event::TransferValidated { event, .. } = event {
-                    if let Some(sender) = session.pending_transfers
+                    if let Some(sender) = session
+                        .pending_transfers
                         .lock()
                         .await
                         .get_mut(&correlation_id)
@@ -723,7 +673,8 @@ impl ConnectionManager {
                 correlation_id,
                 ..
             } => {
-                if let Some(sender) = session.pending_transfers
+                if let Some(sender) = session
+                    .pending_transfers
                     .lock()
                     .await
                     .get_mut(&correlation_id)
@@ -748,15 +699,20 @@ impl ConnectionManager {
 pub struct Session {
     pub qp2p: QuicP2p,
     pub notifier: UnboundedSender<Error>,
-    pub pending_queries: PendingQueryResponses, 
+    pub pending_queries: PendingQueryResponses,
     pub pending_transfers: PendingTransferValidations,
-    pub endpoint: Option<Endpoint>, 
-    pub elders_addrs: HashSet<SocketAddr>,
+    pub endpoint: Option<Endpoint>,
+    pub elders: HashSet<SocketAddr>,
+    pub section_key_set: Option<PublicKeySet>,
     pub signer: Signer,
 }
 
 impl Session {
-    pub fn new(qp2p_config: QuicP2pConfig, signer: Signer, notifier: UnboundedSender<Error>) -> Result<Self, Error> {
+    pub fn new(
+        mut qp2p_config: QuicP2pConfig,
+        signer: Signer,
+        notifier: UnboundedSender<Error>,
+    ) -> Result<Self, Error> {
         qp2p_config.local_port = Some(0); // Make sure we always use a random port for client connections.
         qp2p_config.idle_timeout_msec = Some(5500);
         qp2p_config.keep_alive_interval_msec = Some(4000);
@@ -767,42 +723,75 @@ impl Session {
             pending_queries: Arc::new(Mutex::new(HashMap::default())),
             pending_transfers: Arc::new(Mutex::new(HashMap::default())),
             endpoint: None,
-            elders_addrs: HashSet::default(),
+            section_key_set: None,
+            elders: HashSet::default(),
             signer,
         })
     }
 
-    pub async fn public_key(&self) -> PublicKey {
-        self.signer.public_key().await
+    pub fn client_public_key(&self) -> PublicKey {
+        self.signer.public_key()
     }
 
-    pub async fn endpoint(&self) -> Result<&Endpoint, Error> {
+    pub fn endpoint(&self) -> Result<&Endpoint, Error> {
         match self.endpoint.borrow() {
             Some(endpoint) => Ok(endpoint),
+            None => Err(Error::NotBootstrapped),
+        }
+    }
+
+    pub fn section_key(&self) -> Result<PublicKey, Error> {
+        match self.section_key_set.borrow() {
+            Some(section_key_set) => Ok(PublicKey::Bls(section_key_set.public_key())),
+            None => Err(Error::NotBootstrapped),
+        }
+    }
+
+    pub async fn section_key_set(&self) -> Result<&PublicKeySet, Error> {
+        match self.section_key_set.borrow() {
+            Some(section_key_set) => Ok(section_key_set),
             None => return Err(Error::NotBootstrapped),
         }
+    }
+
+    pub async fn bootstrap_cmd(&self) -> Result<bytes::Bytes, Error> {
+        let socketaddr_sig = self
+            .signer
+            .sign(&serialize(&self.endpoint()?.socket_addr())?)
+            .await?;
+        NetworkInfoMsg::BootstrapCmd {
+            end_user: self.client_public_key(),
+            socketaddr_sig,
+        }
+        .serialize()
+        .map_err(|_| Error::NotBootstrapped)
     }
 
     /// Listen for incoming messages on a connection
     pub async fn listen_to_incoming_messages(
         self,
         mut incoming_messages: IncomingMessages,
-    ) -> Result<Session, Error> { // &'static 
+    ) -> Result<Session, Error> {
+        // &'static
         debug!("Adding IncomingMessages listener");
 
-        let session = self.clone();
+        let mut session = self.clone();
         // Spawn a thread
         let _ = tokio::spawn(async move {
             while let Some((src, message)) = incoming_messages.next().await {
                 let message_type = WireMsg::deserialize(message)?;
                 warn!("Message received at listener from {:?}", &src);
 
-                let session = match message_type {
-                    MessageType::NetworkInfo(msg) => ConnectionManager::handle_networkinfo_msg(msg, self.clone()).await?,
-                    MessageType::ClientMessage(msg) => ConnectionManager::handle_client_msg(msg, src, self.clone()).await,
+                session = match message_type {
+                    MessageType::NetworkInfo(msg) => {
+                        ConnectionManager::handle_networkinfo_msg(msg, session.clone()).await?
+                    }
+                    MessageType::ClientMessage(msg) => {
+                        ConnectionManager::handle_client_msg(msg, src, session.clone()).await
+                    }
                     msg_type => {
                         warn!("Unexpected message type received: {:?}", msg_type);
-                        self.clone()
+                        session.clone()
                     }
                 };
             }
@@ -811,25 +800,27 @@ impl Session {
         });
 
         // Some or None, not super important if this existed before...
-        Ok(session)
+        Ok(self)
     }
 }
-
 
 #[derive(Clone)]
 pub struct Signer {
     keypair: Arc<Mutex<Keypair>>,
+    public_key: PublicKey,
 }
 
 impl Signer {
     pub fn new(keypair: Keypair) -> Self {
+        let public_key = keypair.public_key();
         Self {
-            keypair: Arc::new(Mutex::new(keypair))
+            keypair: Arc::new(Mutex::new(keypair)),
+            public_key,
         }
     }
 
-    pub async fn public_key(&self) -> PublicKey {
-        self.keypair.lock().await.public_key()
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
     }
 
     pub async fn sign<T: serde::Serialize>(&self, data: &T) -> Result<Signature, Error> {

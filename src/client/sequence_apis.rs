@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::errors::Error;
-use crate::Client;
+use crate::{connection_manager::ConnectionManager, errors::Error, Client};
 use log::{debug, trace};
 use sn_data_types::{
     PublicKey, Sequence, SequenceAddress, SequenceDataWriteOp, SequenceEntries, SequenceEntry,
@@ -232,14 +231,11 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = self.create_cmd_message(msg_contents);
+        let message = self.create_cmd_message(msg_contents)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
 
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }
@@ -680,13 +676,11 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = self.create_cmd_message(msg_contents);
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let message = self.create_cmd_message(msg_contents)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }
@@ -939,13 +933,11 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = self.create_cmd_message(msg_contents);
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let message = self.create_cmd_message(msg_contents)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }
@@ -1019,13 +1011,11 @@ impl Client {
             cmd,
             payment: payment_proof.clone(),
         };
-        let message = self.create_cmd_message(msg_contents);
-        let _ = self
-            .connection_manager
-            .lock()
-            .await
-            .send_cmd(&message)
-            .await?;
+        let message = self.create_cmd_message(msg_contents)?;
+        let endpoint = self.session.endpoint()?.clone();
+        let elders = self.session.elders.iter().cloned().collect();
+
+        let _ = ConnectionManager::send_cmd(&message, endpoint, elders).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }
