@@ -17,8 +17,8 @@ use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
 use sn_data_types::{Keypair, PublicKey, Signature, TransferValidated};
 use sn_messaging::{
     client::{Event, Message, QueryResponse},
-    network_info::{
-        Error as NetworkInfoError, GetSectionResponse, Message as NetworkInfoMsg, NetworkInfo,
+    section_info::{
+        Error as SectionInfoError, GetSectionResponse, Message as SectionInfoMsg, SectionInfo,
     },
     MessageId, MessageType, WireMsg,
 };
@@ -78,8 +78,8 @@ impl ConnectionManager {
         incoming_messages: &mut IncomingMessages,
     ) -> Result<Session, Error> {
         if let Some((_src, message)) = incoming_messages.next().await {
-            match NetworkInfoMsg::from(message) {
-                Ok(msg) => ConnectionManager::handle_networkinfo_msg(msg, session).await,
+            match SectionInfoMsg::from(message) {
+                Ok(msg) => ConnectionManager::handle_sectioninfo_msg(msg, session).await,
                 Err(e) => Err(e.into()),
             }
         } else {
@@ -436,7 +436,7 @@ impl ConnectionManager {
 
         // 1. We query the network for section info.
         trace!("Querying for section info from bootstrapped node...");
-        let msg = NetworkInfoMsg::GetSectionQuery(XorName::from(session.client_public_key()))
+        let msg = SectionInfoMsg::GetSectionQuery(XorName::from(session.client_public_key()))
             .serialize()?;
 
         session.endpoint = Some(endpoint);
@@ -542,44 +542,42 @@ impl ConnectionManager {
     }
 
     /// Handle received network info messages
-    async fn handle_networkinfo_msg(
-        msg: NetworkInfoMsg,
+    async fn handle_sectioninfo_msg(
+        msg: SectionInfoMsg,
         mut session: Session,
     ) -> Result<Session, Error> {
         debug!("Handling network info message");
         match &msg {
-            NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
+            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Success(info)) => {
                 trace!("GetSectionResponse Success! Elders: ({:?})", info.elders);
                 ConnectionManager::update_session_info(session, info).await
             }
-            NetworkInfoMsg::BootstrapError(error)
-            | NetworkInfoMsg::GetSectionResponse(GetSectionResponse::SectionNetworkInfoUpdate(
-                error,
-            )) => {
+            SectionInfoMsg::RegisterEndUserError(error)
+            | SectionInfoMsg::GetSectionResponse(GetSectionResponse::SectionInfoUpdate(error)) => {
                 error!("Message {:?} was interrupted due to {:?}. This will most likely need to be sent again.", msg, error);
-                if let NetworkInfoError::TargetSectionInfoOutdated(info) = error {
+                if let SectionInfoError::TargetSectionInfoOutdated(info) = error {
                     trace!("Updated network info: ({:?})", info);
                     session = ConnectionManager::update_session_info(session, info).await?;
                 }
                 Ok(session)
             }
-            NetworkInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
+            SectionInfoMsg::GetSectionResponse(GetSectionResponse::Redirect(addresses)) => {
                 trace!("GetSectionResponse::Redirect, trying with provided elders");
                 session.elders = addresses.iter().copied().collect();
                 // Continually try and bootstrap against new elders while we're getting rediret
                 let (session, _) = Self::get_section(session).await?;
                 Ok(session)
             }
-            NetworkInfoMsg::NetworkInfoUpdate(update) => {
+            SectionInfoMsg::SectionInfoUpdate(update) => {
                 let correlation_id = update.correlation_id;
                 error!("MessageId {:?} was interrupted due to infrastructure updates. This will most likely need to be sent again. Update was : {:?}", correlation_id, update);
-                if let NetworkInfoError::TargetSectionInfoOutdated(info) = update.clone().error {
+                if let SectionInfoError::TargetSectionInfoOutdated(info) = update.clone().error {
                     trace!("Updated network info: ({:?})", info);
                     session = ConnectionManager::update_session_info(session, &info).await?;
                 }
                 Ok(session)
             }
-            NetworkInfoMsg::BootstrapCmd { .. } | NetworkInfoMsg::GetSectionQuery(_) => {
+            SectionInfoMsg::RegisterEndUserCmd { .. } | SectionInfoMsg::GetSectionQuery(_) => {
                 Err(Error::UnexpectedMessageOnJoin(format!(
                     "bootstrapping failed since an invalid response ({:?}) was received",
                     msg
@@ -591,7 +589,7 @@ impl ConnectionManager {
     /// Apply updated info to a network session, and trigger connections
     async fn update_session_info(
         mut session: Session,
-        info: &NetworkInfo,
+        info: &SectionInfo,
     ) -> Result<Session, Error> {
         let elders = &info.elders;
         session.section_key_set = Some(info.pk_set.clone());
@@ -753,7 +751,7 @@ impl Session {
             .signer
             .sign(&serialize(&self.endpoint()?.socket_addr())?)
             .await?;
-        NetworkInfoMsg::BootstrapCmd {
+        SectionInfoMsg::RegisterEndUserCmd {
             end_user: self.client_public_key(),
             socketaddr_sig,
         }
@@ -777,8 +775,8 @@ impl Session {
                 warn!("Message received at listener from {:?}", &src);
                 let session_clone = session.clone();
                 session = match message_type {
-                    MessageType::NetworkInfo(msg) => {
-                        match ConnectionManager::handle_networkinfo_msg(msg, session).await {
+                    MessageType::SectionInfo(msg) => {
+                        match ConnectionManager::handle_sectioninfo_msg(msg, session).await {
                             Ok(session) => session,
                             Err(error) => {
                                 error!("Error handling network info message: {:?}", error);
