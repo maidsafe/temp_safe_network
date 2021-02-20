@@ -11,9 +11,9 @@ pub mod client;
 mod errors;
 pub mod location;
 mod msg_id;
-pub mod network_info;
 #[cfg(not(feature = "client-only"))]
 pub mod node;
+pub mod section_info;
 mod serialisation;
 
 pub use self::{
@@ -31,7 +31,7 @@ use bytes::Bytes;
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
     Ping,
-    NetworkInfo(network_info::Message),
+    SectionInfo(section_info::Message),
     ClientMessage(client::Message),
     #[cfg(not(feature = "client-only"))]
     NodeMessage(node::NodeMessage),
@@ -42,7 +42,7 @@ impl MessageType {
     pub fn serialize(&self) -> Result<Bytes> {
         match self {
             Self::Ping => WireMsg::new_ping_msg().serialize(),
-            Self::NetworkInfo(query) => WireMsg::serialize_networkinfo_msg(query),
+            Self::SectionInfo(query) => WireMsg::serialize_sectioninfo_msg(query),
             Self::ClientMessage(msg) => WireMsg::serialize_client_msg(msg),
             #[cfg(not(feature = "client-only"))]
             Self::NodeMessage(msg) => WireMsg::serialize_node_msg(msg),

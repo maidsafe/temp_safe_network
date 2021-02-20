@@ -23,9 +23,9 @@ pub enum Message {
     /// Message to request information about the section that matches the given name.
     GetSectionQuery(XorName),
     /// An EndUser that wants to interact with the network,
-    /// would send this bootstrap cmd to the elders received
+    /// would send this cmd to the elders received
     /// in the GetSectionResponse.
-    BootstrapCmd {
+    RegisterEndUserCmd {
         /// The end user public key.
         end_user: PublicKey,
         /// A sig over the socketaddr from which
@@ -35,16 +35,16 @@ pub enum Message {
     },
     /// If the sig over the sender socketaddr
     /// cannot be verified by the provided public key.
-    BootstrapError(Error),
+    RegisterEndUserError(Error),
     /// Response to `GetSectionQuery`.
     GetSectionResponse(GetSectionResponse),
     /// Updated info related to section
-    NetworkInfoUpdate(ErrorResponse),
+    SectionInfoUpdate(ErrorResponse),
 }
 
 /// All the info a client needs about their section
 #[derive(Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
-pub struct NetworkInfo {
+pub struct SectionInfo {
     /// Prefix of the section.
     pub prefix: Prefix,
     /// Public key set of the section.
@@ -79,12 +79,12 @@ pub struct ErrorResponse {
 pub enum GetSectionResponse {
     /// Successful response to `GetSectionQuery`. Contains information about the requested
     /// section.
-    Success(NetworkInfo),
+    Success(SectionInfo),
     /// Response to `GetSectionQuery` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<SocketAddr>),
     /// Request could not be fulfilled due to section constellation updates
-    SectionNetworkInfoUpdate(Error),
+    SectionInfoUpdate(Error),
 }
 
 impl Message {
@@ -92,7 +92,7 @@ impl Message {
     /// It returns an error if the bytes don't correspond to a network info query.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::NetworkInfo(query) = deserialized {
+        if let MessageType::SectionInfo(query) = deserialized {
             Ok(query)
         } else {
             Err(crate::Error::FailedToParse(
@@ -103,6 +103,6 @@ impl Message {
 
     /// serialize this Query into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> crate::Result<Bytes> {
-        WireMsg::serialize_networkinfo_msg(self)
+        WireMsg::serialize_sectioninfo_msg(self)
     }
 }

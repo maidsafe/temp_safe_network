@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network_info::NetworkInfo;
+use crate::section_info::SectionInfo;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -15,7 +15,7 @@ use thiserror::Error;
 pub enum Error {
     /// Target section key provided with message is out of date. Current PK Set is provided in error
     #[error("Target section's public key is outdated. New information has been provided.")]
-    TargetSectionInfoOutdated(NetworkInfo),
+    TargetSectionInfoOutdated(SectionInfo),
     /// Target section is undergoing churn, a new key set will be agreed upon shortly
     #[error("DKG is in process. New key set will be agreed upon shortly.")]
     DkgInProgress,

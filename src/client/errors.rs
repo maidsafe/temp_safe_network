@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::network_info::Error as TargetSectionError;
+use crate::section_info::Error as TargetSectionError;
 use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;
 use std::{
