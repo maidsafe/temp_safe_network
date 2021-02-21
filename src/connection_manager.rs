@@ -347,6 +347,7 @@ impl ConnectionManager {
                     received_errors,
                     &mut has_elected_a_response,
                 );
+                has_elected_a_response = true;
             }
         }
 
