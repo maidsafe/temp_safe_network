@@ -13,7 +13,7 @@ use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
 use sn_data_types::ReplicaPublicKeySet;
-use std::{collections::BTreeMap, net::SocketAddr};
+use std::{collections::BTreeMap, fmt, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
 /// Message to query the network infrastructure.
@@ -28,7 +28,7 @@ pub enum Message {
 }
 
 /// All the info a client needs about their section
-#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
 pub struct InfrastructureInformation {
     /// Prefix of the section.
     pub prefix: Prefix,
@@ -36,6 +36,18 @@ pub struct InfrastructureInformation {
     pub pk_set: ReplicaPublicKeySet,
     /// Section elders.
     pub elders: BTreeMap<XorName, SocketAddr>,
+}
+
+impl fmt::Debug for InfrastructureInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "InfrastructureInformation {{ prefix: {:?}, pk_set: PkSet {{ public_key: {:?} }}, elders: {:?} }}",
+            self.prefix,
+            self.pk_set.public_key(),
+            self.elders
+        )
+    }
 }
 // Infrastructure error wrapper to add correltion info for triggering message
 #[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
