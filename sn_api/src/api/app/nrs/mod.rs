@@ -40,7 +40,7 @@ impl Safe {
     // this second SafeUrl instance contains the information of the parsed NRS-URL.
     // *Note* this is not part of the public API, but an internal helper function used by API impl.
     pub(crate) async fn parse_and_resolve_url(
-        &mut self,
+        &self,
         url: &str,
     ) -> Result<(SafeUrl, Option<SafeUrl>)> {
         let safe_url = Safe::parse_url(url)?;
@@ -240,7 +240,7 @@ impl Safe {
     ///     assert_eq!(nrs_map_container.get_default_link().unwrap(), file_xorurl);
     /// # });
     /// ```
-    pub async fn nrs_map_container_get(&mut self, url: &str) -> Result<(u64, NrsMap)> {
+    pub async fn nrs_map_container_get(&self, url: &str) -> Result<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
         let safe_url = Safe::parse_url(url)?;
 

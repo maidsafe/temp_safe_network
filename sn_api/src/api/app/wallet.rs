@@ -210,7 +210,7 @@ impl Safe {
     }
 
     pub async fn wallet_get_default_balance(
-        &mut self,
+        &self,
         url: &str,
     ) -> Result<(WalletSpendableBalance, u64)> {
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
@@ -370,7 +370,7 @@ impl Safe {
 
     /// Fetch a Wallet from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_wallet(
-        &mut self,
+        &self,
         safeurl: &SafeUrl,
     ) -> Result<WalletSpendableBalances> {
         gen_wallet_spendable_balances_list(
@@ -385,7 +385,7 @@ impl Safe {
 
 // Private helper to generate the list of SpendableBalances which is used for different purposes
 async fn gen_wallet_spendable_balances_list(
-    safe: &mut Safe,
+    safe: &Safe,
     xorname: XorName,
     type_tag: u64,
     url: &str,
@@ -446,7 +446,7 @@ async fn gen_wallet_spendable_balances_list(
 // Private helper to fetch a specific spendable balance from a Wallet usng its assigned frienly name
 // TODO: move this out to a WalletRdf API
 async fn wallet_get_spendable_balance(
-    safe: &mut Safe,
+    safe: &Safe,
     xorname: XorName,
     type_tag: u64,
     balance_name: &[u8],

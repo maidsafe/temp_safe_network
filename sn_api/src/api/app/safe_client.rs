@@ -111,7 +111,7 @@ impl SafeAppClient {
 
     #[cfg(feature = "simulated-payouts")]
     pub async fn trigger_simulated_farming_payout(
-        &mut self,
+        &self,
         amount: Token,
         id: Option<Keypair>,
     ) -> Result<()> {

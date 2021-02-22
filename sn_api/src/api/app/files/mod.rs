@@ -143,7 +143,7 @@ impl Safe {
 
     /// Fetch a FilesContainer from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_files_container(
-        &mut self,
+        &self,
         safe_url: &SafeUrl,
     ) -> Result<(u64, FilesMap)> {
         // Check if the URL specifies a specific version of the content or simply the latest available
@@ -586,7 +586,7 @@ impl Safe {
 
     /// Fetch an Blob from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_public_blob(
-        &mut self,
+        &self,
         safe_url: &SafeUrl,
         range: Range,
     ) -> Result<Vec<u8>> {

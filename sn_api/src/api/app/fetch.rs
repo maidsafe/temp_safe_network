@@ -201,7 +201,7 @@ impl Safe {
     // An optional 'while_is' argment can be set as a filter to stop reslution process
     // upon the first non-matching content type.
     pub(crate) async fn retrieve_from_url(
-        &mut self,
+        &self,
         url: &str,
         retrieve_data: bool,
         range: Range,
@@ -243,7 +243,7 @@ impl Safe {
     }
 
     async fn resolve_one_indirection(
-        &mut self,
+        &self,
         mut the_xor: SafeUrl,
         metadata: Option<FileItem>,
         retrieve_data: bool,
@@ -506,7 +506,7 @@ impl Safe {
     }
 
     async fn retrieve_blob(
-        &mut self,
+        &self,
         the_xor: &SafeUrl,
         retrieve_data: bool,
         media_type: Option<String>,

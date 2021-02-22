@@ -73,7 +73,7 @@ impl Safe {
     }
 
     /// Fetch a Sequence from a SafeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_sequence(&mut self, safe_url: &SafeUrl) -> Result<(u64, Vec<u8>)> {
+    pub(crate) async fn fetch_sequence(&self, safe_url: &SafeUrl) -> Result<(u64, Vec<u8>)> {
         let is_private = safe_url.data_type() == SafeDataType::PrivateSequence;
         let data = match safe_url.content_version() {
             Some(version) => {

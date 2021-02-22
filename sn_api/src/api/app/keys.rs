@@ -29,7 +29,7 @@ impl Safe {
     // Create a SafeKey allocating token from current client's key onto it,
     // and return the SafeKey's XOR-URL
     pub async fn keys_create_and_preload(
-        &mut self,
+        &self,
         preload_amount: &str,
     ) -> Result<(String, Keypair)> {
         let amount = parse_coins_amount(preload_amount)?;
@@ -49,7 +49,7 @@ impl Safe {
 
     // Create a SafeKey preloaded from another key and return its XOR-URL.
     pub async fn keys_create_and_preload_from_sk_string(
-        &mut self,
+        &self,
         from: &str,
         preload_amount: &str,
     ) -> Result<(String, Keypair)> {
@@ -79,7 +79,7 @@ impl Safe {
     #[cfg(feature = "simulated-payouts")]
     // Create a SafeKey on the network, allocates testcoins onto it, and return the SafeKey's XOR-URL
     pub async fn keys_create_preload_test_coins(
-        &mut self,
+        &self,
         preload_amount: &str,
     ) -> Result<(String, Keypair)> {
         let amount = parse_coins_amount(preload_amount)?;
@@ -114,7 +114,7 @@ impl Safe {
     // The difference between this and 'keys_balance_from_sk' function is that this will additionally
     // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
     pub async fn keys_balance_from_url(
-        &mut self,
+        &self,
         url: &str,
         secret_key: SecretKey,
     ) -> Result<String> {
@@ -124,7 +124,7 @@ impl Safe {
 
     // Check that the XOR/NRS-URL corresponds to the public key derived from the provided client id
     pub async fn validate_sk_for_url(
-        &mut self,
+        &self,
         secret_key: &SecretKey,
         url: &str,
     ) -> Result<String> {
@@ -174,7 +174,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn keys_transfer(
-        &mut self,
+        &self,
         amount: &str,
         from_sk_str: Option<&str>,
         to: &str,
@@ -221,7 +221,7 @@ impl Safe {
     }
 
     async fn transfer_to_url(
-        &mut self,
+        &self,
         from: Option<Keypair>,
         to: &str,
         amount_coins: Token,
@@ -271,14 +271,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_create_preload_test_coins() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let _ = safe.keys_create_preload_test_coins("12.23").await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn test_keys_create_and_preload_from_sk_string() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (_, from_keypair) = safe.keys_create_preload_test_coins("543.2312").await?;
         let from_sk_hex = sk_to_hex(from_keypair.secret_key()?);
 
@@ -293,7 +293,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_create_preload_invalid_amounts() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         match safe.keys_create_preload_test_coins(".45").await {
             Ok(_) => {
                 bail!("Key with test-coins was created unexpectedly".to_string(),)
@@ -363,7 +363,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_create_pk() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (_, from_keypair) = safe.keys_create_preload_test_coins("1.1").await?;
         let from_sk_hex = sk_to_hex(from_keypair.secret_key()?);
         let _ = safe
@@ -374,7 +374,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_test_coins_balance_pk() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let preload_amount = "1.154200000";
         let (_, keypair) = safe.keys_create_preload_test_coins(preload_amount).await?;
         let current_balance = safe.keys_balance_from_sk(keypair.secret_key()?).await?;
@@ -384,7 +384,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_test_coins_balance_xorurl() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let preload_amount = "0.243000000";
         let (xorurl, keypair) = safe.keys_create_preload_test_coins(preload_amount).await?;
         let current_balance = safe
@@ -396,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_test_coins_balance_wrong_url() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (_, keypair) = safe.keys_create_preload_test_coins("0").await?;
 
         let invalid_xorurl = "safe://this-is-not-a-valid-xor-url";
@@ -415,7 +415,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_test_coins_balance_wrong_location() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let amount = "35312.000000000";
         let (xorurl, keypair) = safe.keys_create_preload_test_coins(amount).await?;
 
@@ -443,7 +443,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_test_coins_balance_wrong_sk() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, _) = safe.keys_create_preload_test_coins("0").await?;
 
         let mut rng = OsRng;
@@ -461,7 +461,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_balance_pk() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let preload_amount = "1743.234";
         let (_, from_keypair) = safe.keys_create_preload_test_coins(preload_amount).await?;
         let from_sk_hex = sk_to_hex(from_keypair.secret_key()?);
@@ -486,7 +486,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_balance_xorname() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let preload_amount = "435.34";
         let (from_xorname, from_keypair) =
             safe.keys_create_preload_test_coins(preload_amount).await?;
@@ -514,7 +514,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_validate_sk_for_url() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, keypair) = safe.keys_create_preload_test_coins("23.22").await?;
         let pk = safe
             .validate_sk_for_url(&keypair.secret_key()?, &xorurl)
@@ -525,7 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_transfer_from_zero_balance() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (_, keypair1) = safe.keys_create_preload_test_coins("0.0").await?;
         let from_sk1_hex = sk_to_hex(keypair1.secret_key()?);
         let (to_safekey_xorurl, _keypair2) = safe.keys_create_preload_test_coins("0.5").await?;
@@ -546,7 +546,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_transfer_diff_amounts() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (safekey1_xorurl, keypair1) = safe.keys_create_preload_test_coins("0.5").await?;
         let from_sk1_hex = sk_to_hex(keypair1.secret_key()?);
 
@@ -687,7 +687,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_keys_transfer_to_pk() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (_, keypair1) = safe.keys_create_preload_test_coins("0.136").await?;
         let from_sk1_hex = sk_to_hex(keypair1.secret_key()?);
