@@ -59,6 +59,43 @@ fn run_safe_cmd(
     Ok(())
 }
 
+/// Tries to print the version of the node binary pointed to
+pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
+    let bin_path = get_node_bin_path(node_path)?.join(SN_NODE_EXECUTABLE);
+    let path_str = bin_path.display().to_string();
+
+    if !bin_path.as_path().is_file() {
+        return Err(anyhow!(format!(
+            "node executable not found at '{}'.",
+            path_str
+        )));
+    }
+
+    let output = Command::new(&path_str)
+        .arg("--version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|err| {
+            anyhow!(format!(
+                "Failed to execute node from '{}': {}",
+                path_str, err
+            ))
+        })?;
+
+    if output.status.success() {
+        io::stdout()
+            .write_all(&output.stdout)
+            .map_err(|err| anyhow!(format!("failed to write to stdout: {}", err)))
+    } else {
+        Err(anyhow!(
+            "Failed to get node version nodes when invoking executable from '{}': {}",
+            path_str,
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
 #[cfg(not(feature = "self-update"))]
 pub fn node_install(_vault_path: Option<PathBuf>) -> Result<()> {
     anyhow!("Self updates are disabled")

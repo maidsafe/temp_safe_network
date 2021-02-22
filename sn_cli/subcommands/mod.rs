@@ -25,7 +25,7 @@ pub mod update;
 pub mod wallet;
 pub mod xorurl;
 
-use structopt::StructOpt;
+use structopt::{clap::AppSettings, StructOpt};
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum OutputFmt {
@@ -54,52 +54,100 @@ impl std::str::FromStr for OutputFmt {
 
 #[derive(StructOpt, Debug)]
 pub enum SubCommands {
-    #[structopt(name = "config")]
+    #[structopt(
+        name = "config",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// CLI config settings
     Config {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<config::ConfigSubCommands>,
     },
-    #[structopt(name = "networks")]
+    #[structopt(
+        name = "networks",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Switch between SAFE networks
     Networks {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<networks::NetworksSubCommands>,
     },
-    #[structopt(name = "auth")]
+    #[structopt(
+        name = "auth", 
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Authorise the SAFE CLI and interact with a remote Authenticator daemon
     Auth {
         /// subcommands
         #[structopt(subcommand)]
         cmd: Option<auth::AuthSubCommands>,
     },
-    #[structopt(name = "cat")]
+    #[structopt(
+        name = "cat",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Read data on the SAFE Network
     Cat(cat::CatCommands),
-    #[structopt(name = "dog")]
+    #[structopt(
+        name = "dog",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Inspect data on the SAFE Network providing only metadata information about the content
     Dog(dog::DogCommands),
-    #[structopt(name = "files")]
+    #[structopt(
+        name = "files",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Manage files on the SAFE Network
     Files(files::FilesSubCommands),
-    #[structopt(name = "setup")]
+    #[structopt(
+        name = "setup", 
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Perform setup tasks
     Setup(setup::SetupSubCommands),
-    #[structopt(name = "keypair")]
+    #[structopt(
+        name = "keypair",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Generate a key pair without creating and/or storing a SafeKey on the network
     Keypair {},
-    #[structopt(name = "nrs")]
+    #[structopt(
+        name = "nrs",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Manage public names on the SAFE Network
     Nrs(nrs::NrsSubCommands),
-    #[structopt(name = "keys")]
+    #[structopt(
+        name = "keys",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Manage keys on the SAFE Network
     Keys(keys::KeysSubCommands),
-    #[structopt(name = "wallet")]
+    #[structopt(
+        name = "wallet",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Manage wallets on the SAFE Network
     Wallet(wallet::WalletSubCommands),
-    #[structopt(name = "xorurl")]
+    #[structopt(
+        name = "xorurl",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs
     Xorurl {
         /// subcommands
@@ -114,16 +162,28 @@ pub enum SubCommands {
         #[structopt(short = "l", long = "follow-links")]
         follow_links: bool,
     },
-    #[structopt(name = "seq")]
+    #[structopt(
+        name = "seq",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Manage Sequences on the Safe Network
     Seq(seq::SeqSubCommands),
     // #[structopt(name = "safe-id")]
     // /// Manage identities on the Safe Network
     // SafeId(safe_id::SafeIdSubCommands),
-    #[structopt(name = "update")]
+    #[structopt(
+        name = "update",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Update the application to the latest available version
     Update {},
-    #[structopt(name = "node")]
+    #[structopt(
+        name = "node",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
     /// Commands to manage Safe Network Nodes
     Node {
         /// subcommands

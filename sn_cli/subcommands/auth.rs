@@ -18,7 +18,7 @@ const AUTH_REQ_NOTIFS_ENDPOINT: &str = "https://localhost:33002";
 #[derive(StructOpt, Debug)]
 pub enum AuthSubCommands {
     /// Shows the version of the Authenticator binary
-    Version {
+    BinVersion {
         #[structopt(long = "authd-path")]
         /// Path of sn_authd executable (default ~/.safe/authd/)
         authd_path: Option<String>,
@@ -134,7 +134,7 @@ pub async fn auth_commander(
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
-        Some(AuthSubCommands::Version {authd_path}) => {
+        Some(AuthSubCommands::BinVersion {authd_path}) => {
             let sn_authd = SafeAuthdClient::new(endpoint);
             authd_version(&sn_authd, authd_path)
         }

@@ -22,6 +22,11 @@ const LOCAL_NODE_DIR: &str = "local-node";
 
 #[derive(StructOpt, Debug)]
 pub enum NodeSubCommands {
+    /// Gets the version of `sn_node` binary
+    BinVersion {
+        #[structopt(long = "node_path", env = "SN_NODE_PATH")]
+        node_path: Option<PathBuf>,
+    },
     #[structopt(name = "install")]
     /// Install latest sn_node released version in the system
     Install {
@@ -87,6 +92,7 @@ pub enum NodeSubCommands {
 
 pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
     match cmd {
+        Some(NodeSubCommands::BinVersion { node_path }) => node_version(node_path),
         Some(NodeSubCommands::Install { node_path }) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
