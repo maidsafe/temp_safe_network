@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [5.0.0](https://github.com/maidsafe/sn_messaging/compare/v4.0.5...v5.0.0) (2021-02-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** remove msgenvelope, change infrastructure msg
+
+### Features
+
+* **enduser:** add bootstrap msg variants ([129924e](https://github.com/maidsafe/sn_messaging/commit/129924e03eb020881322b1ce3d5412de70c02172))
+* **enduser:** replace socketaddr with a hash ([45ac67f](https://github.com/maidsafe/sn_messaging/commit/45ac67f80dd010c3536a4632dcbf952d0f01a007))
+* **messages:** implement location ([cf37569](https://github.com/maidsafe/sn_messaging/commit/cf37569d55515d35e5652c2c06f9ac3e8b3b7dbc))
+* **messages:** remove MsgEnvelope ([d54b6c4](https://github.com/maidsafe/sn_messaging/commit/d54b6c42d119221f066d24109805b0995caf224b))
+
+
+### Bug Fixes
+
+* add string payload to invalid bootstrap error ([23ed16c](https://github.com/maidsafe/sn_messaging/commit/23ed16c2dd68f75c2554f7cc4d54c6fd6a9c7522))
+* improve debug msg ([17daa0b](https://github.com/maidsafe/sn_messaging/commit/17daa0bca15a1d48a8869642969eca213196312e))
+* post-rebase issues ([93578c7](https://github.com/maidsafe/sn_messaging/commit/93578c7b60fe8ec30dfbfd8d4371e8566284a9c1))
+
+
+* **deps:** update sn_data_types ([555e4fb](https://github.com/maidsafe/sn_messaging/commit/555e4fbb3222ba0a46fd189c9c62bfd8052d9d19))
+
 ### [4.0.5](https://github.com/maidsafe/sn_messaging/compare/v4.0.4...v4.0.5) (2021-02-22)
 
 ### [4.0.4](https://github.com/maidsafe/sn_messaging/compare/v4.0.3...v4.0.4) (2021-02-18)
