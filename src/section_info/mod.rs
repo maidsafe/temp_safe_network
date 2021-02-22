@@ -53,11 +53,11 @@ pub struct SectionInfo {
     pub elders: BTreeMap<XorName, SocketAddr>,
 }
 
-impl fmt::Debug for InfrastructureInformation {
+impl fmt::Debug for SectionInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "InfrastructureInformation {{ prefix: {:?}, pk_set: PkSet {{ public_key: {:?} }}, elders: {:?} }}",
+            "SectionInfo {{ prefix: {:?}, pk_set: PkSet {{ public_key: {:?} }}, elders: {:?} }}",
             self.prefix,
             self.pk_set.public_key(),
             self.elders
