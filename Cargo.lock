@@ -3114,7 +3114,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_api"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3177,7 +3177,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
