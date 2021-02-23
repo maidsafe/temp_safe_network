@@ -98,6 +98,9 @@ pub enum DstLocation {
     EndUser(EndUser),
     /// Destination is a single node with the given name.
     Node(XorName),
+    /// Destination is a single node which will perform accumulation of BLS
+    /// signature shares before processing the message.
+    AccumulatingNode(XorName),
     /// Destination are the nodes of the section whose prefix matches the given name.
     Section(XorName),
     /// Destination is the node at the `ConnectionInfo` the message is directly sent to.
@@ -124,8 +127,9 @@ impl DstLocation {
         }
 
         match self {
-            Self::EndUser(user) => user.contains(name),
+            Self::EndUser(user) => prefix.matches(&user.name()),
             Self::Node(self_name) => name == self_name,
+            Self::AccumulatingNode(self_name) => name == self_name,
             Self::Section(self_name) => prefix.matches(self_name),
             Self::Direct => true,
         }
@@ -136,6 +140,7 @@ impl DstLocation {
         match self {
             Self::EndUser(user) => Some((*user.id()).into()),
             Self::Node(name) => Some(*name),
+            Self::AccumulatingNode(name) => Some(*name),
             Self::Section(name) => Some(*name),
             Self::Direct => None,
         }
