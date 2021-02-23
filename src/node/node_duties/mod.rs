@@ -30,11 +30,13 @@ use sn_data_types::{
     ActorHistory, Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
     TransferPropagated, WalletInfo,
 };
-use sn_messaging::client::{
-    Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
-    NodeTransferQuery,
+use sn_messaging::{
+    client::{
+        Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
+        NodeTransferQuery,
+    },
+    DstLocation, SrcLocation,
 };
-use sn_routing::DstLocation;
 use std::collections::{BTreeMap, VecDeque};
 
 use super::node_ops::Msg;
@@ -149,18 +151,20 @@ pub struct NodeDuties {
 /// -> 3. Add own wallet to rewards.
 
 impl NodeDuties {
-    pub async fn new(node_info: NodeInfo, network_api: Network) -> Self {
-        let msg_analysis = ReceivedMsgAnalysis::new(network_api.clone());
+    pub async fn new(node_info: NodeInfo, network_api: Network) -> Result<Self> {
+        // todo: do not instantiate AdultState here..
+        let state =
+            NodeState::Adult(AdultState::new(node_info.clone(), network_api.clone()).await?);
+        let msg_analysis = ReceivedMsgAnalysis::new(state);
         let network_events = NetworkEvents::new(msg_analysis);
-
         let messaging = Messaging::new(network_api.clone());
-        Self {
+        Ok(Self {
             node_info,
             stage: Stage::Infant,
             network_events,
             messaging,
             network_api,
-        }
+        })
     }
 
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
@@ -305,6 +309,7 @@ impl NodeDuties {
         let duties = AdultDuties::new(&self.node_info, state).await?;
         self.node_info.used_space.reset().await;
         self.stage = Stage::Adult(duties);
+        self.network_events = NetworkEvents::new(ReceivedMsgAnalysis::new(NodeState::Adult(state)));
         info!("Adult duties assumed.");
         // NB: This is wrong, shouldn't write to disk here,
         // let it be upper layer resp.
@@ -623,7 +628,8 @@ impl NodeDuties {
         // 3. Set new stage
         self.node_info.used_space.reset().await;
         self.stage = Stage::Elder(ElderConstellation::new(duties, self.network_api.clone()));
-
+        self.network_events =
+            NetworkEvents::new(ReceivedMsgAnalysis::new(NodeState::Elder(state.clone())));
         // NB: This is wrong, shouldn't write to disk here,
         // let it be upper layer resp.
         // Also, "Error-to-Unit" is not a good conversion..
@@ -638,7 +644,7 @@ impl NodeDuties {
             RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(node_id),
                 msg_id: MessageId::new(),
-                origin: node_id,
+                origin: SrcLocation::Node(node_id),
             }
             .into(),
         );
@@ -651,7 +657,7 @@ impl NodeDuties {
                     wallet_id: self.node_info.reward_key,
                 },
                 msg_id: MessageId::new(),
-                origin: node_id,
+                origin: SrcLocation::Node(node_id),
             }
             .into(),
         );

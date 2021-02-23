@@ -17,7 +17,11 @@ use crate::{
 use chunk_storage::ChunkStorage;
 use log::{info, trace};
 use sn_data_types::{Blob, BlobAddress};
-use sn_messaging::client::{DataQuery, Message, MessageId, NodeCmd, NodeDataCmd, Query};
+use sn_messaging::{
+    client::{DataQuery, Message, MessageId, NodeCmd, NodeDataCmd, Query},
+    location::User,
+    SrcLocation,
+};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -38,11 +42,7 @@ impl Chunks {
         })
     }
 
-    pub async fn receive_msg(
-        &mut self,
-        msg: Message,
-        origin: XorName,
-    ) -> Result<NodeMessagingDuty> {
+    pub async fn receive_msg(&mut self, msg: Message, origin: User) -> Result<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src [..]", // {:?}
             self,
@@ -79,7 +79,7 @@ impl Chunks {
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
         //section_authority: MsgSender,
-        msg_id: MessageId,
+        _msg_id: MessageId,
         //origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
         info!("Creating new Message for acquiring chunk from current_holders");
@@ -93,7 +93,7 @@ impl Chunks {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: XorName,
+        origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         info!("Send blob for replication to the new holder.");
         self.chunk_storage

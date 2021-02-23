@@ -53,6 +53,10 @@ impl NodeState {
             Self::Elder(state) => state.node_id,
         }
     }
+
+    pub fn node_name(&self) -> XorName {
+        PublicKey::Ed25519(self.node_id()).into()
+    }
 }
 
 #[derive(Clone)]
@@ -95,6 +99,11 @@ impl AdultState {
     /// Static state
     pub fn node_id(&self) -> Ed25519PublicKey {
         self.node_id
+    }
+
+    /// Static state
+    pub fn section_proof_chain(&self) -> &SectionProofChain {
+        &self.section_proof_chain
     }
 
     /// "Sort of" static; this is calling into routing layer
@@ -209,12 +218,12 @@ impl ElderState {
     }
 
     /// Static state
-    pub async fn elder_names(&self) -> BTreeSet<&XorName> {
+    pub fn elder_names(&self) -> BTreeSet<&XorName> {
         self.elders.iter().map(|(name, _)| name).collect()
     }
 
     /// Static state
-    pub async fn elders(&self) -> &Vec<(XorName, SocketAddr)> {
+    pub fn elders(&self) -> &Vec<(XorName, SocketAddr)> {
         &self.elders
     }
 

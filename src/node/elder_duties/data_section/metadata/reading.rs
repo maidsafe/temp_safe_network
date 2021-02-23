@@ -15,12 +15,14 @@ use super::{
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::{Error, Result};
 use log::info;
-use sn_messaging::client::{BlobRead, DataQuery, MapRead, Message, MessageId, Query, SequenceRead};
-use sn_routing::XorName;
+use sn_messaging::{
+    client::{BlobRead, DataQuery, MapRead, Message, MessageId, Query, SequenceRead},
+    location::User,
+};
 
 pub(super) async fn get_result(
     msg: Message,
-    origin: XorName,
+    origin: User,
     stores: &ElderStores,
 ) -> Result<NodeMessagingDuty> {
     use DataQuery::*;
@@ -50,7 +52,7 @@ async fn blob(
     read: &BlobRead,
     register: &BlobRegister,
     msg_id: MessageId,
-    origin: XorName,
+    origin: User,
 ) -> Result<NodeMessagingDuty> {
     register.read(read, msg_id, origin).await // since the data is sent on to adults, the entire msg is passed in
 }
@@ -59,7 +61,7 @@ async fn map(
     read: &MapRead,
     storage: &MapStorage,
     msg_id: MessageId,
-    origin: XorName,
+    origin: User,
 ) -> Result<NodeMessagingDuty> {
     storage.read(read, msg_id, origin).await // map data currently stay at elders, so the msg is not needed
 }
@@ -68,7 +70,7 @@ async fn sequence(
     read: &SequenceRead,
     storage: &SequenceStorage,
     msg_id: MessageId,
-    origin: XorName,
+    origin: User,
 ) -> Result<NodeMessagingDuty> {
     storage.read(read, msg_id, origin).await // sequence data currently stay at elders, so the msg is not needed
 }

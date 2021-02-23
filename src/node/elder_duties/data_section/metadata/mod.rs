@@ -24,7 +24,10 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
-use sn_messaging::client::{ElderDuties, Message};
+use sn_messaging::{
+    client::{ElderDuties, Message},
+    location::User,
+};
 
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -68,7 +71,7 @@ impl Metadata {
         }
     }
 
-    async fn process_msg(&mut self, msg: Message, origin: XorName) -> Result<NodeOperation> {
+    async fn process_msg(&mut self, msg: Message, origin: User) -> Result<NodeOperation> {
         match &msg {
             Message::Cmd { .. } => writing::get_result(msg, origin, &mut self.elder_stores).await,
             Message::Query { .. } => reading::get_result(msg, origin, &self.elder_stores)

@@ -17,13 +17,15 @@ use crate::{
     AdultState, NodeInfo, Result,
 };
 use log::{error, info};
-use sn_data_types::{Blob, BlobAddress, Signature};
-use sn_messaging::client::{
-    Address, AdultDuties, CmdError, Error as ErrorMessage, Message, MessageId, NodeCmdError,
-    NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-    QueryResponse,
+use sn_data_types::{Blob, BlobAddress};
+use sn_messaging::{
+    client::{
+        AdultDuties, CmdError, Error as ErrorMessage, Message, MessageId, NodeDataQuery,
+        NodeDataQueryResponse, NodeQuery, NodeQueryResponse, QueryResponse,
+    },
+    location::User,
+    DstLocation, SrcLocation,
 };
-use sn_routing::DstLocation;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -47,68 +49,71 @@ impl ChunkStorage {
         &mut self,
         data: &Blob,
         msg_id: MessageId,
-        origin: XorName,
+        origin: User,
     ) -> Result<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data, origin).await {
             let message_error = convert_to_error_message(error)?;
 
             return self
                 .wrapping
-                .error(CmdError::Data(message_error), msg_id, origin)
+                .error(
+                    CmdError::Data(message_error),
+                    msg_id,
+                    SrcLocation::User(origin),
+                )
                 .await;
         }
         Ok(NodeMessagingDuty::NoOp)
     }
 
-    #[allow(unused)]
-    pub(crate) async fn take_replica(
-        &mut self,
-        data: &Blob,
-        msg_id: MessageId,
-        origin: XorName,
-        accumulated_signature: &Signature,
-    ) -> Result<NodeMessagingDuty> {
-        let msg = match self.try_store(data, origin).await {
-            Ok(()) => Message::NodeEvent {
-                event: NodeEvent::ReplicationCompleted {
-                    chunk: *data.address(),
-                    proof: accumulated_signature.clone(),
-                },
-                id: MessageId::new(),
-                correlation_id: msg_id,
-            },
-            Err(error) => {
-                let message_error = convert_to_error_message(error)?;
-                Message::NodeCmdError {
-                    id: MessageId::new(),
-                    error: NodeCmdError::Data(NodeDataError::ChunkReplication {
-                        address: *data.address(),
-                        error: message_error,
-                    }),
-                    correlation_id: msg_id,
-                    cmd_origin: Address::Node(origin),
-                }
-            }
-        };
-        self.wrapping
-            .send_to_node(Msg {
-                msg,
-                dst: DstLocation::Node(origin),
-            })
-            .await
-    }
+    // #[allow(unused)]
+    // pub(crate) async fn take_replica(
+    //     &mut self,
+    //     data: &Blob,
+    //     msg_id: MessageId,
+    //     origin: SrcLocation,
+    //     accumulated_signature: &Signature,
+    // ) -> Result<NodeMessagingDuty> {
+    //     let msg = match self.try_store(data, origin).await {
+    //         Ok(()) => Message::NodeEvent {
+    //             event: NodeEvent::ReplicationCompleted {
+    //                 chunk: *data.address(),
+    //                 proof: accumulated_signature.clone(),
+    //             },
+    //             id: MessageId::new(),
+    //             correlation_id: msg_id,
+    //         },
+    //         Err(error) => {
+    //             let message_error = convert_to_error_message(error)?;
+    //             Message::NodeCmdError {
+    //                 id: MessageId::new(),
+    //                 error: NodeCmdError::Data(NodeDataError::ChunkReplication {
+    //                     address: *data.address(),
+    //                     error: message_error,
+    //                 }),
+    //                 correlation_id: msg_id,
+    //                 cmd_origin: origin,
+    //             }
+    //         }
+    //     };
+    //     self.wrapping
+    //         .send_to_node(Msg {
+    //             msg,
+    //             dst: origin.to_dst(),
+    //         })
+    //         .await
+    // }
 
-    async fn try_store(&mut self, data: &Blob, origin: XorName) -> Result<()> {
+    async fn try_store(&mut self, data: &Blob, origin: User) -> Result<()> {
         info!("TRYING TO STORE BLOB");
-        if data.is_unpub() {
-            let data_owner = *data.owner().ok_or(Error::InvalidOperation)?; // Error::InvalidOwners(origin)
-            let owner: XorName = data_owner.into();
+        if data.is_private() {
+            let data_owner = data.owner().ok_or(Error::InvalidOwners(*origin.id()))?;
             info!("Blob is unpub");
-            info!("DATA OWNER: {:?}", owner);
+            info!("DATA OWNER: {:?}", data_owner);
             info!("ORIGIN: {:?}", origin);
-            if owner != origin {
+            if data_owner != origin.id() {
                 info!("INVALID OWNER! Returning error");
-                return Err(Error::InvalidOwners(data_owner)); // should be origin here..
+                return Err(Error::InvalidOwners(*origin.id()));
             }
         }
 
@@ -127,7 +132,7 @@ impl ChunkStorage {
         &self,
         address: &BlobAddress,
         msg_id: MessageId,
-        origin: XorName,
+        origin: User,
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .chunks
@@ -140,9 +145,9 @@ impl ChunkStorage {
                         id: MessageId::in_response_to(&msg_id),
                         response: QueryResponse::GetBlob(result),
                         correlation_id: msg_id,
-                        query_origin: Address::Client(origin),
+                        query_origin: SrcLocation::User(origin),
                     },
-                    dst: DstLocation::Client(origin),
+                    dst: DstLocation::User(origin),
                 },
                 true,
             )
@@ -167,9 +172,7 @@ impl ChunkStorage {
             id: MessageId::new(),
         };
         info!("Sending NodeDataQuery::GetChunk to existing holders");
-        self.wrapping
-            .send_to_adults(message, current_holders, AdultDuties::ChunkReplication)
-            .await
+        self.wrapping.send_to_adults(message, current_holders).await
     }
 
     ///
@@ -177,7 +180,7 @@ impl ChunkStorage {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: XorName,
+        origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
@@ -190,9 +193,9 @@ impl ChunkStorage {
                     response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
                     id: MessageId::new(),
                     correlation_id: msg_id,
-                    query_origin: Address::Node(origin),
+                    query_origin: origin,
                 },
-                dst: DstLocation::Node(origin),
+                dst: origin.to_dst(),
             })
             .await
     }
@@ -244,7 +247,7 @@ impl ChunkStorage {
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: XorName,
+        origin: User,
     ) -> Result<NodeMessagingDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
@@ -253,14 +256,13 @@ impl ChunkStorage {
 
         let result = match self.chunks.get(&address) {
             Ok(Blob::Private(data)) => {
-                let data_owner: XorName = (*data.owner()).into();
-                if data_owner == origin {
+                if data.owner() == origin.id() {
                     self.chunks
                         .delete(&address)
                         .await
                         .map_err(|_error| ErrorMessage::FailedToDelete)
                 } else {
-                    Err(ErrorMessage::InvalidOwners(*data.owner())) // should be origin...
+                    Err(ErrorMessage::InvalidOwners(*origin.id()))
                 }
             }
             Ok(_) => {
@@ -276,7 +278,7 @@ impl ChunkStorage {
         if let Err(error) = result {
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, origin)
+                .error(CmdError::Data(error), msg_id, SrcLocation::User(origin))
                 .await;
         }
         Ok(NodeMessagingDuty::NoOp)

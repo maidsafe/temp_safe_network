@@ -23,9 +23,12 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{Error as DtError, PublicKey, Token};
-use sn_messaging::client::{
-    Address, ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
-    NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
+use sn_messaging::{
+    client::{
+        ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
+        NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
+    },
+    SrcLocation,
 };
 
 use sn_transfers::TransferActor;
@@ -102,7 +105,7 @@ impl Rewards {
             .send_to_section(
                 Message::NodeQuery {
                     query: NodeQuery::Transfers(NodeTransferQuery::CatchUpWithSectionWallet(
-                        self.peer_replicas,
+                        self.peer_replicas, // consider removing this
                     )),
                     id: MessageId::new(),
                 },
@@ -143,7 +146,7 @@ impl Rewards {
         &mut self,
         cmd: RewardCmd,
         _msg_id: MessageId,
-        _origin: XorName,
+        _origin: SrcLocation,
     ) -> Result<NodeOperation> {
         use RewardCmd::*;
         let result = match cmd {
@@ -184,7 +187,7 @@ impl Rewards {
         &self,
         query: RewardQuery,
         msg_id: MessageId,
-        origin: XorName,
+        origin: SrcLocation,
     ) -> Result<NodeOperation> {
         use RewardQuery::*;
         let result = match query {
@@ -406,7 +409,7 @@ impl Rewards {
         old_node_id: XorName,
         new_node_id: XorName,
         msg_id: MessageId,
-        origin: XorName,
+        origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         let entry = match self.node_rewards.get(&old_node_id) {
             Some(entry) => entry.clone(),
@@ -429,9 +432,9 @@ impl Rewards {
                             ))),
                             id: MessageId::in_response_to(&msg_id),
                             correlation_id: msg_id,
-                            query_origin: Address::Node(origin),
+                            query_origin: origin,
                         },
-                        origin,
+                        origin.to_dst(),
                     )
                     .await;
             }
@@ -452,9 +455,9 @@ impl Rewards {
                     response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    query_origin: Address::Node(origin),
+                    query_origin: origin,
                 },
-                origin,
+                origin.to_dst(),
             )
             .await
     }

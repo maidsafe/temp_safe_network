@@ -10,8 +10,11 @@ use crate::node::node_ops::{MetadataDuty, NodeOperation, TransferCmd, TransferDu
 use crate::ElderState;
 use crate::{Error, Result};
 use log::info;
-use sn_messaging::client::{Cmd, Message, Query};
-use sn_routing::XorName;
+use sn_messaging::{
+    client::{Cmd, Message, Query},
+    location::User,
+    SrcLocation,
+};
 
 // NB: Just as with the msg_analysis.rs,
 // this approach is not entirely good, so will need to be improved.
@@ -19,33 +22,29 @@ use sn_routing::XorName;
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
 pub struct ClientMsgAnalysis {
-    elder_state: ElderState,
+    _elder_state: ElderState,
 }
 
 impl ClientMsgAnalysis {
-    pub fn new(elder_state: ElderState) -> Self {
-        Self { elder_state }
+    pub fn new(_elder_state: ElderState) -> Self {
+        Self { _elder_state }
     }
 
-    pub async fn evaluate(&self, msg: Message, client: XorName) -> Result<NodeOperation> {
+    pub async fn evaluate(&self, msg: Message, origin: User) -> Result<NodeOperation> {
         info!("Evaluation of client msg envelope: {:?}", msg);
         let msg_id = msg.id();
         match msg {
             Message::Query {
                 query: Query::Data { .. },
                 ..
-            } => Ok(MetadataDuty::ProcessRead {
-                msg,
-                origin: client,
-            }
-            .into()), // TODO: Fix these for type safety
+            } => Ok(MetadataDuty::ProcessRead { msg, origin }.into()), // TODO: Fix these for type safety
             Message::Cmd {
                 cmd: Cmd::Data { .. },
                 ..
             } => Ok(TransferDuty::ProcessCmd {
                 cmd: TransferCmd::ProcessPayment(msg.clone()),
                 msg_id: msg.id(),
-                origin: client.into(),
+                origin: SrcLocation::User(origin),
             }
             .into()),
             Message::Cmd {
@@ -54,7 +53,7 @@ impl ClientMsgAnalysis {
             } => Ok(TransferDuty::ProcessCmd {
                 cmd: cmd.into(),
                 msg_id,
-                origin: client.into(),
+                origin: SrcLocation::User(origin),
             }
             .into()),
             Message::Query {
@@ -63,7 +62,7 @@ impl ClientMsgAnalysis {
             } => Ok(TransferDuty::ProcessQuery {
                 query: query.into(),
                 msg_id,
-                origin: client,
+                origin: SrcLocation::User(origin),
             }
             .into()),
             _ => Err(Error::Logic(format!(

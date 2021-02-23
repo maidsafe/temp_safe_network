@@ -11,8 +11,7 @@ use crate::{
     Error, Network, Result,
 };
 use log::error;
-use sn_messaging::client::Message;
-use sn_routing::{DstLocation, SrcLocation};
+use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -26,7 +25,7 @@ impl NetworkSender {
         Self { network }
     }
 
-    pub async fn send_to_client(&mut self, msg: Msg, as_node: bool) -> Result<NodeOperation> {
+    pub async fn send_to_client(&mut self, msg: Msg, _as_node: bool) -> Result<NodeOperation> {
         Ok(GatewayDuty::FindClientFor(msg).into())
         // let dst = match msg.destination()? {
         //     Address::Client(xorname) => xorname,
@@ -42,7 +41,7 @@ impl NetworkSender {
         // }
     }
 
-    pub async fn send_to_node(&mut self, msg: Msg, as_node: bool) -> Result<NodeOperation> {
+    pub async fn send_to_node(&mut self, msg: Msg, _as_node: bool) -> Result<NodeOperation> {
         let name = self.network.our_name().await;
         let dst = msg.dst; // DstLocation::Node(msg.dst.name());
 

@@ -15,10 +15,14 @@ use sn_data_types::{
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::client::{Message, MessageId};
+use sn_messaging::{
+    client::{Message, MessageId},
+    location::User,
+    DstLocation, SrcLocation,
+};
 use std::fmt::Formatter;
 
-use sn_routing::{DstLocation, Event as RoutingEvent, Prefix, SrcLocation};
+use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
@@ -348,12 +352,12 @@ impl Into<NodeOperation> for AdultDuty {
 /// Duties only run as a Key section.
 #[derive(Debug)]
 pub enum KeySectionDuty {
-    /// Incoming client msgs
+    /// Incoming user msgs
     /// are to be evaluated and
     /// sent to their respective module.
-    EvaluateClientMsg {
+    EvaluateUserMsg {
         msg: Message,
-        client: XorName,
+        user: User,
     },
     /// As a Gateway, the node interfaces with
     /// clients, interpreting handshakes and msgs,
@@ -439,12 +443,12 @@ pub enum MetadataDuty {
     /// Reads.
     ProcessRead {
         msg: Message,
-        origin: XorName,
+        origin: User,
     },
     /// Writes.
     ProcessWrite {
         msg: Message,
-        origin: XorName,
+        origin: User,
     },
     NoOp,
 }
@@ -484,7 +488,7 @@ pub enum ChunkReplicationDuty {
         ///
         msg_id: MessageId,
         // ///
-        origin: XorName,
+        origin: SrcLocation,
     },
     ///
     ProcessQuery {
@@ -492,7 +496,7 @@ pub enum ChunkReplicationDuty {
         ///
         msg_id: MessageId,
         // ///
-        origin: XorName,
+        origin: SrcLocation,
     },
     NoOp,
 }
@@ -538,7 +542,7 @@ pub enum RewardDuty {
         ///
         msg_id: MessageId,
         // ///
-        origin: XorName,
+        origin: SrcLocation,
     },
     ///
     ProcessCmd {
@@ -546,7 +550,7 @@ pub enum RewardDuty {
         ///
         msg_id: MessageId,
         // ///
-        origin: XorName,
+        origin: SrcLocation,
     },
     NoOp,
 }
@@ -637,7 +641,7 @@ pub enum TransferDuty {
         ///
         msg_id: MessageId,
         // ///
-        origin: XorName,
+        origin: SrcLocation,
     },
     ///
     ProcessCmd {
@@ -645,7 +649,7 @@ pub enum TransferDuty {
         ///
         msg_id: MessageId,
         // ///
-        origin: XorName,
+        origin: SrcLocation,
     },
     NoOp,
 }

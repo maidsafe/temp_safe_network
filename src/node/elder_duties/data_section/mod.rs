@@ -21,7 +21,7 @@ use crate::{
 };
 use log::info;
 use sn_data_types::{OwnerType, Result as DtResult, Signing, WalletInfo};
-use sn_messaging::client::MessageId;
+use sn_messaging::{client::MessageId, SrcLocation};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use xor_name::XorName;
@@ -172,7 +172,7 @@ impl DataSection {
         self.rewards.remove(to_remove);
 
         // Then payout rewards to all the Elders.
-        let elders = self.elder_state.elder_names().await;
+        let elders = self.elder_state.elder_names();
         self.rewards.payout_rewards(elders).await
     }
 
@@ -182,7 +182,7 @@ impl DataSection {
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(id),
                 msg_id: MessageId::new(),
-                origin: self.elder_state.node_name(),
+                origin: SrcLocation::Node(self.elder_state.node_name()),
             })
             .await
     }
@@ -205,7 +205,7 @@ impl DataSection {
                     age,
                 },
                 msg_id: MessageId::new(),
-                origin: self.elder_state.node_name(),
+                origin: SrcLocation::Node(self.elder_state.node_name()),
             })
             .await
     }
@@ -220,7 +220,7 @@ impl DataSection {
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::DeactivateNode(node_id),
                 msg_id: MessageId::new(),
-                origin: self.elder_state.node_name(),
+                origin: SrcLocation::Node(self.elder_state.node_name()),
             })
             .await;
         let second = self.metadata.trigger_chunk_replication(node_id).await;

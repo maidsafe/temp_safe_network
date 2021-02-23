@@ -9,10 +9,10 @@
 use crate::Result;
 use crate::{node::node_ops::NodeMessagingDuty, AdultState, ElderState, NodeState};
 use log::info;
-use sn_messaging::client::{
-    Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, NodeDuties,
+use sn_messaging::{
+    client::{AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, NodeDuties},
+    DstLocation, SrcLocation,
 };
-use sn_routing::DstLocation;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -83,7 +83,6 @@ impl AdultMsgWrapping {
         &self,
         msg: Message,
         targets: BTreeSet<XorName>,
-        duty: AdultDuties,
     ) -> Result<NodeMessagingDuty> {
         // let (key, sig) = self.inner.ed_key_sig(&message.serialize()?).await?;
         // let origin = MsgSender::adult(key, duty, sig)?;
@@ -94,7 +93,7 @@ impl AdultMsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        cmd_origin: XorName,
+        cmd_origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         self.inner.error(error, msg_id, cmd_origin).await
     }
@@ -114,11 +113,15 @@ impl ElderMsgWrapping {
         })
     }
 
-    pub async fn send_to_client(&self, msg: Message, client: XorName) -> Result<NodeMessagingDuty> {
+    pub async fn send_to_client(
+        &self,
+        msg: Message,
+        client: DstLocation,
+    ) -> Result<NodeMessagingDuty> {
         self.inner
             .send_to_client(Msg {
                 msg,
-                dst: DstLocation::Client(client),
+                dst: client, //DstLocation::EndUser(client),
             })
             .await
     }
@@ -140,11 +143,11 @@ impl ElderMsgWrapping {
             .await
     }
 
-    pub async fn send_to_node(&self, msg: Message, node: XorName) -> Result<NodeMessagingDuty> {
+    pub async fn send_to_node(&self, msg: Message, node: DstLocation) -> Result<NodeMessagingDuty> {
         self.inner
             .send_to_node(Msg {
                 msg,
-                dst: DstLocation::Node(node),
+                dst: node, //DstLocation::Node(node),
             })
             .await
     }
@@ -164,7 +167,7 @@ impl ElderMsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        cmd_origin: XorName,
+        cmd_origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         self.inner.error(error, msg_id, cmd_origin).await
     }
@@ -216,7 +219,7 @@ impl MsgWrapping {
         &self,
         targets: BTreeSet<XorName>,
         msg: Message,
-        as_section: bool,
+        _as_section: bool,
         //origin: MsgSender,
         //proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
@@ -233,7 +236,7 @@ impl MsgWrapping {
         &self,
         error: CmdError,
         msg_id: MessageId,
-        cmd_origin: XorName,
+        cmd_origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         info!("Error {:?}", error);
         self.send_to_section(
@@ -242,9 +245,9 @@ impl MsgWrapping {
                     id: MessageId::new(),
                     error,
                     correlation_id: msg_id,
-                    cmd_origin: Address::Client(cmd_origin.into()),
+                    cmd_origin,
                 },
-                dst: DstLocation::Section(cmd_origin.into()),
+                dst: cmd_origin.to_dst(),
             },
             true,
         )

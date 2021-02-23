@@ -2350,29 +2350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sn_data_types"
-version = "0.14.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87535ae947d2a2f6d54b8ec2c8ee3525846b8857c9936b3f3a777153bffbfaad"
-dependencies = [
- "bincode",
- "crdts",
- "ed25519",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "serde",
- "sha3",
- "signature",
- "thiserror",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "xor_name",
-]
-
-[[package]]
 name = "sn_launch_tool"
 version = "0.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2405,32 +2382,7 @@ dependencies = [
  "serde_bytes",
  "sha3",
  "signature",
- "sn_data_types 0.14.3",
- "thiserror",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
- "xor_name",
-]
-
-[[package]]
-name = "sn_messaging"
-version = "4.0.2"
-dependencies = [
- "bincode",
- "bytes 1.0.1",
- "cookie-factory",
- "crdts",
- "ed25519",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "rmp-serde",
- "serde",
- "serde_bytes",
- "signature",
- "sn_data_types 0.14.3",
+ "sn_data_types",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2469,9 +2421,9 @@ dependencies = [
  "serde_json",
  "sha2 0.8.2",
  "signature",
- "sn_data_types 0.14.4",
+ "sn_data_types",
  "sn_launch_tool",
- "sn_messaging 4.0.2",
+ "sn_messaging",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2501,8 +2453,8 @@ dependencies = [
  "rand_chacha 0.2.2",
  "resource_proof",
  "serde",
- "sn_data_types 0.14.3",
- "sn_messaging 3.0.2",
+ "sn_data_types",
+ "sn_messaging",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2514,8 +2466,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94e8edc973121e93076707bcf2ce3ab88cecac801505813769086e5415f2807"
+source = "git+https://github.com/oetyng/sn_transfers?branch=remove-msgenvelope#e1f6f2abebe5a3c239b375379eecbfb2c448d4f6"
 dependencies = [
  "bincode",
  "crdts",
@@ -2523,7 +2474,7 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types 0.14.4",
+ "sn_data_types",
  "thiserror",
  "threshold_crypto",
  "xor_name",

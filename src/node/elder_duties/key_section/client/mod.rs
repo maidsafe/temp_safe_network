@@ -10,7 +10,7 @@ mod client_msg_handling;
 
 use self::client_msg_handling::ClientMsgHandling;
 use crate::{
-    node::node_ops::{GatewayDuty, KeySectionDuty, Msg, NodeMessagingDuty, NodeOperation},
+    node::node_ops::{GatewayDuty, Msg, NodeMessagingDuty, NodeOperation},
     ElderState, Error, Result,
 };
 use log::{error, trace};
@@ -49,7 +49,7 @@ impl ClientGateway {
     async fn try_find_client(&self, msg: &Msg) -> Result<NodeOperation> {
         trace!("trying to find client...");
         if let Some(xorname) = msg.dst.name() {
-            if self.elder_state.prefix().matches(xorname) {
+            if self.elder_state.prefix().matches(&xorname) {
                 trace!("Message matches gateway prefix");
                 self.client_msg_handling.match_outgoing(&msg.msg).await?;
                 return Ok(NodeOperation::NoOp);
@@ -78,11 +78,12 @@ impl ClientGateway {
                     .track_incoming_message(&content, src)
                     .await
                 {
-                    Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg {
-                        msg: *content,
-                        client: sn_routing::XorName::default(),
-                    }
-                    .into()),
+                    Ok(()) => unimplemented!(),
+                    // Ok(()) => Ok(KeySectionDuty::EvaluateUserMsg {
+                    //     msg: *content,
+                    //     user: User::Client { public_key, socket_id },
+                    // }
+                    // .into()),
                     Err(e) => Err(e),
                 }
             }

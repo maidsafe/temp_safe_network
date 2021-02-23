@@ -12,10 +12,10 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature};
-use sn_messaging::client::Message;
+use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{
-    Config as RoutingConfig, DstLocation, Error as RoutingError, EventStream,
-    Routing as RoutingNode, SectionProofChain, SrcLocation,
+    Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
+    SectionProofChain,
 };
 use std::collections::BTreeSet;
 use std::net::SocketAddr;

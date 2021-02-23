@@ -8,13 +8,15 @@
 
 mod chunks;
 
+use sn_messaging::SrcLocation;
+
 use self::chunks::Chunks;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
         ChunkStoreDuty, IntoNodeOp, NodeOperation,
     },
-    AdultState, NodeInfo, Result,
+    AdultState, Error, NodeInfo, Result,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -45,13 +47,14 @@ impl AdultDuties {
         let result: Result<NodeOperation> = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk(msg) | WriteChunk(msg) => {
-                    let first: Result<NodeOperation> = self
-                        .chunks
-                        .receive_msg(msg.msg, *msg.src.to_dst().name().unwrap())
-                        .await
-                        .convert();
-                    let second = self.chunks.check_storage().await;
-                    Ok(vec![first, second].into())
+                    if let SrcLocation::User(origin) = msg.src {
+                        let first: Result<NodeOperation> =
+                            self.chunks.receive_msg(msg.msg, origin).await.convert();
+                        let second = self.chunks.check_storage().await;
+                        Ok(vec![first, second].into())
+                    } else {
+                        Err(Error::InvalidOperation)
+                    }
                 }
                 ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
             },
@@ -65,11 +68,7 @@ impl AdultDuties {
                     .get_chunk_for_replication(address, msg_id, origin)
                     .await
                     .convert(),
-                ProcessCmd {
-                    cmd,
-                    msg_id,
-                    origin,
-                } => match cmd {
+                ProcessCmd { cmd, msg_id, .. } => match cmd {
                     StoreReplicatedBlob(blob) => {
                         self.chunks.store_replicated_chunk(blob).await.convert()
                     }

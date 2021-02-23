@@ -11,13 +11,15 @@
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::Result;
-use sn_messaging::client::{BlobWrite, Message};
-use sn_routing::XorName;
+use sn_messaging::{
+    client::{BlobWrite, Message},
+    location::User,
+};
 
 pub(super) async fn get_result(
     write: &BlobWrite,
     msg: Message,
-    origin: XorName,
+    origin: User,
     storage: &mut ChunkStorage,
 ) -> Result<NodeMessagingDuty> {
     use BlobWrite::*;
