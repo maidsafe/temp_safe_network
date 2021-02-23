@@ -16,7 +16,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::{
         node_duties::NodeDuties,
-        node_ops::{NetworkDuty, NodeDuty},
+        node_ops::{NetworkDuties, NetworkDuty, NodeDuty},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
     Config, Error, Network, NodeInfo, Result,
@@ -141,21 +141,23 @@ impl Node {
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
-            self.process_while_any(Ok(vec![NodeDuty::ProcessNetworkEvent(event)]))
-                .await;
+            self.process_while_any(Ok(NetworkDuties::from(NodeDuty::ProcessNetworkEvent(
+                event,
+            ))))
+            .await;
         }
 
         Ok(())
     }
 
     /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, ops_vec: Result<Vec<NetworkDuty>>) {
+    async fn process_while_any(&mut self, ops_vec: Result<NetworkDuties>) {
         let mut next_ops = ops_vec;
 
         while let Ok(ops) = next_ops {
             let mut pending_node_ops = Vec::new();
 
-            if ops.len() > 0 {
+            if !ops.is_empty() {
                 for duty in ops {
                     match self.process(duty).await {
                         Ok(new_ops) => pending_node_ops.extend(new_ops),
@@ -169,7 +171,7 @@ impl Node {
         }
     }
 
-    async fn process(&mut self, duty: NetworkDuty) -> Result<Vec<NetworkDuty>> {
+    async fn process(&mut self, duty: NetworkDuty) -> Result<NetworkDuties> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
