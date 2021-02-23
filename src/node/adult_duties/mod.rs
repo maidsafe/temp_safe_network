@@ -8,15 +8,13 @@
 
 mod chunks;
 
-use sn_messaging::SrcLocation;
-
 use self::chunks::Chunks;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
         ChunkStoreDuty, IntoNodeOp, NodeOperation,
     },
-    AdultState, Error, NodeInfo, Result,
+    AdultState, NodeInfo, Result,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -47,24 +45,16 @@ impl AdultDuties {
         let result: Result<NodeOperation> = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk { read, id, origin } => {
-                    if let SrcLocation::EndUser(origin) = origin {
-                        let first: Result<NodeOperation> =
-                            self.chunks.read(&read, id, origin).await.convert();
-                        let second = self.chunks.check_storage().await;
-                        Ok(vec![first, second].into())
-                    } else {
-                        Err(Error::InvalidOperation)
-                    }
+                    let mut ops = vec![];
+                    ops.push(self.chunks.read(&read, id, origin).await.convert());
+                    ops.push(self.chunks.check_storage().await);
+                    Ok(ops.into())
                 }
                 WriteChunk { write, id, origin } => {
-                    if let SrcLocation::EndUser(origin) = origin {
-                        let first: Result<NodeOperation> =
-                            self.chunks.write(&write, id, origin).await.convert();
-                        let second = self.chunks.check_storage().await;
-                        Ok(vec![first, second].into())
-                    } else {
-                        Err(Error::InvalidOperation)
-                    }
+                    let mut ops = vec![];
+                    ops.push(self.chunks.write(&write, id, origin).await.convert());
+                    ops.push(self.chunks.check_storage().await);
+                    Ok(ops.into())
                 }
                 ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
             },

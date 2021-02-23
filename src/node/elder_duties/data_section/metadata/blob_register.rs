@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as NdResult};
 use sn_messaging::{
     client::{
-        BlobRead, BlobWrite, CmdError, DataCmd, DataQuery, Error as ErrorMessage, Message, NodeCmd,
+        BlobRead, BlobWrite, CmdError, DataQuery, Error as ErrorMessage, Message, NodeCmd,
         NodeSystemCmd, Query, QueryResponse,
     },
     DstLocation, EndUser, MessageId, SrcLocation,
@@ -88,7 +88,7 @@ impl BlobRegister {
                             cmd_origin: SrcLocation::EndUser(origin),
                             correlation_id: msg_id,
                         },
-                        dst: DstLocation::Section(origin.name()),
+                        dst: DstLocation::EndUser(origin),
                         to_be_aggregated: false,
                     }));
                 }
@@ -129,8 +129,8 @@ impl BlobRegister {
             info!("Results is not empty!");
         }
         let msg = Message::NodeCmd {
-            cmd: NodeCmd::Data {
-                cmd: DataCmd::Blob(BlobWrite::New(data)),
+            cmd: NodeCmd::Chunks {
+                cmd: BlobWrite::New(data),
                 origin,
             },
             id: msg_id,
@@ -155,7 +155,7 @@ impl BlobRegister {
                 cmd_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -191,8 +191,8 @@ impl BlobRegister {
         if !results.is_empty() {}
 
         let msg = Message::NodeCmd {
-            cmd: NodeCmd::Data {
-                cmd: DataCmd::Blob(BlobWrite::DeletePrivate(address)),
+            cmd: NodeCmd::Chunks {
+                cmd: BlobWrite::DeletePrivate(address),
                 origin,
             },
             id: msg_id,
@@ -380,7 +380,7 @@ impl BlobRegister {
             Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: err_msg,
                 dst: DstLocation::EndUser(origin),
-                to_be_aggregated: true,
+                to_be_aggregated: false, // TODO: to_be_aggregated: true,
             }))
         };
 

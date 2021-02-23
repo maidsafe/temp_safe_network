@@ -200,7 +200,11 @@ impl NodeDuties {
             Some(duties) => NodeState::Elder(duties.state().clone()),
             None => match self.adult_duties() {
                 Some(duties) => NodeState::Adult(duties.state().clone()),
-                None => return Err(Error::InvalidOperation),
+                None => {
+                    return Err(Error::InvalidOperation(
+                        "match self.adult_duties() is None".to_string(),
+                    ))
+                }
             },
         })
     }
@@ -297,7 +301,9 @@ impl NodeDuties {
         {
             return Ok(NodeOperation::NoOp);
         } else if !self.node_info.genesis && matches!(self.stage, Stage::Infant) {
-            return Err(Error::InvalidOperation);
+            return Err(Error::InvalidOperation(
+                "only genesis node can transition to Elder as Infant".to_string(),
+            ));
         }
 
         let is_genesis_section = self.network_api.our_prefix().await.is_empty();
@@ -457,7 +463,11 @@ impl NodeDuties {
                     return Ok(NodeOperation::NoOp);
                 }
             }
-            _ => return Err(Error::InvalidOperation),
+            _ => {
+                return Err(Error::InvalidOperation(
+                    "invalid self.stage at fn receive_genesis_proposal".to_string(),
+                ))
+            }
         };
 
         self.stage = stage;
@@ -521,7 +531,9 @@ impl NodeDuties {
                 }
                 Ok(NodeOperation::NoOp)
             }
-            _ => Err(Error::InvalidOperation),
+            _ => Err(Error::InvalidOperation(
+                "invalid self.stage at fn receive_genesis_accumulation".to_string(),
+            )),
         }
     }
 
@@ -537,11 +549,11 @@ impl NodeDuties {
                 if self.node_info.genesis {
                     queued_duties
                 } else {
-                    return Err(Error::InvalidOperation);
+                    return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Infant".to_string()));
                 }
             }
             Stage::Adult(_) | Stage::AwaitingGenesisThreshold(_) | Stage::ProposingGenesis(_) => {
-                return Err(Error::InvalidOperation)
+                return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Adult | AwaitingGenesisThreshold | ProposingGenesis".to_string()))
             }
             Stage::AccumulatingGenesis(ref mut bootstrap) => &mut bootstrap.queued_ops,
             Stage::AssumingElderDuties(ref mut queue) => queue,

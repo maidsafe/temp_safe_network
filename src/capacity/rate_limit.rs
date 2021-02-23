@@ -47,6 +47,7 @@ impl RateLimit {
     }
 
     ///
+    #[allow(unused)]
     pub async fn check_network_storage(&self) -> bool {
         info!("Checking network storage");
         let all_nodes = self.elder_state.adults().await.len() as f64;

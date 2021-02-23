@@ -231,7 +231,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -258,7 +258,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -285,7 +285,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -322,7 +322,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -349,7 +349,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -377,7 +377,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -405,7 +405,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -432,7 +432,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -463,7 +463,7 @@ impl MapStorage {
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
             },
-            dst: DstLocation::Section(origin.name()),
+            dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
         }))
     }
@@ -485,8 +485,8 @@ impl MapStorage {
                     correlation_id: msg_id,
                     cmd_origin: SrcLocation::EndUser(origin),
                 },
-                dst: DstLocation::Section(origin.name()),
-                to_be_aggregated: true, // this needs more consideration...
+                dst: DstLocation::EndUser(origin),
+                to_be_aggregated: false, // TODO: to_be_aggregated: true, // this needs more consideration...
             }))
         } else {
             info!("MapStorage: Writing chunk PASSED!");

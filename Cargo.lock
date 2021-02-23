@@ -2365,7 +2365,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "3.0.2"
-source = "git+https://github.com/oetyng/sn_messaging?branch=all-accumulation-in-routing#2aec3a6e6a353b65157808514143b200a139ec4a"
+source = "git+https://github.com/oetyng/sn_messaging?branch=all-accumulation-in-routing#34c6a5c215bfcf9df1c63a4c4f4348841f91d4cd"
 dependencies = [
  "bincode",
  "bytes 1.0.1",

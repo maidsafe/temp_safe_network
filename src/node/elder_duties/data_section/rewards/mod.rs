@@ -248,7 +248,7 @@ impl Rewards {
                 query_origin: origin,
             },
             dst: origin.to_dst(),
-            to_be_aggregated: true,
+            to_be_aggregated: false, // TODO: to_be_aggregated: true,
         })
     }
 
@@ -310,10 +310,10 @@ impl Rewards {
                     old_node_id,
                     new_node_id,
                 }),
-                id: MessageId::new(),
+                id: MessageId::combine(vec![old_node_id, new_node_id]),
             },
             dst: DstLocation::Section(old_node_id),
-            to_be_aggregated: false,
+            to_be_aggregated: false, // TODO: to_be_aggregated: true,
         }))
     }
 
@@ -437,7 +437,7 @@ impl Rewards {
                         query_origin: origin,
                     },
                     dst: origin.to_dst(),
-                    to_be_aggregated: true,
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
                 }));
             }
         };
@@ -458,8 +458,8 @@ impl Rewards {
                 correlation_id: msg_id,
                 query_origin: origin,
             },
-            dst: origin.to_dst(),
-            to_be_aggregated: true,
+            dst: DstLocation::Section(new_node_id),
+            to_be_aggregated: false, // TODO: to_be_aggregated: true,
         }))
     }
 }

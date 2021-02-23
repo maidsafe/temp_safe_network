@@ -12,7 +12,7 @@ use crate::{Network, Result};
 use hex_fmt::HexFmt;
 use log::{info, trace};
 use sn_data_types::PublicKey;
-use sn_messaging::client::Message;
+use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use xor_name::XorName;
 
@@ -88,6 +88,14 @@ impl NetworkEvents {
                     trace!("New node has just joined the network and is a fresh node.",);
                     Ok(ProcessNewMember(XorName(name.0)).into())
                 }
+            }
+            RoutingEvent::ClientMessageReceived { msg, user } => {
+                info!("Received client message: {:8?}\n Sent from {:?}", msg, user);
+                self.analysis.evaluate(
+                    *msg,
+                    SrcLocation::EndUser(user),
+                    DstLocation::Node(self.analysis.name()),
+                )
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(

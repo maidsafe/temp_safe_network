@@ -18,8 +18,8 @@ use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
     node::node_ops::{
-        ElderDuty, IntoNodeOp, NodeMessagingDuty, NodeOperation, OutgoingMsg, TransferCmd,
-        TransferDuty, TransferQuery,
+        IntoNodeOp, NodeMessagingDuty, NodeOperation, OutgoingMsg, TransferCmd, TransferDuty,
+        TransferQuery,
     },
     utils, Error, Result,
 };
@@ -183,7 +183,7 @@ impl Transfers {
         debug!("Processing cmd in Transfers mod");
         let result = match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await,
-            ProcessPayment(msg) => self.process_payment(msg).await,
+            ProcessPayment(msg) => self.process_payment(msg, origin).await,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
@@ -229,13 +229,27 @@ impl Transfers {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the section funds.
-    async fn process_payment(&self, msg: &Message) -> Result<NodeMessagingDuty> {
-        let (payment, num_bytes, dst_address) = match &msg {
+    async fn process_payment(
+        &self,
+        msg: &Message,
+        origin: SrcLocation,
+    ) -> Result<NodeMessagingDuty> {
+        let origin = match origin {
+            SrcLocation::EndUser(enduser) => enduser,
+            _ => {
+                return Err(Error::InvalidMessage(
+                    msg.id(),
+                    format!("This source can only be an enduser.. : {:?}", msg),
+                ))
+            }
+        };
+        let (payment, data_cmd, num_bytes, dst_address) = match &msg {
             Message::Cmd {
                 cmd: Cmd::Data { payment, cmd },
                 ..
             } => (
                 payment,
+                cmd,
                 utils::serialise(cmd)?.len() as u64,
                 cmd.dst_address(),
             ),
@@ -255,12 +269,12 @@ impl Transfers {
             return Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: Message::CmdError {
                     error: CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg.id()),
                     correlation_id: msg.id(),
                     cmd_origin: origin,
                 },
                 dst: origin.to_dst(),
-                to_be_aggregated: false,
+                to_be_aggregated: false, // TODO: to_be_aggregated: true,
             }));
         }
         let registration = self.replicas.register(&payment).await;
@@ -277,11 +291,15 @@ impl Transfers {
         };
         match result {
             Ok(_) => {
-                info!("Payment: registration and propagation succeeded.");
-                // Paying too little will see the amount be forfeited.
-                // This prevents spam of the network.
                 let total_cost = self.rate_limit.from(num_bytes).await;
+                info!("Payment: registration and propagation succeeded. (Store cost: {}, paid amount: {}.)", total_cost, payment.amount());
+                info!(
+                    "Section balance: {}",
+                    self.replicas.balance(payment.recipient()).await?
+                );
                 if total_cost > payment.amount() {
+                    // Paying too little will see the amount be forfeited.
+                    // This prevents spam of the network.
                     warn!(
                         "Payment: Too low payment: {}, expected: {}",
                         payment.amount(),
@@ -294,21 +312,27 @@ impl Transfers {
                             error: CmdError::Transfer(TransferRegistration(
                                 ErrorMessage::InsufficientBalance,
                             )),
-                            id: MessageId::new(),
+                            id: MessageId::in_response_to(&msg.id()),
                             correlation_id: msg.id(),
                             cmd_origin: origin,
                         },
                         dst: origin.to_dst(),
-                        to_be_aggregated: false,
+                        to_be_aggregated: false, // TODO: to_be_aggregated: true,
                     }));
                 }
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
                 // informed of this transfer as well..
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
-                    msg: msg.clone(),
+                    msg: Message::NodeCmd {
+                        cmd: NodeCmd::Metadata {
+                            cmd: data_cmd.clone(),
+                            origin,
+                        },
+                        id: MessageId::in_response_to(&msg.id()),
+                    },
                     dst: DstLocation::Section(dst_address),
-                    to_be_aggregated: true,
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
                 }))
             }
             Err(e) => {
@@ -319,12 +343,12 @@ impl Transfers {
                         error: CmdError::Transfer(TransferRegistration(
                             ErrorMessage::PaymentFailed,
                         )),
-                        id: MessageId::new(),
+                        id: MessageId::in_response_to(&msg.id()),
                         correlation_id: msg.id(),
                         cmd_origin: origin,
                     },
                     dst: origin.to_dst(),
-                    to_be_aggregated: false,
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
                 }))
             }
         }
@@ -401,7 +425,7 @@ impl Transfers {
                 query_origin: origin,
             },
             dst: origin.to_dst(),
-            to_be_aggregated: false,
+            to_be_aggregated: false, // TODO: to_be_aggregated: true,
         }))
     }
 
@@ -501,27 +525,30 @@ impl Transfers {
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
-        let msg = match self.replicas.validate(transfer).await {
-            Ok(event) => Message::Event {
-                event: Event::TransferValidated { event },
-                id: MessageId::new(),
-                correlation_id: msg_id,
-            },
+        match self.replicas.validate(transfer).await {
+            Ok(event) => Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                msg: Message::Event {
+                    event: Event::TransferValidated { event },
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                },
+                dst: origin.to_dst(),
+                to_be_aggregated: false,
+            })),
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
-                Message::CmdError {
-                    id: MessageId::new(),
-                    error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
-                    correlation_id: msg_id,
-                    cmd_origin: origin,
-                }
+                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::CmdError {
+                        id: MessageId::in_response_to(&msg_id),
+                        error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
+                        correlation_id: msg_id,
+                        cmd_origin: origin,
+                    },
+                    dst: origin.to_dst(),
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
+                }))
             }
-        };
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg,
-            dst: origin.to_dst(),
-            to_be_aggregated: false,
-        }))
+        }
     }
 
     /// This validation will render a signature over the
@@ -533,31 +560,33 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
-        let msg = match self.replicas.propose_validation(&transfer).await {
+        match self.replicas.propose_validation(&transfer).await {
             Ok(None) => return Ok(NodeMessagingDuty::NoOp),
-            Ok(Some(event)) => Message::NodeEvent {
-                event: NodeEvent::SectionPayoutValidated(event),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-            },
+            Ok(Some(event)) => Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                msg: Message::NodeEvent {
+                    event: NodeEvent::SectionPayoutValidated(event),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                },
+                dst: origin.to_dst(),
+                to_be_aggregated: false,
+            })),
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
-
-                Message::NodeCmdError {
-                    id: MessageId::new(),
-                    error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
-                        message_error,
-                    )), // TODO: SHOULD BE TRANSFERVALIDATION
-                    correlation_id: msg_id,
-                    cmd_origin: origin,
-                }
+                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeCmdError {
+                        id: MessageId::in_response_to(&msg_id),
+                        error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
+                            message_error,
+                        )), // TODO: SHOULD BE TRANSFERVALIDATION
+                        correlation_id: msg_id,
+                        cmd_origin: origin,
+                    },
+                    dst: origin.to_dst(),
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
+                }))
             }
-        };
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg,
-            dst: origin.to_dst(),
-            to_be_aggregated: false,
-        }))
+        }
     }
 
     /// Registration of a transfer is requested,
@@ -579,7 +608,7 @@ impl Transfers {
                         id: MessageId::in_response_to(&msg_id),
                     },
                     dst: DstLocation::Section(location),
-                    to_be_aggregated: true, // not necessary, but will be slimmer
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true, // not necessary, but will be slimmer
                 }))
             }
             Err(e) => {
@@ -594,7 +623,7 @@ impl Transfers {
                         cmd_origin: SrcLocation::EndUser(EndUser::AllClients(proof.sender())),
                     },
                     dst: DstLocation::EndUser(EndUser::AllClients(proof.sender())),
-                    to_be_aggregated: true,
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
                 }))
             }
         }
@@ -627,7 +656,7 @@ impl Transfers {
                             correlation_id: msg_id,
                         },
                         dst: DstLocation::Section(location),
-                        to_be_aggregated: true,
+                        to_be_aggregated: false, // TODO: to_be_aggregated: true,
                     })
                     .into(),
                 );
@@ -640,7 +669,7 @@ impl Transfers {
                             id: MessageId::new(),
                         },
                         dst: DstLocation::Section(location),
-                        to_be_aggregated: true, // not necessary, but will be slimmer
+                        to_be_aggregated: false, // TODO: to_be_aggregated: true, // not necessary, but will be slimmer
                     })
                     .into(),
                 );
@@ -658,7 +687,7 @@ impl Transfers {
                         cmd_origin: origin,
                     },
                     dst: origin.to_dst(),
-                    to_be_aggregated: true,
+                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
                 })
                 .into())
             }
@@ -693,7 +722,7 @@ impl Transfers {
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg,
             dst: origin.to_dst(),
-            to_be_aggregated: true,
+            to_be_aggregated: false, // TODO: to_be_aggregated: true,
         }))
     }
 

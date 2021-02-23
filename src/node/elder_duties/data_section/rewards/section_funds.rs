@@ -120,7 +120,7 @@ impl SectionFunds {
                 id: MessageId::new(),
             },
             dst: DstLocation::Section(new_wallet.into()),
-            to_be_aggregated: false,
+            to_be_aggregated: false, // TODO aggregate this
         }))
     }
 
@@ -290,7 +290,7 @@ impl SectionFunds {
                     id: MessageId::new(),
                 },
                 dst: DstLocation::Section(self.actor.id().into()),
-                to_be_aggregated: true, // not needed, but makes sn_node<logs less chatty..
+                to_be_aggregated: false, // TODO: aggregate here (not needed, but makes sn_node logs less chatty..)
             })
             .into();
 

@@ -411,13 +411,13 @@ pub enum ChunkStoreDuty {
     ReadChunk {
         read: sn_messaging::client::BlobRead,
         id: MessageId,
-        origin: SrcLocation,
+        origin: EndUser,
     },
     /// Writes.
     WriteChunk {
         write: sn_messaging::client::BlobWrite,
         id: MessageId,
-        origin: SrcLocation,
+        origin: EndUser,
     },
     NoOp,
 }

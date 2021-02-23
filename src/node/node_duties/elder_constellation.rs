@@ -94,7 +94,9 @@ impl ElderConstellation {
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
         if new_key == previous_key {
-            return Err(Error::InvalidOperation);
+            return Err(Error::InvalidOperation(
+                "new_key == previous_key".to_string(),
+            ));
         }
         if self.pending_changes.is_empty() {
             return Ok(NodeOperation::NoOp);

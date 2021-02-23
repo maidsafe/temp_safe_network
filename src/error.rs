@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -19,7 +19,6 @@ pub enum Error {
     /// The key balance already exists when it was expected to be empty (during section genesis)
     #[error("Balance already exists.")]
     BalanceExists,
-
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
@@ -56,7 +55,6 @@ pub enum Error {
     /// Network message error.
     #[error("Network message error:: {0}")]
     Message(#[from] sn_messaging::Error),
-
     /// PickleDb error.
     #[error("PickleDb error:: {0}")]
     PickleDb(#[from] pickledb::error::Error),
@@ -89,7 +87,7 @@ pub enum Error {
     InvalidOwners(PublicKey),
     /// Data operation is invalid, eg private operation on public data
     #[error("Invalid operation")]
-    InvalidOperation,
+    InvalidOperation(String),
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
     NoErrorMapping(String),
@@ -100,7 +98,7 @@ pub enum Error {
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
     match error {
-        Error::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
+        Error::InvalidOperation(_msg) => Ok(ErrorMessage::InvalidOperation),
         Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
         Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
         Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
@@ -123,7 +121,6 @@ pub(crate) fn convert_dt_error_to_error_message(
         DtError::CrdtUnexpectedState => Ok(ErrorMessage::CrdtUnexpectedState),
         DtError::OpNotCausallyReady => Ok(ErrorMessage::OpNotCausallyReady),
         DtError::AccessDenied(pk) => Ok(ErrorMessage::AccessDenied(pk)),
-
         error => Err(Error::NoErrorMapping(error.to_string())),
     }
 }
