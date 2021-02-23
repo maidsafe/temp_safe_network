@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,26 +6,41 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::BTreeSet;
+
 use crate::{
-    node::node_ops::{NodeOperation, OutgoingMsg},
-    Error, Network, Result,
+    node::node_ops::{NodeMessagingDuty, NodeOperation, OutgoingMsg},
+    Error,
 };
+use crate::{Network, Result};
 use log::error;
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
-use std::collections::BTreeSet;
-use xor_name::XorName;
+use sn_routing::XorName;
 
-/// Sending of msgs to other nodes in the network.
-pub(super) struct NetworkSender {
+/// Sending of messages
+/// to nodes and clients in the network.
+pub struct Messaging {
     network: Network,
 }
 
-impl NetworkSender {
+impl Messaging {
     pub fn new(network: Network) -> Self {
         Self { network }
     }
 
-    pub async fn send(&mut self, msg: OutgoingMsg) -> Result<NodeOperation> {
+    pub async fn process_messaging_duty(
+        &mut self,
+        duty: NodeMessagingDuty,
+    ) -> Result<NodeOperation> {
+        use NodeMessagingDuty::*;
+        match duty {
+            Send(msg) => self.send(msg).await,
+            SendToAdults { targets, msg } => self.send_to_nodes(targets, &msg).await,
+            NoOp => Ok(NodeOperation::NoOp),
+        }
+    }
+
+    async fn send(&mut self, msg: OutgoingMsg) -> Result<NodeOperation> {
         let src = if msg.to_be_aggregated {
             SrcLocation::Section(self.network.our_prefix().await)
         } else {
@@ -45,7 +60,7 @@ impl NetworkSender {
         )
     }
 
-    pub async fn send_to_nodes(
+    async fn send_to_nodes(
         &mut self,
         targets: BTreeSet<XorName>,
         msg: &Message,

@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// use bls::PublicKey;
 use sn_data_types::{Error as DtError, PublicKey};
-use sn_messaging::client::{Error as ErrorMessage, MessageId};
+use sn_messaging::{client::Error as ErrorMessage, MessageId};
 use std::io;
 use thiserror::Error;
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 #[non_exhaustive]

@@ -20,8 +20,8 @@ use sn_data_types::{
     WalletInfo,
 };
 use sn_messaging::{
-    client::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery},
-    DstLocation,
+    client::{Message, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery},
+    DstLocation, MessageId,
 };
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
@@ -68,10 +68,17 @@ impl SectionFunds {
             },
         }
     }
-
     /// Current Replicas
     pub fn replicas(&self) -> PublicKey {
-        self.actor.replicas()
+        self.actor.replicas_public_key()
+    }
+
+    /// Wallet info
+    pub fn wallet_info(&self) -> WalletInfo {
+        WalletInfo {
+            replicas: self.actor.replicas_key_set(),
+            history: self.actor.history(),
+        }
     }
 
     /// Replica history are synched to section actor instances.

@@ -21,7 +21,7 @@ use crate::{
 };
 use log::info;
 use sn_data_types::{OwnerType, Result as DtResult, Signing, WalletInfo};
-use sn_messaging::{client::MessageId, SrcLocation};
+use sn_messaging::{MessageId, SrcLocation};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use xor_name::XorName;
@@ -115,7 +115,7 @@ impl DataSection {
         let signing = ElderSigning::new(elder_state.clone());
         let actor = TransferActor::from_info(signing, wallet_info, Validator {})?;
         let reward_calc = RewardCalc::new(*elder_state.prefix());
-        let rewards = Rewards::new(elder_state.clone(), actor, reward_calc);
+        let rewards = Rewards::new(actor, reward_calc);
 
         Ok(Self {
             metadata,
@@ -140,7 +140,7 @@ impl DataSection {
     /// as to catch up with the current state of the replicas.
     pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
         self.rewards
-            .catchup_with_replicas(self.elder_state.prefix().name())
+            .get_section_wallet_history(self.elder_state.prefix().name())
             .await
     }
 
@@ -213,8 +213,6 @@ impl DataSection {
     /// Name of the node
     /// Age of the node
     pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NodeOperation> {
-        // marks the reward account as
-        // awaiting claiming of the counter
         let first = self
             .rewards
             .process_reward_duty(RewardDuty::ProcessCmd {

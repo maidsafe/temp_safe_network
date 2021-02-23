@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -11,20 +11,17 @@
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::Result;
-use sn_messaging::{
-    client::{BlobWrite, Message},
-    location::User,
-};
+use sn_messaging::{client::BlobWrite, EndUser, MessageId};
 
 pub(super) async fn get_result(
     write: &BlobWrite,
-    msg: Message,
-    origin: User,
+    msg_id: MessageId,
+    origin: EndUser,
     storage: &mut ChunkStorage,
 ) -> Result<NodeMessagingDuty> {
     use BlobWrite::*;
     match &write {
-        New(data) => storage.store(&data, msg.id(), origin).await,
-        DeletePrivate(address) => storage.delete(*address, msg.id(), origin).await, // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
+        New(data) => storage.store(&data, msg_id, origin).await,
+        DeletePrivate(address) => storage.delete(*address, msg_id, origin).await, // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
     }
 }

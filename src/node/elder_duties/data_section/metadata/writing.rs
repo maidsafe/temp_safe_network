@@ -11,56 +11,43 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, NodeOperation};
-use crate::{Error, Result};
+use crate::Result;
 use log::info;
 use sn_messaging::{
-    client::{BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, SequenceWrite},
-    location::User,
+    client::{BlobWrite, DataCmd, MapWrite, SequenceWrite},
+    EndUser, MessageId,
 };
 
 pub(super) async fn get_result(
-    msg: Message,
-    origin: User,
+    cmd: DataCmd,
+    msg_id: MessageId,
+    origin: EndUser,
     stores: &mut ElderStores,
 ) -> Result<NodeOperation> {
     use DataCmd::*;
-    let msg_id = msg.id();
-    // let msg_origin = msg.origin;
-    // let proxies = msg.proxies;
     info!("Writing Data");
-    let result = match msg {
-        Message::Cmd {
-            cmd: Cmd::Data { cmd: data_cmd, .. },
-            ..
-        } => match data_cmd {
-            Blob(write) => {
-                info!("Writing Blob");
-                blob(write, stores.blob_register_mut(), msg_id, origin).await
-            }
-            Map(write) => {
-                info!("Writing Map");
-                map(write, stores.map_storage_mut(), msg_id, origin).await
-            }
-            Sequence(write) => {
-                info!("Writing Sequence");
-                sequence(write, stores.sequence_storage_mut(), msg_id, origin).await
-            }
-        },
-        _ => Err(Error::Logic(
-            "Unreachable pattern when writing data.".to_string(),
-        )),
-    };
-    if result.is_ok() {
-        info!("Wrote data from message: '{:?}' successfully!", msg_id);
+    match cmd {
+        Blob(write) => {
+            info!("Writing Blob");
+            blob(write, stores.blob_register_mut(), msg_id, origin).await
+        }
+        Map(write) => {
+            info!("Writing Map");
+            map(write, stores.map_storage_mut(), msg_id, origin).await
+        }
+        Sequence(write) => {
+            info!("Writing Sequence");
+            sequence(write, stores.sequence_storage_mut(), msg_id, origin).await
+        }
     }
-    result.convert()
+    .convert()
 }
 
 async fn blob(
     write: BlobWrite,
     register: &mut BlobRegister,
     msg_id: MessageId,
-    origin: User,
+    origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
     register.write(write, msg_id, origin).await
 }
@@ -69,7 +56,7 @@ async fn map(
     write: MapWrite,
     storage: &mut MapStorage,
     msg_id: MessageId,
-    origin: User,
+    origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
     storage.write(write, msg_id, origin).await
 }
@@ -78,7 +65,7 @@ async fn sequence(
     write: SequenceWrite,
     storage: &mut SequenceStorage,
     msg_id: MessageId,
-    origin: User,
+    origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
     storage.write(write, msg_id, origin).await
 }

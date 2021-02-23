@@ -24,13 +24,11 @@ use crate::{
 use bls::SecretKey;
 use log::{error, info};
 use sn_data_types::PublicKey;
-use sn_routing::{Event, EventStream, MIN_AGE};
+use sn_routing::{EventStream, MIN_AGE};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
-
-use self::node_ops::KeySectionDuty;
 
 /// Main node struct.
 pub struct Node {
@@ -142,16 +140,8 @@ impl Node {
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
-            let duty = if let Event::ClientMessageReceived { content, user, .. } = event {
-                KeySectionDuty::EvaluateUserMsg {
-                    msg: *content,
-                    user,
-                }
-                .into()
-            } else {
-                NodeDuty::ProcessNetworkEvent(event).into()
-            };
-            self.process_while_any(Ok(duty)).await;
+            self.process_while_any(Ok(NodeDuty::ProcessNetworkEvent(event).into()))
+                .await;
         }
 
         Ok(())

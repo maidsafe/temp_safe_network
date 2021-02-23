@@ -46,10 +46,20 @@ impl AdultDuties {
         use ChunkStoreDuty::*;
         let result: Result<NodeOperation> = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
-                ReadChunk(msg) | WriteChunk(msg) => {
-                    if let SrcLocation::User(origin) = msg.src {
+                ReadChunk { read, id, origin } => {
+                    if let SrcLocation::EndUser(origin) = origin {
                         let first: Result<NodeOperation> =
-                            self.chunks.receive_msg(msg.msg, origin).await.convert();
+                            self.chunks.read(&read, id, origin).await.convert();
+                        let second = self.chunks.check_storage().await;
+                        Ok(vec![first, second].into())
+                    } else {
+                        Err(Error::InvalidOperation)
+                    }
+                }
+                WriteChunk { write, id, origin } => {
+                    if let SrcLocation::EndUser(origin) = origin {
+                        let first: Result<NodeOperation> =
+                            self.chunks.write(&write, id, origin).await.convert();
                         let second = self.chunks.check_storage().await;
                         Ok(vec![first, second].into())
                     } else {

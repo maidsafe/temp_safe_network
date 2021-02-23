@@ -30,8 +30,8 @@ use sn_data_types::{
     TransferPropagated, WalletInfo,
 };
 use sn_messaging::{
-    client::{Message, MessageId, NodeCmd, NodeQuery, NodeSystemCmd, NodeTransferQuery},
-    DstLocation, SrcLocation,
+    client::{Message, NodeCmd, NodeQuery, NodeRewardQuery, NodeSystemCmd},
+    DstLocation, MessageId, SrcLocation,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -148,9 +148,7 @@ pub struct NodeDuties {
 
 impl NodeDuties {
     pub async fn new(node_info: NodeInfo, network_api: Network) -> Result<Self> {
-        // todo: do not instantiate AdultState here..
-        let state =
-            NodeState::Adult(AdultState::new(node_info.clone(), network_api.clone()).await?);
+        let state = NodeState::Infant(network_api.public_key().await);
         let msg_analysis = ReceivedMsgAnalysis::new(state);
         let network_events = NetworkEvents::new(msg_analysis);
         let messaging = Messaging::new(network_api.clone());
@@ -196,13 +194,6 @@ impl NodeDuties {
             _ => false,
         }
     }
-
-    // fn adult_state(&mut self) -> Result<AdultState> {
-    //     Ok(match self.adult_duties() {
-    //         Some(duties) => duties.state().clone(),
-    //         None => return Err(Error::InvalidOperation),
-    //     })
-    // }
 
     fn node_state(&mut self) -> Result<NodeState> {
         Ok(match self.elder_duties() {
@@ -287,7 +278,7 @@ impl NodeDuties {
         }
         info!("Assuming Adult duties..");
         let state = AdultState::new(self.network_api.clone()).await?;
-        let duties = AdultDuties::new(&self.node_info, state).await?;
+        let duties = AdultDuties::new(&self.node_info, state.clone()).await?;
         self.node_info.used_space.reset().await;
         self.stage = Stage::Adult(duties);
         self.network_events = NetworkEvents::new(ReceivedMsgAnalysis::new(NodeState::Adult(state)));
@@ -368,10 +359,9 @@ impl NodeDuties {
             // must get the above wrapping instance before overwriting stage
             self.stage = Stage::AssumingElderDuties(VecDeque::new());
 
-            use NodeTransferQuery::CatchUpWithSectionWallet;
             return Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: Message::NodeQuery {
-                    query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
+                    query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
                     id: MessageId::new(),
                 },
                 dst: DstLocation::Section(wallet_id.into()),

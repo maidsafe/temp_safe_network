@@ -25,10 +25,10 @@ use log::{debug, error, info, warn};
 use sn_data_types::{Error as DtError, PublicKey, Token};
 use sn_messaging::{
     client::{
-        Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse, NodeRewardQuery,
-        NodeRewardQueryResponse, NodeTransferQuery,
+        Error as ErrorMessage, Message, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        NodeRewardQueryResponse,
     },
-    DstLocation, SrcLocation,
+    DstLocation, MessageId, SrcLocation,
 };
 
 use sn_transfers::TransferActor;
@@ -42,7 +42,6 @@ type SectionActor = TransferActor<Validator, ElderSigning>;
 /// out of rewards to nodes for
 /// their work in the network.
 pub struct Rewards {
-    peer_replicas: PublicKey,
     node_rewards: DashMap<XorName, NodeRewards>,
     section_funds: SectionFunds,
     reward_calc: RewardCalc,
@@ -67,11 +66,9 @@ pub enum NodeRewards {
 }
 
 impl Rewards {
-    pub fn new(elder_state: ElderState, actor: SectionActor, reward_calc: RewardCalc) -> Self {
-        let peer_replicas = elder_state.section_public_key();
+    pub fn new(actor: SectionActor, reward_calc: RewardCalc) -> Self {
         let section_funds = SectionFunds::new(actor);
         Self {
-            peer_replicas,
             node_rewards: Default::default(),
             section_funds,
             reward_calc,
@@ -95,14 +92,12 @@ impl Rewards {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&self, section: XorName) -> Result<NodeOperation> {
-        info!("Rewards: Catching up with our Replicas (section actor history)!");
+    pub async fn get_section_wallet_history(&self, section: XorName) -> Result<NodeOperation> {
+        info!("Rewards: Catching up with our section wallet history!");
         // prepare actor init
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::CatchUpWithSectionWallet(
-                    self.peer_replicas, // consider removing this
-                )),
+                query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
                 id: MessageId::new(),
             },
             dst: DstLocation::Section(section),
@@ -193,6 +188,7 @@ impl Rewards {
                 .get_wallet_id(old_node_id, new_node_id, msg_id, origin)
                 .await?
                 .into(),
+            GetSectionWalletHistory => self.history(msg_id, origin).into(),
         };
 
         Ok(result)
@@ -237,6 +233,23 @@ impl Rewards {
         }
 
         Ok(payouts.into())
+    }
+
+    ///
+    fn history(&self, msg_id: MessageId, origin: SrcLocation) -> NodeMessagingDuty {
+        use NodeQueryResponse::*;
+        use NodeRewardQueryResponse::*;
+
+        NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQueryResponse {
+                response: Rewards(GetSectionWalletHistory(self.section_funds.wallet_info())),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: origin,
+            },
+            dst: origin.to_dst(),
+            to_be_aggregated: true,
+        })
     }
 
     /// 0. A brand new node has joined our section.

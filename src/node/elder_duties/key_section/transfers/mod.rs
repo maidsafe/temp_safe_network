@@ -34,12 +34,11 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Cmd, CmdError, Error as ErrorMessage, Event, Message, MessageId, NodeCmd, NodeCmdError,
-        NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
-        NodeTransferQuery, NodeTransferQueryResponse, QueryResponse, TransferError,
+        Cmd, CmdError, Error as ErrorMessage, Event, Message, NodeCmd, NodeCmdError, NodeEvent,
+        NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+        NodeTransferQueryResponse, QueryResponse, TransferError,
     },
-    location::User,
-    DstLocation, SrcLocation,
+    DstLocation, EndUser, MessageId, SrcLocation,
 };
 use std::fmt::{self, Display, Formatter};
 use xor_name::Prefix;
@@ -101,7 +100,7 @@ impl Transfers {
         let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(pub_key)),
+                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
                 id: MessageId::new(),
             },
             dst: DstLocation::Section(pub_key.into()),
@@ -152,10 +151,6 @@ impl Transfers {
     ) -> Result<NodeOperation> {
         use TransferQuery::*;
         let result = match query {
-            CatchUpWithSectionWallet(wallet_id) => {
-                self.catchup_with_section_wallet(*wallet_id, msg_id, origin)
-                    .await
-            }
             GetNewSectionWallet(wallet_id) => {
                 self.get_new_section_wallet(*wallet_id, msg_id, origin)
                     .await
@@ -256,7 +251,7 @@ impl Transfers {
         use TransferError::*;
         if recipient_is_not_section {
             warn!("Payment: recipient is not section");
-            let origin = SrcLocation::User(User::EndUser(payment.sender()));
+            let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
             return Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: Message::CmdError {
                     error: CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
@@ -293,7 +288,7 @@ impl Transfers {
                         total_cost
                     );
                     // todo, better error, like `TooLowPayment`
-                    let origin = SrcLocation::User(User::EndUser(payment.sender()));
+                    let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
                     return Ok(NodeMessagingDuty::Send(OutgoingMsg {
                         msg: Message::CmdError {
                             error: CmdError::Transfer(TransferRegistration(
@@ -318,7 +313,7 @@ impl Transfers {
             }
             Err(e) => {
                 warn!("Payment: registration or propagation failed: {}", e);
-                let origin = SrcLocation::User(User::EndUser(payment.sender()));
+                let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::CmdError {
                         error: CmdError::Transfer(TransferRegistration(
@@ -352,7 +347,6 @@ impl Transfers {
         };
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
-
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(result)),
@@ -434,36 +428,6 @@ impl Transfers {
             },
             dst: origin.to_dst(),
             to_be_aggregated: false,
-        }))
-    }
-
-    async fn catchup_with_section_wallet(
-        &self,
-        wallet_id: PublicKey,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeMessagingDuty> {
-        info!("Handling CatchUpWithSectionWallet query");
-        use NodeQueryResponse::*;
-        use NodeTransferQueryResponse::*;
-        // todo: validate signature
-        let result = match self.replicas.history(wallet_id).await {
-            Ok(history) => Ok(WalletInfo {
-                replicas: self.replicas.replicas_pk_set(),
-                history,
-            }),
-            Err(error) => Err(convert_to_error_message(error)?),
-        };
-
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
-                response: Transfers(CatchUpWithSectionWallet(result)),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                query_origin: origin,
-            },
-            dst: origin.to_dst(),
-            to_be_aggregated: false, // this has to be sorted out by recipient..
         }))
     }
 
@@ -627,9 +591,9 @@ impl Transfers {
                         )),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        cmd_origin: SrcLocation::User(User::EndUser(proof.sender())),
+                        cmd_origin: SrcLocation::EndUser(EndUser::AllClients(proof.sender())),
                     },
-                    dst: DstLocation::User(User::EndUser(proof.sender())),
+                    dst: DstLocation::EndUser(EndUser::AllClients(proof.sender())),
                     to_be_aggregated: true,
                 }))
             }

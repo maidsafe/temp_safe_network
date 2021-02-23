@@ -7,13 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::ReceivedMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation, ReceivedMsg};
-use crate::{Error, Network, Result};
-use bytes::Bytes;
+use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
+use crate::{Network, Result};
 use hex_fmt::HexFmt;
-use log::{error, info, trace};
+use log::{info, trace};
 use sn_data_types::PublicKey;
-use sn_messaging::{client::Message, DstLocation, SrcLocation};
+use sn_messaging::client::Message;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use xor_name::XorName;
 
@@ -97,7 +96,7 @@ impl NetworkEvents {
                     src,
                     dst
                 );
-                self.evaluate_msg(content, src, dst).await
+                self.analysis.evaluate(Message::from(content)?, src, dst)
             }
             RoutingEvent::EldersChanged {
                 key,
@@ -136,30 +135,6 @@ impl NetworkEvents {
             }
             // Ignore all other events
             _ => Ok(NodeOperation::NoOp),
-        }
-    }
-
-    async fn evaluate_msg(
-        &mut self,
-        content: Bytes,
-        src: SrcLocation,
-        dst: DstLocation,
-    ) -> Result<NodeOperation> {
-        match Message::from(content) {
-            Ok(msg) => {
-                info!("Message Envelope received. Contents: {:?}", &msg);
-                self.analysis.evaluate(&ReceivedMsg { msg, src, dst }).await
-            }
-            Err(e) => {
-                error!(
-                    "Error deserializing received network message into Message type: {:?}",
-                    e
-                );
-                Err(Error::Logic(format!(
-                    "Error deserializing network msg into Message: {:?}",
-                    e
-                )))
-            }
         }
     }
 }

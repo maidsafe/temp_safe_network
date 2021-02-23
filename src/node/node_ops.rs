@@ -15,11 +15,7 @@ use sn_data_types::{
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::{
-    client::{Message, MessageId},
-    location::User,
-    DstLocation, SrcLocation,
-};
+use sn_messaging::{client::Message, DstLocation, EndUser, MessageId, SrcLocation};
 use std::fmt::Formatter;
 
 use sn_routing::{Event as RoutingEvent, Prefix};
@@ -199,19 +195,6 @@ impl Debug for NodeDuty {
 // --------------- Messaging ---------------
 
 #[derive(Debug, Clone)]
-pub struct ReceivedMsg {
-    pub msg: Message,
-    pub src: SrcLocation,
-    pub dst: DstLocation,
-}
-
-impl ReceivedMsg {
-    pub fn id(&self) -> MessageId {
-        self.msg.id()
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct OutgoingMsg {
     pub msg: Message,
     pub dst: DstLocation,
@@ -342,13 +325,6 @@ impl Into<NodeOperation> for AdultDuty {
 /// Duties only run as a Key section.
 #[derive(Debug)]
 pub enum KeySectionDuty {
-    /// Incoming user msgs
-    /// are to be evaluated and
-    /// sent to their respective module.
-    EvaluateUserMsg {
-        msg: Message,
-        user: User,
-    },
     /// Transfers of tokens between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
     NoOp,
@@ -371,6 +347,7 @@ impl Into<NodeOperation> for KeySectionDuty {
 
 /// Duties only run as a Data section.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum DataSectionDuty {
     /// Metadata is the info about
     /// data types structures, ownership
@@ -393,16 +370,19 @@ pub enum DataSectionDuty {
 /// chunks, and are then relayed to
 /// Adults (i.e. chunk holders).
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum MetadataDuty {
     /// Reads.
     ProcessRead {
-        msg: Message,
-        origin: User,
+        query: sn_messaging::client::DataQuery,
+        id: MessageId,
+        origin: EndUser,
     },
     /// Writes.
     ProcessWrite {
-        msg: Message,
-        origin: User,
+        cmd: sn_messaging::client::DataCmd,
+        id: MessageId,
+        origin: EndUser,
     },
     NoOp,
 }
@@ -425,11 +405,20 @@ impl Into<NodeOperation> for MetadataDuty {
 
 /// Chunk storage and retrieval is done at Adults.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ChunkStoreDuty {
     /// Reads.
-    ReadChunk(ReceivedMsg),
+    ReadChunk {
+        read: sn_messaging::client::BlobRead,
+        id: MessageId,
+        origin: SrcLocation,
+    },
     /// Writes.
-    WriteChunk(ReceivedMsg),
+    WriteChunk {
+        write: sn_messaging::client::BlobWrite,
+        id: MessageId,
+        origin: SrcLocation,
+    },
     NoOp,
 }
 
@@ -495,7 +484,7 @@ pub enum RewardDuty {
         query: RewardQuery,
         ///
         msg_id: MessageId,
-        // ///
+        ///
         origin: SrcLocation,
     },
     ///
@@ -503,7 +492,7 @@ pub enum RewardDuty {
         cmd: RewardCmd,
         ///
         msg_id: MessageId,
-        // ///
+        ///
         origin: SrcLocation,
     },
     NoOp,
@@ -566,6 +555,9 @@ pub enum RewardQuery {
         /// The id of the node at its new section (i.e. this one).
         new_node_id: XorName,
     },
+    /// When a new Section Actor share joins,
+    /// it queries the other shares for the section wallet history.
+    GetSectionWalletHistory,
 }
 
 impl Into<NodeOperation> for RewardDuty {
@@ -594,7 +586,7 @@ pub enum TransferDuty {
         query: TransferQuery,
         ///
         msg_id: MessageId,
-        // ///
+        ///
         origin: SrcLocation,
     },
     ///
@@ -602,7 +594,7 @@ pub enum TransferDuty {
         cmd: TransferCmd,
         ///
         msg_id: MessageId,
-        // ///
+        ///
         origin: SrcLocation,
     },
     NoOp,
@@ -626,8 +618,6 @@ impl Into<NodeOperation> for TransferDuty {
 /// handled by AT2 Replicas.
 #[derive(Debug)]
 pub enum TransferQuery {
-    /// Get section actor transfers.
-    CatchUpWithSectionWallet(PublicKey),
     /// Get section actor transfers.
     GetNewSectionWallet(PublicKey),
     /// Get the PublicKeySet for replicas of a given PK

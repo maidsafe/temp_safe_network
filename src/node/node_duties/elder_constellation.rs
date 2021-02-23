@@ -6,6 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::ElderDuties;
+use crate::{ElderState, Network, NodeInfo, Result};
+
+use crate::{node::node_ops::NodeOperation, Error};
+use log::{debug, info};
+use sn_data_types::PublicKey;
+use sn_routing::Prefix;
+
 // we want a consistent view of the elder constellation
 
 // when we have an ElderChange, underlying sn_routing will
@@ -14,20 +22,6 @@
 
 // so, to correctly transition between keys, we need to not mix states,
 // and keep a tidy order, i.e. use one constellation at a time.
-
-// What things do we _need_ to snapshot?
-// - Public/Secret KeySet
-// - ..
-// What things do we _need_ to access most current state of?
-// - ..
-
-use super::ElderDuties;
-use crate::{ElderState, Network, NodeInfo, Result};
-
-use crate::{node::node_ops::NodeOperation, Error};
-use log::{debug, info};
-use sn_data_types::PublicKey;
-use sn_routing::Prefix;
 
 ///
 pub struct ElderConstellation {

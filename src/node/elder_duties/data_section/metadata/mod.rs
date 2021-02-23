@@ -15,16 +15,14 @@ mod writing;
 
 use crate::{
     capacity::ChunkHolderDbs,
-    node::node_ops::{IntoNodeOp, MetadataDuty, NodeOperation},
+    node::node_ops::{MetadataDuty, NodeOperation},
     node::NodeInfo,
-    ElderState, Error, Result,
+    ElderState, Result,
 };
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
-use sn_messaging::{client::Message, location::User};
-
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
@@ -54,22 +52,13 @@ impl Metadata {
     pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NodeOperation> {
         use MetadataDuty::*;
         match duty {
-            ProcessRead { msg, origin } | ProcessWrite { msg, origin } => {
-                self.process_msg(msg, origin).await
+            ProcessRead { query, id, origin } => {
+                reading::get_result(query, id, origin, &self.elder_stores).await
+            }
+            ProcessWrite { cmd, id, origin } => {
+                writing::get_result(cmd, id, origin, &mut self.elder_stores).await
             }
             NoOp => Ok(NodeOperation::NoOp),
-        }
-    }
-
-    async fn process_msg(&mut self, msg: Message, origin: User) -> Result<NodeOperation> {
-        match &msg {
-            Message::Cmd { .. } => writing::get_result(msg, origin, &mut self.elder_stores).await,
-            Message::Query { .. } => reading::get_result(msg, origin, &self.elder_stores)
-                .await
-                .convert(),
-            _ => Err(Error::Logic(
-                "Only Queries and Cmds from client can be handled at Metadata".to_string(),
-            )), // only Queries and Cmds from client is handled at Metadata
         }
     }
 

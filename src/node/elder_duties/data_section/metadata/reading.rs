@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -12,65 +12,51 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::NodeMessagingDuty;
-use crate::{Error, Result};
-use log::info;
+use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, NodeOperation};
+use crate::Result;
 use sn_messaging::{
-    client::{BlobRead, DataQuery, MapRead, Message, MessageId, Query, SequenceRead},
-    location::User,
+    client::{BlobRead, DataQuery, MapRead, SequenceRead},
+    EndUser, MessageId,
 };
 
 pub(super) async fn get_result(
-    msg: Message,
-    origin: User,
+    query: DataQuery,
+    msg_id: MessageId,
+    origin: EndUser,
     stores: &ElderStores,
-) -> Result<NodeMessagingDuty> {
+) -> Result<NodeOperation> {
     use DataQuery::*;
-    let msg_id = msg.id();
-    // let origin = msg.origin;
-    // let proxies = msg.proxies;
-    let res = match msg {
-        Message::Query {
-            query: Query::Data(data_query),
-            ..
-        } => match &data_query {
-            Blob(read) => blob(read, stores.blob_register(), msg_id, origin).await,
-            Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
-            Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
-        },
-        _ => Err(Error::Logic(
-            "Unreachable pattern when reading data.".to_string(),
-        )),
-    };
-    if res.is_ok() {
-        info!("Read data queried by message: '{:?}' successfully!", msg_id);
+    match &query {
+        Blob(read) => blob(read, stores.blob_register(), msg_id, origin).await,
+        Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
+        Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
     }
-    res
+    .convert()
 }
 
 async fn blob(
     read: &BlobRead,
     register: &BlobRegister,
     msg_id: MessageId,
-    origin: User,
+    origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
-    register.read(read, msg_id, origin).await // since the data is sent on to adults, the entire msg is passed in
+    register.read(read, msg_id, origin).await
 }
 
 async fn map(
     read: &MapRead,
     storage: &MapStorage,
     msg_id: MessageId,
-    origin: User,
+    origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
-    storage.read(read, msg_id, origin).await // map data currently stay at elders, so the msg is not needed
+    storage.read(read, msg_id, origin).await
 }
 
 async fn sequence(
     read: &SequenceRead,
     storage: &SequenceStorage,
     msg_id: MessageId,
-    origin: User,
+    origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
-    storage.read(read, msg_id, origin).await // sequence data currently stay at elders, so the msg is not needed
+    storage.read(read, msg_id, origin).await
 }
