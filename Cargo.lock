@@ -1287,12 +1287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keccak"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
-
-[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1692,9 +1686,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.9.17"
+version = "0.9.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad444bf88addd3368e5b4ccec6a06b6b616e6f49a5d295bc350bada9d6bc80a"
+checksum = "1e9942ea11e9a97d6cf9a533960663c5ab049078e17e40ba7ea1491fb1675b15"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2303,19 +2297,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha3"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd26bc0e7a2e3a7c959bc494caf58b72ee0c71d67704e9520f736ca7e4853ecf"
-dependencies = [
- "block-buffer 0.7.3",
- "byte-tools",
- "digest 0.8.1",
- "keccak",
- "opaque-debug 0.2.3",
-]
-
-[[package]]
 name = "signature"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2329,23 +2310,22 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.14.3"
-source = "git+https://github.com/oetyng/sn_data_types?branch=remove-msgenvelope#1b2a0e655b61bcff544d5d4deddd4fcc64f439c1"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa9cd49d26b0981cf2d822c1865a63506b082b902bab2c82b33d2943b15548fb"
 dependencies = [
  "bincode",
  "crdts",
- "ed25519",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
- "sha3",
  "signature",
  "thiserror",
  "threshold_crypto",
- "tiny-keccak 1.5.0",
+ "tiny-keccak 2.0.2",
  "xor_name",
 ]
 
@@ -2364,14 +2344,14 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "3.0.2"
-source = "git+https://github.com/oetyng/sn_messaging?branch=all-accumulation-in-routing#34c6a5c215bfcf9df1c63a4c4f4348841f91d4cd"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6802c41867ea2bc0dde87309c5e204a86bc4e65ec604eb20aa87d4467a6f619b"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
  "cookie-factory",
  "crdts",
- "ed25519",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
@@ -2380,7 +2360,6 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_bytes",
- "sha3",
  "signature",
  "sn_data_types",
  "thiserror",
@@ -2436,8 +2415,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.43.1"
-source = "git+https://github.com/oetyng/sn_routing?branch=all-accumulation-in-routing#cc9cd223c8643756f700a43b8d9a6629320521d4"
+version = "0.44.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84c5dd580ca42c5ab1d5b71a5d766879bfd98de4ac16c4e8480465a52c97f76e"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2465,8 +2445,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.3.2"
-source = "git+https://github.com/oetyng/sn_transfers?branch=remove-msgenvelope#e1f6f2abebe5a3c239b375379eecbfb2c448d4f6"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2c6410c7870b371fc5ae407113c8ecd870bbdd6252bb84b26af9c2ed8ef5ddb"
 dependencies = [
  "bincode",
  "crdts",

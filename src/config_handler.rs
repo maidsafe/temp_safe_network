@@ -291,10 +291,6 @@ impl Config {
             self.update_only = occurrences >= 1;
         } else if arg == "local" {
             self.local = occurrences >= 1;
-        } else if arg == "fresh" {
-            self.network_config.fresh = occurrences >= 1;
-        } else if arg == "clean" {
-            self.network_config.clean = occurrences >= 1;
         } else if arg == "clear-data" {
             self.clear_data = occurrences >= 1;
         } else {
