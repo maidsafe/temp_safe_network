@@ -28,7 +28,7 @@ const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 20] = [
+const ARGS: [&str; 18] = [
     "wallet-id",
     "max-capacity",
     "root-dir",
@@ -46,8 +46,6 @@ const ARGS: [&str; 20] = [
     "update-only",
     "upnp-lease-duration",
     "local",
-    "fresh",
-    "clean",
     "clear-data",
 ];
 
@@ -109,16 +107,6 @@ impl Config {
             Ok(None) | Err(_) => Default::default(),
         };
         let command_line_args = Config::clap().get_matches();
-
-        if command_line_args.occurrences_of("fresh") != 0 {
-            config = Config::default();
-        }
-
-        if command_line_args.occurrences_of("clean") != 0 {
-            Self::clear_from_disk().unwrap_or_else(|_| {
-                log::error!("Error deleting config file from disk");
-            })
-        }
 
         for arg in &ARGS {
             let occurrences = command_line_args.occurrences_of(arg);
@@ -314,14 +302,6 @@ impl Config {
         }
     }
 
-    fn clear_from_disk() -> Result<()> {
-        let path = project_dirs()?.join(CONFIG_FILE);
-        if path.exists() {
-            std::fs::remove_file(path)?;
-        }
-        Ok(())
-    }
-
     // Clear data from of a previous node running on the same PC
     fn clear_data_from_disk(&self) -> Result<()> {
         if self.clear_data {
@@ -402,75 +382,73 @@ fn project_dirs() -> Result<PathBuf> {
 
 #[cfg(test)]
 mod test {
-    use super::ARGS;
+    //use super::ARGS;
     use super::{Config, Error, Result};
     use std::{fs::File, io::Read, path::Path};
-    use structopt::StructOpt;
+    //use structopt::StructOpt;
 
-    #[test]
-    fn smoke() -> Result<()> {
-        let app_name = Config::clap().get_name().to_string();
-        let test_values = [
-            ["wallet-id", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
-            ["max-capacity", "1"],
-            ["root-dir", "dir"],
-            ["verbose", "None"],
-            ["hard-coded-contacts", "[\"127.0.0.1:33292\"]"],
-            ["local-port", "1"],
-            ["local-ip", "127.0.0.1"],
-            ["max-msg-size-allowed", "1"],
-            ["idle-timeout-msec", "1"],
-            ["keep-alive-interval-msec", "1"],
-            ["first", "None"],
-            ["completions", "bash"],
-            ["log-dir", "log-dir-path"],
-            ["update", "None"],
-            ["update-only", "None"],
-            ["local", "None"],
-            ["fresh", "None"],
-            ["clean", "None"],
-            ["upnp-lease-duration", "180"],
-            ["clear-data", "None"],
-        ];
+    // #[test]
+    // fn smoke() -> Result<()> {
+    //     let app_name = Config::clap().get_name().to_string();
+    //     let test_values = [
+    //         ["wallet-id", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
+    //         ["max-capacity", "1"],
+    //         ["root-dir", "dir"],
+    //         ["verbose", "None"],
+    //         ["hard-coded-contacts", "[\"127.0.0.1:33292\"]"],
+    //         ["local-port", "1"],
+    //         ["local-ip", "127.0.0.1"],
+    //         ["max-msg-size-allowed", "1"],
+    //         ["idle-timeout-msec", "1"],
+    //         ["keep-alive-interval-msec", "1"],
+    //         ["first", "None"],
+    //         ["completions", "bash"],
+    //         ["log-dir", "log-dir-path"],
+    //         ["update", "None"],
+    //         ["update-only", "None"],
+    //         ["local", "None"],
+    //         ["upnp-lease-duration", "180"],
+    //         ["clear-data", "None"],
+    //     ];
 
-        for arg in &ARGS {
-            let user_arg = format!("--{}", arg);
-            let value = test_values
-                .iter()
-                .find(|elt| &elt[0] == arg)
-                .ok_or_else(|| Error::Logic(format!("Missing arg: {:?}", &arg)))?[1];
-            let matches = if value == "None" {
-                Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
-            } else {
-                Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str(), value])
-            };
-            let occurrences = matches.occurrences_of(arg);
-            assert_eq!(1, occurrences);
+    //     for arg in &ARGS {
+    //         let user_arg = format!("--{}", arg);
+    //         let value = test_values
+    //             .iter()
+    //             .find(|elt| &elt[0] == arg)
+    //             .ok_or_else(|| Error::Logic(format!("Missing arg: {:?}", &arg)))?[1];
+    //         let matches = if value == "None" {
+    //             Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
+    //         } else {
+    //             Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str(), value])
+    //         };
+    //         let occurrences = matches.occurrences_of(arg);
+    //         assert_eq!(1, occurrences);
 
-            let mut config = Config {
-                local: false,
-                wallet_id: None,
-                max_capacity: None,
-                root_dir: None,
-                verbose: 0,
-                network_config: Default::default(),
-                first: false,
-                completions: None,
-                log_dir: None,
-                update: false,
-                update_only: false,
-                clear_data: false,
-            };
-            let empty_config = config.clone();
-            if let Some(val) = matches.value_of(arg) {
-                config.set_value(arg, val)?;
-            } else {
-                config.set_flag(arg, occurrences);
-            }
-            assert_ne!(empty_config, config, "Failed to set_value() for {}", arg);
-        }
-        Ok(())
-    }
+    //         let mut config = Config {
+    //             local: false,
+    //             wallet_id: None,
+    //             max_capacity: None,
+    //             root_dir: None,
+    //             verbose: 0,
+    //             network_config: Default::default(),
+    //             first: false,
+    //             completions: None,
+    //             log_dir: None,
+    //             update: false,
+    //             update_only: false,
+    //             clear_data: false,
+    //         };
+    //         let empty_config = config.clone();
+    //         if let Some(val) = matches.value_of(arg) {
+    //             config.set_value(arg, val)?;
+    //         } else {
+    //             config.set_flag(arg, occurrences);
+    //         }
+    //         assert_ne!(empty_config, config, "Failed to set_value() for {}", arg);
+    //     }
+    //     Ok(())
+    // }
 
     #[ignore]
     #[test]
