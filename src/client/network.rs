@@ -17,6 +17,7 @@ use sn_data_types::{
     SignedCredit, SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use std::collections::BTreeSet;
+use threshold_crypto::PublicKeySet;
 use xor_name::XorName;
 
 use super::{BlobRead, BlobWrite};
@@ -160,8 +161,7 @@ pub enum NodeTransferQuery {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
-    /// A second pk may be optinally passed for sibling section setup
-    SetupNewSectionWallets((PublicKey, Option<PublicKey>)),
+    GetWalletReplicas(PublicKey),
     /// Replicas starting up
     /// need to query for events of
     /// the existing Replicas. (Sent to the other Elders).
@@ -202,7 +202,9 @@ pub enum NodeRewardQueryResponse {
     /// together with the new node id,
     /// that followed with the original query.
     GetNodeWalletId(Result<(PublicKey, XorName)>),
-    /// Returns the history of the section wallet.
+    /// A new Section Actor share (i.e. a new Elder) needs to query
+    /// its peer Elders for the replicas' public key set
+    /// and the history of events of the section wallet.
     GetSectionWalletHistory(WalletInfo),
 }
 
@@ -210,15 +212,10 @@ pub enum NodeRewardQueryResponse {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeTransferQueryResponse {
-    /// On Elder change, all Elders neet to query
+    /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
-    SetupNewSectionWallets{
-        our_wallet: Result<WalletInfo>,
-        sibling_key: Option<PublicKey>
-    },
-    // /// Returns the history of the section actor.
-    // GetSectionWalletInfo(Result<Vec<ReplicaEvent>>),
+    GetWalletReplicas(PublicKeySet),
     /// Replicas starting up
     /// need to query for events of
     /// the existing Replicas.
