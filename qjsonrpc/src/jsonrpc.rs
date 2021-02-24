@@ -20,6 +20,15 @@ const SN_AUTHD_JSONRPC_VERSION: &str = "2.0";
 const JSONRPC_PARSE_ERROR: isize = -32700;
 const JSONRPC_INVALID_REQUEST: isize = -32600;
 
+/// Spec-defined code for method not found
+pub const JSONRPC_METHOD_NOT_FOUND: isize = -32601;
+
+/// Spec-defined code for invalid method params
+pub const JSONRPC_INVALID_PARAMS: isize = -32602;
+
+/// Spec-defined catch-all error to use as a fallback
+pub const JSONRPC_INTERNAL_ERROR: isize = -32603;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcRequest {
     jsonrpc: String,
