@@ -160,7 +160,8 @@ pub enum NodeTransferQuery {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
-    GetNewSectionWallet(PublicKey),
+    /// A second pk may be optinally passed for sibling section setup
+    SetupNewSectionWallets((PublicKey, Option<PublicKey>)),
     /// Replicas starting up
     /// need to query for events of
     /// the existing Replicas. (Sent to the other Elders).
@@ -212,7 +213,10 @@ pub enum NodeTransferQueryResponse {
     /// On Elder change, all Elders neet to query
     /// network for the new wallet's replicas' public key set
     /// and the history of events of the wallet (which will be empty at that point..).
-    GetNewSectionWallet(Result<WalletInfo>),
+    SetupNewSectionWallets{
+        our_wallet: Result<WalletInfo>,
+        sibling_key: Option<PublicKey>
+    },
     // /// Returns the history of the section actor.
     // GetSectionWalletInfo(Result<Vec<ReplicaEvent>>),
     /// Replicas starting up
