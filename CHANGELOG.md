@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.0.0](https://github.com/maidsafe/sn_messaging/compare/v5.0.0...v6.0.0) (2021-02-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **location:** this adds a new variant to SrcLocation
+
+### Features
+
+* **location:** add support for accumulation at destination ([89cadad](https://github.com/maidsafe/sn_messaging/commit/89cadad9669295f2833f0a161acd252d04e4218a))
+
 ## [5.0.0](https://github.com/maidsafe/sn_messaging/compare/v4.0.5...v5.0.0) (2021-02-22)
 
 
