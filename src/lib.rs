@@ -18,7 +18,7 @@ mod serialisation;
 
 pub use self::{
     errors::{Error, Result},
-    location::{DstLocation, EndUser, SrcLocation},
+    location::{Aggregation, DstLocation, EndUser, Itinerary, SrcLocation},
     msg_id::MessageId,
     serialisation::WireMsg,
 };

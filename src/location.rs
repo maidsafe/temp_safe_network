@@ -12,6 +12,52 @@ use xor_name::{Prefix, XorName};
 
 type SocketId = XorName;
 
+/// The planned route of a message.
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+pub struct Itinerary {
+    /// Source
+    pub src: SrcLocation,
+    pub dst: DstLocation,
+    pub aggregation: Aggregation,
+}
+
+impl Itinerary {
+    /// Elders will aggregate a group sig before
+    /// they all all send one copy of it each to dst.
+    pub fn aggregate_at_src(&self) -> bool {
+        matches!(self.aggregation, Aggregation::AtSource)
+    }
+
+    /// Elders will send their signed message, which
+    /// recipients aggregate.
+    pub fn aggregate_at_dst(&self) -> bool {
+        matches!(self.aggregation, Aggregation::AtDestination)
+    }
+
+    /// Name of the source
+    pub fn src_name(&self) -> XorName {
+        self.src.name()
+    }
+
+    /// Name of the destionation
+    pub fn dst_name(&self) -> Option<XorName> {
+        self.dst.name()
+    }
+}
+
+/// Aggregation scheme
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+pub enum Aggregation {
+    /// No aggregation is made, eg. when the payload contains full authority.
+    None,
+    /// Elders will aggregate a group sig before
+    /// they all all send one copy of it each to dst.
+    AtSource,
+    /// Elders will send their signed message, which
+    /// recipients aggregate.
+    AtDestination,
+}
+
 /// An EndUser is repreented by a PublicKey.
 /// It uses 1-n clients to access the network.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
@@ -23,7 +69,8 @@ pub enum EndUser {
     Client {
         /// The EndUser PublicKey
         public_key: PublicKey,
-        /// A random hash that maps to a SocketAddr.
+        /// A hash of the EndUser signature over their socket address.
+        /// This maps to the SocketAddr at the Elders where the EndUser registered.
         socket_id: SocketId,
     },
 }
@@ -42,7 +89,7 @@ impl EndUser {
         (*self.id()).into()
     }
 
-    pub fn contains(&self, name: &XorName) -> bool {
+    pub fn equals(&self, name: &XorName) -> bool {
         match self {
             Self::Client { public_key, .. } => name == &(*public_key).into(),
             Self::AllClients(public_key) => name == &(*public_key).into(),
@@ -57,8 +104,8 @@ pub enum SrcLocation {
     EndUser(EndUser),
     /// A single node with the given name.
     Node(XorName),
-    /// A section with the given prefix.
-    Section(Prefix),
+    /// A section close to a name.
+    Section(XorName),
 }
 
 impl SrcLocation {
@@ -73,11 +120,20 @@ impl SrcLocation {
     }
 
     /// Returns whether the given name is part of this location
-    pub fn contains(&self, name: &XorName) -> bool {
+    pub fn equals(&self, name: &XorName) -> bool {
         match self {
-            Self::EndUser(user) => user.contains(name),
+            Self::EndUser(user) => user.equals(name),
             Self::Node(self_name) => name == self_name,
-            Self::Section(self_prefix) => self_prefix.matches(name),
+            Self::Section(some_name) => name == some_name,
+        }
+    }
+
+    /// Returns the name of this location, or `None` if it is `Direct`.
+    pub fn name(&self) -> XorName {
+        match self {
+            Self::EndUser(user) => user.name(),
+            Self::Node(name) => *name,
+            Self::Section(name) => *name,
         }
     }
 
@@ -86,7 +142,7 @@ impl SrcLocation {
         match self {
             Self::EndUser(user) => DstLocation::EndUser(*user),
             Self::Node(name) => DstLocation::Node(*name),
-            Self::Section(prefix) => DstLocation::Section(prefix.name()),
+            Self::Section(name) => DstLocation::Section(*name),
         }
     }
 }
@@ -98,9 +154,6 @@ pub enum DstLocation {
     EndUser(EndUser),
     /// Destination is a single node with the given name.
     Node(XorName),
-    /// Destination is a single node which will perform accumulation of BLS
-    /// signature shares before processing the message.
-    AccumulatingNode(XorName),
     /// Destination are the nodes of the section whose prefix matches the given name.
     Section(XorName),
     /// Destination is the node at the `ConnectionInfo` the message is directly sent to.
@@ -129,7 +182,6 @@ impl DstLocation {
         match self {
             Self::EndUser(user) => prefix.matches(&user.name()),
             Self::Node(self_name) => name == self_name,
-            Self::AccumulatingNode(self_name) => name == self_name,
             Self::Section(self_name) => prefix.matches(self_name),
             Self::Direct => true,
         }
@@ -138,9 +190,8 @@ impl DstLocation {
     /// Returns the name of this location, or `None` if it is `Direct`.
     pub fn name(&self) -> Option<XorName> {
         match self {
-            Self::EndUser(user) => Some((*user.id()).into()),
+            Self::EndUser(user) => Some(user.name()),
             Self::Node(name) => Some(*name),
-            Self::AccumulatingNode(name) => Some(*name),
             Self::Section(name) => Some(*name),
             Self::Direct => None,
         }
