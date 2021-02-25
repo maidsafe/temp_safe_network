@@ -91,8 +91,8 @@ impl Safe {
                 let mut processed_files =
                     file_system_dir_walk(self, path, recursive, follow_links, dry_run).await?;
 
-                // The FilesContainer is created as a Sequence with a single entry containing the
-                // timestamp as the entry's key, and the serialised FilesMap as the entry's value
+                // The FilesContainer is stored on a Sequence
+                // and the link to the serialised FilesMap as the entry's value
                 // TODO: use RDF format
                 let files_map = files_map_create(
                     self,
@@ -111,18 +111,11 @@ impl Safe {
         let xorurl = if dry_run {
             "".to_string()
         } else {
-            // Store the serialised FilesMap on a Blob
-            let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
-                Error::Serialisation(format!(
-                    "Couldn't serialise the FilesMap generated: {:?}",
-                    err
-                ))
-            })?;
-            let files_map_xorurl = self
-                .files_store_public_blob(serialised_files_map.as_bytes(), None, false)
-                .await?;
+            // Store the serialised FilesMap in a Public Blob
+            let files_map_xorurl = self.store_files_map(&files_map).await?;
 
-            // Store the FilesContainer in a Public Sequence
+            // Store the FilesContainer in a Public Sequence, putting the
+            // serialised FilesMap XOR-URL as the first entry value
             let xorname = self
                 .safe_client
                 .store_sequence(
@@ -179,13 +172,14 @@ impl Safe {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
                 // We first obtained the FilesMap XOR-URL from the Sequence
-                let files_map_xorurl =
-                    XorUrlEncoder::from_url(&String::from_utf8(serialised_files_map).map_err(|err| {
+                let files_map_xorurl = XorUrlEncoder::from_url(
+                    &String::from_utf8(serialised_files_map).map_err(|err| {
                         Error::ContentError(format!(
-                            "Couldn't deserialise the FilesMap link stored in the FilesContainer: {:?}",
+                            "Couldn't parse the FilesMap link stored in the FilesContainer: {:?}",
                             err
                         ))
-                    })?)?;
+                    })?,
+                )?;
 
                 // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
                 let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
@@ -520,19 +514,14 @@ impl Safe {
         } else if dry_run {
             current_version + 1
         } else {
-            // The FilesContainer is updated by adding an entry containing the timestamp as the
-            // entry's key, and the serialised new version of the FilesMap as the entry's value
-            let serialised_files_map = serde_json::to_string(new_files_map).map_err(|err| {
-                Error::Serialisation(format!(
-                    "Couldn't serialise the FilesMap generated: {:?}",
-                    err
-                ))
-            })?;
+            // The FilesContainer is updated by adding an entry containing the link to
+            // the Blob with the serialised new version of the FilesMap.
+            let files_map_xorurl = self.store_files_map(new_files_map).await?;
 
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
             self.safe_client
-                .append_to_sequence(serialised_files_map.as_bytes(), xorname, type_tag, false)
+                .append_to_sequence(files_map_xorurl.as_bytes(), xorname, type_tag, false)
                 .await?;
 
             let new_version = current_version + 1;
@@ -624,6 +613,24 @@ impl Safe {
         self.safe_client
             .get_public_blob(xorurl_encoder.xorname(), range)
             .await
+    }
+
+    // Private helper to serialise a FilesMap and store it in a Public Blob
+    async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
+        // The FilesMapContainer is a Sequence where each NRS Map version is
+        // an entry containing the XOR-URL of the Blob containing the serialised NrsMap.
+        // TODO: use RDF format
+        let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
+            Error::Serialisation(format!(
+                "Couldn't serialise the FilesMap generated: {:?}",
+                err
+            ))
+        })?;
+        let files_map_xorurl = self
+            .files_store_public_blob(serialised_files_map.as_bytes(), None, false)
+            .await?;
+
+        Ok(files_map_xorurl)
     }
 }
 

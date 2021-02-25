@@ -96,10 +96,10 @@ impl Safe {
         debug!("The new NRS Map: {:?}", nrs_map);
         if !dry_run {
             // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
-            let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
+            let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
             self.safe_client
                 .append_to_sequence(
-                    &nrs_map_raw_data,
+                    nrs_map_xorurl.as_bytes(),
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
                     false,
@@ -155,12 +155,15 @@ impl Safe {
                 let nrs_xorname = XorUrlEncoder::from_nrsurl(&nrs_url)?.xorname();
                 debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
 
-                // Store the NrsMapContainer in a Public Sequence
-                let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
+                // Store the serialised NrsMap in a Public Blob
+                let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
+
+                // Store the NrsMapContainer in a Public Sequence, putting the
+                // serialised NrsMap XOR-URL as the first entry value
                 let xorname = self
                     .safe_client
                     .store_sequence(
-                        &nrs_map_raw_data,
+                        nrs_map_xorurl.as_bytes(),
                         Some(nrs_xorname),
                         NRS_MAP_TYPE_TAG,
                         None,
@@ -203,10 +206,10 @@ impl Safe {
         debug!("The new NRS Map: {:?}", nrs_map);
         if !dry_run {
             // Append new version of the NrsMap in the Public Sequence (NRS Map Container)
-            let nrs_map_raw_data = gen_nrs_map_raw_data(&nrs_map)?;
+            let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
             self.safe_client
                 .append_to_sequence(
-                    &nrs_map_raw_data,
+                    nrs_map_xorurl.as_bytes(),
                     xorurl_encoder.xorname(),
                     xorurl_encoder.type_tag(),
                     false,
@@ -269,7 +272,20 @@ impl Safe {
         };
 
         match data {
-            Ok((version, serialised_nrs_map)) => {
+            Ok((version, nrs_map_xorurl_bytes)) => {
+                // We first parse the NrsMap XOR-URL from the Sequence
+                let url = String::from_utf8(nrs_map_xorurl_bytes).map_err(|err| {
+                    Error::ContentError(format!(
+                        "Couldn't parse the NrsMap link stored in the NrsMapContainer: {:?}",
+                        err
+                    ))
+                })?;
+                debug!("Deserialised NrsMap XOR-URL: {}", url);
+                let nrs_map_xorurl = XorUrlEncoder::from_url(&url)?;
+
+                // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
+                let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
+
                 debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
                 let nrs_map =
                     serde_json::from_str(&String::from_utf8_lossy(&serialised_nrs_map.as_slice()))
@@ -296,6 +312,25 @@ impl Safe {
             ))),
         }
     }
+
+    // Private helper to serialise an NrsMap and store it in a Public Blob
+    async fn store_nrs_map(&mut self, nrs_map: &NrsMap) -> Result<String> {
+        // The NrsMapContainer is a Sequence where each NRS Map version is
+        // an entry containing the XOR-URL of the Blob containing the serialised NrsMap.
+        // TODO: use RDF format
+        let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
+            Error::Serialisation(format!(
+                "Couldn't serialise the NrsMap generated: {:?}",
+                err
+            ))
+        })?;
+
+        let nrs_map_xorurl = self
+            .files_store_public_blob(serialised_nrs_map.as_bytes(), None, false)
+            .await?;
+
+        Ok(nrs_map_xorurl)
+    }
 }
 
 fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
@@ -319,20 +354,6 @@ fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
 fn sanitised_url(name: &str) -> String {
     // FIXME: make sure we remove the starting 'safe://'
     format!("safe://{}", name.replace("safe://", ""))
-}
-
-fn gen_nrs_map_raw_data(nrs_map: &NrsMap) -> Result<Vec<u8>> {
-    // The NrsMapContainer is a Sequence where each NRS Map version is
-    // an entry containing the serialised NrsMap
-    // TODO: use RDF format
-    let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
-        Error::Serialisation(format!(
-            "Couldn't serialise the NrsMap generated: {:?}",
-            err
-        ))
-    })?;
-
-    Ok(serialised_nrs_map.as_bytes().to_vec())
 }
 
 #[cfg(test)]
