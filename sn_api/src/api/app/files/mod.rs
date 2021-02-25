@@ -111,18 +111,22 @@ impl Safe {
         let xorurl = if dry_run {
             "".to_string()
         } else {
+            // Store the serialised FilesMap on a Blob
             let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
                 Error::Serialisation(format!(
                     "Couldn't serialise the FilesMap generated: {:?}",
                     err
                 ))
             })?;
+            let files_map_xorurl = self
+                .files_store_public_blob(serialised_files_map.as_bytes(), None, false)
+                .await?;
 
             // Store the FilesContainer in a Public Sequence
             let xorname = self
                 .safe_client
                 .store_sequence(
-                    serialised_files_map.as_bytes(),
+                    files_map_xorurl.as_bytes(),
                     None,
                     FILES_CONTAINER_TYPE_TAG,
                     None,
@@ -174,15 +178,25 @@ impl Safe {
             Ok((version, serialised_files_map)) => {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
-                let files_map = serde_json::from_str(&String::from_utf8_lossy(
-                    &serialised_files_map.as_slice(),
-                ))
-                .map_err(|err| {
-                    Error::ContentError(format!(
-                        "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
-                        err
-                    ))
-                })?;
+                // We first obtained the FilesMap XOR-URL from the Sequence
+                let files_map_xorurl =
+                    XorUrlEncoder::from_url(&String::from_utf8(serialised_files_map).map_err(|err| {
+                        Error::ContentError(format!(
+                            "Couldn't deserialise the FilesMap link stored in the FilesContainer: {:?}",
+                            err
+                        ))
+                    })?)?;
+
+                // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
+                let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
+                let files_map =
+                    serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
+                        Error::ContentError(format!(
+                            "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
+                            err
+                        ))
+                    })?;
+
                 Ok((version, files_map))
             }
             Err(Error::EmptyContent(_)) => {

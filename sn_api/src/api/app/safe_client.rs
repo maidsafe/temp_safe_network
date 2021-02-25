@@ -421,7 +421,7 @@ impl SafeAppClient {
         let _address = if private {
             // Set permissions for append, delete, and manage perms to this application
             let mut perms = BTreeMap::default();
-            let _ = perms.insert(owner, SequencePrivatePermissions::new(true, true, true));
+            let _ = perms.insert(owner, SequencePrivatePermissions::new(true, true));
 
             client
                 .store_private_sequence(Some(vec![data.to_vec()]), xorname, tag, owner, perms)
@@ -433,7 +433,7 @@ impl SafeAppClient {
             // Set permissions for append and manage perms to this application
             let user_app = SequenceUser::Key(owner);
             let mut perms = BTreeMap::default();
-            let _ = perms.insert(user_app, SequencePublicPermissions::new(true, true));
+            let _ = perms.insert(user_app, SequencePublicPermissions::new(true));
 
             client
                 .store_public_sequence(Some(vec![data.to_vec()]), xorname, tag, owner, perms)
