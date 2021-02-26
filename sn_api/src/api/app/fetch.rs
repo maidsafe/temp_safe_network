@@ -8,9 +8,8 @@
 // Software.
 
 use super::{
-    files::{FileItem, FileMeta, FilesMap},
+    files::{FileItem, FileMeta, FilesMap, RealPath},
     nrs_map::NrsMap,
-    realpath::RealPath,
     Safe, XorName,
 };
 pub use super::{
