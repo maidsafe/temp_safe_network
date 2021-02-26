@@ -17,7 +17,9 @@ type SocketId = XorName;
 pub struct Itinerary {
     /// Source
     pub src: SrcLocation,
+    /// Destionation
     pub dst: DstLocation,
+    /// Wether this will be aggregated, and where.
     pub aggregation: Aggregation,
 }
 
@@ -89,6 +91,7 @@ impl EndUser {
         (*self.id()).into()
     }
 
+    /// Returns true if the provided name equals the enduser name.
     pub fn equals(&self, name: &XorName) -> bool {
         match self {
             Self::Client { public_key, .. } => name == &(*public_key).into(),
