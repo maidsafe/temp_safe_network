@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.0.0](https://github.com/maidsafe/sn_messaging/compare/v6.0.2...v7.0.0) (2021-02-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** location scheme updated, breaking the current messaging api
+
+### Features
+
+* **api:** api updated ([4e11d0e](https://github.com/maidsafe/sn_messaging/commit/4e11d0ecf10eb1b9c5ead1ac5be0de1e079bff05))
+
 ### [6.0.2](https://github.com/maidsafe/sn_messaging/compare/v6.0.1...v6.0.2) (2021-02-26)
 
 ### [6.0.1](https://github.com/maidsafe/sn_messaging/compare/v6.0.0...v6.0.1) (2021-02-24)
