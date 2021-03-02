@@ -316,7 +316,7 @@ impl Safe {
     // Private helper to serialise an NrsMap and store it in a Public Blob
     async fn store_nrs_map(&mut self, nrs_map: &NrsMap) -> Result<String> {
         // The NrsMapContainer is a Sequence where each NRS Map version is
-        // an entry containing the XOR-URL of the Blob containing the serialised NrsMap.
+        // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
         // TODO: use RDF format
         let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
             Error::Serialisation(format!(

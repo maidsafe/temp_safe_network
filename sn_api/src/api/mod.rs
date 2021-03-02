@@ -40,6 +40,6 @@ pub use authd_client::*;
 #[cfg(any(feature = "authenticator", feature = "authd_client"))]
 pub use common::auth_types::*;
 
-pub use common::{bls_sk_from_hex, ed_sk_from_hex, sk_to_hex};
+pub use common::{ed_sk_from_hex, sk_to_hex};
 
 pub use errors::{Error, Result};

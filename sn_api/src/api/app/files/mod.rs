@@ -171,7 +171,7 @@ impl Safe {
             Ok((version, serialised_files_map)) => {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
-                // We first obtained the FilesMap XOR-URL from the Sequence
+                // We first obtain the FilesMap XOR-URL from the Sequence
                 let files_map_xorurl = XorUrlEncoder::from_url(
                     &String::from_utf8(serialised_files_map).map_err(|err| {
                         Error::ContentError(format!(
@@ -618,7 +618,7 @@ impl Safe {
     // Private helper to serialise a FilesMap and store it in a Public Blob
     async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
         // The FilesMapContainer is a Sequence where each NRS Map version is
-        // an entry containing the XOR-URL of the Blob containing the serialised NrsMap.
+        // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
         // TODO: use RDF format
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
             Error::Serialisation(format!(

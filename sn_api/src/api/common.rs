@@ -53,14 +53,6 @@ pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     bytes
 }
 
-#[allow(unused)]
-pub fn bls_sk_from_hex(hex_str: &str) -> Result<threshold_crypto::SecretKey> {
-    let sk_bytes = parse_hex(&hex_str);
-    bincode::deserialize(&sk_bytes).map_err(|_| {
-        Error::InvalidInput("Failed to deserialize provided BLS secret key".to_string())
-    })
-}
-
 pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
     let sk_bytes = parse_hex(&hex_str);
     ed25519_dalek::SecretKey::from_bytes(&sk_bytes).map_err(|_| {
