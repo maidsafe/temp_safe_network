@@ -100,7 +100,7 @@ jobs:
 
       # Run cargo tarpaulin
       - name: Code Coverage - sn_api
-        uses: actions-rs/tarpaulin@master
+        uses: actions-rs/tarpaulin@v0.1
         with:
           args: '-v --manifest-path=sn_api/Cargo.toml --release --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
 
