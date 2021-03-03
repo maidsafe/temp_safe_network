@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [8.0.0](https://github.com/maidsafe/sn_messaging/compare/v7.0.1...v8.0.0) (2021-03-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **Seq:** Policy mutation operations are removed.
+
+### Features
+
+* **Seq:** upgrading sn_data_types to v0.16.0 and removing operations that are meant for mutating Seuquence's Policy ([306d8c1](https://github.com/maidsafe/sn_messaging/commit/306d8c16ea627f2aaed597d8c0df3698ab7d3a3e))
+
 ### [7.0.1](https://github.com/maidsafe/sn_messaging/compare/v7.0.0...v7.0.1) (2021-03-03)
 
 ## [7.0.0](https://github.com/maidsafe/sn_messaging/compare/v6.0.2...v7.0.0) (2021-02-26)
