@@ -10,9 +10,8 @@
 use super::{AuthorisationKind, CmdError, DataAuthKind, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    PublicKey, Sequence, SequenceAddress as Address, SequenceDataWriteOp, SequenceEntry as Entry,
-    SequenceIndex as Index, SequencePolicyWriteOp, SequencePrivatePolicy as PrivatePolicy,
-    SequencePublicPolicy as PublicPolicy, SequenceUser as User,
+    PublicKey, Sequence, SequenceAddress as Address, SequenceEntry as Entry,
+    SequenceIndex as Index, SequenceOp, SequenceUser as User,
 };
 use std::fmt;
 use xor_name::XorName;
@@ -62,16 +61,12 @@ pub enum SequenceWrite {
     /// Create a new Sequence on the network.
     New(Sequence),
     /// Edit the Sequence (insert/remove entry).
-    Edit(SequenceDataWriteOp<Entry>),
+    Edit(SequenceOp<Entry>),
     /// Delete a private Sequence.
     ///
     /// This operation MUST return an error if applied to public Sequence. Only the current
     /// owner(s) can perform this action.
     Delete(Address),
-    /// Set new policy for public Sequence.
-    SetPublicPolicy(SequencePolicyWriteOp<PublicPolicy>),
-    /// Set new policy for private Sequence.
-    SetPrivatePolicy(SequencePolicyWriteOp<PrivatePolicy>),
 }
 
 impl SequenceRead {
@@ -162,9 +157,6 @@ impl SequenceWrite {
         match self {
             New(ref data) => *data.name(),
             Delete(ref address) => *address.name(),
-            SetPublicPolicy(ref op) => *op.address.name(),
-            SetPrivatePolicy(ref op) => *op.address.name(),
-            // SetOwner(ref op) => *op.address.name(),
             Edit(ref op) => *op.address.name(),
         }
     }
@@ -187,9 +179,6 @@ impl fmt::Debug for SequenceWrite {
             match *self {
                 New(_) => "NewSequence",
                 Delete(_) => "DeleteSequence",
-                SetPublicPolicy(_) => "SetPublicPolicy",
-                SetPrivatePolicy(_) => "SetPrivatePolicy",
-                // SetOwner(_) => "SetOwner",
                 Edit(_) => "EditSequence",
             }
         )
