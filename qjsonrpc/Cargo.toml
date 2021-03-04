@@ -1,6 +1,6 @@
 [package]
 name = "qjsonrpc"
-version = "0.1.1"
+version = "0.1.2"
 description = "JSON-RPC over QUIC comm"
 authors = ["bochaco <gabrielviganotti@gmail.com>"]
 license = "MIT OR BSD-3-Clause"

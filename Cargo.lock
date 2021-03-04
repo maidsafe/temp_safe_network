@@ -225,7 +225,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -397,7 +397,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c924d49bd09e7c06003acda26cd9742e796e34282ec6c1189404dee0c1f4774"
 dependencies = [
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
 ]
 
 [[package]]
@@ -745,7 +745,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
 dependencies = [
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
  "subtle 1.0.0",
 ]
 
@@ -846,7 +846,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dc203b75decc900220c4d9838e738d08413e663c26826ba92b669bed1d0795"
 dependencies = [
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
 ]
 
 [[package]]
@@ -1240,7 +1240,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
  "waker-fn",
 ]
 
@@ -1281,7 +1281,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1290,9 +1290,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
+checksum = "ffdf9f34f1447443d37393cc6c2b8313aebddcd96906caf34e54c68d8e57d7bd"
 dependencies = [
  "typenum",
 ]
@@ -1747,9 +1747,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.86"
+version = "0.2.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
+checksum = "265d751d31d6780a3f956bb5b8022feba2d94eeee5a84ba64f4212eedca42213"
 
 [[package]]
 name = "linked-hash-map"
@@ -1890,7 +1890,7 @@ dependencies = [
  "crypto-mac 0.7.0",
  "ctr",
  "dbl",
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
  "pmac",
  "stream-cipher",
  "subtle 2.4.0",
@@ -2031,9 +2031,9 @@ checksum = "a9a7ab5d64814df0fe4a4b5ead45ed6c5f181ee3ff04ba344313a6c80446c5d4"
 
 [[package]]
 name = "once_cell"
-version = "1.7.0"
+version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10acf907b94fc1b1a152d08ef97e7759650268cf986bf127f387e602b02c7e5a"
+checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
 
 [[package]]
 name = "oorandom"
@@ -2159,15 +2159,15 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
+checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.4"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439697af366c49a6d0a010c56a0d97685bc140ce0d377b13a2ea2aa42d64a827"
+checksum = "dc0e1f259c92177c30a4c9d177246edd0a3568b25756a977d0632cf8fa37e905"
 
 [[package]]
 name = "pin-utils"
@@ -2349,7 +2349,7 @@ dependencies = [
 
 [[package]]
 name = "qjsonrpc"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "futures",
  "log",
@@ -2365,9 +2365,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.9.24"
+version = "0.9.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef10e98c0f371c4e5ec7c531a99455a58c5d72d3198af6f281bae51b2ba5207d"
+checksum = "73014771cb6cbeee64b02cca7655d19665a29d22ca483b6ae616f061c23baf4e"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2416,9 +2416,9 @@ dependencies = [
 
 [[package]]
 name = "quinn"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88de58d76d8f82fb28e5c89302119c102bb5b9ce57b034186b559b63ba147a0f"
+checksum = "8a626bb32aee973667aff87a9f5187bd076a78a09f79c262f78ab260b9ba0077"
 dependencies = [
  "bytes 0.5.6",
  "err-derive",
@@ -2427,6 +2427,7 @@ dependencies = [
  "mio 0.6.23",
  "quinn-proto",
  "rustls 0.17.0",
+ "socket2",
  "tokio 0.2.25",
  "tracing",
  "webpki",
@@ -2701,7 +2702,7 @@ dependencies = [
  "log",
  "mime",
  "percent-encoding",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
  "rustls 0.19.0",
  "serde",
  "serde_json",
@@ -2866,9 +2867,9 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.20.1"
+version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce1f27f760159f6386a4c2d9bb8ad5ee0b2f154e9783cf4ca5e969a0d793a05f"
+checksum = "ddd8f234bb5c2371ee4f665599857da82a8649dd320afe9eea052edad605c880"
 dependencies = [
  "aes",
  "async-trait",
@@ -3070,7 +3071,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_api"
-version = "0.19.1"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3108,7 +3109,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cluFlock",
@@ -3132,7 +3133,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.19.1"
+version = "0.20.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3247,9 +3248,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.0.18"
+version = "0.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "065ca5631a3cac1b922296f3739cda2964d66a78f113d9eace258be970839be6"
+checksum = "c88cc07a0dcdfcdbe79437d8fec9669a79f901cc9b3a07fdd1f7ca5411c91244"
 dependencies = [
  "directories",
  "env_logger 0.8.3",
@@ -3286,9 +3287,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77e38e3fe7051af3d6cd8515ae0ad8f841bd49a83ca784a62a51f7731576d951"
+checksum = "920f9f65f2c395e60b37cd61c187450c46bb462acf0d31303bea46149420b300"
 dependencies = [
  "bincode",
  "crdts",
@@ -3325,7 +3326,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8131256a5896cabcf5eb04f4d6dacbe1aefda854b0d9896e09cb58829ec5638c"
 dependencies = [
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
 ]
 
 [[package]]
@@ -3528,9 +3529,9 @@ dependencies = [
 
 [[package]]
 name = "tinytemplate"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2ada8616fad06a2d0c455adc530de4ef57605a8120cc65da9653e0e9623ca74"
+checksum = "be4d6b5f19ff7664e8c98d03e2139cb510db9b0a60b55f8e8709b689d939b6bc"
 dependencies = [
  "serde",
  "serde_json",
@@ -3565,7 +3566,7 @@ dependencies = [
  "memchr",
  "mio 0.6.23",
  "num_cpus",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "slab",
  "tokio-macros",
 ]
@@ -3582,7 +3583,7 @@ dependencies = [
  "memchr",
  "mio 0.7.9",
  "num_cpus",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
 ]
 
 [[package]]
@@ -3617,7 +3618,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "tokio 0.2.25",
 ]
 
@@ -3631,7 +3632,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
  "tokio 1.2.0",
 ]
 
@@ -3658,7 +3659,7 @@ checksum = "01ebdc2bb4498ab1ab5f5b73c5803825e60199229ccba0698170e3be0e7f959f"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.6",
  "tracing-attributes",
  "tracing-core",
 ]
@@ -4076,9 +4077,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "1.1.11"
+version = "1.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea259e8f54c31d8088fea71fa315456b6cedaa5851ec3fafbe9daca49c6884f6"
+checksum = "b4987d7748c7907cc296e40cc89577ba3b19d339ae12ba529c9f16cb1fb0e845"
 dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.20.0](https://github.com/maidsafe/sn_api/compare/v0.19.1...v0.20.0) (2021-04-04)
+
+### Features
+
+* ***api*** store serialised NrsMap/FilesMap in a Blob, and only their XOR-URLs in the underlying Sequence of the NrsMapContainer/FilesContainer
+
+* ***api*** adding a README.md file to sn_api crate with a description of the current APIs
+
+* ***cli*** adds bin-version subcommands to node & auth, supressing -V for all subcommands
+
+* ***qjsonrpc*** adds JSON-RPC spec-defined error code constants
+
 ### [0.19.1](https://github.com/maidsafe/sn_api/compare/v0.19.0...v0.19.1) (2021-02-23)
 
 ### Features
