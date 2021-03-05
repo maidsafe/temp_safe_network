@@ -176,6 +176,9 @@ impl SafeAppClient {
                 .send_tokens(to_pk, amount)
                 .await
                 .map_err(|err| match err {
+                    ClientError::Transfer(TransfersError::ZeroValueTransfer) => {
+                        Error::InvalidAmount("Cannot send zero-value transfers".to_string())
+                    }
                     ClientError::Transfer(TransfersError::InsufficientBalance) => {
                         Error::NotEnoughBalance(format!(
                             "Not enough balance at 'source' for the operation: {}",
