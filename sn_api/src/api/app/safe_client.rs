@@ -88,6 +88,11 @@ impl SafeAppClient {
         Ok(())
     }
 
+    pub async fn keypair(&self) -> Result<Keypair> {
+        let client = self.get_safe_client()?;
+        Ok(client.keypair().await)
+    }
+
     // === Token operations ===
     pub async fn read_balance_from_keypair(&self, id: Keypair) -> Result<Token> {
         let temp_client = Client::new(

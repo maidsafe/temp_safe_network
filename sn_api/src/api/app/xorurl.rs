@@ -29,6 +29,10 @@ const XOR_URL_STR_MAX_LENGTH: usize = 44;
 const XOR_NAME_BYTES_OFFSET: usize = 4; // offset where to find the XoR name bytes
 const URL_VERSION_QUERY_NAME: &str = "v";
 
+// URL labels must be 63 characters or less.
+// See https://www.ietf.org/rfc/rfc1035.txt
+const MAX_LEN_URL_LABELS: usize = 63;
+
 // Invalid NRS characters
 // These are characters that have no visual presence.
 // Confusables are worrisome but not invalid.
@@ -245,7 +249,7 @@ pub(crate) struct SafeUrlParts {
 
 impl SafeUrlParts {
     // parses a URL into its component parts, performing basic validation.
-    pub fn parse(url: &str) -> Result<Self> {
+    pub fn parse(url: &str, ignore_labels_size: bool) -> Result<Self> {
         // detect any invalid url chars before parsing
         validate_url_chars(url)?;
         // Note: we use rust-url for parsing because it is most widely used
@@ -297,17 +301,17 @@ impl SafeUrlParts {
         // parse top_name and sub_names from name
         let names_vec: Vec<String> = public_name.split('.').map(String::from).collect();
 
-        // validate names length
-        // labels must be 63 characters or less.
-        // see https://www.ietf.org/rfc/rfc1035.txt
-        for name in &names_vec {
-            if name.len() > 63 {
-                let msg = format!(
-                    "Label is {} chars, must be no more than 63: {}",
-                    name.len(),
-                    name
-                );
-                return Err(Error::InvalidInput(msg));
+        // validate names length unless it's not required
+        if !ignore_labels_size {
+            for name in &names_vec {
+                if name.len() > MAX_LEN_URL_LABELS {
+                    let msg = format!(
+                        "Label is {} chars, must be no more than 63: {}",
+                        name.len(),
+                        name
+                    );
+                    return Err(Error::InvalidInput(msg));
+                }
             }
         }
 
@@ -500,7 +504,7 @@ impl SafeUrl {
                 }
                 // Validate that nrs_name hash matches xor_name
                 let tmpurl = format!("{}{}", SAFE_URL_PROTOCOL, nh);
-                let parts = SafeUrlParts::parse(&tmpurl)?;
+                let parts = SafeUrlParts::parse(&tmpurl, false)?;
                 let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
                 if hashed_name != xor_name {
                     let msg = format!(
@@ -603,7 +607,7 @@ impl SafeUrl {
     ///
     /// * `nrsurl` - an nrsurl.
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
-        let parts = SafeUrlParts::parse(&nrsurl)?;
+        let parts = SafeUrlParts::parse(&nrsurl, false)?;
 
         let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
 
@@ -629,7 +633,7 @@ impl SafeUrl {
     ///
     /// * `xorurl` - an xorurl.
     pub fn from_xorurl(xorurl: &str) -> Result<Self> {
-        let parts = SafeUrlParts::parse(&xorurl)?;
+        let parts = SafeUrlParts::parse(&xorurl, true)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&parts.top_name)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -805,7 +809,7 @@ impl SafeUrl {
     /// sets sub_names portion of URL
     pub fn set_sub_names(&mut self, sub_names: &str) -> Result<()> {
         let tmpurl = format!("{}{}.{}", SAFE_URL_PROTOCOL, sub_names, self.top_name());
-        let parts = SafeUrlParts::parse(&tmpurl)?;
+        let parts = SafeUrlParts::parse(&tmpurl, false)?;
         self.sub_names = parts.sub_names;
         self.sub_names_vec = parts.sub_names_vec;
         self.public_name = parts.public_name;
@@ -2115,7 +2119,7 @@ mod tests {
             "safe://ideographic\u{3000}space",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url) {
+            match SafeUrlParts::parse(&url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with whitespace {}",
@@ -2204,7 +2208,7 @@ mod tests {
             "safe://application\u{009F}programcommand",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url) {
+            match SafeUrlParts::parse(&url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with control character {}",
@@ -2259,7 +2263,7 @@ mod tests {
             "safe://nominal\u{206F}digitshapes",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url) {
+            match SafeUrlParts::parse(&url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with invalid character {}",
