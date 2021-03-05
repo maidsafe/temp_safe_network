@@ -83,3 +83,16 @@ macro_rules! retry_loop {
         }
     };
 }
+
+#[macro_export]
+macro_rules! retry_loop_for_pattern {
+    ($async_func:expr, $pattern:pat $(if $cond:expr)?) => {
+        loop {
+            let result = $async_func.await;
+            match &result {
+                $pattern $(if $cond)? => break result,
+                Ok(_) | Err(_) => tokio::time::delay_for(std::time::Duration::from_millis(200)).await,
+            }
+        }
+    };
+}

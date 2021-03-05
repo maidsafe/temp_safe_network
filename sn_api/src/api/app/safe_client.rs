@@ -10,7 +10,7 @@
 use super::{fetch::Range, helpers::xorname_to_hex};
 use crate::{api::ipc::BootstrapConfig, Error, Result};
 use log::{debug, info};
-use sn_client::{Client, Error as ClientError, TransfersError};
+use sn_client::{Client, Error as ClientError, ErrorMessage, TransfersError};
 use sn_data_types::{
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
@@ -309,7 +309,8 @@ impl SafeAppClient {
             .get_map_value(address, key_vec)
             .await
             .map_err(|err| match err {
-                ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
+                ClientError::ErrorMessage(ErrorMessage::AccessDenied(_pk))
+                | ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
                     Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
                 }
                 // FIXME: we need to match the appropriate error
