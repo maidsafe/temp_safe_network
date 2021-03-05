@@ -256,9 +256,12 @@ impl Safe {
 #[cfg(all(test, feature = "simulated-payouts"))]
 mod tests {
     use super::*;
-    use crate::api::{
-        app::test_helpers::{new_safe_instance, random_nrs_name},
-        common::sk_to_hex,
+    use crate::{
+        api::{
+            app::test_helpers::{new_safe_instance, random_nrs_name},
+            common::sk_to_hex,
+        },
+        retry_loop,
     };
     use anyhow::{anyhow, bail, Result};
 
@@ -293,7 +296,7 @@ mod tests {
             }
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.45' (Can\'t parse Token units)".to_string()
+                "Invalid safecoins amount '.45' (Can\'t parse token units)".to_string()
             ),
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -309,7 +312,7 @@ mod tests {
             }
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
+                "Invalid safecoins amount '.003' (Can\'t parse token units)".to_string()
             ),
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -325,7 +328,7 @@ mod tests {
             }
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.003' (Can\'t parse Token units)".to_string()
+                "Invalid safecoins amount '.003' (Can\'t parse token units)".to_string()
             ),
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -506,7 +509,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validate_sk_for_url() -> Result<()> {
+    async fn test_keys_validate_sk_for_url() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, keypair) = safe.keys_create_preload_test_coins("23.22").await?;
         let pk = safe
@@ -528,7 +531,7 @@ mod tests {
             .keys_transfer("0", Some(&from_sk1_hex), &to_safekey_xorurl)
             .await
         {
-            Err(Error::NetDataError(msg)) => {
+            Err(Error::InvalidAmount(msg)) => {
                 assert!(msg.contains("Cannot send zero-value transfers"));
                 Ok(())
             }
@@ -570,7 +573,7 @@ mod tests {
         {
             Err(Error::InvalidAmount(msg)) => assert_eq!(
                 msg,
-                "Invalid safecoins amount '.06' (Can\'t parse Token units)"
+                "Invalid safecoins amount '.06' (Can\'t parse token units)"
             ),
             Err(err) => {
                 bail!("Error returned is not the expected: {:?}", err)
@@ -654,14 +657,19 @@ mod tests {
 
         let (to_safekey_xorurl, keypair2) = safe.keys_create_preload_test_coins("0.1").await?;
 
-        let to_nrsurl = random_nrs_name();
-        let _ = safe
-            .nrs_map_container_create(&to_nrsurl, &to_safekey_xorurl, false, true, false)
+        let to_nrs_name = random_nrs_name();
+        let (xorurl, _, _) = safe
+            .nrs_map_container_create(&to_nrs_name, &to_safekey_xorurl, false, true, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // test successful transfer
         let _ = safe
-            .keys_transfer("0.2", Some(&from_sk1_hex), &to_nrsurl)
+            .keys_transfer(
+                "0.2",
+                Some(&from_sk1_hex),
+                &format!("safe://{}", to_nrs_name),
+            )
             .await?;
 
         let from_current_balance = safe.keys_balance_from_sk(keypair1.secret_key()?).await?;

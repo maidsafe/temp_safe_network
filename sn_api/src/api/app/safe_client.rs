@@ -10,7 +10,7 @@
 use super::{fetch::Range, helpers::xorname_to_hex};
 use crate::{api::ipc::BootstrapConfig, Error, Result};
 use log::{debug, info};
-use sn_client::{Client, Error as ClientError, TransfersError};
+use sn_client::{Client, Error as ClientError, ErrorMessage, TransfersError};
 use sn_data_types::{
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
@@ -86,6 +86,11 @@ impl SafeAppClient {
 
         debug!("Successfully connected to the Network!!!");
         Ok(())
+    }
+
+    pub async fn keypair(&self) -> Result<Keypair> {
+        let client = self.get_safe_client()?;
+        Ok(client.keypair().await)
     }
 
     // === Token operations ===
@@ -171,6 +176,9 @@ impl SafeAppClient {
                 .send_tokens(to_pk, amount)
                 .await
                 .map_err(|err| match err {
+                    ClientError::Transfer(TransfersError::ZeroValueTransfer) => {
+                        Error::InvalidAmount("Cannot send zero-value transfers".to_string())
+                    }
                     ClientError::Transfer(TransfersError::InsufficientBalance) => {
                         Error::NotEnoughBalance(format!(
                             "Not enough balance at 'source' for the operation: {}",
@@ -301,7 +309,8 @@ impl SafeAppClient {
             .get_map_value(address, key_vec)
             .await
             .map_err(|err| match err {
-                ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
+                ClientError::ErrorMessage(ErrorMessage::AccessDenied(_pk))
+                | ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
                     Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
                 }
                 // FIXME: we need to match the appropriate error

@@ -578,11 +578,12 @@ type NextStepInfo = (XorUrlEncoder, Option<FileItem>);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::app::test_helpers::new_safe_instance;
-    use crate::api::xorurl::XorUrlEncoder;
+    use crate::{
+        api::{app::test_helpers::new_safe_instance, xorurl::XorUrlEncoder},
+        retry_loop,
+    };
     use anyhow::{anyhow, bail, Context, Result};
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::io::Read;
 
     #[tokio::test]
@@ -592,7 +593,7 @@ mod tests {
         let (xorurl, _key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        let content = safe.fetch(&xorurl, None).await?;
+        let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::SafeKey {
@@ -615,7 +616,7 @@ mod tests {
         let xorurl = safe.wallet_create().await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        let content = safe.fetch(&xorurl, None).await?;
+        let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::Wallet {
@@ -643,7 +644,7 @@ mod tests {
             .await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        let content = safe.fetch(&xorurl, None).await?;
+        let content = retry_loop!(safe.fetch(&xorurl, None));
 
         assert!(
             content
@@ -688,6 +689,7 @@ mod tests {
         let (xorurl, _, the_files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
@@ -696,7 +698,7 @@ mod tests {
             .await?;
 
         let nrs_url = format!("safe://{}", site_name);
-        let content = safe.fetch(&nrs_url, None).await?;
+        let content = retry_loop!(safe.fetch(&nrs_url, None));
 
         xorurl_encoder.set_sub_names("")?;
         let xorurl_without_subname = xorurl_encoder.to_string();
@@ -737,6 +739,7 @@ mod tests {
         let (xorurl, _, _the_files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
@@ -746,7 +749,7 @@ mod tests {
             .await?;
 
         let nrs_url = format!("safe://{}", site_name);
-        let content = safe.fetch(&nrs_url, None).await?;
+        let content = retry_loop!(safe.fetch(&nrs_url, None));
 
         // this should resolve to a FilesContainer
         match &content {
@@ -777,7 +780,7 @@ mod tests {
             .await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        let content = safe.fetch(&xorurl, None).await?;
+        let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::PublicBlob {
@@ -817,7 +820,7 @@ mod tests {
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
-        let content = safe.fetch(&xorurl, fetch_first_half).await?;
+        let content = retry_loop!(safe.fetch(&xorurl, fetch_first_half));
 
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
@@ -849,6 +852,7 @@ mod tests {
         let (xorurl, _, _files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
@@ -866,7 +870,7 @@ mod tests {
         let file_size = file_data.len();
 
         // Fetch full file and match
-        let content = safe.fetch(&nrs_url, None).await?;
+        let content = retry_loop!(safe.fetch(&nrs_url, None));
         if let SafeData::PublicBlob { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {
@@ -905,7 +909,7 @@ mod tests {
         let xorurl = safe.sequence_create(data, None, 25_000, false).await?;
 
         let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        let content = safe.fetch(&xorurl, None).await?;
+        let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::PublicSequence {

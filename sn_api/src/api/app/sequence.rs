@@ -161,7 +161,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::app::test_helpers::new_safe_instance;
+    use crate::{api::app::test_helpers::new_safe_instance, retry_loop};
     use anyhow::Result;
 
     #[tokio::test]
@@ -176,8 +176,8 @@ mod tests {
             .sequence_create(initial_data, None, 25_000, true)
             .await?;
 
-        let received_data = safe.sequence_get(&xorurl).await?;
-        let received_data_priv = safe.sequence_get(&xorurl_priv).await?;
+        let received_data = retry_loop!(safe.sequence_get(&xorurl));
+        let received_data_priv = retry_loop!(safe.sequence_get(&xorurl_priv));
         assert_eq!(received_data, (0, initial_data.to_vec()));
         assert_eq!(received_data_priv, (0, initial_data.to_vec()));
         Ok(())
@@ -190,9 +190,12 @@ mod tests {
         let data_v1 = b"Second in the sequence";
 
         let xorurl = safe.sequence_create(data_v0, None, 25_000, false).await?;
+        let xorurl_priv = safe.sequence_create(data_v0, None, 25_000, true).await?;
+
+        let _ = retry_loop!(safe.sequence_get(&xorurl));
         safe.append_to_sequence(&xorurl, data_v1).await?;
 
-        let xorurl_priv = safe.sequence_create(data_v0, None, 25_000, true).await?;
+        let _ = retry_loop!(safe.sequence_get(&xorurl_priv));
         safe.append_to_sequence(&xorurl_priv, data_v1).await?;
 
         let received_data_v0 = safe.sequence_get(&format!("{}?v=0", xorurl)).await?;
@@ -216,6 +219,7 @@ mod tests {
         let xorurl = client1
             .sequence_create(data_v0, None, 25_000, false)
             .await?;
+        let _ = retry_loop!(client1.sequence_get(&xorurl));
         client1.append_to_sequence(&xorurl, data_v1).await?;
 
         let mut client2 = new_safe_instance().await?;
@@ -230,16 +234,25 @@ mod tests {
     async fn test_sequence_append_concurrently_from_second_client() -> Result<()> {
         let mut client1 = new_safe_instance().await?;
         let mut client2 = new_safe_instance().await?;
+        // this tests assumes the same credentials/keypair have been set for all tests,
+        // so both instances should be using the same keypair to sign the messages
+        assert_eq!(
+            client1.get_my_keypair().await?,
+            client1.get_my_keypair().await?
+        );
+
         let data_v0 = b"First from client1";
         let data_v1 = b"First from client2";
 
         let xorurl = client1
             .sequence_create(data_v0, None, 25_000, false)
             .await?;
+
+        let received_client1 = retry_loop!(client1.sequence_get(&xorurl));
+
         client2.append_to_sequence(&xorurl, data_v1).await?;
 
-        let received_client1 = client1.sequence_get(&xorurl).await?;
-        let received_client2 = client2.sequence_get(&xorurl).await?;
+        let received_client2 = retry_loop!(client2.sequence_get(&xorurl));
 
         // client1 sees only data_v0 as version 0 since it's using its own replica
         // it didn't see the append from client2 even it was merged on the network

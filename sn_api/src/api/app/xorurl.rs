@@ -29,6 +29,10 @@ const XOR_URL_STR_MAX_LENGTH: usize = 44;
 const XOR_NAME_BYTES_OFFSET: usize = 4; // offset where to find the XoR name bytes
 const URL_VERSION_QUERY_NAME: &str = "v";
 
+// URL labels must be 63 characters or less.
+// See https://www.ietf.org/rfc/rfc1035.txt
+const MAX_LEN_URL_LABELS: usize = 63;
+
 // Invalid NRS characters
 // These are characters that have no visual presence.
 // Confusables are worrisome but not invalid.
@@ -245,7 +249,7 @@ pub(crate) struct SafeUrlParts {
 
 impl SafeUrlParts {
     // parses a URL into its component parts, performing basic validation.
-    pub fn parse(url: &str) -> Result<Self> {
+    pub fn parse(url: &str, ignore_labels_size: bool) -> Result<Self> {
         // detect any invalid url chars before parsing
         validate_url_chars(url)?;
         // Note: we use rust-url for parsing because it is most widely used
@@ -297,17 +301,17 @@ impl SafeUrlParts {
         // parse top_name and sub_names from name
         let names_vec: Vec<String> = public_name.split('.').map(String::from).collect();
 
-        // validate names length
-        // labels must be 63 characters or less.
-        // see https://www.ietf.org/rfc/rfc1035.txt
-        for name in &names_vec {
-            if name.len() > 63 {
-                let msg = format!(
-                    "Label is {} chars, must be no more than 63: {}",
-                    name.len(),
-                    name
-                );
-                return Err(Error::InvalidInput(msg));
+        // validate names length unless it's not required
+        if !ignore_labels_size {
+            for name in &names_vec {
+                if name.len() > MAX_LEN_URL_LABELS {
+                    let msg = format!(
+                        "Label is {} chars, must be no more than 63: {}",
+                        name.len(),
+                        name
+                    );
+                    return Err(Error::InvalidInput(msg));
+                }
             }
         }
 
@@ -500,7 +504,7 @@ impl SafeUrl {
                 }
                 // Validate that nrs_name hash matches xor_name
                 let tmpurl = format!("{}{}", SAFE_URL_PROTOCOL, nh);
-                let parts = SafeUrlParts::parse(&tmpurl)?;
+                let parts = SafeUrlParts::parse(&tmpurl, false)?;
                 let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
                 if hashed_name != xor_name {
                     let msg = format!(
@@ -603,7 +607,7 @@ impl SafeUrl {
     ///
     /// * `nrsurl` - an nrsurl.
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
-        let parts = SafeUrlParts::parse(&nrsurl)?;
+        let parts = SafeUrlParts::parse(&nrsurl, false)?;
 
         let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
 
@@ -629,7 +633,7 @@ impl SafeUrl {
     ///
     /// * `xorurl` - an xorurl.
     pub fn from_xorurl(xorurl: &str) -> Result<Self> {
-        let parts = SafeUrlParts::parse(&xorurl)?;
+        let parts = SafeUrlParts::parse(&xorurl, true)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = decode(&parts.top_name)
             .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
@@ -805,7 +809,7 @@ impl SafeUrl {
     /// sets sub_names portion of URL
     pub fn set_sub_names(&mut self, sub_names: &str) -> Result<()> {
         let tmpurl = format!("{}{}.{}", SAFE_URL_PROTOCOL, sub_names, self.top_name());
-        let parts = SafeUrlParts::parse(&tmpurl)?;
+        let parts = SafeUrlParts::parse(&tmpurl, false)?;
         self.sub_names = parts.sub_names;
         self.sub_names_vec = parts.sub_names_vec;
         self.public_name = parts.public_name;
@@ -1541,7 +1545,7 @@ mod tests {
             XorUrlBase::Base32,
         )?;
         let base32_xorurl =
-            "safe://biaaaatcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmrtgq2tmnzyheydcmvggi6e2srs";
+            "safe://baeaaaajrgiztinjwg44dsmbrgiztinjwg44dsmbrgiztinjwg44dsmbrgktdepcnjiza";
         assert_eq!(xorurl, base32_xorurl);
         Ok(())
     }
@@ -1550,7 +1554,7 @@ mod tests {
     fn test_safeurl_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = SafeUrl::encode_blob(xor_name, SafeContentType::Raw, XorUrlBase::Base32z)?;
-        let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+        let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1565,7 +1569,7 @@ mod tests {
             XorUrlBase::Base64,
             false,
         )?;
-        let base64_xorurl = "safe://mQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+        let base64_xorurl = "safe://mAQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
         let xorurl_encoder = SafeUrl::from_url(&base64_xorurl)?;
         assert_eq!(base64_xorurl, xorurl_encoder.to_base(XorUrlBase::Base64));
@@ -1584,7 +1588,7 @@ mod tests {
     #[test]
     fn test_safeurl_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let base32z_xorurl = "safe://hbyyyyncj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1gc4dkptz8yhuycj1";
+        let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
         let xorurl = SafeUrl::encode_blob(xor_name, SafeContentType::Raw, DEFAULT_XORURL_BASE)?;
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
@@ -1744,7 +1748,8 @@ mod tests {
             XorUrlBase::Base32z,
         )?;
 
-        let len = xorurl.len() - 1;
+        // TODO: we need to add checksum to be able to detect even 1 single char change
+        let len = xorurl.len() - 2;
         match SafeUrl::from_xorurl(&xorurl[..len]) {
             Ok(_) => Err(anyhow!(
                 "Unexpectedly parsed an invalid (too short) xorurl".to_string(),
@@ -1870,48 +1875,52 @@ mod tests {
     #[test]
     fn test_safeurl_path() -> Result<()> {
         // Make sure we can read percent-encoded paths, and set them as well.
+        // Here we verify that url::Url has the same path encoding behavior
+        // as our implementation...for better or worse.
         let mut x = SafeUrl::from_url("safe://domain/path/to/my%20file.txt?v=1")?;
+        let mut u = Url::parse("safe://domain/path/to/my%20file.txt?v=1").map_err(|e| {
+            Error::InvalidInput(format!(
+                "Unexpectedly failed to parse with third-party Url::parse: {}",
+                e
+            ))
+        })?;
+
         assert_eq!(x.path(), "/path/to/my%20file.txt");
+        assert_eq!(x.path(), u.path());
+
         x.set_path("/path/to/my new file.txt");
-        assert_eq!(x.path(), "/path/to/my%20new%20file.txt");
-        assert_eq!(x.path_decoded()?, "/path/to/my new file.txt");
-        x.set_path("/trailing/slash/");
-        assert_eq!(x.path(), "/trailing/slash/");
-
-        // here we verify that url::Url has the same path encoding behavior
-        // as our implementation.  for better or worse.
-        let mut u = Url::parse("safe://domain/path/to/my%20file.txt?v=1")
-            .map_err(|e| Error::InvalidInput(e.to_string()))?;
-        assert_eq!(u.path(), "/path/to/my%20file.txt");
         u.set_path("/path/to/my new file.txt");
-        assert_eq!(u.path(), "/path/to/my%20new%20file.txt");
+        assert_eq!(x.path(), "/path/to/my%20new%20file.txt");
+        assert_eq!(x.path(), u.path());
+        assert_eq!(x.path_decoded()?, "/path/to/my new file.txt");
+
+        x.set_path("/trailing/slash/");
         u.set_path("/trailing/slash/");
-        assert_eq!(u.path(), "/trailing/slash/");
+        assert_eq!(x.path(), "/trailing/slash/");
+        assert_eq!(x.path(), u.path());
 
-        // note: our impl and url::Url differ with no-leading-slash behavior.
-        // we prepend leading slash when storing and return a changed path.
-        // some SAFE code appears to depend on this presently.
         x.set_path("no-leading-slash");
-        assert_eq!(x.path(), "/no-leading-slash");
-        assert_eq!(x.to_string(), "safe://domain/no-leading-slash?v=1");
-        x.set_path("");
-        assert_eq!(x.path(), ""); // no slash if path is empty.
-        assert_eq!(x.to_string(), "safe://domain?v=1");
-        x.set_path("/");
-        assert_eq!(x.path(), ""); // slash removed if path otherwise empty.
-        assert_eq!(x.to_string(), "safe://domain?v=1");
-
-        // url::Url preserves the missing slash, and allows path to
-        // merge with domain.  seems kind of broken.  bug?
         u.set_path("no-leading-slash");
-        assert_eq!(u.path(), "no-leading-slash");
-        assert_eq!(u.to_string(), "safe://domainno-leading-slash?v=1");
+        assert_eq!(x.path(), "/no-leading-slash");
+        assert_eq!(x.path(), u.path());
+        assert_eq!(x.to_string(), "safe://domain/no-leading-slash?v=1");
+        assert_eq!(x.to_string(), u.to_string());
+
+        x.set_path("");
         u.set_path("");
-        assert_eq!(u.path(), "");
+        assert_eq!(x.path(), ""); // no slash if path is empty.
+        assert_eq!(x.path(), u.path());
         assert_eq!(x.to_string(), "safe://domain?v=1");
+        assert_eq!(x.to_string(), u.to_string());
+
+        // TODO: url::Url preserves the missing slash, and allows path to
+        // merge with domain...seems kind of broken.  bug?
+        x.set_path("/");
         u.set_path("/");
-        assert_eq!(u.path(), "/");
+        assert_eq!(x.path(), "");
+        assert_eq!(u.path(), "/"); // slash removed if path otherwise empty.
         assert_eq!(x.to_string(), "safe://domain?v=1"); // note that slash in path omitted.
+        assert_eq!(u.to_string(), "safe://domain/?v=1");
 
         Ok(())
     }
@@ -1920,7 +1929,7 @@ mod tests {
     fn test_safeurl_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hnyydypixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygy5k9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
 
         let nrs = SafeUrl::from_url(nrsurl)?;
         let xor = SafeUrl::from_url(xorurl)?;
@@ -2083,7 +2092,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validate_url_chars_with_whitespace() -> Result<()> {
+    async fn test_safeurl_validate_url_chars_with_whitespace() -> Result<()> {
         let urls = vec![
             // tests for
             // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt
@@ -2115,7 +2124,7 @@ mod tests {
             "safe://ideographic\u{3000}space",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url) {
+            match SafeUrlParts::parse(&url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with whitespace {}",
@@ -2134,7 +2143,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validate_url_chars_with_control_characters() -> Result<()> {
+    async fn test_safeurl_validate_url_chars_with_control_characters() -> Result<()> {
         let urls = vec![
             // tests for
             // https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Basic_ASCII_control_codes
@@ -2204,7 +2213,7 @@ mod tests {
             "safe://application\u{009F}programcommand",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url) {
+            match SafeUrlParts::parse(&url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with control character {}",
@@ -2223,7 +2232,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validate_url_chars_with_invalid_characters() -> Result<()> {
+    async fn test_safeurl_validate_url_chars_with_invalid_characters() -> Result<()> {
         let urls = vec![
             // values from
             // INVALID_NRS_CHARS const
@@ -2259,7 +2268,7 @@ mod tests {
             "safe://nominal\u{206F}digitshapes",
         ];
         for url in urls {
-            match SafeUrlParts::parse(&url) {
+            match SafeUrlParts::parse(&url, false) {
                 Ok(_) => {
                     return Err(anyhow!(
                         "Unexpectedly validated url with invalid character {}",

@@ -18,7 +18,7 @@ mod sequence;
 mod test_helpers;
 mod xorurl_media_types;
 
-use super::{common, constants};
+use super::{common, constants, Result};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
 use std::time::Duration;
@@ -69,5 +69,11 @@ impl Safe {
     pub fn keypair(&self) -> Keypair {
         let mut rng = OsRng;
         Keypair::new_ed25519(&mut rng)
+    }
+
+    /// Retrieve the keypair this instance was instantiated with, i.e. the
+    /// keypair this instance uses by default to sign each outgoing message
+    pub async fn get_my_keypair(&self) -> Result<Keypair> {
+        self.safe_client.keypair().await
     }
 }

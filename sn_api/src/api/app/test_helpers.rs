@@ -9,8 +9,7 @@
 
 use crate::Safe;
 use anyhow::{Context, Result};
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{collections::HashSet, env::var, net::SocketAddr};
 
 // Environment variable which can be set with the auth credentials
@@ -71,4 +70,29 @@ fn get_bootstrap_contacts() -> Result<HashSet<SocketAddr>> {
     };
 
     Ok(contacts)
+}
+
+#[macro_export]
+macro_rules! retry_loop {
+    ($async_func:expr) => {
+        loop {
+            match $async_func.await {
+                Ok(val) => break val,
+                Err(_) => tokio::time::delay_for(std::time::Duration::from_millis(200)).await,
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! retry_loop_for_pattern {
+    ($async_func:expr, $pattern:pat $(if $cond:expr)?) => {
+        loop {
+            let result = $async_func.await;
+            match &result {
+                $pattern $(if $cond)? => break result,
+                Ok(_) | Err(_) => tokio::time::delay_for(std::time::Duration::from_millis(200)).await,
+            }
+        }
+    };
 }
