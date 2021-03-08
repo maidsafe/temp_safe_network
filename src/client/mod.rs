@@ -38,7 +38,7 @@ pub use self::{
     transfer::{TransferCmd, TransferQuery},
 };
 
-use crate::{MessageId, MessageType, SrcLocation, WireMsg};
+use crate::{MessageId, MessageType, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -118,8 +118,6 @@ pub enum Message {
         id: MessageId,
         /// ID of causing query.
         correlation_id: MessageId,
-        /// The sender of the causing query.
-        query_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -131,8 +129,6 @@ pub enum Message {
         id: MessageId,
         /// ID of causing cmd.
         correlation_id: MessageId,
-        /// The sender of the causing cmd.
-        cmd_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -153,8 +149,6 @@ pub enum Message {
         id: MessageId,
         /// ID of causing cmd.
         correlation_id: MessageId,
-        /// The sender of the causing cmd.
-        cmd_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
@@ -186,8 +180,6 @@ pub enum Message {
         id: MessageId,
         /// ID of causing query.
         correlation_id: MessageId,
-        /// The sender of the causing query.
-        query_origin: SrcLocation,
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
