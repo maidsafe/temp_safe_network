@@ -12,11 +12,8 @@ use crate::{
     EndUser,
 };
 use serde::{Deserialize, Serialize};
-use sn_data_types::{
-    Blob, BlobAddress, Credit, DebitId, PublicKey, ReplicaEvent, Signature, SignatureShare,
-    SignedCredit, SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo,
-};
-use std::collections::BTreeSet;
+use sn_data_types::{ActorHistory, Blob, BlobAddress, Credit, DebitId, NodeRewardStage, PublicKey, ReplicaEvent, Signature, SignatureShare, SignedCredit, SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo};
+use std::collections::{BTreeMap, BTreeSet};
 use threshold_crypto::PublicKeySet;
 use xor_name::XorName;
 
@@ -59,12 +56,7 @@ pub enum NodeSystemCmd {
         sig: SignatureShare,
     },
     /// Register a wallet for reward payouts.
-    RegisterWallet {
-        /// The wallet to which rewards will be paid out by the network.
-        wallet: PublicKey,
-        /// The section where this wallet is to be registered (NB: this is the section of the node id).
-        section: XorName,
-    },
+    RegisterWallet(PublicKey),
     /// Notify Elders on nearing max capacity
     StorageFull {
         /// Node Id
@@ -115,6 +107,12 @@ pub enum NodeEvent {
     SectionPayoutValidated(TransferValidated),
     ///
     SectionPayoutRegistered { from: PublicKey, to: PublicKey },
+    ///
+    PromotedToElder {
+        section_wallet: WalletInfo,
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    }
 }
 
 ///
@@ -202,10 +200,6 @@ pub enum NodeRewardQueryResponse {
     /// together with the new node id,
     /// that followed with the original query.
     GetNodeWalletId(Result<(PublicKey, XorName)>),
-    /// A new Section Actor share (i.e. a new Elder) needs to query
-    /// its peer Elders for the replicas' public key set
-    /// and the history of events of the section wallet.
-    GetSectionWalletHistory(WalletInfo),
 }
 
 ///
