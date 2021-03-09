@@ -538,7 +538,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn files_store_public_blob(
-        &mut self,
+        &self,
         data: &[u8],
         media_type: Option<&str>,
         dry_run: bool,
