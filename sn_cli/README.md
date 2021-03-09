@@ -92,17 +92,17 @@
 
 This crate implements a CLI (Command Line Interface) for the Safe Network.
 
-The Safe CLI provides all the tools necessary to interact with the Safe Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the Safe Network and the data stored on it, allowing them to also use it for automated scripts and piped chain of commands.
+The Safe CLI provides all the tools necessary to interact with the Safe Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI, users have access to any type of operation that can be made on the Safe Network and the data stored on it, allowing them to also use it for automated scripts and piped chain of commands.
 
 ## Download
 
 The latest version of the Safe CLI can be downloaded and installed using the [install script](https://sn-api.s3.amazonaws.com/install.sh).
 
-The [install script](https://sn-api.s3.amazonaws.com/install.sh) will not only download latest Safe CLI, but it will also unpack CLI binary onto `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
+The [install script](https://sn-api.s3.amazonaws.com/install.sh) will not only download the latest Safe CLI, but it will also unpack the CLI binary into the `~/.safe/cli/` folder (`C:\Users\<user>\.safe\cli` in Windows), as well as set it in the PATH, so you can run the `safe` binary from any location when opening a console.
 
 ### Linux and Mac
 
-Open a new console and run any of the following `curl` or `wget` commands:
+Open a new console and run either of the following `curl` or `wget` commands:
 ```
 $ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
 ```
@@ -113,20 +113,25 @@ $ wget -qO- https://sn-api.s3.amazonaws.com/install.sh | bash
 
 ### Windows
 
-If you are a Windows user, you'll need to open a [Git BASH](https://gitforwindows.org) console with admin permissions.
+If you are a Windows user, you will need to download and install the [Visual C++ Redistributable for Visual Studio](https://www.microsoft.com/en-in/download/details.aspx?id=48145) if not already installed on your machine, otherwise attempting to run the CLI will result in errors such as:
+`error while loading shared libraries: api-ms-win-crt-locale-l1-1-0.dll: cannot open shared object file: No such file or directory`
 
-Click the "Start" button and type "git-bash" in the search bar, then press the **Shift+Ctrl+Enter** keys to reach Git-Bash console. The Git-Bash icon may also be in the Start Menu. You can [download Git Bash from here](https://gitforwindows.org/) if you don't have in your PC.
+You may already have these Visual C++ libraries on your machine if you already use Visual Studio.
 
-Once you have a Git Bash console just run the above `curl` command:
+Next, you'll need to open a [Git BASH](https://gitforwindows.org) console with admin permissions.
+
+Click the "Start" button and type "git-bash" in the search bar, then press the **Shift+Ctrl+Enter** keys to reach Git-Bash console. The Git-Bash icon may also be in the Start Menu. You can [download Git Bash from here](https://gitforwindows.org/) if you don't already have installed on your PC.
+
+Once you have an admin Git Bash console running, just run the above `curl` command to download and execute our install script:
 ```
 $ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
 ```
 
-Once Safe CLI is downloaded and installed in your system, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
+Once the Safe CLI is downloaded and installed on your system, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
 
-You can alternatively download the latest version of the Safe CLI from the [releases page](https://github.com/maidsafe/sn_api/releases/latest) and install it manually on your system.
+Alternatively, you can download the latest version of the Safe CLI from the [releases page](https://github.com/maidsafe/sn_api/releases/latest) and install it manually on your system.
 
-If otherwise you prefer to build the Safe CLI from source code, please follow the instructions in the next two sections below.
+If you prefer to build the Safe CLI from source code, please follow the instructions in the [Build](#build) section below.
 
 ## Build
 
@@ -139,13 +144,13 @@ $ cd sn_api
 $ cargo build
 ```
 
-Since this project has a cargo workspace with the `sn_cli` as the default crate, when building from the root location it will build the Safe CLI. Once it's built, you can find the `safe` executable at `target/debug/` or `target/release` if you built it with the `--release` flag.
+Since this project has a cargo workspace with the `sn_cli` as the default crate, when building from the root location it will build the Safe CLI. Once it's built, you can find the `safe` executable at `target/debug/`, or `target/release` if you built it with the `--release` flag.
 
 ## Using the CLI
 
 Right now the CLI is under active development. Here we're listing commands ready to be tested.
 
-In this guide we will assume from now on that you have navigated your terminal to the directory where the `safe` executable file you downloaded or built for your platform is located.
+In this guide we will assume from now on that you have used the install script and so have the CLI binary added to your system PATH, or you have navigated your terminal to the directory where the `safe` executable file you downloaded or built for your platform is located.
 
 The base command, once built, is `$ safe`, or all commands can be run via `$ cargo run -- <command>`.
 
@@ -912,7 +917,7 @@ Success. TX_ID: 277748716389078887
 
 #### [ Warning: Underlying API to be deprecated ]
 
-The underlying files APIs used in the CLI, and perhaps much of the CLI will be deprecated in order to use [`sn_fs`](https://github.com/maidsafe/sn_fs) at some point. This is a POSIX based filesystem which is much more comprehensive and performant. It's not yet known the impact (if any) this will have on the CLI commands. But if you're interested in a filesystem on SAFE, `sn_fs` is most definitely where you should be looking at the moment.
+The underlying files APIs used in the CLI, and perhaps much of the CLI will be deprecated in order to use [`sn_fs`](https://github.com/maidsafe/sn_fs) at some point. This is a POSIX based filesystem which is much more comprehensive and performant. It's not yet known the impact (if any) this will have on the CLI commands. But if you're interested in a filesystem on Safe, `sn_fs` is most definitely where you should be looking at the moment.
 
 #### Files...
 
