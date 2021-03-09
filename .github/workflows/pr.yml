@@ -111,6 +111,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./lcov.info
 
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    # wget the shared deny.toml file from the QA repo
+    - shell: bash
+      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
+
+    - uses: EmbarkStudios/cargo-deny-action@v1
+  
   test-component:
     # if: ${{ github.repository_owner == 'maidsafe' }} // re-enable this once these tests are run again
     if: false
