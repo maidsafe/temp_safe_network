@@ -243,23 +243,23 @@ You will need the network configuration containing the details of the hardcoded 
 $ safe networks check
 Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
-Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config' ...
 
 'maidsafe-testnet' network matched!
 Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
 ```
 
-If you don't have a configuration in your results which points to the exact [S3 location](https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config) listed in the results above, you can add using `safe networks add`:
+If you don't have a configuration in your results which points to the exact [S3 location](https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config) listed in the results above, you can add using `safe networks add`:
 ```shell
-$ safe networks add maidsafe-testnet https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config
-Network 'maidsafe-testnet' was added to the list. Connection information is located at 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config'
+$ safe networks add maidsafe-testnet https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config
+Network 'maidsafe-testnet' was added to the list. Connection information is located at 'https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config'
 ```
 
 Now you need to ensure you are set to use this `maidsafe-testnet` configuration that we have updated/added, we can use `safe networks switch maidsafe-testnet` for this:
 ```shell
 $ safe networks switch maidsafe-testnet
 Switching to 'maidsafe-testnet' network...
-Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config' ...
 Successfully switched to 'maidsafe-testnet' network in your system!
 If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
 ```
@@ -295,7 +295,7 @@ Network 'my-network' was added to the list. Connection information is located at
 
 If you also would like to connect to the MaidSafe hosted test network, you would need to set it up in CLI settings as another network, specifying the URL where to fetch latest connection information from:
 ```shell
-$ safe networks add maidsafe-testnet https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config
+$ safe networks add maidsafe-testnet https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config
 Network 'maidsafe-testnet' was added to the list
 ```
 
@@ -307,7 +307,7 @@ $ safe networks
 +----------+------------------+------------------------------------------------------------------------------------------------+
 | Current  | Network name     | Connection info                                                                                |
 +----------+------------------+------------------------------------------------------------------------------------------------+
-|          | maidsafe-testnet | https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config |
+|          | maidsafe-testnet | https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config |
 +----------+------------------+------------------------------------------------------------------------------------------------+
 | *        | my-network       | ~/.safe/cli/networks/my-network_node_connection_info.config                                    |
 +----------+------------------+------------------------------------------------------------------------------------------------+
@@ -317,7 +317,7 @@ Once we have them in the CLI settings, we can use the CLI to automatically fetch
 ```shell
 $ safe networks switch maidsafe-testnet
 Switching to 'maidsafe-testnet' network...
-Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config' ...
 Successfully switched to 'maidsafe-testnet' network in your system!
 If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
 ```
@@ -327,7 +327,7 @@ Remember that every time you launch a local network the connection configuration
 $ safe networks check
 Checking current setup network connection information...
 Fetching 'my-network' network connection information from '~/.config/sn_cli/networks/my-network_node_connection_info.config' ...
-Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config' ...
+Fetching 'maidsafe-testnet' network connection information from 'https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config' ...
 
 'maidsafe-testnet' network matched!
 Current set network connection information at '~/.config/sn_node/node_connection_info.config' matches 'maidsafe-testnet' network as per current config
@@ -361,7 +361,7 @@ $ safe networks
 +----------+-------------------+------------------------------------------------------------------------------------------------+
 | *        | community-network | {161.35.36.112:15000}                                                                          |
 +----------+-------------------+------------------------------------------------------------------------------------------------+
-|          | maidsafe-testnet  | https://sn-node-config.s3.eu-west-2.amazonaws.com/maidsafe-testnet/node_connection_info.config |
+|          | maidsafe-testnet  | https://sn-node-config.s3.eu-west-2.amazonaws.com/config/node_connection_info.config |
 +----------+-------------------+------------------------------------------------------------------------------------------------+
 |          | my-network        | ~/.safe/cli/networks/my-network_node_connection_info.config                                    |
 +----------+-------------------+------------------------------------------------------------------------------------------------+
