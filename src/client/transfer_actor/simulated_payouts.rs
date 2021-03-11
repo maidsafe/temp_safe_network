@@ -100,7 +100,7 @@ mod tests {
     use crate::utils::test_utils::create_test_client;
     use anyhow::Result;
     use std::str::FromStr;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     #[cfg(feature = "simulated-payouts")]
@@ -113,7 +113,7 @@ mod tests {
 
         let mut tokens = client.get_balance_from_network(None).await?;
         while tokens != Token::from_str("110")? {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
             tokens = client.get_balance_from_network(None).await?;
         }
 
