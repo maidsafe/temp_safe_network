@@ -47,8 +47,10 @@ pub async fn jsonrpc_listen(
             .clone(),
     };
 
-    let mut incoming_conn = runtime
-        .enter(|| qjsonrpc_endpoint.bind(&listen_socket_addr))
+    let _ = runtime.enter();
+
+    let mut incoming_conn = qjsonrpc_endpoint
+        .bind(&listen_socket_addr)
         .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
 
     while let Some(conn) = incoming_conn.get_next().await {

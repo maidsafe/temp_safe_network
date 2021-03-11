@@ -24,7 +24,7 @@ pub async fn process_req(
 
         let mut auth_reqs_list = auth_reqs_handle.lock().await;
         match auth_reqs_list.remove(&req_id) {
-            Some(mut auth_req) => match auth_req.tx.try_send(true) {
+            Some(auth_req) => match auth_req.tx.try_send(true) {
                 Ok(_) => {
                     let msg = format!("Authorisation request '{}' allowed", auth_req_id);
                     info!("{}", msg);

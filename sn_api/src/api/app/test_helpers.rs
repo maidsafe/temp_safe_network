@@ -78,7 +78,7 @@ macro_rules! retry_loop {
         loop {
             match $async_func.await {
                 Ok(val) => break val,
-                Err(_) => tokio::time::delay_for(std::time::Duration::from_millis(200)).await,
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(200)).await,
             }
         }
     };
@@ -91,7 +91,7 @@ macro_rules! retry_loop_for_pattern {
             let result = $async_func.await;
             match &result {
                 $pattern $(if $cond)? => break result,
-                Ok(_) | Err(_) => tokio::time::delay_for(std::time::Duration::from_millis(200)).await,
+                Ok(_) | Err(_) => tokio::time::sleep(std::time::Duration::from_millis(200)).await,
             }
         }
     };

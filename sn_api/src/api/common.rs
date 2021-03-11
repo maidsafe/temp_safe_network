@@ -116,7 +116,8 @@ where
             };
 
             let mut outgoing_conn = {
-                runtime.enter(|| qjsonrpc_client.bind()).map_err(|err| {
+                let _ = runtime.enter();
+                qjsonrpc_client.bind().map_err(|err| {
                     Error::AuthdClientError(format!("Failed to bind endpoint: {}", err))
                 })?
             };

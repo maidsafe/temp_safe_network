@@ -12,7 +12,7 @@ use log::{error, info};
 use qjsonrpc::ClientEndpoint;
 use serde_json::json;
 use std::{collections::BTreeMap, time::Duration};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 // Frequency for checking pending auth requests
 const AUTH_REQS_CHECK_FREQ: u64 = 1000;
@@ -132,7 +132,7 @@ pub async fn monitor_pending_auth_reqs(
             }
         }
 
-        delay_for(Duration::from_millis(AUTH_REQS_CHECK_FREQ)).await;
+        sleep(Duration::from_millis(AUTH_REQS_CHECK_FREQ)).await;
     }
 }
 
