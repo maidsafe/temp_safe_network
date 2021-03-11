@@ -39,7 +39,7 @@ fn main() {
         .name("sn_node".to_string())
         .stack_size(8 * 1024 * 1024)
         .spawn(move || {
-            let mut rt = tokio::runtime::Runtime::new()?;
+            let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_node());
             Ok::<(), std::io::Error>(())
         });

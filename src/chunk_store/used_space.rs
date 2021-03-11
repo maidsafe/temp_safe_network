@@ -9,7 +9,7 @@
 use crate::{Error, Result};
 use log::warn;
 use std::{path::Path, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 const USED_SPACE_FILENAME: &str = "used_space";
 
