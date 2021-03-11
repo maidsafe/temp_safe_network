@@ -35,7 +35,7 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";
@@ -142,7 +142,7 @@ pub async fn run_network() -> Result<(), String> {
 
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {
-        let v = "y".repeat(verbosity as usize);
+        let v = "y".repeat(verbosity);
         info!("V: {}", v);
         verbosity_arg.push_str(&v);
         sn_launch_tool_args.push(&verbosity_arg);
@@ -159,7 +159,7 @@ pub async fn run_network() -> Result<(), String> {
 
     let interval_duration = Duration::from_secs(interval_as_int * 15);
 
-    delay_for(interval_duration).await;
+    sleep(interval_duration).await;
 
     Ok(())
 }
