@@ -370,7 +370,7 @@ mod tests {
     use sn_data_types::{PrivateBlob, PublicBlob, Token};
     use sn_messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     // Test putting and getting pub blob.
     #[tokio::test]
@@ -396,7 +396,7 @@ mod tests {
         // Assert that the blob was written
         let mut fetched_data = client.read_blob(address, None, None).await;
         while fetched_data.is_err() {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
             fetched_data = client.read_blob(address, None, None).await;
         }
 
@@ -433,7 +433,7 @@ mod tests {
         // Assert that the blob is stored.
         let mut res = client.read_blob(address, None, None).await;
         while res.is_err() {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
 
             res = client.read_blob(address, None, None).await;
         }
@@ -468,7 +468,7 @@ mod tests {
         // Assert that the blob is stored.
         let mut fetched_data = client.read_blob(pub_address, None, None).await;
         while fetched_data.is_err() {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
 
             fetched_data = client.read_blob(pub_address, None, None).await;
         }
@@ -479,7 +479,7 @@ mod tests {
         // Make sure blob was deleted
         let mut fetched_data = client.read_blob(address, None, None).await;
         while fetched_data.is_ok() {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
 
             fetched_data = client.read_blob(address, None, None).await;
         }
@@ -498,7 +498,7 @@ mod tests {
 
         let mut res = client.fetch_blob_from_network(address).await;
         while res.is_err() {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
 
             res = client.fetch_blob_from_network(address).await;
         }
@@ -629,7 +629,7 @@ mod tests {
 
             let mut fetch_res = client.read_blob(address, None, Some(size as u64 / 2)).await;
             while fetch_res.is_err() {
-                delay_for(Duration::from_millis(200)).await;
+                sleep(Duration::from_millis(200)).await;
 
                 fetch_res = client.read_blob(address, None, Some(size as u64 / 2)).await;
             }
@@ -648,7 +648,7 @@ mod tests {
                 .read_blob(address, Some(size as u64 / 2), Some(size as u64 / 2))
                 .await;
             while fetch_res.is_err() {
-                delay_for(Duration::from_millis(200)).await;
+                sleep(Duration::from_millis(200)).await;
                 fetch_res = client
                     .read_blob(address, Some(size as u64 / 2), Some(size as u64 / 2))
                     .await;
@@ -699,7 +699,7 @@ mod tests {
         fetch_result = client.read_blob(address, None, None).await;
 
         while fetch_result.is_err() {
-            delay_for(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(200)).await;
 
             fetch_result = client.read_blob(address, None, None).await;
         }

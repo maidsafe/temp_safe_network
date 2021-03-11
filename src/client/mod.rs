@@ -348,7 +348,7 @@ mod tests {
     #[tokio::test]
     pub async fn long_lived_connection_survives() -> Result<()> {
         let client = create_test_client().await?;
-        tokio::time::delay_for(tokio::time::Duration::from_secs(40)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
         let balance = client.get_balance().await?;
         assert_ne!(balance, Token::from_nano(0));
 

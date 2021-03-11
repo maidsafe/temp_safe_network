@@ -617,7 +617,7 @@ impl ConnectionManager {
             } => {
                 trace!("Query response in: {:?}", response);
 
-                if let Some(mut sender) = session
+                if let Some(sender) = session
                     .pending_queries
                     .lock()
                     .await
