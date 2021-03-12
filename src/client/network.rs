@@ -14,11 +14,10 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     ActorHistory, Blob, BlobAddress, Credit, DebitId, NodeRewardStage, PublicKey, ReplicaEvent,
-    Signature, SignatureShare, SignedCredit, SignedTransferShare, TransferAgreementProof,
-    TransferValidated, WalletInfo,
+    SectionElders, Signature, SignatureShare, SignedCredit, SignedTransferShare, Token,
+    TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use threshold_crypto::PublicKeySet;
 use xor_name::XorName;
 
 use super::{BlobRead, BlobWrite};
@@ -76,6 +75,11 @@ pub enum NodeSystemCmd {
         address: BlobAddress,
         /// Current holders.
         current_holders: BTreeSet<XorName>,
+    },
+    ///
+    CreateSectionWallet {
+        amount: Token,
+        key: threshold_crypto::PublicKey,
     },
 }
 
@@ -175,7 +179,7 @@ pub enum NodeTransferQuery {
 pub enum NodeSystemQuery {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
-    GetSectionPkSet,
+    GetSectionElders,
     /// Acquire the chunk from current holders for replication.
     GetChunk {
         /// New Holder's name.
@@ -192,7 +196,7 @@ pub enum NodeSystemQuery {
 pub enum NodeSystemQueryResponse {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
-    GetSectionPkSet(PublicKeySet),
+    GetSectionElders(SectionElders),
 }
 
 ///
