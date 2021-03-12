@@ -112,9 +112,7 @@ pub enum NodeEvent {
         proof: Signature,
     },
     ///
-    SectionPayoutValidated(TransferValidated),
-    ///
-    SectionPayoutRegistered { from: PublicKey, to: PublicKey },
+    RewardPayoutValidated(TransferValidated),
     /// Sent to all section Elders after
     // a completed transition to a new constellation.
     PromotedToElder {
