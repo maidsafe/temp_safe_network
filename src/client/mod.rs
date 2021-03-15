@@ -119,6 +119,23 @@ impl Message {
     pub fn serialize(&self) -> crate::Result<Bytes> {
         WireMsg::serialize_client_msg(self)
     }
+
+     /// Gets the message ID.
+     pub fn id(&self) -> MessageId {
+        match self {
+            Self::Functional(FunctionalMsg::Cmd { id, .. })
+            | Self::Functional(FunctionalMsg::Query { id, .. })
+            | Self::Functional(FunctionalMsg::Event { id, .. })
+            | Self::Functional(FunctionalMsg::QueryResponse { id, .. })
+            | Self::Functional(FunctionalMsg::CmdError { id, .. })
+            | Self::Functional(FunctionalMsg::NodeCmd { id, .. })
+            | Self::Functional(FunctionalMsg::NodeEvent { id, .. })
+            | Self::Functional(FunctionalMsg::NodeQuery { id, .. })
+            | Self::Functional(FunctionalMsg::NodeCmdError { id, .. })
+            | Self::Functional(FunctionalMsg::NodeQueryResponse { id, .. })
+            | Self::ProcessingError(ProcessingError { id, .. }) => *id,
+        }
+    }
 }
 
 ///
@@ -223,21 +240,20 @@ impl FunctionalMsg {
     }
 }
 
-impl Message {
+impl FunctionalMsg {
     /// Gets the message ID.
     pub fn id(&self) -> MessageId {
         match self {
-            Self::Functional(FunctionalMsg::Cmd { id, .. })
-            | Self::Functional(FunctionalMsg::Query { id, .. })
-            | Self::Functional(FunctionalMsg::Event { id, .. })
-            | Self::Functional(FunctionalMsg::QueryResponse { id, .. })
-            | Self::Functional(FunctionalMsg::CmdError { id, .. })
-            | Self::Functional(FunctionalMsg::NodeCmd { id, .. })
-            | Self::Functional(FunctionalMsg::NodeEvent { id, .. })
-            | Self::Functional(FunctionalMsg::NodeQuery { id, .. })
-            | Self::Functional(FunctionalMsg::NodeCmdError { id, .. })
-            | Self::Functional(FunctionalMsg::NodeQueryResponse { id, .. })
-            | Self::ProcessingError(ProcessingError { id, .. }) => *id,
+            Self::Cmd { id, .. }
+            | Self::Query { id, .. }
+            | Self::Event { id, .. }
+            | Self::QueryResponse { id, .. }
+            | Self::CmdError { id, .. }
+            | Self::NodeCmd { id, .. }
+            | Self::NodeEvent { id, .. }
+            | Self::NodeQuery { id, .. }
+            | Self::NodeCmdError { id, .. }
+            | Self::NodeQueryResponse { id, .. } => *id,
         }
     }
 }
