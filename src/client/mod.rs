@@ -29,8 +29,8 @@ pub use self::{
     network::{
         NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
         NodeQueryResponse, NodeRewardError, NodeRewardQuery, NodeRewardQueryResponse,
-        NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-        NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
+        NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+        NodeTransferQueryResponse,
     },
     query::Query,
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
@@ -51,12 +51,14 @@ use std::{
     convert::TryFrom,
     fmt,
 };
+use threshold_crypto::PublicKey as BlsPublicKey;
+use xor_name::XorName;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Message {
     Functional(FunctionalMsg),
-    ProcessingError(ProcessingError)
+    ProcessingError(ProcessingError),
 }
 
 /// Our LazyMesssage error. Recipient was unable to process this message for some reason.
@@ -70,7 +72,7 @@ pub struct ProcessingError {
     /// Message that triggered this error
     source_message: FunctionalMsg,
     /// MessageId
-    id: MessageId
+    id: MessageId,
 }
 
 /// Error reasons for inability to handle a message at a client/node.
@@ -106,7 +108,7 @@ impl Message {
     /// It returns an error if the bytes don't correspond to a client message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::ClientMessage(msg) = deserialized {
+        if let MessageType::ClientMessage { msg, .. } = deserialized {
             Ok(msg)
         } else {
             Err(crate::Error::FailedToParse(
@@ -115,13 +117,13 @@ impl Message {
         }
     }
 
-    /// serialize this Message into bytes ready to be sent over the wire.
-    pub fn serialize(&self) -> crate::Result<Bytes> {
-        WireMsg::serialize_client_msg(self)
+    /// Serialize this Message into bytes ready to be sent over the wire.
+    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
+        WireMsg::serialize_client_msg(self, dest, dest_section_pk)
     }
 
-     /// Gets the message ID.
-     pub fn id(&self) -> MessageId {
+    /// Gets the message ID.
+    pub fn id(&self) -> MessageId {
         match self {
             Self::Functional(FunctionalMsg::Cmd { id, .. })
             | Self::Functional(FunctionalMsg::Query { id, .. })
@@ -149,14 +151,14 @@ pub enum FunctionalMsg {
         /// Cmd.
         cmd: Cmd,
         /// Message ID.
-        id: MessageId
+        id: MessageId,
     },
     /// Queries is a read-only operation.
     Query {
         /// Query.
         query: Query,
         /// Message ID.
-        id: MessageId
+        id: MessageId,
     },
     /// An Event is a fact about something that happened.
     Event {
@@ -165,7 +167,7 @@ pub enum FunctionalMsg {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId
+        correlation_id: MessageId,
     },
     /// The response to a query, containing the query result.
     QueryResponse {
@@ -174,7 +176,7 @@ pub enum FunctionalMsg {
         /// Message ID.
         id: MessageId,
         /// ID of causing query.
-        correlation_id: MessageId
+        correlation_id: MessageId,
     },
     /// Cmd error.
     CmdError {
@@ -183,14 +185,14 @@ pub enum FunctionalMsg {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId
+        correlation_id: MessageId,
     },
     /// Cmds only sent internally in the network.
     NodeCmd {
         /// NodeCmd.
         cmd: NodeCmd,
         /// Message ID.
-        id: MessageId
+        id: MessageId,
     },
     /// An error of a NodeCmd.
     NodeCmdError {
@@ -199,7 +201,7 @@ pub enum FunctionalMsg {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId
+        correlation_id: MessageId,
     },
     /// Events only sent internally in the network.
     NodeEvent {
@@ -208,14 +210,14 @@ pub enum FunctionalMsg {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId
+        correlation_id: MessageId,
     },
     /// Queries is a read-only operation.
     NodeQuery {
         /// Query.
         query: NodeQuery,
         /// Message ID.
-        id: MessageId
+        id: MessageId,
     },
     /// The response to a query, containing the query result.
     NodeQueryResponse {
@@ -224,19 +226,18 @@ pub enum FunctionalMsg {
         /// Message ID.
         id: MessageId,
         /// ID of causing query.
-        correlation_id: MessageId
+        correlation_id: MessageId,
     },
 }
 
 impl FunctionalMsg {
+    #[allow(dead_code)]
     fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
-        Message::ProcessingError(
-            ProcessingError{
-                source_message: self.clone(),
-                id: MessageId::new(),
-                reason
-            }
-        )
+        Message::ProcessingError(ProcessingError {
+            source_message: self.clone(),
+            id: MessageId::new(),
+            reason,
+        })
     }
 }
 
@@ -547,44 +548,38 @@ mod tests {
     #[test]
     fn generate_processing_error() -> Result<()> {
         if let Some(key) = gen_keys().first() {
-            let msg = FunctionalMsg::Query{
-                query: Query::Transfer(TransferQuery::GetBalance(key.clone())),
-                id: MessageId::new()
+            let msg = FunctionalMsg::Query {
+                query: Query::Transfer(TransferQuery::GetBalance(*key)),
+                id: MessageId::new(),
             };
-            let lazy_error = msg.create_processing_error_msg(Some(ProcessingErrorReason::CouldNotFindKey));
-            
-            assert!(format!("{:?}", lazy_error)
-                .contains("TransferQuery::GetBalance"));
-            assert!(format!("{:?}", lazy_error)
-                .contains("ProcessingError"));
-            assert!(format!("{:?}", lazy_error)
-                .contains("CouldNotFindKey"));
-            
+            let lazy_error =
+                msg.create_processing_error_msg(Some(ProcessingErrorReason::CouldNotFindKey));
+
+            assert!(format!("{:?}", lazy_error).contains("TransferQuery::GetBalance"));
+            assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
+            assert!(format!("{:?}", lazy_error).contains("CouldNotFindKey"));
+
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))
         }
     }
-    
+
     #[test]
     fn debug_format_processing_error() -> Result<()> {
         if let Some(key) = gen_keys().first() {
-            let errored_response = ProcessingError{
+            let errored_response = ProcessingError {
                 reason: Some(ProcessingErrorReason::CouldNotFindKey),
-                source_message: FunctionalMsg::Query{
+                source_message: FunctionalMsg::Query {
                     id: MessageId::new(),
-                    query: Query::Transfer(TransferQuery::GetBalance(key.clone()))
+                    query: Query::Transfer(TransferQuery::GetBalance(*key)),
                 },
-                id: MessageId::new()
-
+                id: MessageId::new(),
             };
 
-            assert!(format!("{:?}", errored_response)
-                .contains("TransferQuery::GetBalance"));
-            assert!(format!("{:?}", errored_response)
-                .contains("ProcessingError"));
-            assert!(format!("{:?}", errored_response)
-                .contains("CouldNotFindKey"));
+            assert!(format!("{:?}", errored_response).contains("TransferQuery::GetBalance"));
+            assert!(format!("{:?}", errored_response).contains("ProcessingError"));
+            assert!(format!("{:?}", errored_response).contains("CouldNotFindKey"));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))
@@ -642,15 +637,15 @@ mod tests {
 
         let random_xor = xor_name::XorName::random();
         let id = MessageId(random_xor);
-        let message = Message::Functional(
-            FunctionalMsg::Query {
-                query: Query::Transfer(TransferQuery::GetBalance(pk)),
-                id
-            }
-        );
+        let message = Message::Functional(FunctionalMsg::Query {
+            query: Query::Transfer(TransferQuery::GetBalance(pk)),
+            id,
+        });
 
         // test msgpack serialization
-        let serialized = message.serialize()?;
+        let dest = XorName::random();
+        let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
+        let serialized = message.serialize(dest, dest_section_pk)?;
         let deserialized = Message::from(serialized)?;
         assert_eq!(deserialized, message);
 

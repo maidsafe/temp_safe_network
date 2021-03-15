@@ -23,6 +23,8 @@ pub use self::{
     serialisation::WireMsg,
 };
 use bytes::Bytes;
+use threshold_crypto::PublicKey;
+use xor_name::XorName;
 
 /// Type of message.
 /// Note this is part of this crate's public API but this enum is
@@ -30,22 +32,47 @@ use bytes::Bytes;
 #[derive(PartialEq, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
-    Ping,
-    SectionInfo(section_info::Message),
-    ClientMessage(client::Message),
+    Ping(HeaderInfo),
+    SectionInfo {
+        msg: section_info::Message,
+        hdr_info: HeaderInfo,
+    },
+    ClientMessage {
+        msg: client::Message,
+        hdr_info: HeaderInfo,
+    },
     #[cfg(not(feature = "client-only"))]
-    NodeMessage(node::NodeMessage),
+    NodeMessage {
+        msg: node::NodeMessage,
+        hdr_info: HeaderInfo,
+    },
+}
+
+/// This is information kept by 'MessageType' so it can be properly
+/// serialised with a valid 'WireMsgHeader'
+#[derive(PartialEq, Debug)]
+pub struct HeaderInfo {
+    dest: XorName,
+    dest_section_pk: PublicKey,
 }
 
 impl MessageType {
     /// serialize the message type into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> Result<Bytes> {
         match self {
-            Self::Ping => WireMsg::new_ping_msg().serialize(),
-            Self::SectionInfo(query) => WireMsg::serialize_sectioninfo_msg(query),
-            Self::ClientMessage(msg) => WireMsg::serialize_client_msg(msg),
+            Self::Ping(hdr_info) => {
+                WireMsg::new_ping_msg(hdr_info.dest, hdr_info.dest_section_pk).serialize()
+            }
+            Self::SectionInfo { msg, hdr_info } => {
+                WireMsg::serialize_sectioninfo_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            }
+            Self::ClientMessage { msg, hdr_info } => {
+                WireMsg::serialize_client_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeMessage(msg) => WireMsg::serialize_node_msg(msg),
+            Self::NodeMessage { msg, hdr_info } => {
+                WireMsg::serialize_node_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            }
         }
     }
 }

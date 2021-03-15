@@ -11,9 +11,12 @@ use super::{Error, Result};
 use bytes::Bytes;
 use cookie_factory::{
     bytes::{be_u16, be_u8},
+    combinator::slice,
     gen,
 };
 use std::{convert::TryFrom, fmt::Debug, mem::size_of};
+use threshold_crypto::PublicKey;
+use xor_name::{XorName, XOR_NAME_LEN};
 
 // Current version of the messaging protocol.
 // At this point this implementation supports only this version.
@@ -26,31 +29,57 @@ pub(crate) struct WireMsgHeader {
     header_size: u16,
     version: u16,
     kind: MessageKind,
+    dest: XorName,
+    dest_section_pk: PublicKey,
 }
 
 // Bytes length in the header for the 'header_size' field
 const HDR_SIZE_BYTES_LEN: usize = size_of::<u16>();
 
 // Bytes index and size in the header for the 'version' field
-const HDR_VERSION_BYTES_START: usize = 2;
-const HDR_VERSION_BYTES_END: usize = 4;
+const HDR_VERSION_BYTES_START: usize = HDR_SIZE_BYTES_LEN;
 const HDR_VERSION_BYTES_LEN: usize = size_of::<u16>();
+const HDR_VERSION_BYTES_END: usize = HDR_VERSION_BYTES_START + HDR_VERSION_BYTES_LEN;
 
 // Bytes index in the header for the 'kind' field
-const HDR_KIND_BYTES_START: usize = 4;
+const HDR_KIND_BYTES_START: usize = HDR_VERSION_BYTES_END;
+const HDR_KIND_BYTES_LEN: usize = 1;
+
+// Bytes index in the header for the 'dest' field
+const HDR_DEST_BYTES_START: usize = HDR_KIND_BYTES_START + HDR_KIND_BYTES_LEN;
+const HDR_DEST_BYTES_LEN: usize = XOR_NAME_LEN;
+const HDR_DEST_BYTES_END: usize = HDR_DEST_BYTES_START + HDR_DEST_BYTES_LEN;
+
+// Bytes index in the header for the 'dest_section_pk' field
+const HDR_DEST_PK_BYTES_START: usize = HDR_DEST_BYTES_END;
+const HDR_DEST_PK_BYTES_LEN: usize = 48;
+const HDR_DEST_PK_BYTES_END: usize = HDR_DEST_PK_BYTES_START + HDR_DEST_PK_BYTES_LEN;
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(kind: MessageKind) -> Self {
+    pub fn new(kind: MessageKind, dest: XorName, dest_section_pk: PublicKey) -> Self {
         Self {
             header_size: Self::size() as u16,
             version: MESSAGING_PROTO_VERSION,
             kind,
+            dest,
+            dest_section_pk,
         }
     }
 
+    // Return the kind of this message
     pub fn kind(&self) -> MessageKind {
         self.kind
+    }
+
+    // Return the destination section PublicKey for this message
+    pub fn dest_section_pk(&self) -> PublicKey {
+        self.dest_section_pk
+    }
+
+    // Return the destination for this message
+    pub fn dest(&self) -> XorName {
+        self.dest
     }
 
     // Parses the provided bytes to deserialize a WireMsgHeader,
@@ -58,9 +87,7 @@ impl WireMsgHeader {
     // correspond to the message payload. The caller shall then take care of
     // deserializing the payload using the information provided in the WireMsgHeader.
     pub fn from(mut bytes: Bytes) -> Result<(Self, Bytes)> {
-        // We need at least 4 bytes as current version 1 only has
-        // a header size field and the protocol version. Thus, let's
-        // make sure there is this number of bytes as a minimum.
+        // Let's make sure there is a minimum number of bytes to parse the header.
         let length = bytes.len();
         if length < Self::size() {
             return Err(Error::FailedToParse(format!(
@@ -83,13 +110,30 @@ impl WireMsgHeader {
             return Err(Error::UnsupportedVersion(version));
         }
 
-        // ...and finally let's read the message kind value (only 1 byte)
+        // ...read the message kind value (only 1 byte)
         let kind = MessageKind::try_from(bytes[HDR_KIND_BYTES_START])?;
+
+        // ...now let's read the destination bytes
+        let mut dest_bytes = [0; HDR_DEST_BYTES_LEN];
+        dest_bytes[0..].copy_from_slice(&bytes[HDR_DEST_BYTES_START..HDR_DEST_BYTES_END]);
+        let dest = XorName(dest_bytes);
+
+        // ...finally, let's read the destination section pubic key bytes
+        let mut dest_pk_bytes = [0; HDR_DEST_PK_BYTES_LEN];
+        dest_pk_bytes[0..].copy_from_slice(&bytes[HDR_DEST_PK_BYTES_START..HDR_DEST_PK_BYTES_END]);
+        let dest_section_pk = PublicKey::from_bytes(&dest_pk_bytes).map_err(|err| {
+            Error::FailedToParse(format!(
+                "destination section PublicKey couldn't be deserialized from header: {}",
+                err
+            ))
+        })?;
 
         let header = Self {
             header_size,
             version,
             kind,
+            dest,
+            dest_section_pk,
         };
 
         // Get a slice for the payload bytes, i.e. the bytes after the header bytes
@@ -117,8 +161,8 @@ impl WireMsgHeader {
                 ))
             })?;
 
-        // ...and finally, let's write the value signaling the message kind
-        let (buf_at_payload, _) =
+        // ...now let's write the value signaling the message kind
+        let (buf_at_dest, _) =
             gen(be_u8(self.kind.into()), &mut buf_at_msg_kind[..]).map_err(|err| {
                 Error::Serialisation(format!(
                     "message kind field couldn't be serialized in header: {}",
@@ -126,16 +170,39 @@ impl WireMsgHeader {
                 ))
             })?;
 
+        // ...write the destination bytes
+        let (buf_at_dest_pk, _) = gen(slice(&self.dest), &mut buf_at_dest[..]).map_err(|err| {
+            Error::Serialisation(format!(
+                "destination field couldn't be serialized in header: {}",
+                err
+            ))
+        })?;
+
+        // ...finally let's write the destination section public key
+        let (buf_at_payload, _) = gen(
+            slice(self.dest_section_pk.to_bytes()),
+            &mut buf_at_dest_pk[..],
+        )
+        .map_err(|err| {
+            Error::Serialisation(format!(
+                "destination section public key field couldn't be serialized in header: {}",
+                err
+            ))
+        })?;
+
         Ok(buf_at_payload)
     }
 
     // Size in bytes of WireMsgHeader when serialized.
     pub fn size() -> usize {
-        // We don't use 'std::mem::size_of' since for the
+        // We don't use 'std::mem::size_of' since, for example, the
         // 'MessageKind' enum it reports 2 bytes mem size,
         // and we want to serialize that field using 1 byte only.
-        // HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + 1 == 5
-        5
+        HDR_SIZE_BYTES_LEN
+            + HDR_VERSION_BYTES_LEN
+            + HDR_KIND_BYTES_LEN
+            + HDR_DEST_BYTES_LEN
+            + HDR_DEST_PK_BYTES_LEN
     }
 }
 

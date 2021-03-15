@@ -14,6 +14,7 @@ pub use errors::Error;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{PublicKey, ReplicaPublicKeySet, Signature};
 use std::{collections::BTreeMap, fmt, net::SocketAddr};
+use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
 
 /// Messages for exchanging network info, specifically on a target section for a msg.
@@ -92,8 +93,8 @@ impl Message {
     /// It returns an error if the bytes don't correspond to a network info query.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::SectionInfo(query) = deserialized {
-            Ok(query)
+        if let MessageType::SectionInfo { msg, .. } = deserialized {
+            Ok(msg)
         } else {
             Err(crate::Error::FailedToParse(
                 "bytes as a network info message".to_string(),
@@ -102,7 +103,7 @@ impl Message {
     }
 
     /// serialize this Query into bytes ready to be sent over the wire.
-    pub fn serialize(&self) -> crate::Result<Bytes> {
-        WireMsg::serialize_sectioninfo_msg(self)
+    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
+        WireMsg::serialize_sectioninfo_msg(self, dest, dest_section_pk)
     }
 }
