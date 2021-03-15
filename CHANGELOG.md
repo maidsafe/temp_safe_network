@@ -2,7 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [0.20.0](https://github.com/maidsafe/sn_api/compare/v0.19.1...v0.20.0) (2021-04-04)
+### [0.21.0](https://github.com/maidsafe/sn_api/compare/v0.20.0...v0.21.0) (2021-03-15)
+
+### Features
+
+* ***cli*** upgrade tokio to v1.3.0 and quinn to v0.10.1
+
+* ***authd*** upgrade tokio to v1.3.0 and quinn to v0.10.1
+
+* ***cli*** customise the error message displayed when a panic occurred
+
+### Bug Fixes
+
+* ***api*** fix API tests by retrying some operations when network is not fully in sync
+
+* ***cli*** add instructions to CLI User Guide to install VS C++ redistribution package as Windows requirements
+
+### [0.20.0](https://github.com/maidsafe/sn_api/compare/v0.19.1...v0.20.0) (2021-03-04)
 
 ### Features
 

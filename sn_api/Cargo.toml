@@ -1,6 +1,6 @@
 [package]
 name = "sn_api"
-version = "0.20.0"
+version = "0.21.0"
 description = "Safe API"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 license = "MIT OR BSD-3-Clause"
@@ -16,7 +16,7 @@ chrono = "~0.4.19"
 dirs-next = "2.0.0"
 env_logger = "~0.8.3"
 futures = "~0.3.12"
-qjsonrpc = { path = "../qjsonrpc", version = "~0.1.2" }
+qjsonrpc = { path = "../qjsonrpc", version = "~0.2.0" }
 lazy_static = "1.4.0"
 log = "~0.4.14"
 mime_guess = "2.0.3"
@@ -39,9 +39,9 @@ pbkdf2 = { version = "~0.7.0", default-features = false }
 hmac = "~0.10.1"
 sha3 = "~0.9.1"
 
-  [dependencies.tiny-keccak]
-  version = "2.0.2"
-  features = [ "sha3" ]
+[dependencies.tiny-keccak]
+version = "2.0.2"
+features = [ "sha3" ]
 
 [features]
 authenticator = []
