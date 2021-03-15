@@ -359,7 +359,10 @@ fn sanitised_url(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use crate::{
+        api::app::test_helpers::{new_safe_instance, random_nrs_name},
+        retry_loop, retry_loop_for_pattern,
+    };
     use anyhow::{anyhow, bail, Result};
 
     #[tokio::test]
@@ -371,10 +374,10 @@ mod tests {
 
         let nrs_xorname = Safe::parse_url(&site_name)?.xorname();
 
-        let (xor_url, _entries, nrs_map) = safe
+        let (xor_url, _, nrs_map) = safe
             .nrs_map_container_create(
                 &site_name,
-                "safe://linked-from-<site_name>?v=0",
+                "safe://linked-from-site_name?v=0",
                 true,
                 false,
                 false,
@@ -384,7 +387,7 @@ mod tests {
         assert_eq!(nrs_map.sub_names_map.len(), 0);
         assert_eq!(
             nrs_map.get_default_link()?,
-            "safe://linked-from-<site_name>?v=0"
+            "safe://linked-from-site_name?v=0"
         );
 
         if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
@@ -392,7 +395,7 @@ mod tests {
                 .get(FAKE_RDF_PREDICATE_LINK)
                 .ok_or_else(|| anyhow!("Entry not found with key '{}'", FAKE_RDF_PREDICATE_LINK))?;
 
-            assert_eq!(*link, "safe://linked-from-<site_name>?v=0".to_string());
+            assert_eq!(*link, "safe://linked-from-site_name?v=0".to_string());
             assert_eq!(
                 nrs_map.get_default()?,
                 &DefaultRdf::OtherRdf(def_data.clone())
@@ -409,37 +412,29 @@ mod tests {
     async fn test_nrs_map_container_add() -> Result<()> {
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
-        let (_xor_url, _entries, nrs_map) = safe
-            .nrs_map_container_create(
-                &format!("b.{}", site_name),
-                "safe://linked-from-<b.site_name>?v=0",
-                true,
-                false,
-                false,
-            )
+
+        // let's create an empty files container so we have a valid to link
+        let (link, _, _) = safe
+            .files_container_create(None, None, true, true, false)
+            .await?;
+        let link_v0 = format!("{}?v=0", link);
+
+        let (xorurl, _, nrs_map) = safe
+            .nrs_map_container_create(&format!("b.{}", site_name), &link_v0, true, false, false)
             .await?;
         assert_eq!(nrs_map.sub_names_map.len(), 1);
-        assert_eq!(
-            nrs_map.get_default_link()?,
-            "safe://linked-from-<b.site_name>?v=0"
-        );
+        assert_eq!(nrs_map.get_default_link()?, link_v0);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // add subname and set it as the new default too
-        let (version, _xorurl, _entries, updated_nrs_map) = safe
-            .nrs_map_container_add(
-                &format!("a.b.{}", site_name),
-                "safe://linked-from-<a.b.site_name>?v=0",
-                true,
-                false,
-                false,
-            )
+        let link_v1 = format!("{}?v=1", link);
+        let (version, _, _, updated_nrs_map) = safe
+            .nrs_map_container_add(&format!("a.b.{}", site_name), &link_v1, true, false, false)
             .await?;
         assert_eq!(version, 1);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
-        assert_eq!(
-            updated_nrs_map.get_default_link()?,
-            "safe://linked-from-<a.b.site_name>?v=0"
-        );
+        assert_eq!(updated_nrs_map.get_default_link()?, link_v1);
+
         Ok(())
     }
 
@@ -447,21 +442,24 @@ mod tests {
     async fn test_nrs_map_container_add_or_remove_with_versioned_target() -> Result<()> {
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
-        let _ = safe
-            .nrs_map_container_create(
-                &format!("b.{}", site_name),
-                "safe://linked-from-<b.site_name>?v=0",
-                true,
-                false,
-                false,
-            )
+
+        // let's create an empty files container so we have a valid to link
+        let (link, _, _) = safe
+            .files_container_create(None, None, true, true, false)
+            .await?;
+        let link_v0 = format!("{}?v=0", link);
+
+        let (xorurl, _, _) = safe
+            .nrs_map_container_create(&format!("b.{}", site_name), &link_v0, true, false, false)
             .await?;
 
-        let versioned_sitename = format!("safe://a.b.{}?v=6", site_name);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
+
+        let versioned_sitename = format!("a.b.{}?v=6", site_name);
         match safe
             .nrs_map_container_add(
                 &versioned_sitename,
-                "safe://linked-from-<a.b.site_name>?v=0",
+                "safe://linked-from-a_b_site_name?v=0",
                 true,
                 false,
                 false,
@@ -476,7 +474,7 @@ mod tests {
             Err(Error::InvalidInput(msg)) => assert_eq!(
                 msg,
                 format!(
-                    "The NRS name/subname URL cannot contain a version: {}",
+                    "The NRS name/subname URL cannot contain a version: safe://{}",
                     versioned_sitename
                 )
             ),
@@ -494,7 +492,7 @@ mod tests {
                 assert_eq!(
                     msg,
                     format!(
-                        "The NRS name/subname URL cannot contain a version: {}",
+                        "The NRS name/subname URL cannot contain a version: safe://{}",
                         versioned_sitename
                     )
                 );
@@ -511,37 +509,35 @@ mod tests {
     async fn test_nrs_map_container_remove_one_of_two() -> Result<()> {
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
-        let (_xor_url, _entries, nrs_map) = safe
-            .nrs_map_container_create(
-                &format!("a.b.{}", site_name),
-                "safe://linked-from-<a.b.site_name>?v=0",
-                true,
-                false,
-                false,
-            )
+
+        // let's create an empty files container so we have a valid to link
+        let (link, _, _) = safe
+            .files_container_create(None, None, true, true, false)
+            .await?;
+        let link_v0 = format!("{}?v=0", link);
+
+        let (xorurl, _, nrs_map) = safe
+            .nrs_map_container_create(&format!("a.b.{}", site_name), &link_v0, true, false, false)
             .await?;
         assert_eq!(nrs_map.sub_names_map.len(), 1);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let (_version, _xorurl, _entries, _updated_nrs_map) = safe
-            .nrs_map_container_add(
-                &format!("a2.b.{}", site_name),
-                "safe://linked-from-<a2.b.site_name>?v=0",
-                true,
-                false,
-                false,
-            )
+        let link_v1 = format!("{}?v=1", link);
+        let _ = safe
+            .nrs_map_container_add(&format!("a2.b.{}", site_name), &link_v1, true, false, false)
             .await?;
+
+        let _ = retry_loop_for_pattern!(safe.nrs_map_container_get(&xorurl), Ok((version, _)) if *version == 1)?;
 
         // remove subname
-        let (version, _xorurl, _entries, updated_nrs_map) = safe
+        let (version, _, _, updated_nrs_map) = safe
             .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
             .await?;
+
         assert_eq!(version, 2);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 1);
-        assert_eq!(
-            updated_nrs_map.get_default_link()?,
-            "safe://linked-from-<a2.b.site_name>?v=0"
-        );
+        assert_eq!(updated_nrs_map.get_default_link()?, link_v1);
+
         Ok(())
     }
 
@@ -549,19 +545,21 @@ mod tests {
     async fn test_nrs_map_container_remove_default_soft_link() -> Result<()> {
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
-        let (_xor_url, _entries, nrs_map) = safe
-            .nrs_map_container_create(
-                &format!("a.b.{}", site_name),
-                "safe://linked-from-<a.b.site_name>?v=0",
-                true,
-                false,
-                false,
-            )
+
+        // let's create an empty files container so we have a valid to link
+        let (link, _, _) = safe
+            .files_container_create(None, None, true, true, false)
+            .await?;
+        let link_v0 = format!("{}?v=0", link);
+
+        let (xorurl, _, nrs_map) = safe
+            .nrs_map_container_create(&format!("a.b.{}", site_name), &link_v0, true, false, false)
             .await?;
         assert_eq!(nrs_map.sub_names_map.len(), 1);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // remove subname
-        let (version, _xorurl, _entries, updated_nrs_map) = safe
+        let (version, _, _, updated_nrs_map) = safe
             .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
             .await?;
         assert_eq!(version, 1);
@@ -584,27 +582,32 @@ mod tests {
     async fn test_nrs_map_container_remove_default_hard_link() -> Result<()> {
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
-        let (_xor_url, _entries, nrs_map) = safe
+
+        // let's create an empty files container so we have a valid to link
+        let (link, _, _) = safe
+            .files_container_create(None, None, true, true, false)
+            .await?;
+        let link_v0 = format!("{}?v=0", link);
+
+        let (xorurl, _, nrs_map) = safe
             .nrs_map_container_create(
                 &format!("a.b.{}", site_name),
-                "safe://linked-from-<a.b.site_name>?v=0",
+                &link_v0,
                 true,
                 true, // this sets the default to be a hard-link
                 false,
             )
             .await?;
         assert_eq!(nrs_map.sub_names_map.len(), 1);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // remove subname
-        let (version, _xorurl, _entries, updated_nrs_map) = safe
+        let (version, _, _, updated_nrs_map) = safe
             .nrs_map_container_remove(&format!("a.b.{}", site_name), false)
             .await?;
         assert_eq!(version, 1);
         assert_eq!(updated_nrs_map.sub_names_map.len(), 0);
-        assert_eq!(
-            updated_nrs_map.get_default_link()?,
-            "safe://linked-from-<a.b.site_name>?v=0"
-        );
+        assert_eq!(updated_nrs_map.get_default_link()?, link_v0);
         Ok(())
     }
 
@@ -617,7 +620,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validate_nrs_name() -> Result<()> {
+    async fn test_nrs_validate_name() -> Result<()> {
         let nrs_name = random_nrs_name();
         let (_, nrs_url) = validate_nrs_name(&nrs_name)?;
         assert_eq!(nrs_url, format!("safe://{}", nrs_name));
@@ -625,7 +628,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validate_nrs_name_with_slash() -> Result<()> {
+    async fn test_nrs_validate_name_with_slash() -> Result<()> {
         let nrs_name = "name/with/slash";
         match validate_nrs_name(&nrs_name) {
             Ok(_) => Err(anyhow!(

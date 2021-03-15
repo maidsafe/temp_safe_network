@@ -1435,7 +1435,10 @@ async fn files_map_create(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::app::test_helpers::{new_safe_instance, random_nrs_name};
+    use crate::{
+        api::app::test_helpers::{new_safe_instance, random_nrs_name},
+        retry_loop, retry_loop_for_pattern,
+    };
     use anyhow::{anyhow, bail, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
@@ -1494,6 +1497,8 @@ mod tests {
         assert_eq!(processed_files.len(), 0);
         assert_eq!(files_map.len(), 0);
 
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
+
         // let's add a file
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add("../testdata/test.md", &xorurl, false, false, false, false)
@@ -1509,6 +1514,7 @@ mod tests {
             new_processed_files[filename].1,
             new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1522,7 +1528,7 @@ mod tests {
             .files_store_public_blob(random_blob_content.as_bytes(), None, false)
             .await?;
 
-        let retrieved = safe.files_get_public_blob(&file_xorurl, None).await?;
+        let retrieved = retry_loop!(safe.files_get_public_blob(&file_xorurl, None));
         assert_eq!(retrieved, random_blob_content.as_bytes());
 
         Ok(())
@@ -1545,6 +1551,7 @@ mod tests {
             processed_files[filename].1,
             files_map[file_path][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1591,6 +1598,7 @@ mod tests {
             processed_files[filename4].1,
             files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1632,6 +1640,7 @@ mod tests {
             processed_files[filename4].1,
             files_map["/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1673,6 +1682,7 @@ mod tests {
             processed_files[filename4].1,
             files_map["/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1714,6 +1724,7 @@ mod tests {
             processed_files[filename4].1,
             files_map["/myroot/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1755,6 +1766,7 @@ mod tests {
             processed_files[filename4].1,
             files_map["/myroot/testdata/noextension"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1767,6 +1779,8 @@ mod tests {
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
+
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
@@ -1828,6 +1842,7 @@ mod tests {
             new_processed_files[filename6].1,
             new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1840,6 +1855,8 @@ mod tests {
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
+
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
@@ -1903,6 +1920,7 @@ mod tests {
             new_processed_files[filename6].1,
             new_files_map["/sub2.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1915,6 +1933,8 @@ mod tests {
 
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
+
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
@@ -1954,6 +1974,7 @@ mod tests {
             files_map["/test.md"][FAKE_RDF_PREDICATE_LINK],
             new_files_map["/test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -1963,6 +1984,8 @@ mod tests {
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
+
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let versioned_xorurl = format!("{}?v=5", xorurl);
         match safe
@@ -2004,6 +2027,8 @@ mod tests {
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
+
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_sync(
@@ -2060,6 +2085,7 @@ mod tests {
             new_processed_files[filename5].1,
             new_files_map["/subexists.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -2135,6 +2161,8 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
 
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
+
         match safe
             .files_container_sync(
                 "../testdata/subfolder/",
@@ -2170,13 +2198,16 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
 
-        let nrsurl = random_nrs_name();
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
+        let nrsurl = random_nrs_name();
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let _ = safe
+        let (nrs_xorurl, _, _) = safe
             .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string(), false, true, false)
             .await?;
+
+        let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
 
         let _ = safe
             .files_container_sync(
@@ -2194,6 +2225,7 @@ mod tests {
         xorurl_encoder.set_content_version(Some(1));
         let (new_link, _) = safe.parse_and_resolve_url(&nrsurl).await?;
         assert_eq!(new_link.to_string(), xorurl_encoder.to_string());
+
         Ok(())
     }
 
@@ -2203,6 +2235,7 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
@@ -2265,6 +2298,7 @@ mod tests {
             new_processed_files[filename5].1,
             new_files_map["/path/when/sync/subexists.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -2274,6 +2308,7 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
@@ -2336,17 +2371,18 @@ mod tests {
             new_processed_files[filename5].1,
             new_files_map["/path/when/sync/subfolder/subexists.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
     #[tokio::test]
     async fn test_files_container_get() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _processed_files, files_map) = safe
+        let (xorurl, _, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
 
-        let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
+        let (version, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl));
 
         assert_eq!(version, 0);
         assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
@@ -2358,6 +2394,7 @@ mod tests {
             fetched_files_map["/subfolder/subexists.md"]
         );
         assert_eq!(files_map["/noextension"], fetched_files_map["/noextension"]);
+
         Ok(())
     }
 
@@ -2368,7 +2405,7 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
 
-        let (version, _) = safe.files_container_get(&xorurl).await?;
+        let (version, _) = retry_loop!(safe.files_container_get(&xorurl));
         assert_eq!(version, 0);
 
         let (version, _, _) = safe
@@ -2386,10 +2423,10 @@ mod tests {
 
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(None);
-        let (version, _) = safe
-            .files_container_get(&xorurl_encoder.to_string())
-            .await?;
+        let (version, _) = retry_loop_for_pattern!(safe
+            .files_container_get(&xorurl_encoder.to_string()), Ok((version, _)) if *version == 1)?;
         assert_eq!(version, 1);
+
         Ok(())
     }
 
@@ -2399,6 +2436,7 @@ mod tests {
         let (xorurl, _processed_files, files_map) = safe
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's create a new version of the files container
         let (_version, _new_processed_files, new_files_map) = safe
@@ -2431,9 +2469,8 @@ mod tests {
 
         // let's fetch version 1
         xorurl_encoder.set_content_version(Some(1));
-        let (version, v1_files_map) = safe
-            .files_container_get(&xorurl_encoder.to_string())
-            .await?;
+        let (version, v1_files_map) = retry_loop_for_pattern!(safe
+                .files_container_get(&xorurl_encoder.to_string()), Ok((version, _)) if *version == 1)?;
 
         assert_eq!(version, 1);
         assert_eq!(new_files_map, v1_files_map);
@@ -2450,7 +2487,7 @@ mod tests {
         xorurl_encoder.set_content_version(Some(2));
         match safe.files_container_get(&xorurl_encoder.to_string()).await {
             Ok(_) => Err(anyhow!(
-                "Unexpectedly retrieved verion 3 of container".to_string(),
+                "Unexpectedly retrieved verion 2 of container".to_string(),
             )),
             Err(Error::VersionNotFound(msg)) => {
                 assert_eq!(
@@ -2476,7 +2513,7 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, true, false)
             .await?;
 
-        let (_version, files_map_get) = safe.files_container_get(&xorurl.to_string()).await?;
+        let (_, files_map_get) = retry_loop!(safe.files_container_get(&xorurl.to_string()));
 
         assert_eq!(files_map, files_map_get);
         assert_eq!(files_map_get["/emptyfolder"], files_map["/emptyfolder"]);
@@ -2494,14 +2531,15 @@ mod tests {
         let (xorurl, _, _) = safe
             .files_container_create(Some("../testdata/test.md"), None, false, true, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let nrsurl = random_nrs_name();
-
         let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
         xorurl_encoder.set_content_version(Some(0));
-        let _ = safe
+        let (nrs_xorurl, _, _) = safe
             .nrs_map_container_create(&nrsurl, &xorurl_encoder.to_string(), false, true, false)
             .await?;
+        let _ = retry_loop!(safe.fetch(&nrs_xorurl, None));
 
         let _ = safe
             .files_container_sync(
@@ -2537,9 +2575,10 @@ mod tests {
         // └── test.md
         //
         // So, we have 6 items.
-        let (version, fetched_files_map) = safe.files_container_get(&xorurl).await?;
+        let (version, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok((version, _)) if *version == 2)?;
         assert_eq!(version, 2);
         assert_eq!(fetched_files_map.len(), 6);
+
         Ok(())
     }
 
@@ -2551,6 +2590,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
@@ -2598,6 +2638,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
@@ -2641,6 +2682,7 @@ mod tests {
             new_processed_files2[filename].1,
             new_files_map2["/new_filename_test.md"][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 
@@ -2652,6 +2694,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT); // root "/" + 2 files
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         match safe
             .files_container_add("../testdata", &xorurl, false, false, false, false)
@@ -2682,6 +2725,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's try to add a file with same target name and same content, it should fail
         let (version, new_processed_files, new_files_map) = safe
@@ -2748,6 +2792,7 @@ mod tests {
             new_processed_files["../testdata/test.md"].1,
             new_files_map["/sub2.md"]["link"]
         );
+
         Ok(())
     }
 
@@ -2759,6 +2804,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         match safe
             .files_container_sync(
@@ -2818,6 +2864,8 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
+
         let data = b"0123456789";
         let file_xorurl = safe.files_store_public_blob(data, None, false).await?;
         let new_filename = "/new_filename_test.md";
@@ -2887,6 +2935,7 @@ mod tests {
             new_files_map[new_filename][FAKE_RDF_PREDICATE_LINK],
             other_file_xorurl
         );
+
         Ok(())
     }
 
@@ -2898,6 +2947,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let data = b"0123456789";
         let new_filename = "/new_filename_test.md";
@@ -2953,6 +3003,7 @@ mod tests {
             .await?;
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILEITEM_COUNT);
+        let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         // let's remove a file first
         let (version, new_processed_files, new_files_map) = safe
@@ -2995,6 +3046,7 @@ mod tests {
             new_processed_files[filename2].1,
             files_map[filename2][FAKE_RDF_PREDICATE_LINK]
         );
+
         Ok(())
     }
 }
