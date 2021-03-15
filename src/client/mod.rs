@@ -52,6 +52,37 @@ use std::{
     fmt,
 };
 
+/// Our LazyMesssage error. Recipient was unable to process this message for some reason.
+/// The original message should be returned in full, and context can optionally be added via
+/// reason.
+pub struct CannotProcessMessage {
+    reason: Option<CannotProcessMessageReason>,
+    source_message: Message,
+}
+
+/// Error reasons for inability to handle a message at a client/node.
+/// These should be recoverable with updated information from the sender
+/// or other nodes in the network.
+///
+/// A lot of errors should be handled even before they reach the node via
+/// Routing ensuring we're targetting the correct section key.
+pub enum CannotProcessMessageReason {
+    /// No section key known of at our node.
+    NoSectionKey,
+    /// No database set up to handle this function
+    NoTransfersDatabase,
+    /// No database set up to handle this function
+    NoMetaDataDatabase,
+    /// No database set up to handle this function
+    NoSectionFundsDatabase,
+    /// Node genesis_stage
+    IncorrectGenesisStage,
+    /// Could not validate signed data
+    CouldNotValidate,
+    /// Could not find `key`
+    CouldNotFindKey,
+}
+
 /// Message envelope containing a Safe message payload,
 /// This struct also provides utilities to obtain the serialized bytes
 /// ready to send them over the wire.
