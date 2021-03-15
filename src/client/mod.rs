@@ -52,12 +52,25 @@ use std::{
     fmt,
 };
 
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Message {
+    Functional(FunctionalMsg),
+    ProcessingError(ProcessingError)
+}
+
 /// Our LazyMesssage error. Recipient was unable to process this message for some reason.
 /// The original message should be returned in full, and context can optionally be added via
 /// reason.
-pub struct CannotProcessMessage {
-    reason: Option<CannotProcessMessageReason>,
-    source_message: Message,
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct ProcessingError {
+    /// Optional reason for the error. This should help recveiving node handle the error
+    reason: Option<ProcessingErrorReason>,
+    /// Message that triggered this error
+    source_message: FunctionalMsg,
+    /// MessageId
+    id: MessageId
 }
 
 /// Error reasons for inability to handle a message at a client/node.
@@ -66,7 +79,9 @@ pub struct CannotProcessMessage {
 ///
 /// A lot of errors should be handled even before they reach the node via
 /// Routing ensuring we're targetting the correct section key.
-pub enum CannotProcessMessageReason {
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum ProcessingErrorReason {
     /// No section key known of at our node.
     NoSectionKey,
     /// No database set up to handle this function
@@ -109,7 +124,7 @@ impl Message {
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum Message {
+pub enum FunctionalMsg {
     /// A Cmd is leads to a write / change of state.
     /// We expect them to be successful, and only return a msg
     /// if something went wrong.
@@ -117,18 +132,14 @@ pub enum Message {
         /// Cmd.
         cmd: Cmd,
         /// Message ID.
-        id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        id: MessageId
     },
     /// Queries is a read-only operation.
     Query {
         /// Query.
         query: Query,
         /// Message ID.
-        id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        id: MessageId
     },
     /// An Event is a fact about something that happened.
     Event {
@@ -137,9 +148,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        correlation_id: MessageId
     },
     /// The response to a query, containing the query result.
     QueryResponse {
@@ -148,9 +157,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// ID of causing query.
-        correlation_id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        correlation_id: MessageId
     },
     /// Cmd error.
     CmdError {
@@ -159,18 +166,14 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        correlation_id: MessageId
     },
     /// Cmds only sent internally in the network.
     NodeCmd {
         /// NodeCmd.
         cmd: NodeCmd,
         /// Message ID.
-        id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        id: MessageId
     },
     /// An error of a NodeCmd.
     NodeCmdError {
@@ -179,9 +182,7 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        correlation_id: MessageId
     },
     /// Events only sent internally in the network.
     NodeEvent {
@@ -190,18 +191,14 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// ID of causing cmd.
-        correlation_id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        correlation_id: MessageId
     },
     /// Queries is a read-only operation.
     NodeQuery {
         /// Query.
         query: NodeQuery,
         /// Message ID.
-        id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        id: MessageId
     },
     /// The response to a query, containing the query result.
     NodeQueryResponse {
@@ -210,62 +207,37 @@ pub enum Message {
         /// Message ID.
         id: MessageId,
         /// ID of causing query.
-        correlation_id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
+        correlation_id: MessageId
     },
+}
+
+impl FunctionalMsg {
+    fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
+        Message::ProcessingError(
+            ProcessingError{
+                source_message: self.clone(),
+                id: MessageId::new(),
+                reason
+            }
+        )
+    }
 }
 
 impl Message {
     /// Gets the message ID.
     pub fn id(&self) -> MessageId {
         match self {
-            Self::Cmd { id, .. }
-            | Self::Query { id, .. }
-            | Self::Event { id, .. }
-            | Self::QueryResponse { id, .. }
-            | Self::CmdError { id, .. }
-            | Self::NodeCmd { id, .. }
-            | Self::NodeEvent { id, .. }
-            | Self::NodeQuery { id, .. }
-            | Self::NodeCmdError { id, .. }
-            | Self::NodeQueryResponse { id, .. } => *id,
-        }
-    }
-
-    /// Gets the message's expected section PublicKey.
-    pub fn target_section_pk(&self) -> Option<PublicKey> {
-        match self {
-            Self::Cmd {
-                target_section_pk, ..
-            }
-            | Self::Query {
-                target_section_pk, ..
-            }
-            | Self::Event {
-                target_section_pk, ..
-            }
-            | Self::QueryResponse {
-                target_section_pk, ..
-            }
-            | Self::CmdError {
-                target_section_pk, ..
-            }
-            | Self::NodeCmd {
-                target_section_pk, ..
-            }
-            | Self::NodeEvent {
-                target_section_pk, ..
-            }
-            | Self::NodeQuery {
-                target_section_pk, ..
-            }
-            | Self::NodeCmdError {
-                target_section_pk, ..
-            }
-            | Self::NodeQueryResponse {
-                target_section_pk, ..
-            } => *target_section_pk,
+            Self::Functional(FunctionalMsg::Cmd { id, .. })
+            | Self::Functional(FunctionalMsg::Query { id, .. })
+            | Self::Functional(FunctionalMsg::Event { id, .. })
+            | Self::Functional(FunctionalMsg::QueryResponse { id, .. })
+            | Self::Functional(FunctionalMsg::CmdError { id, .. })
+            | Self::Functional(FunctionalMsg::NodeCmd { id, .. })
+            | Self::Functional(FunctionalMsg::NodeEvent { id, .. })
+            | Self::Functional(FunctionalMsg::NodeQuery { id, .. })
+            | Self::Functional(FunctionalMsg::NodeCmdError { id, .. })
+            | Self::Functional(FunctionalMsg::NodeQueryResponse { id, .. })
+            | Self::ProcessingError(ProcessingError { id, .. }) => *id,
         }
     }
 }
@@ -546,11 +518,57 @@ mod tests {
     }
 
     #[test]
-    fn debug_format() -> Result<()> {
+    fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
             let errored_response = QueryResponse::GetSequence(Err(Error::AccessDenied(*key)));
             assert!(format!("{:?}", errored_response)
                 .contains("QueryResponse::GetSequence(AccessDenied(PublicKey::"));
+            Ok(())
+        } else {
+            Err(anyhow!("Could not generate public key"))
+        }
+    }
+    #[test]
+    fn generate_processing_error() -> Result<()> {
+        if let Some(key) = gen_keys().first() {
+            let msg = FunctionalMsg::Query{
+                query: Query::Transfer(TransferQuery::GetBalance(key.clone())),
+                id: MessageId::new()
+            };
+            let lazy_error = msg.create_processing_error_msg(Some(ProcessingErrorReason::CouldNotFindKey));
+            
+            assert!(format!("{:?}", lazy_error)
+                .contains("TransferQuery::GetBalance"));
+            assert!(format!("{:?}", lazy_error)
+                .contains("ProcessingError"));
+            assert!(format!("{:?}", lazy_error)
+                .contains("CouldNotFindKey"));
+            
+            Ok(())
+        } else {
+            Err(anyhow!("Could not generate public key"))
+        }
+    }
+    
+    #[test]
+    fn debug_format_processing_error() -> Result<()> {
+        if let Some(key) = gen_keys().first() {
+            let errored_response = ProcessingError{
+                reason: Some(ProcessingErrorReason::CouldNotFindKey),
+                source_message: FunctionalMsg::Query{
+                    id: MessageId::new(),
+                    query: Query::Transfer(TransferQuery::GetBalance(key.clone()))
+                },
+                id: MessageId::new()
+
+            };
+
+            assert!(format!("{:?}", errored_response)
+                .contains("TransferQuery::GetBalance"));
+            assert!(format!("{:?}", errored_response)
+                .contains("ProcessingError"));
+            assert!(format!("{:?}", errored_response)
+                .contains("CouldNotFindKey"));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))
@@ -608,11 +626,12 @@ mod tests {
 
         let random_xor = xor_name::XorName::random();
         let id = MessageId(random_xor);
-        let message = Message::Query {
-            query: Query::Transfer(TransferQuery::GetBalance(pk)),
-            id,
-            target_section_pk: None,
-        };
+        let message = Message::Functional(
+            FunctionalMsg::Query {
+                query: Query::Transfer(TransferQuery::GetBalance(pk)),
+                id
+            }
+        );
 
         // test msgpack serialization
         let serialized = message.serialize()?;
