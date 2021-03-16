@@ -14,8 +14,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     ActorHistory, Blob, BlobAddress, Credit, DebitId, NodeRewardStage, PublicKey, ReplicaEvent,
-    SectionElders, Signature, SignatureShare, SignedCredit, SignedTransferShare, Token,
-    TransferAgreementProof, TransferValidated, WalletInfo,
+    SectionElders, Signature, SignatureShare, SignedCredit, SignedTransferShare,
+    TransferAgreementProof, TransferValidated, WalletHistory,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -76,10 +76,27 @@ pub enum NodeSystemCmd {
         /// Current holders.
         current_holders: BTreeSet<XorName>,
     },
-    ///
-    CreateSectionWallet {
-        amount: Token,
-        key: threshold_crypto::PublicKey,
+    /// When new section key, all propose new wallet.
+    ProposeNewWallet {
+        /// The genesis credit.
+        credit: Credit,
+        /// An individual Elder's sig share.
+        sig: SignatureShare,
+    },
+    /// When proposal has been agreed, they all accumulate the wallet.
+    AccumulateNewWallet {
+        /// The genesis credit.
+        signed_credit: SignedCredit,
+        /// An individual Elder's sig share.
+        sig: SignatureShare,
+    },
+    /// Sent to all promoted nodes (also sibling if any) after
+    /// a completed transition to a new constellation.
+    ReceiveExistingData {
+        /// Registered node reward wallets.
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        /// Transfer histories
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
 }
 
@@ -113,16 +130,8 @@ pub enum NodeEvent {
     },
     ///
     RewardPayoutValidated(TransferValidated),
-    /// Sent to all section Elders after
-    // a completed transition to a new constellation.
-    PromotedToElder {
-        /// The new section wallet.
-        section_wallet: WalletInfo,
-        /// Registered node reward wallets.
-        node_rewards: BTreeMap<XorName, NodeRewardStage>,
-        /// Transfer histories
-        user_wallets: BTreeMap<PublicKey, ActorHistory>,
-    },
+    /// The new section wallet.
+    SectionWalletCreated(WalletHistory),
 }
 
 ///
