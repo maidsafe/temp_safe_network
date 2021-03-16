@@ -52,8 +52,8 @@ pub enum MessageType {
 /// serialised with a valid 'WireMsgHeader'
 #[derive(PartialEq, Debug)]
 pub struct HeaderInfo {
-    dest: XorName,
-    dest_section_pk: PublicKey,
+    pub dest: XorName,
+    pub dest_section_pk: PublicKey,
 }
 
 impl MessageType {
