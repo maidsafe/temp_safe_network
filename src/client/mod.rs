@@ -57,7 +57,7 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Message {
-    Functional(FunctionalMsg),
+    Process(ProcessMsg),
     ProcessingError(ProcessingError),
 }
 
@@ -70,7 +70,7 @@ pub struct ProcessingError {
     /// Optional reason for the error. This should help recveiving node handle the error
     reason: Option<ProcessingErrorReason>,
     /// Message that triggered this error
-    source_message: FunctionalMsg,
+    source_message: ProcessMsg,
     /// MessageId
     id: MessageId,
 }
@@ -125,17 +125,33 @@ impl Message {
     /// Gets the message ID.
     pub fn id(&self) -> MessageId {
         match self {
-            Self::Functional(FunctionalMsg::Cmd { id, .. })
-            | Self::Functional(FunctionalMsg::Query { id, .. })
-            | Self::Functional(FunctionalMsg::Event { id, .. })
-            | Self::Functional(FunctionalMsg::QueryResponse { id, .. })
-            | Self::Functional(FunctionalMsg::CmdError { id, .. })
-            | Self::Functional(FunctionalMsg::NodeCmd { id, .. })
-            | Self::Functional(FunctionalMsg::NodeEvent { id, .. })
-            | Self::Functional(FunctionalMsg::NodeQuery { id, .. })
-            | Self::Functional(FunctionalMsg::NodeCmdError { id, .. })
-            | Self::Functional(FunctionalMsg::NodeQueryResponse { id, .. })
+            Self::Process(ProcessMsg::Cmd { id, .. })
+            | Self::Process(ProcessMsg::Query { id, .. })
+            | Self::Process(ProcessMsg::Event { id, .. })
+            | Self::Process(ProcessMsg::QueryResponse { id, .. })
+            | Self::Process(ProcessMsg::CmdError { id, .. })
+            | Self::Process(ProcessMsg::NodeCmd { id, .. })
+            | Self::Process(ProcessMsg::NodeEvent { id, .. })
+            | Self::Process(ProcessMsg::NodeQuery { id, .. })
+            | Self::Process(ProcessMsg::NodeCmdError { id, .. })
+            | Self::Process(ProcessMsg::NodeQueryResponse { id, .. })
             | Self::ProcessingError(ProcessingError { id, .. }) => *id,
+        }
+    }
+
+    /// return ProcessMessage if any
+    pub fn get_process(&self) -> Option<&ProcessMsg> {
+        match self {
+            Self::Process(msg) => Some(msg),
+            Self::ProcessingError(_) => None
+        }
+    }
+
+    /// return ProcessMessage if any
+    pub fn get_processing_error(&self) -> Option<&ProcessingError> {
+        match self {
+            Self::Process(_) => None,
+            Self::ProcessingError(error) => Some(error)
         }
     }
 }
@@ -143,7 +159,7 @@ impl Message {
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum FunctionalMsg {
+pub enum ProcessMsg {
     /// A Cmd is leads to a write / change of state.
     /// We expect them to be successful, and only return a msg
     /// if something went wrong.
@@ -230,7 +246,7 @@ pub enum FunctionalMsg {
     },
 }
 
-impl FunctionalMsg {
+impl ProcessMsg {
     #[allow(dead_code)]
     fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
         Message::ProcessingError(ProcessingError {
@@ -241,7 +257,7 @@ impl FunctionalMsg {
     }
 }
 
-impl FunctionalMsg {
+impl ProcessMsg {
     /// Gets the message ID.
     pub fn id(&self) -> MessageId {
         match self {
@@ -548,7 +564,7 @@ mod tests {
     #[test]
     fn generate_processing_error() -> Result<()> {
         if let Some(key) = gen_keys().first() {
-            let msg = FunctionalMsg::Query {
+            let msg = ProcessMsg::Query {
                 query: Query::Transfer(TransferQuery::GetBalance(*key)),
                 id: MessageId::new(),
             };
@@ -570,7 +586,7 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response = ProcessingError {
                 reason: Some(ProcessingErrorReason::CouldNotFindKey),
-                source_message: FunctionalMsg::Query {
+                source_message: ProcessMsg::Query {
                     id: MessageId::new(),
                     query: Query::Transfer(TransferQuery::GetBalance(*key)),
                 },
@@ -637,7 +653,7 @@ mod tests {
 
         let random_xor = xor_name::XorName::random();
         let id = MessageId(random_xor);
-        let message = Message::Functional(FunctionalMsg::Query {
+        let message = Message::Process(ProcessMsg::Query {
             query: Query::Transfer(TransferQuery::GetBalance(pk)),
             id,
         });
