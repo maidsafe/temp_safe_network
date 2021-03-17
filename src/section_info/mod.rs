@@ -83,7 +83,7 @@ pub enum GetSectionResponse {
     Success(SectionInfo),
     /// Response to `GetSectionQuery` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
-    Redirect(Vec<SocketAddr>),
+    Redirect(Vec<(XorName, SocketAddr)>),
     /// Request could not be fulfilled due to section constellation updates
     SectionInfoUpdate(Error),
 }
