@@ -143,7 +143,7 @@ impl Message {
     pub fn get_process(&self) -> Option<&ProcessMsg> {
         match self {
             Self::Process(msg) => Some(msg),
-            Self::ProcessingError(_) => None
+            Self::ProcessingError(_) => None,
         }
     }
 
@@ -151,7 +151,7 @@ impl Message {
     pub fn get_processing_error(&self) -> Option<&ProcessingError> {
         match self {
             Self::Process(_) => None,
-            Self::ProcessingError(error) => Some(error)
+            Self::ProcessingError(error) => Some(error),
         }
     }
 }

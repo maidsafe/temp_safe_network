@@ -230,6 +230,8 @@ impl WireMsg {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use rand::rngs::OsRng;
+    use sn_data_types::Keypair;
     use xor_name::XorName;
 
     #[test]
@@ -260,10 +262,11 @@ mod tests {
 
     #[test]
     fn serialisation_sectioninfo_msg() -> Result<()> {
-        let dest = XorName::random();
         let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
 
-        let query = section_info::Message::GetSectionQuery(dest);
+        let our_pk = Keypair::new_ed25519(&mut OsRng).public_key();
+        let dest = XorName::from(our_pk);
+        let query = section_info::Message::GetSectionQuery(our_pk);
         let wire_msg = WireMsg::new_sectioninfo_msg(&query, dest, dest_section_pk)?;
         let serialized = wire_msg.serialize()?;
 

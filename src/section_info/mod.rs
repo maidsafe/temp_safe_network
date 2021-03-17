@@ -22,7 +22,7 @@ use xor_name::{Prefix, XorName};
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Message {
     /// Message to request information about the section that matches the given name.
-    GetSectionQuery(XorName),
+    GetSectionQuery(PublicKey),
     /// An EndUser that wants to interact with the network,
     /// would send this cmd to the elders received
     /// in the GetSectionResponse.
