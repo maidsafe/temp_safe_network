@@ -145,7 +145,7 @@ impl Safe {
     ///     assert!(data_string.starts_with("hello tests!"));
     /// # });
     /// ```
-    pub async fn fetch(&mut self, url: &str, range: Range) -> Result<SafeData> {
+    pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
         let mut resolution_chain = self.retrieve_from_url(url, true, range, true).await?;
         // Construct return data using the last and first items from the resolution chain
         resolution_chain
