@@ -13,9 +13,9 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, Credit, DebitId, NodeRewardStage, PublicKey, ReplicaEvent,
-    SectionElders, Signature, SignatureShare, SignedCredit, SignedTransferShare,
-    TransferAgreementProof, TransferValidated, WalletHistory,
+    ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, DebitId, NodeRewardStage,
+    PublicKey, ReplicaEvent, SectionElders, Signature, SignatureShare, SignedCredit,
+    SignedTransferShare, TransferAgreementProof, TransferValidated, WalletHistory,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -105,7 +105,7 @@ pub enum NodeSystemCmd {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeTransferCmd {
     ///
-    PropagateTransfer(TransferAgreementProof),
+    PropagateTransfer(CreditAgreementProof),
     ///
     ValidateSectionPayout(SignedTransferShare),
     ///
