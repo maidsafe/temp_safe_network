@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tiny_keccak::{Hasher, Sha3};
@@ -23,6 +24,13 @@ impl MessageId {
     /// Generates a new `MessageId` with random content.
     pub fn new() -> Self {
         Self(XorName::random())
+    }
+
+    pub fn from_content<T: Serialize>(content: &T) -> Result<MessageId> {
+        Ok(MessageId(XorName::from_content(&[&bincode::serialize(
+            content,
+        )
+        .map_err(|e| Error::Serialisation(e.to_string()))?])))
     }
 
     /// Generates a new based on provided id.
