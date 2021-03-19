@@ -22,7 +22,7 @@ use xor_name::XorName;
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum TransferCmd {
     #[cfg(feature = "simulated-payouts")]
-    /// Cmd to simulate a farming payout
+    /// Cmd to simulate a farming payotu
     SimulatePayout(Transfer),
     /// The cmd to validate a transfer.
     ValidateTransfer(SignedTransfer),
@@ -34,8 +34,6 @@ pub enum TransferCmd {
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum TransferQuery {
-    /// Get the PublicKeySet for replicas of a given PK
-    GetReplicaKeys(PublicKey),
     /// Get key balance.
     GetBalance(PublicKey),
     /// Get key transfers since specified version.
