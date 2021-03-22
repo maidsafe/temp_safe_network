@@ -112,7 +112,6 @@ impl TransferQuery {
     //     use TransferQuery::*;
     //     match *self {
     //         // TODO: This should this be private
-    //         GetReplicaKeys(_) => Type::PublicRead,
     //         GetBalance(_) => Type::PrivateRead,
     //         GetHistory { .. } => Type::PrivateRead,
     //     }
@@ -123,7 +122,6 @@ impl TransferQuery {
     pub fn error(&self, error: Error) -> QueryResponse {
         use TransferQuery::*;
         match *self {
-            GetReplicaKeys(_) => QueryResponse::GetReplicaKeys(Err(error)),
             GetBalance(_) => QueryResponse::GetBalance(Err(error)),
             GetHistory { .. } => QueryResponse::GetHistory(Err(error)),
             GetStoreCost { .. } => QueryResponse::GetStoreCost(Err(error)),
@@ -135,7 +133,6 @@ impl TransferQuery {
         use TransferQuery::*;
         match self {
             GetBalance(_) => AuthorisationKind::Token(TokenAuthKind::ReadBalance), // current state
-            GetReplicaKeys(_) => AuthorisationKind::None, // current replica keys
             GetHistory { .. } => AuthorisationKind::Token(TokenAuthKind::ReadHistory), // history of incoming transfers
             GetStoreCost { .. } => AuthorisationKind::None,                            // store cost
         }
@@ -145,10 +142,9 @@ impl TransferQuery {
     pub fn dst_address(&self) -> XorName {
         use TransferQuery::*;
         match self {
-            GetBalance(at)
-            | GetReplicaKeys(at)
-            | GetHistory { at, .. }
-            | GetStoreCost { requester: at, .. } => XorName::from(*at),
+            GetBalance(at) | GetHistory { at, .. } | GetStoreCost { requester: at, .. } => {
+                XorName::from(*at)
+            }
         }
     }
 }
@@ -161,7 +157,6 @@ impl fmt::Debug for TransferQuery {
             "TransferQuery::{}",
             match *self {
                 GetBalance(_) => "GetBalance",
-                GetReplicaKeys(_) => "GetReplicaKeys",
                 GetHistory { .. } => "GetHistory",
                 GetStoreCost { .. } => "GetStoreCost",
             }

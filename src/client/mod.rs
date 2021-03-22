@@ -43,8 +43,8 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
-    ReplicaPublicKeySet, Sequence, SequenceEntries, SequenceEntry, SequencePermissions,
-    SequencePrivatePolicy, SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
+    Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
+    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -331,8 +331,6 @@ pub enum QueryResponse {
     //
     // ===== Tokens =====
     //
-    /// Get replica keys
-    GetReplicaKeys(Result<ReplicaPublicKeySet>),
     /// Get key balance.
     GetBalance(Result<Token>),
     /// Get key transfer history.
@@ -428,7 +426,6 @@ try_from!(SequencePublicPolicy, GetSequencePublicPolicy);
 try_from!(SequencePrivatePolicy, GetSequencePrivatePolicy);
 try_from!(SequencePermissions, GetSequenceUserPermissions);
 try_from!(Token, GetBalance);
-try_from!(ReplicaPublicKeySet, GetReplicaKeys);
 try_from!(ActorHistory, GetHistory);
 
 impl fmt::Debug for QueryResponse {
@@ -485,10 +482,6 @@ impl fmt::Debug for QueryResponse {
             ),
             GetSequenceOwner(res) => {
                 write!(f, "QueryResponse::GetSequenceOwner({:?})", ErrorDebug(res))
-            }
-            // Tokens
-            GetReplicaKeys(res) => {
-                write!(f, "QueryResponse::GetReplicaKeys({:?})", ErrorDebug(res))
             }
             GetBalance(res) => write!(f, "QueryResponse::GetBalance({:?})", ErrorDebug(res)),
             GetHistory(res) => write!(f, "QueryResponse::GetHistory({:?})", ErrorDebug(res)),
