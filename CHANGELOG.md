@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [9.0.0](https://github.com/maidsafe/sn_messaging/compare/v8.0.0...v9.0.0) (2021-03-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* DT update. Naming and message structs for split
+* SetupSections as opposed to GetSectionWallet, allows passing of sibling PK for proper setup of both section wallets
+
+### Features
+
+* Remove GetReplicaKeys trasnfer query ([c4c7a2a](https://github.com/maidsafe/sn_messaging/commit/c4c7a2a019ac9478f2a81d513117c1a21308d7f1))
+* **cmds:** add CreateSectionWallet cmd ([8afb2cf](https://github.com/maidsafe/sn_messaging/commit/8afb2cf72252b2c737a695628920d725e12ce468))
+* **msg_id:** generate from content ([386c092](https://github.com/maidsafe/sn_messaging/commit/386c0925c5ce974b8b08a634f7a98be6e03c297e))
+* **msgs:** rename query ([9bb508b](https://github.com/maidsafe/sn_messaging/commit/9bb508b7b6f760cc214300450a6fda04d4d33528))
+* **node:** add PromotedToElder event ([010bad2](https://github.com/maidsafe/sn_messaging/commit/010bad2595a9054c934f2464064b06cf2a654c13))
+* **systemcmd:** extend with wallet proposals ([553adaa](https://github.com/maidsafe/sn_messaging/commit/553adaa67e54130964e04d8e845f38cbcaa60dfc))
+* **transfers:** propagate the credit proof only ([059eb74](https://github.com/maidsafe/sn_messaging/commit/059eb7427e99a4aadd50129c81b355757a41fb1d))
+* updates to message naming + sibling key passing ([05b0a32](https://github.com/maidsafe/sn_messaging/commit/05b0a32c2f9ef045f2c75e28af670899795c569d))
+* updates to message naming, and removing sibling key passing ([75c9b0b](https://github.com/maidsafe/sn_messaging/commit/75c9b0b57708ef68667c5119029c297ae065f4d8))
+
+
+### Bug Fixes
+
+* remove leftover GetReplicaKeys refs ([ecde8bc](https://github.com/maidsafe/sn_messaging/commit/ecde8bc2d2c1b078579026f01d472feb5f32fe36))
+* remove redundant origin field ([21bf1cb](https://github.com/maidsafe/sn_messaging/commit/21bf1cb88531f5268a0808ae558fb0609aa784e2))
+
+
+* DT dep update ([b82b223](https://github.com/maidsafe/sn_messaging/commit/b82b2237fe67cc72d294d94f9cb61f31c2ee6ef6))
+
 ## [8.0.0](https://github.com/maidsafe/sn_messaging/compare/v7.0.1...v8.0.0) (2021-03-03)
 
 
