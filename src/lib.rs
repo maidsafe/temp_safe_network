@@ -29,7 +29,7 @@ use xor_name::XorName;
 /// Type of message.
 /// Note this is part of this crate's public API but this enum is
 /// never serialised or even part of the message that is sent over the wire.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
     Ping(HeaderInfo),
@@ -50,7 +50,7 @@ pub enum MessageType {
 
 /// This is information kept by 'MessageType' so it can be properly
 /// serialised with a valid 'WireMsgHeader'
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct HeaderInfo {
     pub dest: XorName,
     pub dest_section_pk: PublicKey,
@@ -72,6 +72,22 @@ impl MessageType {
             #[cfg(not(feature = "client-only"))]
             Self::NodeMessage { msg, hdr_info } => {
                 WireMsg::serialize_node_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            }
+        }
+    }
+
+    pub fn update_header(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
+        match self {
+            Self::Ping(hdr_info)
+            | Self::ClientMessage { hdr_info, .. }
+            | Self::SectionInfo { hdr_info, .. }
+            | Self::NodeMessage { hdr_info, .. } => {
+                if let Some(dest) = dest {
+                    hdr_info.dest = dest
+                }
+                if let Some(dest_pk) = dest_pk {
+                    hdr_info.dest_section_pk = dest_pk
+                }
             }
         }
     }

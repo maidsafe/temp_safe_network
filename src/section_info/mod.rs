@@ -19,7 +19,7 @@ use xor_name::{Prefix, XorName};
 
 /// Messages for exchanging network info, specifically on a target section for a msg.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum Message {
     /// Message to request information about the section that matches the given name.
     GetSectionQuery(PublicKey),
@@ -76,7 +76,7 @@ pub struct ErrorResponse {
 }
 
 /// Information about a section.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum GetSectionResponse {
     /// Successful response to `GetSectionQuery`. Contains information about the requested
     /// section.
