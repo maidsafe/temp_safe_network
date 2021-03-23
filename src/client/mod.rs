@@ -68,11 +68,11 @@ pub enum Message {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
     /// Optional reason for the error. This should help recveiving node handle the error
-    reason: Option<ProcessingErrorReason>,
+    pub reason: Option<ProcessingErrorReason>,
     /// Message that triggered this error
-    source_message: ProcessMsg,
+    pub source_message: ProcessMsg,
     /// MessageId
-    id: MessageId,
+    pub id: MessageId,
 }
 
 /// Error reasons for inability to handle a message at a client/node.
