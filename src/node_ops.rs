@@ -13,7 +13,10 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, CmdError, DataExchange, Message, QueryResponse},
+    client::{
+        BlobRead, BlobWrite, CmdError, DataExchange, Message, NodeCmdResult, ProcessMsg,
+        QueryResponse,
+    },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -199,7 +202,7 @@ pub enum NodeDuty {
     Send(OutgoingMsg),
     /// Send the same request to each individual node.
     SendToNodes {
-        msg: Message,
+        msg: ProcessMsg,
         targets: BTreeSet<XorName>,
         aggregation: Aggregation,
     },
@@ -217,7 +220,7 @@ pub enum NodeDuty {
     },
     /// Process Payment for a DataCmd
     ProcessDataPayment {
-        msg: Message,
+        msg: ProcessMsg,
         origin: EndUser,
     },
     /// Receive a chunk that is being replicated.
@@ -314,7 +317,7 @@ impl Debug for NodeDuty {
 
 #[derive(Debug, Clone)]
 pub struct OutgoingMsg {
-    pub msg: Message,
+    pub msg: ProcessMsg,
     pub dst: DstLocation,
     pub section_source: bool,
     pub aggregation: Aggregation,

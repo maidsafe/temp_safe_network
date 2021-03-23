@@ -19,7 +19,7 @@ use crate::{
 };
 use log::{debug, info};
 use sn_messaging::{
-    client::{Message, NodeQuery},
+    client::{Message, NodeQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::ELDER_SIZE;
@@ -334,7 +334,7 @@ impl Node {
                     Ok(vec![elder.meta_data.read(query, id, origin).await?])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: Message::NodeQuery {
+                        msg: ProcessMsg::NodeQuery {
                             query: NodeQuery::Metadata { query, origin },
                             id,
                         },
@@ -373,7 +373,7 @@ impl Node {
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.process_payment(&msg, origin).await?])
+                Ok(elder.transfers.process_payment(&msg, origin).await?)
             }
             NodeDuty::ReplicateChunk { data, id } => {
                 let adult = self.role.as_adult_mut()?;

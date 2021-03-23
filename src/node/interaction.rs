@@ -13,8 +13,8 @@ use crate::{
 use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
-        NodeTransferCmd,
+        NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse, NodeTransferCmd,
+        ProcessMsg,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -60,7 +60,7 @@ impl Node {
             key_set: self.network_api.our_public_key_set().await?,
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
+            msg: ProcessMsg::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
                 )),
@@ -77,7 +77,7 @@ impl Node {
     pub(crate) async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
         let node_id = PublicKey::from(self.network_api.public_key().await);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
                     section: node_id.into(),
                     node_id,
@@ -94,7 +94,7 @@ impl Node {
     pub(crate) async fn register_wallet(&self) -> OutgoingMsg {
         let address = self.network_api.our_prefix().await.name();
         OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
                 id: MessageId::new(),
             },

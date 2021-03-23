@@ -16,8 +16,8 @@ use log::{debug, error, info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
     client::{
-        BlobDataExchange, BlobRead, BlobWrite, CmdError, Message, NodeCmd, NodeQuery,
-        NodeSystemCmd, QueryResponse,
+        BlobDataExchange, BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd,
+        NodeQuery, NodeSystemCmd, NodeSystemQuery, ProcessMsg, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -188,7 +188,7 @@ impl BlobRecords {
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
-                msg: Message::NodeCmd {
+                msg: ProcessMsg::NodeCmd {
                     cmd: NodeCmd::Chunks {
                         cmd: blob_write,
                         origin,
@@ -311,7 +311,7 @@ impl BlobRecords {
     ) -> Result<NodeDuty> {
         let message_error = convert_to_error_message(error)?;
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::CmdError {
+            msg: ProcessMsg::CmdError {
                 error: CmdError::Data(message_error),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
@@ -337,7 +337,7 @@ impl BlobRecords {
             BlobWrite::DeletePrivate(address),
             targets.clone(),
         ) {
-            let msg = Message::NodeCmd {
+            let msg = ProcessMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
                     origin,
@@ -386,7 +386,7 @@ impl BlobRecords {
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
-                msg: Message::NodeCmd {
+                msg: ProcessMsg::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
                     id: msg_id,
                 },
@@ -433,7 +433,7 @@ impl BlobRecords {
             .adult_liveness
             .new_read(msg_id, address, origin, targets.clone())
         {
-            let msg = Message::NodeQuery {
+            let msg = ProcessMsg::NodeQuery {
                 query: NodeQuery::Chunks {
                     query: BlobRead::Get(address),
                     origin,
