@@ -75,6 +75,12 @@ pub struct ProcessingError {
     pub id: MessageId,
 }
 
+impl ProcessingError {
+    pub fn id(&self) -> MessageId {
+        self.id
+    }
+}
+
 /// Error reasons for inability to handle a message at a client/node.
 /// These should be recoverable with updated information from the sender
 /// or other nodes in the network.
