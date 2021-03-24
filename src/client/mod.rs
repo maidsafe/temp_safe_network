@@ -90,8 +90,10 @@ pub enum ProcessingErrorReason {
     NoTransfersDatabase,
     /// No database set up to handle this function
     NoMetaDataDatabase,
-    /// No database set up to handle this function
-    NoSectionFundsDatabase,
+    /// No section funds managed by this node
+    NoSectionFunds,
+    /// Could not deserialize message
+    CouldNotDeserialize,
     /// Node genesis_stage
     IncorrectGenesisStage,
     /// Could not validate signed data
