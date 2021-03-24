@@ -249,8 +249,7 @@ pub enum ProcessMsg {
 }
 
 impl ProcessMsg {
-    #[allow(dead_code)]
-    fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
+    pub fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
         Message::ProcessingError(ProcessingError {
             source_message: Some(self.clone()),
             id: MessageId::new(),
