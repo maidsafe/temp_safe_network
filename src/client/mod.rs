@@ -29,8 +29,8 @@ pub use self::{
     network::{
         NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
         NodeQueryResponse, NodeRewardError, NodeRewardQuery, NodeRewardQueryResponse,
-        NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
-        NodeTransferQueryResponse,
+        NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
+        NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
     },
     query::Query,
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
