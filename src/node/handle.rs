@@ -8,7 +8,7 @@
 
 use super::{
     interaction::push_state,
-    messaging::{send, send_to_nodes},
+    messaging::{send, send_error, send_to_nodes},
     role::{AdultRole, Role},
 };
 use crate::{
@@ -304,6 +304,10 @@ impl Node {
             }
             NodeDuty::Send(msg) => {
                 send(msg, &self.network_api).await?;
+                Ok(vec![])
+            }
+            NodeDuty::SendError(msg) => {
+                send_error(msg, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SendToNodes {

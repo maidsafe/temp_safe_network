@@ -138,6 +138,9 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
+    /// Unable to send message
+    #[error("Unable to send message: {0:?}")]
+    UnableToSend(Message),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
