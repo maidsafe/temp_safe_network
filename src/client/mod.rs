@@ -249,12 +249,12 @@ pub enum ProcessMsg {
 }
 
 impl ProcessMsg {
-    pub fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
-        Message::ProcessingError(ProcessingError {
+    pub fn create_processing_error(&self, reason: Option<ProcessingErrorReason>) -> ProcessingError {
+        ProcessingError {
             source_message: Some(self.clone()),
             id: MessageId::new(),
             reason,
-        })
+        }
     }
 }
 
