@@ -70,7 +70,7 @@ pub struct ProcessingError {
     /// Optional reason for the error. This should help recveiving node handle the error
     pub reason: Option<ProcessingErrorReason>,
     /// Message that triggered this error
-    pub source_message: ProcessMsg,
+    pub source_message: Option<ProcessMsg>,
     /// MessageId
     pub id: MessageId,
 }
@@ -252,7 +252,7 @@ impl ProcessMsg {
     #[allow(dead_code)]
     fn create_processing_error_msg(&self, reason: Option<ProcessingErrorReason>) -> Message {
         Message::ProcessingError(ProcessingError {
-            source_message: self.clone(),
+            source_message: Some(self.clone()),
             id: MessageId::new(),
             reason,
         })
@@ -588,10 +588,10 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response = ProcessingError {
                 reason: Some(ProcessingErrorReason::CouldNotFindKey),
-                source_message: ProcessMsg::Query {
+                source_message: Some(ProcessMsg::Query {
                     id: MessageId::new(),
                     query: Query::Transfer(TransferQuery::GetBalance(*key)),
-                },
+                }),
                 id: MessageId::new(),
             };
 
