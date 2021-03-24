@@ -12,6 +12,8 @@ use sn_data_types::{
     ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
+use sn_messaging::client::{ClientMsg, CmdError};
+use sn_messaging::node::NodeMsg;
 use sn_messaging::{
     client::{BlobRead, BlobWrite, DataExchange, ProcessMsg, ProcessingError, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
@@ -231,6 +233,9 @@ pub enum NodeDuty {
     },
     /// Create proposals to vote unresponsive nodes as offline
     ProposeOffline(Vec<XorName>),
+    /// Send section history to erroring node.
+    /// This should also trigger resending of the original message.
+    UpdateErroringNodeSectionState,
     NoOp,
 }
 
@@ -310,6 +315,9 @@ impl Debug for NodeDuty {
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
             Self::ReplicateChunk { .. } => write!(f, "ReplicateChunk"),
             Self::ProposeOffline(nodes) => write!(f, "ProposeOffline({:?})", nodes),
+            Self::UpdateErroringNodeSectionState { .. } => {
+                write!(f, "UpdateErroringNodeSectionState")
+            }
         }
     }
 }

@@ -6,15 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{LazyError, Mapping, MsgContext};
+use super::{Mapping, MsgContext};
+use crate::error::convert_to_error_message;
+use crate::node_ops::OutgoingMsg;
 use crate::{node_ops::NodeDuty, Error};
+use log::{debug, warn};
+use sn_messaging::client::{ClientMsg, ProcessingError};
+use sn_messaging::node::{
+    NodeCmd, NodeEvent, NodeMsg, NodeQuery, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery,
+    NodeTransferCmd, NodeTransferQuery,
+};
 use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery,
         NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, ProcessMsg, Query,
         QueryResponse, TransferCmd, TransferQuery,
     },
-    DstLocation, EndUser, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId, Msg, SrcLocation,
 };
 
 pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
@@ -26,7 +34,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
         } => Mapping::Ok {
             op: NodeDuty::ProcessRead { query, id, origin },
             ctx: Some(super::MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -39,7 +47,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 origin,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -54,7 +62,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -70,7 +78,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -81,7 +89,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
         } => Mapping::Ok {
             op: NodeDuty::RegisterTransfer { proof, msg_id: id },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -98,7 +106,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -113,7 +121,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -128,47 +136,141 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
-        _ => Mapping::Error(LazyError {
+        _ => Mapping::Error {
             error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
             msg: MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             },
-        }),
-    }
-}
-
-pub fn map_node_msg(msg: ProcessMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
-    match &dst {
-        DstLocation::Section(_name) | DstLocation::Node(_name) => match_or_err(msg, src),
-        _ => Mapping::Error(LazyError {
-            error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
-            msg: MsgContext::Msg { msg, src },
-        }),
-    }
-}
-
-fn match_or_err(msg: Message, src: SrcLocation) -> Mapping {
-    match match_node_msg(msg.clone(), src) {
-        NodeDuty::NoOp => Mapping::Error(LazyError {
-            error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
-            msg: MsgContext::Msg { msg, src },
-        }),
-        op => Mapping::Ok {
-            op,
-            ctx: Some(MsgContext::Msg { msg, src }),
         },
     }
 }
 
-fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
+pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
+    match &dst {
+        DstLocation::Section(_name) | DstLocation::Node(_name) => Mapping {
+            op: match_node_msg(msg, src),
+            ctx: Some(MsgContext::Msg {
+                msg: Msg::Node(msg.clone()),
+                src,
+            }),
+        },
+        _ => {
+            let msg_id = msg.id();
+            let error = convert_to_error_message(Error::InvalidMessage(
+                msg_id,
+                format!("Invalid dst: {:?}", msg),
+            ))?;
+            if let SrcLocation::EndUser(_) = src {
+                log::error!("Logic error! EndUser cannot send NodeMsgs. ({:?})", msg);
+                return Mapping {
+                    op: NodeDuty::NoOp,
+                    ctx: None,
+                };
+            }
+            Mapping {
+                op: NodeDuty::Send(OutgoingMsg {
+                    msg: MsgType::Node(NodeMsg::NodeMsgError {
+                        error,
+                        id: MessageId::in_response_to(&msg_id),
+                        correlation_id: msg_id,
+                    }),
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                    dst: src.to_dst(),
+                    aggregation: Aggregation::AtDestination,
+                }),
+                ctx: Some(MsgContext::Msg {
+                    msg: Msg::Node(msg.clone()),
+                    src,
+                }),
+            }
+        }
+    }
+}
+
+/// Map a process error to relevant node duties
+pub fn map_node_process_err_msg(
+    msg: ProcessingError,
+    src: SrcLocation,
+    dst: DstLocation,
+) -> Mapping {
+    // debug!(" Handling received process err msg. {:?}.", msg);
+    match &dst {
+        DstLocation::Section(_name) | DstLocation::Node(_name) => match_process_err(msg, src),
+        _ => Mapping::Error {
+            error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
+            msg: MsgContext::Msg {
+                msg: Message::ProcessingError(msg),
+                src,
+            },
+        },
+    }
+}
+
+fn match_process_err(msg: ProcessMsg, src: SrcLocation) -> Mapping {
+    if let Some(reason) = msg.clone().reason {
+        // debug!("ProcessingError with reason")
+        match reason {
+            sn_messaging::client::Error::NoSectionFunds => {
+                debug!("error NO FUNDS BEING HANDLED");
+                return Mapping::Ok {
+                    op: NodeDuty::UpdateErroringNodeSectionState,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Message::ProcessingError(msg),
+                        src,
+                    }),
+                };
+            }
+            _ => {
+                warn!(
+                    "TODO: We do not handle this process error reason yet. {:?}",
+                    reason
+                );
+                // do nothing
+                return Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: None,
+                };
+            }
+        }
+    }
+
+    Mapping::Error {
+        error: Error::CannotUpdateProcessErrorNode,
+        msg: MsgContext::Msg {
+            msg: Message::ProcessingError(msg),
+            src,
+        },
+    }
+}
+
+fn match_or_err(msg: NodeMsg, src: SrcLocation) -> Mapping {
+    match match_node_msg(msg.clone(), src) {
+        NodeDuty::NoOp => Mapping::Error {
+            error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
+            msg: MsgContext::Msg {
+                msg: Msg::Node(msg),
+                src,
+            },
+        },
+        op => Mapping::Ok {
+            op,
+            ctx: Some(MsgContext::Msg {
+                msg: Msg::Node(msg),
+                src,
+            }),
+        },
+    }
+}
+
+fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
     match &msg {
         // ------ wallet register ------
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),
             ..
         } => NodeDuty::SetNodeWallet {
@@ -176,7 +278,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             node_id: origin.name(),
         },
         // Churn synch
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd:
                 NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                     node_rewards,
@@ -189,16 +291,16 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             user_wallets: user_wallets.to_owned(),
             metadata: metadata.to_owned(),
         },
-        Message::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             ..
         } => NodeDuty::ReceiveRewardProposal(proposal.clone()),
-        Message::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             ..
         } => NodeDuty::ReceiveRewardAccumulation(accumulation.clone()),
         // ------ section funds -----
-        Message::NodeQuery {
+        NodeMsg::NodeQuery {
             query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),
             id,
             ..
@@ -209,7 +311,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
         //
         // ------ transfers --------
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::Transfers(NodeTransferCmd::PropagateTransfer(proof)),
             id,
             ..
@@ -219,7 +321,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             origin,
         },
         // ------ metadata ------
-        ProcessMsg::NodeQuery {
+        NodeMsg::NodeQuery {
             query: NodeQuery::Metadata { query, origin },
             id,
             ..
@@ -228,7 +330,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             id: *id,
             origin: *origin,
         },
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::Metadata { cmd, origin },
             id,
             ..
@@ -239,7 +341,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
         //
         // ------ adult ------
-        ProcessMsg::NodeQuery {
+        NodeMsg::NodeQuery {
             query: NodeQuery::Chunks { query, origin },
             id,
             ..
@@ -248,7 +350,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks { cmd, origin },
             id,
             ..
@@ -258,14 +360,14 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             origin: *origin,
         },
         // this cmd is accumulated, thus has authority
-        Message::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
             id,
         } => NodeDuty::ReplicateChunk {
             data: data.clone(),
             id: *id,
         },
-        Message::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
             id,
         } => NodeDuty::ProcessRepublish {
@@ -273,7 +375,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
         },
         // Aggregated by us, for security
-        ProcessMsg::NodeQuery {
+        NodeMsg::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
             id,
             ..
@@ -283,13 +385,13 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
         //
         // ------ system cmd ------
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
             ..
         } => NodeDuty::IncrementFullNodeCount { node_id: *node_id },
         //
         // ------ transfers ------
-        ProcessMsg::NodeQuery {
+        NodeMsg::NodeQuery {
             query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
             id,
             ..
@@ -298,7 +400,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             origin,
         },
         // --- Adult ---
-        ProcessMsg::NodeQuery {
+        NodeMsg::NodeQuery {
             query: NodeQuery::Chunks { query, origin },
             id,
             ..
@@ -307,7 +409,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
-        ProcessMsg::NodeCmd {
+        NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks { cmd, origin },
             id,
             ..
@@ -317,7 +419,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             origin: *origin,
         },
         // --- Adult Operation response ---
-        Message::NodeEvent {
+        NodeMsg::NodeEvent {
             event: NodeEvent::ChunkWriteHandled(result),
             correlation_id,
             ..
@@ -326,7 +428,7 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             correlation_id: *correlation_id,
             src: origin.name(),
         },
-        Message::QueryResponse {
+        NodeMsg::QueryResponse {
             response,
             correlation_id,
             ..

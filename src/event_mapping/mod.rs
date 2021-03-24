@@ -9,13 +9,13 @@
 mod map_msg;
 
 use super::node_ops::NodeDuty;
-use crate::{network::Network, Error};
+use crate::{network::Network, node_ops::MsgType, Error};
 use log::{debug, error, info, trace};
 use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
 use sn_messaging::{
-    client::{Message, ProcessMsg, ProcessingError},
-    SrcLocation,
+    client::{ClientMsg, ProcessMsg, ProcessingError},
+    Msg, SrcLocation,
 };
 use sn_routing::XorName;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
@@ -32,24 +32,14 @@ pub enum Mapping {
 
 #[derive(Debug, Clone)]
 pub enum MsgContext {
-    Msg {
-        msg: ProcessMsg,
-        src: SrcLocation,
-    },
-    Error {
-        msg: ProcessingError,
-        src: SrcLocation,
-    },
-    Bytes {
-        msg: bytes::Bytes,
-        src: SrcLocation,
-    },
+    Msg { msg: Msg, src: SrcLocation },
+    Bytes { msg: bytes::Bytes, src: SrcLocation },
 }
 
 #[derive(Debug)]
 pub struct LazyError {
     pub msg: MsgContext,
-    pub error: Error,
+    pub error: crate::Error,
 }
 
 /// Process any routing event
@@ -58,31 +48,56 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
     match event {
         RoutingEvent::MessageReceived {
             content, src, dst, ..
-        } => {
-            let msg = match Message::from(content.clone()) {
-                Ok(msg) => msg,
-                Err(error) => {
-                    return Mapping::Error(LazyError {
-                        msg: MsgContext::Bytes { msg: content, src },
-                        error: crate::Error::Message(error),
-                    })
+        } => match Msg::from(content.clone()) {
+            Ok(msg) => match msg {
+                Msg::Node(msg) => map_node_msg(msg, src, dst),
+                Msg::Client(msg) => {
+                    warn!(
+                        "Unexpected ClientMsg at RoutingEvent::MessageReceived {:?}",
+                        msg
+                    );
+                    return Mapping {
+                        op: NodeDuty::NoOp,
+                        ctx: None,
+                    };
                 }
-            };
-
-            match msg {
-                Message::Process(process_msg) => map_node_msg(process_msg, src, dst),
-                Message::ProcessingError(error) => {
-                    warn!("Processing error received. {:?}", error);
-                    Mapping::Error(LazyError {
-                        msg: MsgContext::Error {
-                            msg: error.clone(),
-                            src,
-                        },
-                        error: Error::ProcessingError(error),
-                    })
+            },
+            Err(error) => {
+                return Mapping::Error(LazyError {
+                    msg: MsgContext::Bytes { msg: content, src },
+                    error: crate::Error::Message(error),
+                })
+            }
+        },
+        RoutingEvent::ClientMsgReceived { msg, user } => match *msg {
+            ClientMsg::Process(process_msg) => match_user_sent_msg(process_msg, user),
+            ClientMsg::ProcessingError(error) => {
+                warn!(
+                    ">>>> Incoming client processing error received. This needs to be handled {:?}",
+                    error
+                );
+                Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Msg::Client(ClientMsg::ProcessingError(error)),
+                        src: SrcLocation::EndUser(user),
+                    }),
                 }
             }
-        }
+            ClientMsg::SupportingInfo(info) => {
+                warn!(
+                    ">>>> SupportingInfo error received. This needs to be handled {:?}",
+                    error.reason
+                );
+                Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Msg::Client(ClientMsg::SupportingInfo(info)),
+                        src: SrcLocation::EndUser(user),
+                    }),
+                }
+            }
+        },
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,
@@ -111,19 +126,6 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 ctx: None,
             }
         }
-        RoutingEvent::ClientMessageReceived { msg, user } => match *msg {
-            Message::Process(process_msg) => match_user_sent_msg(process_msg, user),
-            Message::ProcessingError(error) => {
-                warn!("Processing error received. {:?}", error);
-                Mapping::Error(LazyError {
-                    msg: MsgContext::Error {
-                        msg: error.clone(),
-                        src: SrcLocation::EndUser(user),
-                    },
-                    error: Error::ProcessingError(error),
-                })
-            }
-        },
         RoutingEvent::EldersChanged {
             elders,
             self_status_change,

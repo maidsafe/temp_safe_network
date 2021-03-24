@@ -30,9 +30,30 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// Node does not manage any section funds.
+    #[error("Node does not currently manage any section funds")]
+    NoSectionFunds,
+    /// Node does not manage any metadata, so is likely not a fully prepared elder yet.
+    #[error("Node does not currently manage any section metadata")]
+    NoSectionMetaData,
+    /// Node does not manage any immutable chunks.
+    #[error("Node does not currently manage any immutable chunks")]
+    NoImmutableChunks,
+    /// Node is currently churning so cannot perform the request.
+    #[error("Cannot complete request due to churning of funds")]
+    NodeChurningFunds,
+    /// Node is currently churning, but failed to sign a message.
+    #[error("Error signing message during churn")]
+    ChurnSignError,
+    /// The node is not in genesis stage.
+    #[error("Not in genesis stage")]
+    NotInGenesis,
     /// Target xorname could not be determined from DstLocation
     #[error("No destination name found")]
     NoDestinationName,
+    /// Failed to activate a node, due to it being active already
+    #[error("Cannot activate node: Node is already active")]
+    NodeAlreadyActive,
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
@@ -42,9 +63,9 @@ pub enum Error {
     /// Nodes cannot send direct messages
     #[error("Node cannot send direct messages. This functionality will be deprecated in routing.")]
     CannotDirectMessage,
-    /// Not Section PublicKey.
-    #[error("Not section public key returned from routing for xorname {0}")]
-    NoSectionPublicKeyKnown(XorName),
+    /// Node cannot be updated, message cannot be resent
+    #[error("Process error could not be handled. We cannot update the problem node.")]
+    CannotUpdateProcessErrorNode,
     /// Not a Section PublicKeyShare.
     #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
     ProvidedPkIsNotBlsShare,
@@ -126,9 +147,6 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwners(PublicKey),
-    /// Operation is invalid, eg signing validation
-    #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
     NoErrorMapping(String),
@@ -138,9 +156,6 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
-    /// Unable to send message
-    #[error("Unable to send message: {0:?}")]
-    UnableToSend(Message),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {

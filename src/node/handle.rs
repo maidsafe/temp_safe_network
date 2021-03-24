@@ -13,11 +13,14 @@ use super::{
 };
 use crate::{
     chunks::Chunks,
+    event_mapping::MsgContext,
+    metadata::Metadata,
+    node::{AdultRole, Role},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
-use log::{debug, info};
+use log::{debug, info, trace};
 use sn_messaging::{
     client::{Message, NodeQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId,
@@ -382,6 +385,22 @@ impl Node {
             NodeDuty::ReplicateChunk { data, id } => {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![adult.chunks.store_for_replication(data, id).await?])
+            }
+            NodeDuty::UpdateErroringNodeSectionState => {
+                trace!("No funds section error being handled");
+
+                let is_forming_genesis = is_forming_genesis(&self.network_api).await;
+
+                if is_forming_genesis || !self.network_api.is_elder().await {
+                    trace!("Genesis not yet reached... so we ignore this");
+
+                    Ok(vec![])
+                } else {
+                    // TODO: 1) Send a message with the updated info
+                    // 2) Resend original message (which is ctx)
+                    debug!("TODO: Actually update + send message");
+                    Ok(vec![])
+                }
             }
             NodeDuty::NoOp => Ok(vec![]),
         }
