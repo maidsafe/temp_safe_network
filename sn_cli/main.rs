@@ -13,9 +13,11 @@ mod shell;
 mod subcommands;
 
 use anyhow::Result;
+use chrono::Local;
 use cli::run;
 use human_panic::{handle_dump, Metadata};
 use log::debug;
+use std::io::Write;
 use std::panic::set_hook;
 
 #[macro_use]
@@ -29,7 +31,21 @@ const APP_VENDOR: &str = "MaidSafe.net Ltd";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::init();
+    let mut builder = env_logger::Builder::from_default_env();
+    builder
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "[{}] {} {} [{}:{}] {}",
+                record.module_path().unwrap_or(""),
+                record.level(),
+                Local::now().format("%Y-%m-%dT%H:%M:%S.%f"),
+                record.file().unwrap_or_default(),
+                record.line().unwrap_or_default(),
+                record.args()
+            )
+        })
+        .init();
     debug!("Starting Safe CLI...");
 
     // We register our own panic hook to customise the error message displayed,

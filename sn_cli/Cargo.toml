@@ -16,6 +16,7 @@ path = "main.rs"
 [dependencies]
 ansi_term = "~0.12.1"
 async-std = "1.9.0"
+chrono = "0.4.19"
 dirs-next = "2.0.0"
 env_logger = "~0.8.3"
 envy = "~0.4.2"
