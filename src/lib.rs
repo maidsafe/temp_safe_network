@@ -77,11 +77,26 @@ impl MessageType {
     }
 
     pub fn update_header(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
+        #[cfg(not(feature = "client-only"))]
         match self {
             Self::Ping(hdr_info)
             | Self::ClientMessage { hdr_info, .. }
             | Self::SectionInfo { hdr_info, .. }
             | Self::NodeMessage { hdr_info, .. } => {
+                if let Some(dest) = dest {
+                    hdr_info.dest = dest
+                }
+                if let Some(dest_pk) = dest_pk {
+                    hdr_info.dest_section_pk = dest_pk
+                }
+            }
+        }
+
+        #[cfg(feature = "client-only")]
+        match self {
+            Self::Ping(hdr_info)
+            | Self::ClientMessage { hdr_info, .. }
+            | Self::SectionInfo { hdr_info, .. } => {
                 if let Some(dest) = dest {
                     hdr_info.dest = dest
                 }
