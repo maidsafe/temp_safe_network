@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [10.0.0](https://github.com/maidsafe/sn_messaging/compare/v9.0.0...v10.0.0) (2021-03-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* Split message type into two, for passing process errors
+or messages to be processed.
+
+### Features
+
+* add id func ([2a6ccea](https://github.com/maidsafe/sn_messaging/commit/2a6ccead51550424ea6ac9db6227dddfd9f9ebb7))
+* add processing error reasons ([7455746](https://github.com/maidsafe/sn_messaging/commit/7455746f827b4cfd4bfa9fc34a4af46872e44688))
+* expose processing error ([2237743](https://github.com/maidsafe/sn_messaging/commit/22377431752bb2430fcd57845c4d1e87526bbba8))
+* functional msg id ([fd4062a](https://github.com/maidsafe/sn_messaging/commit/fd4062ab750f3c7ec49281ced38f5d548308b4ad))
+* initial LazyError proposal ([2a971aa](https://github.com/maidsafe/sn_messaging/commit/2a971aab884a8ed4e8538262a92892f3fc5b6634))
+* make headerinfo fields pub ([a868218](https://github.com/maidsafe/sn_messaging/commit/a86821861d58dba2838dc66197a99c15faef4d96))
+* make source message optional ([943048b](https://github.com/maidsafe/sn_messaging/commit/943048baa6438339ed962b1e4885259fd3485b92))
+* remove processErrorReason, just use standard error message ([72283d8](https://github.com/maidsafe/sn_messaging/commit/72283d86eb7703e0e8faa1f97d90a97c81cdf2ae))
+* **GetSectionQuery:** use PK instead of Xor so we have a response pk ([49f29fb](https://github.com/maidsafe/sn_messaging/commit/49f29fb3a6709a902cbb9c6c2e23d2c29dd5f036))
+* **Redirect:** provide elder name too ([7129f9d](https://github.com/maidsafe/sn_messaging/commit/7129f9d5e5f01235e42b87e0e15652241f7ae1c7))
+* **serialisation:** add destination XorName and destination section public key to WireMsgHeader ([7c65ff1](https://github.com/maidsafe/sn_messaging/commit/7c65ff1eacf98d97ee6cebc1e7796b5981c54e36))
+* **trait:** derive Clone Trait for multiple types ([eea57c2](https://github.com/maidsafe/sn_messaging/commit/eea57c276622b31e055fcfaaeaabd76f199d9d3c))
+* one message to rule them all ([8cb9c49](https://github.com/maidsafe/sn_messaging/commit/8cb9c49405782b9bd313ea98435799f31bd445f2))
+
+
+### Bug Fixes
+
+* expose create_processing_error_msg ([0070d89](https://github.com/maidsafe/sn_messaging/commit/0070d899cee49a18be5477f2585a0283d8c02c08))
+* missing export of NodeSystemQueryResponse ([1883557](https://github.com/maidsafe/sn_messaging/commit/1883557ff72acc72eeaf9c33425d7be722f4f08e))
+
 ## [9.0.0](https://github.com/maidsafe/sn_messaging/compare/v8.0.0...v9.0.0) (2021-03-22)
 
 

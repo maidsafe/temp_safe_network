@@ -7,7 +7,7 @@ license = "MIT OR BSD-3-Clause"
 name = "sn_messaging"
 readme = "README.md"
 repository = "https://github.com/maidsafe/sn_messaging"
-version = "9.0.0"
+version = "10.0.0"
 
 [dependencies]
 bincode = "1.2.1"
