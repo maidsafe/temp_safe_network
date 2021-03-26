@@ -68,7 +68,7 @@ pub enum Message {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
     /// Optional reason for the error. This should help recveiving node handle the error
-    pub reason: Option<ProcessingErrorReason>,
+    pub reason: Option<Error>,
     /// Message that triggered this error
     pub source_message: Option<ProcessMsg>,
     /// MessageId
@@ -79,33 +79,6 @@ impl ProcessingError {
     pub fn id(&self) -> MessageId {
         self.id
     }
-}
-
-/// Error reasons for inability to handle a message at a client/node.
-/// These should be recoverable with updated information from the sender
-/// or other nodes in the network.
-///
-/// A lot of errors should be handled even before they reach the node via
-/// Routing ensuring we're targetting the correct section key.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum ProcessingErrorReason {
-    /// No section key known of at our node.
-    NoSectionKey,
-    /// No database set up to handle this function
-    NoTransfersDatabase,
-    /// No database set up to handle this function
-    NoMetaDataDatabase,
-    /// No section funds managed by this node
-    NoSectionFunds,
-    /// Could not deserialize message
-    CouldNotDeserialize,
-    /// Node genesis_stage
-    IncorrectGenesisStage,
-    /// Could not validate signed data
-    CouldNotValidate,
-    /// Could not find `key`
-    CouldNotFindKey,
 }
 
 /// Message envelope containing a Safe message payload,
@@ -255,7 +228,7 @@ pub enum ProcessMsg {
 }
 
 impl ProcessMsg {
-    pub fn create_processing_error(&self, reason: Option<ProcessingErrorReason>) -> ProcessingError {
+    pub fn create_processing_error(&self, reason: Option<Error>) -> ProcessingError {
         ProcessingError {
             source_message: Some(self.clone()),
             id: MessageId::new(),

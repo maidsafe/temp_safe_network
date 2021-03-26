@@ -160,6 +160,9 @@ pub enum Error {
     /// Node failed to delete the requested data for some reason.
     #[error("Failed to delete requested data")]
     FailedToDelete,
+    /// Node does not manage any section funds.
+    #[error("Node does not currentlymanage any section funds")]
+    NoSectionFunds,
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
