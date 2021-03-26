@@ -548,12 +548,11 @@ mod tests {
                 query: Query::Transfer(TransferQuery::GetBalance(*key)),
                 id: MessageId::new(),
             };
-            let lazy_error =
-                msg.create_processing_error_msg(Some(ProcessingErrorReason::CouldNotFindKey));
+            let lazy_error = msg.create_processing_error(Some(Error::NoSuchData));
 
             assert!(format!("{:?}", lazy_error).contains("TransferQuery::GetBalance"));
             assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
-            assert!(format!("{:?}", lazy_error).contains("CouldNotFindKey"));
+            assert!(format!("{:?}", lazy_error).contains("NoSuchData"));
 
             Ok(())
         } else {
@@ -565,7 +564,7 @@ mod tests {
     fn debug_format_processing_error() -> Result<()> {
         if let Some(key) = gen_keys().first() {
             let errored_response = ProcessingError {
-                reason: Some(ProcessingErrorReason::CouldNotFindKey),
+                reason: Some(Error::NoSuchData),
                 source_message: Some(ProcessMsg::Query {
                     id: MessageId::new(),
                     query: Query::Transfer(TransferQuery::GetBalance(*key)),
@@ -575,7 +574,7 @@ mod tests {
 
             assert!(format!("{:?}", errored_response).contains("TransferQuery::GetBalance"));
             assert!(format!("{:?}", errored_response).contains("ProcessingError"));
-            assert!(format!("{:?}", errored_response).contains("CouldNotFindKey"));
+            assert!(format!("{:?}", errored_response).contains("NoSuchData"));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))
