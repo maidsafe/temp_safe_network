@@ -309,6 +309,15 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
+        ProcessMsg::NodeEvent {
+            event: NodeEvent::SectionWalletCreated(wallet_history),
+            id,
+            ..
+        } => NodeDuty::ReceiveSectionWalletHistory {
+            wallet_history: wallet_history.clone(),
+            msg_id: *id,
+            origin,
+        },
         //
         // ------ transfers --------
         NodeMsg::NodeCmd {
@@ -437,6 +446,9 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             correlation_id: *correlation_id,
             src: origin.name(),
         },
-        _ => NodeDuty::NoOp,
+        _ => {
+            warn!("Node ProcessMsg from not handled: {:?}", msg);
+            NodeDuty::NoOp
+        }
     }
 }
