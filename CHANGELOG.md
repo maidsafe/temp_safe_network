@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [12.0.0](https://github.com/maidsafe/sn_messaging/compare/v11.0.0...v12.0.0) (2021-03-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* This reverts commits in release 10.0.0
+
+* Revert release "10.0.0" ([158e3a3](https://github.com/maidsafe/sn_messaging/commit/158e3a312b4461d1d6a23aaefd3e426a17c6b503))
+
 ## [11.0.0](https://github.com/maidsafe/sn_messaging/compare/v10.0.0...v11.0.0) (2021-03-30)
 
 
