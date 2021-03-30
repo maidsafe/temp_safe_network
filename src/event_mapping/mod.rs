@@ -87,12 +87,23 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             ClientMsg::SupportingInfo(info) => {
                 warn!(
                     ">>>> SupportingInfo error received. This needs to be handled {:?}",
-                    error.reason
+                    error.reason()
                 );
                 Mapping::Ok {
                     op: NodeDuty::NoOp,
                     ctx: Some(MsgContext::Msg {
                         msg: Msg::Client(ClientMsg::SupportingInfo(info)),
+                        src: SrcLocation::EndUser(user),
+                    }),
+                }
+            }
+            Message::SupportingInfo(msg) => {
+                debug!(">>>>> Supporting info received");
+
+                Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Message::SupportingInfo(msg),
                         src: SrcLocation::EndUser(user),
                     }),
                 }

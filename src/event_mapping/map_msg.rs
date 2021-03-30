@@ -211,19 +211,19 @@ pub fn map_node_process_err_msg(
     }
 }
 
-fn match_process_err(msg: ProcessMsg, src: SrcLocation) -> Mapping {
-    if let Some(reason) = msg.clone().reason {
+fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
+    if let Some(reason) = msg.clone().reason() {
         // debug!("ProcessingError with reason")
-        match reason {
+        return match reason {
             sn_messaging::client::Error::NoSectionFunds => {
                 debug!("error NO FUNDS BEING HANDLED");
-                return Mapping::Ok {
-                    op: NodeDuty::UpdateErroringNodeSectionState,
+                Mapping::Ok {
+                    op: NodeDuty::ProvideSectionWalletSupportingInfo,
                     ctx: Some(MsgContext::Msg {
-                        msg: Message::ProcessingError(msg),
+                        msg: Msg::Client(ClientMsg::ProcessingError(msg)),
                         src,
                     }),
-                };
+                }
             }
             _ => {
                 warn!(
@@ -231,12 +231,12 @@ fn match_process_err(msg: ProcessMsg, src: SrcLocation) -> Mapping {
                     reason
                 );
                 // do nothing
-                return Mapping::Ok {
+                Mapping::Ok {
                     op: NodeDuty::NoOp,
                     ctx: None,
-                };
+                }
             }
-        }
+        };
     }
 
     Mapping::Error {

@@ -16,13 +16,13 @@ use crate::{
     event_mapping::MsgContext,
     metadata::Metadata,
     node::{AdultRole, Role},
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg, OutgoingSupportingInfo},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
 use log::{debug, info, trace};
 use sn_messaging::{
-    client::{NodeCmd, NodeEvent, NodeQuery, ProcessMsg, Query},
+    client::{NodeCmd, NodeEvent, NodeQuery, ProcessMsg, Query, SupportingInfo, SupportingInfoFor},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::ELDER_SIZE;
@@ -313,6 +313,10 @@ impl Node {
                 send_error(msg, &self.network_api).await?;
                 Ok(vec![])
             }
+            NodeDuty::SendSupport(msg) => {
+                send_support(msg, &self.network_api).await?;
+                Ok(vec![])
+            }
             NodeDuty::SendToNodes {
                 msg,
                 targets,
@@ -398,7 +402,7 @@ impl Node {
                     .await?;
                 Ok(vec![duty])
             }
-            NodeDuty::UpdateErroringNodeSectionState => {
+            NodeDuty::ProvideSectionWalletSupportingInfo => {
                 trace!("No funds section error being handled");
 
                 let mut ops = vec![];
@@ -419,32 +423,19 @@ impl Node {
 
                             let wallet_history = section_funds.section_wallet_history();
 
-                            // 1) Send a message with the updated info
-                            ops.push(NodeDuty::Send(OutgoingMsg {
-                                msg: ProcessMsg::NodeEvent {
-                                    event: NodeEvent::SectionWalletCreated(wallet_history),
-                                    correlation_id: msg.id(),
-                                    id: MessageId::new(),
-                                },
-                                section_source: false,
-                                dst: DstLocation::Node(src.name()),
-                                aggregation: Aggregation::None, // AtDestination
-                            }));
-
-                            // 2) Resend original message (which is ctx)
-                            let originally_sent_msg = msg
-                                .get_processing_error()
-                                .ok_or(Error::UnexpectedProcessMsg)?
-                                .source_message
-                                .as_ref()
+                            let source_message = msg
+                                .get_process()
                                 .ok_or(Error::NoSourceMessageForProcessingError)?
                                 .clone();
 
-                            ops.push(NodeDuty::Send(OutgoingMsg {
-                                msg: originally_sent_msg,
-                                section_source: false,
+                            ops.push(NodeDuty::SendSupport(OutgoingSupportingInfo {
+                                msg: SupportingInfo {
+                                    info: SupportingInfoFor::SectionWallet(wallet_history),
+                                    source_message,
+                                    correlation_id: msg.id(),
+                                    id: MessageId::new(),
+                                },
                                 dst: DstLocation::Node(src.name()),
-                                aggregation: Aggregation::None,
                             }));
                         }
                     }
