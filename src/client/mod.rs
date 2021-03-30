@@ -51,7 +51,7 @@ use sn_data_types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
+    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated, WalletHistory
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -65,6 +65,60 @@ use xor_name::XorName;
 pub enum Message {
     Process(ProcessMsg),
     ProcessingError(ProcessingError),
+    SupportingInfo(SupportingInfo)
+}
+
+/// Our response to a processing error. Anti entropy in that it updates the erroring node
+/// with any relevant information, and includes the original message, which should hereafter
+/// be actionable
+// #[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SupportingInfo {
+    /// Supporting information for the source_message process
+    pub info: SupportingInfoFor,
+    /// The original message that triggered the error this update should be correcting
+    pub source_message: ProcessMsg,
+    /// MessageId
+    pub id: MessageId,
+    /// Correlates to a ProcessingError
+    pub correlation_id: MessageId
+}
+
+/// Various types of supporting information that can be received and acted upon by a node. 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum SupportingInfoFor {
+    SectionWallet(WalletHistory)
+}
+
+impl SupportingInfo {
+    pub fn new(info: SupportingInfoFor, source_message: ProcessMsg, correlation_id: MessageId, id: MessageId ) -> Self {
+        Self {
+            info, 
+            source_message,
+            correlation_id,
+            id
+        }
+    }
+
+    /// Get msg id
+    pub fn id(&self) -> MessageId {
+        self.id
+    }
+
+    /// Get source message that originally triggered a ProcessingError. This should usually be replayed at source after applying supporting information
+    pub fn source_message(&self) -> &ProcessMsg {
+        &self.source_message
+    }
+    
+    /// Get the supporting information of this message
+    pub fn info(&self) -> &SupportingInfoFor {
+        &self.info
+    }
+
+    /// MessageId of the ProcessingError that triggered this InformationUpdate
+    pub fn correlation_id(&self) -> MessageId {
+        self.correlation_id
+    }
 }
 
 /// Our LazyMesssage error. Recipient was unable to process this message for some reason.
@@ -74,16 +128,33 @@ pub enum Message {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
     /// Optional reason for the error. This should help recveiving node handle the error
-    pub reason: Option<Error>,
+    reason: Option<Error>,
     /// Message that triggered this error
-    pub source_message: Option<ProcessMsg>,
+    source_message: Option<ProcessMsg>,
     /// MessageId
-    pub id: MessageId,
+    id: MessageId,
+
 }
 
 impl ProcessingError {
+    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>, id: MessageId ) -> Self {
+        Self {
+            reason, 
+            source_message,
+            id
+        }
+    }
+
     pub fn id(&self) -> MessageId {
         self.id
+    }
+
+    pub fn source_message(&self) -> &Option<ProcessMsg> {
+        &self.source_message
+    }
+
+    pub fn reason(&self) -> &Option<Error> {
+        &self.reason
     }
 }
 
@@ -123,6 +194,7 @@ impl Message {
             | Self::Process(ProcessMsg::NodeCmdError { id, .. })
             | Self::Process(ProcessMsg::NodeQueryResponse { id, .. })
             | Self::ProcessingError(ProcessingError { id, .. }) => *id,
+            | Self::SupportingInfo(SupportingInfo { id, .. }) => *id,
         }
     }
 
@@ -131,6 +203,7 @@ impl Message {
         match self {
             Self::Process(msg) => Some(msg),
             Self::ProcessingError(_) => None,
+            Self::SupportingInfo(msg) => Some(&msg.source_message()),
         }
     }
 
@@ -138,6 +211,7 @@ impl Message {
     pub fn get_processing_error(&self) -> Option<&ProcessingError> {
         match self {
             Self::Process(_) => None,
+            Self::SupportingInfo(_) => None,
             Self::ProcessingError(error) => Some(error),
         }
     }
