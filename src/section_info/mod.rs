@@ -14,15 +14,14 @@ pub use errors::Error;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{PublicKey, ReplicaPublicKeySet, Signature};
 use std::{collections::BTreeMap, fmt, net::SocketAddr};
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
 
 /// Messages for exchanging network info, specifically on a target section for a msg.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Message {
     /// Message to request information about the section that matches the given name.
-    GetSectionQuery(PublicKey),
+    GetSectionQuery(XorName),
     /// An EndUser that wants to interact with the network,
     /// would send this cmd to the elders received
     /// in the GetSectionResponse.
@@ -76,14 +75,14 @@ pub struct ErrorResponse {
 }
 
 /// Information about a section.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum GetSectionResponse {
     /// Successful response to `GetSectionQuery`. Contains information about the requested
     /// section.
     Success(SectionInfo),
     /// Response to `GetSectionQuery` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
-    Redirect(Vec<(XorName, SocketAddr)>),
+    Redirect(Vec<SocketAddr>),
     /// Request could not be fulfilled due to section constellation updates
     SectionInfoUpdate(Error),
 }
@@ -93,8 +92,8 @@ impl Message {
     /// It returns an error if the bytes don't correspond to a network info query.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::SectionInfo { msg, .. } = deserialized {
-            Ok(msg)
+        if let MessageType::SectionInfo(query) = deserialized {
+            Ok(query)
         } else {
             Err(crate::Error::FailedToParse(
                 "bytes as a network info message".to_string(),
@@ -103,7 +102,7 @@ impl Message {
     }
 
     /// serialize this Query into bytes ready to be sent over the wire.
-    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
-        WireMsg::serialize_sectioninfo_msg(self, dest, dest_section_pk)
+    pub fn serialize(&self) -> crate::Result<Bytes> {
+        WireMsg::serialize_sectioninfo_msg(self)
     }
 }

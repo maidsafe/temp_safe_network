@@ -160,22 +160,9 @@ pub enum Error {
     /// Node failed to delete the requested data for some reason.
     #[error("Failed to delete requested data")]
     FailedToDelete,
-    /// Node does not manage any section funds.
-    #[error("Node does not currently manage any section funds")]
-    NoSectionFunds,
-    /// Node does not manage any metadata, so is likely not a fully prepared elder yet.
-    #[error("Node does not currently manage any section metadata")]
-    NoSectionMetaData,
-    /// Node does not manage any immutable chunks.
-    #[error("Node does not currently manage any immutable chunks")]
-    NoImmutableChunks,
-    /// Node is currently churning so cannot perform the request.
-    #[error("Cannot complete request due to churning of funds")]
-    NodeChurningFunds,
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
-
     /// There was an error in the target section of a message. Probably related to section keys.
     #[error("Target section error")]
     TargetSection(#[from] TargetSectionError),

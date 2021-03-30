@@ -11,8 +11,6 @@ use crate::{Error, MessageType, Result, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
-use threshold_crypto::PublicKey as BlsPublicKey;
-use xor_name::XorName;
 
 /// Node message sent over the network.
 // TODO: this is currently holding just bytes as a placeholder, next step
@@ -30,7 +28,7 @@ impl NodeMessage {
     /// It returns an error if the bytes don't correspond to a node message.
     pub fn from(bytes: Bytes) -> Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::NodeMessage { msg, .. } = deserialized {
+        if let MessageType::NodeMessage(msg) = deserialized {
             Ok(msg)
         } else {
             Err(Error::FailedToParse("bytes as a node message".to_string()))
@@ -38,8 +36,8 @@ impl NodeMessage {
     }
 
     /// serialize this NodeMessage into bytes ready to be sent over the wire.
-    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> Result<Bytes> {
-        WireMsg::serialize_node_msg(self, dest, dest_section_pk)
+    pub fn serialize(&self) -> Result<Bytes> {
+        WireMsg::serialize_node_msg(self)
     }
 }
 
