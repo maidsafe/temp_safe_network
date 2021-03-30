@@ -28,9 +28,9 @@ pub use self::{
     map::{MapRead, MapWrite},
     network::{
         NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
-        NodeQueryResponse, NodeRewardError, NodeRewardQuery, NodeRewardQueryResponse,
-        NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-        NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
+        NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery,
+        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+        NodeTransferQueryResponse,
     },
     query::Query,
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},

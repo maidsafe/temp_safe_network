@@ -13,9 +13,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, DebitId, NodeRewardStage,
-    PublicKey, ReplicaEvent, SectionElders, Signature, SignatureShare, SignedCredit,
-    SignedTransferShare, TransferAgreementProof, TransferValidated, WalletHistory,
+    ActorHistory, Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SectionElders,
+    Signature,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -42,22 +41,6 @@ pub enum NodeCmd {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeSystemCmd {
-    /// When threshold Elders have been reached
-    /// in genesis section, they all propose genesis.
-    ProposeGenesis {
-        /// The genesis credit.
-        credit: Credit,
-        /// An individual Elder's sig share.
-        sig: SignatureShare,
-    },
-    /// When proposal has been agreed
-    /// in genesis section, they all accumulate genesis.
-    AccumulateGenesis {
-        /// The genesis credit.
-        signed_credit: SignedCredit,
-        /// An individual Elder's sig share.
-        sig: SignatureShare,
-    },
     /// Register a wallet for reward payouts.
     RegisterWallet(PublicKey),
     /// Notify Elders on nearing max capacity
@@ -76,25 +59,15 @@ pub enum NodeSystemCmd {
         /// Current holders.
         current_holders: BTreeSet<XorName>,
     },
-    /// When new section key, all propose new wallet.
-    ProposeNewWallet {
-        /// The genesis credit.
-        credit: Credit,
-        /// An individual Elder's sig share.
-        sig: SignatureShare,
-    },
-    /// When proposal has been agreed, they all accumulate the wallet.
-    AccumulateNewWallet {
-        /// The genesis credit.
-        signed_credit: SignedCredit,
-        /// An individual Elder's sig share.
-        sig: SignatureShare,
-    },
+    /// When new section key, all propose a reward payout.
+    ProposeRewardPayout(sn_data_types::RewardProposal),
+    /// When proposal has been agreed, they all accumulate the reward payout.
+    AccumulateRewardPayout(sn_data_types::RewardAccumulation),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveExistingData {
         /// Registered node reward wallets.
-        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        node_rewards: BTreeMap<XorName, (u8, PublicKey)>,
         /// Transfer histories
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
@@ -106,10 +79,6 @@ pub enum NodeSystemCmd {
 pub enum NodeTransferCmd {
     ///
     PropagateTransfer(CreditAgreementProof),
-    ///
-    ValidateSectionPayout(SignedTransferShare),
-    ///
-    RegisterSectionPayout(TransferAgreementProof),
 }
 
 // -------------- Node Events --------------
@@ -128,10 +97,6 @@ pub enum NodeEvent {
         /// that this is all good.
         proof: Signature,
     },
-    ///
-    RewardPayoutValidated(TransferValidated),
-    /// The new section wallet.
-    SectionWalletCreated(WalletHistory),
 }
 
 ///
@@ -156,16 +121,7 @@ pub enum NodeQuery {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeRewardQuery {
-    /// Sent by the new section to the
-    /// old section after node relocation.
-    GetNodeWalletId {
-        /// The id of the node
-        /// in the old section.
-        old_node_id: XorName,
-        /// The id of the node
-        /// in the new section.
-        new_node_id: XorName,
-    },
+    GetNodeWalletKey(XorName),
     /// A new Section Actor share (i.e. a new Elder) needs to query
     /// its peer Elders for the replicas' public key set
     /// and the history of events of the section wallet.
@@ -213,21 +169,9 @@ pub enum NodeQueryResponse {
     ///
     Data(NodeDataQueryResponse),
     ///
-    Rewards(NodeRewardQueryResponse),
-    ///
     Transfers(NodeTransferQueryResponse),
     ///
     System(NodeSystemQueryResponse),
-}
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeRewardQueryResponse {
-    /// Returns the wallet address
-    /// together with the new node id,
-    /// that followed with the original query.
-    GetNodeWalletId(Result<(PublicKey, XorName)>),
 }
 
 ///
@@ -257,8 +201,6 @@ pub enum NodeCmdError {
     ///
     Data(NodeDataError),
     ///
-    Rewards(NodeRewardError),
-    ///
     Transfers(NodeTransferError),
 }
 
@@ -279,36 +221,4 @@ pub enum NodeDataError {
 pub enum NodeTransferError {
     /// The error of propagation of TransferRegistered event.
     TransferPropagation(Error),
-    /// The error of registration of a section payout.
-    SectionPayoutRegistration(Error),
-}
-
-///
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeRewardError {
-    ///
-    RewardClaiming {
-        ///
-        wallet: PublicKey,
-        ///
-        error: Error,
-    },
-    ///
-    RewardPayoutInitiation {
-        ///
-        id: DebitId,
-        ///
-        wallet: PublicKey,
-        ///
-        error: Error,
-    },
-    ///
-    RewardPayoutFinalisation {
-        ///
-        id: DebitId,
-        ///
-        wallet: PublicKey,
-        ///
-        error: Error,
-    },
 }
