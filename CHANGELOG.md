@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [11.0.0](https://github.com/maidsafe/sn_messaging/compare/v10.0.0...v11.0.0) (2021-03-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Changes to node reward messages
+
+### Bug Fixes
+
+* clarify api ([6db2924](https://github.com/maidsafe/sn_messaging/commit/6db29249540c3329a7e92c2f3187933ffa5f7159))
+
+
+* **deps:** update sn_data_types ([2597df9](https://github.com/maidsafe/sn_messaging/commit/2597df926eef60298314d79764f5d0153c4225b6))
+
 ## [10.0.0](https://github.com/maidsafe/sn_messaging/compare/v9.0.0...v10.0.0) (2021-03-26)
 
 
