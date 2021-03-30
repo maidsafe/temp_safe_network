@@ -100,31 +100,28 @@ impl WireMsgHeader {
 
     pub fn write<'a>(&self, buffer: &'a mut [u8]) -> Result<&'a mut [u8]> {
         // Let's write the header size first
-        let (buf_at_version, _) =
-            gen(be_u16(self.header_size), &mut buffer[..]).map_err(|err| {
-                Error::Serialisation(format!(
-                    "header size value couldn't be serialized in header: {}",
-                    err
-                ))
-            })?;
+        let (buf_at_version, _) = gen(be_u16(self.header_size), buffer).map_err(|err| {
+            Error::Serialisation(format!(
+                "header size value couldn't be serialized in header: {}",
+                err
+            ))
+        })?;
 
         // Now let's write the serialisation protocol version bytes
-        let (buf_at_msg_kind, _) =
-            gen(be_u16(self.version), &mut buf_at_version[..]).map_err(|err| {
-                Error::Serialisation(format!(
-                    "version field couldn't be serialized in header: {}",
-                    err
-                ))
-            })?;
+        let (buf_at_msg_kind, _) = gen(be_u16(self.version), buf_at_version).map_err(|err| {
+            Error::Serialisation(format!(
+                "version field couldn't be serialized in header: {}",
+                err
+            ))
+        })?;
 
         // ...and finally, let's write the value signaling the message kind
-        let (buf_at_payload, _) =
-            gen(be_u8(self.kind.into()), &mut buf_at_msg_kind[..]).map_err(|err| {
-                Error::Serialisation(format!(
-                    "message kind field couldn't be serialized in header: {}",
-                    err
-                ))
-            })?;
+        let (buf_at_payload, _) = gen(be_u8(self.kind.into()), buf_at_msg_kind).map_err(|err| {
+            Error::Serialisation(format!(
+                "message kind field couldn't be serialized in header: {}",
+                err
+            ))
+        })?;
 
         Ok(buf_at_payload)
     }
