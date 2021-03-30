@@ -13,8 +13,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SectionElders,
-    Signature,
+    ActorHistory, Blob, BlobAddress, CreditAgreementProof, NodeAge, PublicKey, ReplicaEvent,
+    SectionElders, Signature,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -66,8 +66,8 @@ pub enum NodeSystemCmd {
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveExistingData {
-        /// Registered node reward wallets.
-        node_rewards: BTreeMap<XorName, (u8, PublicKey)>,
+        /// Age and reward wallets of registered nodes, keyed by node name.
+        node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// Transfer histories
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
