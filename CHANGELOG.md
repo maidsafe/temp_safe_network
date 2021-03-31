@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [13.0.0](https://github.com/maidsafe/sn_messaging/compare/v12.0.0...v13.0.0) (2021-03-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* Aggregation scheme variant removed.
+
+* remove unused scheme variant ([27c7d86](https://github.com/maidsafe/sn_messaging/commit/27c7d86ebce2a734183aa0136478ea6f13c7a511))
+
 ## [12.0.0](https://github.com/maidsafe/sn_messaging/compare/v11.0.0...v12.0.0) (2021-03-30)
 
 
