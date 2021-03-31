@@ -24,12 +24,6 @@ pub struct Itinerary {
 }
 
 impl Itinerary {
-    /// Elders will aggregate a group sig before
-    /// they all all send one copy of it each to dst.
-    pub fn aggregate_at_src(&self) -> bool {
-        matches!(self.aggregation, Aggregation::AtSource)
-    }
-
     /// Elders will send their signed message, which
     /// recipients aggregate.
     pub fn aggregate_at_dst(&self) -> bool {
@@ -52,9 +46,6 @@ impl Itinerary {
 pub enum Aggregation {
     /// No aggregation is made, eg. when the payload contains full authority.
     None,
-    /// Elders will aggregate a group sig before
-    /// they all all send one copy of it each to dst.
-    AtSource,
     /// Elders will send their signed message, which
     /// recipients aggregate.
     AtDestination,
