@@ -10,7 +10,8 @@
 use crate::Safe;
 use anyhow::{Context, Result};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::{collections::HashSet, env::var, net::SocketAddr};
+use std::{collections::HashSet, env::var, net::SocketAddr, sync::Once};
+use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
 // to be used for all sn_api tests
@@ -20,8 +21,23 @@ const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 // to be used for all sn_api tests
 const TEST_BOOTSTRAPPING_PEERS: &str = "TEST_BOOTSTRAPPING_PEERS";
 
+static INIT: Once = Once::new();
+
+// Initialise logger for tests, this is run only once, even if called multiple times.
+fn init_logger() {
+    INIT.call_once(|| {
+        fmt()
+            // NOTE: comment out this line for more compact (but less readable) log output.
+            .pretty()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_target(false)
+            .init()
+    });
+}
+
 // Instantiate a Safe instance
 pub async fn new_safe_instance() -> Result<Safe> {
+    init_logger();
     let mut safe = Safe::default();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
         Ok(val) => {
@@ -43,6 +59,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
 }
 
 pub async fn new_read_only_safe_instance() -> Result<Safe> {
+    init_logger();
     let mut safe = Safe::default();
     let bootstrap_contacts = get_bootstrap_contacts()?;
     safe.connect(None, None, Some(bootstrap_contacts)).await?;

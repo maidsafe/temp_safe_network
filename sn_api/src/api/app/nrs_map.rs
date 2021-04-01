@@ -25,25 +25,25 @@ type SubName = String;
 type DefinitionData = BTreeMap<String, String>;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum SubNameRDF {
+pub enum SubNameRdf {
     Definition(DefinitionData),
     SubName(NrsMap),
 }
 
-impl SubNameRDF {
+impl SubNameRdf {
     fn get(&self, key: &str) -> Option<String> {
         match self {
-            SubNameRDF::SubName { .. } => Some(self.get(&key)?),
+            SubNameRdf::SubName { .. } => Some(self.get(&key)?),
             _ => None,
         }
     }
 }
 
-impl fmt::Display for SubNameRDF {
+impl fmt::Display for SubNameRdf {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            SubNameRDF::Definition(def_data) => Ok(write!(fmt, "{:?}", def_data)?),
-            SubNameRDF::SubName(map) => Ok(write!(fmt, "{:?}", map)?),
+            SubNameRdf::Definition(def_data) => Ok(write!(fmt, "{:?}", def_data)?),
+            SubNameRdf::SubName(map) => Ok(write!(fmt, "{:?}", map)?),
         }
     }
 }
@@ -64,7 +64,7 @@ impl std::default::Default for DefaultRdf {
 }
 
 // Each PublicName contains metadata and the link to the target's XOR-URL
-pub type SubNamesMap = BTreeMap<SubName, SubNameRDF>;
+pub type SubNamesMap = BTreeMap<SubName, SubNameRdf>;
 
 // To use for mapping sub names to PublicNames
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
@@ -106,7 +106,7 @@ impl NrsMap {
         let num_of_subnames = sub_names.len();
         for (i, curr_sub_name) in sub_names.iter().rev().enumerate() {
             match nrs_map.sub_names_map.get(curr_sub_name) {
-                Some(SubNameRDF::SubName(nrs_sub_map)) => {
+                Some(SubNameRdf::SubName(nrs_sub_map)) => {
                     if nrs_sub_map.sub_names_map.is_empty() || i == num_of_subnames - 1 {
                         // we need default one then
                         if let DefaultRdf::OtherRdf(def_data) = &nrs_sub_map.default {
@@ -120,7 +120,7 @@ impl NrsMap {
                     }
                     nrs_map = nrs_sub_map;
                 }
-                Some(SubNameRDF::Definition(def_data)) => {
+                Some(SubNameRdf::Definition(def_data)) => {
                     debug!("NRS subname resolution done. Located: \"{:?}\"", def_data);
                     if sub_names.is_empty() {
                         // cool, we've gone through all subnames and we found a Definition (tree leaf)
@@ -338,14 +338,14 @@ fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> R
     };
 
     match nrs_map.sub_names_map.get(&curr_sub_name) {
-        Some(SubNameRDF::SubName(nrs_sub_map)) => {
+        Some(SubNameRdf::SubName(nrs_sub_map)) => {
             let updated_sub_map = setup_nrs_tree(nrs_sub_map, sub_names, link)?;
             updated_nrs_map
                 .sub_names_map
-                .insert(curr_sub_name, SubNameRDF::SubName(updated_sub_map));
+                .insert(curr_sub_name, SubNameRdf::SubName(updated_sub_map));
             Ok(updated_nrs_map)
         }
-        Some(SubNameRDF::Definition(def_data)) => {
+        Some(SubNameRdf::Definition(def_data)) => {
             // we need to add the new sub nrs tree but as a sibling
             let new_nrs_map = NrsMap {
                 default: DefaultRdf::OtherRdf(def_data.clone()),
@@ -354,7 +354,7 @@ fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> R
             let updated_new_nrs_map = setup_nrs_tree(&new_nrs_map, sub_names, link)?;
             updated_nrs_map
                 .sub_names_map
-                .insert(curr_sub_name, SubNameRDF::SubName(updated_new_nrs_map));
+                .insert(curr_sub_name, SubNameRdf::SubName(updated_new_nrs_map));
             Ok(updated_nrs_map)
         }
         None => {
@@ -364,7 +364,7 @@ fn setup_nrs_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>, link: &str) -> R
             let updated_new_nrs_map = setup_nrs_tree(&new_nrs_map, sub_names, link)?;
             updated_nrs_map
                 .sub_names_map
-                .insert(curr_sub_name, SubNameRDF::SubName(updated_new_nrs_map));
+                .insert(curr_sub_name, SubNameRdf::SubName(updated_new_nrs_map));
             Ok(updated_nrs_map)
         }
     }
@@ -394,7 +394,7 @@ fn remove_nrs_sub_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>) -> Result<(
     };
 
     match nrs_map.sub_names_map.get(&curr_sub_name) {
-        Some(SubNameRDF::SubName(nrs_sub_map)) => {
+        Some(SubNameRdf::SubName(nrs_sub_map)) => {
             let (updated_sub_map, link) = remove_nrs_sub_tree(nrs_sub_map, sub_names)?;
             if updated_sub_map.sub_names_map.is_empty()
                 && updated_sub_map.default == DefaultRdf::NotSet
@@ -404,11 +404,11 @@ fn remove_nrs_sub_tree(nrs_map: &NrsMap, mut sub_names: Vec<String>) -> Result<(
             } else {
                 updated_nrs_map
                     .sub_names_map
-                    .insert(curr_sub_name, SubNameRDF::SubName(updated_sub_map));
+                    .insert(curr_sub_name, SubNameRdf::SubName(updated_sub_map));
             }
             Ok((updated_nrs_map, link))
         }
-        Some(SubNameRDF::Definition(def_data)) => {
+        Some(SubNameRdf::Definition(def_data)) => {
             println!("NRS subname resolution done. Located: \"{:?}\"", def_data);
             if sub_names.is_empty() {
                 // cool, we've gone through all subnames and we found a Definition (tree leaf)
@@ -443,10 +443,10 @@ fn gen_nrs_map_summary(
     for (subname, subname_rdf) in &nrs_map.sub_names_map {
         let str = format!("{}.{}", subname, sub_names_str);
         match subname_rdf {
-            SubNameRDF::SubName(nrs_sub_map) => {
+            SubNameRdf::SubName(nrs_sub_map) => {
                 gen_nrs_map_summary(&nrs_sub_map, &str, nrs_map_summary);
             }
-            SubNameRDF::Definition(def_data) => {
+            SubNameRdf::Definition(def_data) => {
                 nrs_map_summary.insert(str, def_data.clone());
             }
         }
