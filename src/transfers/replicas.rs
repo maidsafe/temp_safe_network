@@ -320,12 +320,8 @@ impl<T: ReplicaSigning> Replicas<T> {
     ) -> Result<TransferRegistered> {
         let id = transfer_proof.sender();
 
-        let known_key = self.exists_in_chain(&transfer_proof.replica_keys().public_key())
-            || self
-                .info
-                .signing
-                .known_replicas(&id.into(), transfer_proof.replica_keys().public_key())
-                .await;
+        // should only have been signed by our section
+        let known_key = self.exists_in_chain(&transfer_proof.replica_keys().public_key());
         if !known_key {
             return Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted));
         }
@@ -362,15 +358,8 @@ impl<T: ReplicaSigning> Replicas<T> {
         // Acquire lock of the wallet.
         let id = credit_proof.recipient();
         let debiting_replicas_key = credit_proof.replica_keys().public_key();
-        let known_key = self.exists_in_chain(&debiting_replicas_key)
-            || self
-                .info
-                .signing
-                .known_replicas(&debiting_replicas_name, debiting_replicas_key)
-                .await;
-        if !known_key {
-            return Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted));
-        }
+
+        // TODO: check the debiting_replicas_key, needs reverse AE implemented
 
         // Only when propagated is there a risk that the store doesn't exist,
         // and that we want to create it. All other write operations require that
