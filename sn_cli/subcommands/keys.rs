@@ -110,7 +110,7 @@ pub async fn key_commander(
             };
 
             let current_balance = if target.is_empty() {
-                safe.keys_balance_from_sk(sk).await
+                safe.keys_balance_from_sk(&sk).await
             } else {
                 safe.keys_balance_from_url(&target, sk).await
             }?;
