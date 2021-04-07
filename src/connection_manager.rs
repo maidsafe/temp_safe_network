@@ -27,14 +27,12 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
     sync::Arc,
-    time::Duration,
 };
 use threshold_crypto::PublicKeySet;
 use tiny_keccak::{Hasher, Sha3};
 use tokio::{
     sync::mpsc::{channel, Sender, UnboundedSender},
     task::JoinHandle,
-    time::timeout,
 };
 use xor_name::{Prefix, XorName};
 
@@ -82,7 +80,7 @@ impl Session {
 
         // bootstrap is not complete until we have pk set...
         while !we_have_keyset {
-            use tokio::time::sleep;
+            use tokio::time::{sleep, Duration};
             sleep(Duration::from_millis(500)).await;
             we_have_keyset = self.section_key_set.lock().await.is_some();
         }
@@ -466,6 +464,11 @@ impl Session {
             supermajority
         );
 
+        debug!(
+            "Peers ({}) to be used for bootstrapping: {:?}",
+            peers_len, peers
+        );
+
         for (peer_addr, name) in peers {
             let endpoint = endpoint.clone();
             let msg = msg.clone();
@@ -475,18 +478,16 @@ impl Session {
                 let mut attempts: usize = 0;
                 while !connected && attempts <= NUMBER_OF_RETRIES {
                     attempts += 1;
-                    if let Ok(Ok(())) =
-                        timeout(Duration::from_secs(30), endpoint.connect_to(&peer_addr)).await
-                    {
-                        endpoint.send_message(msg.clone(), &peer_addr).await?;
-                        connected = true;
+                    endpoint.connect_to(&peer_addr).await?;
+                    endpoint.send_message(msg.clone(), &peer_addr).await?;
+                    connected = true;
 
-                        debug!("Elder conn attempt #{} @ {} SUCCESS", attempts, peer_addr);
+                    debug!(
+                        "Elder conn attempt #{} @ {} is connected? : {:?}",
+                        attempts, peer_addr, connected
+                    );
 
-                        result = Ok((peer_addr, name))
-                    } else {
-                        debug!("Elder conn attempt #{} @ {} FAILED", attempts, peer_addr);
-                    }
+                    result = Ok((peer_addr, name))
                 }
 
                 result
