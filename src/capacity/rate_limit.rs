@@ -37,20 +37,19 @@ impl RateLimit {
         RateLimit::rate_limit(bytes, full_nodes, all_nodes, prefix_len)
     }
 
-    ///
+    /// Adds this node to the list of full nodes.
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
         self.capacity.increase_full_node_count(node_id).await
     }
 
-    ///
-    #[allow(unused)]
-    pub async fn check_network_storage(&self) -> bool {
-        info!("Checking network storage");
+    /// Returns `true` if more storage capacity is required, otherwise `false`.
+    pub async fn more_nodes_required(&mut self) -> bool {
+        info!("Checking if more nodes are required");
         let all_nodes = self.network.our_adults().await.len() as f64;
         let full_nodes = self.capacity.full_nodes().await as f64;
         let usage_ratio = full_nodes / all_nodes;
         info!("Total number of adult nodes: {:?}", all_nodes);
-        info!("Number of Full adult nodes: {:?}", full_nodes);
+        info!("Number of full adult nodes: {:?}", full_nodes);
         info!("Section storage usage ratio: {:?}", usage_ratio);
         usage_ratio > MAX_NETWORK_STORAGE_RATIO
     }

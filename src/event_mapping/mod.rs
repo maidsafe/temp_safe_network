@@ -184,44 +184,23 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             },
             ctx: None,
         },
-        // RoutingEvent::MemberJoined {
-        //     name,
-        //     previous_name,
-        //     age,
-        //     ..
-        // } => {
-        //     if is_forming_genesis(network_api).await {
-        //         // during formation of genesis we do not process this event
-        //         debug!("Forming genesis so ignore new member");
-        //         return Mapping::Ok {
-        //             op: NodeDuty::NoOp,
-        //             ctx: None,
-        //         };
-        //     }
-
-        //     // info!("New member has joined the section");
-
-        //     //self.log_node_counts().await;
-        //     if let Some(prev_name) = previous_name {
-        //         trace!("The new member is a Relocated Node");
-        //         // Switch joins_allowed off a new adult joining.
-        //         //let second = NetworkDuty::from(SwitchNodeJoin(false));
-        //         Mapping::Ok {
-        //             op: NodeDuty::ProcessRelocatedMember {
-        //                 old_node_id: XorName(prev_name.0),
-        //                 new_node_id: XorName(name.0),
-        //                 age,
-        //             },
-        //             ctx: None,
-        //         }
-        //     } else {
-        //         //trace!("New node has just joined the network and is a fresh node.",);
-        //         Mapping::Ok {
-        //             op: NodeDuty::ProcessNewMember(XorName(name.0)),
-        //             ctx: None,
-        //         }
-        //     }
-        // }
+        RoutingEvent::MemberJoined {
+            name,
+            previous_name,
+            age,
+            ..
+        } => {
+            let op = if let Some(prev_name) = previous_name {
+                trace!("A relocated node has joined the section.");
+                // Switch joins_allowed off a new adult joining.
+                NodeDuty::SetNodeJoinsAllowed(false)
+            } else if network_api.our_prefix().await.is_empty() {
+                NodeDuty::NoOp
+            } else {
+                NodeDuty::SetNodeJoinsAllowed(false)
+            };
+            Mapping::Ok { op, ctx: None }
+        }
         RoutingEvent::Relocated { .. } => {
             // Check our current status
             let age = network_api.age().await;

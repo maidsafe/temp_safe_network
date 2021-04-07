@@ -167,7 +167,8 @@ pub enum NodeDuty {
         /// Node ID of node that reached max capacity.
         node_id: PublicKey,
     },
-    SwitchNodeJoin(bool),
+    /// Sets joining allowed to true or false.
+    SetNodeJoinsAllowed(bool),
     /// Send a message to the specified dst.
     Send(OutgoingMsg),
     /// Send the same request to each individual node.
@@ -258,7 +259,7 @@ impl Debug for NodeDuty {
             Self::ProcessLostMember { .. } => write!(f, "ProcessLostMember"),
             //Self::ProcessRelocatedMember { .. } => write!(f, "ProcessRelocatedMember"),
             Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
-            Self::SwitchNodeJoin(_) => write!(f, "SwitchNodeJoin"),
+            Self::SetNodeJoinsAllowed(_) => write!(f, "SetNodeJoinsAllowed"),
             Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
             Self::SendToNodes { targets, msg } => {
                 write!(f, "SendToNodes [ targets: {:?}, msg: {:?} ]", targets, msg)

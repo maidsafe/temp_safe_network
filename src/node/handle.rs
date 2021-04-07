@@ -226,7 +226,7 @@ impl Node {
                 origin,
             } => {
                 let transfers = self.get_transfers()?;
-                Ok(vec![transfers.get_store_cost(bytes, msg_id, origin).await])
+                Ok(transfers.get_store_cost(bytes, msg_id, origin).await)
             }
             NodeDuty::RegisterTransfer { proof, msg_id } => {
                 let transfers = self.get_transfers()?;
@@ -291,7 +291,10 @@ impl Node {
                 send_to_nodes(targets, &msg, &self.network_api).await?;
                 Ok(vec![])
             }
-            NodeDuty::SwitchNodeJoin(_) => Ok(vec![]),
+            NodeDuty::SetNodeJoinsAllowed(joins_allowed) => {
+                self.network_api.set_joins_allowed(joins_allowed).await?;
+                Ok(vec![])
+            }
             //
             // ------- Data ------------
             NodeDuty::ProcessRead { query, id, origin } => {
