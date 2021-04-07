@@ -123,14 +123,15 @@ impl Transfers {
     /// Get latest StoreCost for the given number of bytes.
     /// Also check for Section storage capacity and report accordingly.
     pub async fn get_store_cost(
-        &self,
+        &mut self,
         bytes: u64,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> NodeDuty {
+    ) -> NodeDuties {
+        let mut ops = vec![];
         let result = self.rate_limit.from(bytes).await;
         info!("StoreCost for {:?} bytes: {}", bytes, result);
-        NodeDuty::Send(OutgoingMsg {
+        let response = NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetStoreCost(Ok(result)),
                 id: MessageId::in_response_to(&msg_id),
@@ -140,11 +141,14 @@ impl Transfers {
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        })
-        //let mut ops = vec![];
-        //ops.push();
-        //ops.push(Ok(ElderDuty::SwitchNodeJoin(self.rate_limit.check_network_storage().await).into()));
-        //ops
+        });
+
+        ops.push(response);
+        ops.push(NodeDuty::SetNodeJoinsAllowed(
+            self.rate_limit.more_nodes_required().await,
+        ));
+
+        ops
     }
 
     ///
