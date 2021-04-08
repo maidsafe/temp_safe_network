@@ -122,7 +122,7 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
                 HashSet::from_iter(hard_coded_contacts)
             };
 
-            let msg = format!("Joining network with contacts {:?}...", network_contacts);
+            let msg = format!("Joining network with contacts {:?} ...", network_contacts);
             debug!("{}", msg);
             println!("{}", msg);
 

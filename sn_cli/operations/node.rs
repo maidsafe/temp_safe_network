@@ -268,9 +268,11 @@ pub fn node_join(
     let contacts_list = contacts
         .iter()
         .map(|c| c.to_string())
-        .collect::<Vec<String>>()
-        .join(" ");
-    sn_launch_tool_args.push(&contacts_list);
+        .collect::<Vec<String>>();
+
+    for peer in &contacts_list {
+        sn_launch_tool_args.push(peer);
+    }
 
     debug!(
         "Running network launch tool with args: {:?}",
