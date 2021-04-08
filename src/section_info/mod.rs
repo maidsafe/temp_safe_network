@@ -51,16 +51,19 @@ pub struct SectionInfo {
     pub pk_set: ReplicaPublicKeySet,
     /// Section elders.
     pub elders: BTreeMap<XorName, SocketAddr>,
+    /// Whether the section is allowed to taking new joining node.
+    pub joins_allowed: bool,
 }
 
 impl fmt::Debug for SectionInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "SectionInfo {{ prefix: {:?}, pk_set: PkSet {{ public_key: {:?} }}, elders: {:?} }}",
+            "SectionInfo {{ prefix: {:?}, pk_set: PkSet {{ public_key: {:?} }}, elders: {:?}, joins_allowed: {:?}}}",
             self.prefix,
             self.pk_set.public_key(),
-            self.elders
+            self.elders,
+            self.joins_allowed
         )
     }
 }
