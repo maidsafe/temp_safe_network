@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [13.1.0](https://github.com/maidsafe/sn_messaging/compare/v13.0.0...v13.1.0) (2021-04-08)
+
+
+### Features
+
+* include the info when join is allowed ([16a5870](https://github.com/maidsafe/sn_messaging/commit/16a587007e024a109b052cb176670dc4a15dc5e0))
+
 ## [13.0.0](https://github.com/maidsafe/sn_messaging/compare/v12.0.0...v13.0.0) (2021-03-31)
 
 
