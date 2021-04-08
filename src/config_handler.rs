@@ -351,7 +351,7 @@ impl Config {
     }
 
     /// Writes the config file to disk
-    pub fn write_to_disk(&self) -> Result<PathBuf> {
+    pub fn write_to_disk(&self) -> Result<()> {
         write_file(CONFIG_FILE, self)
     }
 }
@@ -359,15 +359,15 @@ impl Config {
 /// Overwrites connection info at file.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn set_connection_info(contact: SocketAddr) -> Result<PathBuf> {
+pub fn set_connection_info(contact: SocketAddr) -> Result<()> {
     write_file(CONNECTION_INFO_FILE, &vec![contact])
 }
 
 /// Writes connection info to file for use by clients (and joining nodes when local network).
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn add_connection_info(contact: SocketAddr) -> Result<PathBuf> {
-    let hard_coded_contacts = if let Some(mut hard_coded_contacts) = read_conn_info_from_file()? {
+pub fn add_connection_info(contact: SocketAddr) -> Result<()> {
+    let hard_coded_contacts = if let Ok(mut hard_coded_contacts) = read_conn_info_from_file() {
         let _ = hard_coded_contacts.insert(contact);
         hard_coded_contacts
     } else {
@@ -377,20 +377,8 @@ pub fn add_connection_info(contact: SocketAddr) -> Result<PathBuf> {
     write_file(CONNECTION_INFO_FILE, &hard_coded_contacts)
 }
 
-/// Removes connection info from file.
-///
-/// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn remove_connection_info(contact: SocketAddr) -> Result<PathBuf> {
-    if let Some(mut hard_coded_contacts) = read_conn_info_from_file()? {
-        let _ = hard_coded_contacts.remove(&contact);
-        write_file(CONNECTION_INFO_FILE, &hard_coded_contacts)
-    } else {
-        Err(Error::Logic("Connection info file not found".to_string()))
-    }
-}
-
 /// Reads the default node config file.
-fn read_conn_info_from_file() -> Result<Option<HashSet<SocketAddr>>> {
+fn read_conn_info_from_file() -> Result<HashSet<SocketAddr>> {
     let path = project_dirs()?.join(CONNECTION_INFO_FILE);
 
     match File::open(&path) {
@@ -403,15 +391,13 @@ fn read_conn_info_from_file() -> Result<Option<HashSet<SocketAddr>>> {
         Err(error) => {
             if error.kind() == std::io::ErrorKind::NotFound {
                 debug!("No connection info file available at {}", path.display());
-                Ok(None)
-            } else {
-                Err(error.into())
             }
+            Err(error.into())
         }
     }
 }
 
-fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
+fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<()>
 where
     T: Serialize,
 {
@@ -422,8 +408,7 @@ where
     let mut file = File::create(&path)?;
     serde_json::to_writer_pretty(&mut file, config)?;
     file.sync_all()?;
-
-    Ok(path)
+    Ok(())
 }
 
 fn project_dirs() -> Result<PathBuf> {
