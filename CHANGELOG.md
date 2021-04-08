@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [0.22.0](https://github.com/maidsafe/sn_api/compare/v0.21.0...v0.22.0) (2021-04-01)
+### [0.23.0](https://github.com/maidsafe/sn_api/compare/v0.22.0...v0.23.0) (2021-04-08)
+
+### Features
+
+* ***api*** Upgrade sn_client library to v0.52.9
+
+### Bug Fixes
+
+* ***cli*** node join command was not passing multiple peers addresses correctly to launch tool
+
+### [0.22.0](https://github.com/maidsafe/sn_api/compare/v0.21.0...v0.22.0) (2021-04-07)
 
 ### Features
 

@@ -2222,9 +2222,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.6"
+version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6b50eda8cd67dc1af24c01c94f3227bbe93c13da930804df696bd42aa2b27a2"
+checksum = "f31917847e70d9b6a13def63cdf6626ed515f171cec74c9d430738d918b811e5"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2931,7 +2931,7 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "sn_api"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2970,7 +2970,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cluFlock",
@@ -2994,7 +2994,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3038,9 +3038,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.52.7"
+version = "0.52.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d3baa12b2c99d81dacc02fe9e310797a6c28cee9afcf6e5cddd370dd66b99e1"
+checksum = "f4bfd547b546d9a88259a2549d9d212eb460c7bbf48662f2355242b25d592843"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3123,9 +3123,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "12.0.0"
+version = "13.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77b2983ae0c66e9289efd0d085cd356b5cb37ab941f6e42b6901fb417c737bf6"
+checksum = "42f9b5c9f8c65b3db93fc7eba61f38fa9bf07f6991856a171ea9080f5ec0af72"
 dependencies = [
  "bincode",
  "bytes",
@@ -3245,9 +3245,9 @@ checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.68"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ce15dd3ed8aa2f8eeac4716d6ef5ab58b6b9256db41d7e1a0224c2788e8fd87"
+checksum = "48fe99c6bd8b1cc636890bcc071842de909d902c81ac7dab53ba33c421ab8ffb"
 dependencies = [
  "proc-macro2",
  "quote",
