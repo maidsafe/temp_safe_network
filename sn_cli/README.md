@@ -261,7 +261,7 @@ $ safe networks switch maidsafe-testnet
 Switching to 'maidsafe-testnet' network...
 Fetching 'maidsafe-testnet' network connection information from 'https://sn-node.s3.eu-west-2.amazonaws.com/config/node_connection_info.config' ...
 Successfully switched to 'maidsafe-testnet' network in your system!
-If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
+If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd (safe auth restart), unlock a Safe and re-authorise the CLI again
 ```
 
 We're now ready to launch our node and add it as a node. This is achieved using `safe node join` as follows:
@@ -319,7 +319,7 @@ $ safe networks switch maidsafe-testnet
 Switching to 'maidsafe-testnet' network...
 Fetching 'maidsafe-testnet' network connection information from 'https://sn-node.s3.eu-west-2.amazonaws.com/config/node_connection_info.config' ...
 Successfully switched to 'maidsafe-testnet' network in your system!
-If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
+If you need write access to the 'maidsafe-testnet' network, you'll need to restart authd (safe auth restart), unlock a Safe and re-authorise the CLI again
 ```
 
 Remember that every time you launch a local network the connection configuration in your system is automatically overwritten with new connection information. Also, if the test network was restarted by MaidSafe, the new connection information is published in the same URL and needs to be updated in your system to be able to successfully connect to it. Thus if you want to make sure your current setup network matches any of those set up in the CLI config, you can use the `check` subcommand:
@@ -348,7 +348,7 @@ And as we did before, we could then switch to use this network using its name:
 $ safe networks switch community-network
 Switching to 'community-network' network...
 Successfully switched to 'community-network' network in your system!
-If you need write access to the 'community-network' network, you'll need to restart authd, unlock a Safe and re-authorise the CLI again
+If you need write access to the 'community-network' network, you'll need to restart authd (safe auth restart), unlock a Safe and re-authorise the CLI again
 ```
 
 If now check the list of networks we have in the CLI config settings we can see the 'community-network' is listed as the one currently set:
