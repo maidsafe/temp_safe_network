@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.23.1](https://github.com/maidsafe/sn_api/compare/v0.23.0...v0.23.1) (2021-04-13)
+
+### Bug Fixes
+
+* ***api*** upgrading sn_client to v0.52.10
+* ***cli*** enhance CLI 'networks switch' command message explaining how to restart authd
+
 ### [0.23.0](https://github.com/maidsafe/sn_api/compare/v0.22.0...v0.23.0) (2021-04-08)
 
 ### Features
