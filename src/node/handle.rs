@@ -304,8 +304,12 @@ impl Node {
                 send(msg, &self.network_api).await?;
                 Ok(vec![])
             }
-            NodeDuty::SendToNodes { targets, msg } => {
-                send_to_nodes(targets, &msg, &self.network_api).await?;
+            NodeDuty::SendToNodes {
+                msg,
+                targets,
+                aggregation,
+            } => {
+                send_to_nodes(&msg, targets, aggregation, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SetNodeJoinsAllowed(joins_allowed) => {
@@ -353,48 +357,27 @@ impl Node {
                 elder.section_funds.add_payment(credit);
                 Ok(vec![])
             }
-            NodeDuty::ReplicateChunk {
-                current_holders,
+            NodeDuty::ReplicateChunk(data) => {
+                let adult = self.role.as_adult_mut()?;
+                adult.chunks.store_for_replication(data).await?;
+                Ok(vec![])
+            }
+            NodeDuty::ReturnChunkToElders {
                 address,
                 id,
+                section,
             } => {
                 let adult = self.role.as_adult()?;
                 Ok(vec![
                     adult
                         .chunks
-                        .replicate_chunk(address, current_holders, id)
+                        .get_chunk_for_replication(address, id, section)
                         .await?,
                 ])
             }
-            NodeDuty::GetChunkForReplication {
-                address,
-                new_holder,
-                id,
-            } => {
-                let adult = self.role.as_adult()?;
-                Ok(vec![
-                    adult
-                        .chunks
-                        .get_chunk_for_replication(address, id, new_holder)
-                        .await?,
-                ])
-            }
-            NodeDuty::StoreChunkForReplication {
-                data,
-                correlation_id,
-            } => {
-                // Recreate original MessageId from Section
-                let msg_id = MessageId::combine(vec![
-                    *data.address().name(),
-                    self.network_api.our_name().await,
-                ]);
-                if msg_id == correlation_id {
-                    let adult = self.role.as_adult_mut()?;
-                    Ok(vec![adult.chunks.store_replicated_chunk(data).await?])
-                } else {
-                    log::warn!("Invalid message ID");
-                    Ok(vec![])
-                }
+            NodeDuty::FinishReplication(data) => {
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.meta_data.finish_chunk_replication(data).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

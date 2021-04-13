@@ -173,8 +173,9 @@ pub enum NodeDuty {
     Send(OutgoingMsg),
     /// Send the same request to each individual node.
     SendToNodes {
-        targets: BTreeSet<XorName>,
         msg: Message,
+        targets: BTreeSet<XorName>,
+        aggregation: Aggregation,
     },
     /// Process read of data
     ProcessRead {
@@ -193,27 +194,18 @@ pub enum NodeDuty {
         msg: Message,
         origin: EndUser,
     },
-    /// Process replication of a chunk on `MemberLeft`
-    /// This is run at the node which is the new holder
-    /// of a chunk
-    ReplicateChunk {
+    ///
+    FinishReplication(Blob),
+    /// Receive a chunk that is being replicated.
+    /// This is run at an Adult (the new holder).
+    ReplicateChunk(Blob),
+    /// Retrieve a chunk
+    /// and send it back to to the requesting Elders
+    /// for them to replicate it on new nodes.
+    ReturnChunkToElders {
         address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
         id: MessageId,
-    },
-    /// Process a GetChunk operation
-    /// and send it back to to the requesting node
-    /// for replication
-    GetChunkForReplication {
-        address: BlobAddress,
-        new_holder: XorName,
-        id: MessageId,
-    },
-    /// Store a chunk that is a result of data replication
-    /// on `MemberLeft`
-    StoreChunkForReplication {
-        data: Blob,
-        correlation_id: MessageId,
+        section: XorName,
     },
     NoOp,
 }
@@ -253,7 +245,6 @@ impl Debug for NodeDuty {
             Self::EldersChanged { .. } => write!(f, "EldersChanged"),
             Self::SectionSplit { .. } => write!(f, "SectionSplit"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
-
             Self::NoOp => write!(f, "No op."),
             Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
             Self::ProcessLostMember { .. } => write!(f, "ProcessLostMember"),
@@ -261,15 +252,23 @@ impl Debug for NodeDuty {
             Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
             Self::SetNodeJoinsAllowed(_) => write!(f, "SetNodeJoinsAllowed"),
             Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
-            Self::SendToNodes { targets, msg } => {
-                write!(f, "SendToNodes [ targets: {:?}, msg: {:?} ]", targets, msg)
+            Self::SendToNodes {
+                msg,
+                targets,
+                aggregation,
+            } => {
+                write!(
+                    f,
+                    "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
+                    msg, targets, aggregation
+                )
             }
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
-            Self::ReplicateChunk { .. } => write!(f, "ReplicateChunk"),
-            Self::GetChunkForReplication { .. } => write!(f, "GetChunkForReplication"),
-            Self::StoreChunkForReplication { .. } => write!(f, "StoreChunkForReplication"),
+            Self::ReturnChunkToElders { .. } => write!(f, "ReturnChunkToElders"),
+            Self::FinishReplication(_) => write!(f, "FinishReplication"),
+            Self::ReplicateChunk(_) => write!(f, "ReplicateChunk"),
         }
     }
 }
