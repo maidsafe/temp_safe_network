@@ -16,7 +16,7 @@ use sn_data_types::{
     ActorHistory, Blob, BlobAddress, CreditAgreementProof, NodeAge, PublicKey, ReplicaEvent,
     SectionElders, Signature,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use xor_name::XorName;
 
 use super::{BlobRead, BlobWrite};
@@ -50,15 +50,8 @@ pub enum NodeSystemCmd {
         /// Section to which the message needs to be sent to. (NB: this is the section of the node id).
         section: XorName,
     },
-    /// Replicate a given chunk at another Adult
-    ReplicateChunk {
-        /// New holders's name.
-        new_holder: XorName,
-        /// Address of the blob to be replicated.
-        address: BlobAddress,
-        /// Current holders.
-        current_holders: BTreeSet<XorName>,
-    },
+    /// Replicate a given chunk at an Adult
+    ReplicateChunk(Blob),
     /// When new section key, all propose a reward payout.
     ProposeRewardPayout(sn_data_types::RewardProposal),
     /// When proposal has been agreed, they all accumulate the reward payout.
@@ -144,14 +137,8 @@ pub enum NodeSystemQuery {
     /// network for the new wallet's replicas' public key set
     GetSectionElders,
     /// Acquire the chunk from current holders for replication.
-    GetChunk {
-        /// New Holder's name.
-        new_holder: XorName,
-        /// Address of the blob to be replicated.
-        address: BlobAddress,
-        /// Current holders.
-        current_holders: BTreeSet<XorName>,
-    },
+    /// providing the address of the blob to be replicated.
+    GetChunk(BlobAddress),
 }
 
 ///
