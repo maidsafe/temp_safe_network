@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [14.0.0](https://github.com/maidsafe/sn_messaging/compare/v13.1.0...v14.0.0) (2021-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chunks:** Node messages changed members.
+
+* **chunks:** turn around the replication flow ([cc1e5e8](https://github.com/maidsafe/sn_messaging/commit/cc1e5e8901cf10c89c2fc0db31adc51e6968d4ee))
+
 ## [13.1.0](https://github.com/maidsafe/sn_messaging/compare/v13.0.0...v13.1.0) (2021-04-08)
 
 
