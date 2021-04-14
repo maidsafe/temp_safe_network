@@ -74,28 +74,28 @@ enum Role {
 impl Role {
     fn as_adult(&self) -> Result<&AdultRole> {
         match self {
-            Self::Adult(adult_state) => Ok(adult_state),
+            Self::Adult(adult) => Ok(adult),
             _ => Err(Error::NotAnAdult),
         }
     }
 
     fn as_adult_mut(&mut self) -> Result<&mut AdultRole> {
         match self {
-            Self::Adult(adult_state) => Ok(adult_state),
+            Self::Adult(adult) => Ok(adult),
             _ => Err(Error::NotAnAdult),
         }
     }
 
     fn as_elder(&self) -> Result<&ElderRole> {
         match self {
-            Self::Elder(elder_state) => Ok(elder_state),
+            Self::Elder(elder) => Ok(elder),
             _ => Err(Error::NotAnElder),
         }
     }
 
     fn as_elder_mut(&mut self) -> Result<&mut ElderRole> {
         match self {
-            Self::Elder(elder_state) => Ok(elder_state),
+            Self::Elder(elder) => Ok(elder),
             _ => Err(Error::NotAnElder),
         }
     }
