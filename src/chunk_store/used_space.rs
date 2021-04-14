@@ -144,18 +144,12 @@ mod inner {
             self.max_capacity
         }
 
-        /// Returns the total used space as a snapshot
-        /// Note, due to the async nature of this, the value
-        /// may be stale by the time it is read if there are multiple
-        /// writers
+        /// Returns the total used space
         pub fn total(&self) -> u64 {
             self.total_value
         }
 
         /// Returns the used space of a local store as a snapshot
-        /// Note, due to the async nature of this, the value
-        /// may be stale by the time it is read if there are multiple
-        /// writers
         pub fn local(&self, id: StoreId) -> u64 {
             self.local_stores.get(&id).map_or(0, |res| res.local_value)
         }
@@ -195,8 +189,7 @@ mod inner {
             Ok(id)
         }
 
-        /// Asynchronous implementation to increase used space in a local store
-        /// and globally at the same time
+        /// Increase used space in a local store and globally at the same time
         pub async fn increase(&mut self, id: StoreId, consumed: u64) -> Result<()> {
             let new_total = self
                 .total_value
@@ -230,8 +223,7 @@ mod inner {
             Ok(())
         }
 
-        /// Asynchronous implementation to decrease used space in a local store
-        /// and globally at the same time
+        /// Decrease used space in a local store and globally at the same time
         pub async fn decrease(&mut self, id: StoreId, released: u64) -> Result<()> {
             let new_local = self
                 .local_stores
