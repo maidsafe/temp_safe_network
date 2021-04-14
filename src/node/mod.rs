@@ -120,31 +120,20 @@ impl Node {
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
 
-        let reward_key_task = async move {
-            let res: Result<PublicKey>;
-            match get_reward_pk(root_dir).await? {
-                Some(public_key) => {
-                    res = Ok(PublicKey::Bls(public_key));
-                }
-                None => {
-                    let secret = SecretKey::random();
-                    let public = secret.public_key();
-                    store_new_reward_keypair(root_dir, &secret, &public).await?;
-                    res = Ok(PublicKey::Bls(public));
-                }
-            };
-            res
-        }
-        .await;
+        let reward_key = match get_reward_pk(root_dir).await? {
+            Some(public_key) => PublicKey::Bls(public_key),
+            None => {
+                let secret = SecretKey::random();
+                let public = secret.public_key();
+                store_new_reward_keypair(root_dir, &secret, &public).await?;
+                PublicKey::Bls(public)
+            }
+        };
 
-        let reward_key = reward_key_task?;
         let (network_api, network_events) = Network::new(config).await?;
 
         let node_info = NodeInfo {
-            genesis: config.is_first(),
             root_dir: root_dir_buf,
-            node_name: network_api.our_name().await,
-            node_id: network_api.public_key().await,
             reward_key,
         };
 
