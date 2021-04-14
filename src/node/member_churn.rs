@@ -36,7 +36,7 @@ impl Node {
 
     /// Level up a newbie to an oldie on promotion
     pub async fn level_up(&mut self) -> Result<()> {
-        self.used_space.reset().await; // TODO(drusu): should this be part of adult_state?
+        self.used_space.reset().await?;
 
         //
         // start handling metadata

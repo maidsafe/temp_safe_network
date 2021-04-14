@@ -25,7 +25,6 @@ use crate::{
     Config, Error, Result,
 };
 use bls::SecretKey;
-use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use log::{error, info};
 use sn_data_types::PublicKey;
 use sn_routing::EventStream;
@@ -40,13 +39,7 @@ use std::{
 #[derive(Clone)]
 pub struct NodeInfo {
     ///
-    pub genesis: bool,
-    ///
     pub root_dir: PathBuf,
-    ///
-    pub node_name: XorName,
-    ///
-    pub node_id: Ed25519PublicKey,
     /// The key used by the node to receive earned rewards.
     pub reward_key: PublicKey,
 }
@@ -81,28 +74,28 @@ enum Role {
 impl Role {
     fn as_adult(&self) -> Result<&AdultRole> {
         match self {
-            Self::Adult(adult_state) => Ok(adult_state),
+            Self::Adult(adult) => Ok(adult),
             _ => Err(Error::NotAnAdult),
         }
     }
 
     fn as_adult_mut(&mut self) -> Result<&mut AdultRole> {
         match self {
-            Self::Adult(adult_state) => Ok(adult_state),
+            Self::Adult(adult) => Ok(adult),
             _ => Err(Error::NotAnAdult),
         }
     }
 
     fn as_elder(&self) -> Result<&ElderRole> {
         match self {
-            Self::Elder(elder_state) => Ok(elder_state),
+            Self::Elder(elder) => Ok(elder),
             _ => Err(Error::NotAnElder),
         }
     }
 
     fn as_elder_mut(&mut self) -> Result<&mut ElderRole> {
         match self {
-            Self::Elder(elder_state) => Ok(elder_state),
+            Self::Elder(elder) => Ok(elder),
             _ => Err(Error::NotAnElder),
         }
     }
@@ -127,31 +120,20 @@ impl Node {
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
 
-        let reward_key_task = async move {
-            let res: Result<PublicKey>;
-            match get_reward_pk(root_dir).await? {
-                Some(public_key) => {
-                    res = Ok(PublicKey::Bls(public_key));
-                }
-                None => {
-                    let secret = SecretKey::random();
-                    let public = secret.public_key();
-                    store_new_reward_keypair(root_dir, &secret, &public).await?;
-                    res = Ok(PublicKey::Bls(public));
-                }
-            };
-            res
-        }
-        .await;
+        let reward_key = match get_reward_pk(root_dir).await? {
+            Some(public_key) => PublicKey::Bls(public_key),
+            None => {
+                let secret = SecretKey::random();
+                let public = secret.public_key();
+                store_new_reward_keypair(root_dir, &secret, &public).await?;
+                PublicKey::Bls(public)
+            }
+        };
 
-        let reward_key = reward_key_task?;
         let (network_api, network_events) = Network::new(config).await?;
 
         let node_info = NodeInfo {
-            genesis: config.is_first(),
             root_dir: root_dir_buf,
-            node_name: network_api.our_name().await,
-            node_id: network_api.public_key().await,
             reward_key,
         };
 

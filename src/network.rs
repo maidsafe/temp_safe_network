@@ -33,12 +33,12 @@ pub struct Network {
 #[allow(missing_docs)]
 impl Network {
     pub async fn new(config: &NodeConfig) -> Result<(Self, EventStream)> {
-        let node_config = RoutingConfig {
+        let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
             ..Default::default()
         };
-        let (routing, event_stream) = RoutingNode::new(node_config).await?;
+        let (routing, event_stream) = RoutingNode::new(routing_config).await?;
 
         Ok((
             Self {
