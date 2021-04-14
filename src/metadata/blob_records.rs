@@ -19,6 +19,7 @@ use sn_messaging::{
         BlobDataExchange, BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd,
         NodeQuery, NodeSystemCmd, NodeSystemQuery, ProcessMsg, QueryResponse,
     },
+    node::{NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;

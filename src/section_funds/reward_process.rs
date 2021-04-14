@@ -24,7 +24,8 @@ use sn_data_types::{
     Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeSystemCmd},
+    client::ProcessMsg,
+    node::{NodeCmd, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
 use std::collections::BTreeMap;

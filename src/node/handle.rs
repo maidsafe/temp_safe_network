@@ -22,7 +22,8 @@ use crate::{
 };
 use log::{debug, info, trace};
 use sn_messaging::{
-    client::{NodeCmd, NodeEvent, NodeQuery, ProcessMsg, Query, SupportingInfo, SupportingInfoFor},
+    client::{ProcessMsg, Query, SupportingInfo, SupportingInfoFor},
+    node::{NodeCmd, NodeEvent, NodeQuery},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::ELDER_SIZE;
