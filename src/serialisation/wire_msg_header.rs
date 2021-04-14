@@ -15,7 +15,7 @@ use cookie_factory::{
     gen,
 };
 use std::{convert::TryFrom, fmt::Debug, mem::size_of};
-use threshold_crypto::PublicKey;
+use threshold_crypto::{PublicKey, PK_SIZE};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 // Current version of the messaging protocol.
@@ -31,6 +31,7 @@ pub(crate) struct WireMsgHeader {
     kind: MessageKind,
     dest: XorName,
     dest_section_pk: PublicKey,
+    src_section_pk: Option<PublicKey>,
 }
 
 // Bytes length in the header for the 'header_size' field
@@ -52,18 +53,35 @@ const HDR_DEST_BYTES_END: usize = HDR_DEST_BYTES_START + HDR_DEST_BYTES_LEN;
 
 // Bytes index in the header for the 'dest_section_pk' field
 const HDR_DEST_PK_BYTES_START: usize = HDR_DEST_BYTES_END;
-const HDR_DEST_PK_BYTES_LEN: usize = 48;
+const HDR_DEST_PK_BYTES_LEN: usize = PK_SIZE;
 const HDR_DEST_PK_BYTES_END: usize = HDR_DEST_PK_BYTES_START + HDR_DEST_PK_BYTES_LEN;
+
+// Bytes index in the header for the 'src_section_pk' field
+const HDR_SRC_PK_BYTES_START: usize = HDR_DEST_PK_BYTES_END;
+const HDR_SRC_PK_BYTES_LEN: usize = PK_SIZE;
+const HDR_SRC_PK_BYTES_END: usize = HDR_SRC_PK_BYTES_START + HDR_SRC_PK_BYTES_LEN;
+
+const HEADER_MIN_SIZE: usize = HDR_SIZE_BYTES_LEN
+    + HDR_VERSION_BYTES_LEN
+    + HDR_KIND_BYTES_LEN
+    + HDR_DEST_BYTES_LEN
+    + HDR_DEST_PK_BYTES_LEN;
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(kind: MessageKind, dest: XorName, dest_section_pk: PublicKey) -> Self {
+    pub fn new(
+        kind: MessageKind,
+        dest: XorName,
+        dest_section_pk: PublicKey,
+        src_section_pk: Option<PublicKey>,
+    ) -> Self {
         Self {
-            header_size: Self::size() as u16,
+            header_size: Self::bytes_size(src_section_pk.is_some()) as u16,
             version: MESSAGING_PROTO_VERSION,
             kind,
             dest,
             dest_section_pk,
+            src_section_pk,
         }
     }
 
@@ -82,16 +100,22 @@ impl WireMsgHeader {
         self.dest
     }
 
+    // Return the source section PublicKey for this message
+    // if it's a NodeCmdMessage and it was included in the header
+    pub fn src_section_pk(&self) -> Option<PublicKey> {
+        self.src_section_pk
+    }
+
     // Parses the provided bytes to deserialize a WireMsgHeader,
     // returning the created WireMsgHeader, as well as the remaining bytes which
     // correspond to the message payload. The caller shall then take care of
     // deserializing the payload using the information provided in the WireMsgHeader.
     pub fn from(mut bytes: Bytes) -> Result<(Self, Bytes)> {
-        // Let's make sure there is a minimum number of bytes to parse the header.
+        // Let's make sure there is a minimum number of bytes to parse the header size part.
         let length = bytes.len();
-        if length < Self::size() {
+        if length < HDR_SIZE_BYTES_LEN {
             return Err(Error::FailedToParse(format!(
-                "not enough bytes received ({}) to deserialize wire message header",
+                "not enough bytes received ({}) to even read the wire message header length field",
                 length
             )));
         }
@@ -100,6 +124,16 @@ impl WireMsgHeader {
         let mut header_size_bytes = [0; HDR_SIZE_BYTES_LEN];
         header_size_bytes[0..].copy_from_slice(&bytes[0..HDR_SIZE_BYTES_LEN]);
         let header_size = u16::from_be_bytes(header_size_bytes);
+
+        // TODO: since the header is currently (and temporarily) of a
+        // varian length, we check that at least we have the minimum number of bytes
+        // for the header of any kind of message to be deserialised.
+        if length < header_size.into() || HEADER_MIN_SIZE > header_size.into() {
+            return Err(Error::FailedToParse(format!(
+                "not enough bytes received ({}) to deserialize wire message header",
+                length
+            )));
+        }
 
         // ...now let's read the serialization protocol version bytes
         let mut version_bytes = [0; HDR_VERSION_BYTES_LEN];
@@ -118,7 +152,7 @@ impl WireMsgHeader {
         dest_bytes[0..].copy_from_slice(&bytes[HDR_DEST_BYTES_START..HDR_DEST_BYTES_END]);
         let dest = XorName(dest_bytes);
 
-        // ...finally, let's read the destination section pubic key bytes
+        // ...read the destination section pubic key bytes
         let mut dest_pk_bytes = [0; HDR_DEST_PK_BYTES_LEN];
         dest_pk_bytes[0..].copy_from_slice(&bytes[HDR_DEST_PK_BYTES_START..HDR_DEST_PK_BYTES_END]);
         let dest_section_pk = PublicKey::from_bytes(&dest_pk_bytes).map_err(|err| {
@@ -128,12 +162,32 @@ impl WireMsgHeader {
             ))
         })?;
 
+        // ...finally, we read the source section pubic key bytes if it's a NodeCmdMessage
+        // and if the header size has the exact number of bytes to read a PublicKey from.
+        // Once we move back to fixed-length header we won't need this check.
+        let src_section_pk = if kind == MessageKind::NodeCmdMessage
+            && HEADER_MIN_SIZE + HDR_SRC_PK_BYTES_LEN == header_size.into()
+        {
+            let mut src_pk_bytes = [0; HDR_SRC_PK_BYTES_LEN];
+            src_pk_bytes[0..].copy_from_slice(&bytes[HDR_SRC_PK_BYTES_START..HDR_SRC_PK_BYTES_END]);
+            let src_section_pk = PublicKey::from_bytes(&src_pk_bytes).map_err(|err| {
+                Error::FailedToParse(format!(
+                    "source section PublicKey couldn't be deserialized from header: {}",
+                    err
+                ))
+            })?;
+            Some(src_section_pk)
+        } else {
+            None
+        };
+
         let header = Self {
             header_size,
             version,
             kind,
             dest,
             dest_section_pk,
+            src_section_pk,
         };
 
         // Get a slice for the payload bytes, i.e. the bytes after the header bytes
@@ -175,8 +229,8 @@ impl WireMsgHeader {
             ))
         })?;
 
-        // ...finally let's write the destination section public key
-        let (buf_at_payload, _) = gen(slice(self.dest_section_pk.to_bytes()), buf_at_dest_pk)
+        // ...now let's write the destination section public key
+        let (buf_at_src_pk, _) = gen(slice(self.dest_section_pk.to_bytes()), buf_at_dest_pk)
             .map_err(|err| {
                 Error::Serialisation(format!(
                     "destination section public key field couldn't be serialized in header: {}",
@@ -184,19 +238,47 @@ impl WireMsgHeader {
                 ))
             })?;
 
+        // ...now write the source section public key if it's a NodeCmdMessage
+        // and a source section public key was provided
+        let buf_at_payload = if let Some(src_section_pk) = self.src_section_pk {
+            if self.kind != MessageKind::NodeCmdMessage {
+                return Err(Error::Serialisation(format!(
+                    "source section public key field couldn't be serialized in header since it's not a NodeCmdMessage but a {:?}",
+                    self.kind
+                )));
+            }
+
+            let (buf, _) = gen(slice(src_section_pk.to_bytes()), buf_at_src_pk).map_err(|err| {
+                Error::Serialisation(format!(
+                    "source section public key field couldn't be serialized in header: {}",
+                    err
+                ))
+            })?;
+
+            buf
+        } else {
+            buf_at_src_pk
+        };
+
         Ok(buf_at_payload)
     }
 
-    // Size in bytes of WireMsgHeader when serialized.
-    pub fn size() -> usize {
+    // Size in bytes of this WireMsgHeader when serialized.
+    pub fn size(&self) -> u16 {
+        self.header_size
+    }
+
+    // Size in bytes when serialized if a WireMsgHeader
+    // depending if a source section public key is included.
+    fn bytes_size(with_src_section_pk: bool) -> usize {
         // We don't use 'std::mem::size_of' since, for example, the
         // 'MessageKind' enum it reports 2 bytes mem size,
         // and we want to serialize that field using 1 byte only.
-        HDR_SIZE_BYTES_LEN
-            + HDR_VERSION_BYTES_LEN
-            + HDR_KIND_BYTES_LEN
-            + HDR_DEST_BYTES_LEN
-            + HDR_DEST_PK_BYTES_LEN
+        if with_src_section_pk {
+            HEADER_MIN_SIZE + HDR_SRC_PK_BYTES_LEN
+        } else {
+            HEADER_MIN_SIZE
+        }
     }
 }
 
@@ -208,17 +290,27 @@ pub(crate) enum MessageKind {
     SectionInfo,
     ClientMessage,
     NodeMessage,
+    NodeCmdMessage,
 }
+
+// Bytes values used for each of the kind of messages
+// when written to the message header
+const PING_KIND: u8 = 0x00;
+const SECTION_INFO_KIND: u8 = 0x01;
+const CLIENT_MESSAGE_KIND: u8 = 0x02;
+const NODE_MESSAGE_KIND: u8 = 0x03;
+const NODE_CMD_MESSAGE_KIND: u8 = 0x04;
 
 impl TryFrom<u8> for MessageKind {
     type Error = super::Error;
 
     fn try_from(input: u8) -> Result<Self, Self::Error> {
         match input {
-            0 => Ok(Self::Ping),
-            1 => Ok(Self::SectionInfo),
-            2 => Ok(Self::ClientMessage),
-            3 => Ok(Self::NodeMessage),
+            PING_KIND => Ok(Self::Ping),
+            SECTION_INFO_KIND => Ok(Self::SectionInfo),
+            CLIENT_MESSAGE_KIND => Ok(Self::ClientMessage),
+            NODE_MESSAGE_KIND => Ok(Self::NodeMessage),
+            NODE_CMD_MESSAGE_KIND => Ok(Self::NodeCmdMessage),
             other => Err(Error::UnsupportedMessageKind(other)),
         }
     }
@@ -227,10 +319,11 @@ impl TryFrom<u8> for MessageKind {
 impl From<MessageKind> for u8 {
     fn from(kind: MessageKind) -> u8 {
         match kind {
-            MessageKind::Ping => 0,
-            MessageKind::SectionInfo => 1,
-            MessageKind::ClientMessage => 2,
-            MessageKind::NodeMessage => 3,
+            MessageKind::Ping => PING_KIND,
+            MessageKind::SectionInfo => SECTION_INFO_KIND,
+            MessageKind::ClientMessage => CLIENT_MESSAGE_KIND,
+            MessageKind::NodeMessage => NODE_MESSAGE_KIND,
+            MessageKind::NodeCmdMessage => NODE_CMD_MESSAGE_KIND,
         }
     }
 }
@@ -243,16 +336,17 @@ mod tests {
     #[test]
     fn message_kind_from_u8() -> Result<()> {
         for &(kind, byte) in &[
-            (MessageKind::Ping, 0),
-            (MessageKind::SectionInfo, 1),
-            (MessageKind::ClientMessage, 2),
-            (MessageKind::NodeMessage, 3),
+            (MessageKind::Ping, PING_KIND),
+            (MessageKind::SectionInfo, SECTION_INFO_KIND),
+            (MessageKind::ClientMessage, CLIENT_MESSAGE_KIND),
+            (MessageKind::NodeMessage, NODE_MESSAGE_KIND),
+            (MessageKind::NodeCmdMessage, NODE_CMD_MESSAGE_KIND),
         ] {
             assert_eq!(kind as u8, byte);
             assert_eq!(MessageKind::try_from(byte)?, kind);
         }
 
-        for byte in 4..u8::MAX {
+        for byte in 5..u8::MAX {
             assert!(MessageKind::try_from(byte).is_err());
         }
 

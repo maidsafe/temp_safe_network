@@ -32,26 +32,32 @@ use xor_name::XorName;
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
-    Ping(HeaderInfo),
+    Ping(DestInfo),
     SectionInfo {
         msg: section_info::Message,
-        hdr_info: HeaderInfo,
+        dest_info: DestInfo,
     },
     ClientMessage {
         msg: client::Message,
-        hdr_info: HeaderInfo,
+        dest_info: DestInfo,
     },
     #[cfg(not(feature = "client-only"))]
     NodeMessage {
         msg: node::NodeMessage,
-        hdr_info: HeaderInfo,
+        dest_info: DestInfo,
+    },
+    #[cfg(not(feature = "client-only"))]
+    NodeCmdMessage {
+        msg: node::NodeCmd,
+        dest_info: DestInfo,
+        src_section_pk: Option<PublicKey>,
     },
 }
 
 /// This is information kept by 'MessageType' so it can be properly
 /// serialised with a valid 'WireMsgHeader'
 #[derive(PartialEq, Debug, Clone)]
-pub struct HeaderInfo {
+pub struct DestInfo {
     pub dest: XorName,
     pub dest_section_pk: PublicKey,
 }
@@ -60,56 +66,76 @@ impl MessageType {
     /// serialize the message type into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> Result<Bytes> {
         match self {
-            Self::Ping(hdr_info) => {
-                WireMsg::new_ping_msg(hdr_info.dest, hdr_info.dest_section_pk).serialize()
+            Self::Ping(dest_info) => {
+                WireMsg::new_ping_msg(dest_info.dest, dest_info.dest_section_pk).serialize()
             }
-            Self::SectionInfo { msg, hdr_info } => {
-                WireMsg::serialize_sectioninfo_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            Self::SectionInfo { msg, dest_info } => {
+                WireMsg::serialize_sectioninfo_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
-            Self::ClientMessage { msg, hdr_info } => {
-                WireMsg::serialize_client_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            Self::ClientMessage { msg, dest_info } => {
+                WireMsg::serialize_client_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeMessage { msg, hdr_info } => {
-                WireMsg::serialize_node_msg(msg, hdr_info.dest, hdr_info.dest_section_pk)
+            Self::NodeMessage { msg, dest_info } => {
+                WireMsg::serialize_node_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
+            #[cfg(not(feature = "client-only"))]
+            Self::NodeCmdMessage {
+                msg,
+                dest_info,
+                src_section_pk,
+            } => WireMsg::serialize_node_cmd_msg(
+                msg,
+                dest_info.dest,
+                dest_info.dest_section_pk,
+                *src_section_pk,
+            ),
         }
     }
 
-    pub fn update_header(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
+    pub fn update_dest_info(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
         #[cfg(not(feature = "client-only"))]
         match self {
-            Self::Ping(hdr_info)
-            | Self::ClientMessage { hdr_info, .. }
-            | Self::SectionInfo { hdr_info, .. } => {
+            Self::Ping(dest_info)
+            | Self::ClientMessage { dest_info, .. }
+            | Self::SectionInfo { dest_info, .. } => {
                 if let Some(dest) = dest {
-                    hdr_info.dest = dest
+                    dest_info.dest = dest
                 }
                 if let Some(dest_pk) = dest_pk {
-                    hdr_info.dest_section_pk = dest_pk
+                    dest_info.dest_section_pk = dest_pk
                 }
             }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeMessage { hdr_info, .. } => {
+            Self::NodeMessage { dest_info, .. } => {
                 if let Some(dest) = dest {
-                    hdr_info.dest = dest
+                    dest_info.dest = dest
                 }
                 if let Some(dest_pk) = dest_pk {
-                    hdr_info.dest_section_pk = dest_pk
+                    dest_info.dest_section_pk = dest_pk
+                }
+            }
+            #[cfg(not(feature = "client-only"))]
+            Self::NodeCmdMessage { dest_info, .. } => {
+                if let Some(dest) = dest {
+                    dest_info.dest = dest
+                }
+                if let Some(dest_pk) = dest_pk {
+                    dest_info.dest_section_pk = dest_pk
                 }
             }
         }
 
         #[cfg(feature = "client-only")]
         match self {
-            Self::Ping(hdr_info)
-            | Self::ClientMessage { hdr_info, .. }
-            | Self::SectionInfo { hdr_info, .. } => {
+            Self::Ping(dest_info)
+            | Self::ClientMessage { dest_info, .. }
+            | Self::SectionInfo { dest_info, .. } => {
                 if let Some(dest) = dest {
-                    hdr_info.dest = dest
+                    dest_info.dest = dest
                 }
                 if let Some(dest_pk) = dest_pk {
-                    hdr_info.dest_section_pk = dest_pk
+                    dest_info.dest_section_pk = dest_pk
                 }
             }
         }

@@ -7,6 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod node_cmd;
+
+pub use self::node_cmd::{
+    NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
+    NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
+    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
+};
 use crate::{Error, MessageType, Result, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};

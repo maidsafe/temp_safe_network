@@ -14,7 +14,6 @@ mod data_exchange;
 mod duty;
 mod errors;
 mod map;
-mod network;
 mod query;
 mod register;
 mod sender;
@@ -32,11 +31,6 @@ pub use self::{
     duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
     errors::{Error, Result},
     map::{MapRead, MapWrite},
-    network::{
-        NodeCmd, NodeCmdError, NodeDataError, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-        NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
-    },
     query::Query,
     register::{RegisterRead, RegisterWrite},
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
@@ -51,7 +45,7 @@ use sn_data_types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated, WalletHistory
+    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated, WalletHistory,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -65,7 +59,7 @@ use xor_name::XorName;
 pub enum Message {
     Process(ProcessMsg),
     ProcessingError(ProcessingError),
-    SupportingInfo(SupportingInfo)
+    SupportingInfo(SupportingInfo),
 }
 
 /// Our response to a processing error. Anti entropy in that it updates the erroring node
@@ -81,22 +75,27 @@ pub struct SupportingInfo {
     /// MessageId
     pub id: MessageId,
     /// Correlates to a ProcessingError
-    pub correlation_id: MessageId
+    pub correlation_id: MessageId,
 }
 
-/// Various types of supporting information that can be received and acted upon by a node. 
+/// Various types of supporting information that can be received and acted upon by a node.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SupportingInfoFor {
-    SectionWallet(WalletHistory)
+    SectionWallet(WalletHistory),
 }
 
 impl SupportingInfo {
-    pub fn new(info: SupportingInfoFor, source_message: ProcessMsg, correlation_id: MessageId, id: MessageId ) -> Self {
+    pub fn new(
+        info: SupportingInfoFor,
+        source_message: ProcessMsg,
+        correlation_id: MessageId,
+        id: MessageId,
+    ) -> Self {
         Self {
-            info, 
+            info,
             source_message,
             correlation_id,
-            id
+            id,
         }
     }
 
@@ -109,7 +108,7 @@ impl SupportingInfo {
     pub fn source_message(&self) -> &ProcessMsg {
         &self.source_message
     }
-    
+
     /// Get the supporting information of this message
     pub fn info(&self) -> &SupportingInfoFor {
         &self.info
@@ -133,15 +132,14 @@ pub struct ProcessingError {
     source_message: Option<ProcessMsg>,
     /// MessageId
     id: MessageId,
-
 }
 
 impl ProcessingError {
-    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>, id: MessageId ) -> Self {
+    pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>, id: MessageId) -> Self {
         Self {
-            reason, 
+            reason,
             source_message,
-            id
+            id,
         }
     }
 
@@ -188,13 +186,8 @@ impl Message {
             | Self::Process(ProcessMsg::Event { id, .. })
             | Self::Process(ProcessMsg::QueryResponse { id, .. })
             | Self::Process(ProcessMsg::CmdError { id, .. })
-            | Self::Process(ProcessMsg::NodeCmd { id, .. })
-            | Self::Process(ProcessMsg::NodeEvent { id, .. })
-            | Self::Process(ProcessMsg::NodeQuery { id, .. })
-            | Self::Process(ProcessMsg::NodeCmdError { id, .. })
-            | Self::Process(ProcessMsg::NodeQueryResponse { id, .. })
             | Self::ProcessingError(ProcessingError { id, .. }) => *id,
-            | Self::SupportingInfo(SupportingInfo { id, .. }) => *id,
+            Self::SupportingInfo(SupportingInfo { id, .. }) => *id,
         }
     }
 
@@ -264,56 +257,6 @@ pub enum ProcessMsg {
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
-    /// Cmds only sent internally in the network.
-    NodeCmd {
-        /// NodeCmd.
-        cmd: NodeCmd,
-        /// Message ID.
-        id: MessageId,
-    },
-    /// Result of an applied NodeCmd
-    NodeCmdResult {
-        /// The result
-        result: NodeCmdResult,
-        /// Message ID
-        id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
-    },
-    /// An error of a NodeCmd.
-    NodeCmdError {
-        /// The error.
-        error: NodeCmdError,
-        /// Message ID.
-        id: MessageId,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
-    /// Events only sent internally in the network.
-    NodeEvent {
-        /// Request.
-        event: NodeEvent,
-        /// Message ID.
-        id: MessageId,
-        /// ID of causing cmd.
-        correlation_id: MessageId,
-    },
-    /// Queries is a read-only operation.
-    NodeQuery {
-        /// Query.
-        query: NodeQuery,
-        /// Message ID.
-        id: MessageId,
-    },
-    /// The response to a query, containing the query result.
-    NodeQueryResponse {
-        /// QueryResponse.
-        response: NodeQueryResponse,
-        /// Message ID.
-        id: MessageId,
-        /// ID of causing query.
-        correlation_id: MessageId,
-    },
 }
 
 impl ProcessMsg {
@@ -334,12 +277,7 @@ impl ProcessMsg {
             | Self::Query { id, .. }
             | Self::Event { id, .. }
             | Self::QueryResponse { id, .. }
-            | Self::CmdError { id, .. }
-            | Self::NodeCmd { id, .. }
-            | Self::NodeEvent { id, .. }
-            | Self::NodeQuery { id, .. }
-            | Self::NodeCmdError { id, .. }
-            | Self::NodeQueryResponse { id, .. } => *id,
+            | Self::CmdError { id, .. } => *id,
         }
     }
 }
