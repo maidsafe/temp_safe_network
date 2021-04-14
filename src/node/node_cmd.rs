@@ -7,22 +7,111 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{BlobRead, BlobWrite, DataExchange};
+// FIXME: change NodeCmd defnintions to return Result and
+// Error defined for the crate::node instead of client Result/Error
+use crate::client::{Error, Result};
 use crate::{
-    client::{
-        BlobRead, BlobWrite, DataCmd as NodeDataCmd, DataQuery as NodeDataQuery, Error, Result,
-    },
-    EndUser,
+    client::{BlobRead, BlobWrite, DataCmd as NodeDataCmd, DataQuery as NodeDataQuery},
+    EndUser, MessageId, MessageType, WireMsg,
 };
+use super::{BlobRead, BlobWrite, DataExchange};
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     ActorHistory, Blob, BlobAddress, CreditAgreementProof, NodeAge, PublicKey, ReplicaEvent,
     SectionElders, Signature,
 };
 use std::collections::BTreeMap;
+use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
-// -------------- Node Cmds --------------
+// -------------- Node Cmd Messages --------------
+// TODO: this messages hierarchy needs to be merged into
+// the NodeMessage hierarchy. It's temporarily here till
+// all messages defined within sn_routing are migrated to
+// this crate and within NodeMessage struct.
+
+///
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum NodeCmdMessage {
+    /// Cmds only sent internally in the network.
+    NodeCmd {
+        /// NodeCmd.
+        cmd: NodeCmd,
+        /// Message ID.
+        id: MessageId,
+        /// Target section's current PublicKey
+        target_section_pk: Option<PublicKey>,
+    },
+    /// An error of a NodeCmd.
+    NodeCmdError {
+        /// The error.
+        error: NodeCmdError,
+        /// Message ID.
+        id: MessageId,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+        /// Target section's current PublicKey
+        target_section_pk: Option<PublicKey>,
+    },
+    /// Events only sent internally in the network.
+    NodeEvent {
+        /// Request.
+        event: NodeEvent,
+        /// Message ID.
+        id: MessageId,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+        /// Target section's current PublicKey
+        target_section_pk: Option<PublicKey>,
+    },
+    /// Queries is a read-only operation.
+    NodeQuery {
+        /// Query.
+        query: NodeQuery,
+        /// Message ID.
+        id: MessageId,
+        /// Target section's current PublicKey
+        target_section_pk: Option<PublicKey>,
+    },
+    /// The response to a query, containing the query result.
+    NodeQueryResponse {
+        /// QueryResponse.
+        response: NodeQueryResponse,
+        /// Message ID.
+        id: MessageId,
+        /// ID of causing query.
+        correlation_id: MessageId,
+        /// Target section's current PublicKey
+        target_section_pk: Option<PublicKey>,
+    },
+}
+
+impl NodeCmdMessage {
+    /// Convenience function to deserialize a 'NodeCmdMessage' from bytes received over the wire.
+    /// It returns an error if the bytes don't correspond to a node command message.
+    pub fn from(bytes: Bytes) -> crate::Result<Self> {
+        let deserialized = WireMsg::deserialize(bytes)?;
+        if let MessageType::NodeCmdMessage { msg, .. } = deserialized {
+            Ok(msg)
+        } else {
+            Err(crate::Error::FailedToParse(
+                "bytes as a node command message".to_string(),
+            ))
+        }
+    }
+
+    /// serialize this NodeCmd message into bytes ready to be sent over the wire.
+    pub fn serialize(
+        &self,
+        dest: XorName,
+        dest_section_pk: BlsPublicKey,
+        src_section_pk: Option<BlsPublicKey>,
+    ) -> crate::Result<Bytes> {
+        WireMsg::serialize_node_cmd_msg(self, dest, dest_section_pk, src_section_pk)
+    }
+}
 
 ///
 #[allow(clippy::large_enum_variant)]

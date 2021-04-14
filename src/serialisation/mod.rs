@@ -100,7 +100,7 @@ impl WireMsg {
     /// Creates a new instance keeping a (serialized) copy of the node 'Message' message provided.
     #[cfg(not(feature = "client-only"))]
     pub fn new_node_cmd_msg(
-        msg: &node::NodeCmd,
+        msg: &node::NodeCmdMessage,
         dest: XorName,
         dest_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
@@ -201,7 +201,7 @@ impl WireMsg {
             }
             #[cfg(not(feature = "client-only"))]
             MessageKind::NodeCmdMessage => {
-                let node_cmd: node::NodeCmd =
+                let node_cmd: node::NodeCmdMessage =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("NodeCmd message payload as Msgpack: {}", err))
                     })?;
@@ -276,7 +276,7 @@ impl WireMsg {
     /// node::NodeCmdMessage, returning the serialized WireMsg.
     #[cfg(not(feature = "client-only"))]
     pub fn serialize_node_cmd_msg(
-        msg: &node::NodeCmd,
+        msg: &node::NodeCmdMessage,
         dest: XorName,
         dest_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
@@ -295,12 +295,13 @@ impl WireMsg {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use threshold_crypto::SecretKey;
     use xor_name::XorName;
 
     #[test]
     fn serialisation_ping() -> Result<()> {
         let dest = XorName::random();
-        let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
+        let dest_section_pk = SecretKey::random().public_key();
 
         let wire_msg = WireMsg::new_ping_msg(dest, dest_section_pk);
         let serialized = wire_msg.serialize()?;
@@ -326,7 +327,7 @@ mod tests {
     #[test]
     fn serialisation_sectioninfo_msg() -> Result<()> {
         let dest = XorName::random();
-        let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
+        let dest_section_pk = SecretKey::random().public_key();
 
         let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
         let wire_msg = WireMsg::new_sectioninfo_msg(&query, dest, dest_section_pk)?;
@@ -357,12 +358,18 @@ mod tests {
     #[test]
     #[cfg(not(feature = "client-only"))]
     fn serialisation_node_cmd_msg() -> Result<()> {
-        let dest = XorName::random();
-        let src_section_pk = threshold_crypto::SecretKey::random().public_key();
-        let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
+        use crate::MessageId;
+        use node::{NodeCmd, NodeCmdMessage, NodeSystemCmd};
 
-        let node_cmd =
-            node::NodeCmd::System(node::NodeSystemCmd::RegisterWallet(dest_section_pk.into()));
+        let dest = XorName::random();
+        let src_section_pk = SecretKey::random().public_key();
+        let dest_section_pk = SecretKey::random().public_key();
+
+        let node_cmd = NodeCmdMessage::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(dest_section_pk.into())),
+            id: MessageId::new(),
+            target_section_pk: None,
+        };
 
         // first test without including a source section public key in the header
         let wire_msg = WireMsg::new_node_cmd_msg(&node_cmd, dest, dest_section_pk, None)?;

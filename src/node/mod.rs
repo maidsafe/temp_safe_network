@@ -9,13 +9,14 @@
 
 mod node_cmd;
 
-pub use self::node_cmd::{
-    NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
-    NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
-    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
-};
-use crate::{Error, MessageType, Result, WireMsg};
+use crate::{MessageType, WireMsg};
 use bytes::Bytes;
+pub use node_cmd::{
+    NodeCmd, NodeCmdError, NodeCmdMessage, NodeDataError, NodeDataQueryResponse, NodeEvent,
+    NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery,
+    NodeSystemQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+    NodeTransferQueryResponse,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
 use threshold_crypto::PublicKey as BlsPublicKey;
@@ -35,17 +36,19 @@ impl NodeMessage {
 
     /// Convenience function to deserialize a 'NodeMessage' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node message.
-    pub fn from(bytes: Bytes) -> Result<Self> {
+    pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
         if let MessageType::NodeMessage { msg, .. } = deserialized {
             Ok(msg)
         } else {
-            Err(Error::FailedToParse("bytes as a node message".to_string()))
+            Err(crate::Error::FailedToParse(
+                "bytes as a node message".to_string(),
+            ))
         }
     }
 
     /// serialize this NodeMessage into bytes ready to be sent over the wire.
-    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> Result<Bytes> {
+    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
         WireMsg::serialize_node_msg(self, dest, dest_section_pk)
     }
 }

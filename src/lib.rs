@@ -48,7 +48,7 @@ pub enum MessageType {
     },
     #[cfg(not(feature = "client-only"))]
     NodeCmdMessage {
-        msg: node::NodeCmd,
+        msg: node::NodeCmdMessage,
         dest_info: DestInfo,
         src_section_pk: Option<PublicKey>,
     },
