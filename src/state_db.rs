@@ -27,27 +27,27 @@ pub async fn store_new_reward_keypair(
     Ok(())
 }
 
-// /// Writes the info to disk.
-// pub async fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
-//     let path = root_dir.join(AGE_GROUP_FILENAME);
-//     fs::write(path, utils::serialise(age_group)?).await?;
-//     Ok(())
-// }
-
-// /// Returns Some(AgeGroup) or None if file doesn't exist.
-// pub async fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
-//     let path = root_dir.join(AGE_GROUP_FILENAME);
-//     if !path.is_file() {
-//         return Ok(None);
-//     }
-//     let contents = fs::read(path).await?;
-//     Ok(Some(bincode::deserialize(&contents)?))
-// }
+/// Returns Some(PublicKey) or None if file doesn't exist.
+pub async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
+    let path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).await?;
+    Ok(Some(pk_from_bytes(bytes)?))
+}
 
 ///
 pub fn pk_to_hex(pk: &PublicKey) -> String {
     let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
     vec_to_hex(pk_as_bytes.to_vec())
+}
+
+///
+pub fn pk_from_bytes(bytes: Vec<u8>) -> Result<PublicKey> {
+    let hex = String::from_utf8(bytes)
+        .map_err(|_| Error::Logic("Config error: Could not parse bytes as string".to_string()))?;
+    pk_from_hex(&hex)
 }
 
 ///
@@ -91,6 +91,7 @@ fn parse_hex(hex_str: &str) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use tempdir::TempDir;
 
     /// Hex encoding public keys.
     #[test]
@@ -103,7 +104,26 @@ mod test {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn pubkey_to_and_from_file() -> Result<()> {
+        let sk = SecretKey::random();
+        let pk = sk.public_key();
+
+        let root = create_temp_root(&"rewardkey")?;
+        let root_dir = root.path();
+        store_new_reward_keypair(root_dir, &sk, &pk).await?;
+        let pk_result = get_reward_pk(root_dir).await?;
+
+        assert_eq!(pk_result, Some(pk));
+        Ok(())
+    }
+
     fn gen_key() -> PublicKey {
         SecretKey::random().public_key()
+    }
+
+    /// creates a temp dir for the root of all stores
+    fn create_temp_root(dir: &str) -> Result<TempDir> {
+        TempDir::new(dir).map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 }

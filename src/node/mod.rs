@@ -20,7 +20,7 @@ use crate::{
     network::Network,
     node_ops::NodeDuty,
     section_funds::SectionFunds,
-    state_db::store_new_reward_keypair,
+    state_db::{get_reward_pk, store_new_reward_keypair},
     transfers::Transfers,
     Config, Error, Result,
 };
@@ -129,9 +129,9 @@ impl Node {
 
         let reward_key_task = async move {
             let res: Result<PublicKey>;
-            match config.wallet_id() {
+            match get_reward_pk(root_dir).await? {
                 Some(public_key) => {
-                    res = Ok(PublicKey::Bls(crate::state_db::pk_from_hex(public_key)?));
+                    res = Ok(PublicKey::Bls(public_key));
                 }
                 None => {
                     let secret = SecretKey::random();
