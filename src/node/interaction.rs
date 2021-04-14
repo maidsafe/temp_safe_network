@@ -128,16 +128,16 @@ impl Node {
     pub fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> NodeDuty {
         let dst = DstLocation::Section(prefix.name());
 
-        let user_wallets = if let Some(transfers) = &self.transfers {
-            transfers.user_wallets()
+        let user_wallets = if let Ok(elder) = &self.role.as_elder() {
+            elder.transfers.user_wallets()
         } else {
-            Default::default()
+            BTreeMap::new()
         };
 
-        let node_rewards = match &self.section_funds {
-            Some(SectionFunds::KeepingNodeWallets { wallets, .. })
-            | Some(SectionFunds::Churning { wallets, .. }) => wallets.node_wallets(),
-            None => Default::default(),
+        let node_rewards = if let Ok(elder) = &self.role.as_elder() {
+            elder.section_funds.node_wallets()
+        } else {
+            BTreeMap::new()
         };
 
         // only push that what should be in dst

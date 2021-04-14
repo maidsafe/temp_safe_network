@@ -10,6 +10,7 @@ use super::messaging::{send, send_to_nodes};
 use crate::{
     chunks::Chunks,
     metadata::Metadata,
+    node::{AdultRole, Role},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
         reward_process::RewardProcess,
@@ -77,42 +78,39 @@ impl Node {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
-                if let Ok((churn_process, _, _)) = self.get_churning_funds() {
-                    info!("Handling Churn proposal as an Elder");
-                    Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
-                } else {
-                    // we are an adult, so ignore this msg
-                    Ok(vec![])
-                }
+                let elder = self.role.as_elder_mut()?;
+                info!("Handling Churn proposal as an Elder");
+                let (churn_process, _, _) = elder.section_funds.as_churning_mut()?;
+                Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
-                if let Ok((churn_process, reward_wallets, payments)) = self.get_churning_funds() {
-                    let mut ops = vec![
-                        churn_process
-                            .receive_wallet_accumulation(accumulation)
-                            .await?,
-                    ];
+                let elder = self.role.as_elder_mut()?;
 
-                    if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
-                        let reward_sum = credit_proofs.sum();
-                        ops.extend(Self::propagate_credits(credit_proofs)?);
-                        // update state
-                        self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-                            wallets: reward_wallets.clone(),
-                            payments: payments.clone(),
-                        });
-                        let section_key = &self.network_api.section_public_key().await?;
-                        info!(
-                            "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
-                            section_key, reward_sum
-                        );
-                    }
+                let (churn_process, reward_wallets, payments) =
+                    elder.section_funds.as_churning_mut()?;
 
-                    Ok(ops)
-                } else {
-                    // else we are an adult, so ignore this msg
-                    Ok(vec![])
+                let mut ops = vec![
+                    churn_process
+                        .receive_wallet_accumulation(accumulation)
+                        .await?,
+                ];
+
+                if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                    let reward_sum = credit_proofs.sum();
+                    ops.extend(Self::propagate_credits(credit_proofs)?);
+                    // update state
+                    elder.section_funds = SectionFunds::KeepingNodeWallets {
+                        wallets: reward_wallets.clone(),
+                        payments: payments.clone(),
+                    };
+                    let section_key = &self.network_api.section_public_key().await?;
+                    info!(
+                        "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
+                        section_key, reward_sum
+                    );
                 }
+
+                Ok(ops)
             }
             //
             // ------- reward reg -------
@@ -122,10 +120,12 @@ impl Node {
                 msg_id,
                 origin,
             } => {
+                let elder = self.role.as_elder_mut()?;
                 let members = self.network_api.our_members().await;
-                let rewards = self.get_section_funds()?;
                 if let Some(age) = members.get(&node_id) {
-                    rewards.set_node_wallet(node_id, wallet_id, *age);
+                    elder
+                        .section_funds
+                        .set_node_wallet(node_id, wallet_id, *age);
                     Ok(vec![])
                 } else {
                     debug!(
@@ -149,14 +149,16 @@ impl Node {
                 info!("Setting JoinsAllowed to `True` for replacing the member left");
                 ops.push(NodeDuty::SetNodeJoinsAllowed(true));
 
-                let rewards = self.get_section_funds()?;
-                rewards.remove_node_wallet(name);
+                let elder = self.role.as_elder_mut()?;
+                elder.section_funds.remove_node_wallet(name);
+                elder
+                    .transfers
+                    .decrease_full_node_count_if_present(name)
+                    .await?;
 
-                let transfers = self.get_transfers()?;
-                let _ = transfers.decrease_full_node_count_if_present(name).await;
+                ops.extend(elder.meta_data.trigger_chunk_replication(name).await?);
 
-                let metadata = self.get_metadata()?;
-                Ok(metadata.trigger_chunk_replication(name).await?)
+                Ok(ops)
             }
             //
             // ---------- Levelling --------------
@@ -166,33 +168,33 @@ impl Node {
             } => Ok(vec![self.synch_state(node_rewards, user_wallets).await?]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
-                self.meta_data = None;
-                self.transfers = None;
-                self.section_funds = None;
-                self.chunks = Some(
-                    Chunks::new(
+                self.role = Role::Adult(AdultRole {
+                    chunks: Chunks::new(
                         self.node_info.node_name,
                         self.node_info.root_dir.as_path(),
                         self.used_space.clone(),
                     )
                     .await?,
-                );
+                });
                 Ok(vec![])
             }
             //
             // ----------- Transfers -----------
             NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
-                let transfers = self.get_transfers()?;
-                Ok(vec![transfers.all_events(msg_id, origin).await?])
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.transfers.all_events(msg_id, origin).await?])
             }
             NodeDuty::PropagateTransfer {
                 proof,
                 msg_id,
                 origin,
             } => {
-                let transfers = self.get_transfers()?;
+                let elder = self.role.as_elder_mut()?;
                 Ok(vec![
-                    transfers.receive_propagated(&proof, msg_id, origin).await?,
+                    elder
+                        .transfers
+                        .receive_propagated(&proof, msg_id, origin)
+                        .await?,
                 ])
             }
             NodeDuty::ValidateClientTransfer {
@@ -200,9 +202,12 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let transfers = self.get_transfers()?;
+                let elder = self.role.as_elder()?;
                 Ok(vec![
-                    transfers.validate(signed_transfer, msg_id, origin).await?,
+                    elder
+                        .transfers
+                        .validate(signed_transfer, msg_id, origin)
+                        .await?,
                 ])
             }
             NodeDuty::SimulatePayout {
@@ -210,8 +215,8 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let transfers = self.get_transfers()?;
-                Ok(vec![transfers.credit_without_proof(transfer).await?])
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.transfers.credit_without_proof(transfer).await?])
             }
             NodeDuty::GetTransfersHistory {
                 at,
@@ -220,12 +225,12 @@ impl Node {
                 origin,
             } => {
                 debug!(">>>> TODO: GET TRANSFER HISTORY, ADD limit with since_version....");
-                let transfers = self.get_transfers()?;
-                Ok(vec![transfers.history(&at, msg_id, origin).await?])
+                let elder = self.role.as_elder()?;
+                Ok(vec![elder.transfers.history(&at, msg_id, origin).await?])
             }
             NodeDuty::GetBalance { at, msg_id, origin } => {
-                let transfers = self.get_transfers()?;
-                Ok(vec![transfers.balance(at, msg_id, origin).await?])
+                let elder = self.role.as_elder()?;
+                Ok(vec![elder.transfers.balance(at, msg_id, origin).await?])
             }
             NodeDuty::GetStoreCost {
                 requester,
@@ -233,12 +238,12 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let transfers = self.get_transfers()?;
-                Ok(transfers.get_store_cost(bytes, msg_id, origin).await)
+                let elder = self.role.as_elder_mut()?;
+                Ok(elder.transfers.get_store_cost(bytes, msg_id, origin).await)
             }
             NodeDuty::RegisterTransfer { proof, msg_id } => {
-                let transfers = self.get_transfers()?;
-                Ok(vec![transfers.register(&proof, msg_id).await?])
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.transfers.register(&proof, msg_id).await?])
             }
             //
             // -------- Immutable chunks --------
@@ -256,9 +261,9 @@ impl Node {
                     .await
                     .matches(&&data_section_addr)
                 {
-                    let chunks = self.get_chunks()?;
-                    let read = chunks.read(&read, msg_id, origin).await?;
-                    let mut ops = chunks.check_storage().await?;
+                    let adult = self.role.as_adult_mut()?;
+                    let read = adult.chunks.read(&read, msg_id, origin).await?;
+                    let mut ops = adult.chunks.check_storage().await?;
                     ops.insert(0, read);
                     Ok(ops)
                 } else {
@@ -283,15 +288,15 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let chunks = self.get_chunks()?;
-                Ok(vec![chunks.write(&write, msg_id, origin).await?])
+                let adult = self.role.as_adult_mut()?;
+                Ok(vec![adult.chunks.write(&write, msg_id, origin).await?])
             }
             NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
             //
             // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => {
-                let transfers = self.get_transfers()?;
-                transfers.increase_full_node_count(node_id).await?;
+                let elder = self.role.as_elder_mut()?;
+                elder.transfers.increase_full_node_count(node_id).await?;
                 // Accept a new node in place for the full node.
                 Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
             }
@@ -299,8 +304,12 @@ impl Node {
                 send(msg, &self.network_api).await?;
                 Ok(vec![])
             }
-            NodeDuty::SendToNodes { targets, msg } => {
-                send_to_nodes(targets, &msg, &self.network_api).await?;
+            NodeDuty::SendToNodes {
+                msg,
+                targets,
+                aggregation,
+            } => {
+                send_to_nodes(&msg, targets, aggregation, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SetNodeJoinsAllowed(joins_allowed) => {
@@ -319,8 +328,8 @@ impl Node {
                     .await
                     .matches(&data_section_addr)
                 {
-                    let meta_data = self.get_metadata()?;
-                    Ok(vec![meta_data.read(query, id, origin).await?])
+                    let elder = self.role.as_elder()?;
+                    Ok(vec![elder.meta_data.read(query, id, origin).await?])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: Message::NodeQuery {
@@ -336,108 +345,41 @@ impl Node {
                 }
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                let meta_data = self.get_metadata()?;
-                Ok(vec![meta_data.write(cmd, id, origin).await?])
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.meta_data.write(cmd, id, origin).await?])
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
-                let transfers = self.get_transfers()?;
-                transfers.process_payment(&msg, origin).await
+                let elder = self.role.as_elder_mut()?;
+                elder.transfers.process_payment(&msg, origin).await
             }
             NodeDuty::AddPayment(credit) => {
-                self.get_section_funds()?.add_payment(credit);
+                let elder = self.role.as_elder_mut()?;
+                elder.section_funds.add_payment(credit);
                 Ok(vec![])
             }
-            NodeDuty::ReplicateChunk {
-                current_holders,
-                address,
-                id,
-            } => {
-                let chunks = self.get_chunks()?;
-                Ok(vec![
-                    chunks.replicate_chunk(address, current_holders, id).await?,
-                ])
+            NodeDuty::ReplicateChunk(data) => {
+                let adult = self.role.as_adult_mut()?;
+                adult.chunks.store_for_replication(data).await?;
+                Ok(vec![])
             }
-            NodeDuty::GetChunkForReplication {
+            NodeDuty::ReturnChunkToElders {
                 address,
-                new_holder,
                 id,
+                section,
             } => {
-                let chunks = self.get_chunks()?;
+                let adult = self.role.as_adult()?;
                 Ok(vec![
-                    chunks
-                        .get_chunk_for_replication(address, id, new_holder)
+                    adult
+                        .chunks
+                        .get_chunk_for_replication(address, id, section)
                         .await?,
                 ])
             }
-            NodeDuty::StoreChunkForReplication {
-                data,
-                correlation_id,
-            } => {
-                // Recreate original MessageId from Section
-                let msg_id = MessageId::combine(vec![
-                    *data.address().name(),
-                    self.network_api.our_name().await,
-                ]);
-                if msg_id == correlation_id {
-                    let chunks = self.get_chunks()?;
-                    Ok(vec![chunks.store_replicated_chunk(data).await?])
-                } else {
-                    log::warn!("Invalid message ID");
-                    Ok(vec![])
-                }
+            NodeDuty::FinishReplication(data) => {
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.meta_data.finish_chunk_replication(data).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
-        }
-    }
-
-    fn get_chunks(&mut self) -> Result<&mut Chunks> {
-        if let Some(chunks) = &mut self.chunks {
-            Ok(chunks)
-        } else {
-            Err(Error::NoChunks)
-        }
-    }
-
-    fn get_metadata(&mut self) -> Result<&mut Metadata> {
-        if let Some(meta_data) = &mut self.meta_data {
-            Ok(meta_data)
-        } else {
-            Err(Error::NoMetadata)
-        }
-    }
-
-    pub(crate) fn get_transfers(&mut self) -> Result<&mut Transfers> {
-        if let Some(transfers) = &mut self.transfers {
-            Ok(transfers)
-        } else {
-            Err(Error::NoTransfers)
-        }
-    }
-
-    fn get_section_funds(&mut self) -> Result<&mut SectionFunds> {
-        if let Some(section_funds) = &mut self.section_funds {
-            Ok(section_funds)
-        } else {
-            Err(Error::NoSectionFunds)
-        }
-    }
-
-    fn get_churning_funds(
-        &mut self,
-    ) -> Result<(
-        &mut RewardProcess,
-        &mut RewardWallets,
-        &mut DashMap<CreditId, CreditAgreementProof>,
-    )> {
-        if let Some(SectionFunds::Churning {
-            process,
-            wallets,
-            payments,
-        }) = &mut self.section_funds
-        {
-            Ok((process, wallets, payments))
-        } else {
-            Err(Error::NotChurningFunds)
         }
     }
 }

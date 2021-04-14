@@ -11,7 +11,7 @@ use crate::{
     error::convert_to_error_message,
     node_ops::{NodeDuty, OutgoingMsg},
     section_funds::elder_signing,
-    Error, NodeInfo, Result,
+    Error, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};
@@ -118,35 +118,12 @@ impl ChunkStorage {
         }))
     }
 
-    pub async fn replicate_chunk(
-        &self,
-        address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
-        msg_id: MessageId,
-    ) -> Result<NodeDuty> {
-        let msg = Message::NodeQuery {
-            query: NodeQuery::System(NodeSystemQuery::GetChunk {
-                address,
-                new_holder: self.node_name,
-                current_holders: BTreeSet::default(), //TODO: remove this in sn_messaging
-            }),
-            id: msg_id,
-            target_section_pk: None,
-        };
-        info!("Sending NodeSystemQuery::GetChunk to existing holders");
-
-        Ok(NodeDuty::SendToNodes {
-            msg,
-            targets: current_holders,
-        })
-    }
-
-    ///
+    /// Returns a chunk to the Elders of a section.
     pub async fn get_for_replication(
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        new_holder: XorName,
+        section: XorName,
     ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
@@ -161,9 +138,9 @@ impl ChunkStorage {
                     correlation_id: msg_id,
                     target_section_pk: None,
                 },
-                section_source: false, // sent as single node
-                dst: DstLocation::Node(new_holder),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                section_source: false,              // sent as single node
+                dst: DstLocation::Section(section), // send it back to section Elders
+                aggregation: Aggregation::None,
             }))
         } else {
             log::warn!("Could not read chunk for replication: {:?}", result);
@@ -171,20 +148,20 @@ impl ChunkStorage {
         }
     }
 
-    ///
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeDuty> {
+    /// Stores a chunk that Elders sent to it for replication.
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<()> {
         if self.chunks.has(blob.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
                 blob.address()
             );
-            return Ok(NodeDuty::NoOp);
+            return Ok(());
         }
 
         self.chunks.put(&blob).await?;
 
-        Ok(NodeDuty::NoOp)
+        Ok(())
     }
 
     pub async fn used_space_ratio(&self) -> f64 {

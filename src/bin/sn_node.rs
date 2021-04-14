@@ -33,6 +33,8 @@ use sn_node::{self, add_connection_info, set_connection_info, utils, Config, Nod
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 
+const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
+
 /// Runs a Safe Network node.
 fn main() {
     let sn_node_thread = std::thread::Builder::new()
@@ -103,14 +105,28 @@ async fn run_node() {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let mut node = match Node::new(&config).await {
-        Ok(node) => node,
-        Err(e) => {
-            println!("Cannot start node due to error: {:?}", e);
-            error!("Cannot start node due to error: {:?}", e);
-            process::exit(1);
+    let log = format!(
+        "The network is not accepting nodes right now. Retrying after {} minutes",
+        BOOTSTRAP_RETRY_TIME
+    );
+
+    let mut node = loop {
+        match Node::new(&config).await {
+            Ok(node) => break node,
+            Err(sn_node::Error::Routing(sn_routing::Error::TryJoinLater)) => {
+                println!("{}", log);
+                info!("{}", log);
+                tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
+                    .await;
+            }
+            Err(e) => {
+                println!("Cannot start node due to error: {:?}. Exiting", e);
+                error!("Cannot start node due to error: {:?}. Exiting", e);
+                process::exit(1);
+            }
         }
     };
+
     let node_prefix = node.our_prefix().await;
     let node_name = node.our_name().await;
     let our_conn_info = node.our_connection_info();
@@ -128,11 +144,11 @@ async fn run_node() {
 
     if config.is_first() {
         set_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to write our connection info to disk: {}", err);
+            error!("Unable to write our connection info to disk: {}", err);
         });
     } else {
         add_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to add our connection info to disk: {}", err);
+            error!("Unable to add our connection info to disk: {}", err);
         });
     }
 

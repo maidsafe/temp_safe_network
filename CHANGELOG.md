@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.2](https://github.com/maidsafe/sn_node/compare/v0.37.1...v0.37.2) (2021-04-14)
+
+### [0.37.1](https://github.com/maidsafe/sn_node/compare/v0.37.0...v0.37.1) (2021-04-14)
+
+## [0.37.0](https://github.com/maidsafe/sn_node/compare/v0.36.2...v0.37.0) (2021-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Members of node cmds changed.
+
+### Bug Fixes
+
+* **msgs:** add aggregation scheme to SendToNodes ([ca19c7d](https://github.com/maidsafe/sn_node/commit/ca19c7d8dec0b4b89dd24f923a8d3cac4092de27))
+
+
+* **deps:** update sn_messaging and sn_routing ([0913819](https://github.com/maidsafe/sn_node/commit/09138195c2ca3f5962a351bfbaa0268d07ac2132))
+
+### [0.36.2](https://github.com/maidsafe/sn_node/compare/v0.36.1...v0.36.2) (2021-04-13)
+
+
+### Bug Fixes
+
+* post-rebase issues + clippy ([dffd5c3](https://github.com/maidsafe/sn_node/commit/dffd5c332ad3fc7658c1744b8359812a34456943))
+
+### [0.36.1](https://github.com/maidsafe/sn_node/compare/v0.36.0...v0.36.1) (2021-04-13)
+
+## [0.36.0](https://github.com/maidsafe/sn_node/compare/v0.35.7...v0.36.0) (2021-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** sn_routing major version bump
+* **join:** this updates to the latest version of routing and qp2p
+which have breaking changes
+
+### Bug Fixes
+
+* **join:** automatic retry when RoutingError::TryJoinLater is ([3ce6180](https://github.com/maidsafe/sn_node/commit/3ce6180785ac110557a143fc2100649c78acbb49))
+
+
+* **deps:** cargo update ([ccc5e19](https://github.com/maidsafe/sn_node/commit/ccc5e191a5671659583e25c172876fd69192a620))
+
+### [0.35.7](https://github.com/maidsafe/sn_node/compare/v0.35.6...v0.35.7) (2021-04-13)
+
 ### [0.35.6](https://github.com/maidsafe/sn_node/compare/v0.35.5...v0.35.6) (2021-04-13)
 
 ### [0.35.5](https://github.com/maidsafe/sn_node/compare/v0.35.4...v0.35.5) (2021-04-12)

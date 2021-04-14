@@ -64,16 +64,18 @@ impl Node {
             our_key,
         };
 
+        let elder = self.role.as_elder_mut()?;
+
         let mut process =
             RewardProcess::new(section, ElderSigning::new(self.network_api.clone()).await?);
 
         let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
 
-        self.section_funds = Some(SectionFunds::Churning {
+        elder.section_funds = SectionFunds::Churning {
             process,
             wallets,
-            payments: Default::default(),
-        });
+            payments: DashMap::new(),
+        };
 
         Ok(())
     }
@@ -85,20 +87,17 @@ impl Node {
         our_key: PublicKey,
         sibling_key: PublicKey,
     ) -> Result<NodeDuties> {
-        let user_wallets = if let Some(transfers) = &mut self.transfers {
-            let info = replica_info(&self.node_info, &self.network_api).await?;
-            transfers.update_replica_info(info);
-            transfers.user_wallets()
-        } else {
-            return Err(Error::Logic("No transfers on this node".to_string()));
-        };
+        let elder = self.role.as_elder_mut()?;
 
-        let (wallets, payments) = match &mut self.section_funds {
-            Some(SectionFunds::KeepingNodeWallets { wallets, payments })
-            | Some(SectionFunds::Churning {
+        let info = replica_info(&self.node_info, &self.network_api).await?;
+        elder.transfers.update_replica_info(info);
+        let user_wallets = elder.transfers.user_wallets();
+
+        let (wallets, payments) = match &mut elder.section_funds {
+            SectionFunds::KeepingNodeWallets { wallets, payments }
+            | SectionFunds::Churning {
                 wallets, payments, ..
-            }) => (wallets.clone(), payments.sum()),
-            None => return Err(Error::NoSectionFunds),
+            } => (wallets.clone(), payments.sum()),
         };
 
         let sibling_prefix = our_prefix.sibling();
@@ -115,7 +114,7 @@ impl Node {
         let mut ops = vec![];
 
         if payments > Token::zero() {
-            let section_managed = self.get_transfers()?.managed_amount().await?;
+            let section_managed = elder.transfers.managed_amount().await?;
 
             // payments made since last churn
             debug!("Payments: {}", payments);
@@ -137,11 +136,11 @@ impl Node {
                     .await?,
             );
 
-            self.section_funds = Some(SectionFunds::Churning {
+            elder.section_funds = SectionFunds::Churning {
                 process,
                 wallets: wallets.clone(),
-                payments: Default::default(), // clear old payments
-            });
+                payments: DashMap::new(), // clear old payments
+            };
         } else {
             debug!("Not paying out rewards, as no payments have been received since last split.");
         }

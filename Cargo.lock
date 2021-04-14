@@ -110,9 +110,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.48"
+version = "0.1.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36ea56748e10732c49404c153638a15ec3d6211ec5ff35d9bb20e13b93576adf"
+checksum = "589652ce7ccb335d1e7ecb3be145425702b290dbcb7029bbeaae263fc1d87b48"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -472,9 +472,9 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "3.0.2"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f627126b946c25a4638eec0ea634fc52506dea98db118aae985118ce7c3d723f"
+checksum = "639891fde0dbea823fc3d798a0fdf9d2f9440a42d64a78ab3488b0ca025117b3"
 dependencies = [
  "byteorder",
  "digest",
@@ -959,8 +959,8 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio 1.4.0",
- "tokio-util 0.6.5",
+ "tokio 1.5.0",
+ "tokio-util 0.6.6",
  "tracing",
 ]
 
@@ -1098,7 +1098,7 @@ dependencies = [
  "itoa",
  "pin-project",
  "socket2 0.4.0",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "tower-service",
  "tracing",
  "want",
@@ -1161,7 +1161,7 @@ dependencies = [
  "hyper 0.14.5",
  "log",
  "rand 0.8.3",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "url",
  "xmltree",
 ]
@@ -1641,9 +1641,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.7"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f31917847e70d9b6a13def63cdf6626ed515f171cec74c9d430738d918b811e5"
+checksum = "604dbd98d1a4ed86f164e5e7182235e8c2ecdb6ee7fe751c9a1b113729e4ec1b"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -1659,7 +1659,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "thiserror",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "webpki",
 ]
 
@@ -1699,7 +1699,7 @@ dependencies = [
  "rustls 0.19.0",
  "socket2 0.3.19",
  "thiserror",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "tracing",
  "webpki",
 ]
@@ -1886,9 +1886,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94341e4e44e24f6b591b59e47a8a027df12e008d73fd5672dbea9cc22f4507d9"
+checksum = "8270314b5ccceb518e7e578952f0b72b88222d02e8f77f5ecf7abbb673539041"
 dependencies = [
  "bitflags",
 ]
@@ -2248,9 +2248,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "13.1.0"
+version = "14.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42f9b5c9f8c65b3db93fc7eba61f38fa9bf07f6991856a171ea9080f5ec0af72"
+checksum = "b41d562c8f2d89dce55b911daad0df7dd27aa21a49f54c5ef417679b02fd944c"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2274,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.35.3"
+version = "0.37.1"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2311,15 +2311,15 @@ dependencies = [
  "tempdir",
  "thiserror",
  "threshold_crypto",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "xor_name",
 ]
 
 [[package]]
 name = "sn_routing"
-version = "0.58.1"
+version = "0.60.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f353ad33cce5db9269650c9341c89b3b4f869dc3e53cb58752aa9bd6040ba212"
+checksum = "7e2e9ce56b1e87e22ca5a2300133e3893ee436290e01c2a953d7b18a57ff12e1"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2340,7 +2340,7 @@ dependencies = [
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "tracing",
  "xor_name",
 ]
@@ -2638,9 +2638,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "134af885d758d645f0f0505c9a8b3f9bf8a348fd822e112ab5248138348f1722"
+checksum = "83f0c8e7c0addab50b663055baf787d0af7f413a46e6e7fb9559a4e4db7137a5"
 dependencies = [
  "autocfg",
  "bytes 1.0.1",
@@ -2691,16 +2691,16 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5143d049e85af7fbc36f5454d990e62c2df705b3589f123b71f441b6b59f443f"
+checksum = "940a12c99365c31ea8dd9ba04ec1be183ffe4920102bb7122c2f515437601e8e"
 dependencies = [
  "bytes 1.0.1",
  "futures-core",
  "futures-sink",
  "log",
  "pin-project-lite 0.2.6",
- "tokio 1.4.0",
+ "tokio 1.5.0",
 ]
 
 [[package]]
