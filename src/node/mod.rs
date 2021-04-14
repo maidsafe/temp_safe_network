@@ -25,7 +25,6 @@ use crate::{
     Config, Error, Result,
 };
 use bls::SecretKey;
-use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use log::{error, info};
 use sn_data_types::PublicKey;
 use sn_routing::EventStream;
@@ -40,13 +39,7 @@ use std::{
 #[derive(Clone)]
 pub struct NodeInfo {
     ///
-    pub genesis: bool,
-    ///
     pub root_dir: PathBuf,
-    ///
-    pub node_name: XorName,
-    ///
-    pub node_id: Ed25519PublicKey,
     /// The key used by the node to receive earned rewards.
     pub reward_key: PublicKey,
 }
