@@ -28,7 +28,6 @@ build-tests/
 .idea
 
 # Manual
-.cargo/
 
 # Misc
 packages/
