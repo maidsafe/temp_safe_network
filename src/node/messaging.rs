@@ -44,13 +44,17 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     let content = match msg.msg.clone() {
         MsgType::Client(msg) => ClientMsg::Process(msg).serialize(dst_name, dest_section_pk)?,
         MsgType::Node(msg) => {
-            let src_section_pk = Some(
-                network
-                    .section_public_key()
-                    .await?
-                    .bls()
-                    .ok_or(Error::NoSectionPublicKey)?,
-            );
+            let src_section_pk = if itinerary.aggregate_at_dst() {
+                Some(
+                    network
+                        .section_public_key()
+                        .await?
+                        .bls()
+                        .ok_or(Error::NoSectionPublicKey)?,
+                )
+            } else {
+                None
+            };
             msg.serialize(dst_name, dest_section_pk, src_section_pk)?
         }
     };

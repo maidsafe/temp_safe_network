@@ -149,9 +149,8 @@ impl Network {
         self.routing.public_key_set().await.map_err(Error::Routing)
     }
 
-    #[allow(unused)]
     pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
-        let (pk, elders) = self.routing.matching_section(name).await;
+        let (pk, _elders) = self.routing.matching_section(name).await;
         if let Some(pk) = pk {
             let pk = PublicKey::from(pk);
             Ok(pk)
