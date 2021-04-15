@@ -8,7 +8,7 @@ use structopt::StructOpt;
 // The node will then overwrite the config using the provided command line args
 
 // Note: This is essentially a test, but, when using test filtering, StructOpt
-// tries to parse the filter as an argument passed resulting in a `UnmatchedArument` error.
+// tries to parse the filter as an argument passed resulting in a `UnmatchedArgument` error.
 
 fn main() -> Result<()> {
     // Create some config and write it to disk

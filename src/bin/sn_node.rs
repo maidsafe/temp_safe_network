@@ -120,8 +120,10 @@ async fn run_node() {
                     .await;
             }
             Err(e) => {
-                println!("Cannot start node due to error: {:?}. Exiting", e);
-                error!("Cannot start node due to error: {:?}. Exiting", e);
+                println!("Cannot start node due to error: {:?}. If this is the first node on the network \
+                 pass the local address to be used using --first. Exiting", e);
+                error!("Cannot start node due to error: {:?}. If this is the first node on the network \
+                 pass the local address to be used using --first. Exiting", e);
                 exit(1);
             }
         }
