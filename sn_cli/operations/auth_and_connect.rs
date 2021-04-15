@@ -42,16 +42,6 @@ pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> R
     Ok(())
 }
 
-pub fn clear_credentials() -> Result<()> {
-    let (_, file_path) = create_credentials_file().context("Failed to clear credentials")?;
-
-    println!(
-        "Credentials were succesfully cleared from {}",
-        file_path.display()
-    );
-    Ok(())
-}
-
 // Attempt to connect with credentials if found and valid,
 // otherwise it creates a read only connection.
 // Returns the app's keypair if connection was succesfully made with credentials,
@@ -59,35 +49,10 @@ pub fn clear_credentials() -> Result<()> {
 pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
     debug!("Connecting...");
 
-    let app_keypair = match get_credentials_file_path() {
-        Ok((_, file_path)) => {
-            if let Ok(mut file) = File::open(&file_path) {
-                let mut credentials = String::new();
-                match file.read_to_string(&mut credentials) {
-                    Ok(_) if credentials.is_empty() => None,
-                    Ok(_) => {
-                        let keypair = serde_json::from_str(&credentials).with_context(|| {
-                            format!(
-                                "Unable to parse the credentials read from {}",
-                                file_path.display(),
-                            )
-                        })?;
-                        Some(keypair)
-                    }
-                    Err(err) => {
-                        debug!(
-                            "Unable to read credentials from {}: {}",
-                            file_path.display(),
-                            err
-                        );
-                        None
-                    }
-                }
-            } else {
-                None
-            }
-        }
-        Err(_) => None,
+    let app_keypair = if let Ok((_, keypair)) = read_credentials() {
+        keypair
+    } else {
+        None
     };
 
     let found_app_keypair = app_keypair.is_some();
@@ -118,6 +83,61 @@ pub async fn connect(safe: &mut Safe) -> Result<Option<Keypair>> {
     }
 }
 
+pub fn create_credentials_file() -> Result<(File, PathBuf)> {
+    let (credentials_folder, file_path) = get_credentials_file_path()?;
+    if !credentials_folder.exists() {
+        println!("Creating '{}' folder", credentials_folder.display());
+        create_dir_all(credentials_folder)
+            .context("Couldn't create project's local data folder")?;
+    }
+    let file = File::create(&file_path)
+        .with_context(|| format!("Unable to open credentials file at {}", file_path.display()))?;
+
+    Ok((file, file_path))
+}
+
+pub fn read_credentials() -> Result<(PathBuf, Option<Keypair>)> {
+    let (_, file_path) = get_credentials_file_path()?;
+
+    let keypair = if let Ok(mut file) = File::open(&file_path) {
+        let mut credentials = String::new();
+        match file.read_to_string(&mut credentials) {
+            Ok(_) if credentials.is_empty() => None,
+            Ok(_) => {
+                let keypair = serde_json::from_str(&credentials).with_context(|| {
+                    format!(
+                        "Unable to parse the credentials read from {}",
+                        file_path.display(),
+                    )
+                })?;
+                Some(keypair)
+            }
+            Err(err) => {
+                debug!(
+                    "Unable to read credentials from {}: {}",
+                    file_path.display(),
+                    err
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    Ok((file_path, keypair))
+}
+
+pub fn clear_credentials() -> Result<()> {
+    let (_, file_path) = create_credentials_file().context("Failed to clear credentials")?;
+
+    println!(
+        "Credentials were succesfully cleared from {}",
+        file_path.display()
+    );
+    Ok(())
+}
+
 // Private helpers
 
 fn get_credentials_file_path() -> Result<(PathBuf, PathBuf)> {
@@ -131,19 +151,6 @@ fn get_credentials_file_path() -> Result<(PathBuf, PathBuf)> {
 
     let file_path = credentials_folder.join(AUTH_CREDENTIALS_FILENAME);
     Ok((credentials_folder, file_path))
-}
-
-pub fn create_credentials_file() -> Result<(File, PathBuf)> {
-    let (credentials_folder, file_path) = get_credentials_file_path()?;
-    if !credentials_folder.exists() {
-        println!("Creating '{}' folder", credentials_folder.display());
-        create_dir_all(credentials_folder)
-            .context("Couldn't create project's local data folder")?;
-    }
-    let file = File::create(&file_path)
-        .with_context(|| format!("Unable to open credentials file at {}", file_path.display()))?;
-
-    Ok((file, file_path))
 }
 
 fn client_config_path() -> Option<PathBuf> {

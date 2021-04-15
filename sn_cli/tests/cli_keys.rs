@@ -21,7 +21,7 @@ use sn_cmd_test_utilities::{
 };
 use std::process::Command;
 
-const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created at:";
+const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created:";
 
 #[test]
 fn calling_safe_keys_create_pretty() -> Result<()> {

@@ -11,10 +11,15 @@ use super::{
     helpers::{get_from_arg_or_stdin, get_secret_key, serialise_output},
     OutputFmt,
 };
-use crate::operations::{auth_and_connect::create_credentials_file, safe_net::connect};
+use crate::operations::{
+    auth_and_connect::{create_credentials_file, read_credentials},
+    safe_net::connect,
+};
 use anyhow::{bail, Context, Result};
 use log::{debug, warn};
-use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, PublicKey, Safe, SecretKey};
+use sn_api::{
+    ed_sk_from_hex, fetch::XorUrlEncoder, sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName,
+};
 use std::io::Write;
 use structopt::StructOpt;
 
@@ -23,6 +28,15 @@ const PRELOAD_TESTCOINS_DEFAULT_AMOUNT: &str = "1000.111";
 
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
+    /// Show information about a SafeKey, by default it will show info about the one owned by CLI (if found)
+    Show {
+        /// Show Secret Key as well
+        #[structopt(long = "show-sk")]
+        show_sk: bool,
+        // /// The SafeKey's safe://xor-url to decode and show its Public Key. If this is not provided, the SafeKey owned by CLI (if found) will be shown
+        // #[structopt(long = "keyurl")]
+        // keyurl: Option<String>,
+    },
     #[structopt(name = "create")]
     /// Create a new SafeKey
     Create {
@@ -69,6 +83,25 @@ pub async fn key_commander(
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
+        KeysSubCommands::Show { show_sk } => {
+            match read_credentials()? {
+                (file_path, Some(keypair)) => {
+                    let xorname = XorName::from(keypair.public_key());
+                    let xorurl = XorUrlEncoder::encode_safekey(xorname, safe.xorurl_base)?;
+                    let (pk_hex, sk_hex) = keypair_to_hex_strings(&keypair)?;
+
+                    println!("Current CLI's SafeKey found at {}:", file_path.display());
+                    println!("XOR-URL: {}", xorurl);
+                    println!("Public Key: {}", pk_hex);
+                    if show_sk {
+                        println!("Secret Key: {}", sk_hex);
+                    }
+                }
+                (file_path, None) => println!("No SafeKey found at {}", file_path.display()),
+            }
+
+            Ok(())
+        }
         KeysSubCommands::Create {
             preload,
             pay_with,
@@ -225,7 +258,7 @@ pub fn print_new_key_output(
     test_coins: bool,
 ) {
     if OutputFmt::Pretty == output_fmt {
-        println!("New SafeKey created at: \"{}\"", xorurl);
+        println!("New SafeKey created: \"{}\"", xorurl);
         println!(
             "Preloaded with {} {}",
             amount,
