@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod auth_and_connect;
+pub mod auth_and_connect;
 pub mod auth_daemon;
 pub mod config;
 mod helpers;

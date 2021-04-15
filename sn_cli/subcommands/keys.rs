@@ -11,10 +11,11 @@ use super::{
     helpers::{get_from_arg_or_stdin, get_secret_key, serialise_output},
     OutputFmt,
 };
-use crate::operations::safe_net::connect;
+use crate::operations::{auth_and_connect::create_credentials_file, safe_net::connect};
 use anyhow::{bail, Context, Result};
 use log::{debug, warn};
 use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, PublicKey, Safe, SecretKey};
+use std::io::Write;
 use structopt::StructOpt;
 
 const PRELOAD_DEFAULT_AMOUNT: &str = "0.000000001";
@@ -34,6 +35,9 @@ pub enum KeysSubCommands {
         /// Preload the SafeKey with a balance
         #[structopt(long = "preload")]
         preload: Option<String>,
+        /// Set the newly created keys to be used by CLI
+        #[structopt(long = "for-cli")]
+        for_cli: bool,
         /// Don't generate a key pair and just use the provided public key
         #[structopt(long = "pk")]
         pk: Option<String>,
@@ -73,6 +77,7 @@ pub async fn key_commander(
             pk,
             pay_with,
             test_coins,
+            for_cli,
             ..
         } => {
             // TODO: support pk argument
@@ -86,7 +91,25 @@ pub async fn key_commander(
 
             let (xorurl, key_pair, amount) =
                 create_new_key(safe, test_coins, pay_with, preload, pk).await?;
-            print_new_key_output(output_fmt, xorurl, key_pair, amount, test_coins);
+            print_new_key_output(output_fmt, xorurl, key_pair.as_ref(), amount, test_coins);
+
+            if for_cli {
+                println!("Setting new SafeKey to be used by CLI...");
+                let (mut file, file_path) = create_credentials_file()?;
+                let serialised_keypair = serde_json::to_string(&key_pair)
+                    .context("Unable to serialise the credentials created")?;
+
+                file.write_all(serialised_keypair.as_bytes())
+                    .with_context(|| {
+                        format!("Unable to write credentials in {}", file_path.display(),)
+                    })?;
+
+                println!(
+                    "New credentials were successfully stored in {}",
+                    file_path.display()
+                );
+                println!("Safe CLI now has write access to the network");
+            }
 
             Ok(())
         }
@@ -201,7 +224,7 @@ pub async fn create_new_key(
 pub fn print_new_key_output(
     output_fmt: OutputFmt,
     xorurl: String,
-    key_pair: Option<Keypair>,
+    key_pair: Option<&Keypair>,
     amount: String,
     test_coins: bool,
 ) {

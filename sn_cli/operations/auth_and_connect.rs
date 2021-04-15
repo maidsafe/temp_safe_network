@@ -133,7 +133,7 @@ fn get_credentials_file_path() -> Result<(PathBuf, PathBuf)> {
     Ok((credentials_folder, file_path))
 }
 
-fn create_credentials_file() -> Result<(File, PathBuf)> {
+pub fn create_credentials_file() -> Result<(File, PathBuf)> {
     let (credentials_folder, file_path) = get_credentials_file_path()?;
     if !credentials_folder.exists() {
         println!("Creating '{}' folder", credentials_folder.display());

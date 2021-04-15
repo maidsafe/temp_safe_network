@@ -143,7 +143,7 @@ pub async fn wallet_commander(
                     print_new_key_output(
                         output_fmt,
                         key_generated_output.0,
-                        key_generated_output.1,
+                        key_generated_output.1.as_ref(),
                         key_generated_output.2,
                         test_coins,
                     );
