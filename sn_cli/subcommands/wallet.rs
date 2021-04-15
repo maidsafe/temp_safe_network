@@ -12,7 +12,7 @@ use super::{
     keys::{create_new_key, print_new_key_output},
     OutputFmt,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use log::debug;
 use sn_api::{ed_sk_from_hex, sk_to_hex, Keypair, Safe, SecretKey};
 use structopt::StructOpt;
@@ -119,14 +119,11 @@ pub async fn wallet_commander(
                     None => match secret_key {
                         Some(sk) => sk,
                         None => {
-                            key_generated_output =
-                                create_new_key(safe, test_coins, pay_with, preload, None).await?;
-                            let unwrapped_key_pair = key_generated_output
-                                .1
-                                .clone()
-                                .ok_or_else(|| anyhow!("Failed to read the generated key pair"))?;
-                            let sk = unwrapped_key_pair.secret_key()?;
+                            let (xorurl, key_pair, amount) =
+                                create_new_key(safe, test_coins, pay_with, preload).await?;
+                            let sk = key_pair.secret_key()?;
 
+                            key_generated_output = (xorurl, Some(key_pair), amount);
                             sk_to_hex(sk)
                         }
                     },

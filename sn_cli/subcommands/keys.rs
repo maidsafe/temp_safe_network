@@ -38,9 +38,6 @@ pub enum KeysSubCommands {
         /// Set the newly created keys to be used by CLI
         #[structopt(long = "for-cli")]
         for_cli: bool,
-        /// Don't generate a key pair and just use the provided public key
-        #[structopt(long = "pk")]
-        pk: Option<String>,
     },
     #[structopt(name = "balance")]
     /// Query a SafeKey's current balance
@@ -74,24 +71,24 @@ pub async fn key_commander(
     match cmd {
         KeysSubCommands::Create {
             preload,
-            pk,
             pay_with,
             test_coins,
             for_cli,
             ..
         } => {
-            // TODO: support pk argument
-            if test_coins && (pk.is_some() | pay_with.is_some()) {
-                // We don't support these args with --test-coins
-                bail!("When passing '--test-coins' argument only the '--preload' argument can be also provided");
+            if test_coins && pay_with.is_some() {
+                // We don't support this arg with --test-coins
+                bail!(
+                    "When passing '--test-coins' argument the '--pay-with' argument is not allowed"
+                );
             } else if !test_coins {
                 // We need to connect with an authorised app since we are not creating a SafeKey with test-coins
                 connect(safe).await?;
             }
 
             let (xorurl, key_pair, amount) =
-                create_new_key(safe, test_coins, pay_with, preload, pk).await?;
-            print_new_key_output(output_fmt, xorurl, key_pair.as_ref(), amount, test_coins);
+                create_new_key(safe, test_coins, pay_with, preload).await?;
+            print_new_key_output(output_fmt, xorurl, Some(&key_pair), amount, test_coins);
 
             if for_cli {
                 println!("Setting new SafeKey to be used by CLI...");
@@ -175,8 +172,7 @@ pub async fn create_new_key(
     test_coins: bool,
     pay_with: Option<String>,
     preload: Option<String>,
-    _pk: Option<String>,
-) -> Result<(String, Option<Keypair>, String)> {
+) -> Result<(String, Keypair, String)> {
     if test_coins {
         warn!("Note that the SafeKey to be created will be preloaded with **test coins** rather than real coins");
         let amount = match preload {
@@ -191,7 +187,7 @@ pub async fn create_new_key(
 
         let (xorurl, key_pair) = safe.keys_create_preload_test_coins(&amount).await?;
 
-        Ok((xorurl, Some(key_pair), amount))
+        Ok((xorurl, key_pair, amount))
     } else {
         let amount = match preload {
             None => {
@@ -217,7 +213,7 @@ pub async fn create_new_key(
             }
         };
 
-        Ok((xorurl, Some(key_pair), amount))
+        Ok((xorurl, key_pair, amount))
     }
 }
 

@@ -11,21 +11,11 @@ use crate::{
     operations::safe_net::connect,
     shell,
     subcommands::{
-        auth::auth_commander,
-        cat::cat_commander,
-        config::config_commander,
-        dog::dog_commander,
-        files::files_commander,
-        keys::{key_commander, keypair_to_hex_strings},
-        networks::networks_commander,
-        node::node_commander,
-        nrs::nrs_commander,
-        seq::seq_commander,
-        setup::setup_commander,
-        update::update_commander,
-        wallet::wallet_commander,
-        xorurl::xorurl_commander,
-        OutputFmt, SubCommands,
+        auth::auth_commander, cat::cat_commander, config::config_commander, dog::dog_commander,
+        files::files_commander, keys::key_commander, networks::networks_commander,
+        node::node_commander, nrs::nrs_commander, seq::seq_commander, setup::setup_commander,
+        update::update_commander, wallet::wallet_commander, xorurl::xorurl_commander, OutputFmt,
+        SubCommands,
     },
 };
 use anyhow::{anyhow, Result};
@@ -91,22 +81,6 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd).await,
         Some(SubCommands::Networks { cmd }) => networks_commander(cmd).await,
-        Some(SubCommands::Keypair {}) => {
-            let key_pair = safe.keypair();
-            if OutputFmt::Pretty == output_fmt {
-                println!("Key pair generated:");
-            }
-
-            match keypair_to_hex_strings(&key_pair) {
-                Ok((pk_hex, sk_hex)) => {
-                    println!("Public Key = {}", pk_hex);
-                    println!("Secret Key = {}", sk_hex);
-                }
-                Err(err) => println!("{}", err),
-            }
-
-            Ok(())
-        }
         Some(SubCommands::Update {}) => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.

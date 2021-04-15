@@ -77,7 +77,7 @@ pub enum SubCommands {
         cmd: Option<networks::NetworksSubCommands>,
     },
     #[structopt(
-        name = "auth", 
+        name = "auth",
         no_version,
         global_settings(&[AppSettings::DisableVersion]),
     )]
@@ -109,19 +109,12 @@ pub enum SubCommands {
     /// Manage files on the SAFE Network
     Files(files::FilesSubCommands),
     #[structopt(
-        name = "setup", 
+        name = "setup",
         no_version,
         global_settings(&[AppSettings::DisableVersion]),
     )]
     /// Perform setup tasks
     Setup(setup::SetupSubCommands),
-    #[structopt(
-        name = "keypair",
-        no_version,
-        global_settings(&[AppSettings::DisableVersion]),
-    )]
-    /// Generate a key pair without creating and/or storing a SafeKey on the network
-    Keypair {},
     #[structopt(
         name = "nrs",
         no_version,
