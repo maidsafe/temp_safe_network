@@ -8,7 +8,6 @@
 
 //! Implementation of the "Node" node for the SAFE Network.
 
-#![allow(unused)] // FIXME: Remove this
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",
@@ -25,7 +24,7 @@
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
-    unused_results
+    unused_results,
 )]
 // For quick_error
 #![recursion_limit = "128"]
@@ -40,22 +39,18 @@ mod event_mapping;
 mod metadata;
 mod network;
 mod node;
+mod node_ops;
 mod section_funds;
 mod to_db_key;
 mod transfers;
 
-pub(crate) mod node_ops;
 /// Docs
 pub mod state_db;
 
 pub mod utils;
 
-pub(crate) use to_db_key::ToDbKey;
-
 pub use crate::{
     config_handler::{add_connection_info, set_connection_info, Config},
     error::{Error, Result},
-    network::Network,
     node::Node,
-    node::NodeInfo,
 };

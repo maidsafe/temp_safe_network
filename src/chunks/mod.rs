@@ -13,17 +13,16 @@ mod writing;
 use crate::{
     chunk_store::UsedSpace,
     node_ops::{NodeDuties, NodeDuty},
-    NodeInfo, Result,
+    Result,
 };
 use chunk_storage::ChunkStorage;
 use log::info;
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{BlobRead, BlobWrite},
-    EndUser, MessageId, SrcLocation,
+    EndUser, MessageId,
 };
 use std::{
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     path::Path,
 };
@@ -38,9 +37,9 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub async fn new(node_name: XorName, path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            chunk_storage: ChunkStorage::new(node_name, path, used_space).await?,
+            chunk_storage: ChunkStorage::new(path, used_space).await?,
         })
     }
 
@@ -71,34 +70,21 @@ impl Chunks {
         }
     }
 
-    ///
-    pub async fn replicate_chunk(
-        &self,
-        address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
-        msg_id: MessageId,
-    ) -> Result<NodeDuty> {
-        info!("Creating new Message for acquiring chunk from current_holders");
-        self.chunk_storage
-            .replicate_chunk(address, current_holders, msg_id)
-            .await
-    }
-
-    ///
+    /// Returns a chunk to the Elders of a section.
     pub async fn get_chunk_for_replication(
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        new_holder: XorName,
+        section: XorName,
     ) -> Result<NodeDuty> {
-        info!("Send blob for replication to the new holder.");
+        info!("Send blob for replication to the Elders.");
         self.chunk_storage
-            .get_for_replication(address, msg_id, new_holder)
+            .get_for_replication(address, msg_id, section)
             .await
     }
 
-    ///
-    pub async fn store_replicated_chunk(&mut self, blob: Blob) -> Result<NodeDuty> {
+    /// Stores a chunk that Elders sent to it for replication.
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<()> {
         self.chunk_storage.store_for_replication(blob).await
     }
 }

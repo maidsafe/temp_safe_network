@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.7](https://github.com/maidsafe/sn_node/compare/v0.37.6...v0.37.7) (2021-04-14)
+
+### [0.37.6](https://github.com/maidsafe/sn_node/compare/v0.37.5...v0.37.6) (2021-04-14)
+
+### [0.37.5](https://github.com/maidsafe/sn_node/compare/v0.37.4...v0.37.5) (2021-04-14)
+
+
+### Bug Fixes
+
+* change stack size to 8mb for all windows builds ([27b4c4e](https://github.com/maidsafe/sn_node/commit/27b4c4ea9b3d37bb947961229c3b29e48b014586))
+
+### [0.37.4](https://github.com/maidsafe/sn_node/compare/v0.37.3...v0.37.4) (2021-04-14)
+
+
+### Bug Fixes
+
+* do not overwrite existing reward key ([eee066b](https://github.com/maidsafe/sn_node/commit/eee066b3b300162deabff1bf48958713fbb3fb0d))
+
+### [0.37.3](https://github.com/maidsafe/sn_node/compare/v0.37.2...v0.37.3) (2021-04-14)
+
+### [0.37.2](https://github.com/maidsafe/sn_node/compare/v0.37.1...v0.37.2) (2021-04-14)
+
+### [0.37.1](https://github.com/maidsafe/sn_node/compare/v0.37.0...v0.37.1) (2021-04-14)
+
+## [0.37.0](https://github.com/maidsafe/sn_node/compare/v0.36.2...v0.37.0) (2021-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Members of node cmds changed.
+
+### Bug Fixes
+
+* **msgs:** add aggregation scheme to SendToNodes ([ca19c7d](https://github.com/maidsafe/sn_node/commit/ca19c7d8dec0b4b89dd24f923a8d3cac4092de27))
+
+
+* **deps:** update sn_messaging and sn_routing ([0913819](https://github.com/maidsafe/sn_node/commit/09138195c2ca3f5962a351bfbaa0268d07ac2132))
+
 ### [0.36.2](https://github.com/maidsafe/sn_node/compare/v0.36.1...v0.36.2) (2021-04-13)
 
 

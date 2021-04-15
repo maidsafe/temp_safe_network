@@ -110,9 +110,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.48"
+version = "0.1.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36ea56748e10732c49404c153638a15ec3d6211ec5ff35d9bb20e13b93576adf"
+checksum = "589652ce7ccb335d1e7ecb3be145425702b290dbcb7029bbeaae263fc1d87b48"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -472,9 +472,9 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "3.0.2"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f627126b946c25a4638eec0ea634fc52506dea98db118aae985118ce7c3d723f"
+checksum = "639891fde0dbea823fc3d798a0fdf9d2f9440a42d64a78ab3488b0ca025117b3"
 dependencies = [
  "byteorder",
  "digest",
@@ -1886,9 +1886,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94341e4e44e24f6b591b59e47a8a027df12e008d73fd5672dbea9cc22f4507d9"
+checksum = "8270314b5ccceb518e7e578952f0b72b88222d02e8f77f5ecf7abbb673539041"
 dependencies = [
  "bitflags",
 ]
@@ -2248,9 +2248,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "13.1.0"
+version = "14.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42f9b5c9f8c65b3db93fc7eba61f38fa9bf07f6991856a171ea9080f5ec0af72"
+checksum = "b41d562c8f2d89dce55b911daad0df7dd27aa21a49f54c5ef417679b02fd944c"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2274,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.36.0"
+version = "0.37.5"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2317,9 +2317,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.59.1"
+version = "0.60.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b913d4ed93c4265fa0c1adbe5f190680317947e9eb0c6d162251c0387416810"
+checksum = "c87856d4b119a03fdbaaec7d2018cc41f3d486c021604a3c42146f29544742a8"
 dependencies = [
  "bincode",
  "bls_dkg",

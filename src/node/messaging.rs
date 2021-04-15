@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::{network::Network, Result};
 use crate::{node_ops::OutgoingMsg, Error};
-use crate::{Network, Result};
 use log::{error, trace};
 use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::XorName;
@@ -38,8 +38,9 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
 }
 
 pub(crate) async fn send_to_nodes(
-    targets: BTreeSet<XorName>,
     msg: &Message,
+    targets: BTreeSet<XorName>,
+    aggregation: Aggregation,
     network: &Network,
 ) -> Result<()> {
     let our_prefix = network.our_prefix().await;
@@ -58,7 +59,7 @@ pub(crate) async fn send_to_nodes(
                 Itinerary {
                     src: SrcLocation::Node(name),
                     dst: DstLocation::Node(XorName(target.0)),
-                    aggregation: Aggregation::AtDestination,
+                    aggregation,
                 },
                 bytes.clone(),
             )

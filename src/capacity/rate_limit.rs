@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Capacity, MAX_CHUNK_SIZE, MAX_SUPPLY};
-use crate::Network;
-use crate::Result;
-use log::info;
+use crate::{network::Network, Result};
 use sn_data_types::{PublicKey, Token};
 use xor_name::XorName;
 

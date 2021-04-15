@@ -1,6 +1,6 @@
 use sn_routing::XorName;
 
-use crate::Network;
+use crate::network::Network;
 
 // Copyright 2021 MaidSafe.net limited.
 //
@@ -19,11 +19,6 @@ impl AdultReader {
     /// Access to the current state of our adult constellation
     pub fn new(network: Network) -> Self {
         Self { network }
-    }
-
-    /// Dynamic state
-    pub async fn our_adults(&self) -> Vec<XorName> {
-        self.network.our_adults().await
     }
 
     /// Dynamic state

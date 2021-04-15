@@ -12,22 +12,15 @@ use crate::{
     node::{ElderRole, Role},
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
-    transfers::get_replicas::{replica_info, transfer_replicas},
-    transfers::Transfers,
-    Error, Node, Result,
+    transfers::{
+        get_replicas::{replica_info, transfer_replicas},
+        Transfers,
+    },
+    Node, Result,
 };
-use crdts::Actor;
 use dashmap::DashMap;
-use itertools::Itertools;
-use log::{debug, info};
-use sn_data_types::{
-    ActorHistory, CreditAgreementProof, NodeAge, PublicKey, SectionElders, TransferPropagated,
-    WalletHistory,
-};
-use sn_messaging::{
-    client::{Message, NodeCmd, NodeSystemCmd},
-    Aggregation, DstLocation, MessageId,
-};
+use log::info;
+use sn_data_types::{ActorHistory, NodeAge, PublicKey};
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 
@@ -36,14 +29,14 @@ impl Node {
     /// This updates the replica info on it.
     pub async fn update_replicas(&mut self) -> Result<()> {
         let elder = self.role.as_elder_mut()?;
-        let info = replica_info(&self.node_info, &self.network_api).await?;
+        let info = replica_info(&self.network_api).await?;
         elder.transfers.update_replica_info(info);
         Ok(())
     }
 
     /// Level up a newbie to an oldie on promotion
     pub async fn level_up(&mut self) -> Result<()> {
-        self.used_space.reset().await; // TODO(drusu): should this be part of adult_state?
+        self.used_space.reset().await?;
 
         //
         // start handling metadata
@@ -86,7 +79,7 @@ impl Node {
         let elder = self.role.as_elder_mut()?;
 
         // merge in provided user wallets
-        elder.transfers.merge(user_wallets);
+        elder.transfers.merge(user_wallets).await?;
 
         //  merge in provided node reward stages
         for (key, (age, wallet)) in &node_wallets {

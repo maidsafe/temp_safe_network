@@ -60,7 +60,7 @@ async fn run_node() {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
-            process::exit(1);
+            return exit(1);
         }
     };
 
@@ -87,14 +87,14 @@ async fn run_node() {
             Ok(status) => {
                 if let Status::Updated { .. } = status {
                     println!("Node has been updated. Please restart.");
-                    process::exit(0);
+                    exit(0);
                 }
             }
             Err(e) => error!("Updating node failed: {:?}", e),
         }
 
         if config.update_only() {
-            process::exit(0);
+            exit(0);
         }
     }
 
@@ -106,7 +106,7 @@ async fn run_node() {
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
     let log = format!(
-        "The network is not accepting nodes right now. Retrying after {:?} minutes",
+        "The network is not accepting nodes right now. Retrying after {} minutes",
         BOOTSTRAP_RETRY_TIME
     );
 
@@ -114,8 +114,8 @@ async fn run_node() {
         match Node::new(&config).await {
             Ok(node) => break node,
             Err(sn_node::Error::Routing(sn_routing::Error::TryJoinLater)) => {
-                println!("{:?}", log);
-                info!("{:?}", log);
+                println!("{}", log);
+                info!("{}", log);
                 tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
                     .await;
             }
@@ -124,7 +124,7 @@ async fn run_node() {
                  pass the local address to be used using --first. Exiting", e);
                 error!("Cannot start node due to error: {:?}. If this is the first node on the network \
                  pass the local address to be used using --first. Exiting", e);
-                process::exit(1);
+                exit(1);
             }
         }
     };
@@ -146,22 +146,27 @@ async fn run_node() {
 
     if config.is_first() {
         set_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to write our connection info to disk: {}", err);
+            error!("Unable to write our connection info to disk: {}", err);
         });
     } else {
         add_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to add our connection info to disk: {}", err);
+            error!("Unable to add our connection info to disk: {}", err);
         });
     }
 
     match node.run().await {
-        Ok(()) => process::exit(0),
+        Ok(()) => exit(0),
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);
             error!("Cannot start node due to error: {:?}", e);
-            process::exit(1);
+            exit(1);
         }
     }
+}
+
+fn exit(exit_code: i32) {
+    log::logger().flush();
+    process::exit(exit_code);
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {

@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{Error, Result};
-use log::warn;
 use std::{path::Path, sync::Arc};
 use tokio::{io::AsyncSeekExt, sync::Mutex};
 
@@ -38,14 +37,14 @@ impl UsedSpace {
 
     /// Clears the entire storage and sets total_value back to zero
     /// while removing all local stores
-    pub async fn reset(&self) {
-        inner::UsedSpace::reset(self.inner.clone()).await
+    pub async fn reset(&self) -> Result<()> {
+        self.inner.lock().await.reset().await
     }
 
     /// Returns the maximum capacity (e.g. the maximum
     /// value that total() can return)
     pub async fn max_capacity(&self) -> u64 {
-        inner::UsedSpace::max_capacity(self.inner.clone()).await
+        self.inner.lock().await.max_capacity()
     }
 
     /// Returns the total used space as a snapshot
@@ -53,7 +52,7 @@ impl UsedSpace {
     /// may be stale by the time it is read if there are multiple
     /// writers
     pub async fn total(&self) -> u64 {
-        inner::UsedSpace::total(self.inner.clone()).await
+        self.inner.lock().await.total()
     }
 
     /// Returns the used space of a local store as a snapshot
@@ -62,23 +61,23 @@ impl UsedSpace {
     /// writers
     #[allow(unused)]
     pub async fn local(&self, id: StoreId) -> u64 {
-        inner::UsedSpace::local(self.inner.clone(), id).await
+        self.inner.lock().await.local(id)
     }
 
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
-        inner::UsedSpace::add_local_store(self.inner.clone(), dir).await
+        self.inner.lock().await.add_local_store(dir).await
     }
 
     /// Increase the used amount of a single chunk store and the global used value
     pub async fn increase(&self, id: StoreId, consumed: u64) -> Result<()> {
-        inner::UsedSpace::increase(self.inner.clone(), id, consumed).await
+        self.inner.lock().await.increase(id, consumed).await
     }
 
     /// Decrease the used amount of a single chunk store and the global used value
     pub async fn decrease(&self, id: StoreId, released: u64) -> Result<()> {
-        inner::UsedSpace::decrease(self.inner.clone(), id, released).await
+        self.inner.lock().await.decrease(id, released).await
     }
 }
 
@@ -130,54 +129,35 @@ mod inner {
         /// Clears the storage, setting total value ot zero
         /// and dropping local stores, but leaves
         /// the capacity and next_id unchanged
-        pub async fn reset(used_space: Arc<Mutex<UsedSpace>>) {
-            let mut used_space_lock = used_space.lock().await;
-            used_space_lock.total_value = 0;
-            for (_id, local_used_space) in used_space_lock.local_stores.iter_mut() {
+        pub async fn reset(&mut self) -> Result<()> {
+            self.total_value = 0;
+            for (_id, local_used_space) in self.local_stores.iter_mut() {
                 local_used_space.local_value = 0;
-                if let Err(err) =
-                    Self::write_local_to_file(&mut local_used_space.local_record, 0).await
-                {
-                    warn!("Error updating used_space file on disk: {}", err);
-                }
+                Self::write_local_to_file(&mut local_used_space.local_record, 0).await?;
             }
+            Ok(())
         }
 
         /// Returns the maximum capacity (e.g. the maximum
         /// value that total() can return)
-        pub async fn max_capacity(used_space: Arc<Mutex<UsedSpace>>) -> u64 {
-            let used_space_lock = used_space.lock().await;
-            used_space_lock.max_capacity
+        pub fn max_capacity(&self) -> u64 {
+            self.max_capacity
         }
 
-        /// Returns the total used space as a snapshot
-        /// Note, due to the async nature of this, the value
-        /// may be stale by the time it is read if there are multiple
-        /// writers
-        pub async fn total(used_space: Arc<Mutex<UsedSpace>>) -> u64 {
-            let used_space_lock = used_space.lock().await;
-            used_space_lock.total_value
+        /// Returns the total used space
+        pub fn total(&self) -> u64 {
+            self.total_value
         }
 
         /// Returns the used space of a local store as a snapshot
-        /// Note, due to the async nature of this, the value
-        /// may be stale by the time it is read if there are multiple
-        /// writers
-        pub async fn local(used_space: Arc<Mutex<UsedSpace>>, id: StoreId) -> u64 {
-            let used_space_lock = used_space.lock().await;
-            used_space_lock
-                .local_stores
-                .get(&id)
-                .map_or(0, |res| res.local_value)
+        pub fn local(&self, id: StoreId) -> u64 {
+            self.local_stores.get(&id).map_or(0, |res| res.local_value)
         }
 
         /// Adds a new record for tracking the actions
         /// of a local chunk store as part of the global
         /// used amount tracking
-        pub async fn add_local_store<T: AsRef<Path>>(
-            used_space: Arc<Mutex<UsedSpace>>,
-            dir: T,
-        ) -> Result<StoreId> {
+        pub async fn add_local_store<T: AsRef<Path>>(&mut self, dir: T) -> Result<StoreId> {
             let mut local_record = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -203,29 +183,22 @@ mod inner {
                 local_value,
                 local_record,
             };
-            let mut used_space_lock = used_space.lock().await;
-            let id = used_space_lock.next_id;
-            used_space_lock.next_id += 1;
-            let _ = used_space_lock.local_stores.insert(id, local_store);
+            let id = self.next_id;
+            self.next_id += 1;
+            let _ = self.local_stores.insert(id, local_store);
             Ok(id)
         }
 
-        /// Asynchronous implementation to increase used space in a local store
-        /// and globally at the same time
-        pub async fn increase(
-            used_space: Arc<Mutex<UsedSpace>>,
-            id: StoreId,
-            consumed: u64,
-        ) -> Result<()> {
-            let mut used_space_lock = used_space.lock().await;
-            let new_total = used_space_lock
+        /// Increase used space in a local store and globally at the same time
+        pub async fn increase(&mut self, id: StoreId, consumed: u64) -> Result<()> {
+            let new_total = self
                 .total_value
                 .checked_add(consumed)
                 .ok_or(Error::NotEnoughSpace)?;
-            if new_total > used_space_lock.max_capacity {
+            if new_total > self.max_capacity {
                 return Err(Error::NotEnoughSpace);
             }
-            let new_local = used_space_lock
+            let new_local = self
                 .local_stores
                 .get(&id)
                 .ok_or(Error::NoStoreId)?
@@ -234,16 +207,15 @@ mod inner {
                 .ok_or(Error::NotEnoughSpace)?;
 
             {
-                let record = &mut used_space_lock
+                let record = &mut self
                     .local_stores
                     .get_mut(&id)
                     .ok_or(Error::NoStoreId)?
                     .local_record;
                 Self::write_local_to_file(record, new_local).await?;
             }
-            used_space_lock.total_value = new_total;
-            used_space_lock
-                .local_stores
+            self.total_value = new_total;
+            self.local_stores
                 .get_mut(&id)
                 .ok_or(Error::NoStoreId)?
                 .local_value = new_local;
@@ -251,32 +223,26 @@ mod inner {
             Ok(())
         }
 
-        /// Asynchronous implementation to decrease used space in a local store
-        /// and globally at the same time
-        pub async fn decrease(
-            used_space: Arc<Mutex<UsedSpace>>,
-            id: StoreId,
-            released: u64,
-        ) -> Result<()> {
-            let mut used_space_lock = used_space.lock().await;
-            let new_local = used_space_lock
+        /// Decrease used space in a local store and globally at the same time
+        pub async fn decrease(&mut self, id: StoreId, released: u64) -> Result<()> {
+            let new_local = self
                 .local_stores
                 .get_mut(&id)
                 .ok_or(Error::NoStoreId)?
                 .local_value
                 .saturating_sub(released);
-            let new_total = used_space_lock.total_value.saturating_sub(released);
+
+            let new_total = self.total_value.saturating_sub(released);
             {
-                let record = &mut used_space_lock
+                let record = &mut self
                     .local_stores
                     .get_mut(&id)
                     .ok_or(Error::NoStoreId)?
                     .local_record;
                 Self::write_local_to_file(record, new_local).await?;
             }
-            used_space_lock.total_value = new_total;
-            used_space_lock
-                .local_stores
+            self.total_value = new_total;
+            self.local_stores
                 .get_mut(&id)
                 .ok_or(Error::NoStoreId)?
                 .local_value = new_local;
@@ -284,7 +250,7 @@ mod inner {
         }
 
         /// helper to write the contents of local to file
-        /// NOTE: For now, ou should hold the lock on the inner while doing this
+        /// NOTE: For now, you should hold the lock on the inner while doing this
         /// It's slow, but maintains behaviour from the previous implementation
         async fn write_local_to_file(record: &mut File, local: u64) -> Result<()> {
             record.set_len(0).await?;
