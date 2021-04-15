@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{Error, Result};
 use rand::rngs::OsRng;
-use sn_data_types::{Keypair, SecretKey};
+use sn_data_types::{Keypair, SecretKey, Token};
 use xor_name::XorName;
 
 impl Safe {
@@ -200,41 +200,21 @@ impl Safe {
         };
 
         let result = if to.starts_with("safe://") {
-            // Let's check if the 'to' is a valid Wallet or a SafeKey URL
-            let (to_xorurl_encoder, _) = self.parse_and_resolve_url(to).await.map_err(|_| {
-                Error::InvalidInput(format!("Failed to parse the 'to' URL: {}", to))
-            })?;
-
-            let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
-                let (to_balance, _) = self
-                    .wallet_get_default_balance(&to_xorurl_encoder.to_string())
-                    .await?;
-
-                XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
-            } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
-                && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
-            {
-                to_xorurl_encoder.xorname()
-            } else {
-                return Err(Error::InvalidInput(format!(
-                    "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
-                    to_xorurl_encoder.content_type(),
-                    to_xorurl_encoder.data_type()
-                )));
-            };
-
-            // Finally, let's make the transfer
-            self.safe_client
-                .safecoin_transfer_to_xorname(from, to_xorname, amount_coins)
-                .await
+            self.transfer_to_url(from, to, amount_coins).await
         } else {
             // ...let's assume the 'to' is a PublicKey then
-            let to_pk = pk_from_hex(to)?;
-
-            // and let's make the transfer
-            self.safe_client
-                .safecoin_transfer_to_pk(from, to_pk, amount_coins)
-                .await
+            match pk_from_hex(to) {
+                Ok(to_pk) => {
+                    // and let's make the transfer
+                    self.safe_client
+                        .safecoin_transfer_to_pk(from, to_pk, amount_coins)
+                        .await
+                }
+                Err(_) => {
+                    // ...last chance, let's fall back to try it as a URL
+                    self.transfer_to_url(from, to, amount_coins).await
+                }
+            }
         };
 
         match result {
@@ -250,6 +230,42 @@ impl Safe {
             Err(other_error) => Err(other_error),
             Ok(id) => Ok(id),
         }
+    }
+
+    async fn transfer_to_url(
+        &mut self,
+        from: Option<Keypair>,
+        to: &str,
+        amount_coins: Token,
+    ) -> Result<u64> {
+        // Let's check if the 'to' is a valid Wallet or a SafeKey URL
+        let (to_xorurl_encoder, _) = self
+            .parse_and_resolve_url(to)
+            .await
+            .map_err(|_| Error::InvalidInput(format!("Failed to parse the 'to' URL: {}", to)))?;
+
+        let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
+            let (to_balance, _) = self
+                .wallet_get_default_balance(&to_xorurl_encoder.to_string())
+                .await?;
+
+            XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
+        } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
+            && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
+        {
+            to_xorurl_encoder.xorname()
+        } else {
+            return Err(Error::InvalidInput(format!(
+                "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
+                to_xorurl_encoder.content_type(),
+                to_xorurl_encoder.data_type()
+            )));
+        };
+
+        // Finally, let's make the transfer
+        self.safe_client
+            .safecoin_transfer_to_xorname(from, to_xorname, amount_coins)
+            .await
     }
 }
 
