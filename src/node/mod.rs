@@ -26,14 +26,15 @@ use crate::{
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
-use log::{error, info};
+use bls::SecretKey;
+use log::{error, info, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
-use sn_messaging::client::{
-    ClientMsg, Error as ErrorMessage, Message, ProcessMsg, ProcessingError,
+use sn_messaging::{
+    client::{ClientMsg, Error as ErrorMessage, ProcessingError},
+    DstLocation, MessageId, Msg, SrcLocation,
 };
-use sn_messaging::{DstLocation, MessageId, Msg, SrcLocation};
 use sn_routing::{EventStream, Prefix, XorName};
 use std::{
     fmt::{self, Display, Formatter},

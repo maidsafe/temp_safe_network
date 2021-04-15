@@ -16,7 +16,7 @@ use self::replicas::{ReplicaInfo, Replicas};
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     utils, Error, Result,
 };
 use log::{debug, error, info, trace, warn};
@@ -35,7 +35,7 @@ use sn_messaging::{
         Cmd, CmdError, Error as ErrorMessage, Event, ProcessMsg, QueryResponse, TransferError,
     },
     node::{
-        NodeCmd, NodeCmdError, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
+        NodeCmd, NodeCmdError, NodeMsg, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
         NodeTransferQueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
@@ -136,11 +136,11 @@ impl Transfers {
         };
 
         let response = NodeDuty::Send(OutgoingMsg {
-            msg: ProcessMsg::QueryResponse {
+            msg: MsgType::Client(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetStoreCost(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::AtDestination,
@@ -181,11 +181,11 @@ impl Transfers {
             warn!("Payment: recipient is not section");
             let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
             return Ok(vec![NodeDuty::Send(OutgoingMsg {
-                msg: ProcessMsg::CmdError {
+                msg: MsgType::Client(ProcessMsg::CmdError {
                     error: CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
                     id: MessageId::in_response_to(&msg.id()),
                     correlation_id: msg.id(),
-                },
+                }),
                 section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: origin.to_dst(),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -221,46 +221,47 @@ impl Transfers {
                     );
                     // todo, better error, like `TooLowPayment`
                     let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
-                    Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: ProcessMsg::CmdError {
+                    ops.push(NodeDuty::Send(OutgoingMsg {
+                        msg: MsgType::Client(ProcessMsg::CmdError {
                             error: CmdError::Transfer(TransferRegistration(
                                 ErrorMessage::InsufficientBalance,
                             )),
                             id: MessageId::in_response_to(&msg.id()),
                             correlation_id: msg.id(),
-                        },
+                        }),
                         section_source: true, // strictly this is not correct, but we don't expect responses to a response..
                         dst: DstLocation::Section(dst_address),
                         aggregation: Aggregation::AtDestination, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                    })])
+                    }));
+                    return Ok(ops);
                 }
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
                 // informed of this transfer as well..
-                Ok(vec![NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::NodeCmd {
+                ops.push(NodeDuty::Send(OutgoingMsg {
+                    msg: MsgType::Node(NodeMsg::NodeCmd {
                         cmd: NodeCmd::Metadata {
                             cmd: data_cmd.clone(),
                             origin,
                         },
                         id: MessageId::in_response_to(&msg.id()),
-                    },
+                    }),
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(dst_address),
                     aggregation: Aggregation::AtDestination,
-                })])
+                }))
             }
             Err(e) => {
                 warn!("Payment: registration or propagation failed: {:?}", e);
                 let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
                 Ok(vec![NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::CmdError {
+                    msg: MsgType::Client(ProcessMsg::CmdError {
                         error: CmdError::Transfer(TransferRegistration(
                             ErrorMessage::PaymentFailed,
                         )),
                         id: MessageId::in_response_to(&msg.id()),
                         correlation_id: msg.id(),
-                    },
+                    }),
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -287,11 +288,11 @@ impl Transfers {
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: ProcessMsg::NodeQueryResponse {
+            msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: query_origin.to_dst(),
             aggregation: Aggregation::AtDestination,
@@ -313,11 +314,11 @@ impl Transfers {
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: ProcessMsg::QueryResponse {
+            msg: MsgType::Client(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetBalance(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -338,11 +339,11 @@ impl Transfers {
             .map_err(|_e| ErrorMessage::NoHistoryForPublicKey(*wallet_id));
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: ProcessMsg::QueryResponse {
+            msg: MsgType::Client(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetHistory(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination, // this has to be sorted out by recipient..
@@ -361,11 +362,11 @@ impl Transfers {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
         match self.replicas.validate(transfer).await {
             Ok(event) => Ok(NodeDuty::Send(OutgoingMsg {
-                msg: ProcessMsg::Event {
+                msg: MsgType::Client(ProcessMsg::Event {
                     event: Event::TransferValidated { event },
                     id: MessageId::new(),
                     correlation_id: msg_id,
-                },
+                }),
                 section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                 dst: origin.to_dst(),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -373,11 +374,11 @@ impl Transfers {
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
                 Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::CmdError {
+                    msg: MsgType::Client(ProcessMsg::CmdError {
                         id: MessageId::in_response_to(&msg_id),
                         error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
                         correlation_id: msg_id,
-                    },
+                    }),
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -400,10 +401,10 @@ impl Transfers {
             Ok(event) => {
                 let location = event.transfer_proof.recipient().into();
                 Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::NodeCmd {
+                    msg: MsgType::Node(NodeMsg::NodeCmd {
                         cmd: Transfers(PropagateTransfer(event.transfer_proof.credit_proof())),
                         id: MessageId::in_response_to(&msg_id),
-                    },
+                    }),
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(location),
                     aggregation: Aggregation::AtDestination,
@@ -412,13 +413,13 @@ impl Transfers {
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
                 Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::CmdError {
+                    msg: MsgType::Client(ProcessMsg::CmdError {
                         error: CmdError::Transfer(TransferError::TransferRegistration(
                             message_error,
                         )),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                    },
+                    }),
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: DstLocation::EndUser(EndUser::AllClients(proof.sender())),
                     aggregation: Aggregation::AtDestination,
@@ -447,7 +448,7 @@ impl Transfers {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(Error::NetworkData(error)) => {
                 let message_error = convert_dt_error_to_error_message(error)?;
-                ProcessMsg::NodeCmdError {
+                NodeMsg::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(message_error)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
@@ -456,7 +457,7 @@ impl Transfers {
             Err(Error::UnknownSectionKey(_))
             | Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted)) => {
                 error!(">> UnknownSectionKey at receive_propagated");
-                ProcessMsg::NodeCmdError {
+                NodeMsg::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
@@ -469,7 +470,7 @@ impl Transfers {
             }
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg,
+            msg: MsgType::Node(msg),
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: origin.to_dst(),
             aggregation: Aggregation::AtDestination,

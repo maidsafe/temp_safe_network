@@ -10,7 +10,7 @@ mod map_msg;
 
 use super::node_ops::NodeDuty;
 use crate::{network::Network, node_ops::MsgType, Error};
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
 use sn_messaging::{
@@ -108,6 +108,13 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     }),
                 }
             }
+            ClientMsg::SupportingInfo(msg) => Mapping::Ok {
+                op: NodeDuty::NoOp,
+                ctx: Some(MsgContext::Msg {
+                    msg: Msg::Client(ClientMsg::SupportingInfo(msg)),
+                    src: SrcLocation::EndUser(user),
+                }),
+            },
         },
         RoutingEvent::SectionSplit {
             elders,

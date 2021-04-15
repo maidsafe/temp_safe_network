@@ -119,7 +119,7 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network message error.
     #[error("Client message error:: {0}")]
-    ClientMessage(#[from] sn_messaging::client::Error),
+    ClientMsg(#[from] sn_messaging::client::Error),
     /// Network processing error message.
     #[error("Procesing error:: {0:?}")]
     ProcessingError(sn_messaging::client::ProcessingError),

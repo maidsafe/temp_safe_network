@@ -86,15 +86,12 @@ impl ChunkStorage {
         let result = self
             .get_chunk(address)
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Blob(*address)));
-
-        // Sent back to data's metadata section, who will then
-        // forward it to client after having recorded the adult liveness.
-        ops.push(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: MsgType::Client(ProcessMsg::QueryResponse {
                 id: MessageId::in_response_to(&msg_id),
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // sent as single node
             dst: DstLocation::Section(*address.name()),
             aggregation: Aggregation::None,

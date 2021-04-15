@@ -8,11 +8,13 @@
 
 use crate::{
     network::Network,
-    node_ops::{OutgoingLazyError, OutgoingMsg, OutgoingSupportingInfo},
+    node_ops::{MsgType, OutgoingLazyError, OutgoingMsg, OutgoingSupportingInfo},
     Error, Result,
 };
 use log::{error, trace};
-use sn_messaging::{client::ProcessMsg, Aggregation, DstLocation, Itinerary, SrcLocation};
+use sn_messaging::{
+    client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, Msg, SrcLocation,
+};
 use sn_routing::XorName;
 use std::collections::BTreeSet;
 
@@ -33,21 +35,31 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     let msg_id = msg.id();
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
-    let target_section_pk = network.get_section_pk_by_name(&dst_name).await?;
+    let dest_section_pk = network.get_section_pk_by_name(&dst_name).await?;
 
-    let target_section_pk = target_section_pk
+    let dest_section_pk = dest_section_pk
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
-    let message = Message::Process(msg.msg);
-    let result = network
-        .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
-        .await;
+    let content = match msg.msg.clone() {
+        MsgType::Client(msg) => ClientMsg::Process(msg).serialize(dst_name, dest_section_pk)?,
+        MsgType::Node(msg) => {
+            let src_section_pk = Some(
+                network
+                    .section_public_key()
+                    .await?
+                    .bls()
+                    .ok_or(Error::NoSectionPublicKey)?,
+            );
+            msg.serialize(dst_name, dest_section_pk, src_section_pk)?
+        }
+    };
+    let result = network.send_message(itinerary, content).await;
 
     result.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::UnableToSend(message))
+            Err(Error::UnableToSend(MsgType::convert(msg.msg)))
         },
         |()| Ok(()),
     )
@@ -71,7 +83,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
-    let message = Message::ProcessingError(msg.msg);
+    let message = ClientMsg::ProcessingError(msg.msg);
     let result = network
         .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
         .await;
@@ -79,7 +91,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     result.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::UnableToSend(message))
+            Err(Error::UnableToSend(Msg::Client(message)))
         },
         |()| Ok(()),
     )
@@ -104,7 +116,7 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
-    let message = Message::SupportingInfo(msg.msg);
+    let message = ClientMsg::SupportingInfo(msg.msg);
     let result = network
         .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
         .await;
@@ -112,14 +124,14 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
     result.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::UnableToSend(message))
+            Err(Error::UnableToSend(Msg::Client(message)))
         },
         |()| Ok(()),
     )
 }
 
 pub(crate) async fn send_to_nodes(
-    msg: &ProcessMsg,
+    msg: &NodeMsg,
     targets: BTreeSet<XorName>,
     aggregation: Aggregation,
     network: &Network,
@@ -133,7 +145,13 @@ pub(crate) async fn send_to_nodes(
     );
 
     let name = network.our_name().await;
-    let message = Message::Process(msg.clone());
+    let src_section_pk = Some(
+        network
+            .section_public_key()
+            .await?
+            .bls()
+            .ok_or(Error::NoSectionPublicKey)?,
+    );
 
     for target in targets {
         let target_section_pk = network
@@ -141,7 +159,7 @@ pub(crate) async fn send_to_nodes(
             .await?
             .bls()
             .ok_or(Error::NoSectionPublicKeyKnown(target))?;
-        let bytes = &message.serialize(target, target_section_pk)?;
+        let bytes = &msg.serialize(target, target_section_pk, src_section_pk)?;
 
         network
             .send_message(

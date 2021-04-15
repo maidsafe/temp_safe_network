@@ -19,7 +19,7 @@ use sn_messaging::{
         BlobDataExchange, BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd,
         NodeQuery, NodeSystemCmd, NodeSystemQuery, ProcessMsg, QueryResponse,
     },
-    node::{NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery},
+    node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd, NodeSystemQuery},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
@@ -189,7 +189,7 @@ impl BlobRecords {
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
-                msg: ProcessMsg::NodeCmd {
+                msg: NodeMsg::NodeCmd {
                     cmd: NodeCmd::Chunks {
                         cmd: blob_write,
                         origin,
@@ -312,11 +312,11 @@ impl BlobRecords {
     ) -> Result<NodeDuty> {
         let message_error = convert_to_error_message(error)?;
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: ProcessMsg::CmdError {
+            msg: MsgType::Client(ProcessMsg::CmdError {
                 error: CmdError::Data(message_error),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::AtDestination,
@@ -338,7 +338,7 @@ impl BlobRecords {
             BlobWrite::DeletePrivate(address),
             targets.clone(),
         ) {
-            let msg = ProcessMsg::NodeCmd {
+            let msg = NodeMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
                     origin,
@@ -434,7 +434,7 @@ impl BlobRecords {
             .adult_liveness
             .new_read(msg_id, address, origin, targets.clone())
         {
-            let msg = ProcessMsg::NodeQuery {
+            let msg = NodeMsg::NodeQuery {
                 query: NodeQuery::Chunks {
                     query: BlobRead::Get(address),
                     origin,

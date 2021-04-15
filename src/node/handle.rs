@@ -11,16 +11,19 @@ use super::{
     messaging::{send, send_error, send_to_nodes},
     role::{AdultRole, Role},
 };
+use crate::node::messaging::send_support;
+use crate::node_ops::OutgoingSupportingInfo;
 use crate::{
     chunks::Chunks,
     event_mapping::MsgContext,
     metadata::Metadata,
     node::{AdultRole, Role},
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg, OutgoingSupportingInfo},
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
 use log::{debug, info, trace};
+use sn_messaging::node::NodeMsg;
 use sn_messaging::{
     client::{ProcessMsg, Query, SupportingInfo, SupportingInfoFor},
     node::{NodeCmd, NodeEvent, NodeQuery},
@@ -346,10 +349,10 @@ impl Node {
                     Ok(vec![elder.meta_data.read(query, id, origin).await?])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: ProcessMsg::NodeQuery {
+                        msg: MsgType::Node(NodeMsg::NodeQuery {
                             query: NodeQuery::Metadata { query, origin },
                             id,
-                        },
+                        }),
                         dst: DstLocation::Section(data_section_addr),
                         section_source: false,
                         aggregation: Aggregation::None,
@@ -391,11 +394,7 @@ impl Node {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![adult.chunks.store_for_replication(data, id).await?])
             }
-            NodeDuty::ReceiveSectionWalletHistory {
-                wallet_history,
-                origin,
-                ..
-            } => {
+            NodeDuty::ReceiveSectionWalletHistory { wallet_history, .. } => {
                 trace!("Handling received section wallet history");
                 let mut section_funds = self.section_funds.as_mut().ok_or(Error::NoSectionFunds)?;
                 let duty = section_funds

@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{
     capacity::MAX_SUPPLY,
-    node_ops::{NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{debug, info};
@@ -24,8 +24,7 @@ use sn_data_types::{
     Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
 };
 use sn_messaging::{
-    client::ProcessMsg,
-    node::{NodeCmd, NodeSystemCmd},
+    node::{NodeCmd, NodeMsg, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
 use std::collections::BTreeMap;
@@ -319,10 +318,10 @@ impl RewardProcess {
 
 fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
-        msg: Message::NodeCmd {
+        msg: MsgType::Node(NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             id: MessageId::new(),
-        },
+        }),
         section_source: false,                 // sent as single node
         dst: DstLocation::Section(our_elders), // send this msg to our elders!
         aggregation: Aggregation::None,
@@ -331,10 +330,10 @@ fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
 
 fn send_acc_msg(accumulation: RewardAccumulation, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
-        msg: Message::NodeCmd {
+        msg: MsgType::Node(NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             id: MessageId::new(),
-        },
+        }),
         section_source: false,                 // sent as single node
         dst: DstLocation::Section(our_elders), // send this msg to our elders!
         aggregation: Aggregation::None,

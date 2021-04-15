@@ -8,8 +8,8 @@
 
 use super::{Mapping, MsgContext};
 use crate::error::convert_to_error_message;
-use crate::node_ops::OutgoingMsg;
-use crate::{node_ops::NodeDuty, Error};
+use crate::node_ops::{MsgType, OutgoingMsg};
+use crate::{event_mapping::Msg, node_ops::NodeDuty, Error};
 use log::{debug, warn};
 use sn_messaging::client::{ClientMsg, ProcessingError};
 use sn_messaging::node::{
@@ -34,7 +34,22 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
         } => Mapping::Ok {
             op: NodeDuty::ProcessRead { query, id, origin },
             ctx: Some(super::MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
+        ProcessMsg::QueryResponse {
+            response,
+            correlation_id,
+            ..
+        } => Mapping::Ok {
+            op: NodeDuty::ProcessBlobReadResult {
+                response,
+                original_msg_id: correlation_id,
+                src: origin.name(),
+            },
+            ctx: Some(super::MsgContext::Msg {
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -47,7 +62,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 origin,
             },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -62,7 +77,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -78,7 +93,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -89,7 +104,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
         } => Mapping::Ok {
             op: NodeDuty::RegisterTransfer { proof, msg_id: id },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -106,7 +121,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -121,7 +136,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -136,14 +151,14 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             }),
         },
         _ => Mapping::Error {
             error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
             msg: MsgContext::Msg {
-                msg: Message::Process(msg),
+                msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
             },
         },
@@ -204,7 +219,7 @@ pub fn map_node_process_err_msg(
         _ => Mapping::Error {
             error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
             msg: MsgContext::Msg {
-                msg: Message::ProcessingError(msg),
+                msg: Msg::Client(ClientMsg::ProcessingError(msg)),
                 src,
             },
         },
@@ -242,7 +257,7 @@ fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
     Mapping::Error {
         error: Error::CannotUpdateProcessErrorNode,
         msg: MsgContext::Msg {
-            msg: Message::ProcessingError(msg),
+            msg: Msg::Client(ClientMsg::ProcessingError(msg)),
             src,
         },
     }
