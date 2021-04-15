@@ -89,6 +89,17 @@ pub enum NodeMsg {
 }
 
 impl NodeMsg {
+    /// Gets the message ID.
+    pub fn id(&self) -> MessageId {
+        match self {
+            Self::NodeCmd { id, .. }
+            | Self::NodeQuery { id, .. }
+            | Self::NodeEvent { id, .. }
+            | Self::NodeQueryResponse { id, .. }
+            | Self::NodeCmdError { id, .. } => *id,
+        }
+    }
+
     /// Convenience function to deserialize a 'NodeMsg' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node command message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {

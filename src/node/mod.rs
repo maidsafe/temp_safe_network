@@ -7,11 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod node_cmd;
+mod node_msg;
 
 use crate::{MessageType, WireMsg};
 use bytes::Bytes;
-pub use node_cmd::{
+pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
     NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
     NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
