@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.23.3](https://github.com/maidsafe/sn_api/compare/v0.23.2...v0.23.3) (2021-04-15)
+
+### Features
+
+* ***cli*** add '--for-cli' flag to 'keys create' command which sets the newly created SafeKey for CLI use
+
 ### [0.23.2](https://github.com/maidsafe/sn_api/compare/v0.23.1...v0.23.2) (2021-04-15)
 
 ### Bug Fixes
