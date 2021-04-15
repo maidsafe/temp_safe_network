@@ -56,7 +56,7 @@ use xor_name::XorName;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum Message {
+pub enum ClientMsg {
     Process(ProcessMsg),
     ProcessingError(ProcessingError),
     SupportingInfo(SupportingInfo),
@@ -159,12 +159,12 @@ impl ProcessingError {
 /// Message envelope containing a Safe message payload,
 /// This struct also provides utilities to obtain the serialized bytes
 /// ready to send them over the wire.
-impl Message {
+impl ClientMsg {
     /// Convenience function to deserialize a 'Message' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a client message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::ClientMessage { msg, .. } = deserialized {
+        if let MessageType::Client { msg, .. } = deserialized {
             Ok(msg)
         } else {
             Err(crate::Error::FailedToParse(
@@ -601,7 +601,7 @@ mod tests {
 
         let random_xor = xor_name::XorName::random();
         let id = MessageId(random_xor);
-        let message = Message::Process(ProcessMsg::Query {
+        let message = ClientMsg::Process(ProcessMsg::Query {
             query: Query::Transfer(TransferQuery::GetBalance(pk)),
             id,
         });
@@ -610,7 +610,7 @@ mod tests {
         let dest = XorName::random();
         let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
         let serialized = message.serialize(dest, dest_section_pk)?;
-        let deserialized = Message::from(serialized)?;
+        let deserialized = ClientMsg::from(serialized)?;
         assert_eq!(deserialized, message);
 
         Ok(())

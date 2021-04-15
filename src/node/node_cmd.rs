@@ -34,7 +34,7 @@ use xor_name::XorName;
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeCmdMessage {
+pub enum NodeMsg {
     /// Cmds only sent internally in the network.
     NodeCmd {
         /// NodeCmd.
@@ -88,12 +88,12 @@ pub enum NodeCmdMessage {
     },
 }
 
-impl NodeCmdMessage {
-    /// Convenience function to deserialize a 'NodeCmdMessage' from bytes received over the wire.
+impl NodeMsg {
+    /// Convenience function to deserialize a 'NodeMsg' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node command message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::NodeCmdMessage { msg, .. } = deserialized {
+        if let MessageType::Node { msg, .. } = deserialized {
             Ok(msg)
         } else {
             Err(crate::Error::FailedToParse(
@@ -109,7 +109,7 @@ impl NodeCmdMessage {
         dest_section_pk: BlsPublicKey,
         src_section_pk: Option<BlsPublicKey>,
     ) -> crate::Result<Bytes> {
-        WireMsg::serialize_node_cmd_msg(self, dest, dest_section_pk, src_section_pk)
+        WireMsg::serialize_node_msg(self, dest, dest_section_pk, src_section_pk)
     }
 }
 

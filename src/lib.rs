@@ -37,18 +37,18 @@ pub enum MessageType {
         msg: section_info::Message,
         dest_info: DestInfo,
     },
-    ClientMessage {
-        msg: client::Message,
+    Client {
+        msg: client::ClientMsg,
         dest_info: DestInfo,
     },
     #[cfg(not(feature = "client-only"))]
-    NodeMessage {
-        msg: node::NodeMessage,
+    Routing {
+        msg: node::RoutingMsg,
         dest_info: DestInfo,
     },
     #[cfg(not(feature = "client-only"))]
-    NodeCmdMessage {
-        msg: node::NodeCmdMessage,
+    Node {
+        msg: node::NodeMsg,
         dest_info: DestInfo,
         src_section_pk: Option<PublicKey>,
     },
@@ -72,19 +72,19 @@ impl MessageType {
             Self::SectionInfo { msg, dest_info } => {
                 WireMsg::serialize_sectioninfo_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
-            Self::ClientMessage { msg, dest_info } => {
+            Self::Client { msg, dest_info } => {
                 WireMsg::serialize_client_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeMessage { msg, dest_info } => {
-                WireMsg::serialize_node_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::Routing { msg, dest_info } => {
+                WireMsg::serialize_routing_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeCmdMessage {
+            Self::Node {
                 msg,
                 dest_info,
                 src_section_pk,
-            } => WireMsg::serialize_node_cmd_msg(
+            } => WireMsg::serialize_node_msg(
                 msg,
                 dest_info.dest,
                 dest_info.dest_section_pk,
@@ -97,7 +97,7 @@ impl MessageType {
         #[cfg(not(feature = "client-only"))]
         match self {
             Self::Ping(dest_info)
-            | Self::ClientMessage { dest_info, .. }
+            | Self::Client { dest_info, .. }
             | Self::SectionInfo { dest_info, .. } => {
                 if let Some(dest) = dest {
                     dest_info.dest = dest
@@ -107,7 +107,7 @@ impl MessageType {
                 }
             }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeMessage { dest_info, .. } => {
+            Self::Routing { dest_info, .. } => {
                 if let Some(dest) = dest {
                     dest_info.dest = dest
                 }
@@ -116,7 +116,7 @@ impl MessageType {
                 }
             }
             #[cfg(not(feature = "client-only"))]
-            Self::NodeCmdMessage { dest_info, .. } => {
+            Self::Node { dest_info, .. } => {
                 if let Some(dest) = dest {
                     dest_info.dest = dest
                 }
@@ -129,7 +129,7 @@ impl MessageType {
         #[cfg(feature = "client-only")]
         match self {
             Self::Ping(dest_info)
-            | Self::ClientMessage { dest_info, .. }
+            | Self::Client { dest_info, .. }
             | Self::SectionInfo { dest_info, .. } => {
                 if let Some(dest) = dest {
                     dest_info.dest = dest

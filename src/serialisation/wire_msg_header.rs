@@ -101,7 +101,7 @@ impl WireMsgHeader {
     }
 
     // Return the source section PublicKey for this message
-    // if it's a NodeCmdMessage and it was included in the header
+    // if it's a NodeMsg and it was included in the header
     pub fn src_section_pk(&self) -> Option<PublicKey> {
         self.src_section_pk
     }
@@ -162,10 +162,10 @@ impl WireMsgHeader {
             ))
         })?;
 
-        // ...finally, we read the source section pubic key bytes if it's a NodeCmdMessage
+        // ...finally, we read the source section pubic key bytes if it's a NodeMsg
         // and if the header size has the exact number of bytes to read a PublicKey from.
         // Once we move back to fixed-length header we won't need this check.
-        let src_section_pk = if kind == MessageKind::NodeCmdMessage
+        let src_section_pk = if kind == MessageKind::Node
             && HEADER_MIN_SIZE + HDR_SRC_PK_BYTES_LEN == header_size.into()
         {
             let mut src_pk_bytes = [0; HDR_SRC_PK_BYTES_LEN];
@@ -238,12 +238,12 @@ impl WireMsgHeader {
                 ))
             })?;
 
-        // ...now write the source section public key if it's a NodeCmdMessage
+        // ...now write the source section public key if it's a NodeMsg
         // and a source section public key was provided
         let buf_at_payload = if let Some(src_section_pk) = self.src_section_pk {
-            if self.kind != MessageKind::NodeCmdMessage {
+            if self.kind != MessageKind::Node {
                 return Err(Error::Serialisation(format!(
-                    "source section public key field couldn't be serialized in header since it's not a NodeCmdMessage but a {:?}",
+                    "source section public key field couldn't be serialized in header since it's not a NodeMsg but a {:?}",
                     self.kind
                 )));
             }
@@ -288,18 +288,18 @@ impl WireMsgHeader {
 pub(crate) enum MessageKind {
     Ping,
     SectionInfo,
-    ClientMessage,
-    NodeMessage,
-    NodeCmdMessage,
+    Client,
+    Routing,
+    Node,
 }
 
 // Bytes values used for each of the kind of messages
 // when written to the message header
 const PING_KIND: u8 = 0x00;
 const SECTION_INFO_KIND: u8 = 0x01;
-const CLIENT_MESSAGE_KIND: u8 = 0x02;
-const NODE_MESSAGE_KIND: u8 = 0x03;
-const NODE_CMD_MESSAGE_KIND: u8 = 0x04;
+const CLIENT_MSG_KIND: u8 = 0x02;
+const ROUTING_MSG_KIND: u8 = 0x03;
+const NODE_MSG_KIND: u8 = 0x04;
 
 impl TryFrom<u8> for MessageKind {
     type Error = super::Error;
@@ -308,9 +308,9 @@ impl TryFrom<u8> for MessageKind {
         match input {
             PING_KIND => Ok(Self::Ping),
             SECTION_INFO_KIND => Ok(Self::SectionInfo),
-            CLIENT_MESSAGE_KIND => Ok(Self::ClientMessage),
-            NODE_MESSAGE_KIND => Ok(Self::NodeMessage),
-            NODE_CMD_MESSAGE_KIND => Ok(Self::NodeCmdMessage),
+            CLIENT_MSG_KIND => Ok(Self::Client),
+            ROUTING_MSG_KIND => Ok(Self::Routing),
+            NODE_MSG_KIND => Ok(Self::Node),
             other => Err(Error::UnsupportedMessageKind(other)),
         }
     }
@@ -321,9 +321,9 @@ impl From<MessageKind> for u8 {
         match kind {
             MessageKind::Ping => PING_KIND,
             MessageKind::SectionInfo => SECTION_INFO_KIND,
-            MessageKind::ClientMessage => CLIENT_MESSAGE_KIND,
-            MessageKind::NodeMessage => NODE_MESSAGE_KIND,
-            MessageKind::NodeCmdMessage => NODE_CMD_MESSAGE_KIND,
+            MessageKind::Client => CLIENT_MSG_KIND,
+            MessageKind::Routing => ROUTING_MSG_KIND,
+            MessageKind::Node => NODE_MSG_KIND,
         }
     }
 }
@@ -338,9 +338,9 @@ mod tests {
         for &(kind, byte) in &[
             (MessageKind::Ping, PING_KIND),
             (MessageKind::SectionInfo, SECTION_INFO_KIND),
-            (MessageKind::ClientMessage, CLIENT_MESSAGE_KIND),
-            (MessageKind::NodeMessage, NODE_MESSAGE_KIND),
-            (MessageKind::NodeCmdMessage, NODE_CMD_MESSAGE_KIND),
+            (MessageKind::Client, CLIENT_MSG_KIND),
+            (MessageKind::Routing, ROUTING_MSG_KIND),
+            (MessageKind::Node, NODE_MSG_KIND),
         ] {
             assert_eq!(kind as u8, byte);
             assert_eq!(MessageKind::try_from(byte)?, kind);

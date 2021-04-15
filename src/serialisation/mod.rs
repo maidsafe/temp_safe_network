@@ -59,7 +59,7 @@ impl WireMsg {
 
     /// Creates a new instance keeping a (serialized) copy of the client 'Message' message provided.
     pub fn new_client_msg(
-        msg: &client::Message,
+        msg: &client::ClientMsg,
         dest: XorName,
         dest_section_pk: PublicKey,
     ) -> Result<Self> {
@@ -72,15 +72,15 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::ClientMessage, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(MessageKind::Client, dest, dest_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }
 
     /// Creates a new instance keeping a (serialized) copy of the node 'Message' message provided.
     #[cfg(not(feature = "client-only"))]
-    pub fn new_node_msg(
-        msg: &node::NodeMessage,
+    pub fn new_routing_msg(
+        msg: &node::RoutingMsg,
         dest: XorName,
         dest_section_pk: PublicKey,
     ) -> Result<Self> {
@@ -92,15 +92,15 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::NodeMessage, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(MessageKind::Routing, dest, dest_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }
 
     /// Creates a new instance keeping a (serialized) copy of the node 'Message' message provided.
     #[cfg(not(feature = "client-only"))]
-    pub fn new_node_cmd_msg(
-        msg: &node::NodeCmdMessage,
+    pub fn new_node_msg(
+        msg: &node::NodeMsg,
         dest: XorName,
         dest_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
@@ -113,12 +113,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(
-                MessageKind::NodeCmdMessage,
-                dest,
-                dest_section_pk,
-                src_section_pk,
-            ),
+            header: WireMsgHeader::new(MessageKind::Node, dest, dest_section_pk, src_section_pk),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -171,8 +166,8 @@ impl WireMsg {
 
                 Ok(MessageType::SectionInfo{msg, dest_info})
             }
-            MessageKind::ClientMessage => {
-                let msg: client::Message =
+            MessageKind::Client => {
+                let msg: client::ClientMsg =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!(
                             "Client message payload as Msgpack: {}",
@@ -180,33 +175,33 @@ impl WireMsg {
                         ))
                     })?;
 
-                Ok(MessageType::ClientMessage{msg, dest_info})
+                Ok(MessageType::Client{msg, dest_info})
             }
             #[cfg(feature = "client-only")]
-            MessageKind::NodeMessage => {
+            MessageKind::Routing => {
                 Err(Error::FailedToParse("Message payload is a Node message which is not supported when feature 'client-only' is set".to_string()))
             }
             #[cfg(not(feature = "client-only"))]
-            MessageKind::NodeMessage => {
-                let msg: node::NodeMessage =
+            MessageKind::Routing => {
+                let msg: node::RoutingMsg =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("Node message payload as Msgpack: {}", err))
                     })?;
 
-                Ok(MessageType::NodeMessage{msg, dest_info})
+                Ok(MessageType::Routing{msg, dest_info})
             }
             #[cfg(feature = "client-only")]
-            MessageKind::NodeCmdMessage => {
+            MessageKind::Node => {
                 Err(Error::FailedToParse("Message payload is a NodeCmd message which is not supported when feature 'client-only' is set".to_string()))
             }
             #[cfg(not(feature = "client-only"))]
-            MessageKind::NodeCmdMessage => {
-                let node_cmd: node::NodeCmdMessage =
+            MessageKind::Node => {
+                let node_cmd: node::NodeMsg =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("NodeCmd message payload as Msgpack: {}", err))
                     })?;
 
-                Ok(MessageType::NodeCmdMessage{
+                Ok(MessageType::Node{
                     msg: node_cmd,
                     dest_info,
                     src_section_pk: self.src_section_pk()
@@ -226,7 +221,7 @@ impl WireMsg {
     }
 
     /// Return the source section PublicKey for this
-    /// message if it's a NodeCmdMessage and it was
+    /// message if it's a NodeMsg and it was
     /// provided in the header of message.
     pub fn src_section_pk(&self) -> Option<PublicKey> {
         self.header.src_section_pk()
@@ -254,7 +249,7 @@ impl WireMsg {
     /// Convenience function which creates a temporary WireMsg from the provided
     /// Message, returning the serialized WireMsg.
     pub fn serialize_client_msg(
-        msg: &client::Message,
+        msg: &client::ClientMsg,
         dest: XorName,
         dest_section_pk: PublicKey,
     ) -> Result<Bytes> {
@@ -264,24 +259,24 @@ impl WireMsg {
     /// Convenience function which creates a temporary WireMsg from the provided
     /// node::Messsage, returning the serialized WireMsg.
     #[cfg(not(feature = "client-only"))]
-    pub fn serialize_node_msg(
-        msg: &node::NodeMessage,
+    pub fn serialize_routing_msg(
+        msg: &node::RoutingMsg,
         dest: XorName,
         dest_section_pk: PublicKey,
     ) -> Result<Bytes> {
-        Self::new_node_msg(msg, dest, dest_section_pk)?.serialize()
+        Self::new_routing_msg(msg, dest, dest_section_pk)?.serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
-    /// node::NodeCmdMessage, returning the serialized WireMsg.
+    /// node::Node, returning the serialized WireMsg.
     #[cfg(not(feature = "client-only"))]
-    pub fn serialize_node_cmd_msg(
-        msg: &node::NodeCmdMessage,
+    pub fn serialize_node_msg(
+        msg: &node::NodeMsg,
         dest: XorName,
         dest_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
     ) -> Result<Bytes> {
-        Self::new_node_cmd_msg(msg, dest, dest_section_pk, src_section_pk)?.serialize()
+        Self::new_node_msg(msg, dest, dest_section_pk, src_section_pk)?.serialize()
     }
 
     // Private function which returns the bytes size of this WireMsg
@@ -357,22 +352,22 @@ mod tests {
 
     #[test]
     #[cfg(not(feature = "client-only"))]
-    fn serialisation_node_cmd_msg() -> Result<()> {
+    fn serialisation_node_msg() -> Result<()> {
         use crate::MessageId;
-        use node::{NodeCmd, NodeCmdMessage, NodeSystemCmd};
+        use node::{NodeCmd, NodeMsg, NodeSystemCmd};
 
         let dest = XorName::random();
         let src_section_pk = SecretKey::random().public_key();
         let dest_section_pk = SecretKey::random().public_key();
 
-        let node_cmd = NodeCmdMessage::NodeCmd {
+        let node_cmd = NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(dest_section_pk.into())),
             id: MessageId::new(),
             target_section_pk: None,
         };
 
         // first test without including a source section public key in the header
-        let wire_msg = WireMsg::new_node_cmd_msg(&node_cmd, dest, dest_section_pk, None)?;
+        let wire_msg = WireMsg::new_node_msg(&node_cmd, dest, dest_section_pk, None)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -385,7 +380,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.to_message()?,
-            MessageType::NodeCmdMessage {
+            MessageType::Node {
                 msg: node_cmd.clone(),
                 dest_info: DestInfo {
                     dest,
@@ -397,7 +392,7 @@ mod tests {
 
         // let's now test including a source section public key in the header
         let wire_msg_with_src_pk =
-            WireMsg::new_node_cmd_msg(&node_cmd, dest, dest_section_pk, Some(src_section_pk))?;
+            WireMsg::new_node_msg(&node_cmd, dest, dest_section_pk, Some(src_section_pk))?;
         let serialized = wire_msg_with_src_pk.serialize()?;
 
         // test deserialisation of header
@@ -410,7 +405,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.to_message()?,
-            MessageType::NodeCmdMessage {
+            MessageType::Node {
                 msg: node_cmd,
                 dest_info: DestInfo {
                     dest,
