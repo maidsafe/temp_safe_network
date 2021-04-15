@@ -2930,7 +2930,7 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "sn_api"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2969,7 +2969,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "cluFlock",
@@ -2993,7 +2993,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
