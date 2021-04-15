@@ -10,6 +10,7 @@
 pub mod client;
 mod errors;
 pub mod location;
+mod msg;
 mod msg_id;
 #[cfg(not(feature = "client-only"))]
 pub mod node;
@@ -19,6 +20,7 @@ mod serialisation;
 pub use self::{
     errors::{Error, Result},
     location::{Aggregation, DstLocation, EndUser, Itinerary, SrcLocation},
+    msg::Msg,
     msg_id::MessageId,
     serialisation::WireMsg,
 };
