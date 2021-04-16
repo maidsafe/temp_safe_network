@@ -23,7 +23,7 @@ use serde::Serialize;
 use sn_api::{
     fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
-    xorurl::{XorUrl, XorUrlEncoder},
+    safeurl::{SafeUrl, XorUrl},
     Safe,
 };
 use std::{
@@ -278,11 +278,11 @@ pub async fn files_commander(
             if OutputFmt::Pretty == output_fmt {
                 let (table, success_count) = gen_processed_files_table(&processed_files, true);
                 if success_count > 0 {
-                    let url = match XorUrlEncoder::from_url(&target) {
-                        Ok(mut xorurl_encoder) => {
-                            xorurl_encoder.set_content_version(Some(version));
-                            xorurl_encoder.set_path("");
-                            xorurl_encoder.to_string()
+                    let url = match SafeUrl::from_url(&target) {
+                        Ok(mut safeurl) => {
+                            safeurl.set_content_version(Some(version));
+                            safeurl.set_path("");
+                            safeurl.to_string()
                         }
                         Err(_) => target,
                     };
@@ -479,10 +479,10 @@ fn print_serialized_output(
     processed_files: BTreeMap<String, (String, String)>,
     output_fmt: OutputFmt,
 ) {
-    let url = match XorUrlEncoder::from_url(&xorurl) {
-        Ok(mut xorurl_encoder) => {
-            xorurl_encoder.set_content_version(Some(version));
-            xorurl_encoder.to_string()
+    let url = match SafeUrl::from_url(&xorurl) {
+        Ok(mut safeurl) => {
+            safeurl.set_content_version(Some(version));
+            safeurl.to_string()
         }
         Err(_) => xorurl,
     };
@@ -498,11 +498,11 @@ fn output_processed_files_list(
     if OutputFmt::Pretty == output_fmt {
         let (table, success_count) = gen_processed_files_table(&processed_files, true);
         if success_count > 0 {
-            let url = match XorUrlEncoder::from_url(&target_url) {
-                Ok(mut xorurl_encoder) => {
-                    xorurl_encoder.set_content_version(Some(version));
-                    xorurl_encoder.set_path("");
-                    xorurl_encoder.to_string()
+            let url = match SafeUrl::from_url(&target_url) {
+                Ok(mut safeurl) => {
+                    safeurl.set_content_version(Some(version));
+                    safeurl.set_path("");
+                    safeurl.to_string()
                 }
                 Err(_) => target_url,
             };
@@ -772,7 +772,7 @@ fn print_files_map(files_map: &FilesMap, total_files: u64, version: u64, target_
 
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap)> {
     let mut filtered_filesmap = FilesMap::default();
-    let mut xorurl_encoder = Safe::parse_url(target_url)?;
+    let mut safeurl = Safe::parse_url(target_url)?;
     let mut total = 0;
 
     for (filepath, fileitem) in files_map.iter() {
@@ -820,8 +820,8 @@ fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, File
                     let mut fileitem = fileitem.clone();
                     if is_folder {
                         // then set link to xorurl with path current subfolder
-                        xorurl_encoder.set_path(&subdirs[0]);
-                        let link = xorurl_encoder.to_string();
+                        safeurl.set_path(&subdirs[0]);
+                        let link = safeurl.to_string();
                         fileitem.insert("link".to_string(), link);
                         fileitem.insert("type".to_string(), "".to_string());
                     }

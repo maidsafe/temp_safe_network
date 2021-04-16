@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::xorurl::XorUrlBase;
+use super::safeurl::XorUrlBase;
 
 // Default base encoding used for XOR URLs
 pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;
@@ -17,15 +17,15 @@ pub const CONTENT_UPDATED_SIGN: &str = "*";
 pub const CONTENT_DELETED_SIGN: &str = "-";
 pub const CONTENT_ERROR_SIGN: &str = "E";
 
-pub const FAKE_RDF_PREDICATE_LINK: &str = "link";
-pub const FAKE_RDF_PREDICATE_TYPE: &str = "type";
-pub const FAKE_RDF_PREDICATE_SIZE: &str = "size";
-pub const FAKE_RDF_PREDICATE_MODIFIED: &str = "modified";
-pub const FAKE_RDF_PREDICATE_CREATED: &str = "created";
-pub const FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED: &str = "o_modified";
-pub const FAKE_RDF_PREDICATE_ORIGINAL_CREATED: &str = "o_created";
-pub const FAKE_RDF_PREDICATE_READONLY: &str = "readonly";
-pub const FAKE_RDF_PREDICATE_MODE_BITS: &str = "mode_bits";
+pub const PREDICATE_LINK: &str = "link";
+pub const PREDICATE_TYPE: &str = "type";
+pub const PREDICATE_SIZE: &str = "size";
+pub const PREDICATE_MODIFIED: &str = "modified";
+pub const PREDICATE_CREATED: &str = "created";
+pub const PREDICATE_ORIGINAL_MODIFIED: &str = "o_modified";
+pub const PREDICATE_ORIGINAL_CREATED: &str = "o_created";
+pub const PREDICATE_READONLY: &str = "readonly";
+pub const PREDICATE_MODE_BITS: &str = "mode_bits";
 
 // see: https://stackoverflow.com/questions/18869772/mime-type-for-a-directory
 // We will use the FreeDesktop standard for directories and symlinks.

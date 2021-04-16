@@ -10,7 +10,7 @@
 use super::common::ed_sk_from_hex;
 use super::helpers::{parse_coins_amount, pk_from_hex, xorname_to_hex};
 use crate::{
-    xorurl::{SafeContentType, SafeDataType, XorUrl, XorUrlEncoder},
+    api::app::safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl},
     Error, Result, Safe,
 };
 use log::debug;
@@ -41,7 +41,7 @@ impl Safe {
             .store_map(None, WALLET_TYPE_TAG, None, None)
             .await?;
 
-        XorUrlEncoder::encode_mutable_data(
+        SafeUrl::encode_mutable_data(
             xorname,
             WALLET_TYPE_TAG,
             SafeContentType::Wallet,
@@ -61,7 +61,7 @@ impl Safe {
         let acutal_sk = ed_sk_from_hex(sk)?;
         let keypair = Keypair::from(acutal_sk);
         let xorname = XorName::from(keypair.public_key());
-        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+        let xorurl = SafeUrl::encode_safekey(xorname, self.xorurl_base)?;
 
         let value = WalletSpendableBalance {
             xorurl: xorurl.clone(),
@@ -76,10 +76,10 @@ impl Safe {
         })?;
 
         let md_key = name.unwrap_or(&xorurl);
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
         self.safe_client
             .map_insert(
-                xorurl_encoder.xorname(),
+                safeurl.xorname(),
                 WALLET_TYPE_TAG,
                 &md_key.to_string().into_bytes(),
                 &serialised_value.into_bytes(),
@@ -104,7 +104,7 @@ impl Safe {
             match self
                 .safe_client
                 .map_insert(
-                    xorurl_encoder.xorname(),
+                    safeurl.xorname(),
                     WALLET_TYPE_TAG,
                     WALLET_DEFAULT_BYTES,
                     &default_key,
@@ -115,7 +115,7 @@ impl Safe {
                     let (_, version) = self.wallet_get_default_balance(url).await?;
                     self.safe_client
                         .update_map(
-                            xorurl_encoder.xorname(),
+                            safeurl.xorname(),
                             WALLET_TYPE_TAG,
                             WALLET_DEFAULT_BYTES,
                             &default_key,
@@ -138,26 +138,18 @@ impl Safe {
         let mut total_balance = Token::from_nano(0);
 
         // Let's get the list of balances from the Wallet
-        let (xorurl_encoder, nrs_xorurl_encoder) = self.parse_and_resolve_url(url).await?;
-        debug!(
-            "Wallet URL was parsed and resolved to: {:?}",
-            xorurl_encoder
-        );
-        let url_path = if let Some(nrs_url) = nrs_xorurl_encoder {
+        let (safeurl, nrs_safeurl) = self.parse_and_resolve_url(url).await?;
+        debug!("Wallet URL was parsed and resolved to: {:?}", safeurl);
+        let url_path = if let Some(nrs_url) = nrs_safeurl {
             nrs_url.path().to_string()
         } else {
-            xorurl_encoder.path().to_string()
+            safeurl.path().to_string()
         };
 
         let balances = if url_path.is_empty() {
             debug!("We'll check the total balance of the Wallet");
-            gen_wallet_spendable_balances_list(
-                self,
-                xorurl_encoder.xorname(),
-                xorurl_encoder.type_tag(),
-                url,
-            )
-            .await?
+            gen_wallet_spendable_balances_list(self, safeurl.xorname(), safeurl.type_tag(), url)
+                .await?
         } else {
             let balance_name = &url_path[1..]; // we get rid of starting '/'
             debug!(
@@ -166,8 +158,8 @@ impl Safe {
             );
             let (spendable_balance, _) = wallet_get_spendable_balance(
                 self,
-                xorurl_encoder.xorname(),
-                xorurl_encoder.type_tag(),
+                safeurl.xorname(),
+                safeurl.type_tag(),
                 balance_name.as_bytes(),
             )
             .await
@@ -218,14 +210,10 @@ impl Safe {
         &mut self,
         url: &str,
     ) -> Result<(WalletSpendableBalance, u64)> {
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
         let default = self
             .safe_client
-            .map_get_value(
-                xorurl_encoder.xorname(),
-                xorurl_encoder.type_tag(),
-                WALLET_DEFAULT_BYTES,
-            )
+            .map_get_value(safeurl.xorname(), safeurl.type_tag(), WALLET_DEFAULT_BYTES)
             .await
             .map_err(|err| match err {
                 Error::AccessDenied(_) => Error::AccessDenied(format!(
@@ -249,13 +237,8 @@ impl Safe {
             }
         };
 
-        wallet_get_spendable_balance(
-            self,
-            xorurl_encoder.xorname(),
-            xorurl_encoder.type_tag(),
-            &default_data,
-        )
-        .await
+        wallet_get_spendable_balance(self, safeurl.xorname(), safeurl.type_tag(), &default_data)
+            .await
     }
 
     /// # Transfer safecoins from one Wallet to another
@@ -306,55 +289,50 @@ impl Safe {
         let amount_coins = parse_coins_amount(amount)?;
 
         // Check if 'from_wallet_url' is a valid Wallet URL
-        let (from_xorurl_encoder, from_nrs_xorurl_encoder) = self
+        let (from_safeurl, from_nrs_safeurl) = self
             .parse_and_resolve_url(&from_wallet_url)
             .await
             .map_err(|_| {
-                Error::InvalidInput(format!(
-                    "Failed to parse the 'from' URL: {}",
-                    from_wallet_url
-                ))
-            })?;
+            Error::InvalidInput(format!(
+                "Failed to parse the 'from' URL: {}",
+                from_wallet_url
+            ))
+        })?;
 
-        if from_xorurl_encoder.content_type() != SafeContentType::Wallet {
+        if from_safeurl.content_type() != SafeContentType::Wallet {
             return Err(Error::InvalidInput(format!(
                 "The 'from_url' URL doesn't target a Wallet, it is: {:?} ({})",
-                from_xorurl_encoder.content_type(),
-                from_xorurl_encoder.data_type()
+                from_safeurl.content_type(),
+                from_safeurl.data_type()
             )));
         }
 
         // realise which is the source spendable balance to be used
-        let from_spendable_balance = resolve_wallet_url(
-            self,
-            from_wallet_url,
-            from_xorurl_encoder,
-            from_nrs_xorurl_encoder,
-        )
-        .await?;
+        let from_spendable_balance =
+            resolve_wallet_url(self, from_wallet_url, from_safeurl, from_nrs_safeurl).await?;
         let from_sk = ed_sk_from_hex(&from_spendable_balance.sk)?;
         let from = Some(Keypair::from(from_sk));
 
         let result = if to.starts_with("safe://") {
             // Now check if the 'to_url' is a valid Wallet or a SafeKey URL
-            let (to_xorurl_encoder, to_nrs_xorurl_encoder) =
+            let (to_safeurl, to_nrs_safeurl) =
                 self.parse_and_resolve_url(to).await.map_err(|_| {
                     Error::InvalidInput(format!("Failed to parse the 'to' URL: {}", to))
                 })?;
 
-            let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
+            let to_xorname = if to_safeurl.content_type() == SafeContentType::Wallet {
                 let to_wallet_balance =
-                    resolve_wallet_url(self, to, to_xorurl_encoder, to_nrs_xorurl_encoder).await?;
-                XorUrlEncoder::from_url(&to_wallet_balance.xorurl)?.xorname()
-            } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
-                && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
+                    resolve_wallet_url(self, to, to_safeurl, to_nrs_safeurl).await?;
+                SafeUrl::from_url(&to_wallet_balance.xorurl)?.xorname()
+            } else if to_safeurl.content_type() == SafeContentType::Raw
+                && to_safeurl.data_type() == SafeDataType::SafeKey
             {
-                to_xorurl_encoder.xorname()
+                to_safeurl.xorname()
             } else {
                 return Err(Error::InvalidInput(format!(
                     "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
-                    to_xorurl_encoder.content_type(),
-                    to_xorurl_encoder.data_type()
+                    to_safeurl.content_type(),
+                    to_safeurl.data_type()
                 )));
             };
 
@@ -383,20 +361,20 @@ impl Safe {
     }
 
     pub async fn wallet_get(&mut self, url: &str) -> Result<WalletSpendableBalances> {
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
-        self.fetch_wallet(&xorurl_encoder).await
+        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
+        self.fetch_wallet(&safeurl).await
     }
 
-    /// Fetch a Wallet from a XorUrlEncoder without performing any type of URL resolution
+    /// Fetch a Wallet from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_wallet(
         &mut self,
-        xorurl_encoder: &XorUrlEncoder,
+        safeurl: &SafeUrl,
     ) -> Result<WalletSpendableBalances> {
         gen_wallet_spendable_balances_list(
             self,
-            xorurl_encoder.xorname(),
-            xorurl_encoder.type_tag(),
-            &xorurl_encoder.to_string(),
+            safeurl.xorname(),
+            safeurl.type_tag(),
+            &safeurl.to_string(),
         )
         .await
     }
@@ -504,13 +482,13 @@ async fn wallet_get_spendable_balance(
 async fn resolve_wallet_url(
     safe: &mut Safe,
     wallet_url: &str,
-    xorurl_encoder: XorUrlEncoder,
-    nrs_xorurl_encoder: Option<XorUrlEncoder>,
+    safeurl: SafeUrl,
+    nrs_safeurl: Option<SafeUrl>,
 ) -> Result<WalletSpendableBalance> {
-    let url_path = if let Some(nrs_url) = nrs_xorurl_encoder {
+    let url_path = if let Some(nrs_url) = nrs_safeurl {
         nrs_url.path().to_string()
     } else {
-        xorurl_encoder.path().to_string()
+        safeurl.path().to_string()
     };
 
     let (wallet_balance, _) = if url_path.is_empty() {
@@ -520,8 +498,8 @@ async fn resolve_wallet_url(
         // Get the spendable balance which name matches the path we found in the URL
         wallet_get_spendable_balance(
             safe,
-            xorurl_encoder.xorname(),
-            xorurl_encoder.type_tag(),
+            safeurl.xorname(),
+            safeurl.type_tag(),
             url_path[1..].as_bytes(), // we get rid of starting '/' from the URL path
         )
         .await
@@ -1030,7 +1008,7 @@ mod tests {
         .await?;
 
         // test fail to transfer more than current balance at 'from-firstbaance'
-        let mut from_wallet_spendable_balance = XorUrlEncoder::from_url(&from_wallet_xorurl)?;
+        let mut from_wallet_spendable_balance = SafeUrl::from_url(&from_wallet_xorurl)?;
         from_wallet_spendable_balance.set_path("from-second-balance");
         let from_spendable_balance = from_wallet_spendable_balance.to_string();
         match safe
@@ -1112,7 +1090,7 @@ mod tests {
         .await?;
 
         // test successful transfer to 'to-second-balance'
-        let mut to_wallet_spendable_balance = XorUrlEncoder::from_url(&to_wallet_xorurl)?;
+        let mut to_wallet_spendable_balance = SafeUrl::from_url(&to_wallet_xorurl)?;
         to_wallet_spendable_balance.set_path("to-second-balance");
         let to_spendable_balance = to_wallet_spendable_balance.to_string();
         match safe

@@ -11,41 +11,38 @@ mod auth;
 mod consts;
 mod helpers;
 mod keys;
-mod nrs;
 mod safe_client;
 mod sequence;
 #[cfg(test)]
 mod test_helpers;
-mod xorurl_media_types;
 
 use super::{common, constants, Result};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
+use safeurl::XorUrlBase;
+use sn_data_types::Keypair;
 use std::time::Duration;
-use xorurl::XorUrlBase;
+
+static DEFAULT_TIMEOUT_SECS: u64 = 20;
 
 // The following is what's meant to be the public API
 
 pub mod fetch;
 pub mod files;
-pub mod nrs_map;
+pub mod nrs;
+pub mod safeurl;
 pub mod wallet;
-pub mod xorurl;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_coins_amount;
-pub use nrs::ProcessedEntries;
-use sn_data_types::Keypair;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
-// TODO: should we be cloning this?
 #[derive(Clone)]
 pub struct Safe {
     safe_client: SafeAppClient,
     pub xorurl_base: XorUrlBase,
+    #[allow(dead_code)]
     timeout: Duration,
 }
-
-static DEFAULT_TIMEOUT_SECS: u64 = 20;
 
 impl Default for Safe {
     fn default() -> Self {

@@ -10,8 +10,7 @@
 use super::{
     common::ed_sk_from_hex,
     helpers::{parse_coins_amount, pk_from_hex, pk_to_hex},
-    xorurl::XorUrlEncoder,
-    xorurl::{SafeContentType, SafeDataType},
+    safeurl::{SafeContentType, SafeDataType, SafeUrl},
     Safe,
 };
 use crate::{Error, Result};
@@ -42,7 +41,7 @@ impl Safe {
             .await?;
 
         let xorname = XorName::from(new_keypair.public_key());
-        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+        let xorurl = SafeUrl::encode_safekey(xorname, self.xorurl_base)?;
 
         Ok((xorurl, new_keypair))
     }
@@ -72,7 +71,7 @@ impl Safe {
             .await?;
 
         let xorname = XorName::from(new_keypair.public_key());
-        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+        let xorurl = SafeUrl::encode_safekey(xorname, self.xorurl_base)?;
 
         Ok((xorurl, new_keypair))
     }
@@ -90,7 +89,7 @@ impl Safe {
             .await?;
 
         let xorname = XorName::from(keypair.public_key());
-        let xorurl = XorUrlEncoder::encode_safekey(xorname, self.xorurl_base)?;
+        let xorurl = SafeUrl::encode_safekey(xorname, self.xorurl_base)?;
 
         Ok((xorurl, keypair))
     }
@@ -150,10 +149,10 @@ impl Safe {
             }
         };
 
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        let (safeurl, _) = self.parse_and_resolve_url(url).await?;
         let public_key = keypair.public_key();
         let derived_xorname = XorName::from(public_key);
-        if xorurl_encoder.xorname() != derived_xorname {
+        if safeurl.xorname() != derived_xorname {
             Err(Error::InvalidInput(
                 "The URL doesn't correspond to the public key derived from the provided secret key"
                     .to_string(),
@@ -239,26 +238,26 @@ impl Safe {
         amount_coins: Token,
     ) -> Result<u64> {
         // Let's check if the 'to' is a valid Wallet or a SafeKey URL
-        let (to_xorurl_encoder, _) = self
+        let (to_safe_url, _) = self
             .parse_and_resolve_url(to)
             .await
             .map_err(|_| Error::InvalidInput(format!("Failed to parse the 'to' URL: {}", to)))?;
 
-        let to_xorname = if to_xorurl_encoder.content_type() == SafeContentType::Wallet {
+        let to_xorname = if to_safe_url.content_type() == SafeContentType::Wallet {
             let (to_balance, _) = self
-                .wallet_get_default_balance(&to_xorurl_encoder.to_string())
+                .wallet_get_default_balance(&to_safe_url.to_string())
                 .await?;
 
-            XorUrlEncoder::from_url(&to_balance.xorurl)?.xorname()
-        } else if to_xorurl_encoder.content_type() == SafeContentType::Raw
-            && to_xorurl_encoder.data_type() == SafeDataType::SafeKey
+            SafeUrl::from_url(&to_balance.xorurl)?.xorname()
+        } else if to_safe_url.content_type() == SafeContentType::Raw
+            && to_safe_url.data_type() == SafeDataType::SafeKey
         {
-            to_xorurl_encoder.xorname()
+            to_safe_url.xorname()
         } else {
             return Err(Error::InvalidInput(format!(
                 "The destination URL doesn't target a SafeKey or Wallet, target is: {:?} ({})",
-                to_xorurl_encoder.content_type(),
-                to_xorurl_encoder.data_type()
+                to_safe_url.content_type(),
+                to_safe_url.data_type()
             )));
         };
 
@@ -444,8 +443,8 @@ mod tests {
         match current_balance {
             Err(Error::InvalidInput(msg)) => {
                 assert!(msg.contains(
-                "The URL doesn't correspond to the public key derived from the provided secret key"
-            ));
+                    "The URL doesn't correspond to the public key derived from the provided secret key"
+                ));
                 Ok(())
             }
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
@@ -601,14 +600,14 @@ mod tests {
 
         // test it fails to transfer less than 1 nano coin
         match safe.keys_transfer(
-                "0.0000000009",
-                Some(&from_sk2_hex),
-                &safekey2_xorurl,
-            ).await {
-                    Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '0.0000000009', the minimum possible amount is one nano coin (0.000000001)"),
-                    Err(err) => bail!("Error returned is not the expected: {:?}", err),
-                    Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),
-            };
+                    "0.0000000009",
+                    Some(&from_sk2_hex),
+                    &safekey2_xorurl,
+                ).await {
+                        Err(Error::InvalidAmount(msg)) => assert_eq!(msg, "Invalid safecoins amount '0.0000000009', the minimum possible amount is one nano coin (0.000000001)"),
+                        Err(err) => bail!("Error returned is not the expected: {:?}", err),
+                        Ok(_) => bail!("Transfer succeeded unexpectedly".to_string()),
+                };
 
         // test successful transfer
         match safe

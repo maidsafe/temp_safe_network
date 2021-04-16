@@ -15,8 +15,8 @@ extern crate duct;
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_api::xorurl::XorUrlEncoder;
-use sn_cmd_test_utilities::{parse_xorurl_output, xorurl_encoder_from, CLI, SAFE_PROTOCOL};
+use sn_api::safeurl::SafeUrl;
+use sn_cmd_test_utilities::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 
 const TEST_FILE: &str = "../testdata/test.md";
@@ -54,7 +54,7 @@ fn calling_safe_xorurl_decode() -> Result<()> {
 
     let xorurls = parse_xorurl_output(&content);
     let file_xorurl = &xorurls[0].1;
-    let xorurl_encoder = xorurl_encoder_from(file_xorurl)?;
+    let safeurl = safeurl_from(file_xorurl)?;
 
     let xorurl_decoded = cmd!(
         env!("CARGO_BIN_EXE_safe"),
@@ -66,9 +66,9 @@ fn calling_safe_xorurl_decode() -> Result<()> {
     .read()
     .map_err(|e| anyhow!(e.to_string()))?;
 
-    let decoded_obj: XorUrlEncoder = serde_json::from_str(&xorurl_decoded)
+    let decoded_obj: SafeUrl = serde_json::from_str(&xorurl_decoded)
         .expect("Failed to parse output of `safe xorurl decode`");
 
-    assert_eq!(xorurl_encoder, decoded_obj);
+    assert_eq!(safeurl, decoded_obj);
     Ok(())
 }

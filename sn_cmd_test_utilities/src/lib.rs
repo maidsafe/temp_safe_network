@@ -11,7 +11,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use multibase::{encode, Base};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_api::{
-    fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, xorurl::XorUrlEncoder,
+    fetch::SafeData, files::ProcessedFiles, safeurl::SafeUrl, wallet::WalletSpendableBalances,
     Keypair,
 };
 use std::{collections::BTreeMap, env, fs, path::Path, process};
@@ -307,8 +307,8 @@ pub fn get_random_nrs_string() -> String {
 }
 
 #[allow(dead_code)]
-pub fn xorurl_encoder_from(url: &str) -> Result<XorUrlEncoder> {
-    XorUrlEncoder::from_url(url).map_err(|e| anyhow!("Failed to parse URL: {}", e))
+pub fn safeurl_from(url: &str) -> Result<SafeUrl> {
+    SafeUrl::from_url(url).map_err(|e| anyhow!("Failed to parse URL: {}", e))
 }
 
 #[allow(dead_code)]

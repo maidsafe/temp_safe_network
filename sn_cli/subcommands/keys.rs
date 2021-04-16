@@ -18,7 +18,7 @@ use crate::operations::{
 use anyhow::{bail, Context, Result};
 use log::{debug, warn};
 use sn_api::{
-    ed_sk_from_hex, fetch::XorUrlEncoder, sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName,
+    ed_sk_from_hex, fetch::SafeUrl, sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName,
 };
 use std::io::Write;
 use structopt::StructOpt;
@@ -87,7 +87,7 @@ pub async fn key_commander(
             match read_credentials()? {
                 (file_path, Some(keypair)) => {
                     let xorname = XorName::from(keypair.public_key());
-                    let xorurl = XorUrlEncoder::encode_safekey(xorname, safe.xorurl_base)?;
+                    let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
                     let (pk_hex, sk_hex) = keypair_to_hex_strings(&keypair)?;
 
                     println!("Current CLI's SafeKey found at {}:", file_path.display());

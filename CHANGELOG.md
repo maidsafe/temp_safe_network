@@ -245,7 +245,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 * ***cli*** Show complete URL resolution chain from dog command. ([3f98b4be](https://github.com/maidsafe/safe-api/commit/3f98b4be0bd40e8e045efccf2308dc082ea1e87e))
 
-* ***api*** Significant reworking of XorUrlEncoder and its API. ([85941f1b](https://github.com/maidsafe/safe-api/commit/85941f1b7080008eb1ffe6d7d408588a1baac33d))
+* ***api*** Significant reworking of SafeUrl and its API. ([85941f1b](https://github.com/maidsafe/safe-api/commit/85941f1b7080008eb1ffe6d7d408588a1baac33d))
 
 * ***api*** Rename SafeUrl properties to match changes in rfc-0052 PR: https://github.com/maidsafe/rfcs/pull/356. ([326cfccd](https://github.com/maidsafe/safe-api/commit/326cfccd433441d602070d04e4e5a3843803131e))
 
@@ -253,7 +253,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 * ***ffi*** Expose vec<string> as string[] in FFI. ([f531ea38](https://github.com/maidsafe/safe-api/commit/f531ea380d4ab5eb6d4e093120b417f9a2997e86))
 
-* ***api*** Parse query params in any type of URL and keep them as part of XorUrlEncoder info. ([3efdacc6](https://github.com/maidsafe/safe-api/commit/3efdacc684a4574b3e99adf59025688c254fa5ba))
+* ***api*** Parse query params in any type of URL and keep them as part of SafeUrl info. ([3efdacc6](https://github.com/maidsafe/safe-api/commit/3efdacc684a4574b3e99adf59025688c254fa5ba))
 
 * ***test*** First version of cmd-test-utils crate. ([81284c43](https://github.com/maidsafe/safe-api/commit/81284c4381d4fcf27531ee28a1dce3cd91e4bd7b))
 
@@ -288,7 +288,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Bug Fixes
 
-* ***api*** verify in XorUrlEncoder::from_url that the URL provided has the minimum length to be valid before processing it ([2554d738](https://github.com/maidsafe/safe-api/commit/2554d738410436f534685160f73eb32d277cf679))
+* ***api*** verify in SafeUrl::from_url that the URL provided has the minimum length to be valid before processing it ([2554d738](https://github.com/maidsafe/safe-api/commit/2554d738410436f534685160f73eb32d277cf679))
 
 * ***cli*** info and warning about missing/invalid credentials are now being logged rather than sent to stdout ([73959656](https://github.com/maidsafe/safe-api/commit/739596560384196b9bebcb68ec9da317080ee834))
 

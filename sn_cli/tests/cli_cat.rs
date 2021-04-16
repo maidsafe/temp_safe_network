@@ -22,7 +22,7 @@ use sn_api::{
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
     parse_files_container_output, parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout,
-    test_symlinks_are_valid, upload_test_symlinks_folder, xorurl_encoder_from, CLI,
+    safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
 use std::process::Command;
 
@@ -53,12 +53,12 @@ fn calling_safe_cat() -> Result<()> {
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
-    let xorurl_encoder = xorurl_encoder_from(&map[TEST_FILE].1)?;
+    let safeurl = safeurl_from(&map[TEST_FILE].1)?;
     assert_eq!(
-        xorurl_encoder.content_type(),
+        safeurl.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(xorurl_encoder.data_type(), SafeDataType::PublicBlob);
+    assert_eq!(safeurl.data_type(), SafeDataType::PublicBlob);
     Ok(())
 }
 
@@ -137,12 +137,12 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
         .success();
 
-    let xorurl_encoder = xorurl_encoder_from(&map[TEST_FILE].1)?;
+    let safeurl = safeurl_from(&map[TEST_FILE].1)?;
     assert_eq!(
-        xorurl_encoder.content_type(),
+        safeurl.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(xorurl_encoder.data_type(), SafeDataType::PublicBlob);
+    assert_eq!(safeurl.data_type(), SafeDataType::PublicBlob);
     Ok(())
 }
 
@@ -160,43 +160,38 @@ fn calling_safe_cat_xorurl_url_with_version() -> Result<()> {
     let (container_xorurl, _files_map) = parse_files_put_or_sync_output(&content);
 
     // let's sync with another file so we get a new version, and a different content in the file
-    let mut xorurl_encoder = xorurl_encoder_from(&container_xorurl)?;
-    xorurl_encoder.set_path("/test.md");
-    xorurl_encoder.set_content_version(None);
+    let mut safeurl = safeurl_from(&container_xorurl)?;
+    safeurl.set_path("/test.md");
+    safeurl.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
-    cmd.args(&vec![
-        "files",
-        "sync",
-        ANOTHER_FILE,
-        &xorurl_encoder.to_string(),
-    ])
-    .assert()
-    .success();
+    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &safeurl.to_string()])
+        .assert()
+        .success();
 
-    xorurl_encoder.set_content_version(None);
+    safeurl.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
-    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
+    cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
-    xorurl_encoder.set_content_version(Some(0));
+    safeurl.set_content_version(Some(0));
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
-    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
+    cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .stdout(predicate::str::contains(TEST_FILE_CONTENT))
         .success();
 
-    xorurl_encoder.set_content_version(Some(1));
+    safeurl.set_content_version(Some(1));
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
-    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
+    cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .stdout(predicate::str::contains(ANOTHER_FILE_CONTENT))
         .success();
 
-    xorurl_encoder.set_content_version(Some(2));
+    safeurl.set_content_version(Some(2));
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
-    cmd.args(&vec!["cat", &xorurl_encoder.to_string()])
+    cmd.args(&vec!["cat", &safeurl.to_string()])
         .assert()
         .failure();
     Ok(())
@@ -235,18 +230,13 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         .success();
 
     // let's sync with another file so we get a new version, and a different content in the file
-    let mut xorurl_encoder = xorurl_encoder_from(&container_xorurl)?;
-    xorurl_encoder.set_path("/test.md");
-    xorurl_encoder.set_content_version(None);
+    let mut safeurl = safeurl_from(&container_xorurl)?;
+    safeurl.set_path("/test.md");
+    safeurl.set_content_version(None);
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| anyhow!(e.to_string()))?;
-    cmd.args(&vec![
-        "files",
-        "sync",
-        ANOTHER_FILE,
-        &xorurl_encoder.to_string(),
-    ])
-    .assert()
-    .success();
+    cmd.args(&vec!["files", "sync", ANOTHER_FILE, &safeurl.to_string()])
+        .assert()
+        .success();
 
     // NRS name was not updated (with --updated-nrs) when doing files sync,
     // so our file should not have been updated
@@ -354,7 +344,7 @@ fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = xorurl_encoder_from(&url)?;
+    let mut safeurl = safeurl_from(&url)?;
     safeurl.set_path("/dir_link_link/parent_dir/dir_link/sibling_dir_file.md");
 
     let args = ["cat", &safeurl.to_string()];
@@ -379,7 +369,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = xorurl_encoder_from(&url)?;
+    let mut safeurl = safeurl_from(&url)?;
 
     safeurl.set_path("/sub/infinite_loop");
     let args = ["cat", &safeurl.to_string()];
@@ -405,7 +395,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
 //       $ cat ../test_symlinks/dir_link_deep/../readme.md
 //       = This is a real markdown file. =
 //
-//    note: This test always failed when XorUrlEncoder
+//    note: This test always failed when SafeUrl
 //          used rust-url for parsing path because it
 //          normalizes away the "../" with no option
 //          to obtain the raw path.
@@ -421,7 +411,7 @@ fn calling_cat_symlinks_resolve_parent_dir() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = xorurl_encoder_from(&url)?;
+    let mut safeurl = safeurl_from(&url)?;
 
     safeurl.set_path("/dir_link_deep/../readme.md");
     let args = ["cat", &safeurl.to_string()];
@@ -444,7 +434,7 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = xorurl_encoder_from(&url)?;
+    let mut safeurl = safeurl_from(&url)?;
 
     safeurl.set_path("/dir_outside");
     let args = ["cat", &safeurl.to_string()];

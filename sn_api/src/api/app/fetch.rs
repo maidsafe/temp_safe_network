@@ -9,12 +9,12 @@
 
 use super::{
     files::{FileItem, FileMeta, FilesMap, RealPath},
-    nrs_map::NrsMap,
+    nrs::NrsMap,
     Safe, XorName,
 };
 pub use super::{
+    safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrlBase},
     wallet::WalletSpendableBalances,
-    xorurl::{SafeContentType, SafeDataType, XorUrlBase, XorUrlEncoder},
 };
 use crate::{Error, Result};
 use log::{debug, info};
@@ -207,29 +207,26 @@ impl Safe {
         range: Range,
         resolve_path: bool,
     ) -> Result<Vec<SafeData>> {
-        let current_xorurl_encoder = Safe::parse_url(url)?;
-        info!(
-            "URL parsed successfully, fetching: {}",
-            current_xorurl_encoder
-        );
+        let current_safe_url = Safe::parse_url(url)?;
+        info!("URL parsed successfully, fetching: {}", current_safe_url);
         debug!(
             "Fetching content of type: {:?}",
-            current_xorurl_encoder.content_type()
+            current_safe_url.content_type()
         );
 
         // Let's create a list keeping track each of the resolution hops we go through
         // TODO: pass option to get raw content AKA: Do not resolve beyond first thing.
         let mut resolution_chain = Vec::<SafeData>::default();
-        let mut next_to_resolve = Some((current_xorurl_encoder, None));
+        let mut next_to_resolve = Some((current_safe_url, None));
         let mut indirections_count = 0;
-        while let Some((next_xorurl_encoder, metadata)) = next_to_resolve {
+        while let Some((next_safe_url, metadata)) = next_to_resolve {
             if indirections_count == INDIRECTION_LIMIT {
                 return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
             }
 
             let (step, next) = self
                 .resolve_one_indirection(
-                    next_xorurl_encoder,
+                    next_safe_url,
                     metadata,
                     retrieve_data,
                     range,
@@ -247,7 +244,7 @@ impl Safe {
 
     async fn resolve_one_indirection(
         &mut self,
-        mut the_xor: XorUrlEncoder,
+        mut the_xor: SafeUrl,
         metadata: Option<FileItem>,
         retrieve_data: bool,
         range: Range,
@@ -285,7 +282,7 @@ impl Safe {
                                 if FileMeta::filetype_is_file(&file_type) {
                                     match file_item.get("link") {
                                         Some(link) => {
-                                            let new_target_xorurl = XorUrlEncoder::from_url(link)?;
+                                            let new_target_xorurl = SafeUrl::from_url(link)?;
                                             let mut metadata = (*file_item).clone();
                                             Path::new(&path).file_name().map(|name| {
                                                 name.to_str().map(|str| {
@@ -352,24 +349,21 @@ impl Safe {
                 let target_url = nrs_map.resolve_for_subnames(the_xor.sub_names_vec())?;
                 debug!("Resolved target: {}", target_url);
 
-                let mut target_xorurl_encoder = Safe::parse_url(&target_url)?;
+                let mut target_safe_url = Safe::parse_url(&target_url)?;
                 // Let's concatenate the path corresponding to the URL we are processing
                 // to the URL we resolved from NRS Map
                 let url_path = the_xor.path_decoded()?;
-                if target_xorurl_encoder.path().is_empty() {
-                    target_xorurl_encoder.set_path(&url_path);
+                if target_safe_url.path().is_empty() {
+                    target_safe_url.set_path(&url_path);
                 } else if !the_xor.path().is_empty() {
-                    target_xorurl_encoder.set_path(&format!(
+                    target_safe_url.set_path(&format!(
                         "{}{}",
-                        target_xorurl_encoder.path_decoded()?,
+                        target_safe_url.path_decoded()?,
                         url_path
                     ));
                 }
 
-                debug!(
-                    "Resolving target from resolvable map: {}",
-                    target_xorurl_encoder
-                );
+                debug!("Resolving target from resolvable map: {}", target_safe_url);
 
                 // We don't want the path or subnames, just the FilesContainer XOR-URL and version
                 the_xor.set_path("");
@@ -389,7 +383,7 @@ impl Safe {
                     resolved_from: url,
                 };
 
-                Ok((nrs_map_container, Some((target_xorurl_encoder, None))))
+                Ok((nrs_map_container, Some((target_safe_url, None))))
             }
             SafeContentType::Raw => {
                 if !the_xor.sub_names_vec().is_empty() {
@@ -513,7 +507,7 @@ impl Safe {
 
     async fn retrieve_blob(
         &mut self,
-        the_xor: &XorUrlEncoder,
+        the_xor: &SafeUrl,
         retrieve_data: bool,
         media_type: Option<String>,
         metadata: &Option<FileItem>,
@@ -573,13 +567,13 @@ fn gen_filtered_filesmap(urlpath: &str, files_map: &FilesMap, xorurl: &str) -> R
 }
 // // This contains information for the next step to be made
 // // in each iteration of the resolution process
-type NextStepInfo = (XorUrlEncoder, Option<FileItem>);
+type NextStepInfo = (SafeUrl, Option<FileItem>);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        api::{app::test_helpers::new_safe_instance, xorurl::XorUrlEncoder},
+        api::{app::test_helpers::new_safe_instance, safeurl::SafeUrl},
         retry_loop,
     };
     use anyhow::{anyhow, bail, Context, Result};
@@ -592,13 +586,13 @@ mod tests {
         let preload_amount = "1324.12";
         let (xorurl, _key_pair) = safe.keys_create_preload_test_coins(preload_amount).await?;
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::SafeKey {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
+                    xorname: safe_url.xorname(),
                     resolved_from: xorurl.clone(),
                 }
         );
@@ -615,13 +609,13 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let xorurl = safe.wallet_create().await?;
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::Wallet {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
+                    xorname: safe_url.xorname(),
                     type_tag: 1_000,
                     balances: WalletSpendableBalances::default(),
                     data_type: SafeDataType::SeqMap,
@@ -643,14 +637,14 @@ mod tests {
             .files_container_create(Some("../testdata/"), None, true, false, false)
             .await?;
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
 
         assert!(
             content
                 == SafeData::FilesContainer {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
+                    xorname: safe_url.xorname(),
                     type_tag: 1_100,
                     version: 0,
                     files_map,
@@ -659,18 +653,12 @@ mod tests {
                 }
         );
 
-        let mut xorurl_encoder_with_path = xorurl_encoder.clone();
-        xorurl_encoder_with_path.set_path("/subfolder/subexists.md");
-        assert_eq!(xorurl_encoder_with_path.path(), "/subfolder/subexists.md");
-        assert_eq!(xorurl_encoder_with_path.xorname(), xorurl_encoder.xorname());
-        assert_eq!(
-            xorurl_encoder_with_path.type_tag(),
-            xorurl_encoder.type_tag()
-        );
-        assert_eq!(
-            xorurl_encoder_with_path.content_type(),
-            xorurl_encoder.content_type()
-        );
+        let mut safe_url_with_path = safe_url.clone();
+        safe_url_with_path.set_path("/subfolder/subexists.md");
+        assert_eq!(safe_url_with_path.path(), "/subfolder/subexists.md");
+        assert_eq!(safe_url_with_path.xorname(), safe_url.xorname());
+        assert_eq!(safe_url_with_path.type_tag(), safe_url.type_tag());
+        assert_eq!(safe_url_with_path.content_type(), safe_url.content_type());
 
         // let's also compare it with the result from inspecting the URL
         let inspected_content = safe.inspect(&xorurl).await?;
@@ -691,17 +679,17 @@ mod tests {
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        xorurl_encoder.set_content_version(Some(0));
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        safe_url.set_content_version(Some(0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
-            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string(), true, true, false)
+            .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
             .await?;
 
         let nrs_url = format!("safe://{}", site_name);
         let content = retry_loop!(safe.fetch(&nrs_url, None));
 
-        xorurl_encoder.set_sub_names("")?;
-        let xorurl_without_subname = xorurl_encoder.to_string();
+        safe_url.set_sub_names("")?;
+        let xorurl_without_subname = safe_url.to_string();
 
         // this should resolve to a FilesContainer until we enable prevent resolution.
         match &content {
@@ -715,7 +703,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(*xorurl, xorurl_without_subname);
-                assert_eq!(*xorname, xorurl_encoder.xorname());
+                assert_eq!(*xorname, safe_url.xorname());
                 assert_eq!(*type_tag, 1_100);
                 assert_eq!(*version, 0);
                 assert_eq!(*data_type, SafeDataType::PublicSequence);
@@ -741,9 +729,9 @@ mod tests {
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        xorurl_encoder.set_content_version(Some(0));
-        let files_container_url = xorurl_encoder.to_string();
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        safe_url.set_content_version(Some(0));
+        let files_container_url = safe_url.to_string();
         let _ = safe
             .nrs_map_container_create(&site_name, &files_container_url, true, true, false)
             .await?;
@@ -779,13 +767,13 @@ mod tests {
             .files_store_public_blob(data, Some("text/plain"), false)
             .await?;
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::PublicBlob {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
+                    xorname: safe_url.xorname(),
                     data: data.to_vec(),
                     resolved_from: xorurl.clone(),
                     media_type: Some("text/plain".to_string()),
@@ -799,7 +787,7 @@ mod tests {
             inspected_content[0]
                 == SafeData::PublicBlob {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
+                    xorname: safe_url.xorname(),
                     data: vec![],
                     resolved_from: xorurl,
                     media_type: Some("text/plain".to_string()),
@@ -854,10 +842,10 @@ mod tests {
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        xorurl_encoder.set_content_version(Some(0));
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        safe_url.set_content_version(Some(0));
         let (_nrs_map_xorurl, _, _nrs_map) = safe
-            .nrs_map_container_create(&site_name, &xorurl_encoder.to_string(), true, true, false)
+            .nrs_map_container_create(&site_name, &safe_url.to_string(), true, true, false)
             .await?;
 
         let nrs_url = format!("safe://{}/test.md", site_name);
@@ -908,14 +896,14 @@ mod tests {
         let data = b"Something super immutable";
         let xorurl = safe.sequence_create(data, None, 25_000, false).await?;
 
-        let xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
                 == SafeData::PublicSequence {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
-                    type_tag: xorurl_encoder.type_tag(),
+                    xorname: safe_url.xorname(),
+                    type_tag: safe_url.type_tag(),
                     version: 0,
                     data: data.to_vec(),
                     resolved_from: xorurl.clone(),
@@ -928,8 +916,8 @@ mod tests {
             inspected_url[0]
                 == SafeData::PublicSequence {
                     xorurl: xorurl.clone(),
-                    xorname: xorurl_encoder.xorname(),
-                    type_tag: xorurl_encoder.type_tag(),
+                    xorname: safe_url.xorname(),
+                    type_tag: safe_url.type_tag(),
                     version: 0,
                     data: vec![],
                     resolved_from: xorurl,
@@ -943,7 +931,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = SafeUrl::encode(
             xorname,
             None,
             type_tag,
@@ -985,7 +973,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
-        let xorurl = XorUrlEncoder::encode(
+        let xorurl = SafeUrl::encode(
             xorname,
             None,
             type_tag,
@@ -1028,10 +1016,10 @@ mod tests {
         let data = b"Something super immutable";
         let xorurl = safe.files_store_public_blob(data, None, false).await?;
 
-        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
-        xorurl_encoder.set_path(path);
-        match safe.fetch(&xorurl_encoder.to_string(), None).await {
+        safe_url.set_path(path);
+        match safe.fetch(&safe_url.to_string(), None).await {
             Ok(c) => {
                 bail!("Unxpected fetched content: {:?}", c)
             }
@@ -1047,9 +1035,9 @@ mod tests {
             .files_store_public_blob(data, Some("text/plain"), false)
             .await?;
 
-        let mut xorurl_encoder = XorUrlEncoder::from_url(&xorurl)?;
-        xorurl_encoder.set_path("/some_relative_filepath");
-        let url_with_path = xorurl_encoder.to_string();
+        let mut safe_url = SafeUrl::from_url(&xorurl)?;
+        safe_url.set_path("/some_relative_filepath");
+        let url_with_path = safe_url.to_string();
         match safe.fetch(&url_with_path, None).await {
             Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
             Err(Error::ContentError(msg)) => {

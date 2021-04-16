@@ -169,8 +169,8 @@ pub async fn wallet_commander(
             let balance = safe.wallet_balance(&target).await?;
 
             if OutputFmt::Pretty == output_fmt {
-                let xorurl_encoder = Safe::parse_url(&target)?;
-                if xorurl_encoder.path().is_empty() {
+                let safeurl = Safe::parse_url(&target)?;
+                if safeurl.path().is_empty() {
                     println!(
                         "Wallet at \"{}\" has a total balance of {} safecoins",
                         target, balance

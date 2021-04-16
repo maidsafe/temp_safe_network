@@ -7,20 +7,22 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
-    nrs_map::NrsMap,
-    xorurl::SafeContentType,
-    Safe,
-};
+mod nrs_map;
+
+pub use nrs_map::{DefaultRdf, NrsMap};
+
 use crate::{
-    xorurl::{XorUrl, XorUrlEncoder},
+    api::app::{
+        consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
+        safeurl::{SafeContentType, SafeUrl, XorUrl},
+        Safe,
+    },
     Error, Result,
 };
 use log::{debug, info, warn};
 use std::collections::BTreeMap;
 
-// Type tag to use for the NrsMapContainer stored on Sequence
+// Type tag to use for the NrsMapContainer stored on Register
 pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
@@ -29,25 +31,25 @@ const ERROR_MSG_NO_NRS_MAP_FOUND: &str = "No NRS Map found at this address";
 pub type ProcessedEntries = BTreeMap<String, (String, String)>;
 
 impl Safe {
-    pub fn parse_url(url: &str) -> Result<XorUrlEncoder> {
-        XorUrlEncoder::from_url(&sanitised_url(url))
+    pub fn parse_url(url: &str) -> Result<SafeUrl> {
+        SafeUrl::from_url(&sanitised_url(url))
     }
 
-    // Parses a safe:// URL and returns all the info in a XorUrlEncoder instance.
-    // It also returns a second XorUrlEncoder if the URL was resolved from an NRS-URL,
-    // this second XorUrlEncoder instance contains the information of the parsed NRS-URL.
+    // Parses a safe:// URL and returns all the info in a SafeUrl instance.
+    // It also returns a second SafeUrl if the URL was resolved from an NRS-URL,
+    // this second SafeUrl instance contains the information of the parsed NRS-URL.
     // *Note* this is not part of the public API, but an internal helper function used by API impl.
     pub(crate) async fn parse_and_resolve_url(
         &mut self,
         url: &str,
-    ) -> Result<(XorUrlEncoder, Option<XorUrlEncoder>)> {
-        let xorurl_encoder = Safe::parse_url(url)?;
-        let orig_path = xorurl_encoder.path_decoded()?;
+    ) -> Result<(SafeUrl, Option<SafeUrl>)> {
+        let safe_url = Safe::parse_url(url)?;
+        let orig_path = safe_url.path_decoded()?;
 
         // Obtain the resolution chain without resolving the URL's path
         let mut resolution_chain = self
             .retrieve_from_url(
-                &xorurl_encoder.to_string(),
+                &safe_url.to_string(),
                 false,
                 None,
                 false, // don't resolve the URL's path
@@ -59,18 +61,17 @@ impl Safe {
             .pop()
             .ok_or_else(|| Error::ContentNotFound(format!("Failed to resolve {}", url)))?;
 
-        // Set the original path so we return the XorUrlEncoder with it
-        let mut xorurl_encoder = XorUrlEncoder::from_url(&safe_data.xorurl())?;
-        xorurl_encoder.set_path(&orig_path);
+        // Set the original path so we return the SafeUrl with it
+        let mut safe_url = SafeUrl::from_url(&safe_data.xorurl())?;
+        safe_url.set_path(&orig_path);
 
         // If there is still one item in the chain, the first item is the NRS Map Container
         // targeted by the URL and where the whole resolution started from
         if resolution_chain.is_empty() {
-            Ok((xorurl_encoder, None))
+            Ok((safe_url, None))
         } else {
-            let nrsmap_xorul_encoder =
-                XorUrlEncoder::from_url(&resolution_chain[0].resolved_from())?;
-            Ok((xorurl_encoder, Some(nrsmap_xorul_encoder)))
+            let nrsmap_xorul_encoder = SafeUrl::from_url(&resolution_chain[0].resolved_from())?;
+            Ok((safe_url, Some(nrsmap_xorul_encoder)))
         }
     }
 
@@ -84,12 +85,12 @@ impl Safe {
     ) -> Result<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Adding to NRS map...");
         // GET current NRS map from name's TLD
-        let (xorurl_encoder, _) = validate_nrs_name(name)?;
-        let xorurl = xorurl_encoder.to_string();
+        let (safe_url, _) = validate_nrs_name(name)?;
+        let xorurl = safe_url.to_string();
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl).await?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
-        let link = nrs_map.nrs_update_map_or_create_data(name, link, default, hard_link)?;
+        let link = nrs_map.update(name, link, default, hard_link)?;
         let mut processed_entries = ProcessedEntries::new();
         processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
@@ -100,8 +101,8 @@ impl Safe {
             self.safe_client
                 .append_to_sequence(
                     nrs_map_xorurl.as_bytes(),
-                    xorurl_encoder.xorname(),
-                    xorurl_encoder.type_tag(),
+                    safe_url.xorname(),
+                    safe_url.type_tag(),
                     false,
                 )
                 .await?;
@@ -144,7 +145,7 @@ impl Safe {
             ))
         } else {
             let mut nrs_map = NrsMap::default();
-            let link = nrs_map.nrs_update_map_or_create_data(&name, link, default, hard_link)?;
+            let link = nrs_map.update(&name, link, default, hard_link)?;
             let mut processed_entries = ProcessedEntries::new();
             processed_entries.insert(name.to_string(), (CONTENT_ADDED_SIGN.to_string(), link));
 
@@ -152,7 +153,7 @@ impl Safe {
             if dry_run {
                 Ok(("".to_string(), processed_entries, nrs_map))
             } else {
-                let nrs_xorname = XorUrlEncoder::from_nrsurl(&nrs_url)?.xorname();
+                let nrs_xorname = SafeUrl::from_nrsurl(&nrs_url)?.xorname();
                 debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
 
                 // Store the serialised NrsMap in a Public Blob
@@ -171,7 +172,7 @@ impl Safe {
                     )
                     .await?;
 
-                let xorurl = XorUrlEncoder::encode_sequence_data(
+                let xorurl = SafeUrl::encode_sequence_data(
                     xorname,
                     NRS_MAP_TYPE_TAG,
                     SafeContentType::NrsMapContainer,
@@ -191,8 +192,8 @@ impl Safe {
     ) -> Result<(u64, XorUrl, ProcessedEntries, NrsMap)> {
         info!("Removing from NRS map...");
         // GET current NRS map from &name TLD
-        let (xorurl_encoder, _) = validate_nrs_name(name)?;
-        let xorurl = xorurl_encoder.to_string();
+        let (safe_url, _) = validate_nrs_name(name)?;
+        let xorurl = safe_url.to_string();
         let (version, mut nrs_map) = self.nrs_map_container_get(&xorurl).await?;
         debug!("NRS, Existing data: {:?}", nrs_map);
 
@@ -210,8 +211,8 @@ impl Safe {
             self.safe_client
                 .append_to_sequence(
                     nrs_map_xorurl.as_bytes(),
-                    xorurl_encoder.xorname(),
-                    xorurl_encoder.type_tag(),
+                    safe_url.xorname(),
+                    safe_url.type_tag(),
                     false,
                 )
                 .await?;
@@ -241,20 +242,20 @@ impl Safe {
     /// ```
     pub async fn nrs_map_container_get(&mut self, url: &str) -> Result<(u64, NrsMap)> {
         debug!("Getting latest resolvable map container from: {:?}", url);
-        let xorurl_encoder = Safe::parse_url(url)?;
+        let safe_url = Safe::parse_url(url)?;
 
         // Check if the URL specified a specific version of the content or simply the latest available
-        let data = match xorurl_encoder.content_version() {
+        let data = match safe_url.content_version() {
             None => {
                 self.safe_client
-                    .sequence_get_last_entry(xorurl_encoder.xorname(), NRS_MAP_TYPE_TAG, false)
+                    .sequence_get_last_entry(safe_url.xorname(), NRS_MAP_TYPE_TAG, false)
                     .await
             }
             Some(content_version) => {
                 let serialised_nrs_map = self
                     .safe_client
                     .sequence_get_entry(
-                        xorurl_encoder.xorname(),
+                        safe_url.xorname(),
                         NRS_MAP_TYPE_TAG,
                         content_version,
                         false,
@@ -281,7 +282,7 @@ impl Safe {
                     ))
                 })?;
                 debug!("Deserialised NrsMap XOR-URL: {}", url);
-                let nrs_map_xorurl = XorUrlEncoder::from_url(&url)?;
+                let nrs_map_xorurl = SafeUrl::from_url(&url)?;
 
                 // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
                 let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
@@ -333,7 +334,7 @@ impl Safe {
     }
 }
 
-fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
+fn validate_nrs_name(name: &str) -> Result<(SafeUrl, String)> {
     // validate no slashes in name.
     if name.find('/').is_some() {
         let msg = "The NRS name/subname cannot contain a slash".to_string();
@@ -341,14 +342,14 @@ fn validate_nrs_name(name: &str) -> Result<(XorUrlEncoder, String)> {
     }
     // parse the name into a url
     let sanitised_url = sanitised_url(name);
-    let xorurl_encoder = Safe::parse_url(&sanitised_url)?;
-    if xorurl_encoder.content_version().is_some() {
+    let safe_url = Safe::parse_url(&sanitised_url)?;
+    if safe_url.content_version().is_some() {
         return Err(Error::InvalidInput(format!(
             "The NRS name/subname URL cannot contain a version: {}",
             sanitised_url
         )));
     };
-    Ok((xorurl_encoder, sanitised_url))
+    Ok((safe_url, sanitised_url))
 }
 
 fn sanitised_url(name: &str) -> String {
@@ -358,17 +359,19 @@ fn sanitised_url(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::nrs_map::DefaultRdf;
     use super::*;
     use crate::{
-        api::app::test_helpers::{new_safe_instance, random_nrs_name},
+        api::app::{
+            consts::PREDICATE_LINK,
+            test_helpers::{new_safe_instance, random_nrs_name},
+        },
         retry_loop, retry_loop_for_pattern,
     };
     use anyhow::{anyhow, bail, Result};
 
     #[tokio::test]
     async fn test_nrs_map_container_create() -> Result<()> {
-        use crate::api::app::consts::FAKE_RDF_PREDICATE_LINK;
-        use crate::nrs_map::DefaultRdf;
         let site_name = random_nrs_name();
         let mut safe = new_safe_instance().await?;
 
@@ -392,15 +395,15 @@ mod tests {
 
         if let DefaultRdf::OtherRdf(def_data) = &nrs_map.default {
             let link = def_data
-                .get(FAKE_RDF_PREDICATE_LINK)
-                .ok_or_else(|| anyhow!("Entry not found with key '{}'", FAKE_RDF_PREDICATE_LINK))?;
+                .get(PREDICATE_LINK)
+                .ok_or_else(|| anyhow!("Entry not found with key '{}'", PREDICATE_LINK))?;
 
             assert_eq!(*link, "safe://linked-from-site_name?v=0".to_string());
             assert_eq!(
                 nrs_map.get_default()?,
                 &DefaultRdf::OtherRdf(def_data.clone())
             );
-            let decoder = XorUrlEncoder::from_url(&xor_url)?;
+            let decoder = SafeUrl::from_url(&xor_url)?;
             assert_eq!(nrs_xorname, decoder.xorname());
             Ok(())
         } else {

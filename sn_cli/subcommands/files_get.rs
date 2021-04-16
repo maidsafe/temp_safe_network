@@ -19,7 +19,7 @@ use sn_api::{
     fetch::Range,
     fetch::SafeData,
     files::{FilesMap, GetAttr, ProcessedFiles},
-    xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
+    safeurl::{SafeDataType, SafeUrl, XorUrl},
     Result as ApiResult, Safe,
 };
 use std::{
@@ -440,8 +440,8 @@ async fn files_container_get_files(
     // Todo: This test will need to be modified once we support empty directories.
     let is_single_file = files_map.len() == 1;
 
-    let xorurl_encoder = XorUrlEncoder::from_url(&url)?;
-    let urlpath = xorurl_encoder.path_decoded()?;
+    let safeurl = SafeUrl::from_url(&url)?;
+    let urlpath = safeurl.path_decoded()?;
 
     let root = find_root_path(&dirpath, &urlpath, is_single_file)?;
 
@@ -629,7 +629,7 @@ async fn files_map_get_files(
         // Download file.  We handle callback from download_file_from_net()
         // and our handler calls a callback supplied by our caller.
         match download_file_from_net(
-            safe.clone(),
+            safe,
             xorurl,
             abspath.as_path(),
             size,
@@ -726,7 +726,7 @@ fn denormalize_slashes(p: &str) -> String {
 // size (in bytes) must be provided
 // A callback/closure is called after each chunk is downloaded.
 async fn download_file_from_net(
-    safe: Safe,
+    safe: &mut Safe,
     xorurl: &str,
     path: &Path,
     size: u64,
@@ -755,7 +755,7 @@ async fn download_file_from_net(
         };
         let range = Some((Some(start), Some(end)));
         // gets public or private, based on xorurl type
-        let filedata = files_get_blob(safe.clone(), &xorurl, range).await?;
+        let filedata = files_get_blob(safe, &xorurl, range).await?;
         bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
         rcvd += filedata.len() as u64;
         trace!(
@@ -833,8 +833,8 @@ async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Resu
 
 /// # Get Public or Private Blob
 /// Get immutable data blobs from the network.
-pub async fn files_get_blob(mut safe: Safe, url: &str, range: Range) -> Result<Vec<u8>> {
-    match XorUrlEncoder::from_url(&url)?.data_type() {
+pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
+    match SafeUrl::from_url(&url)?.data_type() {
         SafeDataType::PublicBlob => {
             let pub_blob = safe.files_get_public_blob(&url, range).await?;
             Ok(pub_blob)

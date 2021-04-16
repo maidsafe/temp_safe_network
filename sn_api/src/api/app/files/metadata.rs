@@ -7,6 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use super::files_map::FileItem;
 use crate::{
     api::app::{
         consts::*,
@@ -15,32 +16,10 @@ use crate::{
     Error, Result,
 };
 use log::debug;
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{fs, path::Path};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-
-// To use for mapping files names (with path in a flattened hierarchy) to FileItems
-pub type FilesMap = BTreeMap<String, FileItem>;
-
-// Each FileItem contains file metadata and the link to the file's Blob XOR-URL
-pub type FileItem = BTreeMap<String, String>;
-
-// A trait to get an key attr and return an API Result
-pub trait GetAttr {
-    fn getattr(&self, key: &str) -> Result<&str>;
-}
-
-impl GetAttr for FileItem {
-    // Makes it more readable to conditionally get an attribute from a FileItem
-    // because we can call it in API funcs like fileitem.getattr("key")?;
-    fn getattr(&self, key: &str) -> Result<&str> {
-        match self.get(key) {
-            Some(v) => Ok(v),
-            None => Err(Error::EntryNotFound(format!("key not found: {}", key))),
-        }
-    }
-}
 
 // Represents file metadata.  Simplifies passing it around.
 // note: all values are String or Option<String>
@@ -105,24 +84,20 @@ impl FileMeta {
         // The first 4 must be present, else a crash.
         // lots of other code relies on this, so big refactor
         // would be needed to change it.
-        let created = file_item[FAKE_RDF_PREDICATE_CREATED].to_string();
-        let modified = file_item[FAKE_RDF_PREDICATE_MODIFIED].to_string();
-        let file_size = file_item[FAKE_RDF_PREDICATE_SIZE].to_string();
-        let file_type = file_item[FAKE_RDF_PREDICATE_TYPE].to_string();
+        let created = file_item[PREDICATE_CREATED].to_string();
+        let modified = file_item[PREDICATE_MODIFIED].to_string();
+        let file_size = file_item[PREDICATE_SIZE].to_string();
+        let file_type = file_item[PREDICATE_TYPE].to_string();
 
         // These are all Option<String>
         let original_created = file_item
-            .get(FAKE_RDF_PREDICATE_ORIGINAL_CREATED)
+            .get(PREDICATE_ORIGINAL_CREATED)
             .map(ToOwned::to_owned);
         let original_modified = file_item
-            .get(FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED)
+            .get(PREDICATE_ORIGINAL_MODIFIED)
             .map(ToOwned::to_owned);
-        let readonly = file_item
-            .get(FAKE_RDF_PREDICATE_READONLY)
-            .map(ToOwned::to_owned);
-        let mode_bits = file_item
-            .get(FAKE_RDF_PREDICATE_MODE_BITS)
-            .map(ToOwned::to_owned);
+        let readonly = file_item.get(PREDICATE_READONLY).map(ToOwned::to_owned);
+        let mode_bits = file_item.get(PREDICATE_MODE_BITS).map(ToOwned::to_owned);
 
         Self {
             created,
@@ -155,42 +130,26 @@ impl FileMeta {
         let mut file_item = FileItem::new();
         Self::add_to_fileitem(
             &mut file_item,
-            FAKE_RDF_PREDICATE_CREATED,
+            PREDICATE_CREATED,
             Some(self.created.clone()),
         );
         Self::add_to_fileitem(
             &mut file_item,
-            FAKE_RDF_PREDICATE_MODIFIED,
+            PREDICATE_MODIFIED,
             Some(self.modified.clone()),
         );
+        Self::add_to_fileitem(&mut file_item, PREDICATE_SIZE, Some(self.file_size.clone()));
+        Self::add_to_fileitem(&mut file_item, PREDICATE_TYPE, Some(self.file_type.clone()));
+        Self::add_to_fileitem(&mut file_item, PREDICATE_READONLY, self.readonly.clone());
+        Self::add_to_fileitem(&mut file_item, PREDICATE_MODE_BITS, self.mode_bits.clone());
         Self::add_to_fileitem(
             &mut file_item,
-            FAKE_RDF_PREDICATE_SIZE,
-            Some(self.file_size.clone()),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_TYPE,
-            Some(self.file_type.clone()),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_READONLY,
-            self.readonly.clone(),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_MODE_BITS,
-            self.mode_bits.clone(),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_ORIGINAL_CREATED,
+            PREDICATE_ORIGINAL_CREATED,
             self.original_created.clone(),
         );
         Self::add_to_fileitem(
             &mut file_item,
-            FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED,
+            PREDICATE_ORIGINAL_MODIFIED,
             self.original_modified.clone(),
         );
 

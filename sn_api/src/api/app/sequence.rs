@@ -7,11 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{xorurl::SafeContentType, Safe};
-use crate::{
-    xorurl::{SafeDataType, XorUrl, XorUrlEncoder},
-    Error, Result,
+use super::{
+    safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl},
+    Safe,
 };
+use crate::{Error, Result};
 use log::debug;
 use xor_name::XorName;
 
@@ -42,7 +42,7 @@ impl Safe {
             .store_sequence(data, name, type_tag, None, private)
             .await?;
 
-        XorUrlEncoder::encode_sequence_data(
+        SafeUrl::encode_sequence_data(
             xorname,
             type_tag,
             SafeContentType::Raw,
@@ -67,25 +67,22 @@ impl Safe {
     /// ```
     pub async fn sequence_get(&mut self, url: &str) -> Result<(u64, Vec<u8>)> {
         debug!("Getting Public Sequence data from: {:?}", url);
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        let (safe_url, _) = self.parse_and_resolve_url(url).await?;
 
-        self.fetch_sequence(&xorurl_encoder).await
+        self.fetch_sequence(&safe_url).await
     }
 
-    /// Fetch a Sequence from a XorUrlEncoder without performing any type of URL resolution
-    pub(crate) async fn fetch_sequence(
-        &mut self,
-        xorurl_encoder: &XorUrlEncoder,
-    ) -> Result<(u64, Vec<u8>)> {
-        let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
-        let data = match xorurl_encoder.content_version() {
+    /// Fetch a Sequence from a SafeUrl without performing any type of URL resolution
+    pub(crate) async fn fetch_sequence(&mut self, safe_url: &SafeUrl) -> Result<(u64, Vec<u8>)> {
+        let is_private = safe_url.data_type() == SafeDataType::PrivateSequence;
+        let data = match safe_url.content_version() {
             Some(version) => {
                 // We fetch a specific entry since the URL specifies a specific version
                 let data = self
                     .safe_client
                     .sequence_get_entry(
-                        xorurl_encoder.xorname(),
-                        xorurl_encoder.type_tag(),
+                        safe_url.xorname(),
+                        safe_url.type_tag(),
                         version,
                         is_private,
                     )
@@ -96,11 +93,7 @@ impl Safe {
             None => {
                 // ...then get last entry in the Sequence
                 self.safe_client
-                    .sequence_get_last_entry(
-                        xorurl_encoder.xorname(),
-                        xorurl_encoder.type_tag(),
-                        is_private,
-                    )
+                    .sequence_get_last_entry(safe_url.xorname(), safe_url.type_tag(), is_private)
                     .await
             }
         };
@@ -112,7 +105,7 @@ impl Safe {
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
                 "Sequence found at \"{}\" was empty",
-                xorurl_encoder
+                safe_url
             ))),
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 "No Sequence found at this address".to_string(),
@@ -138,19 +131,19 @@ impl Safe {
     /// # });
     /// ```
     pub async fn append_to_sequence(&mut self, url: &str, data: &[u8]) -> Result<()> {
-        let xorurl_encoder = Safe::parse_url(url)?;
-        if xorurl_encoder.content_version().is_some() {
+        let safe_url = Safe::parse_url(url)?;
+        if safe_url.content_version().is_some() {
             return Err(Error::InvalidInput(format!(
                 "The target URL cannot contain a version: {}",
                 url
             )));
         };
 
-        let (xorurl_encoder, _) = self.parse_and_resolve_url(url).await?;
+        let (safe_url, _) = self.parse_and_resolve_url(url).await?;
 
-        let xorname = xorurl_encoder.xorname();
-        let type_tag = xorurl_encoder.type_tag();
-        let is_private = xorurl_encoder.data_type() == SafeDataType::PrivateSequence;
+        let xorname = safe_url.xorname();
+        let type_tag = safe_url.type_tag();
+        let is_private = safe_url.data_type() == SafeDataType::PrivateSequence;
 
         // append to the data the data
         self.safe_client

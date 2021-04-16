@@ -17,10 +17,10 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType},
-    xorurl::{XorUrlBase, XorUrlEncoder},
+    safeurl::{SafeUrl, XorUrlBase},
 };
 use sn_cmd_test_utilities::{
-    get_random_nrs_string, parse_nrs_create_output, upload_test_folder, xorurl_encoder_from, CLI,
+    get_random_nrs_string, parse_nrs_create_output, safeurl_from, upload_test_folder, CLI,
     SAFE_PROTOCOL,
 };
 use std::process::Command;
@@ -30,7 +30,7 @@ const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
 
 fn gen_fake_target() -> Result<String> {
     let xorname = XorName(*b"12345678901234567890123456789012");
-    XorUrlEncoder::encode(
+    SafeUrl::encode(
         xorname,
         None,
         0x00a5_3cde,
@@ -144,9 +144,9 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
     let test_name2 = format!("safe://b.c.{}", nrs_name);
 
     let (container_xorurl, _map) = upload_test_folder(true)?;
-    let mut xorurl_encoder = xorurl_encoder_from(&container_xorurl)?;
-    xorurl_encoder.set_path("/test.md");
-    let link = xorurl_encoder.to_string();
+    let mut safeurl = safeurl_from(&container_xorurl)?;
+    safeurl.set_path("/test.md");
+    let link = safeurl.to_string();
     let _nrs_creation = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "nrs",
@@ -164,8 +164,8 @@ fn calling_safe_nrs_put_no_top_default_fetch() -> Result<()> {
         .map_err(|e| anyhow!(e.to_string()))?;
     assert_eq!(cat_of_new_url, "hello tests!");
 
-    xorurl_encoder.set_path("/another.md");
-    let link2 = xorurl_encoder.to_string();
+    safeurl.set_path("/another.md");
+    let link2 = safeurl.to_string();
     let _nrs_addition = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "nrs",

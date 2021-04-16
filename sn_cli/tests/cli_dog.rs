@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use sn_api::fetch::SafeData;
 use sn_cmd_test_utilities::{
     create_preload_and_get_keys, get_random_nrs_string, parse_dog_output,
-    parse_files_put_or_sync_output, xorurl_encoder_from,
+    parse_files_put_or_sync_output, safeurl_from,
 };
 
 const TEST_FILE: &str = "../testdata/test.md";
@@ -205,9 +205,9 @@ fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
 
     let (url, safe_data_vec) = parse_dog_output(&dog_output);
     assert_eq!(url, nrsurl);
-    let mut xorurl_encoder = xorurl_encoder_from(&nrsurl)?;
-    xorurl_encoder.set_sub_names("").map_err(|e| anyhow!(e))?;
-    let nrs_map_xorurl = xorurl_encoder.to_xorurl_string();
+    let mut safeurl = safeurl_from(&nrsurl)?;
+    safeurl.set_sub_names("").map_err(|e| anyhow!(e))?;
+    let nrs_map_xorurl = safeurl.to_xorurl_string();
 
     if let SafeData::NrsMapContainer {
         resolved_from,

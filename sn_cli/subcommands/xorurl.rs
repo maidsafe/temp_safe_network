@@ -13,7 +13,7 @@ use super::{
 };
 use crate::operations::safe_net::connect;
 use anyhow::Result;
-use sn_api::{xorurl::SafeUrl, Safe};
+use sn_api::{safeurl::SafeUrl, Safe};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'

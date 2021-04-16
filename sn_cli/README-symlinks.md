@@ -182,7 +182,7 @@ function on a Unix system, but understands structure/metadata in a FilesMap.
 Safe::fetch() and Safe::inspect() APIs were modified to resolve URL paths via
 FilesMap::realpath()
 
-SafeUrl (XorUrlEncoder) now uses a different URL parser to obtain the raw path,
+SafeUrl (SafeUrl) now uses a different URL parser to obtain the raw path,
 because rust-url normalizes '../' away.
 
 ## Path Resolution

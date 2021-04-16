@@ -13,7 +13,7 @@ use super::{
 };
 use anyhow::Result;
 use prettytable::{format::FormatBuilder, Table};
-use sn_api::{xorurl::XorUrl, Safe};
+use sn_api::{safeurl::XorUrl, Safe};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 
@@ -27,7 +27,7 @@ pub enum NrsSubCommands {
         /// The safe:// URL to map this to. Usually a FilesContainer for a website. This should be wrapped in double quotes on bash based systems.
         #[structopt(short = "l", long = "link")]
         link: Option<String>,
-        /// Set the sub name as default for this public name
+        /// Set the link as default for the top level NRS name as well
         #[structopt(long = "default")]
         default: bool,
         /// If --default is set, the default name is set using a direct link to the final destination that was provided with `--link`, rather than a link to the sub name being added (which is the default behaviour if this flag is not passed)

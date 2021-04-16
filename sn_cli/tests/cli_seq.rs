@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_cmd_test_utilities::{
-    get_random_nrs_string, parse_cat_seq_output, parse_seq_store_output, xorurl_encoder_from, CLI,
+    get_random_nrs_string, parse_cat_seq_output, parse_seq_store_output, safeurl_from, CLI,
     SAFE_PROTOCOL,
 };
 use std::{env, process::Command};
@@ -110,7 +110,7 @@ fn calling_safe_seq_append() -> Result<()> {
     .map_err(|e| anyhow!(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
-    let mut xorurl_encoder = xorurl_encoder_from(&seq_url)?;
+    let mut safeurl = safeurl_from(&seq_url)?;
 
     let content_v1 = "second item";
     let _ = cmd!(
@@ -131,11 +131,11 @@ fn calling_safe_seq_append() -> Result<()> {
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v1.as_bytes());
 
-    xorurl_encoder.set_content_version(Some(0));
+    safeurl.set_content_version(Some(0));
     let seq_cat = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "cat",
-        &xorurl_encoder.to_string(),
+        &safeurl.to_string(),
         "--json"
     )
     .read()
@@ -161,7 +161,7 @@ fn calling_safe_seq_priv_append() -> Result<()> {
     .map_err(|e| anyhow!(e.to_string()))?;
 
     let seq_url = parse_seq_store_output(&seq_store);
-    let mut xorurl_encoder = xorurl_encoder_from(&seq_url)?;
+    let mut safeurl = safeurl_from(&seq_url)?;
 
     let content_v1 = "second item";
     let _ = cmd!(
@@ -182,11 +182,11 @@ fn calling_safe_seq_priv_append() -> Result<()> {
     let (_url, data) = parse_cat_seq_output(&seq_cat);
     assert_eq!(data, content_v1.as_bytes());
 
-    xorurl_encoder.set_content_version(Some(0));
+    safeurl.set_content_version(Some(0));
     let seq_cat = cmd!(
         env!("CARGO_BIN_EXE_safe"),
         "cat",
-        &xorurl_encoder.to_string(),
+        &safeurl.to_string(),
         "--json"
     )
     .read()
@@ -212,9 +212,9 @@ fn calling_seq_store_and_fetch_with_nrsurl() -> Result<()> {
 
     let seq_url = parse_seq_store_output(&seq_store);
 
-    let mut xorurl_encoder = xorurl_encoder_from(&seq_url)?;
-    xorurl_encoder.set_content_version(Some(0));
-    let files_container_v0 = &xorurl_encoder.to_string();
+    let mut safeurl = safeurl_from(&seq_url)?;
+    safeurl.set_content_version(Some(0));
+    let files_container_v0 = &safeurl.to_string();
     let nrsurl = format!("safe://{}", get_random_nrs_string());
 
     let _ = cmd!(

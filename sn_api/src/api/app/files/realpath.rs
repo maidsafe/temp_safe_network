@@ -7,7 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{metadata::FilesMap, FileMeta, GetAttr};
+use super::{
+    files_map::{FilesMap, GetAttr},
+    metadata::FileMeta,
+};
 use crate::{Error, Result};
 
 pub(crate) trait RealPath {

@@ -7,18 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{
-    api::app::{
-        consts::*,
-        helpers::{gen_timestamp_secs, systemtime_to_rfc3339},
-    },
-    Error, Result,
+use super::{
+    file_system::{normalise_path_separator, upload_file_to_net},
+    metadata::FileMeta,
+    ProcessedFiles,
 };
-use log::debug;
+use crate::{api::app::consts::*, Error, Result, Safe};
+use log::{debug, info};
 use std::{collections::BTreeMap, fs, path::Path};
-
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 
 // To use for mapping files names (with path in a flattened hierarchy) to FileItems
 pub type FilesMap = BTreeMap<String, FileItem>;
@@ -42,230 +38,111 @@ impl GetAttr for FileItem {
     }
 }
 
-// Represents file metadata.  Simplifies passing it around.
-// note: all values are String or Option<String>
-// to facilitate use with FileItem.
-pub(crate) struct FileMeta {
-    created: String,
-    modified: String,
-    pub(crate) file_size: String,
-    pub(crate) file_type: String,
-    readonly: Option<String>,
-    mode_bits: Option<String>,
-    original_created: Option<String>,
-    original_modified: Option<String>,
-}
+// Helper function to add or update a FileItem in a FilesMap
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn add_or_update_file_item(
+    safe: &mut Safe,
+    file_name: &str,
+    file_name_for_map: &str,
+    file_path: &Path,
+    file_meta: &FileMeta,
+    file_link: Option<&str>,
+    name_exists: bool,
+    dry_run: bool,
+    files_map: &mut FilesMap,
+    processed_files: &mut ProcessedFiles,
+) -> bool {
+    // We need to add a new FileItem, let's generate the FileItem first
+    match gen_new_file_item(safe, file_path, file_meta, file_link, dry_run).await {
+        Ok(new_file_item) => {
+            let content_added_sign = if name_exists {
+                CONTENT_UPDATED_SIGN.to_string()
+            } else {
+                CONTENT_ADDED_SIGN.to_string()
+            };
 
-impl FileMeta {
-    // Instantiates FileMeta from a local filesystem path.
-    pub(crate) fn from_path(path: &str, follow_links: bool) -> Result<Self> {
-        let (metadata, file_type) = get_metadata(&Path::new(path), follow_links)?;
+            debug!("New FileItem item: {:?}", new_file_item);
+            debug!("New FileItem item inserted as {:?}", file_name);
+            files_map.insert(file_name_for_map.to_string(), new_file_item.clone());
 
-        // created and modified may not be available on all platforms/filesystems.
-        let original_created = if let Ok(time) = metadata.created() {
-            Some(systemtime_to_rfc3339(&time))
-        } else {
-            None
-        };
-        let original_modified = if let Ok(time) = metadata.modified() {
-            Some(systemtime_to_rfc3339(&time))
-        } else {
-            None
-        };
-        let readonly = Some(metadata.permissions().readonly().to_string());
+            processed_files.insert(
+                file_name.to_string(),
+                (
+                    content_added_sign,
+                    // note: files have link property,
+                    //       dirs and symlinks do not
+                    new_file_item
+                        .get(PREDICATE_LINK)
+                        .unwrap_or(&String::default())
+                        .to_string(),
+                ),
+            );
 
-        // We use 0 as file_size for metadata such as directories, symlinks.
-        let file_size = if metadata.file_type().is_file() {
-            metadata.len().to_string()
-        } else {
-            "0".to_string()
-        };
-
-        #[cfg(windows)]
-        let mode_bits = None; // Todo:  what does git do for windows?
-
-        #[cfg(not(windows))]
-        let mode_bits = Some(metadata.permissions().mode().to_string());
-
-        let s = Self {
-            created: gen_timestamp_secs(),
-            modified: gen_timestamp_secs(),
-            file_size,
-            file_type,
-            readonly,
-            mode_bits,
-            original_created,
-            original_modified,
-        };
-        Ok(s)
-    }
-
-    // Instantiates FileMeta from a FileItem
-    pub(crate) fn from_file_item(file_item: &FileItem) -> Self {
-        // The first 4 must be present, else a crash.
-        // lots of other code relies on this, so big refactor
-        // would be needed to change it.
-        let created = file_item[FAKE_RDF_PREDICATE_CREATED].to_string();
-        let modified = file_item[FAKE_RDF_PREDICATE_MODIFIED].to_string();
-        let file_size = file_item[FAKE_RDF_PREDICATE_SIZE].to_string();
-        let file_type = file_item[FAKE_RDF_PREDICATE_TYPE].to_string();
-
-        // These are all Option<String>
-        let original_created = file_item
-            .get(FAKE_RDF_PREDICATE_ORIGINAL_CREATED)
-            .map(ToOwned::to_owned);
-        let original_modified = file_item
-            .get(FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED)
-            .map(ToOwned::to_owned);
-        let readonly = file_item
-            .get(FAKE_RDF_PREDICATE_READONLY)
-            .map(ToOwned::to_owned);
-        let mode_bits = file_item
-            .get(FAKE_RDF_PREDICATE_MODE_BITS)
-            .map(ToOwned::to_owned);
-
-        Self {
-            created,
-            modified,
-            file_size,
-            file_type,
-            readonly,
-            mode_bits,
-            original_created,
-            original_modified,
+            true
         }
-    }
+        Err(err) => {
+            processed_files.insert(
+                file_name.to_string(),
+                (CONTENT_ERROR_SIGN.to_string(), format!("<{}>", err)),
+            );
+            info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
 
-    // Instantiates FileMeta from just type and size properties.
-    pub(crate) fn from_type_and_size(file_type: &str, file_size: &str) -> Self {
-        Self {
-            created: gen_timestamp_secs(),
-            modified: gen_timestamp_secs(),
-            file_size: file_size.to_string(),
-            file_type: file_type.to_string(),
-            readonly: None,
-            mode_bits: None,
-            original_created: None,
-            original_modified: None,
-        }
-    }
-
-    // converts Self to FileItem
-    pub(crate) fn to_file_item(&self) -> FileItem {
-        let mut file_item = FileItem::new();
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_CREATED,
-            Some(self.created.clone()),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_MODIFIED,
-            Some(self.modified.clone()),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_SIZE,
-            Some(self.file_size.clone()),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_TYPE,
-            Some(self.file_type.clone()),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_READONLY,
-            self.readonly.clone(),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_MODE_BITS,
-            self.mode_bits.clone(),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_ORIGINAL_CREATED,
-            self.original_created.clone(),
-        );
-        Self::add_to_fileitem(
-            &mut file_item,
-            FAKE_RDF_PREDICATE_ORIGINAL_MODIFIED,
-            self.original_modified.clone(),
-        );
-
-        file_item
-    }
-
-    // returns false if a directory or symlink, true if anything else (a file).
-    pub(crate) fn filetype_is_file(file_type: &str) -> bool {
-        !matches!(
-            file_type,
-            MIMETYPE_FILESYSTEM_DIR | MIMETYPE_FILESYSTEM_SYMLINK
-        )
-    }
-
-    // returns false if a directory or symlink, true if anything else (a file).
-    pub(crate) fn filetype_is_symlink(file_type: &str) -> bool {
-        file_type == MIMETYPE_FILESYSTEM_SYMLINK
-    }
-
-    // returns false if a directory or symlink, true if anything else (a file).
-    pub(crate) fn filetype_is_dir(file_type: &str) -> bool {
-        file_type == MIMETYPE_FILESYSTEM_DIR
-    }
-
-    // returns false if a directory or symlink, true if anything else (a file).
-    pub(crate) fn is_file(&self) -> bool {
-        Self::filetype_is_file(&self.file_type)
-    }
-
-    pub(crate) fn is_symlink(&self) -> bool {
-        Self::filetype_is_symlink(&self.file_type)
-    }
-
-    pub(crate) fn is_dir(&self) -> bool {
-        Self::filetype_is_dir(&self.file_type)
-    }
-
-    // helper: adds property to FileItem if val.is_some()
-    fn add_to_fileitem(file_item: &mut FileItem, key: &str, val: Option<String>) {
-        if let Some(v) = val {
-            file_item.insert(key.to_string(), v);
+            false
         }
     }
 }
 
-// Get file metadata from local filesystem
-pub(crate) fn get_metadata(path: &Path, follow_links: bool) -> Result<(fs::Metadata, String)> {
-    let result = if follow_links {
-        fs::metadata(path)
-    } else {
-        fs::symlink_metadata(path)
-    };
-    let metadata = result.map_err(|err| {
-        Error::FileSystemError(format!(
-            "Couldn't read metadata from source path ('{}'): {}",
-            path.display(),
-            err
-        ))
-    })?;
-    debug!("Metadata for location: {:?}", metadata);
-
-    let media_type = get_media_type(path, &metadata);
-    Ok((metadata, media_type))
-}
-
-fn get_media_type(path: &Path, meta: &fs::Metadata) -> String {
-    // see: https://stackoverflow.com/questions/18869772/mime-type-for-a-directory
-    // We will use the FreeDesktop standard for directories and symlinks.
-    //   https://specifications.freedesktop.org/shared-mime-info-spec/shared-mime-info-spec-latest.html#idm140625828597376
-    if meta.file_type().is_dir() {
-        return MIMETYPE_FILESYSTEM_DIR.to_string();
-    } else if meta.file_type().is_symlink() {
-        return MIMETYPE_FILESYSTEM_SYMLINK.to_string();
+// Generate a FileItem for a file which can then be added to a FilesMap
+// This is now a pseudo-RDF but will eventually be converted to be an RDF graph
+async fn gen_new_file_item(
+    safe: &mut Safe,
+    file_path: &Path,
+    file_meta: &FileMeta,
+    link: Option<&str>, // must be symlink target or None if FileMeta::is_symlink() is true.
+    dry_run: bool,
+) -> Result<FileItem> {
+    let mut file_item = file_meta.to_file_item();
+    if file_meta.is_file() {
+        let xorurl = match link {
+            None => upload_file_to_net(safe, file_path, dry_run).await?,
+            Some(link) => link.to_string(),
+        };
+        file_item.insert(PREDICATE_LINK.to_string(), xorurl);
+    } else if file_meta.is_symlink() {
+        // get metadata, with any symlinks resolved.
+        let result = fs::metadata(&file_path);
+        let symlink_target_type = match result {
+            Ok(meta) => {
+                if meta.is_dir() {
+                    "dir"
+                } else {
+                    "file"
+                }
+            }
+            Err(_) => "unknown", // this occurs for a broken link.  on windows, this would be fixed by: https://github.com/rust-lang/rust/pull/47956
+                                 // on unix, there is no way to know if broken link points to file or dir, though we could guess, based on if it has an extension or not.
+        };
+        let target_path = match link {
+            Some(target) => target.to_string(),
+            None => {
+                let target_path = fs::read_link(&file_path).map_err(|e| {
+                    Error::FileSystemError(format!(
+                        "Unable to read link: {}.  {:#?}",
+                        file_path.display(),
+                        e
+                    ))
+                })?;
+                normalise_path_separator(&target_path.display().to_string())
+            }
+        };
+        file_item.insert("symlink_target".to_string(), target_path);
+        // This is a hint for windows-platform clients to be able to call
+        //   symlink_dir() or symlink_file().  on unix, there's no need.
+        file_item.insert(
+            "symlink_target_type".to_string(),
+            symlink_target_type.to_string(),
+        );
     }
-    let mime_type = mime_guess::from_path(&path);
-    let media_type = mime_type.first_raw().unwrap_or("Raw");
-    media_type.to_string()
+
+    Ok(file_item)
 }
