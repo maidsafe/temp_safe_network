@@ -16,8 +16,7 @@ mod shared;
 mod update;
 
 use errors::{Error, Result};
-use flexi_logger::Logger;
-use log::{debug, error};
+use log::error;
 use std::{path::PathBuf, process};
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use update::update_commander;
@@ -83,16 +82,10 @@ enum CmdArgs {
 
 #[tokio::main]
 async fn main() {
-    if let Err(err) = Logger::with_env().start() {
-        error!("sn_authd error: {}", err);
-        process::exit(1);
-    }
-
     setup_panic!();
 
     // Let's first get all the arguments passed in
     let opt = CmdArgs::from_args();
-    debug!("Running authd with options: {:?}", opt);
 
     if let Err(err) = process_command(opt).await {
         error!("sn_authd error: {}", err);
