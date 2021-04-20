@@ -11,7 +11,6 @@ use super::{
     helpers::{gen_processed_files_table, get_from_arg_or_stdin, serialise_output, xorname_to_hex},
     OutputFmt,
 };
-use crate::operations::safe_net::connect;
 use anyhow::Result;
 use sn_api::{safeurl::SafeUrl, Safe};
 use structopt::StructOpt;
@@ -71,7 +70,6 @@ pub async fn xorurl_commander(
             }
         }
         None => {
-            connect(safe).await?;
             let location =
                 get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
 

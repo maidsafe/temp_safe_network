@@ -16,6 +16,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
+name = "aead"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cf01b9b56e767bb57b94ebf91a58b338002963785cdd7013e21c0d4679471e4"
+dependencies = [
+ "generic-array 0.12.4",
+]
+
+[[package]]
 name = "aes"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -24,6 +33,23 @@ dependencies = [
  "aes-soft",
  "aesni",
  "block-cipher-trait",
+]
+
+[[package]]
+name = "aes-siv"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34eed13dc1be5d8c2a5a1f40e166bd9308b7cc41cc53a30f42d6c9ff21828cbb"
+dependencies = [
+ "aead",
+ "aes",
+ "cmac",
+ "crypto-mac 0.7.0",
+ "ctr",
+ "dbl",
+ "pmac",
+ "stream-cipher",
+ "zeroize",
 ]
 
 [[package]]
@@ -279,9 +305,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "backtrace"
-version = "0.3.56"
+version = "0.3.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d117600f438b1707d4e4ae15d3595657288f8235a0eb593e80ecc98ab34e1bc"
+checksum = "78ed203b9ba68b242c62b3fb7480f589dd49829be1edb3fe8fc8b4ffda2dcb8d"
 dependencies = [
  "addr2line",
  "cfg-if 1.0.0",
@@ -793,7 +819,7 @@ dependencies = [
  "digest",
  "rand_core 0.5.1",
  "subtle 2.4.0",
- "zeroize 1.2.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -928,7 +954,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha2",
- "zeroize 1.2.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -1743,22 +1769,17 @@ dependencies = [
 
 [[package]]
 name = "miscreant"
-version = "0.4.2"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e37d77fff73f19e198036d3ca2bdbf8d4bca650daeda979bae0fdd31fce11d9"
+checksum = "3c174360ad70a6f4c707dee38ac3c9b1bc74c1cd9bc9bc66bc20b8868f6d2672"
 dependencies = [
  "aes",
- "aesni",
- "byteorder",
+ "aes-siv",
  "cmac",
  "crypto-mac 0.7.0",
  "ctr",
- "dbl",
- "generic-array 0.12.4",
  "pmac",
  "stream-cipher",
- "subtle 2.4.0",
- "zeroize 0.5.2",
 ]
 
 [[package]]
@@ -2899,9 +2920,9 @@ checksum = "0f0242b8e50dd9accdd56170e94ca1ebd223b098eb9c83539a6e367d0f36ae68"
 
 [[package]]
 name = "slab"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
+checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
 
 [[package]]
 name = "smallvec"
@@ -3021,9 +3042,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.52.10"
+version = "0.52.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e70b8d3b87621a007105e0a8fb54a9ec1bb2152a99ef11ab9c891df0570bf70"
+checksum = "77788e94c0c2f695f1d152ec8c46b80dbca27eb4e522a8d20eb5c8592eb29970"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3359,7 +3380,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "serde",
  "tiny-keccak",
- "zeroize 1.2.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -3952,24 +3973,18 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "0.5.2"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ddfeb6eee2fb3b262ef6e0898a52b7563bb8e0d5955a313b3cf2f808246ea14"
-
-[[package]]
-name = "zeroize"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81a974bcdd357f0dca4d41677db03436324d45a4c9ed2d0b873a5a360ce41c36"
+checksum = "4756f7db3f7b5574938c3eb1c117038b8e07f95ee6718c0efad4ac21508f1efd"
 dependencies = [
  "zeroize_derive",
 ]
 
 [[package]]
 name = "zeroize_derive"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3f369ddb18862aba61aa49bf31e74d29f0f162dec753063200e1dc084345d16"
+checksum = "a2c1e130bebaeab2f23886bf9acbaca14b092408c452543c857f66399cd6dab1"
 dependencies = [
  "proc-macro2",
  "quote",

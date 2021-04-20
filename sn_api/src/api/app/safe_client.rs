@@ -199,17 +199,19 @@ impl SafeAppClient {
     }
 
     // // === Blob operations ===
-    pub async fn store_public_blob(&self, data: &[u8], _dry_run: bool) -> Result<XorName> {
-        // TODO: allow this operation to work without a connection when it's a dry run
-        let client = self.get_safe_client()?;
+    pub async fn store_public_blob(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
+        let address = if dry_run {
+            let (_, address) = Client::blob_data_map(data.to_vec(), None).await?;
+            address
+        } else {
+            let client = self.get_safe_client()?;
+            client
+                .store_public_blob(data)
+                .await
+                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?
+        };
 
-        let address = client
-            .store_public_blob(data)
-            .await
-            .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?;
-
-        let xorname = *address.name();
-        Ok(xorname)
+        Ok(*address.name())
     }
 
     pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
