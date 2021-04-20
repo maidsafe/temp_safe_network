@@ -20,6 +20,7 @@ use sn_messaging::{
     client::{Message, NodeQuery},
     Aggregation, DstLocation, MessageId,
 };
+use sn_routing::ELDER_SIZE;
 use xor_name::XorName;
 
 impl Node {
@@ -60,7 +61,13 @@ impl Node {
             } => {
                 if newbie {
                     info!("Promoted to Elder on Churn");
-                    self.level_up(false).await
+                    if self.network_api.our_prefix().await.is_empty()
+                        && self.network_api.section_chain().await.len() <= ELDER_SIZE
+                    {
+                        self.level_up(true).await
+                    } else {
+                        self.level_up(false).await
+                    }
                 } else {
                     info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
