@@ -58,7 +58,7 @@ pub enum NodeSystemCmd {
     AccumulateRewardPayout(sn_data_types::RewardAccumulation),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
-    ReceiveExistingData {
+    ReceiveExistingTransfers {
         /// Age and reward wallets of registered nodes, keyed by node name.
         node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// Transfer histories
@@ -139,6 +139,11 @@ pub enum NodeSystemQuery {
     /// Acquire the chunk from current holders for replication.
     /// providing the address of the blob to be replicated.
     GetChunk(BlobAddress),
+    /// Update node on churn accordingly
+    UpdateData {
+        our_name: XorName,
+        section_pk: PublicKey,
+    },
 }
 
 ///
@@ -147,6 +152,8 @@ pub enum NodeSystemQueryResponse {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     GetSectionElders(SectionElders),
+    /// On Elder change, new Elders query network for data
+    UpdateData(BTreeMap<String, Vec<u8>>),
 }
 
 ///
