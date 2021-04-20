@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Config as NodeConfig, Error, Result};
+use crate::{
+    state_db::{get_network_keypair, store_network_keypair},
+    utils, Config as NodeConfig, Error, Result,
+};
 use bls::PublicKeySet;
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
@@ -17,10 +20,11 @@ use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,
 };
-use std::sync::Arc;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
+    path::Path,
+    sync::Arc,
 };
 use xor_name::{Prefix, XorName};
 
@@ -32,13 +36,18 @@ pub struct Network {
 
 #[allow(missing_docs)]
 impl Network {
-    pub async fn new(config: &NodeConfig) -> Result<(Self, EventStream)> {
+    pub async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
+        let keypair = get_network_keypair(root_dir).await?;
+
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
-            ..Default::default()
+            keypair,
         };
         let (routing, event_stream) = RoutingNode::new(routing_config).await?;
+
+        // Network keypair may have to be changed due to naming criteria or network requirements.
+        store_network_keypair(root_dir, routing.keypair_as_bytes().await).await?;
 
         Ok((
             Self {
