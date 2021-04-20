@@ -12,7 +12,7 @@ use crate::{
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
-use log::info;
+use log::{debug, info};
 use sn_data_types::{
     Error as DtError, Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex,
     SequenceOp, SequenceUser,
@@ -22,6 +22,8 @@ use sn_messaging::{
     Aggregation, DstLocation, EndUser, MessageId,
 };
 
+use crate::node::SequenceDataExchange;
+use std::collections::BTreeMap;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -36,6 +38,28 @@ impl SequenceStorage {
     pub(super) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let chunks = SequenceChunkStore::new(path, used_space).await?;
         Ok(Self { chunks })
+    }
+
+    pub fn fetch_seq_data(&self) -> Result<SequenceDataExchange> {
+        let store = &self.chunks;
+        let all_keys = store.keys();
+        let mut sequence: BTreeMap<SequenceAddress, Sequence> = BTreeMap::new();
+        for key in all_keys {
+            let _ = sequence.insert(key, store.get(&key)?);
+        }
+        Ok(SequenceDataExchange(sequence))
+    }
+
+    pub async fn update_seq_data(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
+        debug!("Updating Sequence chunkstore");
+        let chunkstore = &mut self.chunks;
+        let SequenceDataExchange(data) = seq_data;
+
+        for (_key, value) in data {
+            chunkstore.put(&value).await?;
+        }
+
+        Ok(())
     }
 
     pub(super) async fn read(

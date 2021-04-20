@@ -9,6 +9,8 @@
 use super::{
     blob_register::BlobRegister, map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
+use crate::node::{MapDataExchange, SequenceDataExchange};
+use crate::Error;
 
 /// The various data type stores,
 /// that are only managed at Elders.
@@ -49,5 +51,20 @@ impl ElderStores {
 
     pub fn sequence_storage_mut(&mut self) -> &mut SequenceStorage {
         &mut self.sequence_storage
+    }
+
+    pub fn fetch_map_and_sequence(&self) -> Result<(MapDataExchange, SequenceDataExchange), Error> {
+        let map_data = self.map_storage.fetch_map_data()?;
+        let seq_data = self.sequence_storage.fetch_seq_data()?;
+        Ok((map_data, seq_data))
+    }
+
+    pub async fn update_map_and_sequence(
+        &mut self,
+        data: (MapDataExchange, SequenceDataExchange),
+    ) -> Result<(), Error> {
+        self.map_storage.update_map_data(data.0).await?;
+        self.sequence_storage.update_seq_data(data.1).await?;
+        Ok(())
     }
 }

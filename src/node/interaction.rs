@@ -134,7 +134,7 @@ impl Node {
 
         NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingTransfers {
                     node_rewards,
                     user_wallets,
                 }),

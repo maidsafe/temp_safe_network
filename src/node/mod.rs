@@ -26,7 +26,7 @@ use crate::{
 };
 use bls::SecretKey;
 use log::{error, info};
-use sn_data_types::PublicKey;
+use sn_data_types::{MapAddress, PublicKey, SequenceAddress};
 use sn_routing::EventStream;
 use sn_routing::{Prefix, XorName};
 use std::path::{Path, PathBuf};
@@ -63,6 +63,8 @@ struct ElderRole {
     transfers: Transfers,
     // reward payouts
     section_funds: SectionFunds,
+    // denotes if we are caught up
+    is_caught_up: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -100,6 +102,25 @@ impl Role {
         }
     }
 }
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize)]
+pub struct BlobDataExchange {
+    /// Full Adults register
+    pub full_adults: BTreeMap<String, String>,
+    /// Blob holders register
+    pub holders: BTreeMap<String, String>,
+    /// Metadata register
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MapDataExchange(pub BTreeMap<MapAddress, sn_data_types::Map>);
+
+#[derive(Serialize, Deserialize)]
+pub struct SequenceDataExchange(pub BTreeMap<SequenceAddress, sn_data_types::Sequence>);
 
 /// Main node struct.
 pub struct Node {

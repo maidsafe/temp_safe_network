@@ -12,7 +12,7 @@ use crate::{
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
-use log::info;
+use log::{debug, info};
 use sn_data_types::{
     Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
     PublicKey, Result as NdResult,
@@ -22,6 +22,8 @@ use sn_messaging::{
     Aggregation, DstLocation, EndUser, MessageId,
 };
 
+use crate::node::MapDataExchange;
+use std::collections::BTreeMap;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -36,6 +38,27 @@ impl MapStorage {
     pub(super) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let chunks = MapChunkStore::new(path, used_space).await?;
         Ok(Self { chunks })
+    }
+
+    pub(super) fn fetch_map_data(&self) -> Result<MapDataExchange> {
+        let store = &self.chunks;
+        let all_keys = self.chunks.keys();
+        let mut map: BTreeMap<MapAddress, Map> = BTreeMap::new();
+        for key in all_keys {
+            let _ = map.insert(key, store.get(&key)?);
+        }
+        Ok(MapDataExchange(map))
+    }
+
+    pub async fn update_map_data(&mut self, map_data: MapDataExchange) -> Result<()> {
+        debug!("Updating Map chunkstore");
+        let chunkstore = &mut self.chunks;
+        let MapDataExchange(data) = map_data;
+
+        for (_key, value) in data {
+            chunkstore.put(&value).await?;
+        }
+        Ok(())
     }
 
     pub(super) async fn read(

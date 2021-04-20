@@ -11,8 +11,8 @@ use crate::{node_ops::NodeDuty, Error};
 use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query,
-        TransferCmd, TransferQuery,
+        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
+        NodeTransferQuery, Query, TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -185,7 +185,7 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         // Churn synch
         Message::NodeCmd {
             cmd:
-                NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+                NodeCmd::System(NodeSystemCmd::ReceiveExistingTransfers {
                     node_rewards,
                     user_wallets,
                 }),
@@ -287,6 +287,23 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
+        Message::NodeQuery {
+            query:
+                NodeQuery::System(NodeSystemQuery::UpdateData {
+                    our_name,
+                    section_pk,
+                }),
+            id,
+            ..
+        } => NodeDuty::RequestForUpdatingDataAsElder {
+            name: *our_name,
+            msg_id: *id,
+            section_pk: *section_pk,
+        },
+        Message::NodeQueryResponse {
+            response: NodeQueryResponse::System(NodeSystemQueryResponse::UpdateData(data)),
+            ..
+        } => NodeDuty::ResponseForUpdatingDataAsElder(data.clone()),
         _ => NodeDuty::NoOp,
     }
 }

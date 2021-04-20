@@ -15,6 +15,7 @@ use crate::{
     Error, Node, Result,
 };
 use log::{debug, info};
+use sn_messaging::client::{NodeQueryResponse, NodeSystemQueryResponse};
 use sn_messaging::{
     client::{Message, NodeQuery},
     Aggregation, DstLocation, MessageId,
@@ -26,8 +27,30 @@ impl Node {
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         info!("Handling NodeDuty: {:?}", duty);
         match duty {
-            NodeDuty::Genesis => {
-                self.level_up().await?;
+            NodeDuty::Genesis => self.level_up(true).await,
+            NodeDuty::RequestForUpdatingDataAsElder { name, msg_id, .. } => {
+                if name != self.our_name().await {
+                    let list = self.fetch_all_data().await?;
+                    let msg = Message::NodeQueryResponse {
+                        response: NodeQueryResponse::System(NodeSystemQueryResponse::UpdateData(
+                            list,
+                        )),
+                        id: msg_id,
+                        correlation_id: MessageId::in_response_to(&msg_id),
+                        target_section_pk: Some(self.network_api.section_public_key().await?),
+                    };
+                    Ok(vec![NodeDuty::Send(OutgoingMsg {
+                        msg,
+                        dst: DstLocation::Node(name),
+                        section_source: true,
+                        aggregation: Aggregation::AtDestination,
+                    })])
+                } else {
+                    Ok(vec![])
+                }
+            }
+            NodeDuty::ResponseForUpdatingDataAsElder(data) => {
+                self.furnish(data).await?;
                 Ok(vec![])
             }
             NodeDuty::EldersChanged {
@@ -37,8 +60,7 @@ impl Node {
             } => {
                 if newbie {
                     info!("Promoted to Elder on Churn");
-                    self.level_up().await?;
-                    Ok(vec![])
+                    self.level_up(false).await
                 } else {
                     info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
@@ -55,8 +77,7 @@ impl Node {
             } => {
                 if newbie {
                     info!("Beginning split as Newbie");
-                    self.begin_split_as_newbie(our_key, our_prefix).await?;
-                    Ok(vec![])
+                    self.begin_split_as_newbie(our_key, our_prefix).await
                 } else {
                     info!("Beginning split as Oldie");
                     self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
