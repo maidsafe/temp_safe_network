@@ -45,15 +45,19 @@ impl Node {
 
         //
         // start handling metadata
-        let dbs = ChunkHolderDbs::new(self.node_info.path())?;
+        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let reader = AdultReader::new(self.network_api.clone());
-        let meta_data =
-            Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
+        let meta_data = Metadata::new(
+            &self.node_info.path(),
+            &self.used_space,
+            dbs.clone(),
+            reader,
+        )
+        .await?;
 
         //
         // start handling transfers
-        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
-        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
+        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
@@ -69,7 +73,7 @@ impl Node {
             meta_data,
             transfers,
             section_funds,
-            is_caught_up: false,
+            is_caught_up: is_genesis,
         });
 
         if is_genesis {

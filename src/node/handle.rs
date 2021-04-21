@@ -30,7 +30,7 @@ impl Node {
         match duty {
             NodeDuty::Genesis => self.level_up(true).await,
             NodeDuty::RequestForUpdatingDataAsElder { name, msg_id, .. } => {
-                if name != self.our_name().await {
+                if name != self.our_name().await && self.role.as_elder()?.is_caught_up {
                     let list = self.fetch_all_data().await?;
                     let msg = Message::NodeQueryResponse {
                         response: NodeQueryResponse::System(NodeSystemQueryResponse::UpdateData(

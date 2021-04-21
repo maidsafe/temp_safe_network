@@ -20,6 +20,7 @@ use super::node_ops::NodeDuty;
 use crate::node::{MapDataExchange, SequenceDataExchange};
 use crate::{capacity::ChunkHolderDbs, chunk_store::UsedSpace, node_ops::NodeDuties, Result};
 use blob_register::BlobRegister;
+pub use blob_register::{ChunkMetadata, HolderMetadata};
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;

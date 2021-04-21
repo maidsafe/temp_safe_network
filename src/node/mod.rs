@@ -103,17 +103,18 @@ impl Role {
     }
 }
 
+use crate::metadata::{ChunkMetadata, HolderMetadata};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BlobDataExchange {
     /// Full Adults register
     pub full_adults: BTreeMap<String, String>,
     /// Blob holders register
-    pub holders: BTreeMap<String, String>,
+    pub holders: BTreeMap<String, HolderMetadata>,
     /// Metadata register
-    pub metadata: BTreeMap<String, String>,
+    pub metadata: BTreeMap<String, ChunkMetadata>,
 }
 
 #[derive(Serialize, Deserialize)]
