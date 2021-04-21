@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [16.2.0](https://github.com/maidsafe/sn_messaging/compare/v16.1.0...v16.2.0) (2021-04-21)
+
+
+### Features
+
+* **register:** adding messages for Register data type operations ([082f544](https://github.com/maidsafe/sn_messaging/commit/082f544a6bc889cbc75ca806998c06504e9dbad8))
+
 ## [16.1.0](https://github.com/maidsafe/sn_messaging/compare/v16.0.0...v16.1.0) (2021-04-21)
 
 
