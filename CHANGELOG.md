@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [15.0.0](https://github.com/maidsafe/sn_messaging/compare/v14.0.0...v15.0.0) (2021-04-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* re-enable aggregate at source
+
+### api
+
+* re-enable aggregate at source ([2074770](https://github.com/maidsafe/sn_messaging/commit/207477079622c6fdc9e0ee44ba58d694bf9b3fe6))
+
 ## [14.0.0](https://github.com/maidsafe/sn_messaging/compare/v13.1.0...v14.0.0) (2021-04-13)
 
 
