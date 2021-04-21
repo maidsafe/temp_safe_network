@@ -130,7 +130,7 @@ impl Node {
             }
         };
 
-        let (network_api, network_events) = Network::new(config).await?;
+        let (network_api, network_events) = Network::new(root_dir, config).await?;
 
         let node_info = NodeInfo {
             root_dir: root_dir_buf,
