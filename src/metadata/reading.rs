@@ -23,11 +23,11 @@ pub(super) async fn get_result(
     query: DataQuery,
     msg_id: MessageId,
     origin: EndUser,
-    stores: &ElderStores,
+    stores: &mut ElderStores,
 ) -> Result<NodeDuty> {
     use DataQuery::*;
     match &query {
-        Blob(read) => blob(read, stores.blob_register(), msg_id, origin).await,
+        Blob(read) => blob(read, stores.blob_register_mut(), msg_id, origin).await,
         Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
         Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
     }
@@ -35,7 +35,7 @@ pub(super) async fn get_result(
 
 async fn blob(
     read: &BlobRead,
-    register: &BlobRegister,
+    register: &mut BlobRegister,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeDuty> {

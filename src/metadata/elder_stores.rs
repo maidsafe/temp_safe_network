@@ -31,10 +31,6 @@ impl ElderStores {
         }
     }
 
-    pub fn blob_register(&self) -> &BlobRegister {
-        &self.blob_register
-    }
-
     pub fn map_storage(&self) -> &MapStorage {
         &self.map_storage
     }

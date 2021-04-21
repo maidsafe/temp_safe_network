@@ -13,7 +13,7 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, Message},
+    client::{BlobRead, BlobWrite, Message, NodeCmdResult, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -87,6 +87,20 @@ pub enum NodeDuty {
         write: BlobWrite,
         msg_id: MessageId,
         origin: EndUser,
+    },
+    /// Run at data-section Elders on receiving the result of
+    /// write operations from Adults
+    ProcessBlobWriteResult {
+        result: NodeCmdResult,
+        msg_id: MessageId,
+        src: XorName,
+    },
+    /// Run at data-section Elders on receiving the result of
+    /// read operations from Adults
+    ProcessBlobReadResult {
+        response: QueryResponse,
+        msg_id: MessageId,
+        src: XorName,
     },
     /// Get section elders.
     GetSectionElders {
@@ -230,6 +244,24 @@ impl Debug for NodeDuty {
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
+            Self::ProcessBlobWriteResult {
+                msg_id,
+                result,
+                src,
+            } => write!(
+                f,
+                "ProcessBlobWriteResult {{ id: {}, result: {:?}, src: {} }}",
+                msg_id, result, src
+            ),
+            Self::ProcessBlobReadResult {
+                msg_id,
+                response,
+                src,
+            } => write!(
+                f,
+                "ProcessBlobReadResult {{ id: {}, response: {:?}, src: {} }}",
+                msg_id, response, src
+            ),
             Self::ReceiveRewardProposal { .. } => write!(f, "ReceiveRewardProposal"),
             Self::ReceiveRewardAccumulation { .. } => write!(f, "ReceiveRewardAccumulation"),
             // ------
