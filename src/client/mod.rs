@@ -15,6 +15,7 @@ mod errors;
 mod map;
 mod network;
 mod query;
+mod register;
 mod sender;
 mod sequence;
 mod transfer;
@@ -33,6 +34,7 @@ pub use self::{
         NodeTransferQueryResponse,
     },
     query::Query,
+    register::{RegisterRead, RegisterWrite},
     sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
     sequence::{SequenceRead, SequenceWrite},
     transfer::{TransferCmd, TransferQuery},
@@ -42,6 +44,7 @@ use crate::{MessageId, MessageType, WireMsg};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
+    register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
     SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
@@ -332,8 +335,6 @@ pub enum QueryResponse {
     //
     /// Get Sequence.
     GetSequence(Result<Sequence>),
-    /// Get Sequence owners.
-    GetSequenceOwner(Result<PublicKey>),
     /// Get Sequence entries from a range.
     GetSequenceRange(Result<SequenceEntries>),
     /// Get Sequence last entry.
@@ -344,6 +345,19 @@ pub enum QueryResponse {
     GetSequencePrivatePolicy(Result<SequencePrivatePolicy>),
     /// Get Sequence permissions for a user.
     GetSequenceUserPermissions(Result<SequencePermissions>),
+    //
+    // ===== Register Data =====
+    //
+    /// Get Register.
+    GetRegister(Result<Register>),
+    /// Get Register owners.
+    GetRegisterOwner(Result<PublicKey>),
+    /// Read Register.
+    ReadRegister(Result<BTreeSet<(EntryHash, Entry)>>),
+    /// Get public Register permissions for a user.
+    GetRegisterPolicy(Result<Policy>),
+    /// Get Register permissions for a user.
+    GetRegisterUserPermissions(Result<Permissions>),
     //
     // ===== Tokens =====
     //
@@ -435,12 +449,16 @@ try_from!(MapPermissionSet, ListMapUserPermissions);
 try_from!(BTreeMap<PublicKey, MapPermissionSet>, ListMapPermissions);
 try_from!(MapValue, GetMapValue);
 try_from!(Sequence, GetSequence);
-try_from!(PublicKey, GetSequenceOwner);
 try_from!(SequenceEntries, GetSequenceRange);
 try_from!((u64, SequenceEntry), GetSequenceLastEntry);
 try_from!(SequencePublicPolicy, GetSequencePublicPolicy);
 try_from!(SequencePrivatePolicy, GetSequencePrivatePolicy);
 try_from!(SequencePermissions, GetSequenceUserPermissions);
+try_from!(Register, GetRegister);
+try_from!(PublicKey, GetRegisterOwner);
+try_from!(BTreeSet<(EntryHash, Entry)>, ReadRegister);
+try_from!(Policy, GetRegisterPolicy);
+try_from!(Permissions, GetRegisterUserPermissions);
 try_from!(Token, GetBalance);
 try_from!(ActorHistory, GetHistory);
 
@@ -496,8 +514,21 @@ impl fmt::Debug for QueryResponse {
                 "QueryResponse::GetSequencePrivatePolicy({:?})",
                 ErrorDebug(res)
             ),
-            GetSequenceOwner(res) => {
-                write!(f, "QueryResponse::GetSequenceOwner({:?})", ErrorDebug(res))
+            // Register
+            GetRegister(res) => write!(f, "QueryResponse::GetRegister({:?})", ErrorDebug(res)),
+            ReadRegister(res) => {
+                write!(f, "QueryResponse::ReadRegister({:?})", ErrorDebug(res))
+            }
+            GetRegisterUserPermissions(res) => write!(
+                f,
+                "QueryResponse::GetRegisterUserPermissions({:?})",
+                ErrorDebug(res)
+            ),
+            GetRegisterPolicy(res) => {
+                write!(f, "QueryResponse::GetRegisterPolicy({:?})", ErrorDebug(res))
+            }
+            GetRegisterOwner(res) => {
+                write!(f, "QueryResponse::GetRegisterOwner({:?})", ErrorDebug(res))
             }
             GetBalance(res) => write!(f, "QueryResponse::GetBalance({:?})", ErrorDebug(res)),
             GetHistory(res) => write!(f, "QueryResponse::GetHistory({:?})", ErrorDebug(res)),

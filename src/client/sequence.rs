@@ -50,8 +50,6 @@ pub enum SequenceRead {
         /// User to get permissions for.
         user: User,
     },
-    /// Get current owner.
-    GetOwner(Address),
 }
 
 /// TODO: docs
@@ -81,7 +79,6 @@ impl SequenceRead {
             GetPublicPolicy(_) => QueryResponse::GetSequencePublicPolicy(Err(error)),
             GetPrivatePolicy(_) => QueryResponse::GetSequencePrivatePolicy(Err(error)),
             GetUserPermissions { .. } => QueryResponse::GetSequenceUserPermissions(Err(error)),
-            GetOwner(_) => QueryResponse::GetSequenceOwner(Err(error)),
         }
     }
 
@@ -94,8 +91,7 @@ impl SequenceRead {
             | GetLastEntry(address)
             | GetPublicPolicy(address)
             | GetPrivatePolicy(address)
-            | GetUserPermissions { address, .. }
-            | GetOwner(address) => {
+            | GetUserPermissions { address, .. } => {
                 if address.is_public() {
                     AuthorisationKind::Data(DataAuthKind::PublicRead)
                 } else {
@@ -114,8 +110,7 @@ impl SequenceRead {
             | GetLastEntry(ref address)
             | GetPublicPolicy(ref address)
             | GetPrivatePolicy(ref address)
-            | GetUserPermissions { ref address, .. }
-            | GetOwner(ref address) => *address.name(),
+            | GetUserPermissions { ref address, .. } => *address.name(),
         }
     }
 }
@@ -133,7 +128,6 @@ impl fmt::Debug for SequenceRead {
                 GetPublicPolicy { .. } => "GetSequencePublicPolicy",
                 GetPrivatePolicy { .. } => "GetSequencePrivatePolicy",
                 GetUserPermissions { .. } => "GetUserPermissions",
-                GetOwner { .. } => "GetOwner",
             }
         )
     }

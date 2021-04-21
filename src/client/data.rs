@@ -10,6 +10,7 @@
 use super::{
     blob::{BlobRead, BlobWrite},
     map::{MapRead, MapWrite},
+    register::{RegisterRead, RegisterWrite},
     sequence::{SequenceRead, SequenceWrite},
     AuthorisationKind, CmdError, Error, QueryResponse,
 };
@@ -29,6 +30,8 @@ pub enum DataCmd {
     Map(MapWrite),
     /// Sequence write operation
     Sequence(SequenceWrite),
+    /// Register write operation
+    Register(RegisterWrite),
 }
 
 impl DataCmd {
@@ -40,6 +43,7 @@ impl DataCmd {
             Blob(c) => c.error(error),
             Map(c) => c.error(error),
             Sequence(c) => c.error(error),
+            Register(c) => c.error(error),
         }
     }
     /// Returns the type of authorisation needed for the cuest.
@@ -49,6 +53,7 @@ impl DataCmd {
             Blob(c) => c.authorisation_kind(),
             Map(c) => c.authorisation_kind(),
             Sequence(c) => c.authorisation_kind(),
+            Register(c) => c.authorisation_kind(),
         }
     }
 
@@ -59,6 +64,7 @@ impl DataCmd {
             Blob(c) => c.dst_address(),
             Map(c) => c.dst_address(),
             Sequence(c) => c.dst_address(),
+            Register(c) => c.dst_address(),
         }
     }
 
@@ -68,6 +74,7 @@ impl DataCmd {
             Self::Blob(write) => write.owner(),
             Self::Map(write) => write.owner(),
             Self::Sequence(write) => write.owner(),
+            Self::Register(write) => write.owner(),
         }
     }
 }
@@ -79,6 +86,7 @@ impl fmt::Debug for DataCmd {
             Blob(c) => write!(formatter, "{:?}", c),
             Map(c) => write!(formatter, "{:?}", c),
             Sequence(c) => write!(formatter, "{:?}", c),
+            Register(c) => write!(formatter, "{:?}", c),
         }
     }
 }
@@ -93,6 +101,8 @@ pub enum DataQuery {
     Map(MapRead),
     /// TODO: docs
     Sequence(SequenceRead),
+    /// TODO: docs
+    Register(RegisterRead),
 }
 
 impl DataQuery {
@@ -104,6 +114,7 @@ impl DataQuery {
             Blob(q) => q.error(error),
             Map(q) => q.error(error),
             Sequence(q) => q.error(error),
+            Register(q) => q.error(error),
         }
     }
 
@@ -114,6 +125,7 @@ impl DataQuery {
             Blob(q) => q.authorisation_kind(),
             Map(q) => q.authorisation_kind(),
             Sequence(q) => q.authorisation_kind(),
+            Register(q) => q.authorisation_kind(),
         }
     }
 
@@ -124,6 +136,7 @@ impl DataQuery {
             Blob(q) => q.dst_address(),
             Map(q) => q.dst_address(),
             Sequence(q) => q.dst_address(),
+            Register(q) => q.dst_address(),
         }
     }
 }
@@ -135,6 +148,7 @@ impl fmt::Debug for DataQuery {
             Blob(q) => write!(formatter, "{:?}", q),
             Map(q) => write!(formatter, "{:?}", q),
             Sequence(q) => write!(formatter, "{:?}", q),
+            Register(q) => write!(formatter, "{:?}", q),
         }
     }
 }
