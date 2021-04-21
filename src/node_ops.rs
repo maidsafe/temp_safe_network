@@ -6,20 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bls::PublicKeySet;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, NodeAge, PublicKey,
-    ReplicaEvent, RewardAccumulation, RewardProposal, SectionElders, SignatureShare, SignedCredit,
-    SignedTransfer, SignedTransferShare, Token, TransferAgreementProof, TransferValidated,
-    WalletHistory,
+    ActorHistory, Blob, BlobAddress, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
+    RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, Message, NodeSystemCmd},
+    client::{BlobRead, BlobWrite, Message},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
-use sn_routing::{NodeElderChange, Prefix};
+use sn_routing::Prefix;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},
@@ -59,8 +56,6 @@ pub enum NodeDuty {
     SetNodeWallet {
         wallet_id: PublicKey,
         node_id: XorName,
-        msg_id: MessageId,
-        origin: SrcLocation,
     },
     GetTransferReplicaEvents {
         msg_id: MessageId,
@@ -114,8 +109,6 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
     GetStoreCost {
-        /// The requester's key.
-        requester: PublicKey,
         /// Number of bytes to write.
         bytes: u64,
         msg_id: MessageId,
@@ -256,13 +249,11 @@ impl Debug for NodeDuty {
                 msg,
                 targets,
                 aggregation,
-            } => {
-                write!(
-                    f,
-                    "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
-                    msg, targets, aggregation
-                )
-            }
+            } => write!(
+                f,
+                "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
+                msg, targets, aggregation
+            ),
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),

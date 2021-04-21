@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.9](https://github.com/maidsafe/sn_node/compare/v0.37.8...v0.37.9) (2021-04-21)
+
+
+### Features
+
+* write network keypair to disk ([ad4c3ab](https://github.com/maidsafe/sn_node/commit/ad4c3ab2df7379e199bd1b1f53161321fe2e5af0))
+
+### [0.37.8](https://github.com/maidsafe/sn_node/compare/v0.37.7...v0.37.8) (2021-04-15)
+
+### [0.37.7](https://github.com/maidsafe/sn_node/compare/v0.37.6...v0.37.7) (2021-04-14)
+
+### [0.37.6](https://github.com/maidsafe/sn_node/compare/v0.37.5...v0.37.6) (2021-04-14)
+
+### [0.37.5](https://github.com/maidsafe/sn_node/compare/v0.37.4...v0.37.5) (2021-04-14)
+
+
+### Bug Fixes
+
+* change stack size to 8mb for all windows builds ([27b4c4e](https://github.com/maidsafe/sn_node/commit/27b4c4ea9b3d37bb947961229c3b29e48b014586))
+
+### [0.37.4](https://github.com/maidsafe/sn_node/compare/v0.37.3...v0.37.4) (2021-04-14)
+
+
+### Bug Fixes
+
+* do not overwrite existing reward key ([eee066b](https://github.com/maidsafe/sn_node/commit/eee066b3b300162deabff1bf48958713fbb3fb0d))
+
+### [0.37.3](https://github.com/maidsafe/sn_node/compare/v0.37.2...v0.37.3) (2021-04-14)
+
 ### [0.37.2](https://github.com/maidsafe/sn_node/compare/v0.37.1...v0.37.2) (2021-04-14)
 
 ### [0.37.1](https://github.com/maidsafe/sn_node/compare/v0.37.0...v0.37.1) (2021-04-14)

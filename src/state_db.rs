@@ -6,15 +6,54 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Error, Result};
+use crate::{Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
-use serde::{Deserialize, Serialize};
+pub use ed25519_dalek::{Keypair, KEYPAIR_LENGTH};
 use std::path::Path;
 use tokio::fs;
 
-const AGE_GROUP_FILENAME: &str = "age_group";
 const REWARD_PUBLIC_KEY_FILENAME: &str = "reward_public_key";
 const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
+
+const NETWORK_KEYPAIR_FILENAME: &str = "network_keypair";
+
+/// Writes the network keypair to disk.
+pub async fn store_network_keypair(
+    root_dir: &Path,
+    keypair_as_bytes: [u8; KEYPAIR_LENGTH],
+) -> Result<()> {
+    let keypair_path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
+    fs::write(keypair_path, keypair_to_hex(keypair_as_bytes)).await?;
+    Ok(())
+}
+
+fn keypair_to_hex(keypair_as_bytes: [u8; KEYPAIR_LENGTH]) -> String {
+    vec_to_hex(keypair_as_bytes.to_vec())
+}
+
+/// Returns Some(KeyPair) or None if file doesn't exist.
+pub async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
+    let path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).await?;
+    Ok(Some(keypair_from_bytes(bytes)?))
+}
+
+fn keypair_from_bytes(bytes: Vec<u8>) -> Result<Keypair> {
+    let hex = String::from_utf8(bytes)
+        .map_err(|_| Error::Logic("Config error: Could not parse bytes as string".to_string()))?;
+    keypair_from_hex(&hex)
+}
+
+fn keypair_from_hex(hex_str: &str) -> Result<Keypair> {
+    let keypair_bytes = parse_hex(&hex_str);
+    let mut keypair_bytes_array: [u8; KEYPAIR_LENGTH] = [0; KEYPAIR_LENGTH];
+    keypair_bytes_array.copy_from_slice(&keypair_bytes[..KEYPAIR_LENGTH]);
+    Keypair::from_bytes(&keypair_bytes_array)
+        .map_err(|_| Error::Logic("Config error: Invalid network keypair bytes".to_string()))
+}
 
 /// Writes the public and secret key to different locations at disk.
 pub async fn store_new_reward_keypair(
@@ -29,27 +68,27 @@ pub async fn store_new_reward_keypair(
     Ok(())
 }
 
-// /// Writes the info to disk.
-// pub async fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
-//     let path = root_dir.join(AGE_GROUP_FILENAME);
-//     fs::write(path, utils::serialise(age_group)?).await?;
-//     Ok(())
-// }
-
-// /// Returns Some(AgeGroup) or None if file doesn't exist.
-// pub async fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
-//     let path = root_dir.join(AGE_GROUP_FILENAME);
-//     if !path.is_file() {
-//         return Ok(None);
-//     }
-//     let contents = fs::read(path).await?;
-//     Ok(Some(bincode::deserialize(&contents)?))
-// }
+/// Returns Some(PublicKey) or None if file doesn't exist.
+pub async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
+    let path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).await?;
+    Ok(Some(pk_from_bytes(bytes)?))
+}
 
 ///
 pub fn pk_to_hex(pk: &PublicKey) -> String {
     let pk_as_bytes: [u8; PK_SIZE] = pk.to_bytes();
     vec_to_hex(pk_as_bytes.to_vec())
+}
+
+///
+pub fn pk_from_bytes(bytes: Vec<u8>) -> Result<PublicKey> {
+    let hex = String::from_utf8(bytes)
+        .map_err(|_| Error::Logic("Config error: Could not parse bytes as string".to_string()))?;
+    pk_from_hex(&hex)
 }
 
 ///
@@ -93,6 +132,7 @@ fn parse_hex(hex_str: &str) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use tempdir::TempDir;
 
     /// Hex encoding public keys.
     #[test]
@@ -105,7 +145,26 @@ mod test {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn pubkey_to_and_from_file() -> Result<()> {
+        let sk = SecretKey::random();
+        let pk = sk.public_key();
+
+        let root = create_temp_root(&"rewardkey")?;
+        let root_dir = root.path();
+        store_new_reward_keypair(root_dir, &sk, &pk).await?;
+        let pk_result = get_reward_pk(root_dir).await?;
+
+        assert_eq!(pk_result, Some(pk));
+        Ok(())
+    }
+
     fn gen_key() -> PublicKey {
         SecretKey::random().public_key()
+    }
+
+    /// creates a temp dir for the root of all stores
+    fn create_temp_root(dir: &str) -> Result<TempDir> {
+        TempDir::new(dir).map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 }
