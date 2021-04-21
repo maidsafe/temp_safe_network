@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [16.0.0](https://github.com/maidsafe/sn_messaging/compare/v15.0.0...v16.0.0) (2021-04-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **msg:** this adds a new variant to the message enum
+
+### Features
+
+* **msg:** add message variant for NodeCmdResult ([f3a6e48](https://github.com/maidsafe/sn_messaging/commit/f3a6e487e18a29d7ba08b52edaf62b1b40be8feb))
+
 ## [15.0.0](https://github.com/maidsafe/sn_messaging/compare/v14.0.0...v15.0.0) (2021-04-21)
 
 
