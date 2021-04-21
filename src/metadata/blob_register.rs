@@ -13,13 +13,13 @@ use crate::{
     to_db_key::ToDbKey,
     Error, Result,
 };
-use log::{info, trace, warn};
+use log::{error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
 use sn_messaging::{
     client::{
-        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeQuery,
-        NodeSystemCmd, NodeSystemQuery, QueryResponse,
+        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeCmdResult,
+        NodeQuery, NodeSystemCmd, NodeSystemQuery, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -30,6 +30,7 @@ use std::{
 };
 use xor_name::XorName;
 
+use super::adult_ops::AdultOps;
 use super::adult_reader::AdultReader;
 
 // The number of separate copies of a blob chunk which should be maintained.
@@ -50,11 +51,16 @@ struct HolderMetadata {
 pub(super) struct BlobRegister {
     dbs: ChunkHolderDbs,
     reader: AdultReader,
+    adult_ops: AdultOps,
 }
 
 impl BlobRegister {
     pub(super) fn new(dbs: ChunkHolderDbs, reader: AdultReader) -> Self {
-        Self { dbs, reader }
+        Self {
+            dbs,
+            reader,
+            adult_ops: AdultOps::new(),
+        }
     }
 
     pub(super) async fn write(
@@ -102,35 +108,101 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        let mut owner = None;
-        if data.address().is_private() {
-            owner = Some(*origin.id());
+        let blob_write = BlobWrite::New(data);
+
+        if self
+            .adult_ops
+            .new_write(msg_id, blob_write.clone(), origin, target_holders.clone())
+            .is_ok()
+        {
+            Ok(NodeDuty::SendToNodes {
+                targets: target_holders,
+                msg: Message::NodeCmd {
+                    cmd: NodeCmd::Chunks {
+                        cmd: blob_write,
+                        origin,
+                    },
+                    id: msg_id,
+                    target_section_pk: None,
+                },
+                aggregation: Aggregation::AtDestination,
+            })
+        } else {
+            info!(
+                "Operation with MessageId {:?} is already in progress",
+                msg_id
+            );
+            Ok(NodeDuty::NoOp)
         }
-        for holder in &target_holders {
-            // TODO: This error needs to be handled in some way.
-            if let Err(e) = self.set_chunk_holder(*data.address(), *holder, owner).await {
-                warn!(
-                    "Error ({:?}) setting chunk holder ({:?}) of {:?}, sent by origin: {:?}",
-                    e,
-                    *holder,
-                    *data.address(),
-                    origin
-                )
+    }
+
+    pub async fn process_blob_write_result(
+        &mut self,
+        msg_id: MessageId,
+        result: NodeCmdResult,
+        src: XorName,
+    ) -> Result<NodeDuty> {
+        if let Some(blob_write) = self.adult_ops.process_blob_write_result(msg_id, src) {
+            if let Err(err) = result {
+                error!("Error at Adult while performing a BlobWrite: {:?}", err);
+                // We have to take action here.
+            } else {
+                match blob_write {
+                    BlobWrite::New(data) => {
+                        if let Err(e) = self
+                            .set_chunk_holder(*data.address(), src, data.owner().cloned())
+                            .await
+                        {
+                            warn!("Error ({:?}) setting chunk holder ({:?}) of {:?}, sent by origin: {:?}", e, src, *data.address(), data.owner());
+                        } else {
+                            info!("MsgId: {:?} Successfully added {:?} to the list of holders for Blob at {:?}", msg_id, src, data.address());
+                        }
+                    }
+                    BlobWrite::DeletePrivate(_) => (),
+                }
             }
         }
+        for (name, count) in self.adult_ops.find_unresponsive_adults() {
+            warn!(
+                "Adult {} has {} pending ops. It might be unresponsive",
+                name, count
+            );
+        }
+        Ok(NodeDuty::NoOp)
+    }
 
-        Ok(NodeDuty::SendToNodes {
-            targets: target_holders,
-            msg: Message::NodeCmd {
-                cmd: NodeCmd::Chunks {
-                    cmd: BlobWrite::New(data),
-                    origin,
-                },
-                id: msg_id,
-                target_section_pk: None,
-            },
-            aggregation: Aggregation::AtDestination,
-        })
+    pub async fn process_blob_read_result(
+        &mut self,
+        msg_id: MessageId,
+        response: QueryResponse,
+        src: XorName,
+    ) -> Result<NodeDuty> {
+        if let Some((_address, end_user)) = self.adult_ops.process_blob_read_result(msg_id, src) {
+            if let QueryResponse::GetBlob(result) = &response {
+                if result.is_ok() {
+                    return Ok(NodeDuty::Send(OutgoingMsg {
+                        msg: Message::QueryResponse {
+                            response,
+                            id: MessageId::in_response_to(&msg_id),
+                            correlation_id: msg_id,
+                            target_section_pk: None,
+                        },
+                        dst: DstLocation::EndUser(end_user),
+                        section_source: false,
+                        aggregation: Aggregation::None,
+                    }));
+                }
+            } else {
+                error!("Unexpected QueryReponse from Adult: {:?}", response);
+            }
+        }
+        for (name, count) in self.adult_ops.find_unresponsive_adults() {
+            warn!(
+                "Adult {} has {} pending ops. It might be unresponsive",
+                name, count
+            );
+        }
+        Ok(NodeDuty::NoOp)
     }
 
     async fn send_blob_cmd_error(
@@ -184,19 +256,36 @@ impl BlobRegister {
 
         if !results.is_empty() {}
 
-        let msg = Message::NodeCmd {
-            cmd: NodeCmd::Chunks {
-                cmd: BlobWrite::DeletePrivate(address),
+        if self
+            .adult_ops
+            .new_write(
+                msg_id,
+                BlobWrite::DeletePrivate(address),
                 origin,
-            },
-            id: msg_id,
-            target_section_pk: None,
-        };
-        Ok(NodeDuty::SendToNodes {
-            msg,
-            targets: metadata.holders,
-            aggregation: Aggregation::AtDestination,
-        })
+                metadata.holders.clone(),
+            )
+            .is_ok()
+        {
+            let msg = Message::NodeCmd {
+                cmd: NodeCmd::Chunks {
+                    cmd: BlobWrite::DeletePrivate(address),
+                    origin,
+                },
+                id: msg_id,
+                target_section_pk: None,
+            };
+            Ok(NodeDuty::SendToNodes {
+                msg,
+                targets: metadata.holders,
+                aggregation: Aggregation::AtDestination,
+            })
+        } else {
+            info!(
+                "Operation with MessageId {:?} is already in progress",
+                msg_id
+            );
+            Ok(NodeDuty::NoOp)
+        }
     }
 
     async fn set_chunk_holder(
@@ -404,7 +493,7 @@ impl BlobRegister {
     }
 
     pub(super) async fn read(
-        &self,
+        &mut self,
         read: &BlobRead,
         msg_id: MessageId,
         origin: EndUser,
@@ -416,7 +505,7 @@ impl BlobRegister {
     }
 
     async fn get(
-        &self,
+        &mut self,
         address: BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
@@ -447,19 +536,31 @@ impl BlobRegister {
                 return query_error(Error::NetworkData(DtError::AccessDenied(*origin.id()))).await;
             }
         };
-        let msg = Message::NodeQuery {
-            query: NodeQuery::Chunks {
-                query: BlobRead::Get(address),
-                origin,
-            },
-            id: msg_id,
-            target_section_pk: None,
-        };
-        Ok(NodeDuty::SendToNodes {
-            msg,
-            targets: metadata.holders,
-            aggregation: Aggregation::AtDestination,
-        })
+        if self
+            .adult_ops
+            .new_read(msg_id, address, origin, metadata.holders.clone())
+            .is_ok()
+        {
+            let msg = Message::NodeQuery {
+                query: NodeQuery::Chunks {
+                    query: BlobRead::Get(address),
+                    origin,
+                },
+                id: msg_id,
+                target_section_pk: None,
+            };
+            Ok(NodeDuty::SendToNodes {
+                msg,
+                targets: metadata.holders,
+                aggregation: Aggregation::AtDestination,
+            })
+        } else {
+            info!(
+                "Operation with MessageId {:?} is already in progress",
+                msg_id
+            );
+            Ok(NodeDuty::NoOp)
+        }
     }
 
     // Updates the metadata of the chunks help by a node that left.

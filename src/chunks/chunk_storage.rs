@@ -46,18 +46,28 @@ impl ChunkStorage {
     ) -> Result<NodeDuty> {
         if let Err(error) = self.try_store(data, origin).await {
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
-                    error: CmdError::Data(convert_to_error_message(error)?),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
+                msg: Message::NodeCmdResult {
+                    result: Err(CmdError::Data(convert_to_error_message(error)?)),
+                    id: msg_id,
                     target_section_pk: None,
                 },
                 section_source: false, // sent as single node
-                dst: DstLocation::EndUser(origin),
+                // Data's metadata section
+                dst: DstLocation::Section(*data.address().name()),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))
         } else {
-            Ok(NodeDuty::NoOp)
+            Ok(NodeDuty::Send(OutgoingMsg {
+                msg: Message::NodeCmdResult {
+                    result: Ok(()),
+                    id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false,
+                // Data's metadata section
+                dst: DstLocation::Section(*data.address().name()),
+                aggregation: Aggregation::None,
+            }))
         }
     }
 
@@ -91,7 +101,7 @@ impl ChunkStorage {
         &self,
         address: &BlobAddress,
         msg_id: MessageId,
-        origin: EndUser,
+        _origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = self
             .chunks
@@ -105,7 +115,8 @@ impl ChunkStorage {
                 target_section_pk: None,
             },
             section_source: false, // sent as single node
-            dst: DstLocation::EndUser(origin),
+            // Respond to the chunk's metadata elders
+            dst: DstLocation::Section(*address.name()),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
@@ -192,20 +203,17 @@ impl ChunkStorage {
             _ => Err(ErrorMessage::NoSuchKey),
         };
 
-        if let Err(error) = result {
-            return Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
-                    error: CmdError::Data(error),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // sent as single node
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            }));
-        }
-        Ok(NodeDuty::NoOp)
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeCmdResult {
+                result: result.map_err(CmdError::Data),
+                id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // sent as single node
+            // respond to data's metadata elders
+            dst: DstLocation::Section(*address.name()),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 }
 

@@ -312,7 +312,7 @@ impl Node {
                     .await
                     .matches(&data_section_addr)
                 {
-                    let elder = self.role.as_elder()?;
+                    let elder = self.role.as_elder_mut()?;
                     Ok(vec![elder.meta_data.read(query, id, origin).await?])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
@@ -331,6 +331,33 @@ impl Node {
             NodeDuty::ProcessWrite { cmd, id, origin } => {
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![elder.meta_data.write(cmd, id, origin).await?])
+            }
+            // --- Completion of Adult operations ---
+            NodeDuty::ProcessBlobWriteResult {
+                msg_id,
+                result,
+                src,
+            } => {
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![
+                    elder
+                        .meta_data
+                        .process_blob_write_result(msg_id, result, src)
+                        .await?,
+                ])
+            }
+            NodeDuty::ProcessBlobReadResult {
+                msg_id,
+                response,
+                src,
+            } => {
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![
+                    elder
+                        .meta_data
+                        .process_blob_read_result(msg_id, response, src)
+                        .await?,
+                ])
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let elder = self.role.as_elder_mut()?;

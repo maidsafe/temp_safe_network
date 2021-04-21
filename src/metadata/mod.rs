@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod adult_ops;
 pub mod adult_reader;
 mod blob_register;
 mod elder_stores;
@@ -23,7 +24,7 @@ use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::Blob;
 use sn_messaging::{
-    client::{DataCmd, DataQuery},
+    client::{DataCmd, DataQuery, NodeCmdResult, QueryResponse},
     EndUser, MessageId,
 };
 use std::{
@@ -56,8 +57,37 @@ impl Metadata {
         Ok(Self { elder_stores })
     }
 
-    pub async fn read(&self, query: DataQuery, id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        reading::get_result(query, id, origin, &self.elder_stores).await
+    pub async fn read(
+        &mut self,
+        query: DataQuery,
+        id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        reading::get_result(query, id, origin, &mut self.elder_stores).await
+    }
+
+    pub async fn process_blob_write_result(
+        &mut self,
+        msg_id: MessageId,
+        result: NodeCmdResult,
+        src: XorName,
+    ) -> Result<NodeDuty> {
+        self.elder_stores
+            .blob_register_mut()
+            .process_blob_write_result(msg_id, result, src)
+            .await
+    }
+
+    pub async fn process_blob_read_result(
+        &mut self,
+        msg_id: MessageId,
+        response: QueryResponse,
+        src: XorName,
+    ) -> Result<NodeDuty> {
+        self.elder_stores
+            .blob_register_mut()
+            .process_blob_read_result(msg_id, response, src)
+            .await
     }
 
     pub async fn write(

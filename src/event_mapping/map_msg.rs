@@ -341,6 +341,27 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
+        // --- Adult Operation response ---
+        Message::NodeCmdResult { result, id, .. } => {
+            NodeDuty::ProcessBlobWriteResult {
+                result: result.clone(),
+                // we need the original message ID.
+                msg_id: *id,
+                src: origin.name(),
+            }
+        }
+        Message::QueryResponse {
+            response,
+            correlation_id,
+            ..
+        } => {
+            NodeDuty::ProcessBlobReadResult {
+                response: response.clone(),
+                // use the original message ID
+                msg_id: *correlation_id,
+                src: origin.name(),
+            }
+        }
         _ => NodeDuty::NoOp,
     }
 }
