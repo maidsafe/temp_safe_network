@@ -2234,8 +2234,33 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "16.0.0"
+source = "git+https://github.com/Yoga07/sn_messaging?branch=data-loss#6b154d14be980a7cebe61abeb02ec9ed8f58e38a"
+dependencies = [
+ "bincode",
+ "bytes 1.0.1",
+ "cookie-factory",
+ "crdts",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "signature",
+ "sn_data_types",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 2.0.2",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_messaging"
+version = "16.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b592de8411a951bb7376a3bdca263e73cc3df337021f82f0652e321a2e9f9d5"
+checksum = "3f231040477f5dd838f50b7606550699c171522b7ca4989b86885b29d6384c81"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2289,7 +2314,7 @@ dependencies = [
  "signature",
  "sn_data_types",
  "sn_launch_tool",
- "sn_messaging",
+ "sn_messaging 16.0.0",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2302,9 +2327,8 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.60.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e7636e65d17daddb09f16a7b3d50a89c246565cf8c9298ce68e3a01ada8d69b"
+version = "0.60.10"
+source = "git+https://github.com/Yoga07/sn_routing?branch=data-loss#6d4246d61b136681450092038ba843e21cc48f84"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2321,7 +2345,7 @@ dependencies = [
  "resource_proof",
  "serde",
  "sn_data_types",
- "sn_messaging",
+ "sn_messaging 16.1.0",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
