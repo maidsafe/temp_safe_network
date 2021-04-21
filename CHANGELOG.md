@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [17.0.0](https://github.com/maidsafe/sn_messaging/compare/v16.2.0...v17.0.0) (2021-04-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **dataexchange:** Updated members on ReceiveExistingData cmd.
+
+### Features
+
+* **dataexchange:** add structs ([3e7b68b](https://github.com/maidsafe/sn_messaging/commit/3e7b68ba3b1954beae8a5615643ca4c29160d60e))
+
 ## [16.2.0](https://github.com/maidsafe/sn_messaging/compare/v16.1.0...v16.2.0) (2021-04-21)
 
 
