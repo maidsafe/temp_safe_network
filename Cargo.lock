@@ -2234,7 +2234,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "16.0.0"
-source = "git+https://github.com/Yoga07/sn_messaging?branch=data-loss#6b154d14be980a7cebe61abeb02ec9ed8f58e38a"
+source = "git+https://github.com/Yoga07/sn_messaging?branch=data-loss#0589a6086c970773d5ff9e2cfbf74f9849cf81c5"
 dependencies = [
  "bincode",
  "bytes 1.0.1",

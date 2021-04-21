@@ -15,7 +15,6 @@ use crate::{
     Error, Node, Result,
 };
 use log::{debug, info};
-use sn_messaging::client::{NodeQueryResponse, NodeSystemQueryResponse};
 use sn_messaging::{
     client::{Message, NodeQuery},
     Aggregation, DstLocation, MessageId,
@@ -29,31 +28,6 @@ impl Node {
         info!("Handling NodeDuty: {:?}", duty);
         match duty {
             NodeDuty::Genesis => self.level_up(true).await,
-            NodeDuty::RequestForUpdatingDataAsElder { name, msg_id, .. } => {
-                if name != self.our_name().await && self.role.as_elder()?.is_caught_up {
-                    let list = self.fetch_all_data().await?;
-                    let msg = Message::NodeQueryResponse {
-                        response: NodeQueryResponse::System(NodeSystemQueryResponse::UpdateData(
-                            list,
-                        )),
-                        id: msg_id,
-                        correlation_id: MessageId::in_response_to(&msg_id),
-                        target_section_pk: Some(self.network_api.section_public_key().await?),
-                    };
-                    Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg,
-                        dst: DstLocation::Node(name),
-                        section_source: true,
-                        aggregation: Aggregation::AtDestination,
-                    })])
-                } else {
-                    Ok(vec![])
-                }
-            }
-            NodeDuty::ResponseForUpdatingDataAsElder(data) => {
-                self.furnish(data).await?;
-                Ok(vec![])
-            }
             NodeDuty::EldersChanged {
                 our_key,
                 our_prefix,
@@ -73,7 +47,7 @@ impl Node {
                     self.update_replicas().await?;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-                    Ok(vec![self.push_state(our_prefix, msg_id)])
+                    Ok(vec![self.push_state(our_prefix, msg_id).await?])
                 }
             }
             NodeDuty::SectionSplit {
@@ -194,7 +168,10 @@ impl Node {
             NodeDuty::SynchState {
                 node_rewards,
                 user_wallets,
-            } => Ok(vec![self.synch_state(node_rewards, user_wallets).await?]),
+                data,
+            } => Ok(vec![
+                self.synch_state(node_rewards, user_wallets, data).await?,
+            ]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 self.role = Role::Adult(AdultRole {

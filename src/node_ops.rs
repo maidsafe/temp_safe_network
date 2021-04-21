@@ -43,12 +43,6 @@ pub type NodeDuties = Vec<NodeDuty>;
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
     AddPayment(CreditAgreementProof),
-    RequestForUpdatingDataAsElder {
-        name: XorName,
-        msg_id: MessageId,
-        section_pk: PublicKey,
-    },
-    ResponseForUpdatingDataAsElder(BTreeMap<String, Vec<u8>>),
     GetNodeWalletKey {
         node_name: XorName,
         msg_id: MessageId,
@@ -165,6 +159,8 @@ pub enum NodeDuty {
         node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
+        /// Data that needs to be shared to new Elders
+        data: BTreeMap<String, Vec<u8>>,
     },
     /// As members are lost for various reasons
     /// there are certain things nodes need

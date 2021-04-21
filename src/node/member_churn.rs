@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{BlobDataExchange, MapDataExchange, SequenceDataExchange};
-use crate::node_ops::{NodeDuties, OutgoingMsg};
+use crate::node_ops::NodeDuties;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
@@ -23,9 +23,6 @@ use crate::{
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{ActorHistory, NodeAge, PublicKey};
-use sn_messaging::client::NodeQuery;
-use sn_messaging::client::{Message, NodeSystemQuery};
-use sn_messaging::{Aggregation, DstLocation, MessageId};
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 
@@ -76,26 +73,7 @@ impl Node {
             is_caught_up: is_genesis,
         });
 
-        if is_genesis {
-            Ok(vec![])
-        } else {
-            let duty: NodeDuty = NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeQuery {
-                    query: NodeQuery::System(NodeSystemQuery::UpdateData {
-                        our_name: self.network_api.our_name().await,
-                        section_pk: self.network_api.section_public_key().await?,
-                    }),
-                    id: MessageId::new(),
-                    target_section_pk: Some(self.network_api.section_public_key().await?),
-                },
-                dst: DstLocation::Section(self.our_prefix().await.name()),
-                section_source: false,
-                aggregation: Aggregation::None,
-            });
-
-            // TODO(drusu): return a  mutable reference to elder state?
-            Ok(vec![duty])
-        }
+        Ok(vec![])
     }
 
     /// Continue the level up and handle more responsibilities.
@@ -103,6 +81,7 @@ impl Node {
         &mut self,
         node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
+        data: BTreeMap<String, Vec<u8>>,
     ) -> Result<NodeDuty> {
         let elder = self.role.as_elder_mut()?;
 
@@ -113,6 +92,9 @@ impl Node {
         for (key, (age, wallet)) in &node_wallets {
             elder.section_funds.set_node_wallet(*key, *wallet, *age)
         }
+
+        // Update ourself with the data
+        self.furnish(data).await?;
 
         let node_id = self.network_api.our_name().await;
         let no_wallet_found = node_wallets.get(&node_id).is_none();

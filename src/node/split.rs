@@ -130,10 +130,10 @@ impl Node {
         }
 
         let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-        ops.push(self.push_state(our_prefix, msg_id));
+        ops.push(self.push_state(our_prefix, msg_id).await?);
 
         let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
-        ops.push(self.push_state(sibling_prefix, msg_id));
+        ops.push(self.push_state(sibling_prefix, msg_id).await?);
 
         Ok(ops)
     }
