@@ -113,7 +113,6 @@ impl BlobRegister {
         if self
             .adult_ops
             .new_write(msg_id, blob_write.clone(), origin, target_holders.clone())
-            .is_ok()
         {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
@@ -162,13 +161,15 @@ impl BlobRegister {
                 }
             }
         }
+        let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_ops.find_unresponsive_adults() {
             warn!(
                 "Adult {} has {} pending ops. It might be unresponsive",
                 name, count
             );
+            unresponsive_adults.push(name);
         }
-        Ok(NodeDuty::NoOp)
+        Ok(NodeDuty::ProposeOffline(unresponsive_adults))
     }
 
     pub async fn process_blob_read_result(
@@ -256,16 +257,12 @@ impl BlobRegister {
 
         if !results.is_empty() {}
 
-        if self
-            .adult_ops
-            .new_write(
-                msg_id,
-                BlobWrite::DeletePrivate(address),
-                origin,
-                metadata.holders.clone(),
-            )
-            .is_ok()
-        {
+        if self.adult_ops.new_write(
+            msg_id,
+            BlobWrite::DeletePrivate(address),
+            origin,
+            metadata.holders.clone(),
+        ) {
             let msg = Message::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
@@ -539,7 +536,6 @@ impl BlobRegister {
         if self
             .adult_ops
             .new_read(msg_id, address, origin, metadata.holders.clone())
-            .is_ok()
         {
             let msg = Message::NodeQuery {
                 query: NodeQuery::Chunks {
