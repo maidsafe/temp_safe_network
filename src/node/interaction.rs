@@ -107,7 +107,7 @@ impl Node {
     }
 
     /// Push our state to the given dst
-    pub fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> NodeDuty {
+    pub async fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> Result<NodeDuty> {
         let dst = DstLocation::Section(prefix.name());
 
         let user_wallets = if let Ok(elder) = &self.role.as_elder() {
@@ -132,11 +132,14 @@ impl Node {
             .filter(|(name, _)| dst.contains(name, &prefix))
             .collect();
 
-        NodeDuty::Send(OutgoingMsg {
+        let data = self.fetch_all_data().await?;
+
+        Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingTransfers {
                     node_rewards,
                     user_wallets,
+                    data,
                 }),
                 id: msg_id,
                 target_section_pk: None,
@@ -144,6 +147,6 @@ impl Node {
             section_source: false, // strictly this is not correct, but we don't expect responses to an event..
             dst,
             aggregation: Aggregation::None,
-        })
+        }))
     }
 }

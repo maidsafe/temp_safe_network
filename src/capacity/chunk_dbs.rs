@@ -15,7 +15,6 @@ use std::sync::Arc;
 const BLOB_META_DB_NAME: &str = "immutable_data.db";
 const HOLDER_META_DB_NAME: &str = "holder_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
-// The number of separate copies of a blob chunk which should be maintained.
 
 #[derive(Clone)]
 pub struct ChunkHolderDbs {

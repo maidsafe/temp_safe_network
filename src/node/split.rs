@@ -31,7 +31,7 @@ impl Node {
         &mut self,
         our_key: PublicKey,
         our_prefix: Prefix,
-    ) -> Result<()> {
+    ) -> Result<NodeDuties> {
         let section_key = self.network_api.section_public_key().await?;
         if our_key != section_key {
             return Err(Error::Logic(format!(
@@ -42,7 +42,7 @@ impl Node {
 
         debug!("begin_split_as_newbie");
 
-        self.level_up().await?;
+        let duty = self.level_up(false).await?;
 
         let section = OurSection {
             our_prefix,
@@ -62,7 +62,7 @@ impl Node {
             payments: DashMap::new(),
         };
 
-        Ok(())
+        Ok(duty)
     }
 
     /// Called on split reported from routing layer.
@@ -76,6 +76,11 @@ impl Node {
 
         let info = replica_info(&self.network_api).await?;
         elder.transfers.update_replica_info(info);
+
+        elder
+            .transfers
+            .retain_members_only(self.network_api.our_adults().await)
+            .await;
 
         let (wallets, payments) = match &mut elder.section_funds {
             SectionFunds::KeepingNodeWallets { wallets, payments }
@@ -130,10 +135,10 @@ impl Node {
         }
 
         let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-        ops.push(self.push_state(our_prefix, msg_id));
+        ops.push(self.push_state(our_prefix, msg_id).await?);
 
         let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
-        ops.push(self.push_state(sibling_prefix, msg_id));
+        ops.push(self.push_state(sibling_prefix, msg_id).await?);
 
         Ok(ops)
     }

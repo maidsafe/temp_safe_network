@@ -7,8 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Capacity, MAX_CHUNK_SIZE, MAX_SUPPLY};
-use crate::{network::Network, Result};
+use crate::metadata::{ChunkMetadata, HolderMetadata};
+use crate::node::BlobDataExchange;
+use crate::{network::Network, Error, Result};
+use log::debug;
 use sn_data_types::{PublicKey, Token};
+use std::collections::BTreeMap;
 use xor_name::XorName;
 
 /// Calculation of rate limit for writes.
@@ -22,6 +26,23 @@ impl RateLimit {
     /// gets a new instance of rate limit
     pub fn new(network: Network, capacity: Capacity) -> RateLimit {
         Self { network, capacity }
+    }
+
+    pub async fn retain_members_only(&mut self, members: Vec<XorName>) {
+        let mut full_adults = self.capacity.dbs.full_adults.lock().await;
+        let member_names_as_string = members
+            .iter()
+            .map(|name| name.to_string())
+            .collect::<Vec<_>>();
+        let all_keys = full_adults.get_all();
+        let absent_keys = all_keys
+            .into_iter()
+            .filter(|key| !member_names_as_string.contains(key))
+            .collect::<Vec<_>>();
+
+        for key in absent_keys {
+            let _ = full_adults.rem(&key);
+        }
     }
 
     /// Calculates the rate limit of write operations,
@@ -46,6 +67,76 @@ impl RateLimit {
         self.capacity
             .decrease_full_node_count_if_present(node_name)
             .await
+    }
+
+    pub async fn fetch_register(&self) -> Result<BlobDataExchange> {
+        // Prepare full_adult details
+        debug!("Fetching full_adults");
+        let adult_details = &self.capacity.dbs.full_adults.lock().await;
+        let all_full_adults_keys = adult_details.get_all();
+        let mut full_adults = BTreeMap::new();
+        for key in all_full_adults_keys {
+            let val: String = adult_details
+                .get(&key)
+                .ok_or_else(|| Error::Logic("Error fetching full Adults".to_string()))?;
+            let _ = full_adults.insert(key, val);
+        }
+
+        // Prepare older Details
+        debug!("Fetching holders");
+        let holder_details = self.capacity.dbs.holders.lock().await;
+        let all_holder_keys = holder_details.get_all();
+        let mut holders = BTreeMap::new();
+        for key in all_holder_keys {
+            let val: HolderMetadata = holder_details
+                .get(&key)
+                .ok_or_else(|| Error::Logic("Error fetching Holder".to_string()))?;
+            let _ = holders.insert(key, val);
+        }
+
+        // Prepare Metadata Details
+        debug!("Fetching Metadata");
+        let metadata_details = self.capacity.dbs.metadata.lock().await;
+        let all_metadata_keys = metadata_details.get_all();
+        let mut metadata = BTreeMap::new();
+        for key in all_metadata_keys {
+            let val: ChunkMetadata = metadata_details
+                .get(&key)
+                .ok_or_else(|| Error::Logic("Error fetching Metadata".to_string()))?;
+            let _ = metadata.insert(key, val);
+        }
+
+        Ok(BlobDataExchange {
+            full_adults,
+            holders,
+            metadata,
+        })
+    }
+
+    pub async fn update_register(&self, blob_register_exchange: BlobDataExchange) -> Result<()> {
+        debug!("Updating Blob Registers");
+        let mut orig_full_adults = self.capacity.dbs.full_adults.lock().await;
+        let mut orig_holders = self.capacity.dbs.holders.lock().await;
+        let mut orig_meta = self.capacity.dbs.metadata.lock().await;
+
+        let BlobDataExchange {
+            metadata,
+            holders,
+            full_adults,
+        } = blob_register_exchange;
+
+        for (key, value) in full_adults {
+            orig_full_adults.set(&key, &value)?;
+        }
+
+        for (key, value) in holders {
+            orig_holders.set(&key, &value)?;
+        }
+
+        for (key, value) in metadata {
+            orig_meta.set(&key, &value)?;
+        }
+        Ok(())
     }
 
     fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Token {

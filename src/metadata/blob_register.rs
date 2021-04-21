@@ -37,13 +37,13 @@ use super::adult_reader::AdultReader;
 const CHUNK_COPY_COUNT: usize = 4;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-struct ChunkMetadata {
+pub struct ChunkMetadata {
     holders: BTreeSet<XorName>,
     owner: Option<PublicKey>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-struct HolderMetadata {
+pub struct HolderMetadata {
     chunks: BTreeSet<BlobAddress>,
 }
 

@@ -17,8 +17,10 @@ mod writing;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
+use crate::node::{MapDataExchange, SequenceDataExchange};
 use crate::{capacity::ChunkHolderDbs, chunk_store::UsedSpace, node_ops::NodeDuties, Result};
 use blob_register::BlobRegister;
+pub use blob_register::{ChunkMetadata, HolderMetadata};
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
@@ -116,6 +118,17 @@ impl Metadata {
             .blob_register_mut()
             .replicate_chunk(data)
             .await
+    }
+
+    pub fn fetch_map_and_sequence(&self) -> Result<(MapDataExchange, SequenceDataExchange)> {
+        self.elder_stores.fetch_map_and_sequence()
+    }
+
+    pub async fn update_map_and_sequence(
+        &mut self,
+        data: (MapDataExchange, SequenceDataExchange),
+    ) -> Result<()> {
+        self.elder_stores.update_map_and_sequence(data).await
     }
 }
 

@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::{BlobDataExchange, MapDataExchange, SequenceDataExchange};
+use crate::node_ops::NodeDuties;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
@@ -16,7 +18,7 @@ use crate::{
         get_replicas::{replica_info, transfer_replicas},
         Transfers,
     },
-    Node, Result,
+    Error, Node, Result,
 };
 use dashmap::DashMap;
 use log::info;
@@ -35,20 +37,24 @@ impl Node {
     }
 
     /// Level up a newbie to an oldie on promotion
-    pub async fn level_up(&mut self) -> Result<()> {
+    pub async fn level_up(&mut self, is_genesis: bool) -> Result<NodeDuties> {
         self.used_space.reset().await?;
 
         //
         // start handling metadata
-        let dbs = ChunkHolderDbs::new(self.node_info.path())?;
+        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let reader = AdultReader::new(self.network_api.clone());
-        let meta_data =
-            Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
+        let meta_data = Metadata::new(
+            &self.node_info.path(),
+            &self.used_space,
+            dbs.clone(),
+            reader,
+        )
+        .await?;
 
         //
         // start handling transfers
-        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
-        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
+        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
@@ -64,10 +70,10 @@ impl Node {
             meta_data,
             transfers,
             section_funds,
+            is_caught_up: is_genesis,
         });
 
-        // TODO(drusu): return a  mutable reference to elder state?
-        Ok(())
+        Ok(vec![])
     }
 
     /// Continue the level up and handle more responsibilities.
@@ -75,6 +81,7 @@ impl Node {
         &mut self,
         node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
+        data: BTreeMap<String, Vec<u8>>,
     ) -> Result<NodeDuty> {
         let elder = self.role.as_elder_mut()?;
 
@@ -85,6 +92,9 @@ impl Node {
         for (key, (age, wallet)) in &node_wallets {
             elder.section_funds.set_node_wallet(*key, *wallet, *age)
         }
+
+        // Update ourself with the data
+        self.furnish(data).await?;
 
         let node_id = self.network_api.our_name().await;
         let no_wallet_found = node_wallets.get(&node_id).is_none();
@@ -97,5 +107,56 @@ impl Node {
         } else {
             Ok(NodeDuty::NoOp)
         }
+    }
+
+    ///
+    pub async fn fetch_all_data(&self) -> Result<BTreeMap<String, Vec<u8>>> {
+        let elder_role = self.role.as_elder()?;
+
+        // Prepare blob_register, map and sequence data
+        let blob_register = elder_role.transfers.fetch_blob_register().await?;
+        let (map_list, seq_list) = elder_role.meta_data.fetch_map_and_sequence()?;
+
+        // Create an aggregated map of all the data
+        let mut aggregated_map = BTreeMap::new();
+        let _ = aggregated_map.insert(
+            "BlobRegister".to_string(),
+            bincode::serialize(&blob_register)?,
+        );
+        let _ = aggregated_map.insert("MapData".to_string(), bincode::serialize(&map_list)?);
+        let _ = aggregated_map.insert("SequenceData".to_string(), bincode::serialize(&seq_list)?);
+        Ok(aggregated_map)
+    }
+
+    ///
+    pub async fn furnish(&mut self, data: BTreeMap<String, Vec<u8>>) -> Result<()> {
+        info!("Furnishing Chunkstores with received data");
+        let elder_role = self.role.as_elder_mut()?;
+
+        if !elder_role.is_caught_up {
+            let serialized_blob_reg = data.get("BlobRegister").ok_or_else(|| {
+                Error::Logic("Cannot find Blob_register on received data".to_string())
+            })?;
+            let serialized_map_list = data
+                .get("MapData")
+                .ok_or_else(|| Error::Logic("Cannot find MapData on received data".to_string()))?;
+            let serialized_seq_list = data.get("SequenceData").ok_or_else(|| {
+                Error::Logic("Cannot find SequenceData on received data".to_string())
+            })?;
+
+            let blob_reg: BlobDataExchange = bincode::deserialize(serialized_blob_reg)?;
+            let map_list: MapDataExchange = bincode::deserialize(serialized_map_list)?;
+            let seq_list: SequenceDataExchange = bincode::deserialize(serialized_seq_list)?;
+
+            elder_role.transfers.update_blob_register(blob_reg).await?;
+            elder_role
+                .meta_data
+                .update_map_and_sequence((map_list, seq_list))
+                .await?;
+            elder_role.is_caught_up = true;
+        } else {
+            info!("We are caught up with the section already. Ignoring update");
+        }
+        Ok(())
     }
 }

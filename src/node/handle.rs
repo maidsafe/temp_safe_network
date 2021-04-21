@@ -19,6 +19,7 @@ use sn_messaging::{
     client::{Message, NodeQuery},
     Aggregation, DstLocation, MessageId,
 };
+use sn_routing::ELDER_SIZE;
 use xor_name::XorName;
 
 impl Node {
@@ -26,10 +27,7 @@ impl Node {
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         info!("Handling NodeDuty: {:?}", duty);
         match duty {
-            NodeDuty::Genesis => {
-                self.level_up().await?;
-                Ok(vec![])
-            }
+            NodeDuty::Genesis => self.level_up(true).await,
             NodeDuty::EldersChanged {
                 our_key,
                 our_prefix,
@@ -37,14 +35,24 @@ impl Node {
             } => {
                 if newbie {
                     info!("Promoted to Elder on Churn");
-                    self.level_up().await?;
-                    Ok(vec![])
+                    if self.network_api.our_prefix().await.is_empty()
+                        && self.network_api.section_chain().await.len() <= ELDER_SIZE
+                    {
+                        self.level_up(true).await
+                    } else {
+                        self.level_up(false).await
+                    }
                 } else {
                     info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
+                    self.role
+                        .as_elder_mut()?
+                        .transfers
+                        .retain_members_only(self.network_api.our_adults().await)
+                        .await;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-                    Ok(vec![self.push_state(our_prefix, msg_id)])
+                    Ok(vec![self.push_state(our_prefix, msg_id).await?])
                 }
             }
             NodeDuty::SectionSplit {
@@ -55,8 +63,7 @@ impl Node {
             } => {
                 if newbie {
                     info!("Beginning split as Newbie");
-                    self.begin_split_as_newbie(our_key, our_prefix).await?;
-                    Ok(vec![])
+                    self.begin_split_as_newbie(our_key, our_prefix).await
                 } else {
                     info!("Beginning split as Oldie");
                     self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
@@ -166,7 +173,10 @@ impl Node {
             NodeDuty::SynchState {
                 node_rewards,
                 user_wallets,
-            } => Ok(vec![self.synch_state(node_rewards, user_wallets).await?]),
+                data,
+            } => Ok(vec![
+                self.synch_state(node_rewards, user_wallets, data).await?,
+            ]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 self.role = Role::Adult(AdultRole {
