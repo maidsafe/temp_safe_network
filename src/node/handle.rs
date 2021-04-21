@@ -63,6 +63,12 @@ impl Node {
                         .await
                 }
             }
+            NodeDuty::ProposeOffline(unresponsive_adults) => {
+                for adult in unresponsive_adults {
+                    self.network_api.propose_offline(adult).await?;
+                }
+                Ok(vec![])
+            }
             // a remote section asks for the replicas of their wallet
             NodeDuty::GetSectionElders { msg_id, origin } => {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
@@ -334,7 +340,7 @@ impl Node {
             }
             // --- Completion of Adult operations ---
             NodeDuty::ProcessBlobWriteResult {
-                msg_id,
+                original_msg_id,
                 result,
                 src,
             } => {
@@ -342,12 +348,12 @@ impl Node {
                 Ok(vec![
                     elder
                         .meta_data
-                        .process_blob_write_result(msg_id, result, src)
+                        .process_blob_write_result(original_msg_id, result, src)
                         .await?,
                 ])
             }
             NodeDuty::ProcessBlobReadResult {
-                msg_id,
+                original_msg_id,
                 response,
                 src,
             } => {
@@ -355,7 +361,7 @@ impl Node {
                 Ok(vec![
                     elder
                         .meta_data
-                        .process_blob_read_result(msg_id, response, src)
+                        .process_blob_read_result(original_msg_id, response, src)
                         .await?,
                 ])
             }

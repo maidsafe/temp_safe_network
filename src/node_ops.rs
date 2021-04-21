@@ -92,14 +92,14 @@ pub enum NodeDuty {
     /// write operations from Adults
     ProcessBlobWriteResult {
         result: NodeCmdResult,
-        msg_id: MessageId,
+        original_msg_id: MessageId,
         src: XorName,
     },
     /// Run at data-section Elders on receiving the result of
     /// read operations from Adults
     ProcessBlobReadResult {
         response: QueryResponse,
-        msg_id: MessageId,
+        original_msg_id: MessageId,
         src: XorName,
     },
     /// Get section elders.
@@ -214,6 +214,8 @@ pub enum NodeDuty {
         id: MessageId,
         section: XorName,
     },
+    /// Create proposals to vote unresponsive nodes as offline
+    ProposeOffline(Vec<XorName>),
     NoOp,
 }
 
@@ -245,22 +247,22 @@ impl Debug for NodeDuty {
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
             Self::ProcessBlobWriteResult {
-                msg_id,
+                original_msg_id,
                 result,
                 src,
             } => write!(
                 f,
-                "ProcessBlobWriteResult {{ id: {}, result: {:?}, src: {} }}",
-                msg_id, result, src
+                "ProcessBlobWriteResult {{ original_msg_id: {}, result: {:?}, src: {} }}",
+                original_msg_id, result, src
             ),
             Self::ProcessBlobReadResult {
-                msg_id,
+                original_msg_id,
                 response,
                 src,
             } => write!(
                 f,
-                "ProcessBlobReadResult {{ id: {}, response: {:?}, src: {} }}",
-                msg_id, response, src
+                "ProcessBlobReadResult {{ original_msg_id: {}, response: {:?}, src: {} }}",
+                original_msg_id, response, src
             ),
             Self::ReceiveRewardProposal { .. } => write!(f, "ReceiveRewardProposal"),
             Self::ReceiveRewardAccumulation { .. } => write!(f, "ReceiveRewardAccumulation"),
@@ -292,6 +294,7 @@ impl Debug for NodeDuty {
             Self::ReturnChunkToElders { .. } => write!(f, "ReturnChunkToElders"),
             Self::FinishReplication(_) => write!(f, "FinishReplication"),
             Self::ReplicateChunk(_) => write!(f, "ReplicateChunk"),
+            Self::ProposeOffline(_) => write!(f, "ProposeOffline"),
         }
     }
 }

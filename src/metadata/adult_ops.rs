@@ -8,7 +8,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Result};
 use itertools::Itertools;
 use sn_data_types::BlobAddress;
 use sn_messaging::{client::BlobWrite, EndUser, MessageId};
@@ -47,48 +46,54 @@ impl AdultOps {
         }
     }
 
+    // Inserts a new write operation
+    // Returns false if the operation already existed.
     pub fn new_write(
         &mut self,
         msg_id: MessageId,
         blob_write: BlobWrite,
         origin: EndUser,
         targets: BTreeSet<XorName>,
-    ) -> Result<(), Error> {
-        if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
+    ) -> bool {
+        let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(Operation::Write {
                 blob_write: Box::new(blob_write),
                 origin,
                 targets: targets.clone(),
             });
-            Ok(())
+            true
         } else {
-            Err(Error::AdultOperationInProgress)
-        }
-        .map(|()| {
+            false
+        };
+        if new_operation {
             self.increment_pending_op(&targets);
-        })
+        }
+        new_operation
     }
 
+    // Inserts a new read operation
+    // Returns false if the operation already existed.
     pub fn new_read(
         &mut self,
         msg_id: MessageId,
         address: BlobAddress,
         origin: EndUser,
         targets: BTreeSet<XorName>,
-    ) -> Result<()> {
-        if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
+    ) -> bool {
+        let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(Operation::Read {
                 address,
                 origin,
                 targets: targets.clone(),
             });
-            Ok(())
+            true
         } else {
-            Err(Error::AdultOperationInProgress)
-        }
-        .map(|()| {
+            false
+        };
+        if new_operation {
             self.increment_pending_op(&targets);
-        })
+        }
+        new_operation
     }
 
     pub fn remove_target(&mut self, msg_id: MessageId, name: XorName) {

@@ -114,6 +114,13 @@ impl Network {
         self.routing.public_key().await
     }
 
+    pub async fn propose_offline(&self, name: XorName) -> Result<()> {
+        self.routing
+            .propose_offline(name)
+            .await
+            .map_err(|_| Error::NotAnElder)
+    }
+
     pub async fn section_public_key(&self) -> Result<PublicKey> {
         Ok(PublicKey::Bls(
             self.routing

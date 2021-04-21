@@ -134,9 +134,6 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
-    /// Represents an error when a read/write operation at Adults is already in progress.
-    #[error("Adult Operation in progress")]
-    AdultOperationInProgress,
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
