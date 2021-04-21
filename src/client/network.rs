@@ -19,7 +19,7 @@ use sn_data_types::{
 use std::collections::BTreeMap;
 use xor_name::XorName;
 
-use super::{BlobRead, BlobWrite};
+use super::{BlobRead, BlobWrite, DataExchange};
 
 // -------------- Node Cmds --------------
 
@@ -58,13 +58,13 @@ pub enum NodeSystemCmd {
     AccumulateRewardPayout(sn_data_types::RewardAccumulation),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
-    ReceiveExistingTransfers {
+    ReceiveExistingData {
         /// Age and reward wallets of registered nodes, keyed by node name.
         node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// Transfer histories
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
-        /// All data
-        data: BTreeMap<String, Vec<u8>>,
+        /// Metadata
+        metadata: DataExchange,
     },
 }
 

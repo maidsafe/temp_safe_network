@@ -10,6 +10,7 @@
 mod blob;
 mod cmd;
 mod data;
+mod data_exchange;
 mod duty;
 mod errors;
 mod map;
@@ -24,6 +25,10 @@ pub use self::{
     blob::{BlobRead, BlobWrite},
     cmd::Cmd,
     data::{DataCmd, DataQuery},
+    data_exchange::{
+        BlobDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
+        SequenceDataExchange,
+    },
     duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
     errors::{Error, ErrorDebug, Result},
     map::{MapRead, MapWrite},
