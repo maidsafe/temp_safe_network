@@ -156,10 +156,7 @@ pub(crate) fn convert_dt_error_to_error_message(
 ) -> Result<sn_messaging::client::Error> {
     match error {
         DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
-        DtError::PolicyNotSet => Ok(ErrorMessage::PolicyNotSet),
         DtError::NoSuchEntry => Ok(ErrorMessage::NoSuchEntry),
-        DtError::CrdtUnexpectedState => Ok(ErrorMessage::CrdtUnexpectedState),
-        DtError::OpNotCausallyReady => Ok(ErrorMessage::OpNotCausallyReady),
         DtError::AccessDenied(pk) => Ok(ErrorMessage::AccessDenied(pk)),
         error => Err(Error::NoErrorMapping(error.to_string())),
     }

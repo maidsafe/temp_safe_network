@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, map_storage::MapStorage, sequence_storage::SequenceStorage,
+    blob_register::BlobRegister, map_storage::MapStorage, register_storage::RegisterStorage,
+    sequence_storage::SequenceStorage,
 };
 use crate::node::{MapDataExchange, SequenceDataExchange};
 use crate::Error;
@@ -18,6 +19,7 @@ pub(super) struct ElderStores {
     blob_register: BlobRegister,
     map_storage: MapStorage,
     sequence_storage: SequenceStorage,
+    register_storage: RegisterStorage,
 }
 
 impl ElderStores {
@@ -25,11 +27,13 @@ impl ElderStores {
         blob_register: BlobRegister,
         map_storage: MapStorage,
         sequence_storage: SequenceStorage,
+        register_storage: RegisterStorage,
     ) -> Self {
         Self {
             blob_register,
             map_storage,
             sequence_storage,
+            register_storage,
         }
     }
 
@@ -39,6 +43,10 @@ impl ElderStores {
 
     pub fn sequence_storage(&self) -> &SequenceStorage {
         &self.sequence_storage
+    }
+
+    pub fn register_storage(&self) -> &RegisterStorage {
+        &self.register_storage
     }
 
     pub fn blob_register_mut(&mut self) -> &mut BlobRegister {
@@ -51,6 +59,10 @@ impl ElderStores {
 
     pub fn sequence_storage_mut(&mut self) -> &mut SequenceStorage {
         &mut self.sequence_storage
+    }
+
+    pub fn register_storage_mut(&mut self) -> &mut RegisterStorage {
+        &mut self.register_storage
     }
 
     pub fn fetch_map_and_sequence(&self) -> Result<(MapDataExchange, SequenceDataExchange), Error> {

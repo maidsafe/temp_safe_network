@@ -12,6 +12,7 @@ mod blob_register;
 mod elder_stores;
 mod map_storage;
 mod reading;
+mod register_storage;
 mod sequence_storage;
 mod writing;
 
@@ -23,6 +24,7 @@ use blob_register::BlobRegister;
 pub use blob_register::{ChunkMetadata, HolderMetadata};
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
+use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::Blob;
 use sn_messaging::{
@@ -55,7 +57,13 @@ impl Metadata {
         let blob_register = BlobRegister::new(dbs, reader);
         let map_storage = MapStorage::new(path, used_space.clone()).await?;
         let sequence_storage = SequenceStorage::new(path, used_space.clone()).await?;
-        let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
+        let register_storage = RegisterStorage::new(path, used_space.clone()).await?;
+        let elder_stores = ElderStores::new(
+            blob_register,
+            map_storage,
+            sequence_storage,
+            register_storage,
+        );
         Ok(Self { elder_stores })
     }
 
