@@ -8,13 +8,13 @@
 
 use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
-    sequence_storage::SequenceStorage,
+    register_storage::RegisterStorage, sequence_storage::SequenceStorage,
 };
 use crate::node_ops::NodeDuty;
 use crate::Result;
 use log::info;
 use sn_messaging::{
-    client::{BlobWrite, DataCmd, MapWrite, SequenceWrite},
+    client::{BlobWrite, DataCmd, MapWrite, RegisterWrite, SequenceWrite},
     EndUser, MessageId,
 };
 
@@ -38,6 +38,10 @@ pub(super) async fn get_result(
         Sequence(write) => {
             info!("Writing Sequence");
             sequence(write, stores.sequence_storage_mut(), msg_id, origin).await
+        }
+        Register(write) => {
+            info!("Writing Register");
+            register(write, stores.register_storage_mut(), msg_id, origin).await
         }
     }
 }
@@ -63,6 +67,15 @@ async fn map(
 async fn sequence(
     write: SequenceWrite,
     storage: &mut SequenceStorage,
+    msg_id: MessageId,
+    origin: EndUser,
+) -> Result<NodeDuty> {
+    storage.write(write, msg_id, origin).await
+}
+
+async fn register(
+    write: RegisterWrite,
+    storage: &mut RegisterStorage,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeDuty> {

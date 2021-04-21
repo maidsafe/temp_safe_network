@@ -7,93 +7,65 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{SequenceChunkStore, UsedSpace},
+    chunk_store::{RegisterChunkStore, UsedSpace},
     error::convert_to_error_message,
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
-use log::{debug, info};
-use sn_data_types::{
-    Error as DtError, Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex,
-    SequenceOp, SequenceUser,
-};
+use log::info;
+use sn_data_types::register::{Action, Address, Entry, Register, RegisterOp, User};
 use sn_messaging::{
-    client::{CmdError, Message, QueryResponse, SequenceRead, SequenceWrite},
+    client::{CmdError, Message, QueryResponse, RegisterRead, RegisterWrite},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 
-use crate::node::SequenceDataExchange;
-use std::collections::BTreeMap;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
 
-/// Operations over the data type Sequence.
-pub(super) struct SequenceStorage {
-    chunks: SequenceChunkStore,
+/// Operations over the data type Register.
+pub(super) struct RegisterStorage {
+    chunks: RegisterChunkStore,
 }
 
-impl SequenceStorage {
+impl RegisterStorage {
     pub(super) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        let chunks = SequenceChunkStore::new(path, used_space).await?;
+        let chunks = RegisterChunkStore::new(path, used_space).await?;
         Ok(Self { chunks })
-    }
-
-    pub fn fetch_seq_data(&self) -> Result<SequenceDataExchange> {
-        let store = &self.chunks;
-        let all_keys = store.keys();
-        let mut sequence: BTreeMap<SequenceAddress, Sequence> = BTreeMap::new();
-        for key in all_keys {
-            let _ = sequence.insert(key, store.get(&key)?);
-        }
-        Ok(SequenceDataExchange(sequence))
-    }
-
-    pub async fn update_seq_data(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
-        debug!("Updating Sequence chunkstore");
-        let chunkstore = &mut self.chunks;
-        let SequenceDataExchange(data) = seq_data;
-
-        for (_key, value) in data {
-            chunkstore.put(&value).await?;
-        }
-
-        Ok(())
     }
 
     pub(super) async fn read(
         &self,
-        read: &SequenceRead,
+        read: &RegisterRead,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        use SequenceRead::*;
+        use RegisterRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin).await,
-            GetRange { address, range } => self.get_range(*address, *range, msg_id, origin).await,
-            GetLastEntry(address) => self.get_last_entry(*address, msg_id, origin).await,
+            Read(address) => self.read_register(*address, msg_id, origin).await,
+            GetOwner(address) => self.get_owner(*address, msg_id, origin).await,
             GetUserPermissions { address, user } => {
                 self.get_user_permissions(*address, *user, msg_id, origin)
                     .await
             }
-            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, origin).await,
-            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, origin).await,
+            GetPolicy(address) => self.get_policy(*address, msg_id, origin).await,
         }
     }
 
     pub(super) async fn write(
         &mut self,
-        write: SequenceWrite,
+        write: RegisterWrite,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        use SequenceWrite::*;
-        info!("Matching Sequence Write");
+        use RegisterWrite::*;
+        info!("Matching Register Write");
         match write {
             New(data) => self.store(&data, msg_id, origin).await,
             Edit(operation) => {
-                info!("Editing Sequence");
+                info!("Editing Register");
                 self.edit(operation, msg_id, origin).await
             }
             Delete(address) => self.delete(address, msg_id, origin).await,
@@ -102,7 +74,7 @@ impl SequenceStorage {
 
     async fn store(
         &mut self,
-        data: &Sequence,
+        data: &Register,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
@@ -114,19 +86,15 @@ impl SequenceStorage {
         self.ok_or_error(result, msg_id, origin).await
     }
 
-    async fn get(
-        &self,
-        address: SequenceAddress,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self.get_chunk(address, SequenceAction::Read, origin) {
+    async fn get(&self, address: Address, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
+        let result = match self.get_chunk(address, Action::Read, origin) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
+
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
-                response: QueryResponse::GetSequence(result),
+                response: QueryResponse::GetRegister(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 target_section_pk: None,
@@ -137,12 +105,7 @@ impl SequenceStorage {
         }))
     }
 
-    fn get_chunk(
-        &self,
-        address: SequenceAddress,
-        action: SequenceAction,
-        origin: EndUser,
-    ) -> Result<Sequence> {
+    fn get_chunk(&self, address: Address, action: Action, origin: EndUser) -> Result<Register> {
         let data = self.chunks.get(&address)?;
         data.check_permission(action, Some(*origin.id()))?;
         Ok(data)
@@ -150,23 +113,21 @@ impl SequenceStorage {
 
     async fn delete(
         &mut self,
-        address: SequenceAddress,
+        address: Address,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.chunks.get(&address).and_then(|sequence| {
-            // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
-            if sequence.address().is_public() {
+        let result = match self.chunks.get(&address).and_then(|register| {
+            // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
+            if register.address().is_public() {
                 return Err(Error::InvalidMessage(
                     msg_id,
-                    "Sequence::check_permission() doesn't support Delete yet in safe-nd"
-                        .to_string(),
+                    "Cannot delete public Register".to_string(),
                 ));
             }
 
             let public_key = *origin.id();
-            let policy = sequence.private_policy(Some(public_key))?;
-            if public_key != policy.owner {
+            if public_key != register.owner() {
                 Err(Error::InvalidOwners(public_key))
             } else {
                 Ok(())
@@ -179,26 +140,23 @@ impl SequenceStorage {
         self.ok_or_error(result, msg_id, origin).await
     }
 
-    async fn get_range(
+    async fn read_register(
         &self,
-        address: SequenceAddress,
-        range: (SequenceIndex, SequenceIndex),
+        address: Address,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| {
-                sequence
-                    .in_range(range.0, range.1, Some(*origin.id()))?
-                    .ok_or(Error::NetworkData(DtError::NoSuchEntry))
-            }) {
+            .get_chunk(address, Action::Read, origin)
+            .and_then(|register| register.read(Some(*origin.id())).map_err(Error::from))
+        {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
+
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
-                response: QueryResponse::GetSequenceRange(result),
+                response: QueryResponse::ReadRegister(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 target_section_pk: None,
@@ -209,24 +167,20 @@ impl SequenceStorage {
         }))
     }
 
-    async fn get_last_entry(
+    async fn get_owner(
         &self,
-        address: SequenceAddress,
+        address: Address,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self
-            .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| match sequence.last_entry(Some(*origin.id()))? {
-                Some(entry) => Ok((sequence.len(Some(*origin.id()))? - 1, entry.to_vec())),
-                None => Err(Error::NetworkData(DtError::NoSuchEntry)),
-            }) {
-            Ok(res) => Ok(res),
+        let result = match self.get_chunk(address, Action::Read, origin) {
+            Ok(res) => Ok(res.owner()),
             Err(error) => Err(convert_to_error_message(error)?),
         };
+
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
-                response: QueryResponse::GetSequenceLastEntry(result),
+                response: QueryResponse::GetRegisterOwner(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 target_section_pk: None,
@@ -239,24 +193,25 @@ impl SequenceStorage {
 
     async fn get_user_permissions(
         &self,
-        address: SequenceAddress,
-        user: SequenceUser,
+        address: Address,
+        user: User,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| {
-                sequence
+            .get_chunk(address, Action::Read, origin)
+            .and_then(|register| {
+                register
                     .permissions(user, Some(*origin.id()))
-                    .map_err(|e| e.into())
+                    .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
+
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
-                response: QueryResponse::GetSequenceUserPermissions(result),
+                response: QueryResponse::GetRegisterUserPermissions(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 target_section_pk: None,
@@ -267,62 +222,27 @@ impl SequenceStorage {
         }))
     }
 
-    async fn get_public_policy(
+    async fn get_policy(
         &self,
-        address: SequenceAddress,
+        address: Address,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| {
-                let res = if sequence.is_public() {
-                    let policy = sequence.public_policy()?;
-                    policy.clone()
-                } else {
-                    return Err(Error::NetworkData(DtError::CrdtUnexpectedState));
-                };
-                Ok(res)
+            .get_chunk(address, Action::Read, origin)
+            .and_then(|register| {
+                register
+                    .policy(Some(*origin.id()))
+                    .map(|p| p.clone())
+                    .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::GetSequencePublicPolicy(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
-    }
 
-    async fn get_private_policy(
-        &self,
-        address: SequenceAddress,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        let result = match self
-            .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| {
-                let res = if !sequence.is_public() {
-                    let policy = sequence.private_policy(Some(*origin.id()))?;
-                    policy.clone()
-                } else {
-                    return Err(Error::NetworkData(DtError::CrdtUnexpectedState));
-                };
-                Ok(res)
-            }) {
-            Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
-        };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
-                response: QueryResponse::GetSequencePrivatePolicy(result),
+                response: QueryResponse::GetRegisterPolicy(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 target_section_pk: None,
@@ -335,45 +255,42 @@ impl SequenceStorage {
 
     async fn edit(
         &mut self,
-        write_op: SequenceOp<SequenceEntry>,
+        write_op: RegisterOp<Entry>,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let address = write_op.address;
-        info!("Editing Sequence chunk");
+        info!("Editing Register chunk");
         let result = self
-            .edit_chunk(
-                address,
-                SequenceAction::Append,
-                origin,
-                move |mut sequence| {
-                    sequence.apply_op(write_op)?;
-                    Ok(sequence)
-                },
-            )
+            .edit_chunk(address, Action::Write, origin, move |mut register| {
+                register.apply_op(write_op)?;
+                Ok(register)
+            })
             .await;
+
         if result.is_ok() {
-            info!("Editing Sequence chunk SUCCESSFUL!");
+            info!("Editing Register chunk SUCCESSFUL!");
         } else {
-            info!("Editing Sequence chunk FAILEDDD!");
+            info!("Editing Register chunk FAILED!");
         }
+
         self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn edit_chunk<F>(
         &mut self,
-        address: SequenceAddress,
-        action: SequenceAction,
+        address: Address,
+        action: Action,
         origin: EndUser,
         write_fn: F,
     ) -> Result<()>
     where
-        F: FnOnce(Sequence) -> Result<Sequence>,
+        F: FnOnce(Register) -> Result<Register>,
     {
-        info!("Getting Sequence chunk for Edit");
+        info!("Getting Register chunk for Edit");
         let result = self.get_chunk(address, action, origin)?;
         let sequence = write_fn(result)?;
-        info!("Edited Sequence chunk successfully");
+        info!("Edited Register chunk successfully");
         self.chunks.put(&sequence).await
     }
 
@@ -386,7 +303,7 @@ impl SequenceStorage {
         let error = match result {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(error) => {
-                info!("Error on writing Sequence! {:?}", error);
+                info!("Error on writing Register! {:?}", error);
                 convert_to_error_message(error)?
             }
         };
@@ -404,8 +321,8 @@ impl SequenceStorage {
     }
 }
 
-impl Display for SequenceStorage {
+impl Display for RegisterStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "SequenceStorage")
+        write!(formatter, "RegisterStorage")
     }
 }

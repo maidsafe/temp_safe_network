@@ -10,12 +10,12 @@
 
 use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
-    sequence_storage::SequenceStorage,
+    register_storage::RegisterStorage, sequence_storage::SequenceStorage,
 };
 use crate::node_ops::NodeDuty;
 use crate::Result;
 use sn_messaging::{
-    client::{BlobRead, DataQuery, MapRead, SequenceRead},
+    client::{BlobRead, DataQuery, MapRead, RegisterRead, SequenceRead},
     EndUser, MessageId,
 };
 
@@ -30,6 +30,7 @@ pub(super) async fn get_result(
         Blob(read) => blob(read, stores.blob_register_mut(), msg_id, origin).await,
         Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
         Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
+        Register(read) => register(read, stores.register_storage(), msg_id, origin).await,
     }
 }
 
@@ -54,6 +55,15 @@ async fn map(
 async fn sequence(
     read: &SequenceRead,
     storage: &SequenceStorage,
+    msg_id: MessageId,
+    origin: EndUser,
+) -> Result<NodeDuty> {
+    storage.read(read, msg_id, origin).await
+}
+
+async fn register(
+    read: &RegisterRead,
+    storage: &RegisterStorage,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeDuty> {
