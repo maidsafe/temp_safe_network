@@ -63,6 +63,8 @@ pub enum NodeSystemCmd {
         node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// Transfer histories
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
+        /// All data
+        data: BTreeMap<String, Vec<u8>>,
     },
 }
 
@@ -139,11 +141,6 @@ pub enum NodeSystemQuery {
     /// Acquire the chunk from current holders for replication.
     /// providing the address of the blob to be replicated.
     GetChunk(BlobAddress),
-    /// Update node on churn accordingly
-    UpdateData {
-        our_name: XorName,
-        section_pk: PublicKey,
-    },
 }
 
 ///
@@ -152,8 +149,6 @@ pub enum NodeSystemQueryResponse {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     GetSectionElders(SectionElders),
-    /// On Elder change, new Elders query network for data
-    UpdateData(BTreeMap<String, Vec<u8>>),
 }
 
 ///
