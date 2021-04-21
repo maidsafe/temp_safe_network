@@ -11,6 +11,8 @@ mod auth;
 mod consts;
 mod helpers;
 mod keys;
+mod multimap;
+mod register;
 mod safe_client;
 mod sequence;
 #[cfg(test)]

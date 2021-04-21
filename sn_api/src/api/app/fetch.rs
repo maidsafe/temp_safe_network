@@ -385,6 +385,10 @@ impl Safe {
 
                 Ok((nrs_map_container, Some((target_safe_url, None))))
             }
+            SafeContentType::Multimap => {
+                // let _ = self.multimap_get(&xourl).await?;
+                unimplemented!()
+            }
             SafeContentType::Raw => {
                 if !the_xor.sub_names_vec().is_empty() {
                     let msg = format!(

@@ -91,6 +91,7 @@ pub enum SafeContentType {
     Wallet,
     FilesContainer,
     NrsMapContainer,
+    Multimap,
     MediaType(String),
 }
 
@@ -106,7 +107,8 @@ impl SafeContentType {
             0 => Ok(Self::Raw),
             1 => Ok(Self::Wallet),
             2 => Ok(Self::FilesContainer),
-            3 => Ok(Self::NrsMapContainer),
+            3 => Ok(Self::Multimap),
+            4 => Ok(Self::NrsMapContainer),
             _other => Err(Error::InvalidInput("Invalid Media-type code".to_string())),
         }
     }
@@ -116,7 +118,8 @@ impl SafeContentType {
             Self::Raw => Ok(0),
             Self::Wallet => Ok(1),
             Self::FilesContainer => Ok(2),
-            Self::NrsMapContainer => Ok(3),
+            Self::Multimap => Ok(3),
+            Self::NrsMapContainer => Ok(4),
             Self::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
                 Some(media_type_code) => Ok(*media_type_code),
                 None => Err(Error::InvalidMediaType(format!("Media-type '{}' not supported. You can use 'SafeContentType::Raw' as the 'content_type' for this type of content", media_type))),
@@ -133,10 +136,12 @@ pub enum SafeDataType {
     SafeKey = 0x00,
     PublicBlob = 0x01,
     PrivateBlob = 0x02,
-    PublicSequence = 0x03,
-    PrivateSequence = 0x04,
-    SeqMap = 0x05,
-    UnseqMap = 0x06,
+    PublicRegister = 0x03,
+    PrivateRegister = 0x04,
+    PublicSequence = 0x05,
+    PrivateSequence = 0x06,
+    SeqMap = 0x07,
+    UnseqMap = 0x08,
 }
 
 impl std::fmt::Display for SafeDataType {
@@ -151,10 +156,12 @@ impl SafeDataType {
             0 => Ok(Self::SafeKey),
             1 => Ok(Self::PublicBlob),
             2 => Ok(Self::PrivateBlob),
-            3 => Ok(Self::PublicSequence),
-            4 => Ok(Self::PrivateSequence),
-            5 => Ok(Self::SeqMap),
-            6 => Ok(Self::UnseqMap),
+            3 => Ok(Self::PublicRegister),
+            4 => Ok(Self::PrivateRegister),
+            5 => Ok(Self::PublicSequence),
+            6 => Ok(Self::PrivateSequence),
+            7 => Ok(Self::SeqMap),
+            8 => Ok(Self::UnseqMap),
             _ => Err(Error::InvalidInput("Invalid SafeDataType code".to_string())),
         }
     }
@@ -479,10 +486,12 @@ impl SafeUrl {
             0 => SafeDataType::SafeKey,
             1 => SafeDataType::PublicBlob,
             2 => SafeDataType::PrivateBlob,
-            3 => SafeDataType::PublicSequence,
-            4 => SafeDataType::PrivateSequence,
-            5 => SafeDataType::SeqMap,
-            6 => SafeDataType::UnseqMap,
+            3 => SafeDataType::PublicRegister,
+            4 => SafeDataType::PrivateRegister,
+            5 => SafeDataType::PublicSequence,
+            6 => SafeDataType::PrivateSequence,
+            7 => SafeDataType::SeqMap,
+            8 => SafeDataType::UnseqMap,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid SAFE data type encoded in the XOR-URL string: {}",
@@ -1031,6 +1040,33 @@ impl SafeUrl {
                 SafeDataType::PrivateSequence
             } else {
                 SafeDataType::PublicSequence
+            },
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+            base,
+        )
+    }
+
+    // A non-member Register data URL encoder function for convenience
+    pub fn encode_register(
+        xor_name: XorName,
+        type_tag: u64,
+        content_type: SafeContentType,
+        base: XorUrlBase,
+        is_private: bool,
+    ) -> Result<String> {
+        SafeUrl::encode(
+            xor_name,
+            None,
+            type_tag,
+            if is_private {
+                SafeDataType::PrivateRegister
+            } else {
+                SafeDataType::PublicRegister
             },
             content_type,
             None,

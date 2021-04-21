@@ -13,12 +13,13 @@ use hex::encode;
 use log::{debug, info};
 use sn_client::{Client, Error as ClientError, ErrorMessage, TransfersError};
 use sn_data_types::{
+    register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
 };
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     net::SocketAddr,
     path::{Path, PathBuf},
 };
@@ -559,5 +560,162 @@ impl SafeAppClient {
             .append_to_sequence(sequence_address, data.to_vec())
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to append to Sequence: {:?}", e)))
+    }
+
+    // === Register data operations ===
+    pub async fn store_register(
+        &self,
+        name: Option<XorName>,
+        tag: u64,
+        _permissions: Option<String>,
+        private: bool,
+    ) -> Result<XorName> {
+        debug!(
+            "Storing {} Register data with tag type: {}, xorname: {:?}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
+        );
+
+        let client = self.get_safe_client()?;
+        let xorname = name.unwrap_or_else(rand::random);
+        info!("Xorname for new Register storage: {:?}", &xorname);
+
+        // The Register's owner will be the client's public key
+        let my_pk = client.public_key().await;
+
+        // Store the Register on the network
+        let _ = if private {
+            // Set read and write  permissions to this application
+            let mut perms = BTreeMap::default();
+            let _ = perms.insert(my_pk, PrivatePermissions::new(true, true));
+
+            client
+                .store_private_register(xorname, tag, my_pk, perms)
+                .await
+                .map_err(|e| {
+                    Error::NetDataError(format!("Failed to store Private Register data: {:?}", e))
+                })?
+        } else {
+            // Set write permissions to this application
+            let user_app = User::Key(my_pk);
+            let mut perms = BTreeMap::default();
+            let _ = perms.insert(user_app, PublicPermissions::new(true));
+
+            client
+                .store_public_register(xorname, tag, my_pk, perms)
+                .await
+                .map_err(|e| {
+                    Error::NetDataError(format!("Failed to store Public Register data: {:?}", e))
+                })?
+        };
+
+        Ok(xorname)
+    }
+
+    pub async fn read_register(
+        &self,
+        name: XorName,
+        tag: u64,
+        private: bool,
+    ) -> Result<BTreeSet<(EntryHash, Entry)>> {
+        debug!(
+            "Fetching {} Register data with tag type: {}, xorname: {}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
+        );
+
+        let client = self.get_safe_client()?;
+
+        let register_address = if private {
+            Address::Private { name, tag }
+        } else {
+            Address::Public { name, tag }
+        };
+
+        client.read_register(register_address).await.map_err(|err| {
+            if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
+                Error::EmptyContent(format!("Empty Register found at XoR name {}", name))
+            } else {
+                Error::NetDataError(format!(
+                    "Failed to read current value from Register data: {:?}",
+                    err
+                ))
+            }
+        })
+    }
+
+    pub async fn get_register_entry(
+        &self,
+        name: XorName,
+        tag: u64,
+        hash: EntryHash,
+        private: bool,
+    ) -> Result<Entry> {
+        debug!(
+            "Fetching {} Register data with tag type: {}, xorname: {}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
+        );
+
+        let client = self.get_safe_client()?;
+
+        let register_address = if private {
+            Address::Private { name, tag }
+        } else {
+            Address::Public { name, tag }
+        };
+
+        let entry = client
+            .get_register_entry(register_address, hash)
+            .await
+            .map_err(|err| {
+                if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
+                    Error::HashNotFound(format!(
+                        "No entry with hash '{}' for Register found at XoR name {}",
+                        encode(hash),
+                        name
+                    ))
+                } else {
+                    Error::NetDataError(format!(
+                        "Failed to retrieve entry with hash '{}' from Register data: {:?}",
+                        encode(hash),
+                        err
+                    ))
+                }
+            })?;
+
+        Ok(entry.to_vec())
+    }
+
+    pub async fn write_to_register(
+        &self,
+        data: &[u8],
+        name: XorName,
+        tag: u64,
+        private: bool,
+        parents: BTreeSet<EntryHash>,
+    ) -> Result<EntryHash> {
+        debug!(
+            "Writting to {} Register data with tag type: {}, xorname: {}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name
+        );
+
+        let client = self.get_safe_client()?;
+
+        let register_address = if private {
+            Address::Private { name, tag }
+        } else {
+            Address::Public { name, tag }
+        };
+
+        client
+            .write_to_register(register_address, data.to_vec(), parents)
+            .await
+            .map_err(|e| Error::NetDataError(format!("Failed to write to Register: {:?}", e)))
     }
 }
