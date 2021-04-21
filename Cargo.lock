@@ -442,10 +442,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a1db1cc69b5d38a2549f4d78a5f9010e311d59542f876bea6763e7bb64dc395"
 dependencies = [
  "bitvec",
- "num-bigint",
+ "num-bigint 0.2.6",
  "quickcheck",
  "rand 0.7.3",
  "serde",
+]
+
+[[package]]
+name = "crdts"
+version = "6.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad70add68023a49b501c158f197fc4238e56f3854884c17735dd8ab90924a8c"
+dependencies = [
+ "num",
+ "quickcheck",
+ "rand 0.7.3",
+ "serde",
+ "tiny-keccak 2.0.2",
 ]
 
 [[package]]
@@ -668,7 +681,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3776aaf60a45037a9c3cabdd8542b38693acaa3e241ff957181b72579d29feb"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
  "proc-macro2 1.0.26",
@@ -1403,6 +1416,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b7a8e9be5e039e2ff869df49155f1c06bd01ade2117ec783e56ab0932b67a8f"
+dependencies = [
+ "num-bigint 0.3.2",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1414,6 +1441,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d0a3d5e207573f948a9e5376662aa743a2ea13f7c50a554d7af443a73fbfeba"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "747d632c0c558b87dbabbe6a82f3b4ae03720d0646ac5b7b4dae89394be5f2c5"
+dependencies = [
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1421,6 +1470,30 @@ checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 dependencies = [
  "autocfg",
  "num-traits",
+]
+
+[[package]]
+name = "num-iter"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2021c8337a54d21aca0d59a92577a029af9431cb59b909b03252b9c164fad59"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
+dependencies = [
+ "autocfg",
+ "num-bigint 0.3.2",
+ "num-integer",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -2199,12 +2272,12 @@ checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
 
 [[package]]
 name = "sn_data_types"
-version = "0.18.0"
+version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cac59b472fe0a6263dcf44d0c3573422e52dc4bc0488415a260dde26158eeb13"
+checksum = "f12960f7fb2924cbdf25e3556dd0afa7ea1fd5160df5effa54745b85765a599d"
 dependencies = [
  "bincode",
- "crdts",
+ "crdts 6.3.2",
  "ed25519-dalek",
  "hex",
  "multibase",
@@ -2233,31 +2306,6 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "16.0.0"
-source = "git+https://github.com/Yoga07/sn_messaging?branch=data-loss#0589a6086c970773d5ff9e2cfbf74f9849cf81c5"
-dependencies = [
- "bincode",
- "bytes 1.0.1",
- "cookie-factory",
- "crdts",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "rmp-serde",
- "serde",
- "serde_bytes",
- "signature",
- "sn_data_types",
- "thiserror",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
- "xor_name",
-]
-
-[[package]]
-name = "sn_messaging"
 version = "16.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f231040477f5dd838f50b7606550699c171522b7ca4989b86885b29d6384c81"
@@ -2265,7 +2313,7 @@ dependencies = [
  "bincode",
  "bytes 1.0.1",
  "cookie-factory",
- "crdts",
+ "crdts 4.3.0",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
@@ -2292,7 +2340,7 @@ dependencies = [
  "base64 0.10.1",
  "bincode",
  "bytes 1.0.1",
- "crdts",
+ "crdts 4.3.0",
  "dashmap",
  "dirs-next 1.0.2",
  "ed25519",
@@ -2314,7 +2362,7 @@ dependencies = [
  "signature",
  "sn_data_types",
  "sn_launch_tool",
- "sn_messaging 16.0.0",
+ "sn_messaging",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2327,8 +2375,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.60.10"
-source = "git+https://github.com/Yoga07/sn_routing?branch=data-loss#6d4246d61b136681450092038ba843e21cc48f84"
+version = "0.61.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a05e5f97d3ce5d676699c1e508f1cdca278cd977cd6442e1907999833e4c6432"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2345,7 +2394,7 @@ dependencies = [
  "resource_proof",
  "serde",
  "sn_data_types",
- "sn_messaging 16.1.0",
+ "sn_messaging",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2356,12 +2405,12 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bf908f1fd14518ecd9337dc2755e55799fdc5a6c9f6661726ace7715ee5bc64"
+checksum = "21e53e7831a4375b0acac6877877627c216f31b88d46da214836fedc88937e72"
 dependencies = [
  "bincode",
- "crdts",
+ "crdts 6.3.2",
  "itertools 0.9.0",
  "log",
  "rand 0.7.3",
