@@ -427,9 +427,9 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "6.3.2"
+version = "6.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad70add68023a49b501c158f197fc4238e56f3854884c17735dd8ab90924a8c"
+checksum = "de3662f88000c93f9c208d361ffc828c3a061369122f0d2e7805abbee4ce7a4c"
 dependencies = [
  "num",
  "quickcheck",
@@ -2303,7 +2303,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.37.14"
+version = "0.38.1"
 dependencies = [
  "anyhow",
  "async-log",
