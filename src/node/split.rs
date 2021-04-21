@@ -77,6 +77,11 @@ impl Node {
         let info = replica_info(&self.network_api).await?;
         elder.transfers.update_replica_info(info);
 
+        elder
+            .transfers
+            .retain_members_only(self.network_api.our_adults().await)
+            .await;
+
         let (wallets, payments) = match &mut elder.section_funds {
             SectionFunds::KeepingNodeWallets { wallets, payments }
             | SectionFunds::Churning {

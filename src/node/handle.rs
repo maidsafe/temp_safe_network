@@ -45,6 +45,11 @@ impl Node {
                 } else {
                     info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
+                    self.role
+                        .as_elder_mut()?
+                        .transfers
+                        .retain_members_only(self.network_api.our_adults().await)
+                        .await;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
                     Ok(vec![self.push_state(our_prefix, msg_id).await?])
