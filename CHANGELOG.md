@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [16.1.0](https://github.com/maidsafe/sn_messaging/compare/v16.0.0...v16.1.0) (2021-04-21)
+
+
+### Features
+
+* **data:** add NodeQuery variants to facilitate sharing of data to New Elders ([487af89](https://github.com/maidsafe/sn_messaging/commit/487af895238412a1b8fa66fcab6501ff3630b13f))
+
 ## [16.0.0](https://github.com/maidsafe/sn_messaging/compare/v15.0.0...v16.0.0) (2021-04-21)
 
 
