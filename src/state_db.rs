@@ -8,11 +8,52 @@
 
 use crate::{Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
+pub use ed25519_dalek::{Keypair, KEYPAIR_LENGTH};
 use std::path::Path;
 use tokio::fs;
 
 const REWARD_PUBLIC_KEY_FILENAME: &str = "reward_public_key";
 const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
+
+const NETWORK_KEYPAIR_FILENAME: &str = "network_keypair";
+
+/// Writes the network keypair to disk.
+pub async fn store_network_keypair(
+    root_dir: &Path,
+    keypair_as_bytes: [u8; KEYPAIR_LENGTH],
+) -> Result<()> {
+    let keypair_path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
+    fs::write(keypair_path, keypair_to_hex(keypair_as_bytes)).await?;
+    Ok(())
+}
+
+fn keypair_to_hex(keypair_as_bytes: [u8; KEYPAIR_LENGTH]) -> String {
+    vec_to_hex(keypair_as_bytes.to_vec())
+}
+
+/// Returns Some(KeyPair) or None if file doesn't exist.
+pub async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
+    let path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).await?;
+    Ok(Some(keypair_from_bytes(bytes)?))
+}
+
+fn keypair_from_bytes(bytes: Vec<u8>) -> Result<Keypair> {
+    let hex = String::from_utf8(bytes)
+        .map_err(|_| Error::Logic("Config error: Could not parse bytes as string".to_string()))?;
+    keypair_from_hex(&hex)
+}
+
+fn keypair_from_hex(hex_str: &str) -> Result<Keypair> {
+    let keypair_bytes = parse_hex(&hex_str);
+    let mut keypair_bytes_array: [u8; KEYPAIR_LENGTH] = [0; KEYPAIR_LENGTH];
+    keypair_bytes_array.copy_from_slice(&keypair_bytes[..KEYPAIR_LENGTH]);
+    Keypair::from_bytes(&keypair_bytes_array)
+        .map_err(|_| Error::Logic("Config error: Invalid network keypair bytes".to_string()))
+}
 
 /// Writes the public and secret key to different locations at disk.
 pub async fn store_new_reward_keypair(

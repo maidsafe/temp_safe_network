@@ -281,13 +281,11 @@ impl Debug for NodeDuty {
                 msg,
                 targets,
                 aggregation,
-            } => {
-                write!(
-                    f,
-                    "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
-                    msg, targets, aggregation
-                )
-            }
+            } => write!(
+                f,
+                "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
+                msg, targets, aggregation
+            ),
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
