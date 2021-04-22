@@ -149,15 +149,6 @@ pub enum Message {
         /// Target section's current PublicKey
         target_section_pk: Option<PublicKey>,
     },
-    /// Result of an applied NodeCmd
-    NodeCmdResult {
-        /// The result
-        result: NodeCmdResult,
-        /// Message ID
-        id: MessageId,
-        /// Target section's current PublicKey
-        target_section_pk: Option<PublicKey>,
-    },
     /// An error of a NodeCmd.
     NodeCmdError {
         /// The error.
@@ -212,7 +203,6 @@ impl Message {
             | Self::QueryResponse { id, .. }
             | Self::CmdError { id, .. }
             | Self::NodeCmd { id, .. }
-            | Self::NodeCmdResult { id, .. }
             | Self::NodeEvent { id, .. }
             | Self::NodeQuery { id, .. }
             | Self::NodeCmdError { id, .. }
@@ -241,9 +231,6 @@ impl Message {
             | Self::NodeCmd {
                 target_section_pk, ..
             }
-            | Self::NodeCmdResult {
-                target_section_pk, ..
-            }
             | Self::NodeEvent {
                 target_section_pk, ..
             }
@@ -270,9 +257,6 @@ pub enum CmdError {
     ///
     Transfer(TransferError),
 }
-
-/// Result from applied NodeCmds
-pub type NodeCmdResult = Result<(), CmdError>;
 
 ///
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
