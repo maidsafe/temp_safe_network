@@ -107,8 +107,8 @@ impl SafeContentType {
             0 => Ok(Self::Raw),
             1 => Ok(Self::Wallet),
             2 => Ok(Self::FilesContainer),
-            3 => Ok(Self::Multimap),
-            4 => Ok(Self::NrsMapContainer),
+            3 => Ok(Self::NrsMapContainer),
+            4 => Ok(Self::Multimap),
             _other => Err(Error::InvalidInput("Invalid Media-type code".to_string())),
         }
     }
@@ -118,8 +118,8 @@ impl SafeContentType {
             Self::Raw => Ok(0),
             Self::Wallet => Ok(1),
             Self::FilesContainer => Ok(2),
-            Self::Multimap => Ok(3),
-            Self::NrsMapContainer => Ok(4),
+            Self::NrsMapContainer => Ok(3),
+            Self::Multimap => Ok(4),
             Self::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
                 Some(media_type_code) => Ok(*media_type_code),
                 None => Err(Error::InvalidMediaType(format!("Media-type '{}' not supported. You can use 'SafeContentType::Raw' as the 'content_type' for this type of content", media_type))),
@@ -465,6 +465,7 @@ impl SafeUrl {
             1 => SafeContentType::Wallet,
             2 => SafeContentType::FilesContainer,
             3 => SafeContentType::NrsMapContainer,
+            4 => SafeContentType::Multimap,
             other => match MEDIA_TYPE_STR.get(&other) {
                 Some(media_type_str) => SafeContentType::MediaType((*media_type_str).to_string()),
                 None => {

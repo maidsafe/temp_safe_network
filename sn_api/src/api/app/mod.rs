@@ -11,8 +11,6 @@ mod auth;
 mod consts;
 mod helpers;
 mod keys;
-mod multimap;
-mod register;
 mod safe_client;
 mod sequence;
 #[cfg(test)]
@@ -31,7 +29,9 @@ static DEFAULT_TIMEOUT_SECS: u64 = 20;
 
 pub mod fetch;
 pub mod files;
+pub mod multimap;
 pub mod nrs;
+pub mod register;
 pub mod safeurl;
 pub mod wallet;
 pub use consts::DEFAULT_XORURL_BASE;

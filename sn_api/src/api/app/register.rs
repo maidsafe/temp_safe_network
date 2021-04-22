@@ -52,11 +52,14 @@ impl Safe {
         &mut self,
         url: &str,
         hash: EntryHash,
-    ) -> Result<BTreeSet<(EntryHash, Entry)>> {
+    ) -> Result<Option<(EntryHash, Entry)>> {
         debug!("Getting Public Register data from: {:?}", url);
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
 
-        self.fetch_register_value(&safeurl, Some(hash)).await
+        let entries = self.fetch_register_value(&safeurl, Some(hash)).await?;
+
+        // Since we passed down a hash we know only one entry should have been found
+        Ok(entries.into_iter().next())
     }
 
     /// Fetch a Register from a SafeUrl without performing any type of URL resolution
@@ -106,7 +109,7 @@ impl Safe {
         /*
         let safeurl = Safe::parse_url(url)?;
         if safeurl.content_hash().is_some() {
-            // TODO: perhaps we can allow this instad, and that's how an
+            // TODO: perhaps we can allow this, and that's how an
             // application can specify the parent entry in the Register.
             return Err(Error::InvalidInput(format!(
                 "The target URL cannot contain a content hash: {}",
@@ -143,11 +146,22 @@ mod tests {
         let received_data = retry_loop!(safe.register_read(&xorurl));
         let received_data_priv = retry_loop!(safe.register_read(&xorurl_priv));
 
+        assert!(received_data.is_empty());
+        assert!(received_data_priv.is_empty());
+
         let initial_data = b"initial data";
         let hash = safe.write_to_register(&xorurl, initial_data).await?;
-        /*
-        assert_eq!(received_data, (0, initial_data.to_vec()));
-        assert_eq!(received_data_priv, (0, initial_data.to_vec()));*/
+        let hash_priv = safe.write_to_register(&xorurl_priv, initial_data).await?;
+
+        let received_entry = retry_loop!(safe.register_read_entry(&xorurl, hash));
+        let received_entry_priv = retry_loop!(safe.register_read_entry(&xorurl_priv, hash));
+
+        assert_eq!(received_entry, Some((hash, initial_data.to_vec())));
+        assert_eq!(
+            received_entry_priv,
+            Some((hash_priv, initial_data.to_vec()))
+        );
+
         Ok(())
     }
 }

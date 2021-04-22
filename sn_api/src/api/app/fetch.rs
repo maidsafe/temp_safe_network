@@ -7,19 +7,19 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+pub use super::safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrlBase};
 use super::{
     files::{FileItem, FileMeta, FilesMap, RealPath},
+    multimap::MultimapKeyValues,
     nrs::NrsMap,
-    Safe, XorName,
-};
-pub use super::{
-    safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrlBase},
+    register::{Entry, EntryHash},
     wallet::WalletSpendableBalances,
+    Safe, XorName,
 };
 use crate::{Error, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{collections::BTreeSet, path::Path};
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
 
@@ -68,6 +68,13 @@ pub enum SafeData {
         data_type: SafeDataType,
         resolved_from: String,
     },
+    Multimap {
+        xorurl: String,
+        xorname: XorName,
+        type_tag: u64,
+        data: MultimapKeyValues,
+        resolved_from: String,
+    },
     PublicSequence {
         xorurl: String,
         xorname: XorName,
@@ -84,6 +91,20 @@ pub enum SafeData {
         data: Vec<u8>,
         resolved_from: String,
     },
+    PublicRegister {
+        xorurl: String,
+        xorname: XorName,
+        type_tag: u64,
+        data: BTreeSet<(EntryHash, Entry)>,
+        resolved_from: String,
+    },
+    PrivateRegister {
+        xorurl: String,
+        xorname: XorName,
+        type_tag: u64,
+        data: BTreeSet<(EntryHash, Entry)>,
+        resolved_from: String,
+    },
 }
 
 impl SafeData {
@@ -95,8 +116,11 @@ impl SafeData {
             | FilesContainer { xorurl, .. }
             | PublicBlob { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
+            | Multimap { xorurl, .. }
             | PublicSequence { xorurl, .. }
-            | PrivateSequence { xorurl, .. } => xorurl.clone(),
+            | PrivateSequence { xorurl, .. }
+            | PublicRegister { xorurl, .. }
+            | PrivateRegister { xorurl, .. } => xorurl.clone(),
         }
     }
 
@@ -108,8 +132,11 @@ impl SafeData {
             | FilesContainer { resolved_from, .. }
             | PublicBlob { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
+            | Multimap { resolved_from, .. }
             | PrivateSequence { resolved_from, .. }
-            | PublicSequence { resolved_from, .. } => resolved_from.clone(),
+            | PublicSequence { resolved_from, .. }
+            | PublicRegister { resolved_from, .. }
+            | PrivateRegister { resolved_from, .. } => resolved_from.clone(),
         }
     }
 }
@@ -210,8 +237,9 @@ impl Safe {
         let current_safe_url = Safe::parse_url(url)?;
         info!("URL parsed successfully, fetching: {}", current_safe_url);
         debug!(
-            "Fetching content of type: {:?}",
-            current_safe_url.content_type()
+            "Fetching content of type: {:?}, data type: {:?}",
+            current_safe_url.content_type(),
+            current_safe_url.data_type()
         );
 
         // Let's create a list keeping track each of the resolution hops we go through
@@ -252,7 +280,7 @@ impl Safe {
     ) -> Result<(SafeData, Option<NextStepInfo>)> {
         let url = the_xor.to_string();
         let xorurl = the_xor.to_xorurl_string();
-        debug!("Going into a new step in the URL resolution for {}", xorurl);
+        debug!("Going into a new step in the URL resolution for {}, content type: {:?}, data type: {:?}", xorurl, the_xor.content_type(), the_xor.data_type());
         match the_xor.content_type() {
             SafeContentType::FilesContainer => {
                 if !the_xor.sub_names_vec().is_empty() {
@@ -386,8 +414,22 @@ impl Safe {
                 Ok((nrs_map_container, Some((target_safe_url, None))))
             }
             SafeContentType::Multimap => {
-                // let _ = self.multimap_get(&xourl).await?;
-                unimplemented!()
+                let data = if retrieve_data {
+                    //self.fetch_multimap_value(&the_xor, None).await?
+                    unimplemented!()
+                } else {
+                    MultimapKeyValues::new()
+                };
+
+                let safe_data = SafeData::Multimap {
+                    xorurl,
+                    xorname: the_xor.xorname(),
+                    type_tag: the_xor.type_tag(),
+                    data,
+                    resolved_from: url.to_string(),
+                };
+
+                Ok((safe_data, None))
             }
             SafeContentType::Raw => {
                 if !the_xor.sub_names_vec().is_empty() {
@@ -439,6 +481,42 @@ impl Safe {
                             type_tag: the_xor.type_tag(),
                             version,
                             data: if retrieve_data { data } else { vec![] },
+                            resolved_from: url.to_string(),
+                        };
+
+                        Ok((safe_data, None))
+                    }
+                    SafeDataType::PublicRegister => {
+                        let data = if retrieve_data {
+                            // TODO: pass the hash of the URL to grab a single element
+                            self.fetch_register_value(&the_xor, None).await?
+                        } else {
+                            BTreeSet::new()
+                        };
+
+                        let safe_data = SafeData::PublicRegister {
+                            xorurl,
+                            xorname: the_xor.xorname(),
+                            type_tag: the_xor.type_tag(),
+                            data,
+                            resolved_from: url.to_string(),
+                        };
+
+                        Ok((safe_data, None))
+                    }
+                    SafeDataType::PrivateRegister => {
+                        let data = if retrieve_data {
+                            // TODO: pass the hash of the URL to grab a single element
+                            self.fetch_register_value(&the_xor, None).await?
+                        } else {
+                            BTreeSet::new()
+                        };
+
+                        let safe_data = SafeData::PrivateRegister {
+                            xorurl,
+                            xorname: the_xor.xorname(),
+                            type_tag: the_xor.type_tag(),
+                            data,
                             resolved_from: url.to_string(),
                         };
 
