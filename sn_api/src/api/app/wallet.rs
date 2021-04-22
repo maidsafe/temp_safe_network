@@ -7,12 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::common::ed_sk_from_hex;
-use super::helpers::{parse_coins_amount, pk_from_hex, xorname_to_hex};
+use super::{
+    common::ed_sk_from_hex,
+    helpers::{parse_coins_amount, pk_from_hex},
+};
 use crate::{
     api::app::safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl},
     Error, Result, Safe,
 };
+use hex::encode;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Keypair, MapValue, Token};
@@ -456,7 +459,7 @@ async fn wallet_get_spendable_balance(
             .map_err(|_| {
                 Error::ContentError(format!(
                     "Default balance set but not found at Wallet \"{}\"",
-                    xorname_to_hex(&xorname)
+                    encode(&xorname)
                 ))
             })? {
             MapValue::Seq(data) => data,
@@ -520,10 +523,7 @@ mod tests {
     use super::*;
     use crate::{
         api::{
-            app::{
-                helpers::pk_to_hex,
-                test_helpers::{new_read_only_safe_instance, new_safe_instance, random_nrs_name},
-            },
+            app::test_helpers::{new_read_only_safe_instance, new_safe_instance, random_nrs_name},
             common::sk_to_hex,
         },
         retry_loop, retry_loop_for_pattern,
@@ -850,8 +850,7 @@ mod tests {
                     "4097.580000000", /* 4621.45 - 523.87 */
                     from_current_balance
                 );
-                let key_current_balance =
-                    safe.keys_balance_from_sk(&keypair3.secret_key()?).await?;
+                let key_current_balance = safe.keys_balance_from_sk(keypair3.secret_key()?).await?;
                 assert_eq!("533.870000000", key_current_balance);
                 Ok(())
             }
@@ -874,7 +873,7 @@ mod tests {
         .await?;
 
         let (_, keypair2) = safe.keys_create_preload_test_coins("3232").await?;
-        let to_pk_hex = pk_to_hex(&keypair2.public_key());
+        let to_pk_hex = encode(keypair2.public_key().to_bytes());
 
         // test successful transfer
         match safe
@@ -888,8 +887,7 @@ mod tests {
                     "565.060000000", /* 1122.98 - 557.92 */
                     from_current_balance
                 );
-                let key_current_balance =
-                    safe.keys_balance_from_sk(&keypair2.secret_key()?).await?;
+                let key_current_balance = safe.keys_balance_from_sk(keypair2.secret_key()?).await?;
                 assert_eq!(
                     "3789.920000000", /* 3232 + 557.92 */
                     key_current_balance
@@ -962,8 +960,7 @@ mod tests {
             Ok(_) => {
                 let from_current_balance = safe.wallet_balance(&from_nrs_url).await?;
                 assert_eq!("0.000000000" /* 0.2 - 0.2 */, from_current_balance);
-                let key_current_balance =
-                    safe.keys_balance_from_sk(&keypair3.secret_key()?).await?;
+                let key_current_balance = safe.keys_balance_from_sk(keypair3.secret_key()?).await?;
                 assert_eq!("0.300000000" /* 0.1 + 0.2 */, key_current_balance);
                 Ok(())
             }

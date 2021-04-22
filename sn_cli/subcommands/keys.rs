@@ -17,9 +17,7 @@ use crate::operations::{
 };
 use anyhow::{bail, Context, Result};
 use log::{debug, warn};
-use sn_api::{
-    ed_sk_from_hex, fetch::SafeUrl, sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName,
-};
+use sn_api::{fetch::SafeUrl, sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName};
 use std::io::Write;
 use structopt::StructOpt;
 
@@ -158,12 +156,12 @@ pub async fn key_commander(
                     let secret_key =
                         get_secret_key(&target, secret, "the SafeKey to query the balance from")?;
 
-                    SecretKey::Ed25519(ed_sk_from_hex(&secret_key)?)
+                    SecretKey::ed25519_from_hex(&secret_key)?
                 }
             };
 
             let current_balance = if target.is_empty() {
-                safe.keys_balance_from_sk(&sk).await
+                safe.keys_balance_from_sk(sk).await
             } else {
                 safe.keys_balance_from_url(&target, sk).await
             }?;

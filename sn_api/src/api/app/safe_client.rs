@@ -7,8 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{fetch::Range, helpers::xorname_to_hex};
+use super::fetch::Range;
 use crate::{api::ipc::BootstrapConfig, Error, Result};
+use hex::encode;
 use log::{debug, info};
 use sn_client::{Client, Error as ClientError, ErrorMessage, TransfersError};
 use sn_data_types::{
@@ -101,14 +102,11 @@ impl SafeAppClient {
             self.bootstrap_config.clone(),
         )
         .await?;
-        temp_client.get_balance().await.map_err(|err| {
-            // FIXME: we need to match the appropriate error
-            // to map it to our Error::ContentNotFound
-            /*ClientError::NetworkDataError(??) => {
-                Error::ContentNotFound("No SafeKey found at specified location".to_string())
-            }*/
-            Error::NetDataError(format!("Failed to retrieve balance: {:?}", err))
-        })
+
+        temp_client
+            .get_balance()
+            .await
+            .map_err(|err| Error::NetDataError(format!("Failed to retrieve balance: {:?}", err)))
     }
 
     #[cfg(feature = "simulated-payouts")]
@@ -320,13 +318,13 @@ impl SafeAppClient {
                 /*ClientError::NetworkDataError(??) => {
                     Error::ContentNotFound(format!(
                         "Sequenced Map not found at Xor name: {}",
-                        xorname_to_hex(&name)
+                        encode(&name)
                     ))
                 }*/
                 ClientError::NetworkDataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
                         "Entry not found in Sequenced Map found at Xor name: {}",
-                        xorname_to_hex(&name)
+                        encode(&name)
                     ))
                 }
                 err => Error::NetDataError(format!("Failed to retrieve a key. {:?}", err)),
@@ -354,14 +352,14 @@ impl SafeAppClient {
                 /*ClientError::NetworkDataError(??) => {
                     Error::ContentNotFound(format!(
                         "Sequenced Map not found at Xor name: {} (type tag: {})",
-                        xorname_to_hex(&name),
+                        encode(&name),
                         tag
                     ))
                 }*/
                 ClientError::NetworkDataError(SafeNdError::NoSuchEntry) => {
                     Error::EntryNotFound(format!(
                         "Entry not found in Sequenced Map found at Xor name: {} (type tag: {})",
-                        xorname_to_hex(&name),
+                        encode(&name),
                         tag
                     ))
                 }

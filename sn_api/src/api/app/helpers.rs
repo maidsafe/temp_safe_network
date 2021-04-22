@@ -8,37 +8,29 @@
 // Software.
 
 #[cfg(feature = "app")]
-use crate::{api::common::parse_hex, Error, Result};
+use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
-use hex::encode;
 use sn_data_types::{Error as SafeNdError, PublicKey, Token};
 use std::{
     str::{self, FromStr},
     time,
 };
-use xor_name::XorName;
 
 /// The conversion from coin to raw value
 const COIN_TO_RAW_CONVERSION: u64 = 1_000_000_000;
 // The maximum amount of safecoin that can be represented by a single `Token`
 const MAX_COINS_VALUE: u64 = (u32::max_value() as u64 + 1) * COIN_TO_RAW_CONVERSION - 1;
 
-pub fn xorname_to_hex(xorname: &XorName) -> String {
-    encode(xorname.0)
-}
-
-pub fn pk_to_hex(pk: &PublicKey) -> String {
-    let xorname = XorName::from(*pk);
-    xorname_to_hex(&xorname)
-}
-
 pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
-    let pk_bytes = parse_hex(&hex_str);
-    let ed25519_pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes).map_err(|_| {
-        Error::InvalidInput(format!("Invalid Ed25519 public key bytes: {}", hex_str))
-    })?;
-    Ok(PublicKey::Ed25519(ed25519_pk))
+    PublicKey::ed25519_from_hex(&hex_str)
+        .or_else(|_| PublicKey::bls_from_hex(&hex_str))
+        .map_err(|_| {
+            Error::InvalidInput(format!(
+                "Invalid (Ed25519/BLS) public key bytes: {}",
+                hex_str
+            ))
+        })
 }
 
 pub fn parse_coins_amount(amount_str: &str) -> Result<Token> {
