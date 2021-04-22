@@ -11,8 +11,8 @@ use super::{
     helpers::{gen_processed_files_table, get_from_arg_or_stdin, serialise_output, xorname_to_hex},
     OutputFmt,
 };
-use anyhow::Result;
-use sn_api::{safeurl::SafeUrl, Safe};
+use anyhow::{anyhow, Result};
+use sn_api::{safeurl::SafeUrl, PublicKey, Safe, XorName};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'
@@ -23,6 +23,11 @@ pub enum XorurlSubCommands {
     Decode {
         /// The XOR-URL to decode
         xorurl: Option<String>,
+    },
+    /// Generate the SafeKey XOR-URL for a Public Key
+    Pk {
+        /// The Public Key to generate the SafeKey XOR-URL for
+        pk: String,
     },
 }
 
@@ -67,6 +72,21 @@ pub async fn xorurl_commander(
                 );
             } else {
                 println!("{}", serialise_output(&safeurl, output_fmt));
+            }
+        }
+        Some(XorurlSubCommands::Pk { pk }) => {
+            let public_key = PublicKey::ed25519_from_hex(&pk)
+                .or_else(|_| PublicKey::bls_from_hex(&pk))
+                .map_err(|_| anyhow!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
+
+            let xorname = XorName::from(public_key);
+            let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+
+            // Now let's just print out the SafeKey xorurl
+            if OutputFmt::Pretty == output_fmt {
+                println!("SafeKey XOR-URL: {}", xorurl);
+            } else {
+                println!("{}", xorurl);
             }
         }
         None => {
