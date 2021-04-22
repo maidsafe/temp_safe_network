@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.24.0](https://github.com/maidsafe/sn_api/compare/v0.23.3...v0.24.0) (2021-04-21)
+
+### Features
+
+* ***api*** re-enabling dry-run feature for Blob API as well as for CLI commands
+* ***api*** re-organising files, nrs and xorurl files into their own mod folders, and renaming XorUrl to SafeUrl module
+* ***api*** support transfers to BLS public keys
+* ***cli*** adding a new 'keys show' subcommand to display CLI's owned SafeKey, pk, xorurl and sk
+* ***cli*** when the --to value of keys transfer command doesn't start with safe:// and cannot be decoded as PK, it now fallbacks to assume it's a URL
+* ***cli*** remove keypair cmd and --pk argument from the keys command as they are not necessary anymore
+
+
 ### [0.23.3](https://github.com/maidsafe/sn_api/compare/v0.23.2...v0.23.3) (2021-04-15)
 
 ### Features
