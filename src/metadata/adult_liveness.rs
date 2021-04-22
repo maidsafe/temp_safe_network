@@ -31,13 +31,13 @@ enum Operation {
     },
 }
 
-pub struct AdultOps {
+pub struct AdultLiveness {
     ops: HashMap<MessageId, Operation>,
     pending_ops: HashMap<XorName, usize>,
     closest_adults: HashMap<XorName, Vec<XorName>>,
 }
 
-impl AdultOps {
+impl AdultLiveness {
     pub fn new() -> Self {
         Self {
             ops: HashMap::default(),
@@ -96,13 +96,15 @@ impl AdultOps {
         new_operation
     }
 
-    pub fn remove_lost_member(&mut self, name: XorName) {
-        let _ = self.pending_ops.remove(&name);
-        let _ = self.closest_adults.remove(&name);
-        let message_ids = self.ops.keys().cloned().collect::<Vec<_>>();
-        // TODO(after T4): For write operations perhaps we need to write it to a different Adult
-        for msg_id in message_ids {
-            self.remove_target(msg_id, name);
+    pub fn stop_tracking(&mut self, names: BTreeSet<XorName>) {
+        for name in names {
+            let _ = self.pending_ops.remove(&name);
+            let _ = self.closest_adults.remove(&name);
+            let message_ids = self.ops.keys().cloned().collect::<Vec<_>>();
+            // TODO(after T4): For write operations perhaps we need to write it to a different Adult
+            for msg_id in message_ids {
+                self.remove_target(msg_id, name);
+            }
         }
         self.recompute_closest_adults();
     }

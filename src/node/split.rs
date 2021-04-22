@@ -78,9 +78,9 @@ impl Node {
         elder.transfers.update_replica_info(info);
 
         elder
-            .transfers
+            .meta_data
             .retain_members_only(self.network_api.our_adults().await)
-            .await;
+            .await?;
 
         let (wallets, payments) = match &mut elder.section_funds {
             SectionFunds::KeepingNodeWallets { wallets, payments }

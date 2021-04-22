@@ -10,7 +10,7 @@ use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    to_db_key::ToDbKey,
+    to_db_key::{from_db_key, ToDbKey},
     Error, Result,
 };
 use log::{debug, error, info, trace, warn};
@@ -30,7 +30,7 @@ use std::{
 };
 use xor_name::XorName;
 
-use super::adult_ops::AdultOps;
+use super::adult_liveness::AdultLiveness;
 use super::adult_reader::AdultReader;
 
 // The number of separate copies of a blob chunk which should be maintained.
@@ -40,7 +40,7 @@ const CHUNK_COPY_COUNT: usize = 4;
 pub(super) struct BlobRecords {
     dbs: ChunkHolderDbs,
     reader: AdultReader,
-    adult_ops: AdultOps,
+    adult_liveness: AdultLiveness,
 }
 
 impl BlobRecords {
@@ -48,7 +48,7 @@ impl BlobRecords {
         Self {
             dbs,
             reader,
-            adult_ops: AdultOps::new(),
+            adult_liveness: AdultLiveness::new(),
         }
     }
 
@@ -94,10 +94,6 @@ impl BlobRecords {
         })
     }
 
-    pub fn remove_lost_member(&mut self, name: XorName) {
-        self.adult_ops.remove_lost_member(name);
-    }
-
     pub async fn update(&self, blob_data: BlobDataExchange) -> Result<()> {
         debug!("Updating Blob records");
         let mut orig_full_adults = self.dbs.full_adults.lock().await;
@@ -121,6 +117,73 @@ impl BlobRecords {
         for (key, value) in metadata {
             orig_meta.set(&key, &value)?;
         }
+        Ok(())
+    }
+
+    /// Registered holders not present in provided list of members
+    /// will be removed from dbs and no longer tracked for liveness.
+    pub async fn retain_members_only(&mut self, members: Vec<XorName>) -> Result<()> {
+        let member_names_as_string = members
+            .iter()
+            .map(|name| name.to_string())
+            .collect::<Vec<_>>();
+
+        // full adults
+        let mut full_adults_db = self.dbs.full_adults.lock().await;
+        let full_adults = full_adults_db.get_all();
+        let absent_adults = full_adults
+            .into_iter()
+            .filter(|key| !member_names_as_string.contains(key))
+            .collect::<Vec<_>>();
+
+        for adult in absent_adults {
+            let _ = full_adults_db.rem(&adult);
+        }
+
+        // holders
+        let mut holders_db = self.dbs.holders.lock().await;
+        let holders = holders_db.get_all();
+        let absent_holders = holders
+            .into_iter()
+            .filter(|key| !member_names_as_string.contains(key))
+            .collect::<Vec<_>>();
+
+        let mut chunks_with_holder_change = BTreeSet::new();
+
+        for key in &absent_holders {
+            if let Some(holder) = holders_db.get::<HolderMetadata>(key) {
+                chunks_with_holder_change.append(&mut holder.chunks.clone());
+            }
+            let _ = holders_db.rem(key);
+        }
+
+        // chunks
+        let mut metadata_db = self.dbs.metadata.lock().await;
+
+        let absent_holders: BTreeSet<XorName> = absent_holders
+            .into_iter()
+            .map(|holder| from_db_key(&holder).ok())
+            .flatten()
+            .collect();
+
+        for address in chunks_with_holder_change {
+            let chunk_key = &address.to_db_key()?;
+            if let Some(mut info) = metadata_db.get::<ChunkMetadata>(chunk_key) {
+                let mut any_removed = false;
+                for absent_holder in &absent_holders {
+                    if info.holders.remove(absent_holder) {
+                        any_removed = true;
+                    }
+                }
+                if any_removed {
+                    let _ = metadata_db.set(chunk_key, &info)?;
+                }
+            }
+        }
+
+        // stop tracking liveness of absent holders
+        self.adult_liveness.stop_tracking(absent_holders);
+
         Ok(())
     }
 
@@ -172,7 +235,7 @@ impl BlobRecords {
         let blob_write = BlobWrite::New(data);
 
         if self
-            .adult_ops
+            .adult_liveness
             .new_write(msg_id, blob_write.clone(), origin, target_holders.clone())
         {
             Ok(NodeDuty::SendToNodes {
@@ -202,7 +265,7 @@ impl BlobRecords {
         result: NodeCmdResult,
         src: XorName,
     ) -> Result<NodeDuty> {
-        if let Some(blob_write) = self.adult_ops.process_blob_write_result(msg_id, src) {
+        if let Some(blob_write) = self.adult_liveness.process_blob_write_result(msg_id, src) {
             if let Err(err) = result {
                 error!("Error at Adult while performing a BlobWrite: {:?}", err);
                 // We have to take action here.
@@ -223,7 +286,7 @@ impl BlobRecords {
             }
         }
         let mut unresponsive_adults = Vec::new();
-        for (name, count) in self.adult_ops.find_unresponsive_adults() {
+        for (name, count) in self.adult_liveness.find_unresponsive_adults() {
             warn!(
                 "Adult {} has {} pending ops. It might be unresponsive",
                 name, count
@@ -239,7 +302,9 @@ impl BlobRecords {
         response: QueryResponse,
         src: XorName,
     ) -> Result<NodeDuty> {
-        if let Some((_address, end_user)) = self.adult_ops.process_blob_read_result(msg_id, src) {
+        if let Some((_address, end_user)) =
+            self.adult_liveness.process_blob_read_result(msg_id, src)
+        {
             if let QueryResponse::GetBlob(result) = &response {
                 if result.is_ok() {
                     return Ok(NodeDuty::Send(OutgoingMsg {
@@ -258,7 +323,7 @@ impl BlobRecords {
                 error!("Unexpected QueryReponse from Adult: {:?}", response);
             }
         }
-        for (name, count) in self.adult_ops.find_unresponsive_adults() {
+        for (name, count) in self.adult_liveness.find_unresponsive_adults() {
             warn!(
                 "Adult {} has {} pending ops. It might be unresponsive",
                 name, count
@@ -318,7 +383,7 @@ impl BlobRecords {
 
         if !results.is_empty() {}
 
-        if self.adult_ops.new_write(
+        if self.adult_liveness.new_write(
             msg_id,
             BlobWrite::DeletePrivate(address),
             origin,
@@ -595,7 +660,7 @@ impl BlobRecords {
             }
         };
         if self
-            .adult_ops
+            .adult_liveness
             .new_read(msg_id, address, origin, metadata.holders.clone())
         {
             let msg = Message::NodeQuery {
@@ -624,10 +689,14 @@ impl BlobRecords {
     // Returns the list of chunks that were held along with the remaining holders.
     async fn remove_holder(
         &mut self,
-        node: XorName,
+        name: XorName,
     ) -> Result<BTreeMap<BlobAddress, BTreeSet<XorName>>> {
+        // stop tracking liveness of removed holder
+        self.adult_liveness
+            .stop_tracking(vec![name].into_iter().collect());
+
         let mut blob_addresses: BTreeMap<BlobAddress, BTreeSet<XorName>> = BTreeMap::new();
-        let chunk_holder = self.get_holder(node).await;
+        let chunk_holder = self.get_holder(name).await;
 
         if let Ok(holder) = chunk_holder {
             for chunk_address in holder.chunks {
@@ -635,7 +704,7 @@ impl BlobRecords {
                 let chunk_metadata = self.get_metadata_for(chunk_address).await;
 
                 if let Ok(mut metadata) = chunk_metadata {
-                    if !metadata.holders.remove(&node) {
+                    if !metadata.holders.remove(&name) {
                         warn!("doesn't contain the holder",);
                     }
 
@@ -655,7 +724,7 @@ impl BlobRecords {
         }
 
         // Since the node has left the section, remove it from the holders DB
-        if let Err(error) = self.dbs.holders.lock().await.rem(&node.to_db_key()?) {
+        if let Err(error) = self.dbs.holders.lock().await.rem(&name.to_db_key()?) {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
 

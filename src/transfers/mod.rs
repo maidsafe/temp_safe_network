@@ -88,10 +88,6 @@ impl Transfers {
         }
     }
 
-    pub async fn retain_members_only(&mut self, members: Vec<XorName>) {
-        self.rate_limit.retain_members_only(members).await
-    }
-
     /// The total amount in wallets managed
     /// by the replicas in this section.
     pub async fn managed_amount(&self) -> Result<Token> {

@@ -24,23 +24,6 @@ impl RateLimit {
         Self { network, capacity }
     }
 
-    pub async fn retain_members_only(&mut self, members: Vec<XorName>) {
-        let mut full_adults = self.capacity.dbs.full_adults.lock().await;
-        let member_names_as_string = members
-            .iter()
-            .map(|name| name.to_string())
-            .collect::<Vec<_>>();
-        let all_keys = full_adults.get_all();
-        let absent_keys = all_keys
-            .into_iter()
-            .filter(|key| !member_names_as_string.contains(key))
-            .collect::<Vec<_>>();
-
-        for key in absent_keys {
-            let _ = full_adults.rem(&key);
-        }
-    }
-
     /// Calculates the rate limit of write operations,
     /// as a cost to be paid for a certain number of bytes.
     pub async fn from(&self, bytes: u64) -> Token {

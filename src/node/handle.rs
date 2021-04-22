@@ -53,9 +53,9 @@ impl Node {
                     self.update_replicas().await?;
                     self.role
                         .as_elder_mut()?
-                        .transfers
+                        .meta_data
                         .retain_members_only(self.network_api.our_adults().await)
-                        .await;
+                        .await?;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
                     Ok(vec![self.push_state(our_prefix, msg_id).await?])
@@ -170,7 +170,6 @@ impl Node {
                     .transfers
                     .decrease_full_node_count_if_present(name)
                     .await?;
-                elder.meta_data.remove_lost_member(name);
 
                 ops.extend(elder.meta_data.trigger_chunk_replication(name).await?);
 

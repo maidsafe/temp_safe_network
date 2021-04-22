@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod adult_ops;
+mod adult_liveness;
 pub mod adult_reader;
 mod blob_records;
 mod elder_stores;
@@ -98,10 +98,12 @@ impl Metadata {
             .await
     }
 
-    pub fn remove_lost_member(&mut self, name: XorName) {
+    pub async fn retain_members_only(&mut self, members: Vec<XorName>) -> Result<()> {
         self.elder_stores
             .blob_records_mut()
-            .remove_lost_member(name)
+            .retain_members_only(members)
+            .await?;
+        Ok(())
     }
 
     pub async fn write(
