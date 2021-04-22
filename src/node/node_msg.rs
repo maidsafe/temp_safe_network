@@ -11,10 +11,12 @@
 // Error defined for the crate::node instead of client Result/Error
 use crate::client::{Error, Result};
 use crate::{
-    client::{BlobRead, BlobWrite, DataCmd as NodeDataCmd, DataQuery as NodeDataQuery},
+    client::{
+        BlobRead, BlobWrite, DataCmd as NodeDataCmd, DataExchange, DataQuery as NodeDataQuery,
+        NodeCmdResult,
+    },
     EndUser, MessageId, MessageType, WireMsg,
 };
-use super::{BlobRead, BlobWrite, DataExchange};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -40,6 +42,13 @@ pub enum NodeMsg {
         /// NodeCmd.
         cmd: NodeCmd,
         /// Message ID.
+        id: MessageId,
+    },
+    /// Result of an applied NodeCmd
+    NodeCmdResult {
+        /// The result
+        result: NodeCmdResult,
+        /// Message ID
         id: MessageId,
     },
     /// An error of a NodeCmd.
@@ -86,6 +95,7 @@ impl NodeMsg {
             | Self::NodeQuery { id, .. }
             | Self::NodeEvent { id, .. }
             | Self::NodeQueryResponse { id, .. }
+            | Self::NodeCmdResult { id, .. }
             | Self::NodeCmdError { id, .. } => *id,
         }
     }

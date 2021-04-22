@@ -363,7 +363,6 @@ mod tests {
         let node_cmd = NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(dest_section_pk.into())),
             id: MessageId::new(),
-            target_section_pk: None,
         };
 
         // first test without including a source section public key in the header
