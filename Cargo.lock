@@ -3052,6 +3052,7 @@ dependencies = [
  "criterion",
  "dirs-next 2.0.0",
  "duct",
+ "ed25519-dalek",
  "env_logger 0.8.3",
  "envy",
  "hex 0.4.3",

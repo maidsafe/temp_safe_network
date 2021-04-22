@@ -18,6 +18,7 @@ ansi_term = "~0.12.1"
 async-std = "1.9.0"
 chrono = "0.4.19"
 dirs-next = "2.0.0"
+ed25519-dalek = { version = "1.0.1", features = [ "serde" ]}
 env_logger = "~0.8.3"
 envy = "~0.4.2"
 hex = "~0.4.3"

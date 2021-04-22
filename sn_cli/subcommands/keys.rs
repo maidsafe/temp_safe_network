@@ -15,9 +15,13 @@ use crate::operations::{
     auth_and_connect::{create_credentials_file, read_credentials},
     safe_net::connect,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use hex::encode;
 use log::{debug, warn};
-use sn_api::{fetch::SafeUrl, sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName};
+use sn_api::{
+    fetch::{SafeData, SafeUrl},
+    sk_to_hex, Keypair, PublicKey, Safe, SecretKey, XorName,
+};
 use std::io::Write;
 use structopt::StructOpt;
 
@@ -31,9 +35,8 @@ pub enum KeysSubCommands {
         /// Show Secret Key as well
         #[structopt(long = "show-sk")]
         show_sk: bool,
-        // /// The SafeKey's safe://xor-url to decode and show its Public Key. If this is not provided, the SafeKey owned by CLI (if found) will be shown
-        // #[structopt(long = "keyurl")]
-        // keyurl: Option<String>,
+        /// The SafeKey's URL to decode and show its Public Key. If this is not provided, the SafeKey owned by CLI (if found) will be shown
+        keyurl: Option<String>,
     },
     #[structopt(name = "create")]
     /// Create a new SafeKey
@@ -81,21 +84,53 @@ pub async fn key_commander(
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
-        KeysSubCommands::Show { show_sk } => {
-            match read_credentials()? {
-                (file_path, Some(keypair)) => {
-                    let xorname = XorName::from(keypair.public_key());
-                    let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
-                    let (pk_hex, sk_hex) = keypair_to_hex_strings(&keypair)?;
-
-                    println!("Current CLI's SafeKey found at {}:", file_path.display());
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Public Key: {}", pk_hex);
-                    if show_sk {
-                        println!("Secret Key: {}", sk_hex);
-                    }
+        KeysSubCommands::Show { show_sk, keyurl } => {
+            if let Some(url) = keyurl {
+                if show_sk {
+                    bail!("The 'show-sk' flag cannot be set when providing a SafeKey URL");
                 }
-                (file_path, None) => println!("No SafeKey found at {}", file_path.display()),
+
+                match safe.fetch(&url, None).await {
+                    Ok(SafeData::SafeKey {
+                        xorurl, xorname, ..
+                    }) => {
+                        // Get pk from xorname. We assume Ed25519 key for now, which is
+                        // 32 bytes long, just like a xorname.
+                        // TODO: support for BLS keys which are longer.
+                        let pk = ed25519_dalek::PublicKey::from_bytes(&xorname).map_err(|err| {
+                            anyhow!(
+                                "Failed to derive Ed25519 PublicKey from SafeKey at '{}': {:?}",
+                                url,
+                                err
+                            )
+                        })?;
+
+                        println!("SafeKey found at {}:", url);
+                        println!("XOR-URL: {}", xorurl);
+                        println!("Public Key: {}", encode(pk));
+                    }
+                    Ok(other) => bail!(format!(
+                        "The Safe-URL provided is not targetting a SafeKey: {:?}",
+                        other
+                    )),
+                    Err(err) => bail!(err),
+                }
+            } else {
+                match read_credentials()? {
+                    (file_path, Some(keypair)) => {
+                        let xorname = XorName::from(keypair.public_key());
+                        let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+                        let (pk_hex, sk_hex) = keypair_to_hex_strings(&keypair)?;
+
+                        println!("Current CLI's SafeKey found at {}:", file_path.display());
+                        println!("XOR-URL: {}", xorurl);
+                        println!("Public Key: {}", pk_hex);
+                        if show_sk {
+                            println!("Secret Key: {}", sk_hex);
+                        }
+                    }
+                    (file_path, None) => println!("No SafeKey found at {}", file_path.display()),
+                }
             }
 
             Ok(())
