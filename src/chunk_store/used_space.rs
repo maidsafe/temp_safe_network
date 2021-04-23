@@ -63,7 +63,7 @@ impl UsedSpace {
     /// Note, due to the async nature of this, the value
     /// may be stale by the time it is read if there are multiple
     /// writers
-    #[allow(unused)]
+    #[allow(dead_code)]
     pub async fn local(&self, id: StoreId) -> u64 {
         self.inner.lock().await.local(id)
     }
