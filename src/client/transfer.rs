@@ -152,14 +152,12 @@ impl TransferQuery {
 impl fmt::Debug for TransferQuery {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         use TransferQuery::*;
-        write!(
-            formatter,
-            "TransferQuery::{}",
-            match *self {
-                GetBalance(_) => "GetBalance",
-                GetHistory { .. } => "GetHistory",
-                GetStoreCost { .. } => "GetStoreCost",
+        match *self {
+            GetBalance(_) => write!(formatter, "TransferQuery::GetBalance"),
+            GetHistory { .. } => write!(formatter, "TransferQuery::GetHistory"),
+            GetStoreCost { bytes, .. } => {
+                write!(formatter, "TransferQuery::GetStoreCost of {:?}", bytes)
             }
-        )
+        }
     }
 }

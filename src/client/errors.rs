@@ -101,8 +101,8 @@ pub enum Error {
     #[error("Invalid permission version provided: {0}")]
     InvalidPermissionsSuccessor(u64),
     /// Invalid Operation such as a POST on ImmutableData
-    #[error("Invalid operation")]
-    InvalidOperation,
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
     /// Mismatch between key type and signature type.
     #[error("Sign key and signature type do not match")]
     SigningKeyTypeMismatch,
