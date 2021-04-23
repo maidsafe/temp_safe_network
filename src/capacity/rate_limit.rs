@@ -8,7 +8,7 @@
 
 use super::{Capacity, MAX_CHUNK_SIZE, MAX_SUPPLY};
 use crate::{network::Network, Result};
-use log::info;
+use log::{debug, info};
 use sn_data_types::{PublicKey, Token};
 use xor_name::XorName;
 
@@ -59,6 +59,10 @@ impl RateLimit {
     }
 
     fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Token {
+        debug!(
+            "StoreCost input values; bytes: {}, full_nodes: {}, all_nodes: {}, prefix_len: {}",
+            bytes, full_nodes, all_nodes, prefix_len
+        );
         let available_nodes = (all_nodes - full_nodes) as f64;
         let supply_demand_factor = 0.001
             + (1_f64 / available_nodes).powf(8_f64)
@@ -69,7 +73,7 @@ impl RateLimit {
         let section_supply_share = RateLimit::max_section_nanos(prefix_len) as f64;
         let token_source = steepness_reductor * section_supply_share.powf(0.5_f64);
         let rate_limit = (token_source * data_size_factor * supply_demand_factor).round() as u64;
-        Token::from_nano(rate_limit)
+        Token::from_nano(u64::max(1, rate_limit)) // always return > 0
     }
 
     fn max_section_nanos(prefix_len: usize) -> u64 {

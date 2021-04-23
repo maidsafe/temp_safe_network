@@ -138,7 +138,7 @@ pub enum Error {
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
     match error {
-        Error::InvalidOperation(_msg) => Ok(ErrorMessage::InvalidOperation),
+        Error::InvalidOperation(msg) => Ok(ErrorMessage::InvalidOperation(msg)),
         Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
         Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
         Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
@@ -155,7 +155,9 @@ pub(crate) fn convert_dt_error_to_error_message(
     error: DtError,
 ) -> Result<sn_messaging::client::Error> {
     match error {
-        DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
+        DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation(
+            "DtError::InvalidOperation".to_string(),
+        )),
         DtError::NoSuchEntry => Ok(ErrorMessage::NoSuchEntry),
         DtError::AccessDenied(pk) => Ok(ErrorMessage::AccessDenied(pk)),
         error => Err(Error::NoErrorMapping(error.to_string())),

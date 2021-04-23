@@ -133,11 +133,19 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> NodeDuties {
-        let result = self.rate_limit.from(bytes).await;
-        info!("StoreCost for {:?} bytes: {}", bytes, result);
+        let result = if bytes == 0 {
+            Err(sn_messaging::client::Error::InvalidOperation(
+                "Cannot store 0 bytes".to_string(),
+            ))
+        } else {
+            let store_cost = self.rate_limit.from(bytes).await;
+            info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
+            Ok(store_cost)
+        };
+
         let response = NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
-                response: QueryResponse::GetStoreCost(Ok(result)),
+                response: QueryResponse::GetStoreCost(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 target_section_pk: None,

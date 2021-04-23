@@ -198,7 +198,10 @@ impl ChunkStorage {
                     "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
                     self, msg_id
                 );
-                Err(ErrorMessage::InvalidOperation)
+                Err(ErrorMessage::InvalidOperation(format!(
+                    "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
+                    self, msg_id
+                )))
             }
             _ => Err(ErrorMessage::NoSuchKey),
         };
