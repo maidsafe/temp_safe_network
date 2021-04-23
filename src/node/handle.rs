@@ -169,12 +169,8 @@ impl Node {
 
                 let elder = self.role.as_elder_mut()?;
                 elder.section_funds.remove_node_wallet(name);
-                elder
-                    .meta_data
-                    .decrease_full_node_count_if_present(name)
-                    .await?;
 
-                ops.extend(elder.meta_data.trigger_chunk_replication(name).await?);
+                ops.extend(elder.meta_data.remove_and_replicate_chunks(name).await?);
 
                 Ok(ops)
             }

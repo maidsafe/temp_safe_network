@@ -123,22 +123,14 @@ impl Metadata {
             .await
     }
 
-    /// Removes a given node from the list of full nodes.
-    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
-        self.elder_stores
-            .blob_records_mut()
-            .decrease_full_node_count_if_present(node_name)
-            .await
-    }
-
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the remaining holders to return that chunk to us.
     // The list of holders is also updated by removing the node that left.
     // When receiving the chunk from remaining holders, we ask new holders to store it.
-    pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NodeDuties> {
+    pub async fn remove_and_replicate_chunks(&mut self, node: XorName) -> Result<NodeDuties> {
         self.elder_stores
             .blob_records_mut()
-            .begin_replicate_chunks(node)
+            .remove_and_replicate_chunks(node)
             .await
     }
 

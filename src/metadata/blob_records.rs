@@ -187,6 +187,19 @@ impl BlobRecords {
         Ok(())
     }
 
+    pub(super) async fn write(
+        &mut self,
+        write: BlobWrite,
+        msg_id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        use BlobWrite::*;
+        match write {
+            New(data) => self.store(data, msg_id, origin).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin).await,
+        }
+    }
+
     /// Adds a given node to the list of full nodes.
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
         info!("No. of Full Nodes: {:?}", self.full_nodes().await);
@@ -202,7 +215,7 @@ impl BlobRecords {
     }
 
     /// Removes a given node from the list of full nodes.
-    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
+    async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
         info!("No. of Full Nodes: {:?}", self.full_nodes().await);
         info!("Checking if {:?} is present as full_node", node_name);
         match self
@@ -224,19 +237,6 @@ impl BlobRecords {
                 error!("Error removing from full_nodes db");
                 Err(Error::PickleDb(e))
             }
-        }
-    }
-
-    pub(super) async fn write(
-        &mut self,
-        write: BlobWrite,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        use BlobWrite::*;
-        match write {
-            New(data) => self.store(data, msg_id, origin).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin).await,
         }
     }
 
@@ -559,7 +559,10 @@ impl BlobRecords {
         Ok(())
     }
 
-    pub(super) async fn begin_replicate_chunks(&mut self, holder: XorName) -> Result<NodeDuties> {
+    pub(super) async fn remove_and_replicate_chunks(
+        &mut self,
+        holder: XorName,
+    ) -> Result<NodeDuties> {
         info!("Replicating chunks");
         let chunks_stored = match self.remove_holder(holder).await {
             Ok(chunks) => chunks,
