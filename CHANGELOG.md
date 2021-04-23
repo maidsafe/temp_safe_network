@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [18.0.0](https://github.com/maidsafe/sn_messaging/compare/v17.0.1...v18.0.0) (2021-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **adult_ack:** NodeCmdResult removed from Message enum.
+
+* **adult_ack:** use ChunkOpHandled in NodeEvent ([9b1ba47](https://github.com/maidsafe/sn_messaging/commit/9b1ba477a5f951ab9a1fe18a9906773478e2e231))
+
 ### [17.0.1](https://github.com/maidsafe/sn_messaging/compare/v17.0.0...v17.0.1) (2021-04-23)
 
 ## [17.0.0](https://github.com/maidsafe/sn_messaging/compare/v16.2.0...v17.0.0) (2021-04-21)
