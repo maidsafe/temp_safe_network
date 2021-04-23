@@ -14,7 +14,7 @@ const USED_SPACE_FILENAME: &str = "used_space";
 
 /// This holds a record (in-memory and on-disk) of the space used by a single `ChunkStore`, and also
 /// an in-memory record of the total space used by all `ChunkStore`s.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UsedSpace {
     inner: Arc<Mutex<inner::UsedSpace>>,
 }
@@ -55,6 +55,10 @@ impl UsedSpace {
         self.inner.lock().await.total()
     }
 
+    pub async fn next_id(&self) -> u64 {
+        self.inner.lock().await.next_id()
+    }
+
     /// Returns the used space of a local store as a snapshot
     /// Note, due to the async nature of this, the value
     /// may be stale by the time it is read if there are multiple
@@ -78,6 +82,13 @@ impl UsedSpace {
     /// Decrease the used amount of a single chunk store and the global used value
     pub async fn decrease(&self, id: StoreId, released: u64) -> Result<()> {
         self.inner.lock().await.decrease(id, released).await
+    }
+
+    pub fn from_existing_used_space(used_space: &mut UsedSpace) -> UsedSpace {
+        let mut dummy_space = UsedSpace::new(0);
+        std::mem::swap(used_space, &mut dummy_space);
+
+        dummy_space
     }
 }
 
@@ -147,6 +158,10 @@ mod inner {
         /// Returns the total used space
         pub fn total(&self) -> u64 {
             self.total_value
+        }
+
+        pub fn next_id(&self) -> u64 {
+            self.next_id
         }
 
         /// Returns the used space of a local store as a snapshot

@@ -48,14 +48,33 @@ pub struct Metadata {
 impl Metadata {
     pub async fn new(
         path: &Path,
-        used_space: &UsedSpace,
+        max_capacity: u64,
         dbs: ChunkHolderDbs,
         reader: AdultReader,
     ) -> Result<Self> {
         let blob_records = BlobRecords::new(dbs, reader);
-        let map_storage = MapStorage::new(path, used_space.clone()).await?;
-        let sequence_storage = SequenceStorage::new(path, used_space.clone()).await?;
-        let register_storage = RegisterStorage::new(path, used_space.clone()).await?;
+        let map_storage = MapStorage::new(path, max_capacity).await?;
+        let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
+        let register_storage = RegisterStorage::new(path, max_capacity).await?;
+        let elder_stores = ElderStores::new(
+            blob_records,
+            map_storage,
+            sequence_storage,
+            register_storage,
+        );
+        Ok(Self { elder_stores })
+    }
+
+    pub async fn from_used_space(
+        path: &Path,
+        used_space: &mut UsedSpace,
+        dbs: ChunkHolderDbs,
+        reader: AdultReader,
+    ) -> Result<Self> {
+        let blob_records = BlobRecords::new(dbs, reader);
+        let map_storage = MapStorage::from_used_space(path, used_space).await?;
+        let sequence_storage = SequenceStorage::from_used_space(path, used_space).await?;
+        let register_storage = RegisterStorage::from_used_space(path, used_space).await?;
         let elder_stores = ElderStores::new(
             blob_records,
             map_storage,

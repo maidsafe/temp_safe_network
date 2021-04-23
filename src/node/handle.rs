@@ -187,8 +187,11 @@ impl Node {
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 self.role = Role::Adult(AdultRole {
-                    chunks: Chunks::new(self.node_info.root_dir.as_path(), self.used_space.clone())
-                        .await?,
+                    chunks: Chunks::from_used_space(
+                        self.node_info.root_dir.as_path(),
+                        &mut self.used_space,
+                    )
+                    .await?,
                 });
                 Ok(vec![])
             }

@@ -87,11 +87,12 @@ impl Node {
             reward_key,
         };
 
-        let used_space = UsedSpace::new(config.max_capacity());
+        let mut used_space = UsedSpace::new(config.max_capacity());
 
         let node = Self {
             role: Role::Adult(AdultRole {
-                chunks: Chunks::new(node_info.root_dir.as_path(), used_space.clone()).await?,
+                chunks: Chunks::from_used_space(node_info.root_dir.as_path(), &mut used_space)
+                    .await?,
             }),
             node_info,
             used_space,

@@ -63,14 +63,35 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `ChunkStores`, not per `ChunkStore`.
-    pub async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
+    pub async fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
         if fs::read(&dir).is_err() {
             Self::create_new_root(&dir)?
         }
 
+        let used_space = UsedSpace::new(max_capacity);
         let id = used_space.add_local_store(&dir).await?;
+        Ok(ChunkStore {
+            dir,
+            used_space,
+            id,
+            _phantom: PhantomData,
+        })
+    }
+
+    pub async fn from_used_space<P: AsRef<Path>>(
+        root: P,
+        used_space: &mut UsedSpace,
+    ) -> Result<Self> {
+        let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
+
+        if fs::read(&dir).is_err() {
+            Self::create_new_root(&dir)?
+        }
+
+        let used_space = UsedSpace::from_existing_used_space(used_space);
+        let id = used_space.next_id().await;
         Ok(ChunkStore {
             dir,
             used_space,
