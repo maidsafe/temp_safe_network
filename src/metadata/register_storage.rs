@@ -30,12 +30,6 @@ pub(super) struct RegisterStorage {
 }
 
 impl RegisterStorage {
-    #[allow(dead_code)]
-    pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = RegisterChunkStore::new(path, max_capacity).await?;
-        Ok(Self { chunks })
-    }
-
     pub(super) async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
         let chunks = RegisterChunkStore::from_used_space(path, used_space).await?;
 

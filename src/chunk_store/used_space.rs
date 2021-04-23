@@ -63,14 +63,14 @@ impl UsedSpace {
     /// Note, due to the async nature of this, the value
     /// may be stale by the time it is read if there are multiple
     /// writers
-    #[allow(unused)]
+    #[cfg(test)]
     pub async fn local(&self, id: StoreId) -> u64 {
         self.inner.lock().await.local(id)
     }
 
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
         self.inner.lock().await.add_local_store(dir).await
     }

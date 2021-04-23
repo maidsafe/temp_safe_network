@@ -33,11 +33,6 @@ pub(super) struct MapStorage {
 }
 
 impl MapStorage {
-    pub(super) async fn new(path: &Path, capacity: u64) -> Result<Self> {
-        let chunks = MapChunkStore::new(path, capacity).await?;
-        Ok(Self { chunks })
-    }
-
     pub(super) async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
         let chunks = MapChunkStore::from_used_space(path, used_space).await?;
         Ok(Self { chunks })

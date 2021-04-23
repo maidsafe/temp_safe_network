@@ -8,7 +8,7 @@
 
 use super::{
     chunk::{Chunk, ChunkId},
-    ChunkStore, Result as ChunkStoreResult, Subdir, UsedSpace,
+    ChunkStore, Result as ChunkStoreResult, Subdir,
 };
 use crate::{to_db_key::ToDbKey, Error, Result};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
