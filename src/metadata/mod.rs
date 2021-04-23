@@ -26,7 +26,7 @@ use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::{Blob, PublicKey};
 use sn_messaging::{
-    client::{DataCmd, DataExchange, DataQuery, NodeCmdResult, QueryResponse},
+    client::{CmdError, DataCmd, DataExchange, DataQuery, QueryResponse},
     EndUser, MessageId,
 };
 use std::{
@@ -77,7 +77,7 @@ impl Metadata {
     pub async fn process_blob_write_result(
         &mut self,
         msg_id: MessageId,
-        result: NodeCmdResult,
+        result: Result<(), CmdError>,
         src: XorName,
     ) -> Result<NodeDuty> {
         self.elder_stores

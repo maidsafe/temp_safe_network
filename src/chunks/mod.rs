@@ -48,7 +48,7 @@ impl Chunks {
         read: &BlobRead,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeDuty> {
+    ) -> Result<NodeDuties> {
         reading::get_result(read, msg_id, origin, &self.chunk_storage).await
     }
 

@@ -10,7 +10,7 @@ use super::{LazyError, Mapping, MsgContext};
 use crate::{node_ops::NodeDuty, Error};
 use sn_messaging::{
     client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeQuery, NodeQueryResponse,
+        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
         NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query,
         TransferCmd, TransferQuery,
     },
@@ -344,9 +344,13 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             origin: *origin,
         },
         // --- Adult Operation response ---
-        Message::NodeCmdResult { result, id, .. } => NodeDuty::ProcessBlobWriteResult {
+        Message::NodeEvent {
+            event: NodeEvent::ChunkOpHandled(result),
+            correlation_id,
+            ..
+        } => NodeDuty::ProcessBlobWriteResult {
             result: result.clone(),
-            original_msg_id: *id,
+            original_msg_id: *correlation_id,
             src: origin.name(),
         },
         Message::QueryResponse {

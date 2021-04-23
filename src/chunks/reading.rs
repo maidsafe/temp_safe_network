@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::node_ops::NodeDuty;
+use crate::node_ops::NodeDuties;
 use crate::Result;
 use sn_messaging::{client::BlobRead, EndUser, MessageId};
 
@@ -18,7 +18,7 @@ pub(super) async fn get_result(
     msg_id: MessageId,
     origin: EndUser,
     storage: &ChunkStorage,
-) -> Result<NodeDuty> {
+) -> Result<NodeDuties> {
     let BlobRead::Get(address) = read;
     storage.get(address, msg_id, origin).await
 }

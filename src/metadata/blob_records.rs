@@ -18,8 +18,7 @@ use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
 use sn_messaging::{
     client::{
         BlobDataExchange, BlobRead, BlobWrite, ChunkMetadata, CmdError, Error as ErrorMessage,
-        HolderMetadata, Message, NodeCmd, NodeCmdResult, NodeQuery, NodeSystemCmd, NodeSystemQuery,
-        QueryResponse,
+        HolderMetadata, Message, NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -307,7 +306,7 @@ impl BlobRecords {
     pub async fn process_blob_write_result(
         &mut self,
         msg_id: MessageId,
-        result: NodeCmdResult,
+        result: Result<(), CmdError>,
         src: XorName,
     ) -> Result<NodeDuty> {
         if let Some(blob_write) = self.adult_liveness.process_blob_write_result(msg_id, src) {

@@ -13,7 +13,7 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, DataExchange, Message, NodeCmdResult, QueryResponse},
+    client::{BlobRead, BlobWrite, CmdError, DataExchange, Message, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -91,7 +91,7 @@ pub enum NodeDuty {
     /// Run at data-section Elders on receiving the result of
     /// write operations from Adults
     ProcessBlobWriteResult {
-        result: NodeCmdResult,
+        result: Result<(), CmdError>,
         original_msg_id: MessageId,
         src: XorName,
     },

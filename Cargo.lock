@@ -2283,9 +2283,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "17.0.1"
+version = "18.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e01dc26222131c39b08267a3d1ab7197753c05c06b734b1481b90dbd8079782"
+checksum = "d73f05d53408d8543e2c8e7e56f612c25beb2a06b866f4b4f7ca97009483f215"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2309,7 +2309,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.38.9"
+version = "0.38.10"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2352,9 +2352,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.62.1"
+version = "0.63.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05a82dbd934ccf93a47943e6a27c39af424dda6c0f0f4b3abf2fee531782a6c7"
+checksum = "cdce898e3c66cd541372458ef9a4e142e47df09fb2854f462ef3e7503dc3c10f"
 dependencies = [
  "bincode",
  "bls_dkg",

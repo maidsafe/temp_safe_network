@@ -269,9 +269,8 @@ impl Node {
                     .matches(&&data_section_addr)
                 {
                     let adult = self.role.as_adult_mut()?;
-                    let read = adult.chunks.read(&read, msg_id, origin).await?;
-                    let mut ops = adult.chunks.check_storage().await?;
-                    ops.insert(0, read);
+                    let mut ops = adult.chunks.read(&read, msg_id, origin).await?;
+                    ops.extend(adult.chunks.check_storage().await?);
                     Ok(ops)
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
