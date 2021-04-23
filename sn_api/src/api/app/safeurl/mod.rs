@@ -704,6 +704,10 @@ impl SafeUrl {
         self.query_string = pairs.finish();
         trace!("Set query_string: {}", self.query_string);
 
+        if key == URL_VERSION_QUERY_NAME {
+            self.set_content_version_internal(val)?;
+        }
+
         Ok(())
     }
 
