@@ -15,7 +15,7 @@ extern crate duct;
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_api::safeurl::SafeUrl;
+use sn_api::SafeUrl;
 use sn_cmd_test_utilities::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 

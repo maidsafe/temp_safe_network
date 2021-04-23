@@ -8,7 +8,7 @@
 // Software.
 
 use anyhow::Result;
-use sn_api::{fetch::SafeData, safeurl::SafeUrl, BootstrapConfig, Safe};
+use sn_api::{fetch::SafeData, BootstrapConfig, Safe, SafeUrl};
 use std::{env::temp_dir, fs::File, io::Write, path::PathBuf};
 
 const FILE_TO_UPLOAD: &str = "file_to_upload.rs";

@@ -33,13 +33,14 @@ serde_json = "1.0.62"
 sha3 = "~0.9"
 sn_client = "~0.54"
 sn_data_types = "~0.18"
+sn_url = { path = "../sn_url" }
 thiserror = "1.0.23"
 tokio = { version = "1.3.0", features = ["rt"] }
 uhttp_uri = "~0.5"
 url = "2.2.0"
 urlencoding = "1.1.1"
 walkdir = "2.3.1" #ffi utils needs this version
-xor_name = "1.1.10"
+xor_name = "1"
 
 [dependencies.tiny-keccak]
 version = "2.0.2"

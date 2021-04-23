@@ -11,8 +11,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use multibase::{encode, Base};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_api::{
-    fetch::SafeData, files::ProcessedFiles, safeurl::SafeUrl, wallet::WalletSpendableBalances,
-    Keypair,
+    fetch::SafeData, files::ProcessedFiles, wallet::WalletSpendableBalances, Keypair, SafeUrl,
 };
 use std::{collections::BTreeMap, env, fs, path::Path, process};
 use tiny_keccak::{Hasher, Sha3};

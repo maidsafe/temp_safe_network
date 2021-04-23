@@ -15,8 +15,7 @@ use anyhow::Result;
 use log::debug;
 use sn_api::{
     fetch::{SafeContentType, SafeData},
-    safeurl::SafeUrl,
-    Safe,
+    Safe, SafeUrl,
 };
 use structopt::StructOpt;
 

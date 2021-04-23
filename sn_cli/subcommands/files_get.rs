@@ -19,8 +19,7 @@ use sn_api::{
     fetch::Range,
     fetch::SafeData,
     files::{FilesMap, GetAttr, ProcessedFiles},
-    safeurl::{SafeDataType, SafeUrl, XorUrl},
-    Result as ApiResult, Safe,
+    Result as ApiResult, Safe, SafeDataType, SafeUrl, XorUrl,
 };
 use std::{
     fs,

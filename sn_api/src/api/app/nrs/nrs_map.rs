@@ -12,10 +12,9 @@ use crate::{
         consts::{PREDICATE_CREATED, PREDICATE_LINK, PREDICATE_MODIFIED},
         fetch::{SafeContentType, SafeDataType},
         helpers::gen_timestamp_secs,
-        safeurl::XorUrl,
         Safe,
     },
-    Error, Result,
+    Error, Result, XorUrl,
 };
 use log::{debug, info};
 use serde::{Deserialize, Serialize};

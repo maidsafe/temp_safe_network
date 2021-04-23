@@ -13,13 +13,8 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    api::{
-        app::consts::*,
-        fetch::Range,
-        safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl},
-        Safe,
-    },
-    Error, Result,
+    api::{app::consts::*, fetch::Range, Safe},
+    Error, Result, SafeContentType, SafeDataType, SafeUrl, XorUrl,
 };
 use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
 use files_map::add_or_update_file_item;
@@ -560,7 +555,9 @@ impl Safe {
         // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_client.store_public_blob(&data, dry_run).await?;
 
-        SafeUrl::encode_blob(xorname, content_type, self.xorurl_base)
+        let xorurl = SafeUrl::encode_blob(xorname, content_type, self.xorurl_base)?;
+
+        Ok(xorurl)
     }
 
     /// # Get a Public Blob

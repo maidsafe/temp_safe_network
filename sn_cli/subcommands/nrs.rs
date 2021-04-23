@@ -13,7 +13,7 @@ use super::{
 };
 use anyhow::Result;
 use prettytable::{format::FormatBuilder, Table};
-use sn_api::{safeurl::XorUrl, Safe};
+use sn_api::{Safe, XorUrl};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 

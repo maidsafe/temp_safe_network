@@ -7,10 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl},
-    Safe,
-};
+use super::{Safe, SafeContentType, SafeDataType, SafeUrl, XorUrl};
 use crate::{Error, Result};
 use log::debug;
 use xor_name::XorName;
@@ -42,13 +39,15 @@ impl Safe {
             .store_sequence(data, name, type_tag, None, private)
             .await?;
 
-        SafeUrl::encode_sequence_data(
+        let xorurl = SafeUrl::encode_sequence_data(
             xorname,
             type_tag,
             SafeContentType::Raw,
             self.xorurl_base,
             private,
-        )
+        )?;
+
+        Ok(xorurl)
     }
 
     /// Get data from a Public Sequence on the network

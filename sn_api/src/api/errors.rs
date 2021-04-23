@@ -9,6 +9,7 @@
 
 use super::ipc::IpcError;
 use sn_client::Error as ClientError;
+use sn_url::Error as SafeUrlError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -91,4 +92,7 @@ pub enum Error {
     /// FileSystemError
     #[error("FileSystemError: {0}")]
     FileSystemError(String),
+    /// SafeUrlError
+    #[error("SafeUrlError: {0}")]
+    SafeUrlError(#[from] SafeUrlError),
 }

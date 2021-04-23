@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use anyhow::{anyhow, Result};
-use sn_api::{safeurl::SafeUrl, PublicKey, Safe, XorName};
+use sn_api::{PublicKey, Safe, SafeUrl, XorName};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'

@@ -7,14 +7,15 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-pub use super::safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrlBase};
 use super::{
     files::{FileItem, FileMeta, FilesMap, RealPath},
     multimap::MultimapKeyValues,
     nrs::NrsMap,
     register::{Entry, EntryHash},
-    wallet::WalletSpendableBalances,
     Safe, XorName,
+};
+pub use super::{
+    wallet::WalletSpendableBalances, SafeContentType, SafeDataType, SafeUrl, XorUrlBase,
 };
 use crate::{Error, Result};
 use log::{debug, info};
@@ -654,10 +655,7 @@ type NextStepInfo = (SafeUrl, Option<FileItem>);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        api::{app::test_helpers::new_safe_instance, safeurl::SafeUrl},
-        retry_loop,
-    };
+    use crate::{api::app::test_helpers::new_safe_instance, retry_loop, SafeUrl};
     use anyhow::{anyhow, bail, Context, Result};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::io::Read;

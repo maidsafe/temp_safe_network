@@ -8,10 +8,9 @@
 // Software.
 
 use rand::rngs::OsRng;
-use sn_api::{
-    safeurl::{SafeDataType, SafeUrl, XorUrlBase},
-    Error, Keypair, XorName,
-};
+use sn_data_types::Keypair;
+use sn_url::{Error, SafeDataType, SafeUrl, XorUrlBase};
+use xor_name::XorName;
 
 fn main() -> Result<(), Error> {
     // Let's generate a ranadom key pair

@@ -10,8 +10,7 @@
 use super::{
     common::ed_sk_from_hex,
     helpers::{parse_coins_amount, pk_from_hex},
-    safeurl::{SafeContentType, SafeDataType, SafeUrl},
-    Safe,
+    Safe, SafeContentType, SafeDataType, SafeUrl,
 };
 use crate::{Error, Result};
 use hex::encode;

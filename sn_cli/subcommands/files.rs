@@ -23,8 +23,7 @@ use serde::Serialize;
 use sn_api::{
     fetch::SafeData,
     files::{FilesMap, ProcessedFiles},
-    safeurl::{SafeUrl, XorUrl},
-    Safe,
+    Safe, SafeUrl, XorUrl,
 };
 use std::{
     collections::{BTreeMap, HashMap},

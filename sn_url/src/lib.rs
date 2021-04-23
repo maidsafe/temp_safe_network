@@ -7,13 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod errors;
 mod url_parts;
 mod xorurl_media_types;
 
-use crate::{
-    api::app::{nrs::NRS_MAP_TYPE_TAG, DEFAULT_XORURL_BASE},
-    Error, Result,
-};
+pub use errors::{Error, Result};
 use log::{debug, info, trace, warn};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
@@ -24,6 +22,12 @@ use url::Url;
 use url_parts::SafeUrlParts;
 use xor_name::{XorName, XOR_NAME_LEN}; // for parsing raw path
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
+
+// Type tag to use for the NrsMapContainer stored on Sequence
+pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
+
+// Default base encoding used for XOR URLs
+pub const DEFAULT_XORURL_BASE: XorUrlBase = XorUrlBase::Base32z;
 
 const SAFE_URL_PROTOCOL: &str = "safe://";
 const SAFE_URL_SCHEME: &str = "safe";

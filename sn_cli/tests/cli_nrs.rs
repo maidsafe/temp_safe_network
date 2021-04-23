@@ -17,7 +17,7 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::{
     fetch::{SafeContentType, SafeDataType},
-    safeurl::{SafeUrl, XorUrlBase},
+    SafeUrl, XorUrlBase,
 };
 use sn_cmd_test_utilities::{
     get_random_nrs_string, parse_nrs_create_output, safeurl_from, upload_test_folder, CLI,

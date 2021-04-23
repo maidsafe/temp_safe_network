@@ -11,14 +11,12 @@ use super::{
     common::ed_sk_from_hex,
     helpers::{parse_coins_amount, pk_from_hex},
 };
-use crate::{
-    api::app::safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl},
-    Error, Result, Safe,
-};
+use crate::{Error, Result, Safe};
 use hex::encode;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Keypair, MapValue, Token};
+use sn_url::{SafeContentType, SafeDataType, SafeUrl, XorUrl};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 
@@ -44,12 +42,14 @@ impl Safe {
             .store_map(None, WALLET_TYPE_TAG, None, None)
             .await?;
 
-        SafeUrl::encode_mutable_data(
+        let xorurl = SafeUrl::encode_mutable_data(
             xorname,
             WALLET_TYPE_TAG,
             SafeContentType::Wallet,
             self.xorurl_base,
-        )
+        )?;
+
+        Ok(xorurl)
     }
 
     // Add a SafeKey to a Wallet to make it spendable, and returns the friendly name set for it

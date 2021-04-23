@@ -19,7 +19,6 @@ mod test_helpers;
 use super::{common, constants, Result};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
-use safeurl::XorUrlBase;
 use sn_data_types::Keypair;
 use std::time::Duration;
 
@@ -32,10 +31,10 @@ pub mod files;
 pub mod multimap;
 pub mod nrs;
 pub mod register;
-pub mod safeurl;
 pub mod wallet;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_coins_amount;
+pub use sn_url::*;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 #[derive(Clone)]

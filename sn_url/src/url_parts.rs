@@ -227,8 +227,8 @@ mod tests {
     use super::*;
     use anyhow::{anyhow, Result};
 
-    #[tokio::test]
-    async fn test_safeurl_validate_url_chars_with_whitespace() -> Result<()> {
+    #[test]
+    fn test_safeurl_validate_url_chars_with_whitespace() -> Result<()> {
         let urls = vec![
             // tests for
             // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt
@@ -278,8 +278,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_safeurl_validate_url_chars_with_control_characters() -> Result<()> {
+    #[test]
+    fn test_safeurl_validate_url_chars_with_control_characters() -> Result<()> {
         let urls = vec![
             // tests for
             // https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Basic_ASCII_control_codes
@@ -367,8 +367,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_safeurl_validate_url_chars_with_invalid_characters() -> Result<()> {
+    #[test]
+    fn test_safeurl_validate_url_chars_with_invalid_characters() -> Result<()> {
         let urls = vec![
             // values from
             // INVALID_NRS_CHARS const

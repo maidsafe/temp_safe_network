@@ -3005,6 +3005,7 @@ dependencies = [
  "sha3",
  "sn_client",
  "sn_data_types",
+ "sn_url",
  "thiserror",
  "tiny-keccak",
  "tokio",
@@ -3213,6 +3214,25 @@ dependencies = [
  "sn_data_types",
  "thiserror",
  "threshold_crypto",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_url"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "lazy_static",
+ "log",
+ "multibase 0.9.1",
+ "rand 0.7.3",
+ "serde",
+ "sn_data_types",
+ "thiserror",
+ "tiny-keccak",
+ "uhttp_uri",
+ "url",
+ "urlencoding",
  "xor_name",
 ]
 

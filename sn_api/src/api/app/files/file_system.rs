@@ -10,8 +10,7 @@
 use super::{metadata::get_metadata, ProcessedFiles};
 use crate::{
     api::{app::consts::*, Safe},
-    safeurl::XorUrl,
-    Error, Result,
+    Error, Result, XorUrl,
 };
 use log::info;
 use std::{collections::BTreeMap, fs, path::Path};

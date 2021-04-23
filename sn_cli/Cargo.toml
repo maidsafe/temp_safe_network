@@ -43,7 +43,7 @@ num-traits = "~0.2"
 indicatif = { git = "https://github.com/mibac138/indicatif", branch = "mpb-tick" }
 console = "~0.14"
 percent-encoding = "2.1.0"
-xor_name = "1.1.10"
+xor_name = "1"
 
 [features]
 default = ["simulated-payouts", "self-update"]

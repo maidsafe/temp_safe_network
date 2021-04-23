@@ -14,10 +14,9 @@ pub use nrs_map::{DefaultRdf, NrsMap};
 use crate::{
     api::app::{
         consts::{CONTENT_ADDED_SIGN, CONTENT_DELETED_SIGN},
-        safeurl::{SafeContentType, SafeUrl, XorUrl},
         Safe,
     },
-    Error, Result,
+    Error, Result, SafeContentType, SafeUrl, XorUrl,
 };
 use log::{debug, info, warn};
 use std::collections::BTreeMap;
@@ -32,7 +31,8 @@ pub type ProcessedEntries = BTreeMap<String, (String, String)>;
 
 impl Safe {
     pub fn parse_url(url: &str) -> Result<SafeUrl> {
-        SafeUrl::from_url(&sanitised_url(url))
+        let safe_url = SafeUrl::from_url(&sanitised_url(url))?;
+        Ok(safe_url)
     }
 
     // Parses a safe:// URL and returns all the info in a SafeUrl instance.
