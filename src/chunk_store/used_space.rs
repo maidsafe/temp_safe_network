@@ -70,6 +70,7 @@ impl UsedSpace {
 
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
+    #[allow(dead_code)]
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
         self.inner.lock().await.add_local_store(dir).await
     }

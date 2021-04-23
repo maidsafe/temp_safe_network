@@ -37,6 +37,7 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
+    #[allow(dead_code)]
     pub async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         Ok(Self {
             chunk_storage: ChunkStorage::new(path, max_capacity).await?,

@@ -121,7 +121,6 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir()?;
     let capacity = 32;
-    let used_space = UsedSpace::new(capacity);
     let mut chunk_store = ChunkStore::new(root.path(), capacity).await?;
 
     let data = Data {
