@@ -63,7 +63,7 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `ChunkStores`, not per `ChunkStore`.
-    #[cfg(test)]
+    #[allow(dead_code)]
     pub async fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 

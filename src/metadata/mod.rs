@@ -46,6 +46,26 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[allow(dead_code)]
+    pub async fn new(
+        path: &Path,
+        max_capacity: u64,
+        dbs: ChunkHolderDbs,
+        reader: AdultReader,
+    ) -> Result<Self> {
+        let blob_records = BlobRecords::new(dbs, reader);
+        let map_storage = MapStorage::new(path, max_capacity).await?;
+        let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
+        let register_storage = RegisterStorage::new(path, max_capacity).await?;
+        let elder_stores = ElderStores::new(
+            blob_records,
+            map_storage,
+            sequence_storage,
+            register_storage,
+        );
+        Ok(Self { elder_stores })
+    }
+
     pub async fn from_used_space(
         path: &Path,
         used_space: &mut UsedSpace,
