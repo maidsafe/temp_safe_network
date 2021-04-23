@@ -71,7 +71,7 @@ where
             Self::create_new_root(&dir)?
         }
 
-        let used_space = UsedSpace::new(max_capacity);
+        let mut used_space = UsedSpace::new(max_capacity);
         let id = used_space.add_local_store(&dir).await?;
         Ok(ChunkStore {
             dir,
