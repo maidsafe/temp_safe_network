@@ -12,15 +12,14 @@ mod url_parts;
 mod xorurl_media_types;
 
 pub use errors::{Error, Result};
-use log::{debug, info, trace, warn};
+use log::{info, trace, warn};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
 use sn_data_types::register;
 use std::fmt;
-use tiny_keccak::{Hasher, Sha3};
 use url::Url;
 use url_parts::SafeUrlParts;
-use xor_name::{XorName, XOR_NAME_LEN}; // for parsing raw path
+use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 
 // Type tag to use for the NrsMapContainer stored on Sequence
@@ -1232,14 +1231,7 @@ impl SafeUrl {
     }
 
     fn xor_name_from_nrs_string(name: &str) -> XorName {
-        let name_bytes = name.as_bytes();
-        let mut hasher = Sha3::v256();
-        let mut vec_hash = [0; 32];
-        hasher.update(&name_bytes);
-        hasher.finalize(&mut vec_hash);
-        let xor_name = XorName(vec_hash);
-        debug!("Resulting XorName for NRS \"{}\" is: {}", name, xor_name);
-        xor_name
+        XorName::from_content(&[name.as_bytes()])
     }
 }
 

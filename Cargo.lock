@@ -3229,7 +3229,6 @@ dependencies = [
  "serde",
  "sn_data_types",
  "thiserror",
- "tiny-keccak",
  "uhttp_uri",
  "url",
  "urlencoding",
