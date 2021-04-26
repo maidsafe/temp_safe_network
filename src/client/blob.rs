@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{AuthorisationKind, CmdError, DataAuthKind, Error, QueryResponse};
+use super::{CmdError, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use std::fmt;
@@ -46,15 +46,6 @@ impl BlobRead {
         QueryResponse::GetBlob(Err(error))
     }
 
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use BlobRead::*;
-        match self {
-            Get(BlobAddress::Public(_)) => AuthorisationKind::Data(DataAuthKind::PublicRead),
-            Get(BlobAddress::Private(_)) => AuthorisationKind::Data(DataAuthKind::PrivateRead),
-        }
-    }
-
     /// Returns the address of the destination for `request`.
     pub fn dst_address(&self) -> XorName {
         use BlobRead::*;
@@ -69,11 +60,6 @@ impl BlobWrite {
     /// Request variant.
     pub fn error(&self, error: Error) -> CmdError {
         CmdError::Data(error)
-    }
-
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        AuthorisationKind::Data(DataAuthKind::Write)
     }
 
     /// Returns the address of the destination for `request`.

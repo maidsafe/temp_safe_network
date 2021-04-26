@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{AuthorisationKind, CmdError, DataAuthKind, Error, QueryResponse};
+use super::{CmdError, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     PublicKey, Sequence, SequenceAddress as Address, SequenceEntry as Entry,
@@ -82,25 +82,6 @@ impl SequenceRead {
         }
     }
 
-    /// Returns the access categorisation of the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use SequenceRead::*;
-        match *self {
-            Get(address)
-            | GetRange { address, .. }
-            | GetLastEntry(address)
-            | GetPublicPolicy(address)
-            | GetPrivatePolicy(address)
-            | GetUserPermissions { address, .. } => {
-                if address.is_public() {
-                    AuthorisationKind::Data(DataAuthKind::PublicRead)
-                } else {
-                    AuthorisationKind::Data(DataAuthKind::PrivateRead)
-                }
-            }
-        }
-    }
-
     /// Returns the address of the destination for request.
     pub fn dst_address(&self) -> XorName {
         use SequenceRead::*;
@@ -138,11 +119,6 @@ impl SequenceWrite {
     /// Request variant.
     pub fn error(&self, error: Error) -> CmdError {
         CmdError::Data(error)
-    }
-
-    /// Returns the access categorisation of the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        AuthorisationKind::Data(DataAuthKind::Write)
     }
 
     /// Returns the address of the destination for request.

@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{AuthorisationKind, CmdError, DataAuthKind, Error, QueryResponse};
+use super::{CmdError, Error, QueryResponse};
 use sn_data_types::{
     Map, MapAddress as Address, MapEntryActions as Changes, MapPermissionSet as PermissionSet,
     PublicKey,
@@ -106,22 +106,6 @@ impl MapRead {
         }
     }
 
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use MapRead::*;
-        match *self {
-            Get(_)
-            | GetValue { .. }
-            | GetShell(_)
-            | GetVersion(_)
-            | ListEntries(_)
-            | ListKeys(_)
-            | ListValues(_)
-            | ListPermissions(_)
-            | ListUserPermissions { .. } => AuthorisationKind::Data(DataAuthKind::PrivateRead),
-        }
-    }
-
     /// Returns the address of the destination for request.
     pub fn dst_address(&self) -> XorName {
         use MapRead::*;
@@ -165,11 +149,6 @@ impl MapWrite {
     /// Request variant.
     pub fn error(&self, error: Error) -> CmdError {
         CmdError::Data(error)
-    }
-
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        AuthorisationKind::Data(DataAuthKind::Write)
     }
 
     /// Returns the address of the destination for request.

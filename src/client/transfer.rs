@@ -7,9 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    AuthorisationKind, CmdError, Error, MiscAuthKind, QueryResponse, TokenAuthKind, TransferError,
-};
+use super::{CmdError, Error, QueryResponse, TransferError};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
@@ -67,17 +65,6 @@ impl TransferCmd {
         }
     }
 
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use TransferCmd::*;
-        match self {
-            RegisterTransfer(_) => AuthorisationKind::None, // the proof has the authority within it
-            ValidateTransfer(_) => AuthorisationKind::Misc(MiscAuthKind::WriteAndTransfer),
-            #[cfg(feature = "simulated-payouts")]
-            SimulatePayout(_) => AuthorisationKind::None,
-        }
-    }
-
     /// Returns the address of the destination for `request`.
     pub fn dst_address(&self) -> XorName {
         use TransferCmd::*;
@@ -125,16 +112,6 @@ impl TransferQuery {
             GetBalance(_) => QueryResponse::GetBalance(Err(error)),
             GetHistory { .. } => QueryResponse::GetHistory(Err(error)),
             GetStoreCost { .. } => QueryResponse::GetStoreCost(Err(error)),
-        }
-    }
-
-    /// Returns the type of authorisation needed for the query.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use TransferQuery::*;
-        match self {
-            GetBalance(_) => AuthorisationKind::Token(TokenAuthKind::ReadBalance), // current state
-            GetHistory { .. } => AuthorisationKind::Token(TokenAuthKind::ReadHistory), // history of incoming transfers
-            GetStoreCost { .. } => AuthorisationKind::None,                            // store cost
         }
     }
 

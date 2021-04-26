@@ -93,7 +93,7 @@ pub enum NodeEvent {
         proof: Signature,
     },
     /// Adults ack read/write of chunks as to convey responsivity.
-    ChunkOpHandled(Result<(), super::CmdError>),
+    ChunkWriteHandled(Result<(), super::CmdError>),
 }
 
 ///

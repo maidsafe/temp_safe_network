@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{data::DataQuery, transfer::TransferQuery, AuthorisationKind, Error, QueryResponse};
+use super::{data::DataQuery, transfer::TransferQuery, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -22,15 +22,6 @@ pub enum Query {
 }
 
 impl Query {
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use Query::*;
-        match self {
-            Data(q) => q.authorisation_kind(),
-            Transfer(q) => q.authorisation_kind(),
-        }
-    }
-
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> QueryResponse {

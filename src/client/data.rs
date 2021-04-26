@@ -12,7 +12,7 @@ use super::{
     map::{MapRead, MapWrite},
     register::{RegisterRead, RegisterWrite},
     sequence::{SequenceRead, SequenceWrite},
-    AuthorisationKind, CmdError, Error, QueryResponse,
+    CmdError, Error, QueryResponse,
 };
 use sn_data_types::PublicKey;
 use xor_name::XorName;
@@ -44,16 +44,6 @@ impl DataCmd {
             Map(c) => c.error(error),
             Sequence(c) => c.error(error),
             Register(c) => c.error(error),
-        }
-    }
-    /// Returns the type of authorisation needed for the cuest.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use DataCmd::*;
-        match self {
-            Blob(c) => c.authorisation_kind(),
-            Map(c) => c.authorisation_kind(),
-            Sequence(c) => c.authorisation_kind(),
-            Register(c) => c.authorisation_kind(),
         }
     }
 
@@ -115,17 +105,6 @@ impl DataQuery {
             Map(q) => q.error(error),
             Sequence(q) => q.error(error),
             Register(q) => q.error(error),
-        }
-    }
-
-    /// Returns the type of authorisation needed for the request.
-    pub fn authorisation_kind(&self) -> AuthorisationKind {
-        use DataQuery::*;
-        match self {
-            Blob(q) => q.authorisation_kind(),
-            Map(q) => q.authorisation_kind(),
-            Sequence(q) => q.authorisation_kind(),
-            Register(q) => q.authorisation_kind(),
         }
     }
 

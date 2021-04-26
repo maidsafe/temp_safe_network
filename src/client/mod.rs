@@ -251,8 +251,6 @@ impl Message {
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum CmdError {
     ///
-    Auth(Error), // temporary, while Authenticator is not handling this
-    ///
     Data(Error), // DataError enum for better differentiation?
     ///
     Transfer(TransferError),
@@ -356,48 +354,6 @@ pub enum QueryResponse {
     GetHistory(Result<ActorHistory>),
     /// Get Store Cost.
     GetStoreCost(Result<Token>),
-}
-
-/// The kind of authorisation needed for a request.
-pub enum AuthorisationKind {
-    /// Authorisation for data requests.
-    Data(DataAuthKind),
-    /// Authorisation for token requests.
-    Token(TokenAuthKind),
-    /// Miscellaneous authorisation kinds.
-    /// NB: Not very well categorized yet
-    Misc(MiscAuthKind),
-    /// When none required.
-    None,
-}
-
-/// Authorisation for data requests.
-pub enum DataAuthKind {
-    /// Read of public data.
-    PublicRead,
-    /// Read of private data.
-    PrivateRead,
-    /// Write of data/metadata.
-    Write,
-}
-
-/// Authorisation for token requests.
-pub enum TokenAuthKind {
-    /// Request to get key balance.
-    ReadBalance,
-    /// Request to get key transfer history.
-    ReadHistory,
-    /// Request to transfer tokens from key.
-    Transfer,
-}
-
-/// Miscellaneous authorisation kinds.
-/// NB: Not very well categorized yet
-pub enum MiscAuthKind {
-    /// Request to manage app keys.
-    ManageAppKeys,
-    /// Request to mutate and transfer tokens from key.
-    WriteAndTransfer,
 }
 
 /// Error type for an attempted conversion from `QueryResponse` to a type implementing
