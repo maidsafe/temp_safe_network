@@ -369,10 +369,7 @@ impl Safe {
     }
 
     /// Fetch a Wallet from a SafeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_wallet(
-        &self,
-        safeurl: &SafeUrl,
-    ) -> Result<WalletSpendableBalances> {
+    pub(crate) async fn fetch_wallet(&self, safeurl: &SafeUrl) -> Result<WalletSpendableBalances> {
         gen_wallet_spendable_balances_list(
             self,
             safeurl.xorname(),

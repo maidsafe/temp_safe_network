@@ -28,10 +28,7 @@ impl Safe {
 
     // Create a SafeKey allocating token from current client's key onto it,
     // and return the SafeKey's XOR-URL
-    pub async fn keys_create_and_preload(
-        &self,
-        preload_amount: &str,
-    ) -> Result<(String, Keypair)> {
+    pub async fn keys_create_and_preload(&self, preload_amount: &str) -> Result<(String, Keypair)> {
         let amount = parse_coins_amount(preload_amount)?;
         let new_keypair = self.generate_random_ed_keypair();
 
@@ -113,21 +110,13 @@ impl Safe {
     // Check SafeKey's balance from the network from a given XOR/NRS-URL and secret key string.
     // The difference between this and 'keys_balance_from_sk' function is that this will additionally
     // check that the XOR/NRS-URL corresponds to the public key derived from the provided secret key
-    pub async fn keys_balance_from_url(
-        &self,
-        url: &str,
-        secret_key: SecretKey,
-    ) -> Result<String> {
+    pub async fn keys_balance_from_url(&self, url: &str, secret_key: SecretKey) -> Result<String> {
         self.validate_sk_for_url(&secret_key, url).await?;
         self.keys_balance_from_sk(secret_key).await
     }
 
     // Check that the XOR/NRS-URL corresponds to the public key derived from the provided client id
-    pub async fn validate_sk_for_url(
-        &self,
-        secret_key: &SecretKey,
-        url: &str,
-    ) -> Result<String> {
+    pub async fn validate_sk_for_url(&self, secret_key: &SecretKey, url: &str) -> Result<String> {
         let derived_xorname = match secret_key {
             SecretKey::Ed25519(sk) => {
                 let pk: ed25519_dalek::PublicKey = sk.into();

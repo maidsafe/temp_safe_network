@@ -799,7 +799,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_range_public_blob() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let saved_data = b"Something super immutable";
         let size = saved_data.len();
         let xorurl = safe
@@ -1012,7 +1012,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_public_blob_with_path() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let data = b"Something super immutable";
         let xorurl = safe.files_store_public_blob(data, None, false).await?;
 
