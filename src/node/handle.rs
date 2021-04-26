@@ -269,7 +269,7 @@ impl Node {
                     .matches(&&data_section_addr)
                 {
                     let adult = self.role.as_adult_mut()?;
-                    let mut ops = adult.chunks.read(&read, msg_id, origin).await?;
+                    let mut ops = adult.chunks.read(&read, msg_id).await?;
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(ops)
                 } else {
@@ -280,7 +280,6 @@ impl Node {
                                 origin,
                             },
                             id: msg_id,
-                            target_section_pk: None,
                         },
                         dst: DstLocation::Section(data_section_addr),
                         // TBD
@@ -341,7 +340,6 @@ impl Node {
                         msg: Message::NodeQuery {
                             query: NodeQuery::Metadata { query, origin },
                             id,
-                            target_section_pk: None,
                         },
                         dst: DstLocation::Section(data_section_addr),
                         // TBD
@@ -355,8 +353,8 @@ impl Node {
                 Ok(vec![elder.meta_data.write(cmd, id, origin).await?])
             }
             // --- Completion of Adult operations ---
-            NodeDuty::ProcessBlobWriteResult {
-                original_msg_id,
+            NodeDuty::RecordAdultWriteLiveness {
+                correlation_id,
                 result,
                 src,
             } => {
@@ -364,20 +362,20 @@ impl Node {
                 Ok(vec![
                     elder
                         .meta_data
-                        .process_blob_write_result(original_msg_id, result, src)
+                        .record_adult_write_liveness(correlation_id, result, src)
                         .await?,
                 ])
             }
-            NodeDuty::ProcessBlobReadResult {
-                original_msg_id,
+            NodeDuty::RecordAdultReadLiveness {
                 response,
+                correlation_id,
                 src,
             } => {
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![
                     elder
                         .meta_data
-                        .process_blob_read_result(original_msg_id, response, src)
+                        .record_adult_read_liveness(correlation_id, response, src)
                         .await?,
                 ])
             }

@@ -135,26 +135,26 @@ impl AdultLiveness {
         }
     }
 
-    pub fn process_blob_write_result(
+    pub fn record_adult_write_liveness(
         &mut self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         src: XorName,
     ) -> Option<BlobWrite> {
-        let op = self.ops.get(&msg_id).cloned();
-        self.remove_target(msg_id, src);
+        let op = self.ops.get(&correlation_id).cloned();
+        self.remove_target(correlation_id, src);
         op.and_then(|op| match op {
             Operation::Write { blob_write, .. } => Some(*blob_write),
             Operation::Read { .. } => None,
         })
     }
 
-    pub fn process_blob_read_result(
+    pub fn record_adult_read_liveness(
         &mut self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         src: XorName,
     ) -> Option<(BlobAddress, EndUser)> {
-        let op = self.ops.get(&msg_id).cloned();
-        self.remove_target(msg_id, src);
+        let op = self.ops.get(&correlation_id).cloned();
+        self.remove_target(correlation_id, src);
         op.and_then(|op| match op {
             Operation::Read {
                 address, origin, ..

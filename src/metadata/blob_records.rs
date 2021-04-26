@@ -259,7 +259,6 @@ impl BlobRecords {
                         error: CmdError::Data(ErrorMessage::DataExists),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: DstLocation::EndUser(origin),
@@ -290,7 +289,6 @@ impl BlobRecords {
                         origin,
                     },
                     id: msg_id,
-                    target_section_pk: None,
                 },
                 aggregation: Aggregation::AtDestination,
             })
@@ -303,16 +301,19 @@ impl BlobRecords {
         }
     }
 
-    pub async fn process_blob_write_result(
+    pub async fn record_adult_write_liveness(
         &mut self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         result: Result<(), CmdError>,
         src: XorName,
     ) -> Result<NodeDuty> {
-        if let Some(blob_write) = self.adult_liveness.process_blob_write_result(msg_id, src) {
+        if let Some(blob_write) = self
+            .adult_liveness
+            .record_adult_write_liveness(correlation_id, src)
+        {
             if let Err(err) = result {
                 error!("Error at Adult while performing a BlobWrite: {:?}", err);
-                // We have to take action here.
+                // Depending on error, we might have to take action here.
             } else {
                 match blob_write {
                     BlobWrite::New(data) => {
@@ -322,7 +323,7 @@ impl BlobRecords {
                         {
                             warn!("Error ({:?}) setting chunk holder ({:?}) of {:?}, sent by origin: {:?}", e, src, *data.address(), data.owner());
                         } else {
-                            info!("MsgId: {:?} Successfully added {:?} to the list of holders for Blob at {:?}", msg_id, src, data.address());
+                            info!("(Chunk write msg {:?}): Successfully added {:?} to the list of holders for Blob at {:?}", correlation_id, src, data.address());
                         }
                     }
                     BlobWrite::DeletePrivate(_) => (),
@@ -340,40 +341,42 @@ impl BlobRecords {
         Ok(NodeDuty::ProposeOffline(unresponsive_adults))
     }
 
-    pub async fn process_blob_read_result(
+    pub async fn record_adult_read_liveness(
         &mut self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         response: QueryResponse,
         src: XorName,
     ) -> Result<NodeDuty> {
-        if let Some((_address, end_user)) =
-            self.adult_liveness.process_blob_read_result(msg_id, src)
-        {
-            if let QueryResponse::GetBlob(result) = &response {
-                if result.is_ok() {
-                    return Ok(NodeDuty::Send(OutgoingMsg {
-                        msg: Message::QueryResponse {
-                            response,
-                            id: MessageId::in_response_to(&msg_id),
-                            correlation_id: msg_id,
-                            target_section_pk: None,
-                        },
-                        dst: DstLocation::EndUser(end_user),
-                        section_source: false,
-                        aggregation: Aggregation::None,
-                    }));
-                }
-            } else {
-                error!("Unexpected QueryReponse from Adult: {:?}", response);
-            }
+        if !matches!(response, QueryResponse::GetBlob(_)) {
+            return Err(Error::Logic(format!(
+                "Got {:?}, but only `GetBlob` query responses are supposed to exist in this flow.",
+                response
+            )));
         }
+        if let Some((_address, end_user)) = self
+            .adult_liveness
+            .record_adult_read_liveness(correlation_id, src)
+        {
+            return Ok(NodeDuty::Send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response,
+                    id: MessageId::in_response_to(&correlation_id),
+                    correlation_id,
+                },
+                dst: DstLocation::EndUser(end_user),
+                section_source: false,
+                aggregation: Aggregation::AtDestination,
+            }));
+        }
+        let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_liveness.find_unresponsive_adults() {
             warn!(
                 "Adult {} has {} pending ops. It might be unresponsive",
                 name, count
             );
+            unresponsive_adults.push(name);
         }
-        Ok(NodeDuty::NoOp)
+        Ok(NodeDuty::ProposeOffline(unresponsive_adults))
     }
 
     async fn send_blob_cmd_error(
@@ -388,7 +391,6 @@ impl BlobRecords {
                 error: CmdError::Data(message_error),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::EndUser(origin),
@@ -439,7 +441,6 @@ impl BlobRecords {
                     origin,
                 },
                 id: msg_id,
-                target_section_pk: None,
             };
             Ok(NodeDuty::SendToNodes {
                 msg,
@@ -625,7 +626,6 @@ impl BlobRecords {
             msg: Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
                 id: msg_id,
-                target_section_pk: None,
             },
             aggregation: Aggregation::AtDestination,
         })
@@ -645,7 +645,6 @@ impl BlobRecords {
                     Message::NodeQuery {
                         query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
                         id: MessageId::combine(vec![*address.name(), holder]),
-                        target_section_pk: None,
                     },
                     holder,
                 )
@@ -681,15 +680,12 @@ impl BlobRecords {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let query_error = |error: Error| async {
-            let message_error = convert_to_error_message(error)?;
-            let err_msg = Message::QueryResponse {
-                response: QueryResponse::GetBlob(Err(message_error)),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            };
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: err_msg,
+                msg: Message::QueryResponse {
+                    response: QueryResponse::GetBlob(Err(convert_to_error_message(error)?)),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                },
                 section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                 dst: DstLocation::EndUser(origin),
                 aggregation: Aggregation::AtDestination,
@@ -716,7 +712,6 @@ impl BlobRecords {
                     origin,
                 },
                 id: msg_id,
-                target_section_pk: None,
             };
             Ok(NodeDuty::SendToNodes {
                 msg,

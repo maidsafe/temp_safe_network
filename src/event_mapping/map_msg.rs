@@ -12,7 +12,7 @@ use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
         NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query,
-        TransferCmd, TransferQuery,
+        QueryResponse, TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -324,42 +324,23 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
-        // --- Adult ---
-        Message::NodeQuery {
-            query: NodeQuery::Chunks { query, origin },
-            id,
-            ..
-        } => NodeDuty::ReadChunk {
-            read: query.clone(),
-            msg_id: *id,
-            origin: *origin,
-        },
-        Message::NodeCmd {
-            cmd: NodeCmd::Chunks { cmd, origin },
-            id,
-            ..
-        } => NodeDuty::WriteChunk {
-            write: cmd.clone(),
-            msg_id: *id,
-            origin: *origin,
-        },
         // --- Adult Operation response ---
         Message::NodeEvent {
-            event: NodeEvent::ChunkOpHandled(result),
+            event: NodeEvent::ChunkWriteHandled(result),
             correlation_id,
             ..
-        } => NodeDuty::ProcessBlobWriteResult {
+        } => NodeDuty::RecordAdultWriteLiveness {
             result: result.clone(),
-            original_msg_id: *correlation_id,
+            correlation_id: *correlation_id,
             src: origin.name(),
         },
         Message::QueryResponse {
             response,
             correlation_id,
             ..
-        } => NodeDuty::ProcessBlobReadResult {
+        } if matches!(response, QueryResponse::GetBlob(_)) => NodeDuty::RecordAdultReadLiveness {
             response: response.clone(),
-            original_msg_id: *correlation_id,
+            correlation_id: *correlation_id,
             src: origin.name(),
         },
         _ => NodeDuty::NoOp,

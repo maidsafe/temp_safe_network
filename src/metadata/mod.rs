@@ -74,27 +74,27 @@ impl Metadata {
         reading::get_result(query, id, origin, &mut self.elder_stores).await
     }
 
-    pub async fn process_blob_write_result(
+    pub async fn record_adult_write_liveness(
         &mut self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         result: Result<(), CmdError>,
         src: XorName,
     ) -> Result<NodeDuty> {
         self.elder_stores
             .blob_records_mut()
-            .process_blob_write_result(msg_id, result, src)
+            .record_adult_write_liveness(correlation_id, result, src)
             .await
     }
 
-    pub async fn process_blob_read_result(
+    pub async fn record_adult_read_liveness(
         &mut self,
-        msg_id: MessageId,
-        response: QueryResponse,
+        correlation_id: MessageId,
+        result: QueryResponse,
         src: XorName,
     ) -> Result<NodeDuty> {
         self.elder_stores
             .blob_records_mut()
-            .process_blob_read_result(msg_id, response, src)
+            .record_adult_read_liveness(correlation_id, result, src)
             .await
     }
 

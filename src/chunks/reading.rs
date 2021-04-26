@@ -9,16 +9,15 @@
 use super::chunk_storage::ChunkStorage;
 use crate::node_ops::NodeDuties;
 use crate::Result;
-use sn_messaging::{client::BlobRead, EndUser, MessageId};
+use sn_messaging::{client::BlobRead, MessageId};
 
 /// Read operations on data chunks.
 
 pub(super) async fn get_result(
     read: &BlobRead,
     msg_id: MessageId,
-    origin: EndUser,
     storage: &ChunkStorage,
 ) -> Result<NodeDuties> {
     let BlobRead::Get(address) = read;
-    storage.get(address, msg_id, origin).await
+    storage.get(address, msg_id).await
 }

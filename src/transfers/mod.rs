@@ -135,7 +135,6 @@ impl Transfers {
                 response: QueryResponse::GetStoreCost(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
@@ -182,7 +181,6 @@ impl Transfers {
                     error: CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
                     id: MessageId::in_response_to(&msg.id()),
                     correlation_id: msg.id(),
-                    target_section_pk: None,
                 },
                 section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: origin.to_dst(),
@@ -227,7 +225,6 @@ impl Transfers {
                             )),
                             id: MessageId::in_response_to(&msg.id()),
                             correlation_id: msg.id(),
-                            target_section_pk: None,
                         },
                         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                         dst: origin.to_dst(),
@@ -245,7 +242,6 @@ impl Transfers {
                             origin,
                         },
                         id: MessageId::in_response_to(&msg.id()),
-                        target_section_pk: None,
                     },
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(dst_address),
@@ -263,7 +259,6 @@ impl Transfers {
                         )),
                         id: MessageId::in_response_to(&msg.id()),
                         correlation_id: msg.id(),
-                        target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
@@ -295,7 +290,6 @@ impl Transfers {
                 response: Transfers(GetReplicaEvents(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: query_origin.to_dst(),
@@ -322,7 +316,6 @@ impl Transfers {
                 response: QueryResponse::GetBalance(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
@@ -348,7 +341,6 @@ impl Transfers {
                 response: QueryResponse::GetHistory(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
@@ -372,7 +364,6 @@ impl Transfers {
                     event: Event::TransferValidated { event },
                     id: MessageId::new(),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                 dst: origin.to_dst(),
@@ -385,7 +376,6 @@ impl Transfers {
                         id: MessageId::in_response_to(&msg_id),
                         error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
                         correlation_id: msg_id,
-                        target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
@@ -412,7 +402,6 @@ impl Transfers {
                     msg: Message::NodeCmd {
                         cmd: Transfers(PropagateTransfer(event.transfer_proof.credit_proof())),
                         id: MessageId::in_response_to(&msg_id),
-                        target_section_pk: None,
                     },
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(location),
@@ -428,7 +417,6 @@ impl Transfers {
                         )),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: DstLocation::EndUser(EndUser::AllClients(proof.sender())),
@@ -462,7 +450,6 @@ impl Transfers {
                     error: NodeCmdError::Transfers(TransferPropagation(message_error)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 }
             }
             Err(Error::UnknownSectionKey(_))
@@ -472,7 +459,6 @@ impl Transfers {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 }
             }
             Err(e) => {

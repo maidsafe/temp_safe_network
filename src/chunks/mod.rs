@@ -43,13 +43,8 @@ impl Chunks {
         })
     }
 
-    pub async fn read(
-        &mut self,
-        read: &BlobRead,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuties> {
-        reading::get_result(read, msg_id, origin, &self.chunk_storage).await
+    pub async fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> Result<NodeDuties> {
+        reading::get_result(read, msg_id, &self.chunk_storage).await
     }
 
     pub async fn write(

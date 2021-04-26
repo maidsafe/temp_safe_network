@@ -90,16 +90,16 @@ pub enum NodeDuty {
     },
     /// Run at data-section Elders on receiving the result of
     /// write operations from Adults
-    ProcessBlobWriteResult {
+    RecordAdultWriteLiveness {
         result: Result<(), CmdError>,
-        original_msg_id: MessageId,
+        correlation_id: MessageId,
         src: XorName,
     },
     /// Run at data-section Elders on receiving the result of
     /// read operations from Adults
-    ProcessBlobReadResult {
+    RecordAdultReadLiveness {
         response: QueryResponse,
-        original_msg_id: MessageId,
+        correlation_id: MessageId,
         src: XorName,
     },
     /// Get section elders.
@@ -248,23 +248,23 @@ impl Debug for NodeDuty {
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
-            Self::ProcessBlobWriteResult {
-                original_msg_id,
+            Self::RecordAdultWriteLiveness {
+                correlation_id,
                 result,
                 src,
             } => write!(
                 f,
-                "ProcessBlobWriteResult {{ original_msg_id: {}, result: {:?}, src: {} }}",
-                original_msg_id, result, src
+                "RecordAdultWriteLiveness {{ correlation_id: {}, result: {:?}, src: {} }}",
+                correlation_id, result, src
             ),
-            Self::ProcessBlobReadResult {
-                original_msg_id,
+            Self::RecordAdultReadLiveness {
+                correlation_id,
                 response,
                 src,
             } => write!(
                 f,
-                "ProcessBlobReadResult {{ original_msg_id: {}, response: {:?}, src: {} }}",
-                original_msg_id, response, src
+                "RecordAdultReadLiveness {{ correlation_id: {}, response: {:?}, src: {} }}",
+                correlation_id, response, src
             ),
             Self::ReceiveRewardProposal { .. } => write!(f, "ReceiveRewardProposal"),
             Self::ReceiveRewardAccumulation { .. } => write!(f, "ReceiveRewardAccumulation"),

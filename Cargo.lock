@@ -1250,9 +1250,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.93"
+version = "0.2.94"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
+checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
 
 [[package]]
 name = "linked-hash-map"
@@ -1682,9 +1682,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.8"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "604dbd98d1a4ed86f164e5e7182235e8c2ecdb6ee7fe751c9a1b113729e4ec1b"
+checksum = "08604106daaa1a6415e401eecbf7257fed6dce7ee42746ad207866a3a0fc89a2"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2270,9 +2270,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f9a8df9d31ec249e47efd5de62770dbd08bedbc368fc497eaa0eb01be34b9e0"
+checksum = "fb1e3099925addc0fc8b15f29a8964f818eeba6219e80c583b1d3ec6d7dc3713"
 dependencies = [
  "dirs-next 1.0.2",
  "env_logger 0.8.3",
@@ -2283,9 +2283,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "18.0.0"
+version = "18.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d73f05d53408d8543e2c8e7e56f612c25beb2a06b866f4b4f7ca97009483f215"
+checksum = "4cf32ec2378dc318c29d51e564c95256dbed4cca3ed7596027ac2826dee3b268"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2309,7 +2309,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.38.10"
+version = "0.39.0"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2352,9 +2352,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.63.0"
+version = "0.63.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdce898e3c66cd541372458ef9a4e142e47df09fb2854f462ef3e7503dc3c10f"
+checksum = "3944b67a1bcaa1facf3c2b79fa7af34f920ef2c2bbeb35f3c794a9e3c2ea21bd"
 dependencies = [
  "bincode",
  "bls_dkg",

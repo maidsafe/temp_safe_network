@@ -321,7 +321,6 @@ fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
         msg: Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             id: MessageId::new(),
-            target_section_pk: None,
         },
         section_source: false,                 // sent as single node
         dst: DstLocation::Section(our_elders), // send this msg to our elders!
@@ -334,7 +333,6 @@ fn send_acc_msg(accumulation: RewardAccumulation, our_elders: XorName) -> NodeDu
         msg: Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             id: MessageId::new(),
-            target_section_pk: None,
         },
         section_source: false,                 // sent as single node
         dst: DstLocation::Section(our_elders), // send this msg to our elders!

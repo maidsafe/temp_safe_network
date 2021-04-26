@@ -97,7 +97,6 @@ impl RegisterStorage {
                 response: QueryResponse::GetRegister(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
@@ -159,7 +158,6 @@ impl RegisterStorage {
                 response: QueryResponse::ReadRegister(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
@@ -183,7 +181,6 @@ impl RegisterStorage {
                 response: QueryResponse::GetRegisterOwner(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
@@ -214,7 +211,6 @@ impl RegisterStorage {
                 response: QueryResponse::GetRegisterUserPermissions(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
@@ -245,7 +241,6 @@ impl RegisterStorage {
                 response: QueryResponse::GetRegisterPolicy(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
@@ -312,7 +307,6 @@ impl RegisterStorage {
                 id: MessageId::in_response_to(&msg_id),
                 error: CmdError::Data(error),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::Section(origin.name()),

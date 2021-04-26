@@ -44,35 +44,23 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = self.try_store(data, origin).await {
-            Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeEvent {
-                    event: NodeEvent::ChunkOpHandled(Err(CmdError::Data(
-                        convert_to_error_message(error)?,
-                    ))),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // sent as single node
-                // Data's metadata section
-                dst: DstLocation::Section(*data.address().name()),
-                aggregation: Aggregation::None,
-            }))
+        let result = if let Err(error) = self.try_store(data, origin).await {
+            Err(CmdError::Data(convert_to_error_message(error)?))
         } else {
-            Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeEvent {
-                    event: NodeEvent::ChunkOpHandled(Ok(())),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false,
-                // Data's metadata section
-                dst: DstLocation::Section(*data.address().name()),
-                aggregation: Aggregation::None,
-            }))
-        }
+            Ok(())
+        };
+
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeEvent {
+                event: NodeEvent::ChunkWriteHandled(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+            },
+            section_source: false, // sent as single node
+            // Data's metadata section
+            dst: DstLocation::Section(*data.address().name()),
+            aggregation: Aggregation::None,
+        }))
     }
 
     async fn try_store(&mut self, data: &Blob, origin: EndUser) -> Result<()> {
@@ -101,45 +89,23 @@ impl ChunkStorage {
         self.chunks.put(&data).await
     }
 
-    pub(crate) async fn get(
-        &self,
-        address: &BlobAddress,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuties> {
+    pub(crate) async fn get(&self, address: &BlobAddress, msg_id: MessageId) -> Result<NodeDuties> {
         let mut ops = vec![];
         let result = self
             .chunks
             .get(address)
             .map_err(|_| ErrorMessage::NoSuchData);
 
-        let report_result = if result.is_err() {
-            Err(CmdError::Data(sn_messaging::client::Error::NoSuchData))
-        } else {
-            Ok(())
-        };
-        ops.push(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeEvent {
-                event: NodeEvent::ChunkOpHandled(report_result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false,
-            // Data's metadata section
-            dst: DstLocation::Section(*address.name()),
-            aggregation: Aggregation::None,
-        }));
-
+        // Sent back to data's metadata section, who will then
+        // forward it to client after having recorded the adult liveness.
         ops.push(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
                 id: MessageId::in_response_to(&msg_id),
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
-            dst: DstLocation::EndUser(origin),
+            dst: DstLocation::Section(*address.name()),
             aggregation: Aggregation::None,
         }));
 
@@ -164,7 +130,6 @@ impl ChunkStorage {
                     response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(Ok(data))),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false,              // sent as single node
                 dst: DstLocation::Section(section), // send it back to section Elders
@@ -233,15 +198,14 @@ impl ChunkStorage {
 
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeEvent {
-                event: NodeEvent::ChunkOpHandled(result.map_err(CmdError::Data)),
+                event: NodeEvent::ChunkWriteHandled(result.map_err(CmdError::Data)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             // respond to data's metadata elders
             dst: DstLocation::Section(*address.name()),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::None,
         }))
     }
 }

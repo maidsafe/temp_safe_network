@@ -36,7 +36,6 @@ impl Node {
                 msg: Message::NodeCmd {
                     cmd: Transfers(PropagateTransfer(credit_proof)),
                     id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: true, // i.e. errors go to our section
                 dst: DstLocation::Section(location),
@@ -64,8 +63,7 @@ impl Node {
                     elders,
                 )),
                 correlation_id: msg_id,
-                id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
-                target_section_pk: None,
+                id: MessageId::in_response_to(&msg_id),
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section
@@ -83,7 +81,6 @@ impl Node {
                     node_id,
                 }),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::Section(node_id.into()),
@@ -98,7 +95,6 @@ impl Node {
             msg: Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::Section(address),
@@ -133,7 +129,6 @@ impl Node {
                     metadata,
                 }),
                 id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an event..
             dst,
