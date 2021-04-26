@@ -154,17 +154,11 @@ pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping
 }
 
 fn match_or_err(msg: Message, src: SrcLocation) -> Mapping {
-    match match_section_msg(msg.clone(), src) {
-        NodeDuty::NoOp => match match_node_msg(msg.clone(), src) {
-            NodeDuty::NoOp => Mapping::Error(LazyError {
-                error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
-                msg: MsgContext::Msg { msg, src },
-            }),
-            op => Mapping::Ok {
-                op,
-                ctx: Some(MsgContext::Msg { msg, src }),
-            },
-        },
+    match match_node_msg(msg.clone(), src) {
+        NodeDuty::NoOp => Mapping::Error(LazyError {
+            error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
+            msg: MsgContext::Msg { msg, src },
+        }),
         op => Mapping::Ok {
             op,
             ctx: Some(MsgContext::Msg { msg, src }),
@@ -172,7 +166,7 @@ fn match_or_err(msg: Message, src: SrcLocation) -> Mapping {
     }
 }
 
-fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
+fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
     match &msg {
         // ------ wallet register ------
         Message::NodeCmd {
@@ -289,12 +283,6 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
-        _ => NodeDuty::NoOp,
-    }
-}
-
-fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
-    match &msg {
         //
         // ------ system cmd ------
         Message::NodeCmd {
