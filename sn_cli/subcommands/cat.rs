@@ -136,6 +136,9 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
                 println!("{}", serialise_output(&(url, data), output_fmt));
             }
         }
+        SafeData::Multimap { .. }
+        | SafeData::PrivateRegister { .. }
+        | SafeData::PublicRegister { .. } => unimplemented!(),
     }
 
     Ok(())

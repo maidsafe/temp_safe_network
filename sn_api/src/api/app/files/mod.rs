@@ -564,7 +564,7 @@ impl Safe {
     }
 
     /// # Get a Public Blob
-    /// Put data blobs onto the network.
+    /// Get blob from the network.
     ///
     /// ## Example
     /// ```

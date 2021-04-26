@@ -166,6 +166,9 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: PrivateSequence");
                 }
+                SafeData::Multimap { .. }
+                | SafeData::PrivateRegister { .. }
+                | SafeData::PublicRegister { .. } => unimplemented!(),
             }
         }
         println!();

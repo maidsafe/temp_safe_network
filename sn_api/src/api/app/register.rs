@@ -18,7 +18,7 @@ use xor_name::XorName;
 impl Safe {
     /// Create a Register on the network
     pub async fn register_create(
-        &mut self,
+        &self,
         name: Option<XorName>,
         type_tag: u64,
         private: bool,
@@ -40,7 +40,7 @@ impl Safe {
     }
 
     /// Read value from a Register on the network
-    pub async fn register_read(&mut self, url: &str) -> Result<BTreeSet<(EntryHash, Entry)>> {
+    pub async fn register_read(&self, url: &str) -> Result<BTreeSet<(EntryHash, Entry)>> {
         debug!("Getting Public Register data from: {:?}", url);
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
 
@@ -49,7 +49,7 @@ impl Safe {
 
     /// Read value from a Register on the network by its hash
     pub async fn register_read_entry(
-        &mut self,
+        &self,
         url: &str,
         hash: EntryHash,
     ) -> Result<Option<(EntryHash, Entry)>> {
@@ -58,13 +58,13 @@ impl Safe {
 
         let entries = self.fetch_register_value(&safeurl, Some(hash)).await?;
 
-        // Since we passed down a hash we know only one entry should have been found
+        // Since we passed down a hash we know only one single entry should have been found
         Ok(entries.into_iter().next())
     }
 
     /// Fetch a Register from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_register_value(
-        &mut self,
+        &self,
         safeurl: &SafeUrl,
         hash: Option<EntryHash>,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
@@ -105,7 +105,7 @@ impl Safe {
     }
 
     /// Write value to a Register on the network
-    pub async fn write_to_register(&mut self, url: &str, data: &[u8]) -> Result<EntryHash> {
+    pub async fn write_to_register(&self, url: &str, data: &[u8]) -> Result<EntryHash> {
         /*
         let safeurl = Safe::parse_url(url)?;
         if safeurl.content_hash().is_some() {
@@ -138,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_create() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let xorurl = safe.register_create(None, 25_000, false).await?;
         let xorurl_priv = safe.register_create(None, 25_000, true).await?;
