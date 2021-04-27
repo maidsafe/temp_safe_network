@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [19.0.1](https://github.com/maidsafe/sn_messaging/compare/v19.0.0...v19.0.1) (2021-04-27)
+
+
+### Bug Fixes
+
+* **error:** use correct address for DataNotFound error ([1518e57](https://github.com/maidsafe/sn_messaging/commit/1518e57e77bb9a43dceab4f51bd6a98033844a40))
+
 ## [19.0.0](https://github.com/maidsafe/sn_messaging/compare/v18.0.1...v19.0.0) (2021-04-27)
 
 
