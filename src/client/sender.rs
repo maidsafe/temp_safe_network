@@ -217,7 +217,7 @@ impl Display for EntitySignature {
 }
 
 ///
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum Address {
     ///
     Client(XorName),
