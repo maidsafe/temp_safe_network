@@ -7,9 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::client::Address;
 use crate::section_info::Error as TargetSectionError;
 use serde::{Deserialize, Serialize};
+use sn_data_types::DataAddress;
 use sn_data_types::PublicKey;
 use std::{
     fmt::{self, Debug, Formatter},
@@ -55,7 +55,7 @@ pub enum Error {
     Serialization(String),
     /// Requested data not found
     #[error("Requested data not found: {0:?}")]
-    DataNotFound(Address),
+    DataNotFound(DataAddress),
     /// No history found for PublicKey
     #[error("No history found for PublicKey: {0}")]
     NoHistoryForPublicKey(sn_data_types::PublicKey),
