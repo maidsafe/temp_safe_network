@@ -16,6 +16,7 @@ use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum Msg {
     #[cfg(not(feature = "client-only"))]
     Node(NodeMsg),

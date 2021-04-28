@@ -126,7 +126,7 @@ impl SupportingInfo {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
-    /// Optional reason for the error. This should help recveiving node handle the error
+    /// Optional reason for the error. This should help receiving node handle the error
     reason: Option<Error>,
     /// Message that triggered this error
     source_message: Option<ProcessMsg>,
@@ -479,7 +479,7 @@ try_from!(ActorHistory, GetHistory);
 mod tests {
     use super::*;
     use anyhow::{anyhow, Result};
-    use sn_data_types::{Keypair, PublicBlob, UnseqMap};
+    use sn_data_types::{BlobAddress, DataAddress, Keypair, PublicBlob, UnseqMap};
     use std::convert::{TryFrom, TryInto};
 
     fn gen_keypairs() -> Vec<Keypair> {
@@ -517,11 +517,15 @@ mod tests {
                 query: Query::Transfer(TransferQuery::GetBalance(*key)),
                 id: MessageId::new(),
             };
-            let lazy_error = msg.create_processing_error(Some(Error::NoSuchData));
+            let random_addr = DataAddress::Blob(BlobAddress::Public(XorName::random()));
+            let lazy_error =
+                msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
 
             assert!(format!("{:?}", lazy_error).contains("TransferQuery::GetBalance"));
             assert!(format!("{:?}", lazy_error).contains("ProcessingError"));
-            assert!(format!("{:?}", lazy_error).contains("NoSuchData"));
+            assert!(
+                format!("{:?}", lazy_error).contains(&format!("DataNotFound({:?})", random_addr))
+            );
 
             Ok(())
         } else {
@@ -532,8 +536,9 @@ mod tests {
     #[test]
     fn debug_format_processing_error() -> Result<()> {
         if let Some(key) = gen_keys().first() {
+            let random_addr = DataAddress::Blob(BlobAddress::Public(XorName::random()));
             let errored_response = ProcessingError {
-                reason: Some(Error::NoSuchData),
+                reason: Some(Error::DataNotFound(random_addr.clone())),
                 source_message: Some(ProcessMsg::Query {
                     id: MessageId::new(),
                     query: Query::Transfer(TransferQuery::GetBalance(*key)),
@@ -543,7 +548,8 @@ mod tests {
 
             assert!(format!("{:?}", errored_response).contains("TransferQuery::GetBalance"));
             assert!(format!("{:?}", errored_response).contains("ProcessingError"));
-            assert!(format!("{:?}", errored_response).contains("NoSuchData"));
+            assert!(format!("{:?}", errored_response)
+                .contains(&format!("DataNotFound({:?})", random_addr)));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))

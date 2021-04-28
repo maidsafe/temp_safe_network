@@ -9,11 +9,10 @@
 
 // FIXME: change NodeCmd defnintions to return Result and
 // Error defined for the crate::node instead of client Result/Error
-use crate::client::{Error, Result};
+use crate::client::{CmdError, Error, Result};
 use crate::{
     client::{
         BlobRead, BlobWrite, DataCmd as NodeDataCmd, DataExchange, DataQuery as NodeDataQuery,
-        NodeCmdResult,
     },
     EndUser, MessageId, MessageType, WireMsg,
 };
@@ -42,13 +41,6 @@ pub enum NodeMsg {
         /// NodeCmd.
         cmd: NodeCmd,
         /// Message ID.
-        id: MessageId,
-    },
-    /// Result of an applied NodeCmd
-    NodeCmdResult {
-        /// The result
-        result: NodeCmdResult,
-        /// Message ID
         id: MessageId,
     },
     /// An error of a NodeCmd.
@@ -95,7 +87,6 @@ impl NodeMsg {
             | Self::NodeQuery { id, .. }
             | Self::NodeEvent { id, .. }
             | Self::NodeQueryResponse { id, .. }
-            | Self::NodeCmdResult { id, .. }
             | Self::NodeCmdError { id, .. } => *id,
         }
     }
@@ -196,7 +187,7 @@ pub enum NodeEvent {
         proof: Signature,
     },
     /// Adults ack read/write of chunks as to convey responsivity.
-    ChunkWriteHandled(Result<(), super::CmdError>),
+    ChunkWriteHandled(Result<(), CmdError>),
 }
 
 ///
