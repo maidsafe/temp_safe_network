@@ -11,7 +11,6 @@ mod reading;
 mod writing;
 
 use crate::{
-    chunk_store::UsedSpace,
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
@@ -37,16 +36,9 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    #[allow(dead_code)]
     pub async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         Ok(Self {
             chunk_storage: ChunkStorage::new(path, max_capacity).await?,
-        })
-    }
-
-    pub async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
-        Ok(Self {
-            chunk_storage: ChunkStorage::from_used_space(path, used_space).await?,
         })
     }
 

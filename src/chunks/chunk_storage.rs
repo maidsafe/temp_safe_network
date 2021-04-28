@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{BlobChunkStore, UsedSpace},
+    chunk_store::BlobChunkStore,
     error::convert_to_error_message,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
@@ -36,11 +36,6 @@ impl ChunkStorage {
     #[allow(dead_code)]
     pub(crate) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         let chunks = BlobChunkStore::new(path, max_capacity).await?;
-        Ok(Self { chunks })
-    }
-
-    pub(crate) async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
-        let chunks = BlobChunkStore::from_used_space(path, used_space).await?;
         Ok(Self { chunks })
     }
 
