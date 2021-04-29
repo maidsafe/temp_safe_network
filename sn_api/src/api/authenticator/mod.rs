@@ -421,7 +421,10 @@ impl SafeAuthenticator {
 
                     keypair
                 }
-                Err(ClientError::ErrorMessage(NoSuchEntry)) => {
+                Err(ClientError::ErrorMessage {
+                    source: NoSuchEntry,
+                    ..
+                }) => {
                     // This is the first time this app is being authorised,
                     // thus let's generate a keypair for it
                     trace!(

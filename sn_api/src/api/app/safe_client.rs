@@ -310,8 +310,11 @@ impl SafeAppClient {
             .get_map_value(address, key_vec)
             .await
             .map_err(|err| match err {
-                ClientError::ErrorMessage(ErrorMessage::AccessDenied(_pk))
-                | ClientError::NetworkDataError(SafeNdError::AccessDenied(_pk)) => {
+                ClientError::ErrorMessage {
+                    source: ErrorMessage::AccessDenied(_),
+                    ..
+                }
+                | ClientError::NetworkDataError(SafeNdError::AccessDenied(_)) => {
                     Error::AccessDenied(format!("Failed to retrieve a key: {:?}", key))
                 }
                 // FIXME: we need to match the appropriate error

@@ -24,7 +24,7 @@ const LOCAL_NODE_DIR: &str = "local-node";
 pub enum NodeSubCommands {
     /// Gets the version of `sn_node` binary
     BinVersion {
-        #[structopt(long = "node_path", env = "SN_NODE_PATH")]
+        #[structopt(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
     },
     #[structopt(name = "install")]
