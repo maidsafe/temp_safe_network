@@ -14,7 +14,7 @@ use crate::{
     Result,
 };
 use chunk_storage::ChunkStorage;
-use log::info;
+use log::{info, warn};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{BlobRead, BlobWrite, CmdError, Message, NodeEvent},
