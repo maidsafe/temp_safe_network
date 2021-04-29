@@ -245,6 +245,8 @@ pub enum NodeSystemQueryResponse {
     /// On Elder change, all Elders need to query
     /// network for the new wallet's replicas' public key set
     GetSectionElders(SectionElders),
+    /// Respond elders with the requested chunk for replication
+    GetChunk(Blob),
 }
 
 ///
