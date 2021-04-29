@@ -61,8 +61,8 @@ pub enum Error {
     #[error("VersionNotFound: {0}")]
     VersionNotFound(String),
     /// HashNotFound
-    #[error("HashNotFound: {0}")]
-    HashNotFound(String),
+    #[error("No entry with hash {0:?}")]
+    HashNotFound(crate::register::EntryHash),
     /// EntryNotFound
     #[error("EntryNotFound: {0}")]
     EntryNotFound(String),

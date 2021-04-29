@@ -9,7 +9,7 @@
 
 pub use sn_data_types::register::{Entry, EntryHash};
 
-use super::safeurl::{SafeContentType, SafeDataType, SafeUrl, XorUrl};
+use super::safeurl::{SafeContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use log::debug;
 use std::collections::BTreeSet;
@@ -44,51 +44,28 @@ impl Safe {
         debug!("Getting Public Register data from: {:?}", url);
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
 
-        self.fetch_register_value(&safeurl, None).await
+        self.fetch_register_entries(&safeurl).await
     }
 
     /// Read value from a Register on the network by its hash
-    pub async fn register_read_entry(
-        &self,
-        url: &str,
-        hash: EntryHash,
-    ) -> Result<Option<(EntryHash, Entry)>> {
+    pub async fn register_read_entry(&self, url: &str, hash: EntryHash) -> Result<Entry> {
         debug!("Getting Public Register data from: {:?}", url);
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
 
-        let entries = self.fetch_register_value(&safeurl, Some(hash)).await?;
-
-        // Since we passed down a hash we know only one single entry should have been found
-        Ok(entries.into_iter().next())
+        self.fetch_register_entry(&safeurl, hash).await
     }
 
     /// Fetch a Register from a SafeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_register_value(
+    pub(crate) async fn fetch_register_entries(
         &self,
         safeurl: &SafeUrl,
-        hash: Option<EntryHash>,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        let is_private = safeurl.data_type() == SafeDataType::PrivateRegister;
-
         // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
 
-        let data = if let Some(hash) = hash {
-            // We fetch a specific entry with provided hash
-            let data = self
-                .safe_client
-                .get_register_entry(safeurl.xorname(), safeurl.type_tag(), hash, is_private)
-                .await?;
+        let address = safeurl.register_address()?;
 
-            Ok(vec![(hash, data)].into_iter().collect())
-        } else {
-            // ...then get last entry from the Register
-            self.safe_client
-                .read_register(safeurl.xorname(), safeurl.type_tag(), is_private)
-                .await
-        };
-
-        match data {
+        match self.safe_client.read_register(address).await {
             Ok(data) => {
                 debug!("Register retrieved...");
                 Ok(data)
@@ -104,8 +81,27 @@ impl Safe {
         }
     }
 
+    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    pub(crate) async fn fetch_register_entry(
+        &self,
+        safeurl: &SafeUrl,
+        hash: EntryHash,
+    ) -> Result<Entry> {
+        // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
+        // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
+        let address = safeurl.register_address()?;
+
+        // We fetch a specific entry with provided hash
+        self.safe_client.get_register_entry(address, hash).await
+    }
+
     /// Write value to a Register on the network
-    pub async fn write_to_register(&self, url: &str, data: &[u8]) -> Result<EntryHash> {
+    pub async fn write_to_register(
+        &self,
+        url: &str,
+        data: Vec<u8>,
+        parents: BTreeSet<EntryHash>,
+    ) -> Result<EntryHash> {
         /*
         let safeurl = Safe::parse_url(url)?;
         if safeurl.content_hash().is_some() {
@@ -119,14 +115,11 @@ impl Safe {
         */
 
         let (safeurl, _) = self.parse_and_resolve_url(url).await?;
-
-        let xorname = safeurl.xorname();
-        let type_tag = safeurl.type_tag();
-        let is_private = safeurl.data_type() == SafeDataType::PrivateRegister;
+        let address = safeurl.register_address()?;
 
         // write the data to the Register
         self.safe_client
-            .write_to_register(data, xorname, type_tag, is_private, BTreeSet::new())
+            .write_to_register(address, data, parents)
             .await
     }
 }
@@ -150,17 +143,18 @@ mod tests {
         assert!(received_data_priv.is_empty());
 
         let initial_data = b"initial data";
-        let hash = safe.write_to_register(&xorurl, initial_data).await?;
-        let hash_priv = safe.write_to_register(&xorurl_priv, initial_data).await?;
+        let hash = safe
+            .write_to_register(&xorurl, initial_data.to_vec(), Default::default())
+            .await?;
+        let hash_priv = safe
+            .write_to_register(&xorurl_priv, initial_data.to_vec(), Default::default())
+            .await?;
 
         let received_entry = retry_loop!(safe.register_read_entry(&xorurl, hash));
-        let received_entry_priv = retry_loop!(safe.register_read_entry(&xorurl_priv, hash));
+        let received_entry_priv = retry_loop!(safe.register_read_entry(&xorurl_priv, hash_priv));
 
-        assert_eq!(received_entry, Some((hash, initial_data.to_vec())));
-        assert_eq!(
-            received_entry_priv,
-            Some((hash_priv, initial_data.to_vec()))
-        );
+        assert_eq!(received_entry, initial_data.to_vec());
+        assert_eq!(received_entry_priv, initial_data.to_vec());
 
         Ok(())
     }

@@ -613,30 +613,14 @@ impl SafeAppClient {
         Ok(xorname)
     }
 
-    pub async fn read_register(
-        &self,
-        name: XorName,
-        tag: u64,
-        private: bool,
-    ) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        debug!(
-            "Fetching {} Register data with tag type: {}, xorname: {}",
-            if private { "Private" } else { "Public" },
-            tag,
-            name
-        );
+    pub async fn read_register(&self, address: Address) -> Result<BTreeSet<(EntryHash, Entry)>> {
+        debug!("Fetching Register data at {:?}", address);
 
         let client = self.get_safe_client()?;
 
-        let register_address = if private {
-            Address::Private { name, tag }
-        } else {
-            Address::Public { name, tag }
-        };
-
-        client.read_register(register_address).await.map_err(|err| {
+        client.read_register(address).await.map_err(|err| {
             if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
-                Error::EmptyContent(format!("Empty Register found at XoR name {}", name))
+                Error::EmptyContent(format!("Empty Register found at {:?}", address))
             } else {
                 Error::NetDataError(format!(
                     "Failed to read current value from Register data: {:?}",
@@ -646,38 +630,16 @@ impl SafeAppClient {
         })
     }
 
-    pub async fn get_register_entry(
-        &self,
-        name: XorName,
-        tag: u64,
-        hash: EntryHash,
-        private: bool,
-    ) -> Result<Entry> {
-        debug!(
-            "Fetching {} Register data with tag type: {}, xorname: {}",
-            if private { "Private" } else { "Public" },
-            tag,
-            name
-        );
+    pub async fn get_register_entry(&self, address: Address, hash: EntryHash) -> Result<Entry> {
+        debug!("Fetching Register hash {:?} at {:?}", hash, address);
 
         let client = self.get_safe_client()?;
-
-        let register_address = if private {
-            Address::Private { name, tag }
-        } else {
-            Address::Public { name, tag }
-        };
-
         let entry = client
-            .get_register_entry(register_address, hash)
+            .get_register_entry(address, hash)
             .await
             .map_err(|err| {
                 if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
-                    Error::HashNotFound(format!(
-                        "No entry with hash '{}' for Register found at XoR name {}",
-                        encode(hash),
-                        name
-                    ))
+                    Error::HashNotFound(hash)
                 } else {
                     Error::NetDataError(format!(
                         "Failed to retrieve entry with hash '{}' from Register data: {:?}",
@@ -692,29 +654,15 @@ impl SafeAppClient {
 
     pub async fn write_to_register(
         &self,
-        data: &[u8],
-        name: XorName,
-        tag: u64,
-        private: bool,
+        address: Address,
+        data: Vec<u8>,
         parents: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
-        debug!(
-            "Writting to {} Register data with tag type: {}, xorname: {}",
-            if private { "Private" } else { "Public" },
-            tag,
-            name
-        );
-
+        debug!("Writing to Register at {:?}", address);
         let client = self.get_safe_client()?;
 
-        let register_address = if private {
-            Address::Private { name, tag }
-        } else {
-            Address::Public { name, tag }
-        };
-
         client
-            .write_to_register(register_address, data.to_vec(), parents)
+            .write_to_register(address, data, parents)
             .await
             .map_err(|e| Error::NetDataError(format!("Failed to write to Register: {:?}", e)))
     }

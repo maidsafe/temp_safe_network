@@ -17,6 +17,7 @@ use crate::{
 use log::{debug, info, trace, warn};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
+use sn_data_types::register;
 use std::fmt;
 use tiny_keccak::{Hasher, Sha3};
 use url::Url;
@@ -556,6 +557,19 @@ impl SafeUrl {
     /// returns XorName
     pub fn xorname(&self) -> XorName {
         self.xor_name
+    }
+
+    pub fn register_address(&self) -> Result<register::Address> {
+        let name = self.xor_name;
+        let tag = self.type_tag;
+        match self.data_type {
+            SafeDataType::PrivateRegister => Ok(register::Address::Private { name, tag }),
+            SafeDataType::PublicRegister => Ok(register::Address::Public { name, tag }),
+            _ => Err(Error::InvalidInput(format!(
+                "Attempting to create a register address for wrong datatype {}",
+                self.data_type
+            ))),
+        }
     }
 
     /// returns public_name portion of xorurl using the

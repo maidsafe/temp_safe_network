@@ -416,7 +416,7 @@ impl Safe {
             SafeContentType::Multimap => {
                 let data = if retrieve_data {
                     // TODO: pass the hash of the URL to grab a single element
-                    self.fetch_multimap_value(&the_xor, None, None).await?
+                    self.fetch_multimap_values(&the_xor).await?
                 } else {
                     MultimapKeyValues::new()
                 };
@@ -488,8 +488,8 @@ impl Safe {
                     }
                     SafeDataType::PublicRegister => {
                         let data = if retrieve_data {
-                            // TODO: pass the hash of the URL to grab a single element
-                            self.fetch_register_value(&the_xor, None).await?
+                            // TODO: use the content hash in the URL to grab a single element if it exists
+                            self.fetch_register_entries(&the_xor).await?
                         } else {
                             BTreeSet::new()
                         };
@@ -506,8 +506,8 @@ impl Safe {
                     }
                     SafeDataType::PrivateRegister => {
                         let data = if retrieve_data {
-                            // TODO: pass the hash of the URL to grab a single element
-                            self.fetch_register_value(&the_xor, None).await?
+                            // TODO: use the content hash in the URL to grab a single element if it exists
+                            self.fetch_register_entries(&the_xor).await?
                         } else {
                             BTreeSet::new()
                         };
