@@ -13,7 +13,6 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::client::{ClientMsg, CmdError};
-use sn_messaging::node::NodeMsg;
 use sn_messaging::{
     client::{
         BlobRead, BlobWrite, DataExchange, ProcessMsg, ProcessingError, QueryResponse,
@@ -203,11 +202,11 @@ pub enum NodeDuty {
     SetNodeJoinsAllowed(bool),
     /// Send a message to the specified dst.
     Send(OutgoingMsg),
-    /// Send a lazy error as a result of a specfic message.
+    /// Send a lazy error as a result of a specific message.
     /// The aim here is for the sender to respond with any missing state
     SendError(OutgoingLazyError),
-    /// Send supporting infor for a given processing error.
-    /// Theis should be any missing state required to proceed at the erroring node.
+    /// Send supporting in for for a given processing error.
+    /// This should be any missing state required to proceed at the erring node.
     SendSupport(OutgoingSupportingInfo),
     /// Send the same request to each individual node.
     SendToNodes {

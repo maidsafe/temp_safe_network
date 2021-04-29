@@ -32,6 +32,7 @@ use xor_name::XorName;
 
 use super::adult_liveness::AdultLiveness;
 use super::adult_reader::AdultReader;
+use crate::node_ops::MsgType;
 
 // The number of separate copies of a blob chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
@@ -279,16 +280,16 @@ impl BlobRecords {
             .adult_liveness
             .record_adult_read_liveness(correlation_id, src)
         {
-            duties.push(NodeDuty::Send(OutgoingMsg {
-                msg: Message::QueryResponse {
+            return Ok(vec![NodeDuty::Send(OutgoingMsg {
+                msg: MsgType::Client(ProcessMsg::QueryResponse {
                     response,
                     id: MessageId::in_response_to(&correlation_id),
                     correlation_id,
-                },
+                }),
                 dst: DstLocation::EndUser(end_user),
                 section_source: false,
                 aggregation: Aggregation::AtDestination,
-            }));
+            })]);
         }
         let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_liveness.find_unresponsive_adults() {

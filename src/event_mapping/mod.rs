@@ -11,7 +11,7 @@ mod map_msg;
 use super::node_ops::NodeDuty;
 use crate::{network::Network, node_ops::MsgType, Error};
 use log::{debug, error, info, trace, warn};
-use map_msg::{map_node_msg, match_user_sent_msg};
+use map_msg::{map_node_msg, map_node_process_err_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
 use sn_messaging::{
     client::{ClientMsg, ProcessMsg, ProcessingError},

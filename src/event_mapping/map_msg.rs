@@ -13,8 +13,8 @@ use crate::{event_mapping::Msg, node_ops::NodeDuty, Error};
 use log::{debug, warn};
 use sn_messaging::client::{ClientMsg, ProcessingError};
 use sn_messaging::node::{
-    NodeCmd, NodeEvent, NodeMsg, NodeQuery, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery,
-    NodeTransferCmd, NodeTransferQuery,
+    NodeCmd, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery, NodeQueryResponse,
+    NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
 };
 use sn_messaging::{
     client::{
@@ -33,21 +33,6 @@ pub fn match_user_sent_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             ..
         } => Mapping::Ok {
             op: NodeDuty::ProcessRead { query, id, origin },
-            ctx: Some(super::MsgContext::Msg {
-                msg: Msg::Client(ClientMsg::Process(msg)),
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        ProcessMsg::QueryResponse {
-            response,
-            correlation_id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::ProcessBlobReadResult {
-                response,
-                original_msg_id: correlation_id,
-                src: origin.name(),
-            },
             ctx: Some(super::MsgContext::Msg {
                 msg: Msg::Client(ClientMsg::Process(msg)),
                 src: SrcLocation::EndUser(origin),
@@ -271,6 +256,7 @@ fn match_or_err(msg: NodeMsg, src: SrcLocation) -> Mapping {
                 msg: Msg::Node(msg),
                 src,
             },
+            error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
         },
         op => Mapping::Ok {
             op,
@@ -364,7 +350,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             origin: *origin,
         },
         //
-        // ------ adult ------
+        // ------ Adult ------
         NodeMsg::NodeQuery {
             query: NodeQuery::Chunks { query, origin },
             id,
@@ -423,25 +409,6 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
-        // --- Adult ---
-        NodeMsg::NodeQuery {
-            query: NodeQuery::Chunks { query, origin },
-            id,
-            ..
-        } => NodeDuty::ReadChunk {
-            read: query.clone(),
-            msg_id: *id,
-            origin: *origin,
-        },
-        NodeMsg::NodeCmd {
-            cmd: NodeCmd::Chunks { cmd, origin },
-            id,
-            ..
-        } => NodeDuty::WriteChunk {
-            write: cmd.clone(),
-            msg_id: *id,
-            origin: *origin,
-        },
         // --- Adult Operation response ---
         NodeMsg::NodeEvent {
             event: NodeEvent::ChunkWriteHandled(result),
@@ -452,18 +419,15 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             correlation_id: *correlation_id,
             src: origin.name(),
         },
-        NodeMsg::QueryResponse {
-            response,
+        NodeMsg::NodeQueryResponse {
+            response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(res)),
             correlation_id,
             ..
-        } if matches!(response, QueryResponse::GetBlob(_)) => NodeDuty::RecordAdultReadLiveness {
-            response: response.clone(),
+        } => NodeDuty::RecordAdultReadLiveness {
+            response: sn_messaging::client::QueryResponse::GetBlob(res.clone()),
             correlation_id: *correlation_id,
             src: origin.name(),
         },
-        _ => {
-            warn!("Node ProcessMsg from not handled: {:?}", msg);
-            NodeDuty::NoOp
-        }
+        _ => NodeDuty::NoOp,
     }
 }

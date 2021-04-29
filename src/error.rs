@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_data_types::{DataAddress, Error as DtError, PublicKey};
-use sn_messaging::{client::Error as ErrorMessage, MessageId};
+use sn_messaging::{client::Error as ErrorMessage, MessageId, Msg};
 use sn_routing::Prefix;
 use std::io;
 use thiserror::Error;
@@ -166,7 +166,6 @@ pub enum Error {
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
     match error {
-        Error::InvalidOperation(msg) => Ok(ErrorMessage::InvalidOperation(msg)),
         Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
         Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
         Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),

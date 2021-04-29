@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node_ops::MsgType;
 use crate::{
     chunk_store::BlobChunkStore,
     error::convert_to_error_message,
@@ -19,6 +20,7 @@ use sn_messaging::{
         CmdError, Error as ErrorMessage, Message, NodeEvent, NodeQueryResponse, ProcessMsg,
         QueryResponse,
     },
+    node::{NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQueryResponse, NodeSystemQueryResponse},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use std::{
@@ -49,11 +51,11 @@ impl ChunkStorage {
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeEvent {
+            msg: MsgType::Node(NodeMsg::NodeEvent {
                 event: NodeEvent::ChunkWriteHandled(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // sent as single node
             // Data's metadata section
             dst: DstLocation::Section(*data.address().name()),
@@ -81,23 +83,21 @@ impl ChunkStorage {
         self.chunks.delete(&address).await
     }
 
-    pub(crate) fn get(&self, address: &BlobAddress, msg_id: MessageId) -> NodeDuties {
-        let mut ops = vec![];
+    pub(crate) fn get(&self, address: &BlobAddress, msg_id: MessageId) -> NodeDuty {
         let result = self
             .get_chunk(address)
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Blob(*address)));
+
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ProcessMsg::QueryResponse {
+            msg: MsgType::Node(NodeMsg::NodeQueryResponse {
+                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
                 id: MessageId::in_response_to(&msg_id),
-                response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
             }),
             section_source: false, // sent as single node
             dst: DstLocation::Section(*address.name()),
             aggregation: Aggregation::None,
-        }));
-
-        ops
+        }))
     }
 
     /// Stores a chunk that Elders sent to it for replication.
@@ -155,11 +155,11 @@ impl ChunkStorage {
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeEvent {
+            msg: MsgType::Node(NodeMsg::NodeEvent {
                 event: NodeEvent::ChunkWriteHandled(result.map_err(CmdError::Data)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // sent as single node
             // respond to data's metadata elders
             dst: DstLocation::Section(*address.name()),

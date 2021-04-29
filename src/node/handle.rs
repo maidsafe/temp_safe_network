@@ -16,8 +16,6 @@ use crate::node_ops::OutgoingSupportingInfo;
 use crate::{
     chunks::Chunks,
     event_mapping::MsgContext,
-    metadata::Metadata,
-    node::{AdultRole, Role},
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,

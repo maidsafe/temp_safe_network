@@ -19,14 +19,11 @@ use crate::{
     chunks::Chunks,
     error::convert_to_error_message,
     event_mapping::{map_routing_event, Mapping, MsgContext},
-    metadata::Metadata,
     network::Network,
-    node_ops::{NodeDuty, OutgoingLazyError, OutgoingMsg},
-    section_funds::SectionFunds,
+    node_ops::{NodeDuty, OutgoingLazyError},
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
-use bls::SecretKey;
 use log::{error, info, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
