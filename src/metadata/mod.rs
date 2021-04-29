@@ -16,7 +16,7 @@ mod sequence_storage;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
-use crate::{capacity::ChunkHolderDbs, chunk_store::UsedSpace, node_ops::NodeDuties, Result};
+use crate::{capacity::ChunkHolderDbs, node_ops::NodeDuties, Result};
 use blob_records::BlobRecords;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
@@ -46,14 +46,14 @@ pub struct Metadata {
 impl Metadata {
     pub async fn new(
         path: &Path,
-        used_space: &UsedSpace,
+        max_capacity: u64,
         dbs: ChunkHolderDbs,
         reader: AdultReader,
     ) -> Result<Self> {
         let blob_records = BlobRecords::new(dbs, reader);
-        let map_storage = MapStorage::new(path, used_space.clone()).await?;
-        let sequence_storage = SequenceStorage::new(path, used_space.clone()).await?;
-        let register_storage = RegisterStorage::new(path, used_space.clone()).await?;
+        let map_storage = MapStorage::new(path, max_capacity).await?;
+        let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
+        let register_storage = RegisterStorage::new(path, max_capacity).await?;
         let elder_stores = ElderStores::new(
             blob_records,
             map_storage,

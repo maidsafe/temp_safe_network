@@ -14,7 +14,7 @@ const USED_SPACE_FILENAME: &str = "used_space";
 
 /// This holds a record (in-memory and on-disk) of the space used by a single `ChunkStore`, and also
 /// an in-memory record of the total space used by all `ChunkStore`s.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UsedSpace {
     inner: Arc<Mutex<inner::UsedSpace>>,
 }
@@ -59,13 +59,14 @@ impl UsedSpace {
     /// Note, due to the async nature of this, the value
     /// may be stale by the time it is read if there are multiple
     /// writers
-    #[allow(unused)]
+    #[allow(dead_code)]
     pub async fn local(&self, id: StoreId) -> u64 {
         self.inner.lock().await.local(id)
     }
 
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
+    #[allow(dead_code)]
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
         self.inner.lock().await.add_local_store(dir).await
     }
