@@ -12,9 +12,9 @@ use futures::{
     future::{join_all, select_all},
     lock::Mutex,
 };
+use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use qp2p::{self, Config as QuicP2pConfig, Endpoint, IncomingMessages, QuicP2p};
-use rand::seq::IteratorRandom;
 use sn_data_types::{
     Blob, Keypair, PrivateBlob, PublicBlob, PublicKey, Signature, TransferValidated,
 };
@@ -226,25 +226,28 @@ impl Session {
     }
 
     /// Send a Query `Message` to the network awaiting for the response.
-    pub(crate) async fn send_query(&self, msg: &Message) -> Result<QueryResult, Error> {
+    pub(crate) async fn send_query(&self, query: Query) -> Result<QueryResult, Error> {
+        let data_name = query.dst_address();
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
-        let msg_id = msg.id();
-        let msg_bytes = msg.serialize()?;
         let mut pending_sending = Vec::new();
 
-        // Force the `rand::thread_rng` to stay in a scope with
-        // no `.await` between calls to it, since it is `!Send`
-        let elders: Vec<SocketAddr> = {
-            let connected_elders = self.connected_elders.lock().await;
-            // We select a random subset of NUM_OF_ELDERS_SUBSET_FOR_QUERIES
-            // from connected Elders to send the query to
-            let mut rng = &mut rand::thread_rng();
-            connected_elders
-                .keys()
-                .cloned()
-                .choose_multiple(&mut rng, NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-        };
+        let msg_id = MessageId::new();
+        let msg = Message::Query { query, id: msg_id };
+        let msg_bytes = msg.serialize()?;
+
+        // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
+        // connected Elders to the data we are querying
+        let elders: Vec<SocketAddr> = self
+            .connected_elders
+            .lock()
+            .await
+            .clone()
+            .into_iter()
+            .sorted_by(|(_, lhs_name), (_, rhs_name)| data_name.cmp_distance(&lhs_name, &rhs_name))
+            .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
+            .map(|(addr, _)| addr)
+            .collect();
 
         let elders_len = elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES {
@@ -256,7 +259,7 @@ impl Session {
         }
 
         info!(
-            "Sending query message {:?} w/ id: {:?}, to {} randomly chosen Elders: {:?}",
+            "Sending query message {:?} w/ id: {:?}, to the {} Elders closest to data name: {:?}",
             msg, msg_id, elders_len, elders
         );
 
@@ -700,14 +703,17 @@ impl Session {
 
     // Handle messages intended for client consumption (re: queries + commands)
     async fn handle_client_msg(&self, msg: Message, src: SocketAddr) {
-        let notifier = self.notifier.clone();
-        match msg.clone() {
+        match msg {
             Message::QueryResponse {
                 response,
                 correlation_id,
                 ..
             } => {
-                trace!("Query response in: {:?}", response);
+                trace!(
+                    "Query response (correlation id: {}): {:?}",
+                    correlation_id,
+                    response
+                );
 
                 if let Some(sender) = self
                     .pending_queries
@@ -715,7 +721,10 @@ impl Session {
                     .await
                     .remove(&(src, correlation_id))
                 {
-                    trace!("Sender channel found for query response");
+                    trace!(
+                        "Sender channel found for query response with correlation id {}",
+                        correlation_id
+                    );
                     let _ = sender.send(Ok(response)).await;
                 } else {
                     trace!(
@@ -757,7 +766,7 @@ impl Session {
                     warn!("No sender subscribing and listening for errors relating to message {}. Error returned is: {:?}", correlation_id, error)
                 }
 
-                let _ = notifier.send(Error::from((error, correlation_id)));
+                let _ = self.notifier.send(Error::from((error, correlation_id)));
             }
             msg => {
                 warn!("Ignoring unexpected message type received: {:?}", msg);

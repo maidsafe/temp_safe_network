@@ -216,19 +216,13 @@ impl Client {
     /// ```
     pub async fn public_key(&self) -> PublicKey {
         let id = self.keypair().await;
-
         id.public_key()
     }
 
     /// Send a Query to the network and await a response
     async fn send_query(&self, query: Query) -> Result<QueryResult, Error> {
-        // `sign` should be false for GETs on published data, true otherwise.
-
         debug!("Sending QueryRequest: {:?}", query);
-
-        let message = self.create_query_message(query).await?;
-
-        self.session.send_query(&message).await
+        self.session.send_query(query).await
     }
 
     // Build and sign Cmd Message Envelope
@@ -238,17 +232,6 @@ impl Client {
 
         Ok(Message::Cmd {
             cmd: msg_contents,
-            id,
-        })
-    }
-
-    // Build a Query
-    pub(crate) async fn create_query_message(&self, msg_contents: Query) -> Result<Message, Error> {
-        let id = MessageId::new();
-        trace!("Creating query message with id : {:?}", id);
-
-        Ok(Message::Query {
-            query: msg_contents,
             id,
         })
     }
