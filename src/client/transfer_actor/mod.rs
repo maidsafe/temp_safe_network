@@ -123,15 +123,13 @@ impl Client {
         let public_key = self.public_key().await;
         info!("Getting SnTransfers history for pk: {:?}", public_key);
 
-        let msg_contents = Query::Transfer(TransferQuery::GetHistory {
+        let query = Query::Transfer(TransferQuery::GetHistory {
             at: public_key,
             since_version: 0,
         });
 
-        let message = self.create_query_message(msg_contents).await?;
-
         // This is a normal response manager request. We want quorum on this for now...
-        let query_result = self.session.send_query(&message).await?;
+        let query_result = self.session.send_query(query).await?;
         let msg_id = query_result.msg_id;
 
         let history = match query_result.response {
@@ -167,16 +165,14 @@ impl Client {
 
         let public_key = self.public_key().await;
 
-        let msg_contents = Query::Transfer(TransferQuery::GetStoreCost {
+        let query = Query::Transfer(TransferQuery::GetStoreCost {
             requester: public_key,
             bytes,
         });
 
-        let message = self.create_query_message(msg_contents).await?;
-
         // This is a normal response manager request. We want quorum on this for now...
 
-        let query_result = self.session.send_query(&message).await?;
+        let query_result = self.session.send_query(query).await?;
         let msg_id = query_result.msg_id;
 
         match query_result.response {

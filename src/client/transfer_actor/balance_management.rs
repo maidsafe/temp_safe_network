@@ -79,10 +79,9 @@ impl Client {
         info!("Getting balance for {:?} or self", pk);
         let public_key = pk.unwrap_or(self.public_key().await);
 
-        let msg_contents = Query::Transfer(TransferQuery::GetBalance(public_key));
+        let query = Query::Transfer(TransferQuery::GetBalance(public_key));
 
-        let message = self.create_query_message(msg_contents).await?;
-        let query_result = self.session.send_query(&message).await?;
+        let query_result = self.session.send_query(query).await?;
         let msg_id = query_result.msg_id;
 
         match query_result.response {
