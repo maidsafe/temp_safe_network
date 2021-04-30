@@ -52,6 +52,8 @@ pub enum NodeSystemCmd {
     },
     /// Replicate a given chunk at an Adult
     ReplicateChunk(Blob),
+    /// Tells the Elders to re-publish a chunk in the data section
+    RepublishChunk(Blob),
     /// When new section key, all propose a reward payout.
     ProposeRewardPayout(sn_data_types::RewardProposal),
     /// When proposal has been agreed, they all accumulate the reward payout.
@@ -158,8 +160,6 @@ pub enum NodeSystemQueryResponse {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQueryResponse {
     ///
-    Data(NodeDataQueryResponse),
-    ///
     Transfers(NodeTransferQueryResponse),
     ///
     System(NodeSystemQueryResponse),
@@ -173,16 +173,6 @@ pub enum NodeTransferQueryResponse {
     /// need to query for events of
     /// the existing Replicas.
     GetReplicaEvents(Result<Vec<ReplicaEvent>>),
-}
-
-///
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataQueryResponse {
-    /// Elder to Adult Get.
-    GetChunk(Result<Blob>),
-    /// Adult to Adult Get
-    GetChunks(Result<Vec<Blob>>),
 }
 
 ///

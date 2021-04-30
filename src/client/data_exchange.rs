@@ -37,10 +37,6 @@ pub struct DataExchange {
 pub struct BlobDataExchange {
     /// Full Adults register
     pub full_adults: BTreeMap<String, String>,
-    /// Blob holders register
-    pub holders: BTreeMap<String, HolderMetadata>,
-    /// Metadata register
-    pub metadata: BTreeMap<String, ChunkMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

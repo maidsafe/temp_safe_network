@@ -33,10 +33,9 @@ pub use self::{
     errors::{Error, ErrorDebug, Result},
     map::{MapRead, MapWrite},
     network::{
-        NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
-        NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
-        NodeTransferQueryResponse,
+        NodeCmd, NodeCmdError, NodeDataError, NodeEvent, NodeQuery, NodeQueryResponse,
+        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
+        NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
     },
     query::Query,
     register::{RegisterRead, RegisterWrite},
