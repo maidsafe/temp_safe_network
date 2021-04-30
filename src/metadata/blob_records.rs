@@ -463,6 +463,47 @@ impl BlobRecords {
             .non_full_adults_closest_to(&target, &full_adults, CHUNK_COPY_COUNT)
             .await
     }
+
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        if let Err(error) = result {
+            info!("BlobRecords: Writing chunk Failed. {:?}", error);
+            let messaging_error = convert_to_error_message(error)?;
+
+            Ok(NodeDuty::Send(OutgoingMsg {
+                msg: Message::CmdError {
+                    error: CmdError::Data(messaging_error),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            }))
+        } else {
+            Ok(NodeDuty::NoOp)
+        }
+    }
+}
+
+fn validate_data_owner(data: &Blob, origin: &EndUser) -> Result<()> {
+    if data.is_private() {
+        data.owner()
+            .ok_or_else(|| Error::InvalidOwners(*origin.id()))
+            .and_then(|data_owner| {
+                if data_owner != origin.id() {
+                    Err(Error::InvalidOwners(*origin.id()))
+                } else {
+                    Ok(())
+                }
+            })
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_data_owner(data: &Blob, origin: &EndUser) -> Result<()> {
