@@ -141,7 +141,7 @@ impl Network {
     }
 
     pub async fn matching_section(&self, name: &XorName) -> Option<bls::PublicKey> {
-        let (key, _) = self.routing.matching_section(&name).await;
+        let (key, _) = self.routing.matching_section(name).await;
         key
     }
 
@@ -182,8 +182,8 @@ impl Network {
     }
 
     #[allow(unused)]
-    pub async fn matches_our_prefix(&self, name: XorName) -> bool {
-        self.routing.matches_our_prefix(&XorName(name.0)).await
+    pub async fn matches_our_prefix(&self, name: &XorName) -> bool {
+        self.routing.matches_our_prefix(name).await
     }
 
     pub async fn send_message(
@@ -224,7 +224,7 @@ impl Network {
             .our_elders()
             .await
             .iter()
-            .map(|p2p_node| XorName(p2p_node.name().0))
+            .map(|p2p_node| *p2p_node.name())
             .collect::<BTreeSet<_>>()
     }
 
@@ -234,7 +234,7 @@ impl Network {
             .our_elders()
             .await
             .iter()
-            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.addr()))
+            .map(|p2p_node| (*p2p_node.name(), *p2p_node.addr()))
             .collect::<Vec<_>>()
     }
 
@@ -244,10 +244,10 @@ impl Network {
         name: &XorName,
     ) -> Vec<(XorName, SocketAddr)> {
         self.routing
-            .our_elders_sorted_by_distance_to(&XorName(name.0))
+            .our_elders_sorted_by_distance_to(name)
             .await
             .into_iter()
-            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.addr()))
+            .map(|p2p_node| (*p2p_node.name(), *p2p_node.addr()))
             .collect::<Vec<_>>()
     }
 
@@ -258,11 +258,11 @@ impl Network {
         count: usize,
     ) -> Vec<XorName> {
         self.routing
-            .our_elders_sorted_by_distance_to(&XorName(name.0))
+            .our_elders_sorted_by_distance_to(name)
             .await
             .into_iter()
             .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
+            .map(|p2p_node| *p2p_node.name())
             .collect::<Vec<_>>()
     }
 
@@ -293,7 +293,7 @@ impl Network {
             .our_adults()
             .await
             .into_iter()
-            .map(|p2p_node| XorName(p2p_node.name().0))
+            .map(|p2p_node| *p2p_node.name())
             .collect::<Vec<_>>()
     }
 
@@ -303,11 +303,11 @@ impl Network {
         count: usize,
     ) -> Vec<XorName> {
         self.routing
-            .our_adults_sorted_by_distance_to(&XorName(name.0))
+            .our_adults_sorted_by_distance_to(name)
             .await
             .into_iter()
             .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
+            .map(|p2p_node| *p2p_node.name())
             .collect::<Vec<_>>()
     }
 }
