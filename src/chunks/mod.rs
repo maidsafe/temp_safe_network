@@ -91,7 +91,7 @@ impl Chunks {
         let data_name = *blob.address().name();
         let result = match self.chunk_storage.store_for_replication(blob).await {
             Ok(()) => Ok(()),
-            Err(err) => Err(CmdError::Data(convert_to_error_message(err)?)),
+            Err(err) => Err(CmdError::Data(convert_to_error_message(err))),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Node(NodeMsg::NodeEvent {

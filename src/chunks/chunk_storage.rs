@@ -47,7 +47,7 @@ impl ChunkStorage {
     pub(crate) async fn store(&mut self, data: &Blob, msg_id: MessageId) -> Result<NodeDuty> {
         let result = match self.try_store(data).await {
             Ok(()) | Err(Error::DataExists) => Ok(()), // if the data already exists we are fine too
-            Err(other) => Err(CmdError::Data(convert_to_error_message(other)?)),
+            Err(other) => Err(CmdError::Data(convert_to_error_message(other))),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {

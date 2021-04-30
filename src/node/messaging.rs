@@ -40,7 +40,7 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
     let content = match msg.msg.clone() {
-        MsgType::Client(msg) => ClientMsg::Process(msg).serialize(dst_name, dest_section_pk)?,
+        MsgType::Client(msg) => msg.serialize(dst_name, dest_section_pk)?,
         MsgType::Node(msg) => {
             let src_section_pk = if itinerary.aggregate_at_dst() {
                 Some(

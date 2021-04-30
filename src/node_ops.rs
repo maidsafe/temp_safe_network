@@ -336,7 +336,7 @@ pub struct OutgoingMsg {
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
     Node(NodeMsg),
-    Client(ProcessMsg),
+    Client(ClientMsg),
 }
 
 impl MsgType {

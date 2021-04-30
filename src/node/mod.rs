@@ -18,7 +18,7 @@ use crate::{
     chunk_store::UsedSpace,
     chunks::Chunks,
     error::convert_to_error_message,
-    event_mapping::{map_routing_event, Mapping, MsgContext},
+    event_mapping::{map_routing_event, MsgContext},
     network::Network,
     node_ops::{NodeDuty, OutgoingLazyError},
     state_db::{get_reward_pk, store_new_reward_keypair},
@@ -32,7 +32,9 @@ use sn_messaging::{
     client::{ClientMsg, Error as ErrorMessage, ProcessingError},
     DstLocation, MessageId, Msg, SrcLocation,
 };
-use sn_routing::{EventStream, Prefix, XorName};
+use sn_routing::{
+    EventStream, {Prefix, XorName},
+};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -175,17 +177,25 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
     let op = match ctx {
         None => {
             error!(
-                "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
-            );
+                    "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
+                );
             return vec![];
         }
         Some(MsgContext::Msg { msg, src }) => {
             warn!("Sending in response to a message: {:?}", msg);
             match msg {
                 Msg::Client(ClientMsg::Process(msg)) => NodeDuty::SendError(OutgoingLazyError {
-                    msg: msg.create_processing_error(convert_to_error_message(err).ok()),
+                    msg: msg.create_processing_error(convert_to_error_message(err).ok),
                     dst: src.to_dst(),
                 }),
+                Msg::Client(ClientMsg::ProcessingError(_err)) => {
+                    // TODO: handle error as a result of handling processing error...
+                    NodeDuty::NoOp
+                }
+                Msg::Client(ClientMsg::SupportingInfo(_msg)) => {
+                    // TODO: handle error as a result of supporting info msg
+                    NodeDuty::NoOp
+                }
                 _ => NodeDuty::NoOp,
             }
         }

@@ -33,6 +33,7 @@ use xor_name::XorName;
 use super::adult_liveness::AdultLiveness;
 use super::adult_reader::AdultReader;
 use crate::node_ops::MsgType;
+use sn_messaging::client::ClientMsg;
 
 // The number of separate copies of a blob chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
@@ -232,11 +233,11 @@ impl BlobRecords {
                 // Depending on error, we might have to take action here.
                 if let Some(end_user) = origin {
                     duties.push(NodeDuty::Send(OutgoingMsg {
-                        msg: MsgType::Client(ProcessMsg::CmdError {
+                        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                             error,
                             id: MessageId::in_response_to(&correlation_id),
                             correlation_id,
-                        }),
+                        })),
                         dst: DstLocation::EndUser(end_user),
                         section_source: false,
                         aggregation: Aggregation::AtDestination,
@@ -281,11 +282,11 @@ impl BlobRecords {
             .record_adult_read_liveness(correlation_id, src)
         {
             return Ok(vec![NodeDuty::Send(OutgoingMsg {
-                msg: MsgType::Client(ProcessMsg::QueryResponse {
+                msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                     response,
                     id: MessageId::in_response_to(&correlation_id),
                     correlation_id,
-                }),
+                })),
                 dst: DstLocation::EndUser(end_user),
                 section_source: false,
                 aggregation: Aggregation::AtDestination,
@@ -313,11 +314,11 @@ impl BlobRecords {
     ) -> Result<NodeDuty> {
         let message_error = convert_to_error_message(error)?;
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ProcessMsg::CmdError {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                 error: CmdError::Data(message_error),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            }),
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::AtDestination,
