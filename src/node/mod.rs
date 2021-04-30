@@ -62,10 +62,7 @@ pub struct Node {
 
 impl Node {
     /// Initialize a new node.
-    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-    #[allow(clippy::eval_order_dependence)]
     pub async fn new(config: &Config) -> Result<Self> {
-        // TODO: STARTUP all things
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
@@ -140,7 +137,7 @@ impl Node {
         Ok(())
     }
 
-    /// Keeps processing resulting node operations.
+    // Keeps processing resulting node operations.
     async fn process_while_any(&mut self, op: NodeDuty, ctx: Option<MsgContext>) {
         let mut next_ops = vec![op];
 
