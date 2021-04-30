@@ -238,10 +238,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             id: *id,
             origin: *origin,
         },
-        Message::NodeCmd {
-            cmd: NodeCmd::Republish { chunk },
-            id,
-        } => NodeDuty::ReplicateChunk(chunk.clone()),
         //
         // ------ adult ------
         Message::NodeQuery {
