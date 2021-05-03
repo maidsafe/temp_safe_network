@@ -60,6 +60,7 @@ pub enum Error {
     /// VersionNotFound
     #[error("VersionNotFound: {0}")]
     VersionNotFound(String),
+    #[cfg(feature = "app")]
     /// HashNotFound
     #[error("No entry with hash {0:?}")]
     HashNotFound(crate::register::EntryHash),
