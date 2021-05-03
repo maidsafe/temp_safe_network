@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [20.0.1](https://github.com/maidsafe/sn_messaging/compare/v20.0.0...v20.0.1) (2021-05-03)
+
+
+### Bug Fixes
+
+* **full-adults:** use BTreeSet to hold full adult information for ([85ecb70](https://github.com/maidsafe/sn_messaging/commit/85ecb70e1210f808ac51b9d219e17fdea810a002))
+
 ## [20.0.0](https://github.com/maidsafe/sn_messaging/compare/v19.0.1...v20.0.0) (2021-04-30)
 
 
