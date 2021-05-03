@@ -36,7 +36,7 @@ pub struct DataExchange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlobDataExchange {
     /// Full Adults register
-    pub full_adults: BTreeMap<String, String>,
+    pub full_adults: BTreeSet<XorName>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
