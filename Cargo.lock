@@ -2977,7 +2977,7 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "sn_api"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3018,7 +3018,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "cluFlock",
@@ -3042,7 +3042,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3088,9 +3088,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.52.19"
+version = "0.54.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f41fcb5bcbba99c2579dbb8e33d1567c4ccecda60686d46866f98314bc55804"
+checksum = "8d03b67ae3b25fc2a48538584bd265a3e10109bcc6248e03cc68c7fc4cbd35e4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3101,6 +3101,7 @@ dependencies = [
  "dirs-next 2.0.0",
  "futures",
  "futures-util",
+ "itertools 0.10.0",
  "log",
  "miscreant",
  "qp2p",
@@ -3173,9 +3174,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "17.0.1"
+version = "20.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e01dc26222131c39b08267a3d1ab7197753c05c06b734b1481b90dbd8079782"
+checksum = "6cf4d5fcee06a1bf3a428557837d16676c64f59ea24a1ad85dc54e4da45d046a"
 dependencies = [
  "bincode",
  "bytes",

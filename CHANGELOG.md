@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.0](https://github.com/maidsafe/sn_api/compare/v0.24.0...v0.25.0) (2021-05-03)
+
+* ***cli*** change node_path arg of 'node bin-path' command to node-path
+* ***api*** register API takes an address and ownership over data
+* ***api*** adding Register and Multimap public APIs
+* ***api*** allow immutable reference to fetch method
+* ***api*** removed more mut bindings to self methods
+* ***api*** allow aliases of Safe (immutable references)
+* ***api*** fix set_content_version api in SafeUrl API to update its internal state
+* ***cli*** add 'xorurl pk' subcommand which generates the SafeKey XOR-URL for the given public key
+
 ### [0.24.0](https://github.com/maidsafe/sn_api/compare/v0.23.3...v0.24.0) (2021-04-21)
 
 ### Features

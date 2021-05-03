@@ -53,7 +53,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-cache-v2-${{ hashFiles('**/Cargo.lock') }}
 
       # Build on Ubuntu
       - name: Build Ubuntu
