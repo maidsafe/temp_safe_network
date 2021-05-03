@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.1](https://github.com/maidsafe/sn_api/compare/v0.25.0...v0.25.1) (2021-05-03)
+
+* ***api** add feature gate to app-specific error
+
 ### [0.25.0](https://github.com/maidsafe/sn_api/compare/v0.24.0...v0.25.0) (2021-05-03)
 
 * ***cli*** change node_path arg of 'node bin-path' command to node-path
