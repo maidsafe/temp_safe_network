@@ -25,6 +25,7 @@ pub use self::{
     serialisation::WireMsg,
 };
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use threshold_crypto::PublicKey;
 use xor_name::XorName;
 
@@ -58,7 +59,7 @@ pub enum MessageType {
 
 /// This is information kept by 'MessageType' so it can be properly
 /// serialised with a valid 'WireMsgHeader'
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Ord, PartialOrd, Eq)]
 pub struct DestInfo {
     pub dest: XorName,
     pub dest_section_pk: PublicKey,
