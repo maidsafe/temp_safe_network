@@ -31,8 +31,6 @@ impl BlobStorage {
 #[async_trait]
 impl Storage for BlobStorage {
     async fn get(&mut self, name: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        trace!("Self encrypt invoked GetBlob.");
-
         if name.len() != XOR_NAME_LEN {
             return Err(SelfEncryptionError::Generic(
                 "Requested `name` is incorrect size.".to_owned(),
@@ -51,6 +49,8 @@ impl Storage for BlobStorage {
             BlobAddress::Private(name)
         };
 
+        trace!("Self encrypt invoked GetBlob({:?})", &address);
+
         match self.client.fetch_blob_from_network(address).await {
             Ok(data) => Ok(data.value().clone()),
             Err(error) => Err(SelfEncryptionError::Generic(format!("{}", error))),
@@ -58,8 +58,6 @@ impl Storage for BlobStorage {
     }
 
     async fn delete(&mut self, name: &[u8]) -> Result<(), SelfEncryptionError> {
-        trace!("Self encrypt invoked DeleteBlob.");
-
         if name.len() != XOR_NAME_LEN {
             return Err(SelfEncryptionError::Generic(
                 "Requested `name` is incorrect size.".to_owned(),
@@ -79,6 +77,7 @@ impl Storage for BlobStorage {
         } else {
             BlobAddress::Private(name)
         };
+        trace!("Self encrypt invoked DeleteBlob({:?})", &address);
 
         match self.client.delete_blob_from_network(address).await {
             Ok(_) => Ok(()),
@@ -87,12 +86,12 @@ impl Storage for BlobStorage {
     }
 
     async fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionError> {
-        trace!("Self encrypt invoked PutBlob.");
         let blob: Blob = if self.public {
             PublicBlob::new(data).into()
         } else {
             PrivateBlob::new(data, self.client.public_key().await).into()
         };
+        trace!("Self encrypt invoked PutBlob({:?})", &blob);
         self.client
             .store_blob_on_network(blob)
             .await
