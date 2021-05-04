@@ -625,27 +625,16 @@ async fn files_map_get_files(
         // Note: must never get here if a directory/symlink.
         let xorurl = &details.getattr("link")?;
 
-        // Download file.  We handle callback from download_file_from_net()
-        // and our handler calls a callback supplied by our caller.
-        match download_file_from_net(
-            safe,
-            xorurl,
-            abspath.as_path(),
-            size,
-            |_path, _file_size, file_bytes_written, last_write: u64| {
-                transfer_bytes_written += last_write;
+        // Download file
+        match download_file_from_net(safe, xorurl, abspath.as_path(), size).await {
+            Ok(file_bytes_written) => {
+                processed_files.insert(path.to_string(), ("+".to_string(), (*xorurl).to_string()));
+                transfer_bytes_written += file_bytes_written;
                 status.transfer_bytes_written = transfer_bytes_written;
                 status.file_bytes_written = file_bytes_written;
 
-                // status callback for each chunk of file downloaded.
+                // status callback for this file which has been downloaded.
                 callback(&status);
-                true
-            },
-        )
-        .await
-        {
-            Ok(_bytes) => {
-                processed_files.insert(path.to_string(), ("+".to_string(), (*xorurl).to_string()));
             }
             Err(err) => {
                 processed_files.insert(path.to_string(), ("E".to_string(), format!("<{}>", err)));
@@ -720,59 +709,31 @@ fn denormalize_slashes(p: &str) -> String {
 }
 
 // Downloads a file from the network to a given file path
-// Data is downloaded and written to filesystem in 64k chunks.
-// xorurl must point to immutable data
+// xorurl must point to a Blob
 // size (in bytes) must be provided
-// A callback/closure is called after each chunk is downloaded.
 async fn download_file_from_net(
     safe: &mut Safe,
     xorurl: &str,
     path: &Path,
     size: u64,
-    //Path, file_size, file_bytes_written, bytes_written.  return false to cancel download.
-    mut callback: impl FnMut(&Path, u64, u64, u64) -> bool,
 ) -> Result<u64> {
     debug!("downloading file {} to {}", xorurl, path.display());
 
-    // chunk_size based on https://stackoverflow.com/questions/8803515/optimal-buffer-size-for-write2
-    // originally it was 4096 to match common disk block size, but that seems a bit small for the
-    // network, so I multiplied by 16.  Perhaps should make it a param so caller can decide.
-    let chunk_size: u64 = 65536;
+    // TODO: download the file by concurrently (spawning tasks/threads) pulling chunks.
+    // The chunk_size can be based on https://stackoverflow.com/questions/8803515/optimal-buffer-size-for-write2
+    // which can be 4096 to match common disk block size, but that seems a bit small for the
+    // network, so I multiplied by 16. Perhaps should make it a param so caller can decide.
     let mut rcvd: u64 = 0;
     let mut bytes_written: u64 = 0;
 
     let fh = file_create(path)?;
     let mut stream = BufWriter::new(fh);
 
-    // stream and write the file in chunk_size pieces
-    while rcvd < size {
-        let start = rcvd;
-        let end = if rcvd + chunk_size < size {
-            rcvd + chunk_size
-        } else {
-            size
-        };
-        let range = Some((Some(start), Some(end)));
-        // gets public or private, based on xorurl type
-        let filedata = files_get_blob(safe, &xorurl, range).await?;
-        bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
-        rcvd += filedata.len() as u64;
-        trace!(
-            "received {} bytes of {}.  chunk start: {}, end: {}",
-            rcvd,
-            size,
-            start,
-            end
-        );
-
-        // invoke callback if present, with status info.
-        //        if let Some(cb) = callback {
-        let b_continue = callback(path, size, bytes_written, filedata.len() as u64);
-        if !b_continue {
-            trace!("download cancelled by callback");
-            break;
-        }
-    }
+    // gets public or private, based on xorurl type
+    let filedata = files_get_blob(safe, &xorurl, None).await?;
+    bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
+    rcvd += filedata.len() as u64;
+    trace!("received {} bytes of {}", rcvd, size,);
 
     // Close may generate an error, so we do a flush/sync first to detect such.
     // see https://github.com/rust-lang/rust/pull/63410#issuecomment-519965351
