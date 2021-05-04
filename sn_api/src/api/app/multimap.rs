@@ -7,12 +7,10 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{
-    register::EntryHash,
-    safeurl::{SafeContentType, SafeUrl, XorUrl},
-};
+use super::register::EntryHash;
 use crate::{Error, Result, Safe};
 use log::debug;
+use sn_url::{SafeContentType, SafeUrl, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 

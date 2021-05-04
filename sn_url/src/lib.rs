@@ -1399,7 +1399,7 @@ mod tests {
             XorUrlBase::Base64,
             false,
         )?;
-        let base64_xorurl = "safe://mAQACAzEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
+        let base64_xorurl = "safe://mAQACBTEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
         let safeurl = SafeUrl::from_url(&base64_xorurl)?;
         assert_eq!(base64_xorurl, safeurl.to_base(XorUrlBase::Base64));
@@ -1747,7 +1747,7 @@ mod tests {
     fn test_safeurl_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hyryygy5k9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygbmk9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=5&name=John+Doe#somefragment";
 
         let nrs = SafeUrl::from_url(nrsurl)?;
         let xor = SafeUrl::from_url(xorurl)?;

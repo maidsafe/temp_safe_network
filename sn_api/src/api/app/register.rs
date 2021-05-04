@@ -9,9 +9,9 @@
 
 pub use sn_data_types::register::{Entry, EntryHash};
 
-use super::safeurl::{SafeContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use log::debug;
+use sn_url::{SafeContentType, SafeUrl, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
