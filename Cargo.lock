@@ -2759,9 +2759,9 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.21.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbc2d705d8017cb9bbc71b821b5271ab16874fce24a69a78c140e66d5e937fc1"
+checksum = "d1cdfcbf44496831b84d9daff79bdb41cb89863fe5db995c95bfea44562195da"
 dependencies = [
  "aes",
  "async-trait",
@@ -3089,9 +3089,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.54.3"
+version = "0.54.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba1beb308b72d493ac0dca9b1299e157d6874e3249af8189ef453d5a178dcef9"
+checksum = "94380c8cfb51c92b9314c8698a4a1f650e1888e5cc7123552a0a9cb9c892a614"
 dependencies = [
  "anyhow",
  "async-trait",

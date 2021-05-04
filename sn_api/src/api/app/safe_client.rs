@@ -224,7 +224,13 @@ impl SafeAppClient {
             } else {
                 None
             };
-            client.read_blob(blob_address, start, len).await
+            client
+                .read_blob(
+                    blob_address,
+                    start.map(|val| val as usize),
+                    len.map(|val| val as usize),
+                )
+                .await
         } else {
             client.read_blob(blob_address, None, None).await
         }
