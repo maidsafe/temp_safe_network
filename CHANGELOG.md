@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.2](https://github.com/maidsafe/sn_api/compare/v0.25.1...v0.25.2) (2021-05-04)
+
+* ***api*** update sn_client to v0.54.4
+* ***api*** move safe_url into a separate crate
+* ***api*** remove tiny-keccak dependency and use xor_name to calculate sha3 of NRS string
+
 ### [0.25.1](https://github.com/maidsafe/sn_api/compare/v0.25.0...v0.25.1) (2021-05-03)
 
 * ***api** add feature gate to app-specific error
