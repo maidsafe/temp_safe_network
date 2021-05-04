@@ -12,9 +12,9 @@ mod node_msg;
 use crate::{MessageType, WireMsg};
 use bytes::Bytes;
 pub use node_msg::{
-    NodeCmd, NodeCmdError, NodeDataError, NodeEvent, NodeMsg, NodeQuery, NodeQueryResponse,
-    NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-    NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
+    NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
+    NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
+    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};

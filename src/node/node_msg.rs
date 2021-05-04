@@ -254,6 +254,8 @@ pub enum NodeSystemQueryResponse {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQueryResponse {
     ///
+    Data(NodeDataQueryResponse),
+    ///
     Transfers(NodeTransferQueryResponse),
     ///
     System(NodeSystemQueryResponse),
@@ -267,6 +269,14 @@ pub enum NodeTransferQueryResponse {
     /// need to query for events of
     /// the existing Replicas.
     GetReplicaEvents(Result<Vec<ReplicaEvent>>),
+}
+
+///
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum NodeDataQueryResponse {
+    /// Elder to Adult Get.
+    GetChunk(Result<Blob>),
 }
 
 ///
