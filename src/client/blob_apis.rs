@@ -59,8 +59,8 @@ impl Client {
     pub async fn read_blob(
         &self,
         address: BlobAddress,
-        position: Option<u64>,
-        len: Option<u64>,
+        position: Option<usize>,
+        len: Option<usize>,
     ) -> Result<Vec<u8>, Error>
     where
         Self: Sized,
@@ -313,8 +313,8 @@ impl Client {
         &self,
         data_map: DataMap,
         public: bool,
-        position: Option<u64>,
-        len: Option<u64>,
+        position: Option<usize>,
+        len: Option<usize>,
     ) -> Result<Vec<u8>, Error> {
         let blob_storage = BlobStorage::new(self.clone(), public);
         let self_encryptor =
@@ -674,11 +674,11 @@ mod tests {
 
             let address = client.store_public_blob(&data).await?;
 
-            let mut fetch_res = client.read_blob(address, None, Some(size as u64 / 2)).await;
+            let mut fetch_res = client.read_blob(address, None, Some(size / 2)).await;
             while fetch_res.is_err() {
                 sleep(Duration::from_millis(200)).await;
 
-                fetch_res = client.read_blob(address, None, Some(size as u64 / 2)).await;
+                fetch_res = client.read_blob(address, None, Some(size / 2)).await;
             }
             let fetched_data = fetch_res?;
             assert_eq!(fetched_data, data[0..size / 2].to_vec());
@@ -692,12 +692,12 @@ mod tests {
             let address = client.store_public_blob(&data).await?;
 
             let mut fetch_res = client
-                .read_blob(address, Some(size as u64 / 2), Some(size as u64 / 2))
+                .read_blob(address, Some(size / 2), Some(size / 2))
                 .await;
             while fetch_res.is_err() {
                 sleep(Duration::from_millis(200)).await;
                 fetch_res = client
-                    .read_blob(address, Some(size as u64 / 2), Some(size as u64 / 2))
+                    .read_blob(address, Some(size / 2), Some(size / 2))
                     .await;
             }
             let fetched_data = fetch_res?;
