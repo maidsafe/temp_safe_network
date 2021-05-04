@@ -10,7 +10,7 @@ use crate::node_ops::MsgType;
 use crate::{
     chunk_store::BlobChunkStore,
     error::convert_to_error_message,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{error, info};
@@ -88,7 +88,7 @@ impl ChunkStorage {
             .get_chunk(address)
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Blob(*address)));
 
-        Ok(NodeDuty::Send(OutgoingMsg {
+        NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
                 id: MessageId::in_response_to(&msg_id),
@@ -97,7 +97,7 @@ impl ChunkStorage {
             section_source: false, // sent as single node
             dst: DstLocation::Section(*address.name()),
             aggregation: Aggregation::None,
-        }))
+        })
     }
 
     /// Stores a chunk that Elders sent to it for replication.

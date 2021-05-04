@@ -198,9 +198,8 @@ pub fn map_node_process_err_msg(
     src: SrcLocation,
     dst: DstLocation,
 ) -> Mapping {
-    // debug!(" Handling received process err msg. {:?}.", msg);
     match &dst {
-        DstLocation::Section(_name) | DstLocation::Node(_name) => match_process_err(msg, src),
+        DstLocation::Section(_) | DstLocation::Node(_) => match_process_err(msg, src),
         _ => Mapping::Error {
             error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
             msg: MsgContext::Msg {
@@ -212,30 +211,15 @@ pub fn map_node_process_err_msg(
 }
 
 fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
-    if let Some(reason) = msg.clone().reason() {
-        // debug!("ProcessingError with reason")
-        return match reason {
-            sn_messaging::client::Error::NoSectionFunds => {
-                debug!("error NO FUNDS BEING HANDLED");
-                Mapping::Ok {
-                    op: NodeDuty::ProvideSectionWalletSupportingInfo,
-                    ctx: Some(MsgContext::Msg {
-                        msg: Msg::Client(ClientMsg::ProcessingError(msg)),
-                        src,
-                    }),
-                }
-            }
-            _ => {
-                warn!(
-                    "TODO: We do not handle this process error reason yet. {:?}",
-                    reason
-                );
-                // do nothing
-                Mapping::Ok {
-                    op: NodeDuty::NoOp,
-                    ctx: None,
-                }
-            }
+    if let Some(reason) = msg.reason() {
+        warn!(
+            "TODO: We do not handle this process error reason yet. {:?}",
+            reason
+        );
+        // do nothing
+        return Mapping::Ok {
+            op: NodeDuty::NoOp,
+            ctx: None,
         };
     }
 
@@ -310,15 +294,6 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
-        ProcessMsg::NodeEvent {
-            event: NodeEvent::SectionWalletCreated(wallet_history),
-            id,
-            ..
-        } => NodeDuty::ReceiveSectionWalletHistory {
-            wallet_history: wallet_history.clone(),
-            msg_id: *id,
-            origin,
-        },
         //
         // ------ transfers --------
         NodeMsg::NodeCmd {
@@ -352,13 +327,12 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
         //
         // ------ Adult ------
         NodeMsg::NodeQuery {
-            query: NodeQuery::Chunks { query, origin },
+            query: NodeQuery::Chunks { query, .. },
             id,
             ..
         } => NodeDuty::ReadChunk {
             read: query.clone(),
             msg_id: *id,
-            origin: *origin,
         },
         NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks { cmd, origin },

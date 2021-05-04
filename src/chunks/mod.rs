@@ -10,14 +10,15 @@ mod chunk_storage;
 
 use crate::{
     error::convert_to_error_message,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     Result,
 };
 use chunk_storage::ChunkStorage;
 use log::info;
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, CmdError, Message, NodeEvent},
+    client::{BlobRead, BlobWrite, CmdError},
+    node::{NodeEvent, NodeMsg},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use std::{
@@ -52,7 +53,7 @@ impl Chunks {
         self.chunk_storage.get_chunk(address)
     }
 
-    pub fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> NodeDuties {
+    pub fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> NodeDuty {
         let BlobRead::Get(address) = read;
         self.chunk_storage.get(address, msg_id)
     }
@@ -93,11 +94,11 @@ impl Chunks {
             Err(err) => Err(CmdError::Data(convert_to_error_message(err)?)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeEvent {
+            msg: MsgType::Node(NodeMsg::NodeEvent {
                 event: NodeEvent::ChunkWriteHandled(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            }),
             section_source: false, // sent as single node
             // Data's metadata section
             dst: DstLocation::Section(data_name),

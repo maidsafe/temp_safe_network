@@ -232,11 +232,11 @@ impl BlobRecords {
                 // Depending on error, we might have to take action here.
                 if let Some(end_user) = origin {
                     duties.push(NodeDuty::Send(OutgoingMsg {
-                        msg: Message::CmdError {
+                        msg: MsgType::Client(ProcessMsg::CmdError {
                             error,
                             id: MessageId::in_response_to(&correlation_id),
                             correlation_id,
-                        },
+                        }),
                         dst: DstLocation::EndUser(end_user),
                         section_source: false,
                         aggregation: Aggregation::AtDestination,
@@ -388,7 +388,7 @@ impl BlobRecords {
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
-                msg: ProcessMsg::NodeCmd {
+                msg: NodeMsg::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
                     id: msg_id,
                 },
@@ -464,22 +464,6 @@ impl BlobRecords {
         self.reader
             .non_full_adults_closest_to(&target, &full_adults, CHUNK_COPY_COUNT)
             .await
-    }
-}
-
-fn validate_data_owner(data: &Blob, origin: &EndUser) -> Result<()> {
-    if data.is_private() {
-        data.owner()
-            .ok_or_else(|| Error::InvalidOwners(*origin.id()))
-            .and_then(|data_owner| {
-                if data_owner != origin.id() {
-                    Err(Error::InvalidOwners(*origin.id()))
-                } else {
-                    Ok(())
-                }
-            })
-    } else {
-        Ok(())
     }
 }
 

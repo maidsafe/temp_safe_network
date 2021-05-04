@@ -61,6 +61,7 @@ impl AdultLiveness {
             let _ = entry.insert(Operation::Write {
                 blob_write: Box::new(blob_write),
                 targets: targets.clone(),
+                origin,
             });
             true
         } else {

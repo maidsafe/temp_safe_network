@@ -85,7 +85,6 @@ pub enum NodeDuty {
     ReadChunk {
         read: BlobRead,
         msg_id: MessageId,
-        origin: EndUser,
     },
     WriteChunk {
         write: BlobWrite,
@@ -205,7 +204,7 @@ pub enum NodeDuty {
     /// Send a lazy error as a result of a specific message.
     /// The aim here is for the sender to respond with any missing state
     SendError(OutgoingLazyError),
-    /// Send supporting in for for a given processing error.
+    /// Send supporting info for a given processing error.
     /// This should be any missing state required to proceed at the erring node.
     SendSupport(OutgoingSupportingInfo),
     /// Send the same request to each individual node.

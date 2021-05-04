@@ -32,8 +32,6 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
         aggregation: msg.aggregation,
     };
 
-    let msg_id = msg.id();
-
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
     let dest_section_pk = network.get_section_pk_by_name(&dst_name).await?;
 
@@ -78,8 +76,6 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
         aggregation: Aggregation::None,
     };
 
-    let msg_id = msg.id();
-
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
     let target_section_pk = network.get_section_pk_by_name(&dst_name).await?;
 
@@ -110,8 +106,6 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
         dst: msg.dst,
         aggregation: Aggregation::None,
     };
-
-    let msg_id = msg.id();
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
     let target_section_pk = network.get_section_pk_by_name(&dst_name).await?;

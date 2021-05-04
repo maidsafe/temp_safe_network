@@ -65,7 +65,7 @@ impl Node {
                     elders,
                 )),
                 correlation_id: msg_id,
-                id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
+                id: MessageId::in_response_to(&msg_id),
             }),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section

@@ -8,14 +8,12 @@
 
 use super::{
     interaction::push_state,
-    messaging::{send, send_error, send_to_nodes},
+    messaging::{send, send_error, send_support, send_to_nodes},
     role::{AdultRole, Role},
 };
-use crate::node::messaging::send_support;
 use crate::node_ops::OutgoingSupportingInfo;
 use crate::{
     chunks::Chunks,
-    event_mapping::MsgContext,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
@@ -276,9 +274,9 @@ impl Node {
             }
             //
             // -------- Immutable chunks --------
-            NodeDuty::ReadChunk { read, msg_id, .. } => {
+            NodeDuty::ReadChunk { read, msg_id } => {
                 let adult = self.role.as_adult_mut()?;
-                let mut ops = adult.chunks.read(&read, msg_id);
+                let mut ops = vec![adult.chunks.read(&read, msg_id)];
                 ops.extend(adult.chunks.check_storage().await?);
                 Ok(ops)
             }
@@ -391,55 +389,6 @@ impl Node {
             NodeDuty::ReplicateChunk { data, id } => {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![adult.chunks.store_for_replication(data, id).await?])
-            }
-            NodeDuty::ReceiveSectionWalletHistory { wallet_history, .. } => {
-                trace!("Handling received section wallet history");
-                let mut section_funds = self.section_funds.as_mut().ok_or(Error::NoSectionFunds)?;
-                let duty = section_funds
-                    .sync_section_wallet_history(wallet_history)
-                    .await?;
-                Ok(vec![duty])
-            }
-            NodeDuty::ProvideSectionWalletSupportingInfo => {
-                trace!("No funds section error being handled");
-
-                let mut ops = vec![];
-                let is_forming_genesis = is_forming_genesis(&self.network_api).await;
-
-                if is_forming_genesis || !self.network_api.is_elder().await {
-                    trace!("Genesis not yet reached... so we ignore this");
-
-                    Ok(ops)
-                } else {
-                    if let Some(ctx) = ctx {
-                        debug!("ProcessingError context found, sending updates to failing node...");
-                        if let MsgContext::Msg { msg, src } = ctx {
-                            // This will map to the error that triggered this duty
-                            // and until we are updated, this will loop between these two nodes...
-                            let section_funds =
-                                self.section_funds.as_ref().ok_or(Error::NoSectionFunds)?;
-
-                            let wallet_history = section_funds.section_wallet_history();
-
-                            let source_message = msg
-                                .get_process()
-                                .ok_or(Error::NoSourceMessageForProcessingError)?
-                                .clone();
-
-                            ops.push(NodeDuty::SendSupport(OutgoingSupportingInfo {
-                                msg: SupportingInfo {
-                                    info: SupportingInfoFor::SectionWallet(wallet_history),
-                                    source_message,
-                                    correlation_id: msg.id(),
-                                    id: MessageId::new(),
-                                },
-                                dst: DstLocation::Node(src.name()),
-                            }));
-                        }
-                    }
-
-                    Ok(ops)
-                }
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

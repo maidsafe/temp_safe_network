@@ -9,13 +9,13 @@
 use crate::{
     chunks::Chunks,
     metadata::CHUNK_COPY_COUNT,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
 };
 use itertools::Itertools;
 use log::{info, trace, warn};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeSystemCmd},
+    node::{NodeCmd, NodeMsg, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::XorName;
