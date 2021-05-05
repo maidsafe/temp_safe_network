@@ -2977,7 +2977,7 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "sn_api"
-version = "0.25.2"
+version = "0.25.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3019,7 +3019,7 @@ dependencies = [
 
 [[package]]
 name = "sn_authd"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "cluFlock",
@@ -3043,7 +3043,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.25.2"
+version = "0.25.3"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3089,9 +3089,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.54.4"
+version = "0.54.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94380c8cfb51c92b9314c8698a4a1f650e1888e5cc7123552a0a9cb9c892a614"
+checksum = "acceb1139a2b487be111aef191ff794f2f85a901a2d79089bfbb9d2f2f76b723"
 dependencies = [
  "anyhow",
  "async-trait",
