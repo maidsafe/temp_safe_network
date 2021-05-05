@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [20.1.0](https://github.com/maidsafe/sn_messaging/compare/v20.0.1...v20.1.0) (2021-05-05)
+
+
+### Features
+
+* **api:** add new QueryResponse::is_success API ([8d1425e](https://github.com/maidsafe/sn_messaging/commit/8d1425e054797a4046eb5730cbe394facb3b9c21))
+
 ### [20.0.1](https://github.com/maidsafe/sn_messaging/compare/v20.0.0...v20.0.1) (2021-05-03)
 
 
