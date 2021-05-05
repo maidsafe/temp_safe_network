@@ -396,178 +396,162 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::{Blob, BlobAddress, Client, DataMap, DataMapLevel, Error};
-    use crate::client::blob_storage::BlobStorage;
-    use crate::utils::{
-        generate_random_vector, test_utils::create_test_client, test_utils::gen_ed_keypair,
-    };
-    use anyhow::{bail, Result};
+    use crate::utils::{generate_random_vector, test_utils::create_test_client};
+    use crate::{client::blob_storage::BlobStorage, retry_loop};
+    use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use self_encryption::Storage;
     use sn_data_types::{PrivateBlob, PublicBlob, Token};
     use sn_messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
-    use tokio::time::{sleep, Duration};
 
-    // Test putting and getting pub blob.
+    // Test putting and getting pub Blob.
     #[tokio::test]
-    pub async fn pub_blob_test() -> Result<()> {
+    pub async fn public_blob_test() -> Result<()> {
         let client = create_test_client().await?;
         let value = generate_random_vector::<u8>(10);
-        let data = Blob::Public(PublicBlob::new(value.clone()));
-        let address = *data.address();
-        let _pk = gen_ed_keypair().public_key();
+        let (_, expected_address) = Client::blob_data_map(value.clone(), None).await?;
 
-        let res = client
-            // Get non-existent blob
-            .read_blob(address, None, None)
-            .await;
-        match res {
-            Ok(data) => bail!("Pub blob should not exist yet: {:?}", data),
+        // Get non-existent Blob
+        match client.read_blob(expected_address, None, None).await {
+            Ok(data) => bail!("Public Blob should not exist yet: {:?}", data),
             Err(Error::ErrorMessage {
                 source: ErrorMessage::DataNotFound(_),
                 ..
             }) => (),
             Err(e) => bail!("Unexpected: {:?}", e),
         }
+
         // Put blob
-        let address = client.store_public_blob(&value).await?;
+        let pub_address = client.store_public_blob(&value).await?;
+        // check it's the expected Blob address
+        assert_eq!(expected_address, pub_address);
 
         // Assert that the blob was written
-        let mut fetched_data = client.read_blob(address, None, None).await;
-        while fetched_data.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            fetched_data = client.read_blob(address, None, None).await;
-        }
+        let fetched_data = retry_loop!(client.read_blob(pub_address, None, None));
+        assert_eq!(value, fetched_data);
 
-        assert_eq!(value, fetched_data?);
+        // Test putting public Blob with the same value.
+        // Should not conflict and return same address
+        let addr = client.store_public_blob(&value).await?;
+        assert_eq!(addr, pub_address);
 
         Ok(())
     }
 
     // Test putting, getting, and deleting private blob.
     #[tokio::test]
-    pub async fn priv_blob_test() -> Result<()> {
+    pub async fn private_blob_test() -> Result<()> {
         let client = create_test_client().await?;
 
-        let pk = client.public_key().await;
-
         let value = generate_random_vector::<u8>(10);
-        let data = Blob::Private(PrivateBlob::new(value.clone(), pk));
-        let address = *data.address();
 
-        let res = client
-            // Get nonexistent blob
-            .read_blob(address, None, None)
-            .await;
+        let owner = client.public_key().await;
+        let (_, expected_address) = Client::blob_data_map(value.clone(), Some(owner)).await?;
 
-        match res {
-            Ok(_) => bail!("Private blob should not exist yet"),
+        // Get non-existent Blob
+        match client.read_blob(expected_address, None, None).await {
+            Ok(_) => bail!("Private Blob should not exist yet"),
             Err(Error::ErrorMessage {
                 source: ErrorMessage::DataNotFound(_),
                 ..
             }) => (),
-            Err(e) => bail!("Unexpected: {:?}", e),
+            Err(e) => bail!("Expecting DataNotFound error, got: {:?}", e),
         }
 
-        // Put blob
-        let address = client.store_private_blob(&value).await?;
+        // Put Blob
+        let priv_address = client.store_private_blob(&value).await?;
+        // check it's the expected Blob address
+        assert_eq!(expected_address, priv_address);
 
         // Assert that the blob is stored.
-        let mut res = client.read_blob(address, None, None).await;
-        while res.is_err() {
-            sleep(Duration::from_millis(200)).await;
+        let fetched_data = retry_loop!(client.read_blob(priv_address, None, None));
+        assert_eq!(value, fetched_data);
 
-            res = client.read_blob(address, None, None).await;
-        }
+        // Test putting private Blob with the same value.
+        // Should not conflict and return same address
+        let addr = client.store_private_blob(&value).await?;
+        assert_eq!(addr, priv_address);
 
-        // Test putting private blob with the same value.
-        // Should conflict because duplication does not apply to private data.
-        let _ = client.store_private_blob(&value).await;
-
-        let _ = match tokio::time::timeout(
-            std::time::Duration::from_secs(60),
-            client.notification_receiver.clone().lock().await.recv(),
-        )
-        .await
-        {
-            Ok(Some(Error::ErrorMessage {
-                source: ErrorMessage::DataExists,
-                ..
-            })) => {
-                // Ok
-            }
-            Ok(Some(error)) => bail!("Expecting DataExists error got: {:?}", error),
-            Ok(None) => bail!("Expecting DataExists Error, got None"),
-            Err(_) => bail!("Timeout when expecting DataExists error"),
-        };
-
-        // let balance = client.get_balance().await?;
-        // mutation_count of 3 as even our failed op counts as a mutation
-        // let expected_bal = calculate_new_balance(start_bal, Some(3), None);
-        // assert_eq!(balance, expected_bal);
-
-        // Test putting public blob with the same value. Should not conflict.
+        // Test putting public Blob with the same value. Should not conflict.
         let pub_address = client.store_public_blob(&value).await?;
 
-        // Fetch blob
-        // Assert that the blob is stored.
-        let mut fetched_data = client.read_blob(pub_address, None, None).await;
-        while fetched_data.is_err() {
-            sleep(Duration::from_millis(200)).await;
+        // Assert that the Blob is stored.
+        let fetched_data = retry_loop!(client.read_blob(pub_address, None, None));
+        assert_eq!(value, fetched_data);
 
-            fetched_data = client.read_blob(pub_address, None, None).await;
+        // Delete Blob
+        client.delete_blob(priv_address).await?;
+
+        // Make sure Blob was deleted
+        let mut attempts = 3u8;
+        while client.read_blob(priv_address, None, None).await.is_ok() {
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            if attempts == 0 {
+                bail!("The private Blob was not deleted: {:?}", priv_address);
+            } else {
+                attempts -= 1;
+            }
         }
 
-        // Delete blob
-        client.delete_blob(address).await?;
+        // Test putting private Blob with the same value again. Should not conflict.
+        let new_addr = client.store_private_blob(&value).await?;
+        assert_eq!(new_addr, priv_address);
 
-        // Make sure blob was deleted
-        let mut fetched_data = client.read_blob(address, None, None).await;
-        while fetched_data.is_ok() {
-            sleep(Duration::from_millis(200)).await;
-
-            fetched_data = client.read_blob(address, None, None).await;
-        }
-        // Test putting private blob with the same value again. Should not conflict.
-        let _ = client.store_private_blob(&value).await?;
+        // Assert that the Blob is stored again.
+        let fetched_data = retry_loop!(client.read_blob(priv_address, None, None));
+        assert_eq!(value, fetched_data);
 
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn priv_delete_large() -> Result<()> {
+    pub async fn private_delete_large() -> Result<()> {
         let client = create_test_client().await?;
 
         let value = generate_random_vector::<u8>(1024 * 1024);
         let address = client.store_private_blob(&value).await?;
 
-        let mut res = client.fetch_blob_from_network(address).await;
-        while res.is_err() {
-            sleep(Duration::from_millis(200)).await;
+        // let's make sure we have all chunks stored on the network
+        let _ = retry_loop!(client.read_blob(address, None, None));
 
-            res = client.fetch_blob_from_network(address).await;
-        }
+        let fetched_data = retry_loop!(client.fetch_blob_from_network(address));
 
-        let root_data_map = match deserialize(res?.value())? {
-            DataMapLevel::Root(data_map) | DataMapLevel::Child(data_map) => data_map,
+        let root_data_map = match deserialize(fetched_data.value())? {
+            DataMapLevel::Root(data_map) => data_map,
+            DataMapLevel::Child(data_map) => bail!(
+                "A DataMapLevel::Child data-map was unexpectedly returned: {:?}",
+                data_map
+            ),
         };
 
         client.delete_blob(address).await?;
 
         let mut blob_storage = BlobStorage::new(client, false);
 
-        match &root_data_map {
-            DataMap::Chunks(chunks) => {
-                for chunk in chunks {
-                    while blob_storage.get(&chunk.hash).await.is_ok() {
-                        sleep(Duration::from_millis(500)).await;
+        if let DataMap::Chunks(chunks) = root_data_map {
+            for chunk in chunks {
+                let mut attempts = 3u8;
+                while blob_storage.get(&chunk.hash).await.is_ok() {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    if attempts == 0 {
+                        bail!(
+                            "At least one of the chunks of the private Blob was not deleted: {:?}",
+                            chunk.hash
+                        );
+                    } else {
+                        attempts -= 1;
                     }
                 }
             }
-            DataMap::None | DataMap::Content(_) => bail!("shall return DataMap::Chunks"),
-        }
 
-        Ok(())
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "It didn't return DataMap::Chunks, instead: {:?}",
+                root_data_map
+            ))
+        }
     }
 
     #[tokio::test]
@@ -578,12 +562,7 @@ mod tests {
             .store_private_blob(&generate_random_vector::<u8>(10))
             .await?;
 
-        let mut res = client.fetch_blob_from_network(address).await;
-        while res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-
-            res = client.fetch_blob_from_network(address).await;
-        }
+        let _ = retry_loop!(client.read_blob(address, None, None));
 
         let balance_before_delete = client.get_balance().await?;
         client.delete_blob(address).await?;
@@ -622,6 +601,10 @@ mod tests {
         let client = create_test_client().await?;
         let address = client.store_public_blob(&data).await?;
 
+        // let's make sure the public Blob is stored
+        let _ = retry_loop!(client.read_blob(address, None, None));
+
+        // and now trying to read a private Blob with same address should fail
         let res = client
             .read_blob(BlobAddress::Private(*address.name()), None, None)
             .await;
@@ -640,6 +623,10 @@ mod tests {
 
         let address = client.store_private_blob(&value).await?;
 
+        // let's make sure the private Blob is stored
+        let _ = retry_loop!(client.read_blob(address, None, None));
+
+        // and now trying to read a public Blob with same address should fail
         let res = client
             .read_blob(BlobAddress::Public(*address.name()), None, None)
             .await;
@@ -672,42 +659,23 @@ mod tests {
     }
 
     async fn create_and_index_based_retrieve(size: usize) -> Result<()> {
+        // Test read first half
         let data = generate_random_vector(size);
-        {
-            // Read first half
-            let client = create_test_client().await?;
+        let client = create_test_client().await?;
 
-            let address = client.store_public_blob(&data).await?;
+        let address = client.store_public_blob(&data).await?;
 
-            let mut fetch_res = client.read_blob(address, None, Some(size / 2)).await;
-            while fetch_res.is_err() {
-                sleep(Duration::from_millis(200)).await;
+        let fetched_data = retry_loop!(client.read_blob(address, None, Some(size / 2)));
+        assert_eq!(fetched_data, data[0..size / 2].to_vec());
 
-                fetch_res = client.read_blob(address, None, Some(size / 2)).await;
-            }
-            let fetched_data = fetch_res?;
-            assert_eq!(fetched_data, data[0..size / 2].to_vec());
-        }
-
+        // Test read second half
         let data = generate_random_vector(size);
-        {
-            // Read Second half
-            let client = create_test_client().await?;
+        let client = create_test_client().await?;
 
-            let address = client.store_public_blob(&data).await?;
+        let address = client.store_public_blob(&data).await?;
 
-            let mut fetch_res = client
-                .read_blob(address, Some(size / 2), Some(size / 2))
-                .await;
-            while fetch_res.is_err() {
-                sleep(Duration::from_millis(200)).await;
-                fetch_res = client
-                    .read_blob(address, Some(size / 2), Some(size / 2))
-                    .await;
-            }
-            let fetched_data = fetch_res?;
-            assert_eq!(fetched_data, data[size / 2..size].to_vec());
-        }
+        let fetched_data = retry_loop!(client.read_blob(address, Some(size / 2), Some(size / 2)));
+        assert_eq!(fetched_data, data[size / 2..size].to_vec());
 
         Ok(())
     }
@@ -749,18 +717,10 @@ mod tests {
             client.store_private_blob(&raw_data).await?
         };
 
-        let mut fetch_result;
         // now that it was put to the network we should be able to retrieve it
-        fetch_result = client.read_blob(address, None, None).await;
-
-        while fetch_result.is_err() {
-            sleep(Duration::from_millis(200)).await;
-
-            fetch_result = client.read_blob(address, None, None).await;
-        }
-
+        let fetched_data = retry_loop!(client.read_blob(address, None, None));
         // then the content should be what we put
-        assert_eq!(fetch_result?, raw_data);
+        assert_eq!(fetched_data, raw_data);
 
         // now let's test Blob data map generation utility returns the correct Blob address
         let privately_owned = if public {
