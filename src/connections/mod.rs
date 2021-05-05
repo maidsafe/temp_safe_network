@@ -25,7 +25,7 @@ use std::{
     sync::Arc,
 };
 use threshold_crypto::PublicKeySet;
-use tokio::sync::mpsc::{Sender, UnboundedSender};
+use tokio::sync::mpsc::Sender;
 use xor_name::{Prefix, XorName};
 
 // Channel for sending result of transfer validation
@@ -43,7 +43,6 @@ pub(crate) struct QueryResult {
 #[derive(Clone)]
 pub struct Session {
     qp2p: QuicP2p,
-    notifier: UnboundedSender<Error>,
     pending_queries: PendingQueryResponses,
     pending_transfers: PendingTransferValidations,
     endpoint: Option<Endpoint>,
@@ -58,17 +57,12 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(
-        qp2p_config: QuicP2pConfig,
-        signer: Signer,
-        notifier: UnboundedSender<Error>,
-    ) -> Result<Self, Error> {
+    pub fn new(qp2p_config: QuicP2pConfig, signer: Signer) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), true)?;
-        Ok(Session {
+        Ok(Self {
             qp2p,
-            notifier,
             pending_queries: Arc::new(Mutex::new(HashMap::default())),
             pending_transfers: Arc::new(Mutex::new(HashMap::default())),
             endpoint: None,

@@ -267,8 +267,6 @@ impl Session {
                 } else {
                     warn!("No sender subscribing and listening for errors relating to message {}. Error returned is: {:?}", correlation_id, error)
                 }
-
-                let _ = self.notifier.send(Error::from((error, correlation_id)));
             }
             msg => {
                 warn!("Ignoring unexpected message type received: {:?}", msg);
