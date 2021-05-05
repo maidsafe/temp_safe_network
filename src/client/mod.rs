@@ -36,7 +36,6 @@ use std::{
     str::FromStr,
     {collections::HashSet, net::SocketAddr, sync::Arc},
 };
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// Client object
 #[derive(Clone)]
@@ -45,7 +44,6 @@ pub struct Client {
     transfer_actor: Arc<Mutex<SafeTransferActor<Keypair>>>,
     simulated_farming_payout_dot: Dot<PublicKey>,
     session: Session,
-    notification_receiver: Arc<Mutex<UnboundedReceiver<Error>>>,
 }
 
 /// Easily manage connections to/from The Safe Network with the client and its APIs.
@@ -96,14 +94,12 @@ impl Client {
             }
         };
 
-        let (notification_sender, notification_receiver) = unbounded_channel::<Error>();
-
         let mut qp2p_config = Config::new(config_file_path, bootstrap_config).qp2p;
         // We use feature `no-igd` so this will use the echo service only
         qp2p_config.forward_port = true;
 
         // Create the connection manager
-        let session = attempt_bootstrap(qp2p_config, keypair.clone(), notification_sender).await?;
+        let session = attempt_bootstrap(qp2p_config, keypair.clone()).await?;
 
         // random PK used for from payment
         let random_payment_id = Keypair::new_ed25519(&mut rng);
@@ -134,7 +130,6 @@ impl Client {
             keypair,
             transfer_actor,
             simulated_farming_payout_dot,
-            notification_receiver: Arc::new(Mutex::new(notification_receiver)),
         };
 
         if cfg!(feature = "simulated-payouts") {
@@ -231,16 +226,12 @@ impl Client {
 
 /// Utility function that bootstraps a client to the network. If there is a failure then it retries.
 /// After a maximum of three attempts if the boostrap process still fails, then an error is returned.
-async fn attempt_bootstrap(
-    qp2p_config: QuicP2pConfig,
-    keypair: Keypair,
-    notifier: UnboundedSender<Error>,
-) -> Result<Session, Error> {
+async fn attempt_bootstrap(qp2p_config: QuicP2pConfig, keypair: Keypair) -> Result<Session, Error> {
     let mut attempts: u32 = 0;
 
     let signer = Signer::new(keypair);
 
-    let mut session = Session::new(qp2p_config, signer, notifier)?;
+    let mut session = Session::new(qp2p_config, signer)?;
     loop {
         let res = session.bootstrap().await;
         match res {

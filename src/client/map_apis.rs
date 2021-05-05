@@ -862,21 +862,13 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        client.delete_map(mapref).await?;
-
-        match tokio::time::timeout(
-            Duration::from_secs(60),
-            client.notification_receiver.clone().lock().await.recv(),
-        )
-        .await
-        {
-            Ok(Some(Error::ErrorMessage {
+        match client.delete_map(mapref).await {
+            Err(Error::ErrorMessage {
                 source: ErrorMessage::AccessDenied(_),
                 ..
-            })) => Ok(()),
-            Ok(Some(error)) => bail!("Expecting AccessDenied error got: {:?}", error),
-            Ok(None) => bail!("Expecting AccessDenited Error, got None"),
-            Err(_) => bail!("Timeout when expecting AcccessDenied error"),
+            }) => Ok(()),
+            Err(error) => bail!("Expecting AccessDenied error got: {:?}", error),
+            other => bail!("Expecting AccessDenited Error, got: {:?}", other),
         }
     }
 
