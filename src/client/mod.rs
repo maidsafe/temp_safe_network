@@ -298,6 +298,39 @@ pub enum QueryResponse {
     GetStoreCost(Result<Token>),
 }
 
+impl QueryResponse {
+    /// Returns true if the result returned is a success or not
+    pub fn is_success(&self) -> bool {
+        use QueryResponse::*;
+        match self {
+            GetBlob(result) => result.is_ok(),
+            GetMap(result) => result.is_ok(),
+            GetMapShell(result) => result.is_ok(),
+            GetMapVersion(result) => result.is_ok(),
+            ListMapEntries(result) => result.is_ok(),
+            ListMapKeys(result) => result.is_ok(),
+            ListMapValues(result) => result.is_ok(),
+            ListMapUserPermissions(result) => result.is_ok(),
+            ListMapPermissions(result) => result.is_ok(),
+            GetMapValue(result) => result.is_ok(),
+            GetSequence(result) => result.is_ok(),
+            GetSequenceRange(result) => result.is_ok(),
+            GetSequenceLastEntry(result) => result.is_ok(),
+            GetSequencePublicPolicy(result) => result.is_ok(),
+            GetSequencePrivatePolicy(result) => result.is_ok(),
+            GetSequenceUserPermissions(result) => result.is_ok(),
+            GetRegister(result) => result.is_ok(),
+            GetRegisterOwner(result) => result.is_ok(),
+            ReadRegister(result) => result.is_ok(),
+            GetRegisterPolicy(result) => result.is_ok(),
+            GetRegisterUserPermissions(result) => result.is_ok(),
+            GetBalance(result) => result.is_ok(),
+            GetHistory(result) => result.is_ok(),
+            GetStoreCost(result) => result.is_ok(),
+        }
+    }
+}
+
 /// Error type for an attempted conversion from `QueryResponse` to a type implementing
 /// `TryFrom<Response>`.
 #[derive(Debug, PartialEq)]
@@ -371,18 +404,6 @@ mod tests {
 
     pub fn gen_keys() -> Vec<PublicKey> {
         gen_keypairs().iter().map(PublicKey::from).collect()
-    }
-
-    #[test]
-    fn debug_format() -> Result<()> {
-        if let Some(key) = gen_keys().first() {
-            let errored_response = QueryResponse::GetSequence(Err(Error::AccessDenied(*key)));
-            assert!(format!("{:?}", errored_response)
-                .contains("QueryResponse::GetSequence(AccessDenied(PublicKey::"));
-            Ok(())
-        } else {
-            Err(anyhow!("Could not generate public key"))
-        }
     }
 
     #[test]
