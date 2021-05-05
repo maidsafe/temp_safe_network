@@ -11,27 +11,11 @@ use crate::section_info::Error as TargetSectionError;
 use serde::{Deserialize, Serialize};
 use sn_data_types::DataAddress;
 use sn_data_types::PublicKey;
-use std::{
-    fmt::{self, Debug, Formatter},
-    result,
-};
+use std::result;
 use thiserror::Error;
 
 /// A specialised `Result` type.
 pub type Result<T, E = Error> = result::Result<T, E>;
-
-/// Error debug struct
-pub struct ErrorDebug<'a, T>(pub &'a Result<T>);
-
-impl<'a, T> Debug for ErrorDebug<'a, T> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Err(error) = self.0 {
-            write!(f, "{:?}", error)
-        } else {
-            write!(f, "Success")
-        }
-    }
-}
 
 /// Main error type for the crate.
 #[derive(Error, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]

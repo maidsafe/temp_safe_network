@@ -30,7 +30,7 @@ pub use self::{
         SequenceDataExchange,
     },
     duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
-    errors::{Error, ErrorDebug, Result},
+    errors::{Error, Result},
     map::{MapRead, MapWrite},
     network::{
         NodeCmd, NodeCmdError, NodeDataError, NodeEvent, NodeQuery, NodeQueryResponse,
@@ -56,7 +56,6 @@ use sn_data_types::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
-    fmt,
 };
 
 /// Message envelope containing a Safe message payload,
@@ -232,7 +231,7 @@ pub enum Event {
 
 /// Query responses from the network.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
     //
     // ===== Blob =====
@@ -349,81 +348,6 @@ try_from!(Policy, GetRegisterPolicy);
 try_from!(Permissions, GetRegisterUserPermissions);
 try_from!(Token, GetBalance);
 try_from!(ActorHistory, GetHistory);
-
-impl fmt::Debug for QueryResponse {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use QueryResponse::*;
-
-        match self {
-            // Blob
-            GetBlob(res) => write!(f, "QueryResponse::GetBlob({:?})", ErrorDebug(res)),
-            // Map
-            GetMap(res) => write!(f, "QueryResponse::GetMap({:?})", ErrorDebug(res)),
-            GetMapShell(res) => write!(f, "QueryResponse::GetMapShell({:?})", ErrorDebug(res)),
-            GetMapVersion(res) => write!(f, "QueryResponse::GetMapVersion({:?})", ErrorDebug(res)),
-            ListMapEntries(res) => {
-                write!(f, "QueryResponse::ListMapEntries({:?})", ErrorDebug(res))
-            }
-            ListMapKeys(res) => write!(f, "QueryResponse::ListMapKeys({:?})", ErrorDebug(res)),
-            ListMapValues(res) => write!(f, "QueryResponse::ListMapValues({:?})", ErrorDebug(res)),
-            ListMapPermissions(res) => write!(
-                f,
-                "QueryResponse::ListMapPermissions({:?})",
-                ErrorDebug(res)
-            ),
-            ListMapUserPermissions(res) => write!(
-                f,
-                "QueryResponse::ListMapUserPermissions({:?})",
-                ErrorDebug(res)
-            ),
-            GetMapValue(res) => write!(f, "QueryResponse::GetMapValue({:?})", ErrorDebug(res)),
-            // Sequence
-            GetSequence(res) => write!(f, "QueryResponse::GetSequence({:?})", ErrorDebug(res)),
-            GetSequenceRange(res) => {
-                write!(f, "QueryResponse::GetSequenceRange({:?})", ErrorDebug(res))
-            }
-            GetSequenceLastEntry(res) => write!(
-                f,
-                "QueryResponse::GetSequenceLastEntry({:?})",
-                ErrorDebug(res)
-            ),
-            GetSequenceUserPermissions(res) => write!(
-                f,
-                "QueryResponse::GetSequenceUserPermissions({:?})",
-                ErrorDebug(res)
-            ),
-            GetSequencePublicPolicy(res) => write!(
-                f,
-                "QueryResponse::GetSequencePublicPolicy({:?})",
-                ErrorDebug(res)
-            ),
-            GetSequencePrivatePolicy(res) => write!(
-                f,
-                "QueryResponse::GetSequencePrivatePolicy({:?})",
-                ErrorDebug(res)
-            ),
-            // Register
-            GetRegister(res) => write!(f, "QueryResponse::GetRegister({:?})", ErrorDebug(res)),
-            ReadRegister(res) => {
-                write!(f, "QueryResponse::ReadRegister({:?})", ErrorDebug(res))
-            }
-            GetRegisterUserPermissions(res) => write!(
-                f,
-                "QueryResponse::GetRegisterUserPermissions({:?})",
-                ErrorDebug(res)
-            ),
-            GetRegisterPolicy(res) => {
-                write!(f, "QueryResponse::GetRegisterPolicy({:?})", ErrorDebug(res))
-            }
-            GetRegisterOwner(res) => {
-                write!(f, "QueryResponse::GetRegisterOwner({:?})", ErrorDebug(res))
-            }
-            GetBalance(res) => write!(f, "QueryResponse::GetBalance({:?})", ErrorDebug(res)),
-            GetHistory(res) => write!(f, "QueryResponse::GetHistory({:?})", ErrorDebug(res)),
-            GetStoreCost(res) => write!(f, "QueryResponse::GetStoreCost({:?})", ErrorDebug(res)),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

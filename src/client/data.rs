@@ -18,11 +18,10 @@ use sn_data_types::PublicKey;
 use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// Data command operations. Creating, updating or removing data
 #[allow(clippy::large_enum_variant)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum DataCmd {
     /// Blob write operation
     Blob(BlobWrite),
@@ -69,21 +68,9 @@ impl DataCmd {
     }
 }
 
-impl fmt::Debug for DataCmd {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use DataCmd::*;
-        match self {
-            Blob(c) => write!(formatter, "{:?}", c),
-            Map(c) => write!(formatter, "{:?}", c),
-            Sequence(c) => write!(formatter, "{:?}", c),
-            Register(c) => write!(formatter, "{:?}", c),
-        }
-    }
-}
-
 /// TODO: docs
 #[allow(clippy::large_enum_variant)]
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum DataQuery {
     /// TODO: docs
     Blob(BlobRead),
@@ -116,18 +103,6 @@ impl DataQuery {
             Map(q) => q.dst_address(),
             Sequence(q) => q.dst_address(),
             Register(q) => q.dst_address(),
-        }
-    }
-}
-
-impl fmt::Debug for DataQuery {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use DataQuery::*;
-        match self {
-            Blob(q) => write!(formatter, "{:?}", q),
-            Map(q) => write!(formatter, "{:?}", q),
-            Sequence(q) => write!(formatter, "{:?}", q),
-            Register(q) => write!(formatter, "{:?}", q),
         }
     }
 }

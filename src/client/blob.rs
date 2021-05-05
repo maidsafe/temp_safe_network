@@ -10,11 +10,10 @@
 use super::{CmdError, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
-use std::fmt;
 use xor_name::XorName;
 
 /// TODO: docs
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum BlobRead {
     /// TODO: docs
     Get(BlobAddress),
@@ -22,7 +21,7 @@ pub enum BlobRead {
 
 /// TODO: docs
 #[allow(clippy::large_enum_variant)]
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum BlobWrite {
     /// TODO: docs
     New(Blob),
@@ -31,15 +30,6 @@ pub enum BlobWrite {
 }
 
 impl BlobRead {
-    // /// Get the `Type` of this `Request`.
-    // pub fn get_type(&self) -> Type {
-    //     use BlobRead::*;
-    //     match self {
-    //         Get(BlobAddress::Public(_)) => Type::PublicRead,
-    //         Get(BlobAddress::Private(_)) => Type::PrivateRead,
-    //     }
-    // }
-
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> QueryResponse {
@@ -50,7 +40,7 @@ impl BlobRead {
     pub fn dst_address(&self) -> XorName {
         use BlobRead::*;
         match self {
-            Get(ref address) => *address.name(),
+            Get(address) => *address.name(),
         }
     }
 }
@@ -76,25 +66,6 @@ impl BlobWrite {
         match self {
             Self::New(data) => data.owner().cloned(),
             Self::DeletePrivate(_) => None,
-        }
-    }
-}
-
-impl fmt::Debug for BlobRead {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use BlobRead::*;
-        match self {
-            Get(req) => write!(formatter, "{:?}", req),
-        }
-    }
-}
-
-impl fmt::Debug for BlobWrite {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use BlobWrite::*;
-        match self {
-            New(blob) => write!(formatter, "BlobWrite::New({:?})", blob),
-            DeletePrivate(address) => write!(formatter, "BlobWrite::DeletePrivate({:?})", address),
         }
     }
 }

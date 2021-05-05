@@ -17,7 +17,7 @@ use std::fmt;
 use xor_name::XorName;
 
 /// TODO: docs
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SequenceRead {
     /// Get Sequence from the network.
     Get(Address),
@@ -96,24 +96,6 @@ impl SequenceRead {
     }
 }
 
-impl fmt::Debug for SequenceRead {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use SequenceRead::*;
-        write!(
-            formatter,
-            "SequenceRead::{}",
-            match *self {
-                Get(_) => "GetSequence",
-                GetRange { .. } => "GetSequenceRange",
-                GetLastEntry(_) => "GetSequenceLastEntry",
-                GetPublicPolicy { .. } => "GetSequencePublicPolicy",
-                GetPrivatePolicy { .. } => "GetSequencePrivatePolicy",
-                GetUserPermissions { .. } => "GetUserPermissions",
-            }
-        )
-    }
-}
-
 impl SequenceWrite {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
@@ -146,10 +128,10 @@ impl fmt::Debug for SequenceWrite {
         write!(
             formatter,
             "SequenceWrite::{}",
-            match *self {
-                New(_) => "NewSequence",
-                Delete(_) => "DeleteSequence",
-                Edit(_) => "EditSequence",
+            match self {
+                New(seq) => format!("New({:?})", seq.address()),
+                Delete(address) => format!("Delete({:?})", address),
+                Edit(op) => format!("Edit({:?})", op),
             }
         )
     }

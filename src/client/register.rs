@@ -17,7 +17,7 @@ use std::fmt;
 use xor_name::XorName;
 
 /// Register reading queries
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum RegisterRead {
     /// Get Register from the network.
     Get(Address),
@@ -78,22 +78,6 @@ impl RegisterRead {
     }
 }
 
-impl fmt::Debug for RegisterRead {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "RegisterRead::{}",
-            match *self {
-                RegisterRead::Get(_) => "GetRegister",
-                RegisterRead::Read(_) => "ReadRegister",
-                RegisterRead::GetPolicy { .. } => "GetRegisterPolicy",
-                RegisterRead::GetUserPermissions { .. } => "GetUserPermissions",
-                RegisterRead::GetOwner { .. } => "GetOwner",
-            }
-        )
-    }
-}
-
 impl RegisterWrite {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
@@ -124,10 +108,10 @@ impl fmt::Debug for RegisterWrite {
         write!(
             formatter,
             "RegisterWrite::{}",
-            match *self {
-                RegisterWrite::New(_) => "NewRegister",
-                RegisterWrite::Delete(_) => "DeleteRegister",
-                RegisterWrite::Edit(_) => "EditRegister",
+            match self {
+                RegisterWrite::New(register) => format!("New({:?})", register.address()),
+                RegisterWrite::Delete(address) => format!("Delete({:?})", address),
+                RegisterWrite::Edit(op) => format!("Edit({:?})", op),
             }
         )
     }

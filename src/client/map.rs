@@ -15,10 +15,9 @@ use sn_data_types::{
 use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// TODO: docs
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum MapRead {
     /// Get Map.
     Get(Address),
@@ -53,7 +52,7 @@ pub enum MapRead {
 
 /// TODO: docs
 #[allow(clippy::large_enum_variant)]
-#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum MapWrite {
     /// Create new Map.
     New(Map),
@@ -123,27 +122,6 @@ impl MapRead {
     }
 }
 
-impl fmt::Debug for MapRead {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use MapRead::*;
-        write!(
-            formatter,
-            "MapRead::{}",
-            match *self {
-                Get(_) => "GetMap",
-                GetValue { .. } => "GetMapValue",
-                GetShell(_) => "GetMapShell",
-                GetVersion(_) => "GetMapVersion",
-                ListEntries(_) => "ListMapEntries",
-                ListKeys(_) => "ListMapKeys",
-                ListValues(_) => "ListMapValues",
-                ListPermissions(_) => "ListMapPermissions",
-                ListUserPermissions { .. } => "ListMapUserPermissions",
-            }
-        )
-    }
-}
-
 impl MapWrite {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
@@ -169,22 +147,5 @@ impl MapWrite {
             Self::New(data) => Some(data.owner()),
             _ => None,
         }
-    }
-}
-
-impl fmt::Debug for MapWrite {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use MapWrite::*;
-        write!(
-            formatter,
-            "MapWrite::{}",
-            match *self {
-                New(_) => "NewMap",
-                Delete(_) => "DeleteMap",
-                SetUserPermissions { .. } => "SetMapUserPermissions",
-                DelUserPermissions { .. } => "DelMapUserPermissions",
-                Edit { .. } => "EditMap",
-            }
-        )
     }
 }
