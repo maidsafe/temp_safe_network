@@ -33,9 +33,9 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     };
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
-    let dest_section_pk = network.get_section_pk_by_name(&dst_name).await?;
-
-    let dest_section_pk = dest_section_pk
+    let dest_section_pk = network
+        .get_section_pk_by_name(&dst_name)
+        .await?
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
@@ -77,9 +77,9 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     };
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
-    let target_section_pk = network.get_section_pk_by_name(&dst_name).await?;
-
-    let target_section_pk = target_section_pk
+    let target_section_pk = network
+        .get_section_pk_by_name(&dst_name)
+        .await?
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
@@ -108,9 +108,9 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
     };
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
-    let target_section_pk = network.get_section_pk_by_name(&dst_name).await?;
-
-    let target_section_pk = target_section_pk
+    let target_section_pk = network
+        .get_section_pk_by_name(&dst_name)
+        .await?
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 

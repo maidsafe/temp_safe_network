@@ -188,14 +188,6 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
                     msg: msg.create_processing_error(convert_to_error_message(err).ok),
                     dst: src.to_dst(),
                 }),
-                Msg::Client(ClientMsg::ProcessingError(_err)) => {
-                    // TODO: handle error as a result of handling processing error...
-                    NodeDuty::NoOp
-                }
-                Msg::Client(ClientMsg::SupportingInfo(_msg)) => {
-                    // TODO: handle error as a result of supporting info msg
-                    NodeDuty::NoOp
-                }
                 _ => NodeDuty::NoOp,
             }
         }
