@@ -77,6 +77,15 @@ pub enum NodeMsg {
         /// ID of causing query.
         correlation_id: MessageId,
     },
+    /// The returned error, from any msg handling on recipient node.
+    NodeMsgError {
+        /// The error.
+        error: Error,
+        /// Message ID.
+        id: MessageId,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+    },
 }
 
 impl NodeMsg {
@@ -87,7 +96,8 @@ impl NodeMsg {
             | Self::NodeQuery { id, .. }
             | Self::NodeEvent { id, .. }
             | Self::NodeQueryResponse { id, .. }
-            | Self::NodeCmdError { id, .. } => *id,
+            | Self::NodeCmdError { id, .. }
+            | Self::NodeMsgError { id, .. } => *id,
         }
     }
 

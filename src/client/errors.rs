@@ -160,7 +160,6 @@ pub enum Error {
     /// The node hasn't left the section, and was not marked for relocation during reward operations
     #[error("Node is not being relocated")]
     NodeWasNotRelocated,
-
     /// There was an error in the target section of a message. Probably related to section keys.
     #[error("Target section error")]
     TargetSection(#[from] TargetSectionError),
