@@ -295,7 +295,7 @@ pub enum QueryResponse {
     /// Get key transfer history.
     GetHistory(Result<ActorHistory>),
     /// Get Store Cost.
-    GetStoreCost(Result<Token>),
+    GetStoreCost(Result<(u64, Token, PublicKey)>),
 }
 
 impl QueryResponse {
