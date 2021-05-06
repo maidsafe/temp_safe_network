@@ -161,7 +161,7 @@ impl Client {
     }
 
     /// Fetch latest StoreCost for given number of bytes from the network.
-    pub async fn get_store_cost(&self, bytes: u64) -> Result<Token, Error> {
+    pub async fn get_store_cost(&self, bytes: u64) -> Result<(u64, Token, PublicKey), Error> {
         info!("Sending Query for latest StoreCost");
 
         let public_key = self.public_key().await;
@@ -194,12 +194,10 @@ impl Client {
 
         self.get_history().await?;
 
-        let section_key = self.session.section_key().await?;
-
-        let cost_of_put = self.get_store_cost(bytes).await?;
+        let (bytes, cost_of_put, section_key) = self.get_store_cost(bytes).await?;
         info!(
-            "Current store cost reported by the network: {}",
-            cost_of_put
+            "Current store cost for {} bytes reported by section {}: {}",
+            bytes, section_key, cost_of_put
         );
 
         let initiated = self
