@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [21.0.0](https://github.com/maidsafe/sn_messaging/compare/v20.1.0...v21.0.0) (2021-05-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **storecost:** GetStoreCost query result content changed
+
+### Features
+
+* **storecost:** expand query result with more data ([c5656c2](https://github.com/maidsafe/sn_messaging/commit/c5656c2cabf24bc1d4d51b588ad90abb80bcb41a))
+
 ## [20.1.0](https://github.com/maidsafe/sn_messaging/compare/v20.0.1...v20.1.0) (2021-05-05)
 
 
