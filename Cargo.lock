@@ -3089,9 +3089,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.54.5"
+version = "0.54.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acceb1139a2b487be111aef191ff794f2f85a901a2d79089bfbb9d2f2f76b723"
+checksum = "488358feb3b8a540b8dcde8d939a8feecc5ba33ac2125e26b534a7fa51e43368"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3175,9 +3175,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "20.0.1"
+version = "21.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cf4d5fcee06a1bf3a428557837d16676c64f59ea24a1ad85dc54e4da45d046a"
+checksum = "5a73ed445ac7d27e3411e58622a6c763780d34e83357c491a2d6d5dada264795"
 dependencies = [
  "bincode",
  "bytes",
