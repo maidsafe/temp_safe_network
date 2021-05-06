@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.0](https://github.com/maidsafe/sn_api/compare/v0.25.3...v0.26.0) (2021-05-06)
+
+* ***api*** update sn_client to 0.54.9
+
 ### [0.25.3](https://github.com/maidsafe/sn_api/compare/v0.25.2...v0.25.3) (2021-05-05)
 
 * ***cli*** query each file with a single query rather than in chunks for files get command

@@ -219,11 +219,7 @@ impl SafeAppClient {
         let client = self.get_safe_client()?;
         let blob_address = BlobAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
-            let len = if let Some(end_index) = end {
-                Some(end_index - start.unwrap_or(0))
-            } else {
-                None
-            };
+            let len = end.map(|end_index| end_index - start.unwrap_or(0));
             client
                 .read_blob(
                     blob_address,
