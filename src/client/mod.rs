@@ -504,12 +504,13 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response = QueryResponse::GetSequence(Err(Error::AccessDenied(*key)));
             assert!(format!("{:?}", errored_response)
-                .contains("QueryResponse::GetSequence(AccessDenied(PublicKey::"));
+                .contains("GetSequence(Err(AccessDenied(PublicKey::"));
             Ok(())
         } else {
             Err(anyhow!("Could not generate public key"))
         }
     }
+
     #[test]
     fn generate_processing_error() -> Result<()> {
         if let Some(key) = gen_keys().first() {
