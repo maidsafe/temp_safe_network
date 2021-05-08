@@ -94,8 +94,8 @@ impl SupportingInfo {
         Self {
             info,
             source_message,
-            correlation_id,
             id,
+            correlation_id,
         }
     }
 
@@ -126,7 +126,7 @@ impl SupportingInfo {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ProcessingError {
-    /// Optional reason for the error. This should help receiving node handle the error
+    /// Optional reason for the error. This should help the receiving node handle the error
     reason: Option<Error>,
     /// Message that triggered this error
     source_message: Option<ProcessMsg>,

@@ -107,6 +107,6 @@ impl Message {
 
     /// serialize this Query into bytes ready to be sent over the wire.
     pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
-        WireMsg::serialize_sectioninfo_msg(self, dest, dest_section_pk)
+        WireMsg::serialize_section_info_msg(self, dest, dest_section_pk)
     }
 }

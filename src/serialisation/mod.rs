@@ -39,7 +39,7 @@ impl WireMsg {
     }
 
     /// Creates a new instance keeping a (serialized) copy of the 'SectionInfo' message provided.
-    pub fn new_sectioninfo_msg(
+    pub fn new_section_info_msg(
         query: &section_info::Message,
         dest: XorName,
         dest_section_pk: PublicKey,
@@ -238,12 +238,12 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary WireMsg from the provided
     /// MsgEnvelope, returning the serialized WireMsg.
-    pub fn serialize_sectioninfo_msg(
+    pub fn serialize_section_info_msg(
         query: &section_info::Message,
         dest: XorName,
         dest_section_pk: PublicKey,
     ) -> Result<Bytes> {
-        Self::new_sectioninfo_msg(query, dest, dest_section_pk)?.serialize()
+        Self::new_section_info_msg(query, dest, dest_section_pk)?.serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
@@ -320,12 +320,12 @@ mod tests {
     }
 
     #[test]
-    fn serialisation_sectioninfo_msg() -> Result<()> {
+    fn serialisation_section_info_msg() -> Result<()> {
         let dest = XorName::random();
         let dest_section_pk = SecretKey::random().public_key();
 
         let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
-        let wire_msg = WireMsg::new_sectioninfo_msg(&query, dest, dest_section_pk)?;
+        let wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header

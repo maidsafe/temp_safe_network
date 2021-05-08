@@ -73,7 +73,7 @@ impl MessageType {
                 WireMsg::new_ping_msg(dest_info.dest, dest_info.dest_section_pk).serialize()
             }
             Self::SectionInfo { msg, dest_info } => {
-                WireMsg::serialize_sectioninfo_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+                WireMsg::serialize_section_info_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
             Self::Client { msg, dest_info } => {
                 WireMsg::serialize_client_msg(msg, dest_info.dest, dest_info.dest_section_pk)
