@@ -45,7 +45,7 @@ use sn_data_types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated, WalletHistory,
+    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -80,9 +80,7 @@ pub struct SupportingInfo {
 
 /// Various types of supporting information that can be received and acted upon by a node.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum SupportingInfoFor {
-    SectionWallet(WalletHistory),
-}
+pub enum SupportingInfoFor {}
 
 impl SupportingInfo {
     pub fn new(
