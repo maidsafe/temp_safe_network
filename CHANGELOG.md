@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [21.1.0](https://github.com/maidsafe/sn_messaging/compare/v21.0.0...v21.1.0) (2021-05-10)
+
+
+### Features
+
+* **msg:** add convenience deserialize method ([7a83ab7](https://github.com/maidsafe/sn_messaging/commit/7a83ab7df527edd10ece17bcfa8478b204c2514a))
+* **msg:** add convenience wrapper for client and node msgs ([06fd752](https://github.com/maidsafe/sn_messaging/commit/06fd75271b50dd5124c4b5f1ea35b84026a3d20b))
+* **node-cmds:** add a couple of convenience functions to serialise/deserialise NodeCmdMessages ([9fd827d](https://github.com/maidsafe/sn_messaging/commit/9fd827d21d9a54afc6edc16dbead37030f84d81a))
+* **nodemsg:** add general error enum variant ([80c7056](https://github.com/maidsafe/sn_messaging/commit/80c7056324f6391c9532889a9e8930aab655b7e2))
+* **serialisation:** add source section public key to WireMsgHeader ([66320e3](https://github.com/maidsafe/sn_messaging/commit/66320e306a050df7c8294a7985a09269ed7a55ee))
+* add a SupportingInfo message variant ([4ac0399](https://github.com/maidsafe/sn_messaging/commit/4ac03999cce1ed3b29fa07c548ce22aecd199746))
+
+
+### Bug Fixes
+
+* add GetChunk variant under NodeSystemQueryResponse fixing chunk-replication ([cf6f5d3](https://github.com/maidsafe/sn_messaging/commit/cf6f5d3c2287e1272c0b330a128e70806cf6372e))
+* fix unresolved import ([a325254](https://github.com/maidsafe/sn_messaging/commit/a325254422a6fb6a27cdf1b96ad17c44dc0a35e4))
+* post-rebase issues ([b55744d](https://github.com/maidsafe/sn_messaging/commit/b55744d090c19e4a1e3e899b1155a91fd98f68ea))
+* re-add necessary msgs that were removed ([9643da6](https://github.com/maidsafe/sn_messaging/commit/9643da687b31cae189bfc714641012128e4ab3ac))
+* **node_msg:** remove unused target_section_pk field ([898c1a9](https://github.com/maidsafe/sn_messaging/commit/898c1a95e6d0e74d2179e5921340fc9b479899e1))
+* **node_msg:** rename and expose id function ([8deb221](https://github.com/maidsafe/sn_messaging/commit/8deb221298c4ce4a9345946f74cbd32f5544e90d))
+
 ## [21.0.0](https://github.com/maidsafe/sn_messaging/compare/v20.1.0...v21.0.0) (2021-05-06)
 
 
