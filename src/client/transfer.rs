@@ -94,16 +94,6 @@ impl fmt::Debug for TransferCmd {
 }
 
 impl TransferQuery {
-    // /// Get the variant of this query.
-    // pub fn get_type(&self) -> Type {
-    //     use TransferQuery::*;
-    //     match *self {
-    //         // TODO: This should this be private
-    //         GetBalance(_) => Type::PrivateRead,
-    //         GetHistory { .. } => Type::PrivateRead,
-    //     }
-    // }
-
     /// Creates a QueryResponse containing an error, with the QueryResponse variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> QueryResponse {
