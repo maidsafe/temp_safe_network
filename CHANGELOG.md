@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [22.0.0](https://github.com/maidsafe/sn_messaging/compare/v21.1.0...v22.0.0) (2021-05-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **version:** Anti-entropy related changes before this commit
+included breaking changes
+
+* **version:** remove commented code ([8a2b058](https://github.com/maidsafe/sn_messaging/commit/8a2b058260df807a66ddaf2d649cb5bd145cdbf9))
+
 ## [21.1.0](https://github.com/maidsafe/sn_messaging/compare/v21.0.0...v21.1.0) (2021-05-10)
 
 
