@@ -60,8 +60,8 @@ impl AdultLiveness {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(Operation::Write {
                 blob_write: Box::new(blob_write),
-                origin,
                 targets: targets.clone(),
+                origin,
             });
             true
         } else {

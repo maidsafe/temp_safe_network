@@ -6,14 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod map_msg;
+mod client_msg;
+mod node_msg;
 
-use super::node_ops::NodeDuty;
-use crate::network::Network;
-use log::{debug, error, info, trace};
-use map_msg::{map_node_msg, match_user_sent_msg};
+use crate::{network::Network, node_ops::NodeDuty};
+use client_msg::map_client_msg;
+use log::{debug, error, info, trace, warn};
+use node_msg::map_node_msg;
 use sn_data_types::PublicKey;
-use sn_messaging::{client::Message, SrcLocation};
+use sn_messaging::{client::ClientMsg, Msg, SrcLocation};
 use sn_routing::XorName;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use std::{thread::sleep, time::Duration};
@@ -29,7 +30,7 @@ pub enum Mapping {
 
 #[derive(Debug, Clone)]
 pub enum MsgContext {
-    Msg { msg: Message, src: SrcLocation },
+    Msg { msg: Msg, src: SrcLocation },
     Bytes { msg: bytes::Bytes, src: SrcLocation },
 }
 
@@ -45,20 +46,50 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
     match event {
         RoutingEvent::MessageReceived {
             content, src, dst, ..
-        } => {
-            let msg = match Message::from(content.clone()) {
-                Ok(msg) => msg,
-                Err(error) => {
-                    return Mapping::Error(LazyError {
-                        msg: MsgContext::Bytes { msg: content, src },
-                        error: crate::Error::Message(error),
-                    })
+        } => match Msg::from(content.clone()) {
+            Ok(msg) => match msg {
+                Msg::Node(msg) => map_node_msg(&msg, src, dst),
+                Msg::Client(msg) => {
+                    warn!(
+                        "Unexpected ClientMsg at RoutingEvent::MessageReceived {:?}",
+                        msg
+                    );
+                    return Mapping::Ok {
+                        op: NodeDuty::NoOp,
+                        ctx: None,
+                    };
                 }
-            };
-
-            map_node_msg(msg, src, dst)
-        }
-        RoutingEvent::ClientMessageReceived { msg, user } => match_user_sent_msg(*msg, user),
+            },
+            Err(error) => {
+                return Mapping::Error(LazyError {
+                    msg: MsgContext::Bytes { msg: content, src },
+                    error: crate::Error::Message(error),
+                })
+            }
+        },
+        RoutingEvent::ClientMsgReceived { msg, user } => match *msg {
+            ClientMsg::Process(process_msg) => map_client_msg(process_msg, user),
+            ClientMsg::ProcessingError(error) => {
+                warn!(
+                    "A node should never receive a ClientMsg::ProcessingError {:?}",
+                    error
+                );
+                return Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: None,
+                };
+            }
+            ClientMsg::SupportingInfo(msg) => {
+                warn!(
+                    "A node should never receive a ClientMsg::SupportingInfo {:?}",
+                    msg
+                );
+                return Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: None,
+                };
+            }
+        },
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,
@@ -100,6 +131,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     ctx: None,
                 };
             }
+
             match self_status_change {
                 NodeElderChange::None => {
                     if !network_api.is_elder().await {

@@ -9,7 +9,7 @@
 use crate::{
     chunk_store::MapChunkStore,
     error::convert_to_error_message,
-    node_ops::{NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{debug, info};
@@ -18,7 +18,7 @@ use sn_data_types::{
     PublicKey, Result as NdResult,
 };
 use sn_messaging::{
-    client::{CmdError, MapDataExchange, MapRead, MapWrite, Message, QueryResponse},
+    client::{ClientMsg, CmdError, MapDataExchange, MapRead, MapWrite, ProcessMsg, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
@@ -242,15 +242,15 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(&address, origin, MapAction::Read) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetMap(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -269,15 +269,15 @@ impl MapStorage {
             .map(|data| data.shell())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetMapShell(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -296,15 +296,15 @@ impl MapStorage {
             .map(|data| data.version())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetMapVersion(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -333,15 +333,15 @@ impl MapStorage {
                 .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
         }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetMapValue(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -360,15 +360,15 @@ impl MapStorage {
             .map(|data| data.keys())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::ListMapKeys(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -388,15 +388,15 @@ impl MapStorage {
             Map::Unseq(map) => map.values().into(),
         }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::ListMapValues(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -416,15 +416,15 @@ impl MapStorage {
             Map::Unseq(map) => map.entries().clone().into(),
         }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::ListMapEntries(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -443,15 +443,15 @@ impl MapStorage {
             .map(|data| data.permissions())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::ListMapPermissions(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -474,15 +474,15 @@ impl MapStorage {
                     .map(MapPermissionSet::clone)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::ListMapUserPermissions(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -496,15 +496,15 @@ impl MapStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         if let Err(error) = result {
-            let messaging_error = convert_to_error_message(error)?;
+            let messaging_error = convert_to_error_message(error);
             info!("MapStorage: Writing chunk FAILED!");
 
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
+                msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                     error: CmdError::Data(messaging_error),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                },
+                })),
                 section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: DstLocation::EndUser(origin),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,

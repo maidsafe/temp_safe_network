@@ -15,10 +15,8 @@ use crate::{
 use log::{debug, error, info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
-    client::{
-        BlobDataExchange, BlobRead, BlobWrite, CmdError, Message, NodeCmd, NodeQuery,
-        NodeSystemCmd, QueryResponse,
-    },
+    client::{BlobDataExchange, BlobRead, BlobWrite, CmdError, ProcessMsg, QueryResponse},
+    node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
@@ -31,6 +29,8 @@ use xor_name::XorName;
 
 use super::adult_liveness::AdultLiveness;
 use super::adult_reader::AdultReader;
+use crate::node_ops::MsgType;
+use sn_messaging::client::ClientMsg;
 
 // The number of separate copies of a blob chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
@@ -188,7 +188,7 @@ impl BlobRecords {
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
-                msg: Message::NodeCmd {
+                msg: NodeMsg::NodeCmd {
                     cmd: NodeCmd::Chunks {
                         cmd: blob_write,
                         origin,
@@ -230,11 +230,11 @@ impl BlobRecords {
                 // Depending on error, we might have to take action here.
                 if let Some(end_user) = origin {
                     duties.push(NodeDuty::Send(OutgoingMsg {
-                        msg: Message::CmdError {
+                        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                             error,
                             id: MessageId::in_response_to(&correlation_id),
                             correlation_id,
-                        },
+                        })),
                         dst: DstLocation::EndUser(end_user),
                         section_source: false,
                         aggregation: Aggregation::AtDestination,
@@ -278,16 +278,16 @@ impl BlobRecords {
             .adult_liveness
             .record_adult_read_liveness(correlation_id, src)
         {
-            duties.push(NodeDuty::Send(OutgoingMsg {
-                msg: Message::QueryResponse {
+            return Ok(vec![NodeDuty::Send(OutgoingMsg {
+                msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                     response,
                     id: MessageId::in_response_to(&correlation_id),
                     correlation_id,
-                },
+                })),
                 dst: DstLocation::EndUser(end_user),
                 section_source: false,
                 aggregation: Aggregation::AtDestination,
-            }));
+            })]);
         }
         let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_liveness.find_unresponsive_adults() {
@@ -309,13 +309,13 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let message_error = convert_to_error_message(error)?;
+        let message_error = convert_to_error_message(error);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::CmdError {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                 error: CmdError::Data(message_error),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::AtDestination,
@@ -337,7 +337,7 @@ impl BlobRecords {
             BlobWrite::DeletePrivate(address),
             targets.clone(),
         ) {
-            let msg = Message::NodeCmd {
+            let msg = NodeMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
                     origin,
@@ -386,7 +386,7 @@ impl BlobRecords {
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
-                msg: Message::NodeCmd {
+                msg: NodeMsg::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
                     id: msg_id,
                 },
@@ -433,7 +433,7 @@ impl BlobRecords {
             .adult_liveness
             .new_read(msg_id, address, origin, targets.clone())
         {
-            let msg = Message::NodeQuery {
+            let msg = NodeMsg::NodeQuery {
                 query: NodeQuery::Chunks {
                     query: BlobRead::Get(address),
                     origin,

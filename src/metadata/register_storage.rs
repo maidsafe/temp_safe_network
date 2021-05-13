@@ -9,13 +9,13 @@
 use crate::{
     chunk_store::RegisterChunkStore,
     error::convert_to_error_message,
-    node_ops::{NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::info;
 use sn_data_types::register::{Action, Address, Entry, Register, RegisterOp, User};
 use sn_messaging::{
-    client::{CmdError, Message, QueryResponse, RegisterRead, RegisterWrite},
+    client::{ClientMsg, CmdError, ProcessMsg, QueryResponse, RegisterRead, RegisterWrite},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 
@@ -90,15 +90,15 @@ impl RegisterStorage {
     async fn get(&self, address: Address, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, Action::Read, origin) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetRegister(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -151,15 +151,15 @@ impl RegisterStorage {
             .and_then(|register| register.read(Some(*origin.id())).map_err(Error::from))
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::ReadRegister(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -174,15 +174,15 @@ impl RegisterStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, Action::Read, origin) {
             Ok(res) => Ok(res.owner()),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetRegisterOwner(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -204,15 +204,15 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetRegisterUserPermissions(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -234,15 +234,15 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
                 response: QueryResponse::GetRegisterPolicy(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
@@ -300,15 +300,15 @@ impl RegisterStorage {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(error) => {
                 info!("Error on writing Register! {:?}", error);
-                convert_to_error_message(error)?
+                convert_to_error_message(error)
             }
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::CmdError {
+            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                 id: MessageId::in_response_to(&msg_id),
                 error: CmdError::Data(error),
                 correlation_id: msg_id,
-            },
+            })),
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::Section(origin.name()),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,

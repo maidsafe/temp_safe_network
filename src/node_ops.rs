@@ -12,9 +12,14 @@ use sn_data_types::{
     ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
+use sn_messaging::client::{ClientMsg, CmdError};
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, CmdError, DataExchange, Message, QueryResponse},
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    client::{
+        BlobRead, BlobWrite, DataExchange, ProcessMsg, ProcessingError, QueryResponse,
+        SupportingInfo,
+    },
+    node::NodeMsg,
+    Aggregation, DstLocation, EndUser, MessageId, Msg, SrcLocation,
 };
 use sn_routing::Prefix;
 use std::{
@@ -80,7 +85,6 @@ pub enum NodeDuty {
     ReadChunk {
         read: BlobRead,
         msg_id: MessageId,
-        origin: EndUser,
     },
     WriteChunk {
         write: BlobWrite,
@@ -197,9 +201,15 @@ pub enum NodeDuty {
     SetNodeJoinsAllowed(bool),
     /// Send a message to the specified dst.
     Send(OutgoingMsg),
+    /// Send a lazy error as a result of a specific message.
+    /// The aim here is for the sender to respond with any missing state
+    SendError(OutgoingLazyError),
+    /// Send supporting info for a given processing error.
+    /// This should be any missing state required to proceed at the erring node.
+    SendSupport(OutgoingSupportingInfo),
     /// Send the same request to each individual node.
     SendToNodes {
-        msg: Message,
+        msg: NodeMsg,
         targets: BTreeSet<XorName>,
         aggregation: Aggregation,
     },
@@ -217,7 +227,7 @@ pub enum NodeDuty {
     },
     /// Process Payment for a DataCmd
     ProcessDataPayment {
-        msg: Message,
+        msg: ProcessMsg,
         origin: EndUser,
     },
     /// Receive a chunk that is being replicated.
@@ -292,6 +302,8 @@ impl Debug for NodeDuty {
             Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
             Self::SetNodeJoinsAllowed(_) => write!(f, "SetNodeJoinsAllowed"),
             Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
+            Self::SendError(msg) => write!(f, "SendError [ msg: {:?} ]", msg),
+            Self::SendSupport(msg) => write!(f, "SendSupport [ msg: {:?} ]", msg),
             Self::SendToNodes {
                 msg,
                 targets,
@@ -314,13 +326,60 @@ impl Debug for NodeDuty {
 
 #[derive(Debug, Clone)]
 pub struct OutgoingMsg {
-    pub msg: Message,
+    pub msg: MsgType,
     pub dst: DstLocation,
     pub section_source: bool,
     pub aggregation: Aggregation,
 }
 
+#[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum MsgType {
+    Node(NodeMsg),
+    Client(ClientMsg),
+}
+
+impl MsgType {
+    pub fn id(&self) -> MessageId {
+        match self {
+            Self::Node(msg) => msg.id(),
+            Self::Client(msg) => msg.id(),
+        }
+    }
+
+    pub fn convert(msg: MsgType) -> Msg {
+        match msg {
+            Self::Client(msg) => Msg::Client(msg),
+            Self::Node(msg) => Msg::Node(msg),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OutgoingLazyError {
+    pub msg: ProcessingError,
+    pub dst: DstLocation,
+}
+
+#[derive(Debug, Clone)]
+pub struct OutgoingSupportingInfo {
+    pub msg: SupportingInfo,
+    pub dst: DstLocation,
+}
+
 impl OutgoingMsg {
+    pub fn id(&self) -> MessageId {
+        self.msg.id()
+    }
+}
+
+impl OutgoingLazyError {
+    pub fn id(&self) -> MessageId {
+        self.msg.id()
+    }
+}
+
+impl OutgoingSupportingInfo {
     pub fn id(&self) -> MessageId {
         self.msg.id()
     }

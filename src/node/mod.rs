@@ -13,19 +13,25 @@ mod messaging;
 mod role;
 mod split;
 
+use crate::event_mapping::Mapping;
 use crate::{
     chunk_store::UsedSpace,
     chunks::Chunks,
-    event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
+    error::convert_to_error_message,
+    event_mapping::{map_routing_event, MsgContext},
     network::Network,
-    node_ops::NodeDuty,
+    node_ops::{NodeDuty, OutgoingLazyError},
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
-use log::{error, info};
+use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
+use sn_messaging::{
+    client::{ClientMsg, Error as ErrorMessage, ProcessingError},
+    MessageId, Msg,
+};
 use sn_routing::{
     EventStream, {Prefix, XorName},
 };
@@ -122,7 +128,12 @@ impl Node {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             match map_routing_event(event, &self.network_api).await {
                 Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
-                Mapping::Error(error) => handle_error(error),
+                Mapping::Error(error) => {
+                    let duties = try_handle_error(error.error, Some(error.msg));
+                    for duty in duties {
+                        self.process_while_any(duty, None).await;
+                    }
+                }
             }
         }
 
@@ -138,7 +149,10 @@ impl Node {
             for duty in next_ops {
                 match self.handle(duty).await {
                     Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => try_handle_error(e, ctx.clone()),
+                    Err(e) => {
+                        let new_op = try_handle_error(e, ctx.clone());
+                        pending_node_ops.extend(new_op)
+                    }
                 };
             }
             next_ops = pending_node_ops;
@@ -146,36 +160,50 @@ impl Node {
     }
 }
 
-fn handle_error(err: LazyError) {
+fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
     use std::error::Error;
-    info!(
-        "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-        err
-    );
-
-    if let Some(source) = err.error.source() {
-        error!("Source of error: {:?}", source);
-    }
-}
-
-fn try_handle_error(err: Error, ctx: Option<MsgContext>) {
-    use std::error::Error;
+    warn!("Error being handled by node: {:?}", err);
     if let Some(source) = err.source() {
-        if let Some(_ctx) = ctx {
-            info!(
-                "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-                err
-            );
-            error!("Source of error: {:?}", source);
-        } else {
-            error!(
-                "Erroring without a msg context. Source of error: {:?}",
-                source
-            );
-        }
-    } else {
-        info!("unimplemented: Handle errors. {:?}", err);
+        warn!("Source: {:?}", source);
     }
+    let op = match ctx {
+        None => {
+            error!(
+                    "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
+                );
+            return vec![];
+        }
+        Some(MsgContext::Msg { msg, src }) => {
+            warn!("Sending in response to a message: {:?}", msg);
+            match msg {
+                Msg::Client(ClientMsg::Process(msg)) => NodeDuty::SendError(OutgoingLazyError {
+                    msg: msg.create_processing_error(Some(convert_to_error_message(err))),
+                    dst: src.to_dst(),
+                }),
+                _ => NodeDuty::NoOp,
+            }
+        }
+        Some(MsgContext::Bytes { msg, src }) => {
+            // We generate a message id here since we cannot
+            // retrieve the message id from the message received
+            let msg_id = MessageId::from_content(&msg).unwrap_or_else(|_| MessageId::new());
+
+            warn!("Error decoding msg bytes, sent from {:?}", src);
+
+            NodeDuty::SendError(OutgoingLazyError {
+                msg: ProcessingError::new(
+                    Some(ErrorMessage::Serialization(
+                        "Could not deserialize Message at node".to_string(),
+                    )),
+                    None,
+                    msg_id,
+                ),
+                dst: src.to_dst(),
+            })
+        }
+    };
+
+    vec![op]
 }
 
 impl Display for Node {

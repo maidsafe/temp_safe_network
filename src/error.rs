@@ -7,11 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_data_types::{DataAddress, Error as DtError, PublicKey};
-use sn_messaging::{client::Error as ErrorMessage, MessageId};
+use sn_messaging::{client::Error as ErrorMessage, MessageId, Msg};
 use sn_routing::Prefix;
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
+
+/// Specialisation of `std::Result` for Node.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
@@ -30,12 +33,48 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// No source message provided for ProcessingError
+    #[error("No source message for ProcessingError")]
+    NoSourceMessageForProcessingError,
+    /// Unexpected Process msg. A ProcessingError was expected here...
+    #[error("Unexpected Process msg. A ProcessingError was expected here...")]
+    UnexpectedProcessMsg,
+    /// Node does not manage any section funds.
+    #[error("Node does not currently manage any section funds")]
+    NoSectionFunds,
+    /// Node does not manage any metadata, so is likely not a fully prepared elder yet.
+    #[error("Node does not currently manage any section metadata")]
+    NoSectionMetaData,
+    /// Node does not manage any immutable chunks.
+    #[error("Node does not currently manage any immutable chunks")]
+    NoImmutableChunks,
+    /// Node is currently churning so cannot perform the request.
+    #[error("Cannot complete request due to churning of funds")]
+    NodeChurningFunds,
+    /// Node is currently churning, but failed to sign a message.
+    #[error("Error signing message during churn")]
+    ChurnSignError,
+    /// Genesis node not in genesis stage.
+    #[error("Not in genesis stage")]
+    NotInGenesis,
+    /// Target xorname could not be determined from DstLocation
+    #[error("No destination name found")]
+    NoDestinationName,
+    /// Failed to activate a node, due to it being active already
+    #[error("Cannot activate node: Node is already active")]
+    NodeAlreadyActive,
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
     /// Unknown as a Section PublicKey.
     #[error("PublicKey provided was not identified as a section {0}")]
     UnknownSectionKey(PublicKey),
+    /// Nodes cannot send direct messages
+    #[error("Node cannot send direct messages. This functionality will be deprecated in routing.")]
+    CannotDirectMessage,
+    /// Node cannot be updated, message cannot be resent
+    #[error("Process error could not be handled. We cannot update the erroring node.")]
+    CannotUpdateProcessErrorNode,
     /// Not a Section PublicKeyShare.
     #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
     ProvidedPkIsNotBlsShare,
@@ -83,7 +122,10 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network message error.
     #[error("Client message error:: {0}")]
-    ClientMessage(#[from] sn_messaging::client::Error),
+    ClientMsg(#[from] sn_messaging::client::Error),
+    /// Network processing error message.
+    #[error("Procesing error:: {0:?}")]
+    ProcessingError(sn_messaging::client::ProcessingError),
     /// Network message error.
     #[error("Network message error:: {0}")]
     Message(#[from] sn_messaging::Error),
@@ -126,34 +168,35 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
+    /// Failed to send message to connection.
+    #[error("Failed to send message to connection")]
+    UnableToSend(Msg),
 }
 
-pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
+pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::client::Error {
     match error {
-        Error::InvalidOperation(msg) => Ok(ErrorMessage::InvalidOperation(msg)),
-        Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
-        Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
-        Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
-        Error::NoSuchChunk(address) => Ok(ErrorMessage::DataNotFound(address)),
-        Error::NotEnoughSpace => Ok(ErrorMessage::NotEnoughSpace),
-        Error::TempDirCreationFailed(_) => Ok(ErrorMessage::FailedToWriteFile),
-        Error::DataExists => Ok(ErrorMessage::DataExists),
+        Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
+        Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
+        Error::InvalidOwners(key) => ErrorMessage::InvalidOwners(key),
+        Error::InvalidSignedTransfer(_) => ErrorMessage::InvalidSignature,
+        Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
+        Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
+        Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
+        Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
+        Error::DataExists => ErrorMessage::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        error => Err(Error::NoErrorMapping(error.to_string())),
+        other => {
+            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
+        }
     }
 }
-pub(crate) fn convert_dt_error_to_error_message(
-    error: DtError,
-) -> Result<sn_messaging::client::Error> {
+pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> sn_messaging::client::Error {
     match error {
-        DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation(
-            "DtError::InvalidOperation".to_string(),
-        )),
-        DtError::NoSuchEntry => Ok(ErrorMessage::NoSuchEntry),
-        DtError::AccessDenied(pk) => Ok(ErrorMessage::AccessDenied(pk)),
-        error => Err(Error::NoErrorMapping(error.to_string())),
+        DtError::InvalidOperation => {
+            ErrorMessage::InvalidOperation("DtError::InvalidOperation".to_string())
+        }
+        DtError::NoSuchEntry => ErrorMessage::NoSuchEntry,
+        DtError::AccessDenied(pk) => ErrorMessage::AccessDenied(pk),
+        other => ErrorMessage::InvalidOperation(format!("DtError: {:?}", other)),
     }
 }
-
-/// Specialisation of `std::Result` for Node.
-pub type Result<T, E = Error> = std::result::Result<T, E>;

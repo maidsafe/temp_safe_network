@@ -8,20 +8,18 @@
 
 use super::{
     interaction::push_state,
-    messaging::{send, send_to_nodes},
+    messaging::{send, send_error, send_support, send_to_nodes},
     role::{AdultRole, Role},
 };
 use crate::{
     chunks::Chunks,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
 use log::{debug, info};
-use sn_messaging::{
-    client::{Message, NodeQuery},
-    Aggregation, DstLocation, MessageId,
-};
+use sn_messaging::node::NodeMsg;
+use sn_messaging::{node::NodeQuery, Aggregation, DstLocation, MessageId};
 use sn_routing::ELDER_SIZE;
 use xor_name::XorName;
 
@@ -271,9 +269,9 @@ impl Node {
             }
             //
             // -------- Immutable chunks --------
-            NodeDuty::ReadChunk { read, msg_id, .. } => {
+            NodeDuty::ReadChunk { read, msg_id } => {
                 let adult = self.role.as_adult_mut()?;
-                let mut ops = adult.chunks.read(&read, msg_id);
+                let mut ops = vec![adult.chunks.read(&read, msg_id)];
                 ops.extend(adult.chunks.check_storage().await?);
                 Ok(ops)
             }
@@ -306,6 +304,14 @@ impl Node {
                 send(msg, &self.network_api).await?;
                 Ok(vec![])
             }
+            NodeDuty::SendError(msg) => {
+                send_error(msg, &self.network_api).await?;
+                Ok(vec![])
+            }
+            NodeDuty::SendSupport(msg) => {
+                send_support(msg, &self.network_api).await?;
+                Ok(vec![])
+            }
             NodeDuty::SendToNodes {
                 msg,
                 targets,
@@ -334,10 +340,10 @@ impl Node {
                     Ok(vec![elder.meta_data.read(query, id, origin).await?])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: Message::NodeQuery {
+                        msg: MsgType::Node(NodeMsg::NodeQuery {
                             query: NodeQuery::Metadata { query, origin },
                             id,
-                        },
+                        }),
                         dst: DstLocation::Section(data_section_addr),
                         section_source: false,
                         aggregation: Aggregation::None,
@@ -373,7 +379,7 @@ impl Node {
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.process_payment(&msg, origin).await?])
+                Ok(elder.transfers.process_payment(&msg, origin).await?)
             }
             NodeDuty::ReplicateChunk { data, id } => {
                 let adult = self.role.as_adult_mut()?;

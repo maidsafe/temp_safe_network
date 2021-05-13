@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     Node, Result,
 };
 use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use sn_messaging::{
-    client::{
-        Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
+    node::{
+        NodeCmd, NodeMsg, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
         NodeTransferCmd,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
@@ -35,10 +35,10 @@ impl Node {
             let location = XorName::from(credit_proof.recipient());
             let msg_id = MessageId::from_content(&credit_proof.debiting_replicas_sig)?;
             ops.push(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeCmd {
+                msg: MsgType::Node(NodeMsg::NodeCmd {
                     cmd: Transfers(PropagateTransfer(credit_proof)),
                     id: msg_id,
-                },
+                }),
                 section_source: true, // i.e. errors go to our section
                 dst: DstLocation::Section(location),
                 aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
@@ -60,13 +60,13 @@ impl Node {
             key_set: self.network_api.our_public_key_set().await?,
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
+            msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
                 )),
                 correlation_id: msg_id,
                 id: MessageId::in_response_to(&msg_id),
-            },
+            }),
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section
             aggregation: Aggregation::AtDestination, // None,
@@ -77,13 +77,13 @@ impl Node {
     pub(crate) async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
         let node_id = PublicKey::from(self.network_api.public_key().await);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: MsgType::Node(NodeMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
                     section: node_id.into(),
                     node_id,
                 }),
                 id: MessageId::new(),
-            },
+            }),
             section_source: false, // sent as single node
             dst: DstLocation::Section(node_id.into()),
             aggregation: Aggregation::None,
@@ -94,10 +94,10 @@ impl Node {
     pub(crate) async fn register_wallet(&self) -> OutgoingMsg {
         let address = self.network_api.our_prefix().await.name();
         OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: MsgType::Node(NodeMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
                 id: MessageId::new(),
-            },
+            }),
             section_source: false, // sent as single node
             dst: DstLocation::Section(address),
             aggregation: Aggregation::None,
@@ -128,7 +128,7 @@ pub(crate) async fn push_state(
     let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
 
     Ok(NodeDuty::SendToNodes {
-        msg: Message::NodeCmd {
+        msg: NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                 node_rewards,
                 user_wallets,
