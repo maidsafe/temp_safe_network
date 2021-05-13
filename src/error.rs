@@ -156,6 +156,9 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwners(PublicKey),
+    /// Operation is invalid, eg signing validation
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
     NoErrorMapping(String),
@@ -165,17 +168,20 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
+    /// Failed to send message to connection.
+    #[error("Failed to send message to connection")]
+    UnableToSend(Msg),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::client::Error {
     match error {
+        Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidOwners(key) => ErrorMessage::InvalidOwners(key),
         Error::InvalidSignedTransfer(_) => ErrorMessage::InvalidSignature,
         Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
         Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
         Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
-        Error::BalanceExists => ErrorMessage::BalanceExists,
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
         Error::DataExists => ErrorMessage::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),

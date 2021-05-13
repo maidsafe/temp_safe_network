@@ -23,7 +23,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             query: Query::Data(query),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::ProcessRead { query, id, origin },
             ctx: Some(super::MsgContext::Msg {
                 msg: Msg::Client(ClientMsg::Process(msg)),
@@ -33,7 +33,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
         ProcessMsg::Cmd {
             cmd: Cmd::Data { .. },
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::ProcessDataPayment {
                 msg: msg.clone(),
                 origin,
@@ -47,7 +47,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             cmd: Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer)),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::ValidateClientTransfer {
                 signed_transfer,
                 origin: SrcLocation::EndUser(origin),
@@ -63,7 +63,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             cmd: Cmd::Transfer(TransferCmd::SimulatePayout(transfer)),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::SimulatePayout {
                 transfer,
                 origin: SrcLocation::EndUser(origin),
@@ -78,7 +78,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             cmd: Cmd::Transfer(TransferCmd::RegisterTransfer(proof)),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::RegisterTransfer { proof, msg_id: id },
             ctx: Some(MsgContext::Msg {
                 msg: Msg::Client(ClientMsg::Process(msg)),
@@ -90,7 +90,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             query: Query::Transfer(TransferQuery::GetHistory { at, since_version }),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::GetTransfersHistory {
                 at,
                 since_version,
@@ -106,7 +106,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             query: Query::Transfer(TransferQuery::GetBalance(at)),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::GetBalance {
                 at,
                 origin: SrcLocation::EndUser(origin),
@@ -121,7 +121,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             query: Query::Transfer(TransferQuery::GetStoreCost { bytes, .. }),
             id,
             ..
-        } => Mapping {
+        } => Mapping::Ok {
             op: NodeDuty::GetStoreCost {
                 bytes,
                 origin: SrcLocation::EndUser(origin),
@@ -140,7 +140,7 @@ pub fn map_client_msg(msg: ProcessMsg, origin: EndUser) -> Mapping {
             ));
             let src = SrcLocation::EndUser(origin);
 
-            Mapping {
+            Mapping::Ok {
                 ctx: Some(MsgContext::Msg {
                     msg: Msg::Client(ClientMsg::Process(msg.clone())),
                     src,

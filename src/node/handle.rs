@@ -11,20 +11,15 @@ use super::{
     messaging::{send, send_error, send_support, send_to_nodes},
     role::{AdultRole, Role},
 };
-use crate::node_ops::OutgoingSupportingInfo;
 use crate::{
     chunks::Chunks,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
-use log::{debug, info, trace};
+use log::{debug, info};
 use sn_messaging::node::NodeMsg;
-use sn_messaging::{
-    client::{ProcessMsg, Query, SupportingInfo, SupportingInfoFor},
-    node::{NodeCmd, NodeEvent, NodeQuery},
-    Aggregation, DstLocation, MessageId,
-};
+use sn_messaging::{node::NodeQuery, Aggregation, DstLocation, MessageId};
 use sn_routing::ELDER_SIZE;
 use xor_name::XorName;
 

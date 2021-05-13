@@ -15,11 +15,8 @@ use crate::{
 use log::{debug, error, info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
-    client::{
-        BlobDataExchange, BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd,
-        NodeQuery, NodeSystemCmd, NodeSystemQuery, ProcessMsg, QueryResponse,
-    },
-    node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd, NodeSystemQuery},
+    client::{BlobDataExchange, BlobRead, BlobWrite, CmdError, ProcessMsg, QueryResponse},
+    node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
@@ -312,7 +309,7 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let message_error = convert_to_error_message(error)?;
+        let message_error = convert_to_error_message(error);
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                 error: CmdError::Data(message_error),

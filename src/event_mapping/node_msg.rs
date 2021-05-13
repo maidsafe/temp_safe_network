@@ -24,7 +24,7 @@ use super::Mapping;
 
 pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
     match &dst {
-        DstLocation::Section(_name) | DstLocation::Node(_name) => Mapping {
+        DstLocation::Section(_name) | DstLocation::Node(_name) => Mapping::Ok {
             op: match_node_msg(msg, src),
             ctx: Some(MsgContext::Msg {
                 msg: Msg::Node(msg.clone()),
@@ -39,12 +39,12 @@ pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mappin
             ));
             if let SrcLocation::EndUser(_) = src {
                 log::error!("Logic error! EndUser cannot send NodeMsgs. ({:?})", msg);
-                return Mapping {
+                return Mapping::Ok {
                     op: NodeDuty::NoOp,
                     ctx: None,
                 };
             }
-            Mapping {
+            Mapping::Ok {
                 op: NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Node(NodeMsg::NodeMsgError {
                         error,

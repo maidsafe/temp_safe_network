@@ -19,7 +19,7 @@ use sn_messaging::{
         SupportingInfo,
     },
     node::NodeMsg,
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId, Msg, SrcLocation,
 };
 use sn_routing::Prefix;
 use std::{
@@ -344,6 +344,13 @@ impl MsgType {
         match self {
             Self::Node(msg) => msg.id(),
             Self::Client(msg) => msg.id(),
+        }
+    }
+
+    pub fn convert(msg: MsgType) -> Msg {
+        match msg {
+            Self::Client(msg) => Msg::Client(msg),
+            Self::Node(msg) => Msg::Node(msg),
         }
     }
 }

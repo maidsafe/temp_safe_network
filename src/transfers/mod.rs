@@ -222,7 +222,7 @@ impl Transfers {
                     );
                     // todo, better error, like `TooLowPayment`
                     let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
-                    ops.push(NodeDuty::Send(OutgoingMsg {
+                    return Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                             error: CmdError::Transfer(TransferRegistration(
                                 ErrorMessage::InsufficientBalance,
@@ -231,15 +231,14 @@ impl Transfers {
                             correlation_id: msg.id(),
                         })),
                         section_source: true, // strictly this is not correct, but we don't expect responses to a response..
-                        dst: DstLocation::Section(dst_address),
+                        dst: origin.to_dst(),
                         aggregation: Aggregation::AtDestination, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                    }));
-                    return Ok(ops);
+                    })]);
                 }
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
                 // informed of this transfer as well..
-                ops.push(NodeDuty::Send(OutgoingMsg {
+                return Ok(vec![NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Node(NodeMsg::NodeCmd {
                         cmd: NodeCmd::Metadata {
                             cmd: data_cmd.clone(),
@@ -250,7 +249,7 @@ impl Transfers {
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(dst_address),
                     aggregation: Aggregation::AtDestination,
-                }))
+                })]);
             }
             Err(e) => {
                 warn!("Payment: registration or propagation failed: {:?}", e);
@@ -284,7 +283,7 @@ impl Transfers {
     ) -> Result<NodeDuty> {
         let result = match self.replicas.all_events().await {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
@@ -311,7 +310,7 @@ impl Transfers {
         // validate signature
         let result = match self.replicas.balance(wallet_id).await {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -373,7 +372,7 @@ impl Transfers {
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })),
             Err(e) => {
-                let message_error = convert_to_error_message(e)?;
+                let message_error = convert_to_error_message(e);
                 Ok(NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                         id: MessageId::in_response_to(&msg_id),
@@ -412,7 +411,7 @@ impl Transfers {
                 }))
             }
             Err(e) => {
-                let message_error = convert_to_error_message(e)?;
+                let message_error = convert_to_error_message(e);
                 Ok(NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                         error: CmdError::Transfer(TransferError::TransferRegistration(

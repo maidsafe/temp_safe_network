@@ -13,7 +13,7 @@ mod messaging;
 mod role;
 mod split;
 
-use crate::event_mapping::LazyError;
+use crate::event_mapping::Mapping;
 use crate::{
     chunk_store::UsedSpace,
     chunks::Chunks,
@@ -24,13 +24,13 @@ use crate::{
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
-use log::{error, info, warn};
+use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
 use sn_messaging::{
     client::{ClientMsg, Error as ErrorMessage, ProcessingError},
-    DstLocation, MessageId, Msg, SrcLocation,
+    MessageId, Msg,
 };
 use sn_routing::{
     EventStream, {Prefix, XorName},
@@ -128,8 +128,8 @@ impl Node {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             match map_routing_event(event, &self.network_api).await {
                 Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
-                Mapping::Error { msg, error } => {
-                    let duties = try_handle_error(error, Some(msg));
+                Mapping::Error(error) => {
+                    let duties = try_handle_error(error.error, Some(error.msg));
                     for duty in duties {
                         self.process_while_any(duty, None).await;
                     }
@@ -160,14 +160,6 @@ impl Node {
     }
 }
 
-fn get_dst_from_src(src: SrcLocation) -> DstLocation {
-    match src {
-        SrcLocation::EndUser(user) => DstLocation::EndUser(user),
-        SrcLocation::Node(node) => DstLocation::Node(node),
-        SrcLocation::Section(section) => DstLocation::Section(section),
-    }
-}
-
 fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
     use std::error::Error;
     warn!("Error being handled by node: {:?}", err);
@@ -185,7 +177,7 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
             warn!("Sending in response to a message: {:?}", msg);
             match msg {
                 Msg::Client(ClientMsg::Process(msg)) => NodeDuty::SendError(OutgoingLazyError {
-                    msg: msg.create_processing_error(convert_to_error_message(err).ok),
+                    msg: msg.create_processing_error(Some(convert_to_error_message(err))),
                     dst: src.to_dst(),
                 }),
                 _ => NodeDuty::NoOp,

@@ -49,10 +49,10 @@ impl AdultRole {
             .map(|data| {
                 let data_name = *data.name();
                 NodeDuty::Send(OutgoingMsg {
-                    msg: Message::NodeCmd {
+                    msg: MsgType::Node(NodeMsg::NodeCmd {
                         cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
                         id: MessageId::new(),
-                    },
+                    }),
                     dst: DstLocation::Section(data_name),
                     section_source: false,
                     aggregation: Aggregation::None,

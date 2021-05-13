@@ -127,17 +127,16 @@ pub(crate) async fn push_state(
     // Create an aggregated map of all the metadata of the provided prefix
     let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
 
-    Ok(NodeDuty::Send(OutgoingMsg {
-        msg: MsgType::Node(NodeMsg::NodeCmd {
+    Ok(NodeDuty::SendToNodes {
+        msg: NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                 node_rewards,
                 user_wallets,
                 metadata,
             }),
             id: msg_id,
-        }),
-        section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-        dst,
+        },
+        targets: peers,
         aggregation: Aggregation::None,
-    }))
+    })
 }
