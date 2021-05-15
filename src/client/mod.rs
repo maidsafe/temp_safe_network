@@ -16,7 +16,6 @@ mod errors;
 mod map;
 mod query;
 mod register;
-mod sender;
 mod sequence;
 mod transfer;
 
@@ -33,7 +32,6 @@ pub use self::{
     map::{MapRead, MapWrite},
     query::Query,
     register::{RegisterRead, RegisterWrite},
-    sender::{Address, MsgSender, TransientElderKey, TransientSectionKey},
     sequence::{SequenceRead, SequenceWrite},
     transfer::{TransferCmd, TransferQuery},
 };
