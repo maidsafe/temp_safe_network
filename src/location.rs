@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use serde::{Deserialize, Serialize};
-use sn_data_types::PublicKey;
 use xor_name::{Prefix, XorName};
 
 type SocketId = XorName;
@@ -56,50 +55,20 @@ pub enum Aggregation {
     AtDestination,
 }
 
-/// An EndUser is repreented by a PublicKey.
-/// It uses 1-n clients to access the network.
+/// An EndUser is represented by the name
+/// it's proxied through, and its socket id.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub enum EndUser {
-    /// All clients of this end user.
-    AllClients(PublicKey),
-    /// An EndUser can instantiate multiple Clients.
-    /// The Clients use the same PublicKey, but different SocketAddr.
-    Client {
-        /// The EndUser PublicKey
-        public_key: PublicKey,
-        /// A hash of the EndUser signature over their socket address.
-        /// This maps to the SocketAddr at the Elders where the EndUser registered.
-        socket_id: SocketId,
-    },
-}
-
-impl EndUser {
-    /// Returns the name of this location, or `None` if it is `Direct`.
-    pub fn id(&self) -> &PublicKey {
-        match self {
-            Self::Client { public_key, .. } => public_key,
-            Self::AllClients(public_key) => public_key,
-        }
-    }
-
-    /// Returns the name of this location, or `None` if it is `Direct`.
-    pub fn name(&self) -> XorName {
-        (*self.id()).into()
-    }
-
-    /// Returns true if the provided name equals the enduser name.
-    pub fn equals(&self, name: &XorName) -> bool {
-        match self {
-            Self::Client { public_key, .. } => name == &(*public_key).into(),
-            Self::AllClients(public_key) => name == &(*public_key).into(),
-        }
-    }
+pub struct EndUser {
+    /// The name it's proxied through
+    pub xorname: XorName,
+    /// This maps to the SocketAddr at the Elders where the EndUser is proxied through.
+    pub socket_id: SocketId,
 }
 
 /// Message source location.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub enum SrcLocation {
-    /// An EndUser uses one or more Clients.
+    /// An EndUser.
     EndUser(EndUser),
     /// A single node with the given name.
     Node(XorName),
@@ -113,7 +82,7 @@ impl SrcLocation {
         matches!(self, Self::Section(_))
     }
 
-    /// Returns whether this location is a section.
+    /// Returns whether this location is an end user.
     pub fn is_user(&self) -> bool {
         matches!(self, Self::EndUser(_))
     }
@@ -121,16 +90,16 @@ impl SrcLocation {
     /// Returns whether the given name is part of this location
     pub fn equals(&self, name: &XorName) -> bool {
         match self {
-            Self::EndUser(user) => user.equals(name),
+            Self::EndUser(user) => &user.xorname == name,
             Self::Node(self_name) => name == self_name,
             Self::Section(some_name) => name == some_name,
         }
     }
 
-    /// Returns the name of this location, or `None` if it is `Direct`.
+    /// Returns the name of this location.
     pub fn name(&self) -> XorName {
         match self {
-            Self::EndUser(user) => user.name(),
+            Self::EndUser(user) => user.xorname,
             Self::Node(name) => *name,
             Self::Section(name) => *name,
         }
@@ -149,7 +118,7 @@ impl SrcLocation {
 /// Message destination location.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub enum DstLocation {
-    /// An EndUser uses one or more Clients.
+    /// An EndUser.
     EndUser(EndUser),
     /// Destination is a single node with the given name.
     Node(XorName),
@@ -165,7 +134,7 @@ impl DstLocation {
         matches!(self, Self::Section(_))
     }
 
-    /// Returns whether this location is a section.
+    /// Returns whether this location is an end user.
     pub fn is_user(&self) -> bool {
         matches!(self, Self::EndUser(_))
     }
@@ -179,7 +148,7 @@ impl DstLocation {
         }
 
         match self {
-            Self::EndUser(user) => prefix.matches(&user.name()),
+            Self::EndUser(user) => prefix.matches(&user.xorname),
             Self::Node(self_name) => name == self_name,
             Self::Section(self_name) => prefix.matches(self_name),
             Self::Direct => true,
@@ -189,7 +158,7 @@ impl DstLocation {
     /// Returns the name of this location, or `None` if it is `Direct`.
     pub fn name(&self) -> Option<XorName> {
         match self {
-            Self::EndUser(user) => Some(user.name()),
+            Self::EndUser(user) => Some(user.xorname),
             Self::Node(name) => Some(*name),
             Self::Section(name) => Some(*name),
             Self::Direct => None,

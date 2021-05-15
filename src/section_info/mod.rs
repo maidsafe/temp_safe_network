@@ -12,7 +12,7 @@ use crate::{MessageId, MessageType, WireMsg};
 use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
-use sn_data_types::{PublicKey, ReplicaPublicKeySet, Signature};
+use sn_data_types::{PublicKey, ReplicaPublicKeySet};
 use std::{collections::BTreeMap, fmt, net::SocketAddr};
 use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
@@ -23,20 +23,6 @@ use xor_name::{Prefix, XorName};
 pub enum Message {
     /// Message to request information about the section that matches the given name.
     GetSectionQuery(PublicKey),
-    /// An EndUser that wants to interact with the network,
-    /// would send this cmd to the elders received
-    /// in the GetSectionResponse.
-    RegisterEndUserCmd {
-        /// The end user public key.
-        end_user: PublicKey,
-        /// A sig over the socketaddr from which
-        /// this request is made, by the secret key
-        /// corresponding to the end_user public key.
-        socketaddr_sig: Signature,
-    },
-    /// If the sig over the sender socketaddr
-    /// cannot be verified by the provided public key.
-    RegisterEndUserError(Error),
     /// Response to `GetSectionQuery`.
     GetSectionResponse(GetSectionResponse),
     /// Updated info related to section
