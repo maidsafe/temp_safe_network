@@ -40,7 +40,7 @@ pub struct LazyError {
     pub error: crate::Error,
 }
 
-/// Process any routing event
+// Process any routing event
 pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     info!("Handling RoutingEvent: {:?}", event);
     match event {
@@ -68,26 +68,36 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             }
         },
         RoutingEvent::ClientMsgReceived { msg, user } => match *msg {
-            ClientMsg::Process(process_msg) => map_client_msg(process_msg, user),
+            ClientMsg::Process(process_msg) => {
+                let op = map_client_msg(process_msg.clone(), user);
+                let ctx = Some(MsgContext::Msg {
+                    msg: Msg::Client(ClientMsg::Process(process_msg)),
+                    src: SrcLocation::EndUser(user),
+                });
+
+                Mapping::Ok { op, ctx }
+            }
             ClientMsg::ProcessingError(error) => {
                 warn!(
                     "A node should never receive a ClientMsg::ProcessingError {:?}",
                     error
                 );
-                return Mapping::Ok {
+
+                Mapping::Ok {
                     op: NodeDuty::NoOp,
                     ctx: None,
-                };
+                }
             }
             ClientMsg::SupportingInfo(msg) => {
                 warn!(
                     "A node should never receive a ClientMsg::SupportingInfo {:?}",
                     msg
                 );
-                return Mapping::Ok {
+
+                Mapping::Ok {
                     op: NodeDuty::NoOp,
                     ctx: None,
-                };
+                }
             }
         },
         RoutingEvent::SectionSplit {
