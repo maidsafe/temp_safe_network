@@ -12,7 +12,8 @@
 use crate::client::{CmdError, Error, Result};
 use crate::{
     client::{
-        BlobRead, BlobWrite, DataCmd as NodeDataCmd, DataExchange, DataQuery as NodeDataQuery,
+        BlobRead, BlobWrite, ClientSigned, DataCmd as NodeDataCmd, DataExchange,
+        DataQuery as NodeDataQuery,
     },
     EndUser, MessageId, MessageType, WireMsg,
 };
@@ -130,9 +131,17 @@ impl NodeMsg {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
     /// Metadata is handled by Elders
-    Metadata { cmd: NodeDataCmd, origin: EndUser },
+    Metadata {
+        cmd: NodeDataCmd,
+        client_signed: ClientSigned,
+        origin: EndUser,
+    },
     /// Chunks are handled by Adults
-    Chunks { cmd: BlobWrite, origin: EndUser },
+    Chunks {
+        cmd: BlobWrite,
+        client_signed: ClientSigned,
+        origin: EndUser,
+    },
     /// Transfers are handled by Elders
     Transfers(NodeTransferCmd),
     /// Cmds related to the running of a node.
@@ -206,6 +215,7 @@ pub enum NodeQuery {
     /// Metadata is handled by Elders
     Metadata {
         query: NodeDataQuery,
+        client_signed: ClientSigned,
         origin: EndUser,
     },
     /// Chunks are handled by Adults

@@ -43,7 +43,7 @@ use sn_data_types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
-    SequencePublicPolicy, Token, TransferAgreementProof, TransferValidated,
+    SequencePublicPolicy, Signature, Token, TransferAgreementProof, TransferValidated,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -51,6 +51,13 @@ use std::{
 };
 use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
+
+/// Public key and signature provided by the client
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct ClientSigned {
+    pub public_key: PublicKey,
+    pub signature: Signature,
+}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -214,42 +221,46 @@ pub enum ProcessMsg {
     /// We expect them to be successful, and only return a msg
     /// if something went wrong.
     Cmd {
-        /// Cmd.
-        cmd: Cmd,
         /// Message ID.
         id: MessageId,
+        /// Cmd.
+        cmd: Cmd,
+        /// Public key and corresponding signature over the command
+        client_signed: ClientSigned,
     },
     /// Queries is a read-only operation.
     Query {
-        /// Query.
-        query: Query,
         /// Message ID.
         id: MessageId,
+        /// Query.
+        query: Query,
+        /// Public key and corresponding signature over the query
+        client_signed: ClientSigned,
     },
     /// An Event is a fact about something that happened.
     Event {
-        /// Request.
-        event: Event,
         /// Message ID.
         id: MessageId,
+        /// Request.
+        event: Event,
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
     /// The response to a query, containing the query result.
     QueryResponse {
-        /// QueryResponse.
-        response: QueryResponse,
         /// Message ID.
         id: MessageId,
+        /// QueryResponse.
+        response: QueryResponse,
         /// ID of causing query.
         correlation_id: MessageId,
     },
     /// Cmd error.
     CmdError {
-        /// The error.
-        error: CmdError,
         /// Message ID.
         id: MessageId,
+        /// The error.
+        error: CmdError,
         /// ID of causing cmd.
         correlation_id: MessageId,
     },
@@ -263,9 +274,7 @@ impl ProcessMsg {
             reason,
         }
     }
-}
 
-impl ProcessMsg {
     /// Gets the message ID.
     pub fn id(&self) -> MessageId {
         match self {
@@ -509,10 +518,17 @@ mod tests {
 
     #[test]
     fn generate_processing_error() -> Result<()> {
-        if let Some(key) = gen_keys().first() {
+        if let Some(keypair) = gen_keypairs().first() {
+            let public_key = keypair.public_key();
+            let signature = keypair.sign(b"the query");
+
             let msg = ProcessMsg::Query {
-                query: Query::Transfer(TransferQuery::GetBalance(*key)),
                 id: MessageId::new(),
+                query: Query::Transfer(TransferQuery::GetBalance(public_key)),
+                client_signed: ClientSigned {
+                    public_key,
+                    signature,
+                },
             };
             let random_addr = DataAddress::Blob(BlobAddress::Public(XorName::random()));
             let lazy_error =
@@ -532,13 +548,20 @@ mod tests {
 
     #[test]
     fn debug_format_processing_error() -> Result<()> {
-        if let Some(key) = gen_keys().first() {
+        if let Some(keypair) = gen_keypairs().first() {
+            let public_key = keypair.public_key();
+            let signature = keypair.sign(b"the query");
+
             let random_addr = DataAddress::Blob(BlobAddress::Public(XorName::random()));
             let errored_response = ProcessingError {
                 reason: Some(Error::DataNotFound(random_addr.clone())),
                 source_message: Some(ProcessMsg::Query {
                     id: MessageId::new(),
-                    query: Query::Transfer(TransferQuery::GetBalance(*key)),
+                    query: Query::Transfer(TransferQuery::GetBalance(public_key)),
+                    client_signed: ClientSigned {
+                        public_key,
+                        signature,
+                    },
                 }),
                 id: MessageId::new(),
             };
@@ -600,13 +623,18 @@ mod tests {
     #[test]
     fn serialization() -> Result<()> {
         let keypair = &gen_keypairs()[0];
-        let pk = keypair.public_key();
+        let public_key = keypair.public_key();
+        let signature = keypair.sign(b"the query");
 
         let random_xor = xor_name::XorName::random();
         let id = MessageId(random_xor);
         let message = ClientMsg::Process(ProcessMsg::Query {
-            query: Query::Transfer(TransferQuery::GetBalance(pk)),
             id,
+            query: Query::Transfer(TransferQuery::GetBalance(public_key)),
+            client_signed: ClientSigned {
+                public_key,
+                signature,
+            },
         });
 
         // test msgpack serialization
