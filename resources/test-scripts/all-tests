@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -e -x
-
-cargo fmt -- --check
-
-source ./resources/test-scripts/api-tests
-source ./resources/test-scripts/cli-tests

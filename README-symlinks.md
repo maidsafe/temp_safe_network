@@ -232,7 +232,7 @@ For this reason, it was decided to commit a test directory tree for the relative
 tests to operate on, while absolute symlink tests generate a tree dynamically
 for each test within the system temp directory.
 
-The relative symlinks test directory resides at path sn_api/test_symlinks.
+The relative symlinks test directory resides at path test_symlinks.
 
 See [Integration Testing on Windows](#integration-testing-on-windows)
 

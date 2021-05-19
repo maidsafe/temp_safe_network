@@ -128,7 +128,7 @@ $ curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
 
 Once the Safe CLI is downloaded and installed on your system, you can follow the steps in this User Guide by starting from the [Using the CLI](#using-the-cli) section below in this document.
 
-Alternatively, you can download the latest version of the Safe CLI from the [releases page](https://github.com/maidsafe/sn_api/releases/latest) and install it manually on your system.
+Alternatively, you can download the latest version of the Safe CLI from the [releases page](https://github.com/maidsafe/sn_cli/releases/latest) and install it manually on your system.
 
 If you prefer to build the Safe CLI from source code, please follow the instructions in the [Build](#build) section below.
 
@@ -138,8 +138,8 @@ In order to build this CLI from source code you need to make sure you have `rust
 
 Once Rust and its toolchain are installed, run the following commands to clone this repository and build the `sn_cli` (the build process may take several minutes the first time you run it on this crate):
 ```shell
-$ git clone https://github.com/maidsafe/sn_api.git
-$ cd sn_api
+$ git clone https://github.com/maidsafe/sn_cli.git
+$ cd sn_cli
 $ cargo build
 ```
 
@@ -1610,7 +1610,7 @@ To enable PowerShell completions permanently, generate the sn_cli.ps1 file as pe
 
 ### Update
 
-The CLI can update itself to the latest available version. If you run `safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/sn_api/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
+The CLI can update itself to the latest available version. If you run `safe update`, the application will check if a newer release is available on [GitHub](https://github.com/maidsafe/sn_cli/releases). After prompting to confirm if you want to take the latest version, it will be downloaded and the binary will be updated.
 
 ## Further Help
 
@@ -1618,7 +1618,7 @@ You can discuss development-related topics on the [Safe Dev Forum](https://forum
 
 If you are just starting to develop an application for the Safe Network, it's very advisable to visit the [Safe Network Dev Hub](https://hub.safedev.org) where you will find a lot of relevant information.
 
-If you find any issues, or have ideas for improvements and/or new features for this application and the project, please raise them by [creating a new issue in this repository](https://github.com/maidsafe/sn_api/issues).
+If you find any issues, or have ideas for improvements and/or new features for this application and the project, please raise them by [creating a new issue in this repository](https://github.com/maidsafe/sn_cli/issues).
 
 ## License
 This Safe Network library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
