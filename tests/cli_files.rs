@@ -7,33 +7,31 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate sn_cmd_test_utilities;
-
 #[macro_use]
 extern crate duct;
 
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_cmd_test_utilities::{
-    create_nrs_link, get_random_nrs_string, mk_emptyfolder, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_files_tree_output, safe_cmd_stderr, safe_cmd_stdout,
-    safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder,
-    upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
-};
 use std::{
     env,
     fs::{self, OpenOptions},
     io::{prelude::*, Seek, SeekFrom},
     process::Command,
 };
+use sn_cmd_test_utilities::util::{
+    create_nrs_link, get_random_nrs_string, mk_emptyfolder, parse_files_container_output,
+    parse_files_put_or_sync_output, parse_files_tree_output, safe_cmd_stderr, safe_cmd_stdout,
+    safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder,
+    upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
+};
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
-const TEST_FILE: &str = "../testdata/test.md";
+const TEST_FILE: &str = "./testdata/test.md";
 const TEST_FILE_RANDOM_CONTENT: &str = "test_file_random_content.txt";
-const TEST_FOLDER: &str = "../testdata/";
-const TEST_FOLDER_NO_TRAILING_SLASH: &str = "../testdata";
-const TEST_FOLDER_SUBFOLDER: &str = "../testdata/subfolder/";
+const TEST_FOLDER: &str = "./testdata/";
+const TEST_FOLDER_NO_TRAILING_SLASH: &str = "./testdata";
+const TEST_FOLDER_SUBFOLDER: &str = "./testdata/subfolder/";
 
 const EXPECT_TESTDATA_PUT_CNT: usize = 11; // 8 files, plus 3 directories
 
@@ -90,9 +88,9 @@ fn calling_safe_files_put_recursive() -> Result<()> {
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
         .stdout(predicate::str::contains(r#"+"#).count(EXPECT_TESTDATA_PUT_CNT))
-        .stdout(predicate::str::contains("../testdata/test.md").count(1))
-        .stdout(predicate::str::contains("../testdata/another.md").count(1))
-        .stdout(predicate::str::contains("../testdata/subfolder/subexists.md").count(1))
+        .stdout(predicate::str::contains("./testdata/test.md").count(1))
+        .stdout(predicate::str::contains("./testdata/another.md").count(1))
+        .stdout(predicate::str::contains("./testdata/subfolder/subexists.md").count(1))
         .success();
     Ok(())
 }
@@ -139,9 +137,9 @@ fn calling_safe_files_put_recursive_subfolder() -> Result<()> {
     ])
     .assert()
     .stdout(predicate::str::contains(SAFE_PROTOCOL).count(3))
-    .stdout(predicate::str::contains("../testdata/test.md").count(0))
-    .stdout(predicate::str::contains("../testdata/another.md").count(0))
-    .stdout(predicate::str::contains("../testdata/subfolder/subexists.md").count(1))
+    .stdout(predicate::str::contains("./testdata/test.md").count(0))
+    .stdout(predicate::str::contains("./testdata/another.md").count(0))
+    .stdout(predicate::str::contains("./testdata/subfolder/subexists.md").count(1))
     .success();
     Ok(())
 }
@@ -160,7 +158,7 @@ fn calling_safe_files_put_emptyfolder() -> Result<()> {
     ])
     .assert()
     .stdout(predicate::str::contains(SAFE_PROTOCOL).count(1))
-    .stdout(predicate::str::contains("../testdata/emptyfolder/").count(0))
+    .stdout(predicate::str::contains("./testdata/emptyfolder/").count(0))
     .success();
 
     // cleanup
@@ -968,7 +966,7 @@ fn calling_files_ls_on_nrs_with_path() -> Result<()> {
 //    src is symlinks_test dir, put with trailing slash.
 //
 //    expected result: result contains 9 FileItem and filenames match.
-//                     those in ../test_symlinks
+//                     those in ./test_symlinks
 #[test]
 fn calling_files_ls_with_symlinks() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
@@ -1116,7 +1114,7 @@ fn calling_files_tree() -> Result<()> {
 // Test:  safe files tree <src>
 //    src is symlinks_test dir, put with trailing slash.
 //
-//    expected result: output matches output of `tree ../test_symlinks`
+//    expected result: output matches output of `tree ./test_symlinks`
 #[test]
 fn calling_files_tree_with_symlinks() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.

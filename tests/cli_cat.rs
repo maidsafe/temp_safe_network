@@ -7,8 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate sn_cmd_test_utilities;
-
 #[macro_use]
 extern crate duct;
 
@@ -19,19 +17,19 @@ use sn_api::{
     fetch::{SafeContentType, SafeDataType},
     sk_to_hex, Keypair,
 };
-use sn_cmd_test_utilities::{
+use std::process::Command;
+use sn_cmd_test_utilities::util::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
     parse_files_container_output, parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout,
     safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
-use std::process::Command;
 
-const TEST_DATA: &str = "../testdata/";
-const TEST_FILE: &str = "../testdata/test.md";
+const TEST_DATA: &str = "./testdata/";
+const TEST_FILE: &str = "./testdata/test.md";
 const TEST_FILE_CONTENT: &str = "hello tests!";
 const ID_RELATIVE_FILE_ERROR: &str = "Cannot get relative path of Immutable Data";
 const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6c 6c  6f 20 74 65  73 74 73 21                hello tests!\n";
-const ANOTHER_FILE: &str = "../testdata/another.md";
+const ANOTHER_FILE: &str = "./testdata/another.md";
 const ANOTHER_FILE_CONTENT: &str = "exists";
 
 #[test]
@@ -335,7 +333,7 @@ fn calling_safe_cat_safekey() -> Result<()> {
 //         realpath: /sub2/hello.md
 //
 //    expected result: cmd output matches contents of
-//                     ../test_symlinks/sub2/hello.md
+//                     ./test_symlinks/sub2/hello.md
 #[test]
 fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
@@ -392,7 +390,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
 //    correctly *after* dir_link_deep resolution, not before.
 //
 //    On unix, this behavior can be verified with:
-//       $ cat ../test_symlinks/dir_link_deep/../readme.md
+//       $ cat ./test_symlinks/dir_link_deep/../readme.md
 //       = This is a real markdown file. =
 //
 //    note: This test always failed when SafeUrl

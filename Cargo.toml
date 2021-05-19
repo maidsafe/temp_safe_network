@@ -11,7 +11,7 @@ edition = "2018"
 
 [[bin]]
 name = "safe"
-path = "main.rs"
+path = "src/main.rs"
 
 [dependencies]
 ansi_term = "~0.12"
@@ -48,7 +48,7 @@ xor_name = "1"
 
 [features]
 default = ["simulated-payouts", "self-update"]
-simulated-payouts = ["simulated-payouts"]
+simulated-payouts = ["sn_api/simulated-payouts"]
 self-update = ["reqwest", "self_update"]
 
 [dependencies.self_update]
@@ -65,7 +65,7 @@ sn_data_types = "~0.18"
 criterion = "~0.3"
 walkdir = "2.3.1"
 multibase = "~0.6"
-sn_cmd_test_utilities = { path = "/sn_cmd_test_utilities" }
+sn_cmd_test_utilities = { path = "./sn_cmd_test_utilities" }
 xor_name = "1"
 
 # Our various benchmakrs.

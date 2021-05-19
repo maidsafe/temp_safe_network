@@ -7,8 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate sn_cmd_test_utilities;
-
 #[macro_use]
 extern crate duct;
 
@@ -19,11 +17,11 @@ use sn_api::{
     fetch::{SafeContentType, SafeDataType},
     SafeUrl, XorUrlBase,
 };
-use sn_cmd_test_utilities::{
+use std::process::Command;
+use sn_cmd_test_utilities::util::{
     get_random_nrs_string, parse_nrs_create_output, safeurl_from, upload_test_folder, CLI,
     SAFE_PROTOCOL,
 };
-use std::process::Command;
 use xor_name::XorName;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";
@@ -313,8 +311,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_set_default_and_retrieve() -> Resul
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
     let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["../testdata/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["../testdata/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
 
     let cat_of_another_raw = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_md_xor)
         .read()
@@ -389,8 +387,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_retrieve() -> Result
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
     let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["../testdata/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["../testdata/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
 
     let cat_of_another_raw = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_md_xor)
         .read()
@@ -459,8 +457,8 @@ fn calling_safe_nrs_put_and_add_new_subnames_remove_one_and_so_fail_to_retrieve(
     let test_name_w_sub = format!("safe://a.b.{}", &test_name);
     let test_name_w_new_sub = format!("safe://x.b.{}", &test_name);
 
-    let (_a_sign, another_md_xor) = &file_map["../testdata/another.md"];
-    let (_t_sign, test_md_xor) = &file_map["../testdata/test.md"];
+    let (_a_sign, another_md_xor) = &file_map["./testdata/another.md"];
+    let (_t_sign, test_md_xor) = &file_map["./testdata/test.md"];
 
     let cat_of_another_raw = cmd!(env!("CARGO_BIN_EXE_safe"), "cat", &another_md_xor)
         .read()

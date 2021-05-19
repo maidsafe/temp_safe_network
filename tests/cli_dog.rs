@@ -7,19 +7,17 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate sn_cmd_test_utilities;
-
 #[macro_use]
 extern crate duct;
 
 use anyhow::{anyhow, Result};
 use sn_api::fetch::SafeData;
-use sn_cmd_test_utilities::{
+use sn_cmd_test_utilities::util::{
     create_preload_and_get_keys, get_random_nrs_string, parse_dog_output,
     parse_files_put_or_sync_output, safeurl_from,
 };
 
-const TEST_FILE: &str = "../testdata/test.md";
+const TEST_FILE: &str = "./testdata/test.md";
 
 #[test]
 fn calling_safe_dog_files_container_nrsurl() -> Result<()> {

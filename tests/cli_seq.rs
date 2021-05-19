@@ -7,15 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate sn_cmd_test_utilities;
-
 #[macro_use]
 extern crate duct;
 
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use sn_cmd_test_utilities::{
+use sn_cmd_test_utilities::util::{
     get_random_nrs_string, parse_cat_seq_output, parse_seq_store_output, safeurl_from, CLI,
     SAFE_PROTOCOL,
 };

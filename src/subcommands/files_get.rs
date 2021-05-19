@@ -462,11 +462,11 @@ async fn files_container_get_files(
 source     |source type| dest                      | dest exists | dest type | translated
 ---------------------------------------------------------------------------------------
 testdata   | dir       | /tmp/testdata             | Y           | dir       | /tmp/testdata/testdata
-testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../testdata/'
+testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
 testdata   | dir       | /tmp/testdata             | N           | --        | /tmp/testdata
 
 testdata   | dir       | /tmp/newname              | Y           | dir       | /tmp/newname/testdata
-testdata   | dir       | /tmp/newname              | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../testdata/'
+testdata   | dir       | /tmp/newname              | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
 testdata   | dir       | /tmp/newname              | N           | --        | /tmp/newname
 
 -- source is a file --

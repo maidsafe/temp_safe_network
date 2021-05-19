@@ -7,8 +7,6 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-extern crate sn_cmd_test_utilities;
-
 #[macro_use]
 extern crate duct;
 
@@ -21,22 +19,22 @@ const EXISTS_PRESERVE: &str = "preserve";
 const PROGRESS_NONE: &str = "none";
 
 use anyhow::{anyhow, bail, Result};
-use sn_cmd_test_utilities::{
-    can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
-    create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
-    safe_cmd_stdout, safeurl_from, str_to_sha3_256, sum_tree, test_symlinks_are_valid,
-    upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
-    upload_testfolder_trailing_slash, TEST_FOLDER,
-};
 use std::{
     env, fs,
     path::{Path, PathBuf},
     process,
     time::{SystemTime, UNIX_EPOCH},
 };
+use sn_cmd_test_utilities::util::{
+    can_write_symlinks, create_and_upload_test_absolute_symlinks_folder, create_nrs_link,
+    create_symlink, digest_file, get_random_nrs_string, parse_files_put_or_sync_output,
+    safe_cmd_stdout, safeurl_from, str_to_sha3_256, sum_tree, test_symlinks_are_valid,
+    upload_test_symlinks_folder, upload_testfolder_no_trailing_slash,
+    upload_testfolder_trailing_slash, TEST_FOLDER,
+};
 
 const NOEXTENSION: &str = "noextension";
-const NOEXTENSION_PATH: &str = "../testdata/noextension";
+const NOEXTENSION_PATH: &str = "./testdata/noextension";
 
 // ----------------------------------------
 // Container URL (without url path) Tests
@@ -46,7 +44,7 @@ const NOEXTENSION_PATH: &str = "../testdata/noextension";
 //    src is a container url
 //    dest exists, and is a directory
 //
-//    expected result: ../testdata matches /tmp/testdata/testdata
+//    expected result: ./testdata matches /tmp/testdata/testdata
 #[test]
 fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -75,7 +73,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
 //    src is a container url, uploaded with trailing slash
 //    dest exists, and is an empty directory
 //
-//    expected result: ../testdata matches /tmp/testdata
+//    expected result: ./testdata matches /tmp/testdata
 #[test]
 fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
@@ -103,7 +101,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
 //    src is a container url, testdata put without slash.
 //    dest is the current working directory.
 //
-//    expected result: ../testdata matches ./testdata
+//    expected result: ./testdata matches ./testdata
 #[test]
 fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -131,7 +129,7 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
 //    src is a container url, testdata put without slash.
 //    dest is unspecified.  (should default to the current working directory)
 //
-//    expected result: ../testdata matches ./testdata
+//    expected result: ./testdata matches ./testdata
 #[test]
 fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -231,7 +229,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 //    src is an nrs url, linked to a container url, testdata put without slash.
 //    dest is unspecified.  (should default to the current working directory)
 //
-//    expected result: ../testdata matches ./testdata
+//    expected result: ./testdata matches ./testdata
 #[test]
 fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -276,20 +274,20 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 
 // Test:  safe files get <nrs_url>+path concatenated to <xor url>+path
 //    src is an nrs url with a path, linked to an container xor url with a path.
-//       xorurl ==> safe://.../testdata/subfolder
+//       xorurl ==> safe://./testdata/subfolder
 //       nrsurl ==> safe://nrsname/sub2.md
 //    dest is /tmp/sub2.md
 //
 //    path to sub2.md in FileContainer is /testdata/subfolder/sub2.md
 //
-//    expected result: ../testdata/subfolder/sub2.md matches /tmp/sub2.md
+//    expected result: ./testdata/subfolder/sub2.md matches /tmp/sub2.md
 #[test]
 fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
 
     const TEST_FILE: &str = "sub2.md";
 
-    // make safe://.../testdata/subfolder
+    // make safe://./testdata/subfolder
     let xor_path = join_url_paths(&[TESTDATA, SUBFOLDER]);
     let mut e = safeurl_from(&files_container_xor)?;
     e.set_path(&xor_path);
@@ -343,7 +341,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 //       safe://testdata   --> safe://xorurl/testdata
 //    dest exists
 //
-//    expected result: ../testdata/subfolder matches /tmp/testdata/subfolder
+//    expected result: ./testdata/subfolder matches /tmp/testdata/subfolder
 #[test]
 fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -512,7 +510,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
 //    dest contains only test.md, with 0 bytes.
 //
 //    expected result:
-//        ../testdata does not match /tmp/testdata/
+//        ./testdata does not match /tmp/testdata/
 //        /tmp/testdata still contains test.md with 0 bytes
 //        /tmp/testdata also contains another.md
 #[test]
@@ -549,7 +547,7 @@ fn files_get_exists_preserve() -> Result<()> {
 //    dest contains only test.md, with 0 bytes.
 //
 //    expected result:
-//        ../testdata matches /tmp/testdata
+//        ./testdata matches /tmp/testdata
 #[test]
 fn files_get_exists_overwrite() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
@@ -664,11 +662,11 @@ a test case for each possibility.
 source     |source type| dest                      | dest exists | dest type | translated
 ---------------------------------------------------------------------------------------
 testdata   | dir       | /tmp/testdata             | Y           | dir       | /tmp/testdata/testdata
-testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../testdata/'
+testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
 testdata   | dir       | /tmp/testdata             | N           | --        | /tmp/testdata
 
 testdata   | dir       | /tmp/newname              | Y           | dir       | /tmp/newname/testdata
-testdata   | dir       | /tmp/newname              | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../testdata/'
+testdata   | dir       | /tmp/newname              | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
 testdata   | dir       | /tmp/newname              | N           | --        | /tmp/newname
 
 -- source is a file --
@@ -687,11 +685,11 @@ testdata   | file      | /tmp/newname              | N           | --        | /
 // Path Matrix Tests: Source is a Directory
 // ----------------------------------------
 
-// Test:  safe files get ../testdata /tmp/testdata
+// Test:  safe files get ./testdata /tmp/testdata
 //    src is a dir
 //    dest exists, and is a dir
 //
-//    expected result: ../testdata matches /tmp/testdata/testdata
+//    expected result: ./testdata matches /tmp/testdata/testdata
 #[test]
 fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -716,7 +714,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata /tmp/testdata
+// Test:  safe files get ./testdata /tmp/testdata
 //    src is a dir
 //    dest exists, and is a file
 //
@@ -749,11 +747,11 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata /tmp/testdata
+// Test:  safe files get ./testdata /tmp/testdata
 //    src is a dir
 //    dest does not exist
 //
-//    expected result: ../testdata matches /tmp/testdata
+//    expected result: ./testdata matches /tmp/testdata
 #[test]
 fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -778,11 +776,11 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
 
 // ----
 
-// Test:  safe files get ../testdata /tmp/newname
+// Test:  safe files get ./testdata /tmp/newname
 //    src is a dir
 //    dest exists, and is a dir
 //
-//    expected result: ../testdata matches /tmp/newname/testdata
+//    expected result: ./testdata matches /tmp/newname/testdata
 #[test]
 fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -807,7 +805,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata /tmp/newname
+// Test:  safe files get ./testdata /tmp/newname
 //    src is a dir
 //    dest exists, and is a file
 //
@@ -840,11 +838,11 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata /tmp/newname
+// Test:  safe files get ./testdata /tmp/newname
 //    src is a dir
 //    dest does not exist
 //
-//    expected result: ../testdata matches /tmp/newname
+//    expected result: ./testdata matches /tmp/newname
 #[test]
 fn files_get_src_is_dir_and_dest_newname_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -871,11 +869,11 @@ fn files_get_src_is_dir_and_dest_newname_not_existing() -> Result<()> {
 // Path Matrix Tests: Source is a file
 // ----------------------------------------
 
-// Test:  safe files get ../testdata/noextension /tmp/noextension
+// Test:  safe files get ./testdata/noextension /tmp/noextension
 //    src is a file
 //    dest exists, and is a dir
 //
-//    expected result: ../testdata/noextension matches /tmp/noextension/noextension
+//    expected result: ./testdata/noextension matches /tmp/noextension/noextension
 #[test]
 fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -900,11 +898,11 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata/noextension /tmp/noextension
+// Test:  safe files get ./testdata/noextension /tmp/noextension
 //    src is a file
 //    dest exists, and is a file
 //
-//    expected result: ../testdata/noextension matches /tmp/noextension
+//    expected result: ./testdata/noextension matches /tmp/noextension
 #[test]
 fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -929,11 +927,11 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata/noextension /tmp/noextension
+// Test:  safe files get ./testdata/noextension /tmp/noextension
 //    src is a file
 //    dest does not exist
 //
-//    expected result: ../testdata/noextension matches /tmp/noextension
+//    expected result: ./testdata/noextension matches /tmp/noextension
 #[test]
 fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -958,11 +956,11 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
 
 // ----
 
-// Test:  safe files get ../testdata/noextension /tmp/newname
+// Test:  safe files get ./testdata/noextension /tmp/newname
 //    src is a file
 //    dest exists, and is a dir with new name.
 //
-//    expected result: ../testdata/noextension matches /tmp/newname/noextension
+//    expected result: ./testdata/noextension matches /tmp/newname/noextension
 #[test]
 fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -987,11 +985,11 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata/noextension /tmp/newname
+// Test:  safe files get ./testdata/noextension /tmp/newname
 //    src is a file
 //    dest exists, and is a file with new name
 //
-//    expected result: ../testdata/noextension matches /tmp/newname
+//    expected result: ./testdata/noextension matches /tmp/newname
 #[test]
 fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -1016,11 +1014,11 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe files get ../testdata/noextension /tmp/newname
+// Test:  safe files get ./testdata/noextension /tmp/newname
 //    src is a file
 //    dest does not exist
 //
-//    expected result: ../testdata/noextension matches /tmp/newname
+//    expected result: ./testdata/noextension matches /tmp/newname
 #[test]
 fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_no_trailing_slash()?;
@@ -1048,10 +1046,10 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
 // ----------------------------------------
 
 // Test:  safe files get <src> /tmp/newname
-//    src is xor-url generated from `safe files put ../test_symlinks`
+//    src is xor-url generated from `safe files put ./test_symlinks`
 //    dest does not exist
 //
-//    expected result: ../test_symlinks matches /tmp/newname
+//    expected result: ./test_symlinks matches /tmp/newname
 #[test]
 fn files_get_symlinks_relative() -> Result<()> {
     // Bail if test_symlinks not valid, or cannot write a test symlink.
