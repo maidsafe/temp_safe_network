@@ -13,17 +13,17 @@ extern crate duct;
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use std::{
-    env,
-    fs::{self, OpenOptions},
-    io::{prelude::*, Seek, SeekFrom},
-    process::Command,
-};
 use sn_cmd_test_utilities::util::{
     create_nrs_link, get_random_nrs_string, mk_emptyfolder, parse_files_container_output,
     parse_files_put_or_sync_output, parse_files_tree_output, safe_cmd_stderr, safe_cmd_stdout,
     safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder,
     upload_testfolder_no_trailing_slash, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
+};
+use std::{
+    env,
+    fs::{self, OpenOptions},
+    io::{prelude::*, Seek, SeekFrom},
+    process::Command,
 };
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";

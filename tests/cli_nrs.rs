@@ -17,11 +17,11 @@ use sn_api::{
     fetch::{SafeContentType, SafeDataType},
     SafeUrl, XorUrlBase,
 };
-use std::process::Command;
 use sn_cmd_test_utilities::util::{
     get_random_nrs_string, parse_nrs_create_output, safeurl_from, upload_test_folder, CLI,
     SAFE_PROTOCOL,
 };
+use std::process::Command;
 use xor_name::XorName;
 
 const PRETTY_NRS_CREATION_RESPONSE: &str = "New NRS Map";

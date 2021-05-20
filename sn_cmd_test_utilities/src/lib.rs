@@ -9,8 +9,8 @@
 
 #[allow(dead_code)]
 pub mod util {
-    use duct::cmd;
     use anyhow::{anyhow, bail, Context, Result};
+    use duct::cmd;
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_api::{

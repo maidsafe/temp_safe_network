@@ -14,8 +14,8 @@ use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sn_api::SafeUrl;
-use std::process::Command;
 use sn_cmd_test_utilities::util::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
+use std::process::Command;
 
 const TEST_FILE: &str = "./testdata/test.md";
 const TEST_FOLDER: &str = "./testdata/";

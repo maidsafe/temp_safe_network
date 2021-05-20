@@ -17,12 +17,12 @@ use sn_api::{
     fetch::{SafeContentType, SafeDataType},
     sk_to_hex, Keypair,
 };
-use std::process::Command;
 use sn_cmd_test_utilities::util::{
     create_preload_and_get_keys, get_random_nrs_string, parse_cat_wallet_output,
     parse_files_container_output, parse_files_put_or_sync_output, safe_cmd_stderr, safe_cmd_stdout,
     safeurl_from, test_symlinks_are_valid, upload_test_symlinks_folder, CLI,
 };
+use std::process::Command;
 
 const TEST_DATA: &str = "./testdata/";
 const TEST_FILE: &str = "./testdata/test.md";

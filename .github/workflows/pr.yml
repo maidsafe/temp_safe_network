@@ -1,3 +1,7 @@
+# PR workflow.
+#
+# Runs full suite of checks, with warnings treated as errors.
+
 name: PR
 
 on: pull_request
@@ -10,7 +14,99 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  checks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Rustfmt-Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust & required components
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      
+      # Check if the code is formatted correctly.
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      # Run Clippy.
+      - name: Clippy checks
+        run: cargo clippy --all-targets --all-features
+
+  check_pr_size:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Check PR size doesn't break set limit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
+    - uses: maidsafe/pr_size_checker@v2
+      with:
+        max_lines_changed: 200
+  
+  coverage:
+    # Stopping this from running at this time as tests are failing
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false
+    name: Code coverage check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      
+      # Run cargo tarpaulin & push result to coveralls.io
+      - name: rust-tarpaulin code coverage check
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          args: '-v --release --out Lcov'
+          timeout: 800
+      - name: Push code coverage results to coveralls.io
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel: true
+          path-to-lcov: ./lcov.info
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  # list any unused dependencies using cargo-udeps
   cargo-udeps:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
@@ -27,91 +123,28 @@ jobs:
         run: |
           cargo install cargo-udeps --locked
           cargo +nightly udeps --all-targets
-
-  clippy:
-    if: ${{ github.repository_owner == 'maidsafe' }}
-    name: Clippy & fmt
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust and required components
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Check if the code is formatted correctly.
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      # Run Clippy.
-      - name: Clippy checks
-        run: cargo clippy --all-targets --all-features
-
-  check_pr_size:
-    name: Check PR size doesn't break set limit
+  
+  # list all duplicate dependencies. Note that this does not error if duplicates found
+  duplicate-dependencies:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: List Duplicate Dependencies
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
-      - uses: maidsafe/pr_size_checker@v2
-        with:
-          max_lines_changed: 200
 
-  coverage:
-    # if: ${{ github.repository_owner == 'maidsafe' }}
-    name: Code coverage checks
-    runs-on: ubuntu-latest
-    if: false
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust and required components
-        uses: actions-rs/toolchain@v1
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
 
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Run cargo tarpaulin
-      - name: Code Coverage - sn_api
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          args: '-v --manifest-path=sn_api/Cargo.toml --release --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
-
-      # Push tarpaulin results to coveralls.io
-      - name: Coveralls
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./lcov.info
+      # Run list duplicate dependencies script
+      - shell: bash
+        run: ./resources/duplicate_dependency_check.sh
 
   cargo-deny:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -121,16 +154,16 @@ jobs:
       run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
 
     - uses: EmbarkStudios/cargo-deny-action@v1
-  
-  test-component:
-    # if: ${{ github.repository_owner == 'maidsafe' }} // re-enable this once these tests are run again
+
+  test:
+    # Stopping this from running at this time as tests are failing
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     if: false
-    name: Test Component
+    name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        component: [api-tests, cli-tests]
     steps:
       # Set git to checkout symlinks correctly on Windows only
       # Otherwise the symlinks aren't created and tests fail
@@ -159,4 +192,4 @@ jobs:
 
       # Run tests.
       - shell: bash
-        run: ./resources/test-scripts/${{ matrix.component }}
+        run: ./resources/test-scripts/cli-tests

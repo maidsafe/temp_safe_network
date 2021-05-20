@@ -13,11 +13,11 @@ extern crate duct;
 use anyhow::{anyhow, Result};
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use std::process::Command;
 use sn_cmd_test_utilities::util::{
     create_preload_and_get_keys, create_wallet_with_balance, get_random_nrs_string, CLI,
     SAFE_PROTOCOL,
 };
+use std::process::Command;
 
 const PRETTY_KEYS_CREATION_RESPONSE: &str = "New SafeKey created:";
 
