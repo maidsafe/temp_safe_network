@@ -12,7 +12,7 @@ use log::debug;
 use std::error::Error;
 
 #[cfg(feature = "self-update")]
-const REPO_NAME: &str = "sn_api";
+const REPO_NAME: &str = "sn_cli";
 
 #[cfg(not(feature = "self-update"))]
 pub fn update_commander() -> Result<(), Box<dyn Error>> {
