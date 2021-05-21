@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [23.0.0](https://github.com/maidsafe/sn_messaging/compare/v22.0.1...v23.0.0) (2021-05-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **section_info:** EndUser is now a struct with just the use xorname and a socket id xorname.
+
+### Features
+
+* **client:** add client signature to queries and commands ([eaa3b2a](https://github.com/maidsafe/sn_messaging/commit/eaa3b2acfce90c632c5f8464c90f4f1a095a0cdf))
+
+
+* **section_info:** remove RegisterEndUser related messages ([da66f58](https://github.com/maidsafe/sn_messaging/commit/da66f58262f476e8732ea6955d60dee9737c618b))
+
 ### [22.0.1](https://github.com/maidsafe/sn_messaging/compare/v22.0.0...v22.0.1) (2021-05-15)
 
 ## [22.0.0](https://github.com/maidsafe/sn_messaging/compare/v21.1.0...v22.0.0) (2021-05-12)
