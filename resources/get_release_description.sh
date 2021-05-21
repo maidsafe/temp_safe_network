@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-cli_version=$2
-if [[ -z "$cli_version" ]]; then
+version=$2
+if [[ -z "$version" ]]; then
     echo "You must supply a version number for sn_cli."
     exit 1
 fi
@@ -32,22 +32,22 @@ tar.gz: TAR_WIN_CHECKSUM
 EOF
 
 zip_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-musl.zip" | \
+    "./deploy/prod/sn_cli-$version-x86_64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 zip_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/sn_cli-$version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-pc-windows-msvc.zip" | \
+    "./deploy/prod/sn_cli-$version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/sn_cli-$version-x86_64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 tar_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/prod/sn_cli-$version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 tar_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_cli-$cli_version-x86_64-pc-windows-msvc.tar.gz" | \
+    "./deploy/prod/sn_cli-$version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 
 release_description=$(sed "s/ZIP_LINUX_CHECKSUM/$zip_linux_checksum/g" <<< "$release_description")
