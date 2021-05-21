@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version=$2
+version=$1
 if [[ -z "$version" ]]; then
     echo "You must supply a version number for sn_cli."
     exit 1
