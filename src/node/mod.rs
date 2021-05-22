@@ -138,11 +138,7 @@ impl Node {
             for duty in next_ops {
                 match self.handle(duty).await {
                     Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => {
-                        if let Some(new_op) = try_handle_error(e, ctx.clone()) {
-                            pending_node_ops.push(new_op)
-                        }
-                    }
+                    Err(e) => pending_node_ops.push(try_handle_error(e, ctx.clone())),
                 };
             }
             next_ops = pending_node_ops;
@@ -150,7 +146,7 @@ impl Node {
     }
 }
 
-fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Option<NodeDuty> {
+fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
     use std::error::Error;
     warn!("Error being handled by node: {:?}", err);
     if let Some(source) = err.source() {
@@ -162,18 +158,16 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Option<NodeDuty> {
             error!(
                     "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
                 );
-            None
+            NodeDuty::NoOp
         }
         Some(MsgContext { msg, src }) => {
             warn!("Sending in response to a message: {:?}", msg);
             match msg {
-                Msg::Client(ClientMsg::Process(msg)) => {
-                    Some(NodeDuty::SendError(OutgoingLazyError {
-                        msg: msg.create_processing_error(Some(convert_to_error_message(err))),
-                        dst: src.to_dst(),
-                    }))
-                }
-                _ => None,
+                Msg::Client(ClientMsg::Process(msg)) => NodeDuty::SendError(OutgoingLazyError {
+                    msg: msg.create_processing_error(Some(convert_to_error_message(err))),
+                    dst: src.to_dst(),
+                }),
+                _ => NodeDuty::NoOp,
             }
         }
     }
