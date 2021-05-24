@@ -71,7 +71,7 @@ impl Safe {
 
     /// Retrieve the keypair this instance was instantiated with, i.e. the
     /// keypair this instance uses by default to sign each outgoing message
-    pub async fn get_my_keypair(&self) -> Result<Keypair> {
-        self.safe_client.keypair().await
+    pub fn get_my_keypair(&self) -> Result<Keypair> {
+        self.safe_client.keypair()
     }
 }

@@ -228,10 +228,7 @@ mod tests {
         let mut client2 = new_safe_instance().await?;
         // this tests assumes the same credentials/keypair have been set for all tests,
         // so both instances should be using the same keypair to sign the messages
-        assert_eq!(
-            client1.get_my_keypair().await?,
-            client1.get_my_keypair().await?
-        );
+        assert_eq!(client1.get_my_keypair()?, client2.get_my_keypair()?);
 
         let data_v0 = b"First from client1";
         let data_v1 = b"First from client2";

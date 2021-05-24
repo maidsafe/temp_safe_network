@@ -90,9 +90,9 @@ impl SafeAppClient {
         Ok(())
     }
 
-    pub async fn keypair(&self) -> Result<Keypair> {
+    pub fn keypair(&self) -> Result<Keypair> {
         let client = self.get_safe_client()?;
-        Ok(client.keypair().await)
+        Ok(client.keypair())
     }
 
     // === Token operations ===
@@ -252,7 +252,7 @@ impl SafeAppClient {
 
         // The Map's owner will be the client's public key
         let client = self.get_safe_client()?;
-        let owner = client.public_key().await;
+        let owner = client.public_key();
 
         let permission_set = MapPermissionSet::new()
             .allow(MapAction::Read)
@@ -262,7 +262,7 @@ impl SafeAppClient {
             .allow(MapAction::ManagePermissions);
 
         let mut permission_map = BTreeMap::new();
-        let app_pk = client.public_key().await;
+        let app_pk = client.public_key();
         permission_map.insert(app_pk, permission_set);
 
         client
@@ -430,7 +430,7 @@ impl SafeAppClient {
         info!("Xorname for storage: {:?}", &xorname);
 
         // The Sequence's owner will be the client's public key
-        let owner = client.public_key().await;
+        let owner = client.public_key();
 
         // Store the Sequence on the network
         let _address = if private {
@@ -587,7 +587,7 @@ impl SafeAppClient {
         info!("Xorname for new Register storage: {:?}", &xorname);
 
         // The Register's owner will be the client's public key
-        let my_pk = client.public_key().await;
+        let my_pk = client.public_key();
 
         // Store the Register on the network
         let _ = if private {
