@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [24.0.0](https://github.com/maidsafe/sn_messaging/compare/v23.0.0...v24.0.0) (2021-05-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* removing msg::Msg enum which breaks backward compatibility.
+
+* removing unnecessary message definitions ([6997fc9](https://github.com/maidsafe/sn_messaging/commit/6997fc9d3fa5a3e7b4fd0cca50d6dd5100282b67))
+
 ## [23.0.0](https://github.com/maidsafe/sn_messaging/compare/v22.0.1...v23.0.0) (2021-05-21)
 
 
