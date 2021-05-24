@@ -8,56 +8,31 @@
 - [The Safe API](#the-safe-api)
   - [Table of contents](#table-of-contents)
   - [Description](#description)
-  - [The Safe API (sn_api)](#the-safe-api-sn_api)
-  - [The Safe Network CLI](#the-safe-network-cli)
-  - [The Authenticator daemon](#the-authenticator-daemon)
-  - [JSON-RPC and QUIC](#json-rpc-and-quic)
+  - [The API](#the-api)
   - [Further Help](#further-help)
   - [License](#license)
   - [Contributing](#contributing)
 
 ## Description
 
-In this repository you'll find all that's needed by any application which intends to connect and read/write data on [The Safe Network](https://safenetwork.tech).
+This crate provides all that's needed by any Rust application which intends to connect and read/write data on [The Safe Network](https://safenetwork.tech).
 
-A Rust Safe application can make use of the `sn_api` crate to be able to not only read/write data on the Safe Network but also to send/receive authorisation requests to the Safe Authenticator (see https://hub.safedev.org/discover for additional info of the Authenticator).
+A Rust Safe application can make use of the `sn_api` crate to be able to not only read/write data on the Safe Network but also to send/receive authorisation requests to the Safe Authenticator (see https://hub.safedev.org/discover for additional info of the Authenticator). You can find more information about the Authenticator in MaidSafe reference implementation [sn_authd](https://github.com/maidsafe/sn_authd/blob/master/README.md).
 
 ![Safe app authorisation flow](misc/auth-flow-diagram.png)
 
-In addition to the `sn_api` crate to be used by Rust applications, this repository contains a couple of applications ([sn_authd](sn_authd) and [sn_cli](sn_cli)) which are required depending on the type of Safe application you are developing, use case, and/or if you are just a user of the Safe Network willing to interact with it using a simple command line interface.
-
-The following diagram depicts how each of the artifacts of this repository fit in the Safe applications ecosystem. You can find more information about each of them further below in the next section of this document.
+The following diagram depicts how each of the client side components fit in the Safe applications ecosystem.
 
 ![Safe API ecosystem](misc/safe-api-ecosystem.png)
 
-## The Safe API ([sn_api](sn_api))
+## The API
 
-The [sn_api](sn_api) is a Rust crate which exposes the Safe API with all the functions needed to communicate with the Safe Network and the Safe Authenticator. If you are developing a Rust application for Safe, this is all you need as a dependency from your app.
+The Safe API provides all the functions needed to communicate with the [The Safe Network](https://safenetwork.tech) and the [Safe Authenticator](https://github.com/maidsafe/sn_authd/blob/master/README.md). If you are developing a Rust application for Safe, this is all you need as a dependency from your app.
 
-
-## The Safe Network CLI
-
-The [sn_cli](sn_cli) is a Rust application which implements a CLI (Command Line Interface) for the Safe Network.
-
-![Safe CLI](misc/safe-cli-animation.svg)
-
-The Safe CLI provides all the tools necessary to interact with the Safe Network, including storing and browsing data of any kind, following links that are contained in the data and using their addresses on the network, using safecoin wallets, and much more. Using the CLI users have access to any type of operation that can be made on the Safe Network and the data stored on it.
-
-If you are just a Safe user, or a system engineer creating automated scripts, this application provides you with all you need to interact with the Safe Network. Please refer to [The Safe CLI User Guide](sn_cli/README.md) to learn how to start using it.
-
-## The Authenticator daemon
-
-The [sn_authd](sn_authd) is a Safe Authenticator implementation which runs in the background a daemon on Linux and Mac, or as a service in Windows platforms.
-
-The Safe Authenticator gives complete control over the type of access and permissions that are granted to the applications used by the Safe users. Any application that is intending to write data on the Network on behalf of the user needs to get credentials which are authorised by the user, and the Safe Authenticator is the component which facilitates such mechanism.
-
-This application is normally shipped as part of the package of an Authenticator GUI, like the [Safe Network Application](), and therefore Safe users and Safe app developers don't need it or worry about since the Safe API already provides functions to interact with the `sn_authd`, and the Safe CLI also has commands to do so.
-
-## JSON-RPC and QUIC
-
-One last crate found in this repository is the [qjsonrpc](qjsonrpc). This crate provides the implementation of [JSON-RPC](https://www.jsonrpc.org/) over [QUIC](https://en.wikipedia.org/wiki/QUIC), which is required by the Authenticator daemon communication protocol.
-
-This crate exposes a minimised set of functions which are used by other crates to implement the Authenticator daemon communication protocol. On one hand the `sn_api` makes use of it to be able to send JSON-RPC messages to the `authd` over QUIC, and on the other hand the `sn_authd` makes use of it to accept those requests from clients, generating and sending back a JSON-RPC response over QUIC. Please refer to the [sn_authd README](sn_authd/README.md) to see some examples of these type of requests/responses.
+There are currently three different APIs provided by this crate:
+1. The [API for regular Safe applications](./src/app) which read and write data to Safe. This API exposes all the functions needed to manipulate data, with the additional `auth_app` to obtain a key-pair from `sn_authd`, and `connect` for connecting to Safe (providing a key-pair if write access is required by the app).
+2. An [API for Authenticator apps](./src/authenticator), like `sn_authd` which makes use of this API. This is a small API which exposes functions to create, read and update a private container on Safe where to store the set of key-pairs the user administers for his/her apps, as well as some utilities to parse/generate messages that can be received/sent on an RPC mechanism like what `sn_authd` does with [JSON-RPC over QUIC](https://crates.io/crates/qjsonrpc). The container with key-pairs is stored on Safe at a location derived from a passphrase and password provided by the user.
+3. [API to communicate with an Authenticator through JSON-RPC over QUIC](./src/authd_client). This can be used by apps which can manage an Authenticator app, as an example CLI uses this API to start/stop authd, to send a request to create a Safe, to allow/deny an app authorisation request, to lock/unlock a Safe, etc. The [`$ safe auth` commands](https://github.com/maidsafe/sn_cli/blob/master/README.md#auth) act simply as the user interface for the `sn_authd` using this API to communicate with it.
 
 ## Further Help
 

@@ -102,7 +102,7 @@ jobs:
       - name: Code Coverage - sn_api
         uses: actions-rs/tarpaulin@v0.1
         with:
-          args: '-v --manifest-path=sn_api/Cargo.toml --release --exclude-files=sn_cli/*,qjsonrpc/*,sn_authd/* --out Lcov -- --test-threads=1'
+          args: '-v --release --out Lcov -- --test-threads=1'
 
       # Push tarpaulin results to coveralls.io
       - name: Coveralls

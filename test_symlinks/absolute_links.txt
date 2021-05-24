@@ -1,7 +1,0 @@
-Absolute links are supported and must be tested, however it is problematic to
-check them into git repo because no paths are guaranteed to be present on all
-systems, so they could be a valid link on machine A but invalid on machine B.
-
-For this reason, test cases for valid absolute-path links generate the
-links themselves inside the system temp directory. See integration tests for
-details.
