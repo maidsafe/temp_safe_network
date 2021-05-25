@@ -286,7 +286,6 @@ impl WireMsgHeader {
 // is part of the WireMsgHeader.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum MessageKind {
-    Ping,
     SectionInfo,
     Client,
     Routing,
@@ -295,18 +294,16 @@ pub(crate) enum MessageKind {
 
 // Bytes values used for each of the kind of messages
 // when written to the message header
-const PING_KIND: u8 = 0x00;
-const SECTION_INFO_KIND: u8 = 0x01;
-const CLIENT_MSG_KIND: u8 = 0x02;
-const ROUTING_MSG_KIND: u8 = 0x03;
-const NODE_MSG_KIND: u8 = 0x04;
+const SECTION_INFO_KIND: u8 = 0x00;
+const CLIENT_MSG_KIND: u8 = 0x01;
+const ROUTING_MSG_KIND: u8 = 0x02;
+const NODE_MSG_KIND: u8 = 0x03;
 
 impl TryFrom<u8> for MessageKind {
     type Error = super::Error;
 
     fn try_from(input: u8) -> Result<Self, Self::Error> {
         match input {
-            PING_KIND => Ok(Self::Ping),
             SECTION_INFO_KIND => Ok(Self::SectionInfo),
             CLIENT_MSG_KIND => Ok(Self::Client),
             ROUTING_MSG_KIND => Ok(Self::Routing),
@@ -319,7 +316,6 @@ impl TryFrom<u8> for MessageKind {
 impl From<MessageKind> for u8 {
     fn from(kind: MessageKind) -> u8 {
         match kind {
-            MessageKind::Ping => PING_KIND,
             MessageKind::SectionInfo => SECTION_INFO_KIND,
             MessageKind::Client => CLIENT_MSG_KIND,
             MessageKind::Routing => ROUTING_MSG_KIND,
@@ -336,7 +332,6 @@ mod tests {
     #[test]
     fn message_kind_from_u8() -> Result<()> {
         for &(kind, byte) in &[
-            (MessageKind::Ping, PING_KIND),
             (MessageKind::SectionInfo, SECTION_INFO_KIND),
             (MessageKind::Client, CLIENT_MSG_KIND),
             (MessageKind::Routing, ROUTING_MSG_KIND),

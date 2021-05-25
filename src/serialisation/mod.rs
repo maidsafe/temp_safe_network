@@ -30,14 +30,6 @@ pub struct WireMsg {
 }
 
 impl WireMsg {
-    /// Creates a new instance of a 'Ping' message.
-    pub fn new_ping_msg(dest: XorName, dest_section_pk: PublicKey) -> Self {
-        Self {
-            header: WireMsgHeader::new(MessageKind::Ping, dest, dest_section_pk, None),
-            payload: Bytes::new(),
-        }
-    }
-
     /// Creates a new instance keeping a (serialized) copy of the 'SectionInfo' message provided.
     pub fn new_section_info_msg(
         query: &section_info::Message,
@@ -154,7 +146,6 @@ impl WireMsg {
         };
 
         match self.header.kind() {
-            MessageKind::Ping => Ok(MessageType::Ping(dest_info)),
             MessageKind::SectionInfo => {
                 let msg: section_info::Message =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
@@ -292,32 +283,6 @@ mod tests {
     use anyhow::Result;
     use threshold_crypto::SecretKey;
     use xor_name::XorName;
-
-    #[test]
-    fn serialisation_ping() -> Result<()> {
-        let dest = XorName::random();
-        let dest_section_pk = SecretKey::random().public_key();
-
-        let wire_msg = WireMsg::new_ping_msg(dest, dest_section_pk);
-        let serialized = wire_msg.serialize()?;
-
-        // test deserialisation of header
-        let deserialized = WireMsg::from(serialized)?;
-        assert_eq!(deserialized, wire_msg);
-        assert_eq!(deserialized.dest(), dest);
-        assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
-
-        // test deserialisation of payload
-        assert_eq!(
-            deserialized.to_message()?,
-            MessageType::Ping(DestInfo {
-                dest,
-                dest_section_pk
-            })
-        );
-
-        Ok(())
-    }
 
     #[test]
     fn serialisation_section_info_msg() -> Result<()> {

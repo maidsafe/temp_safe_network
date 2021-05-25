@@ -33,7 +33,6 @@ use xor_name::XorName;
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
-    Ping(DestInfo),
     SectionInfo {
         msg: section_info::Message,
         dest_info: DestInfo,
@@ -67,9 +66,6 @@ impl MessageType {
     /// serialize the message type into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> Result<Bytes> {
         match self {
-            Self::Ping(dest_info) => {
-                WireMsg::new_ping_msg(dest_info.dest, dest_info.dest_section_pk).serialize()
-            }
             Self::SectionInfo { msg, dest_info } => {
                 WireMsg::serialize_section_info_msg(msg, dest_info.dest, dest_info.dest_section_pk)
             }
@@ -97,9 +93,7 @@ impl MessageType {
     pub fn update_dest_info(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
         #[cfg(not(feature = "client-only"))]
         match self {
-            Self::Ping(dest_info)
-            | Self::Client { dest_info, .. }
-            | Self::SectionInfo { dest_info, .. } => {
+            Self::Client { dest_info, .. } | Self::SectionInfo { dest_info, .. } => {
                 if let Some(dest) = dest {
                     dest_info.dest = dest
                 }
@@ -129,9 +123,7 @@ impl MessageType {
 
         #[cfg(feature = "client-only")]
         match self {
-            Self::Ping(dest_info)
-            | Self::Client { dest_info, .. }
-            | Self::SectionInfo { dest_info, .. } => {
+            Self::Client { dest_info, .. } | Self::SectionInfo { dest_info, .. } => {
                 if let Some(dest) = dest {
                     dest_info.dest = dest
                 }

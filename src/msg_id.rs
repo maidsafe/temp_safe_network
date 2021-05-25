@@ -20,6 +20,7 @@ use xor_name::XorName;
 /// an ID that is already in the cache will be ignored.
 #[derive(Ord, PartialOrd, Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct MessageId(pub XorName);
+
 impl MessageId {
     /// Generates a new `MessageId` with random content.
     pub fn new() -> Self {
