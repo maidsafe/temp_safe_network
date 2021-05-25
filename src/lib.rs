@@ -19,7 +19,7 @@ mod serialisation;
 pub use self::{
     errors::{Error, Result},
     location::{Aggregation, DstLocation, EndUser, Itinerary, SrcLocation},
-    msg_id::MessageId,
+    msg_id::{MessageId, MESSAGE_ID_LEN},
     serialisation::WireMsg,
 };
 use bytes::Bytes;

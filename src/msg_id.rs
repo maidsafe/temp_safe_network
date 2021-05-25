@@ -13,54 +13,65 @@ use std::fmt;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
 
+/// Constant byte length of `MessageId`.
+pub const MESSAGE_ID_LEN: usize = 32;
+
 /// Unique ID for messages.
 ///
 /// This is used for deduplication: Since the network sends messages redundantly along different
 /// routes, the same message will usually arrive more than once at any given node. A message with
 /// an ID that is already in the cache will be ignored.
 #[derive(Ord, PartialOrd, Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct MessageId(pub XorName);
+pub struct MessageId([u8; MESSAGE_ID_LEN]);
 
 impl MessageId {
     /// Generates a new `MessageId` with random content.
     pub fn new() -> Self {
-        Self(XorName::random())
+        // Here we use XorName just as helper to generate a random id
+        Self(XorName::random().0)
     }
 
-    pub fn from_content<T: Serialize>(content: &T) -> Result<MessageId> {
-        Ok(MessageId(XorName::from_content(&[&bincode::serialize(
-            content,
-        )
-        .map_err(|e| Error::Serialisation(e.to_string()))?])))
+    /// Generates a new MessageId containing provided bytes
+    pub fn with(id: [u8; MESSAGE_ID_LEN]) -> Self {
+        Self(id)
     }
 
-    /// Generates a new based on provided id.
-    pub fn in_response_to(src: &MessageId) -> MessageId {
-        let mut hash_bytes = Vec::new();
-        let src = src.0;
-        hash_bytes.extend_from_slice(&src.0);
+    /// Generate a message id deterministically derived from a piece of data
+    pub fn from_content<T: Serialize>(content: &T) -> Result<Self> {
+        // Here we use XorName just as a helper to generate the id
+        let msg_id = Self(
+            XorName::from_content(&[
+                &bincode::serialize(content).map_err(|e| Error::Serialisation(e.to_string()))?
+            ])
+            .0,
+        );
 
+        Ok(msg_id)
+    }
+
+    /// Generates a new MessageId based on provided id.
+    pub fn in_response_to(src: &Self) -> Self {
         let mut hasher = Sha3::v256();
-        let mut output = [0; 32];
-        hasher.update(&hash_bytes);
+        let mut output = [0; MESSAGE_ID_LEN];
+        hasher.update(src.as_ref());
         hasher.finalize(&mut output);
 
-        MessageId(XorName(output))
+        Self(output)
     }
 
     /// Generates a new based on provided sources.
-    pub fn combine(srcs: Vec<XorName>) -> MessageId {
+    pub fn combine(sources: &[[u8; MESSAGE_ID_LEN]]) -> Self {
         let mut hash_bytes = Vec::new();
-        for src in srcs.into_iter() {
-            hash_bytes.extend_from_slice(&src.0);
+        for src in sources.iter() {
+            hash_bytes.extend_from_slice(src);
         }
 
         let mut hasher = Sha3::v256();
-        let mut output = [0; 32];
+        let mut output = [0; MESSAGE_ID_LEN];
         hasher.update(&hash_bytes);
         hasher.finalize(&mut output);
 
-        MessageId(XorName(output))
+        Self(output)
     }
 }
 
@@ -70,8 +81,18 @@ impl Default for MessageId {
     }
 }
 
+impl AsRef<[u8; MESSAGE_ID_LEN]> for MessageId {
+    fn as_ref(&self) -> &[u8; MESSAGE_ID_LEN] {
+        &self.0
+    }
+}
+
 impl fmt::Display for MessageId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(
+            f,
+            "{:02x}{:02x}{:02x}{:02x}..",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
     }
 }

@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{Error, Result};
+use crate::{Error, MessageId, Result, MESSAGE_ID_LEN};
 use bytes::Bytes;
 use cookie_factory::{
     bytes::{be_u16, be_u8},
@@ -26,6 +26,7 @@ const MESSAGING_PROTO_VERSION: u16 = 1u16;
 // This header contains the information needed to deserialize the payload.
 #[derive(Debug, PartialEq)]
 pub(crate) struct WireMsgHeader {
+    msg_id: MessageId,
     header_size: u16,
     version: u16,
     kind: MessageKind,
@@ -42,8 +43,13 @@ const HDR_VERSION_BYTES_START: usize = HDR_SIZE_BYTES_LEN;
 const HDR_VERSION_BYTES_LEN: usize = size_of::<u16>();
 const HDR_VERSION_BYTES_END: usize = HDR_VERSION_BYTES_START + HDR_VERSION_BYTES_LEN;
 
+// Bytes index in the header for the 'msg_id' field
+const HDR_MSG_ID_BYTES_START: usize = HDR_VERSION_BYTES_END;
+const HDR_MSG_ID_BYTES_LEN: usize = MESSAGE_ID_LEN;
+const HDR_MSG_ID_BYTES_END: usize = HDR_MSG_ID_BYTES_START + HDR_MSG_ID_BYTES_LEN;
+
 // Bytes index in the header for the 'kind' field
-const HDR_KIND_BYTES_START: usize = HDR_VERSION_BYTES_END;
+const HDR_KIND_BYTES_START: usize = HDR_MSG_ID_BYTES_END;
 const HDR_KIND_BYTES_LEN: usize = 1;
 
 // Bytes index in the header for the 'dest' field
@@ -63,6 +69,7 @@ const HDR_SRC_PK_BYTES_END: usize = HDR_SRC_PK_BYTES_START + HDR_SRC_PK_BYTES_LE
 
 const HEADER_MIN_SIZE: usize = HDR_SIZE_BYTES_LEN
     + HDR_VERSION_BYTES_LEN
+    + HDR_MSG_ID_BYTES_LEN
     + HDR_KIND_BYTES_LEN
     + HDR_DEST_BYTES_LEN
     + HDR_DEST_PK_BYTES_LEN;
@@ -70,12 +77,14 @@ const HEADER_MIN_SIZE: usize = HDR_SIZE_BYTES_LEN
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
     pub fn new(
+        msg_id: MessageId,
         kind: MessageKind,
         dest: XorName,
         dest_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
     ) -> Self {
         Self {
+            msg_id,
             header_size: Self::bytes_size(src_section_pk.is_some()) as u16,
             version: MESSAGING_PROTO_VERSION,
             kind,
@@ -83,6 +92,11 @@ impl WireMsgHeader {
             dest_section_pk,
             src_section_pk,
         }
+    }
+
+    // Return the message id of this message
+    pub fn msg_id(&self) -> MessageId {
+        self.msg_id
     }
 
     // Return the kind of this message
@@ -144,6 +158,11 @@ impl WireMsgHeader {
             return Err(Error::UnsupportedVersion(version));
         }
 
+        // ...read the message id bytes
+        let mut msg_id_bytes = [0; HDR_MSG_ID_BYTES_LEN];
+        msg_id_bytes[0..].copy_from_slice(&bytes[HDR_MSG_ID_BYTES_START..HDR_MSG_ID_BYTES_END]);
+        let msg_id = MessageId::with(msg_id_bytes);
+
         // ...read the message kind value (only 1 byte)
         let kind = MessageKind::try_from(bytes[HDR_KIND_BYTES_START])?;
 
@@ -182,6 +201,7 @@ impl WireMsgHeader {
         };
 
         let header = Self {
+            msg_id,
             header_size,
             version,
             kind,
@@ -206,12 +226,21 @@ impl WireMsgHeader {
         })?;
 
         // Now let's write the serialisation protocol version bytes
-        let (buf_at_msg_kind, _) = gen(be_u16(self.version), buf_at_version).map_err(|err| {
+        let (buf_at_msg_id, _) = gen(be_u16(self.version), buf_at_version).map_err(|err| {
             Error::Serialisation(format!(
                 "version field couldn't be serialized in header: {}",
                 err
             ))
         })?;
+
+        // Write the message id bytes
+        let (buf_at_msg_kind, _) =
+            gen(slice(self.msg_id.as_ref()), buf_at_msg_id).map_err(|err| {
+                Error::Serialisation(format!(
+                    "message id field couldn't be serialized in header: {}",
+                    err
+                ))
+            })?;
 
         // ...now let's write the value signaling the message kind
         let (buf_at_dest, _) = gen(be_u8(self.kind.into()), buf_at_msg_kind).map_err(|err| {

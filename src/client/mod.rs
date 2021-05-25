@@ -626,8 +626,7 @@ mod tests {
         let public_key = keypair.public_key();
         let signature = keypair.sign(b"the query");
 
-        let random_xor = xor_name::XorName::random();
-        let id = MessageId(random_xor);
+        let id = MessageId::new();
         let message = ClientMsg::Process(ProcessMsg::Query {
             id,
             query: Query::Transfer(TransferQuery::GetBalance(public_key)),

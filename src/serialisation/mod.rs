@@ -12,7 +12,7 @@ mod wire_msg_header;
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
 #[cfg(not(feature = "client-only"))]
 use super::node;
-use super::{client, section_info, DestInfo, Error, MessageType, Result};
+use super::{client, section_info, DestInfo, Error, MessageId, MessageType, Result};
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen};
 use std::fmt::Debug;
@@ -44,7 +44,13 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::SectionInfo, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(
+                MessageId::new(),
+                MessageKind::SectionInfo,
+                dest,
+                dest_section_pk,
+                None,
+            ),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -64,7 +70,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::Client, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(msg.id(), MessageKind::Client, dest, dest_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -84,7 +90,13 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::Routing, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(
+                MessageId::new(),
+                MessageKind::Routing,
+                dest,
+                dest_section_pk,
+                None,
+            ),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -105,7 +117,13 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(MessageKind::Node, dest, dest_section_pk, src_section_pk),
+            header: WireMsgHeader::new(
+                msg.id(),
+                MessageKind::Node,
+                dest,
+                dest_section_pk,
+                src_section_pk,
+            ),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -199,6 +217,11 @@ impl WireMsg {
                 })
             }
         }
+    }
+
+    /// Return the message id of this message
+    pub fn msg_id(&self) -> MessageId {
+        self.header.msg_id()
     }
 
     /// Return the destination section PublicKey for this message
@@ -296,6 +319,7 @@ mod tests {
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
+        assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dest(), dest);
         assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
         assert_eq!(deserialized.src_section_pk(), None);
@@ -337,6 +361,7 @@ mod tests {
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
+        assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dest(), dest);
         assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
         assert_eq!(deserialized.src_section_pk(), None);
@@ -362,6 +387,7 @@ mod tests {
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg_with_src_pk);
+        assert_eq!(deserialized.msg_id(), wire_msg_with_src_pk.msg_id());
         assert_eq!(deserialized.dest(), dest);
         assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
         assert_eq!(deserialized.src_section_pk(), Some(src_section_pk));
