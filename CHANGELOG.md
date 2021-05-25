@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [25.0.0](https://github.com/maidsafe/sn_messaging/compare/v24.0.0...v25.0.0) (2021-05-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **header:** header messages are not backward compatible.
+
+### Features
+
+* **header:** include the message id in the header ([d2c49c7](https://github.com/maidsafe/sn_messaging/commit/d2c49c7a6ffbe0ea70ef090bc3834cdc41e14263))
+
 ## [24.0.0](https://github.com/maidsafe/sn_messaging/compare/v23.0.0...v24.0.0) (2021-05-24)
 
 
