@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.1](https://github.com/maidsafe/sn_api/compare/v0.26.0...v0.26.1) (2021-05-25)
+
+
+### Features
+
+* **api:** add an example app showcasing how to fetch a Blob from Safe using sn_api ([9098cff](https://github.com/maidsafe/sn_api/commit/9098cff4c4d2ba15321dd072c970a18781a04a49))
+* **sn_api:** strip all other modules out of this workspace ([1f80627](https://github.com/maidsafe/sn_api/commit/1f80627674448602b11f9a8522a02f043d066180))
+
+
+### Bug Fixes
+
+* install script now uses prebuild latest-package ([1441127](https://github.com/maidsafe/sn_api/commit/1441127c121906a64f8f812a8c657f8eefba36a9))
+
 ### [0.26.0](https://github.com/maidsafe/sn_api/compare/v0.25.3...v0.26.0) (2021-05-06)
 
 * ***api*** update sn_client to 0.54.9
