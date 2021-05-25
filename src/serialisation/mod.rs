@@ -7,14 +7,14 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-mod wire_msg_header;
+pub mod wire_msg_header;
 
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
 #[cfg(not(feature = "client-only"))]
 use super::node;
 use super::{client, section_info, DestInfo, Error, MessageId, MessageType, Result};
 use bytes::Bytes;
-use cookie_factory::{combinator::slice, gen};
+use cookie_factory::{combinator::slice, gen_simple};
 use std::fmt::Debug;
 use threshold_crypto::PublicKey;
 use xor_name::XorName;
@@ -23,7 +23,7 @@ use xor_name::XorName;
 // along with a header (WireMsgHeader) which contains the information needed
 // by the recipient to properly deserialize it.
 // The WireMsg struct provides the utilities to serialize and deserialize messages.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct WireMsg {
     header: WireMsgHeader,
     payload: Bytes,
@@ -147,8 +147,8 @@ impl WireMsg {
 
         let buf_at_payload = self.header.write(&mut buffer)?;
 
-        // ...and finally we write the bytes of the serialized payload
-        let _ = gen(slice(self.payload.clone()), buf_at_payload).map_err(|err| {
+        // ...and finally we write the bytes of the serialized payload to the original buffer
+        let _ = gen_simple(slice(self.payload.clone()), buf_at_payload).map_err(|err| {
             Error::Serialisation(format!("message payload couldn't be serialized: {}", err))
         })?;
 
@@ -298,6 +298,16 @@ impl WireMsg {
     fn size(&self) -> usize {
         self.header.size() as usize + self.payload.len()
     }
+
+    /// Update dest_pk and or dest in the WireMsg
+    pub fn update_dest_info(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
+        if let Some(dest) = dest {
+            self.header.dest = dest
+        }
+        if let Some(dest_pk) = dest_pk {
+            self.header.dest_section_pk = dest_pk
+        }
+    }
 }
 
 #[cfg(test)]
@@ -331,6 +341,44 @@ mod tests {
                 msg: query,
                 dest_info: DestInfo {
                     dest,
+                    dest_section_pk
+                }
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn serialisation_and_update_dest_for_section_info_msg() -> Result<()> {
+        let dest = XorName::random();
+        let dest_section_pk = SecretKey::random().public_key();
+
+        let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
+        let mut wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
+        let serialized = wire_msg.serialize()?;
+
+        let wire_msg2 = wire_msg.clone();
+        let dest_new = XorName::random();
+        wire_msg.update_dest_info(None, Some(dest_new));
+        let serialised_second_msg = wire_msg.serialize()?;
+
+        // test deserialisation of header
+        let deserialized = WireMsg::from(serialised_second_msg.clone())?;
+
+        assert_ne!(serialized, serialised_second_msg);
+        assert_ne!(wire_msg2, wire_msg);
+        assert_eq!(deserialized.dest(), dest_new);
+        assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
+        assert_eq!(deserialized.src_section_pk(), None);
+
+        // test deserialisation of payload
+        assert_eq!(
+            deserialized.to_message()?,
+            MessageType::SectionInfo {
+                msg: query,
+                dest_info: DestInfo {
+                    dest: dest_new,
                     dest_section_pk
                 }
             }

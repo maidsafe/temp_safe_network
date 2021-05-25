@@ -24,14 +24,14 @@ const MESSAGING_PROTO_VERSION: u16 = 1u16;
 
 // Header to be serialisied at the front of the wire message.
 // This header contains the information needed to deserialize the payload.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct WireMsgHeader {
     msg_id: MessageId,
     header_size: u16,
     version: u16,
     kind: MessageKind,
-    dest: XorName,
-    dest_section_pk: PublicKey,
+    pub(crate) dest: XorName,
+    pub(crate) dest_section_pk: PublicKey,
     src_section_pk: Option<PublicKey>,
 }
 
