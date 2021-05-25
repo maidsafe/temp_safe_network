@@ -1,3 +1,8 @@
+# PR workflow.
+#
+# Runs full suite of checks, with warnings treated as errors.
+# Gather code coverage stats and publish them on coveralls.io.
+
 name: PR
 
 on: pull_request
@@ -10,35 +15,14 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  cargo-udeps:
-    name: Unused dependency check
+  checks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Clippy & fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       # Install Rust and required components
       - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-
-      # Install and run cargo udeps to find unused cargo dependencies
-      - name: cargo-udeps unused dependency check
-        run: |
-          cargo install cargo-udeps --locked
-          cargo +nightly udeps --all-targets
-
-  clippy:
-    if: ${{ github.repository_owner == 'maidsafe' }}
-    name: Clippy & fmt
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust and required components
-        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -64,6 +48,7 @@ jobs:
         run: cargo clippy --all-targets --all-features
 
   check_pr_size:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Check PR size doesn't break set limit
     runs-on: ubuntu-latest
     steps:
@@ -73,16 +58,19 @@ jobs:
       - uses: maidsafe/pr_size_checker@v2
         with:
           max_lines_changed: 200
-
+  
   coverage:
-    # if: ${{ github.repository_owner == 'maidsafe' }}
-    name: Code coverage checks
-    runs-on: ubuntu-latest
+    # Disabled cooverage & test stage for now as tests require work
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     if: false
+    name: Code coverage check
+    runs-on: ubuntu-latest
+    env: 
+      PROPTEST_CASES: 1
     steps:
       - uses: actions/checkout@v2
-      - name: Install Rust and required components
-        uses: actions-rs/toolchain@v1
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -98,20 +86,44 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      # Run cargo tarpaulin
-      - name: Code Coverage - sn_api
+      # Run cargo tarpaulin & push result to coveralls.io
+      - name: rust-tarpaulin code coverage check
         uses: actions-rs/tarpaulin@v0.1
         with:
           args: '-v --release --out Lcov -- --test-threads=1'
-
-      # Push tarpaulin results to coveralls.io
-      - name: Coveralls
+      - name: Push code coverage results to coveralls.io
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel: true
           path-to-lcov: ./lcov.info
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  cargo-udeps:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      # Install and run cargo udeps to find unused cargo dependencies
+      - name: cargo-udeps duplicate dependency check
+        run: |
+          cargo install cargo-udeps --locked
+          cargo +nightly udeps --all-targets
 
   cargo-deny:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -121,27 +133,20 @@ jobs:
       run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
 
     - uses: EmbarkStudios/cargo-deny-action@v1
-  
-  test-component:
-    # if: ${{ github.repository_owner == 'maidsafe' }} // re-enable this once these tests are run again
+
+  test:
+    # Disabled coverage & test stage for now as tests require work
+    # if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     if: false
-    name: Test Component
+    name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        component: [api-tests, cli-tests]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
-      # Set git to checkout symlinks correctly on Windows only
-      # Otherwise the symlinks aren't created and tests fail
-      - name: Set git to checkout symlinks correctly on Windows
-        if: matrix.os == 'windows-latest'
-        shell: bash
-        run: git config --global --add core.symlinks true
-
       - uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -156,7 +161,24 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
+      
       # Run tests.
       - shell: bash
-        run: ./resources/test-scripts/${{ matrix.component }}
+        run: ./resources/test-scripts/api-tests
+
+  # Test publish using --dry-run.
+  test-publish:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Test Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cargo publish dry run
+        run: cargo publish --dry-run
