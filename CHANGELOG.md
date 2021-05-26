@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [25.1.0](https://github.com/maidsafe/sn_messaging/compare/v25.0.0...v25.1.0) (2021-05-26)
+
+
+### Features
+
+* enable to directly generate wiremsg ([9ab515d](https://github.com/maidsafe/sn_messaging/commit/9ab515d02a08bcc397b2fc387b10dbb111bb77b9))
+
 ## [25.0.0](https://github.com/maidsafe/sn_messaging/compare/v24.0.0...v25.0.0) (2021-05-25)
 
 
