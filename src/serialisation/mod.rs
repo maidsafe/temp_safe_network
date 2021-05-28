@@ -90,13 +90,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(
-                MessageId::new(),
-                MessageKind::Routing,
-                dest,
-                dest_section_pk,
-                None,
-            ),
+            header: WireMsgHeader::new(msg.id(), MessageKind::Routing, dest, dest_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }

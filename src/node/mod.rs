@@ -7,30 +7,64 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+mod agreement;
+mod network;
 mod node_msg;
+mod plain_message;
+mod prefix_map;
+mod relocation;
+mod section;
+mod src_authority;
+mod variant;
 
-use crate::{MessageType, WireMsg};
-use bytes::Bytes;
+pub use agreement::{DkgFailureProof, DkgFailureProofSet, DkgKey, Proposal, Proven};
+pub use network::{Network, OtherSection};
 pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
     NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
     NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse,
 };
+pub use plain_message::PlainMessage;
+pub use prefix_map::PrefixMap;
+pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise, SignedRelocateDetails};
+pub use section::{
+    ElderCandidates, MemberInfo, Peer, PeerState, Section, SectionAuthorityProvider, SectionPeers,
+};
+pub use src_authority::SrcAuthority;
+pub use variant::{JoinRequest, ResourceProofResponse, Variant};
+
+use crate::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
+use bytes::Bytes;
+use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
 use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
-/// Node message sent over the network.
-// TODO: this is currently holding just bytes as a placeholder, next step
-// is to move all actual node messages structs and definitions within it.
+/// Routing message sent over the network.
 #[derive(Clone, Eq, Serialize, Deserialize)]
-pub struct RoutingMsg(#[serde(with = "serde_bytes")] pub Vec<u8>);
+pub struct RoutingMsg {
+    /// Message ID.
+    pub id: MessageId,
+    /// Source authority.
+    /// Messages do not need to sign this field as it is all verifiable (i.e. if the sig validates
+    /// agains the public key and we know the pub key then we are good. If the proof is not recognised we
+    /// ask for a longer chain that can be recognised). Therefore we don't need to sign this field.
+    pub src: SrcAuthority,
+    /// Destination location.
+    pub dst: DstLocation,
+    /// The aggregation scheme to be used.
+    pub aggregation: Aggregation,
+    /// The body of the message.
+    pub variant: Variant,
+    /// Proof chain to verify the message trust. Does not need to be signed.
+    pub proof_chain: Option<SecuredLinkedList>,
+}
 
 impl RoutingMsg {
-    /// Creates a new instance which wraps the provided node message bytes.
-    pub fn new(bytes: Bytes) -> Self {
-        Self(bytes.to_vec())
+    /// Gets the message ID.
+    pub fn id(&self) -> MessageId {
+        self.id
     }
 
     /// Convenience function to deserialize a 'RoutingMsg' from bytes received over the wire.
@@ -53,16 +87,23 @@ impl RoutingMsg {
 }
 
 impl PartialEq for RoutingMsg {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+    fn eq(&self, other: &RoutingMsg) -> bool {
+        self.src == other.src
+            && self.dst == other.dst
+            && self.id == other.id
+            && self.variant == other.variant
+            && self.proof_chain == other.proof_chain
     }
 }
 
 impl Debug for RoutingMsg {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter
-            .debug_tuple("RoutingMsg")
-            .field(&format_args!("{:10}", hex_fmt::HexFmt(&self.0)))
+            .debug_struct("RoutingMsg")
+            .field("id", &self.id)
+            .field("src", &self.src)
+            .field("dst", &self.dst)
+            .field("variant", &self.variant)
             .finish()
     }
 }
