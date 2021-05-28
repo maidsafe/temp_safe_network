@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [26.0.0](https://github.com/maidsafe/sn_messaging/compare/v25.1.1...v26.0.0) (2021-05-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* Update DstLocation Direct->DirectAndUnrouted for clarity.
+
+### Features
+
+* Update DstLocation Direct->DirectAndUnrouted for clarity. ([2cfef24](https://github.com/maidsafe/sn_messaging/commit/2cfef2434c7957c95d774416489b686d8483dd0c))
+
 ### [25.1.1](https://github.com/maidsafe/sn_messaging/compare/v25.1.0...v25.1.1) (2021-05-27)
 
 ## [25.1.0](https://github.com/maidsafe/sn_messaging/compare/v25.0.0...v25.1.0) (2021-05-26)
