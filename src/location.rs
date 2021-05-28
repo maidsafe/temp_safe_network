@@ -124,8 +124,8 @@ pub enum DstLocation {
     Node(XorName),
     /// Destination are the nodes of the section whose prefix matches the given name.
     Section(XorName),
-    /// Destination is the node at the `ConnectionInfo` the message is directly sent to.
-    Direct,
+    /// Destination is a specific node. To be directly connected to, and so the message is unrouted. `ConnectionInfo` is used to determine the target SocketAdrr for the message.
+    DirectAndUnrouted,
 }
 
 impl DstLocation {
@@ -151,7 +151,7 @@ impl DstLocation {
             Self::EndUser(user) => prefix.matches(&user.xorname),
             Self::Node(self_name) => name == self_name,
             Self::Section(self_name) => prefix.matches(self_name),
-            Self::Direct => true,
+            Self::DirectAndUnrouted => true,
         }
     }
 
@@ -161,7 +161,7 @@ impl DstLocation {
             Self::EndUser(user) => Some(user.xorname),
             Self::Node(name) => Some(*name),
             Self::Section(name) => Some(*name),
-            Self::Direct => None,
+            Self::DirectAndUnrouted => None,
         }
     }
 }
