@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [27.0.0](https://github.com/maidsafe/sn_messaging/compare/v26.0.0...v27.0.0) (2021-05-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **routingMsg:** RoutingMsg now contains its full hierarchy rather than just serialised msg bytes.
+
+### Features
+
+* **routingMsg:** adding all RoutingMsg definitions ([0a50f63](https://github.com/maidsafe/sn_messaging/commit/0a50f63cc02539a8d0e8f2625a49c3248c568d9c))
+
 ## [26.0.0](https://github.com/maidsafe/sn_messaging/compare/v25.1.1...v26.0.0) (2021-05-28)
 
 
