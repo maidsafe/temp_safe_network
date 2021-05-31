@@ -9,6 +9,7 @@
 use bls_signature_aggregator::{Proof, ProofShare};
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::Signature;
+use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -33,6 +34,8 @@ pub enum SrcAuthority {
         src_name: XorName,
         /// Proof Share signed by the peer's BLS KeyShare
         proof_share: ProofShare,
+        /// SectionChain of the sender's section.
+        section_chain: SecuredLinkedList,
     },
     /// Authority of a whole section.
     Section {
@@ -40,5 +43,7 @@ pub enum SrcAuthority {
         src_name: XorName,
         /// BLS proof of the message corresponding to the source section.
         proof: Proof,
+        /// SectionChain of the sender's section.
+        section_chain: SecuredLinkedList,
     },
 }

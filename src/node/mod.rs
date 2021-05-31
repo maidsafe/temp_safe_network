@@ -35,7 +35,6 @@ pub use variant::{JoinRequest, ResourceProofResponse, Variant};
 
 use crate::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
 use bytes::Bytes;
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
 use threshold_crypto::PublicKey as BlsPublicKey;
@@ -57,8 +56,8 @@ pub struct RoutingMsg {
     pub aggregation: Aggregation,
     /// The body of the message.
     pub variant: Variant,
-    /// Proof chain to verify the message trust. Does not need to be signed.
-    pub proof_chain: Option<SecuredLinkedList>,
+    /// Section key of the sender.
+    pub section_pk: BlsPublicKey,
 }
 
 impl RoutingMsg {
@@ -84,6 +83,10 @@ impl RoutingMsg {
     pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
         WireMsg::serialize_routing_msg(self, dest, dest_section_pk)
     }
+
+    pub fn section_pk(&self) -> BlsPublicKey {
+        self.section_pk
+    }
 }
 
 impl PartialEq for RoutingMsg {
@@ -92,7 +95,7 @@ impl PartialEq for RoutingMsg {
             && self.dst == other.dst
             && self.id == other.id
             && self.variant == other.variant
-            && self.proof_chain == other.proof_chain
+            && self.section_pk == other.section_pk
     }
 }
 

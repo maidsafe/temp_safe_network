@@ -38,10 +38,6 @@ pub enum Variant {
         src_info: (Proven<SectionAuthorityProvider>, SecuredLinkedList),
         /// Message
         msg: Option<Box<RoutingMsg>>,
-        // Nonce that is derived from the incoming message that triggered sending this
-        // message. It's purpose is to make sure that `OtherSection`s that are identical
-        // but triggered by different messages are not filtered out.
-        // nonce: MessageHash,
     },
     /// User-facing message
     #[serde(with = "serde_bytes")]
@@ -52,6 +48,7 @@ pub enum Variant {
         genesis_key: BlsPublicKey,
         section_auth: Proven<SectionAuthorityProvider>,
         member_info: Proven<MemberInfo>,
+        section_chain: SecuredLinkedList,
     },
     /// Message sent to all members to update them about the state of our section.
     Sync {
@@ -136,11 +133,13 @@ impl Debug for Variant {
                 genesis_key,
                 section_auth,
                 member_info,
+                section_chain,
             } => f
                 .debug_struct("NodeApproval")
                 .field("genesis_key", genesis_key)
                 .field("section_auth", section_auth)
                 .field("member_info", member_info)
+                .field("section_chain", section_chain)
                 .finish(),
             Self::Sync { section, network } => f
                 .debug_struct("Sync")
