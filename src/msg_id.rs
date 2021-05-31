@@ -21,7 +21,7 @@ pub const MESSAGE_ID_LEN: usize = 32;
 /// This is used for deduplication: Since the network sends messages redundantly along different
 /// routes, the same message will usually arrive more than once at any given node. A message with
 /// an ID that is already in the cache will be ignored.
-#[derive(Ord, PartialOrd, Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Ord, PartialOrd, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct MessageId([u8; MESSAGE_ID_LEN]);
 
 impl MessageId {
@@ -94,5 +94,11 @@ impl fmt::Display for MessageId {
             "{:02x}{:02x}{:02x}{:02x}..",
             self.0[0], self.0[1], self.0[2], self.0[3]
         )
+    }
+}
+
+impl fmt::Debug for MessageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }
