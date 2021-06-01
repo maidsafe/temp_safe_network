@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [28.0.0](https://github.com/maidsafe/sn_messaging/compare/v27.0.1...v28.0.0) (2021-06-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* removal of proofchain alters RoutingMsg type
+
+### Features
+
+* send proofchain only for specific messages ([642401b](https://github.com/maidsafe/sn_messaging/commit/642401b73d3bce47de09512d8afec783353c819e))
+
 ### [27.0.1](https://github.com/maidsafe/sn_messaging/compare/v27.0.0...v27.0.1) (2021-05-31)
 
 ## [27.0.0](https://github.com/maidsafe/sn_messaging/compare/v26.0.0...v27.0.0) (2021-05-30)
