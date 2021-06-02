@@ -59,7 +59,7 @@ xor_name = "1"
   optional = true
 
   [dependencies.sn_api]
-  version = "~0.26"
+  version = "~0.27"
   default-features = false
   features = [ "app", "authd_client", "simulated-payouts" ]
 
