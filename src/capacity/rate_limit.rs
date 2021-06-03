@@ -33,6 +33,10 @@ impl RateLimit {
         let full_nodes = self.capacity.full_nodes().await;
         let all_nodes = self.network.our_adults().await.len() as u8;
 
+        if full_nodes > all_nodes || all_nodes == 0 {
+            return Token::from_nano(u64::MAX);
+        }
+
         RateLimit::rate_limit(bytes, full_nodes, all_nodes, prefix_len)
     }
 
