@@ -250,9 +250,9 @@ dependencies = [
 
 [[package]]
 name = "bls_dkg"
-version = "0.3.8"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4805f2b98d7f048327b288b16d81f4fd7bd56fe71475086512aa8952ea73aa73"
+checksum = "2303b73286f366b6867332099220fab2b94a43412b135dc75ff7e8407663a154"
 dependencies = [
  "aes",
  "anyhow",
@@ -271,9 +271,9 @@ dependencies = [
 
 [[package]]
 name = "bls_signature_aggregator"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f078a529a20765beda0a461d1353ef6b108b3f73fde0474e77d8ad268e54055"
+checksum = "96e26de69928294cb6ba4c080b714efa447d7ed16d2106bbe6b0547daace27b7"
 dependencies = [
  "serde",
  "thiserror",
@@ -481,6 +481,16 @@ checksum = "0f260e2fc850179ef410018660006951c1b55b79e8087e87111a2c388994b9b5"
 dependencies = [
  "ahash",
  "cfg-if 0.1.10",
+ "num_cpus",
+]
+
+[[package]]
+name = "dashmap"
+version = "4.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
+dependencies = [
+ "cfg-if 1.0.0",
  "num_cpus",
 ]
 
@@ -970,9 +980,9 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
 name = "heck"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87cbf45460356b7deeb5e3415b5563308c0a9b057c85e12b06ad551f98d0a6ac"
+checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -1277,12 +1287,6 @@ dependencies = [
  "cfg-if 1.0.0",
  "value-bag",
 ]
-
-[[package]]
-name = "lru_time_cache"
-version = "0.11.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "991058cf0e7f161b37a4a610ddbada9d2f051d0db76369b973de9f3466f1cba3"
 
 [[package]]
 name = "matches"
@@ -1690,9 +1694,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.10"
+version = "0.11.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "326dc32ecbd56d60075b9962713343eb9691fca1ab5f873966ec97ca88d514ae"
+checksum = "015346bc391951d1eca81d76c8fe553d486c2198f92e4407a67001c7a7480fc9"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2334,7 +2338,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.46.4"
+version = "0.46.6"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2343,7 +2347,7 @@ dependencies = [
  "bincode",
  "bytes 1.0.1",
  "crdts",
- "dashmap",
+ "dashmap 3.11.10",
  "dirs-next 1.0.2",
  "ed25519",
  "ed25519-dalek",
@@ -2378,19 +2382,19 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.73.4"
+version = "0.73.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abd92c7a809ee8b4b357a640f14411a3b4d20872957023f5d7bf395cc918cc75"
+checksum = "d12e3151b35d3d4517877f283409d9b7e2da6c90a986fb300f91d40399e87e26"
 dependencies = [
  "bincode",
  "bls_dkg",
  "bls_signature_aggregator",
  "bytes 1.0.1",
+ "dashmap 4.0.2",
  "ed25519-dalek",
  "futures",
  "hex_fmt",
  "itertools 0.9.0",
- "lru_time_cache",
  "qp2p",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
@@ -2846,9 +2850,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-normalization"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33717dca7ac877f497014e10d73f3acf948c342bee31b5ca7892faf94ccc6b49"
+checksum = "d54590932941a9e9266f0832deed84ebe1bf2e4c9e4a3554d393d18f5e854bf9"
 dependencies = [
  "tinyvec",
 ]

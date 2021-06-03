@@ -14,7 +14,7 @@ mod test_utils;
 
 use self::replicas::{ReplicaInfo, Replicas};
 use crate::{
-    capacity::RateLimit,
+    capacity::StoreCost,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     utils, Error, Result,
@@ -75,16 +75,16 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 #[derive(Clone)]
 pub struct Transfers {
     replicas: Replicas<ReplicaSigningImpl>,
-    rate_limit: RateLimit,
+    store_cost: StoreCost,
     // TODO: limit this? where do we store it
     recently_validated_transfers: Arc<Mutex<HashSet<DebitId>>>,
 }
 
 impl Transfers {
-    pub fn new(replicas: Replicas<ReplicaSigningImpl>, rate_limit: RateLimit) -> Self {
+    pub fn new(replicas: Replicas<ReplicaSigningImpl>, store_cost: StoreCost) -> Self {
         Self {
             replicas,
-            rate_limit,
+            store_cost,
             recently_validated_transfers: Arc::default(),
         }
     }
@@ -126,13 +126,17 @@ impl Transfers {
         origin: SrcLocation,
     ) -> NodeDuties {
         let result = if bytes == 0 {
-            Err(sn_messaging::client::Error::InvalidOperation(
+            Err(ErrorMessage::InvalidOperation(
                 "Cannot store 0 bytes".to_string(),
             ))
         } else {
-            let store_cost = self.rate_limit.from(bytes).await;
-            info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
-            Ok((bytes, store_cost, self.section_wallet_id()))
+            match self.store_cost.from(bytes).await {
+                Ok(store_cost) => {
+                    info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
+                    Ok((bytes, store_cost, self.section_wallet_id()))
+                }
+                Err(e) => Err(ErrorMessage::InvalidOperation(e.to_string())), // TODO: Add `NetworkFull` error to sn_messaging
+            }
         };
 
         let response = NodeDuty::Send(OutgoingMsg {
@@ -204,35 +208,42 @@ impl Transfers {
 
         match result {
             Ok(_) => {
-                let total_cost = self.rate_limit.from(num_bytes).await;
+                let (total_cost, error) = match self.store_cost.from(num_bytes).await {
+                    Ok(total_cost) => {
+                        if total_cost > payment.amount() {
+                            // Paying too little will see the amount be forfeited.
+                            // This prevents spam of the network.
+                            warn!(
+                                "Payment: Too low payment: {}, expected: {}",
+                                payment.amount(),
+                                total_cost
+                            );
+                            (total_cost, Some(ErrorMessage::InsufficientBalance))
+                        } else {
+                            (total_cost, None)
+                        }
+                    }
+                    Err(e) => (
+                        Token::from_nano(u64::MAX),
+                        Some(ErrorMessage::InvalidOperation(e.to_string())), // TODO: Add `NetworkFull` error to sn_messaging
+                    ),
+                };
                 info!("Payment: registration and propagation succeeded. (Store cost: {}, paid amount: {}.)", total_cost, payment.amount());
                 info!(
                     "Section balance: {}",
                     self.replicas.balance(payment.recipient()).await?
                 );
-                if total_cost > payment.amount() {
-                    // Paying too little will see the amount be forfeited.
-                    // This prevents spam of the network.
-                    warn!(
-                        "Payment: Too low payment: {}, expected: {}",
-                        payment.amount(),
-                        total_cost
-                    );
-                    // todo, better error, like `TooLowPayment`
-
+                if let Some(e) = error {
                     let origin = SrcLocation::EndUser(origin);
-
                     return Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
                             id: MessageId::in_response_to(&msg_id),
-                            error: CmdError::Transfer(TransferRegistration(
-                                ErrorMessage::InsufficientBalance,
-                            )),
+                            error: CmdError::Transfer(TransferRegistration(e)),
                             correlation_id: msg_id,
                         })),
                         section_source: true, // strictly this is not correct, but we don't expect responses to a response..
                         dst: origin.to_dst(),
-                        aggregation: Aggregation::AtDestination, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                        aggregation: Aggregation::AtDestination,
                     })]);
                 }
                 info!("Payment: forwarding data..");

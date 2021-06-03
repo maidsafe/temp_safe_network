@@ -34,6 +34,9 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// Not enough storage available on the network.
+    #[error("Not enough storage available on the network")]
+    NetworkFull,
     /// No source message provided for ProcessingError
     #[error("No source message for ProcessingError")]
     NoSourceMessageForProcessingError,

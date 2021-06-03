@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_storage_info;
-mod rate_limit;
+mod store_cost;
 
 pub use adult_storage_info::AdultsStorageInfo;
-pub use rate_limit::RateLimit;
+pub use store_cost::StoreCost;
 
 pub const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
 const MAX_CHUNK_SIZE: u64 = 1_000_000;

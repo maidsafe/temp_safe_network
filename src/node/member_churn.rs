@@ -8,7 +8,7 @@
 
 use super::role::{ElderRole, Role};
 use crate::{
-    capacity::{AdultsStorageInfo, Capacity, RateLimit},
+    capacity::{AdultsStorageInfo, Capacity, StoreCost},
     metadata::{adult_reader::AdultReader, Metadata},
     network::Network,
     node_ops::NodeDuty,
@@ -53,11 +53,11 @@ impl Node {
 
         //
         // start handling transfers
-        let rate_limit =
-            RateLimit::new(self.network_api.clone(), Capacity::new(adult_storage_info));
+        let store_cost =
+            StoreCost::new(self.network_api.clone(), Capacity::new(adult_storage_info));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
-        let transfers = Transfers::new(replicas, rate_limit);
+        let transfers = Transfers::new(replicas, store_cost);
 
         //
         // start handling node rewards
