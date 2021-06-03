@@ -110,9 +110,9 @@ pub enum Error {
     /// Transaction ID already exists.
     #[error("Transaction Id already exists")]
     TransactionIdExists,
-    /// Insufficient coins.
-    #[error("Insufficient balance to complete this operation")]
-    InsufficientBalance,
+    /// Insufficient tokens provided to pay for this operation.
+    #[error("Insufficient payment provided to complete this operation")]
+    InsufficientPayment,
     /// Inexistent balance.
     // TODO: key/wallet/balance, what's our vocab here?
     #[error("No such key exists")]
