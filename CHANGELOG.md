@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [29.0.0](https://github.com/maidsafe/sn_messaging/compare/v28.0.0...v29.0.0) (2021-06-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* It's actually insufficient payment, as we dont check the balance of a wallet when doing ops
+
+### Features
+
+* InsufficientBalance error renamed ([8063c67](https://github.com/maidsafe/sn_messaging/commit/8063c67ba4eb6c565aaaedc6e2adc17f1ed57340))
+
 ## [28.0.0](https://github.com/maidsafe/sn_messaging/compare/v27.0.1...v28.0.0) (2021-06-01)
 
 
