@@ -316,7 +316,10 @@ mod tests {
         let dest = XorName::random();
         let dest_section_pk = SecretKey::random().public_key();
 
-        let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
+        let query = section_info::Message::GetSectionQuery {
+            public_key: dest_section_pk.into(),
+            is_node: true,
+        };
         let wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
@@ -348,7 +351,10 @@ mod tests {
         let dest = XorName::random();
         let dest_section_pk = SecretKey::random().public_key();
 
-        let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
+        let query = section_info::Message::GetSectionQuery {
+            public_key: dest_section_pk.into(),
+            is_node: true,
+        };
         let mut wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
