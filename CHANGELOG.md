@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [30.0.0](https://github.com/maidsafe/sn_messaging/compare/v29.0.0...v30.0.0) (2021-06-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **variant:** affects sn_routing's Variant handling
+
+### Features
+
+* **variant:** remove ConnectivityComplaint variant ([71c0b5f](https://github.com/maidsafe/sn_messaging/commit/71c0b5f72ba429ee396764b6b08567706d970e9d))
+
 ## [29.0.0](https://github.com/maidsafe/sn_messaging/compare/v28.0.0...v29.0.0) (2021-06-03)
 
 
