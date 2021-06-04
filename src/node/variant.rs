@@ -118,10 +118,6 @@ pub enum Variant {
         last_known_key: Option<BlsPublicKey>,
         msg: Box<RoutingMsg>,
     },
-    /// A follow-up reply will be sent by src with SectionKnowledge.
-    // DstOutdated,
-    /// Direct complaint sent from an adult to elders regarding the connectivity issue of an elder.
-    ConnectivityComplaint(XorName),
 }
 
 impl Debug for Variant {
@@ -216,7 +212,6 @@ impl Debug for Variant {
                 .field("data_size", data_size)
                 .field("difficulty", difficulty)
                 .finish(),
-            Self::ConnectivityComplaint(name) => write!(f, "ConnectivityComplaint({:?})", name),
             Self::SectionKnowledgeQuery { .. } => write!(f, "SectionKnowledgeQuery"),
         }
     }
