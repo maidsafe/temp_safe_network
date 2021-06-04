@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [31.0.0](https://github.com/maidsafe/sn_messaging/compare/v30.0.0...v31.0.0) (2021-06-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messages:** adds new variant to the get-section-response
+
+* **messages:** add GetSectionResponse::NotAllowed variant ([846e39e](https://github.com/maidsafe/sn_messaging/commit/846e39edc1beef57cd39d563d2ed86b17791235c))
+
 ## [30.0.0](https://github.com/maidsafe/sn_messaging/compare/v29.0.0...v30.0.0) (2021-06-04)
 
 
