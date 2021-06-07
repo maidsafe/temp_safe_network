@@ -90,7 +90,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(msg.id(), MessageKind::Routing, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(msg.id, MessageKind::Routing, dest, dest_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -316,10 +316,7 @@ mod tests {
         let dest = XorName::random();
         let dest_section_pk = SecretKey::random().public_key();
 
-        let query = section_info::Message::GetSectionQuery {
-            public_key: dest_section_pk.into(),
-            is_node: true,
-        };
+        let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
         let wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
@@ -351,10 +348,7 @@ mod tests {
         let dest = XorName::random();
         let dest_section_pk = SecretKey::random().public_key();
 
-        let query = section_info::Message::GetSectionQuery {
-            public_key: dest_section_pk.into(),
-            is_node: true,
-        };
+        let query = section_info::Message::GetSectionQuery(dest_section_pk.into());
         let mut wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
         let serialized = wire_msg.serialize()?;
 

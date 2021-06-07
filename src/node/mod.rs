@@ -8,6 +8,7 @@
 // Software.
 
 mod agreement;
+mod join;
 mod network;
 mod node_msg;
 mod plain_message;
@@ -20,6 +21,7 @@ mod src_authority;
 mod variant;
 
 pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven};
+pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
@@ -35,7 +37,7 @@ pub use section::{
 pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;
-pub use variant::{JoinRequest, ResourceProofResponse, Variant};
+pub use variant::Variant;
 
 use crate::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
 use bytes::Bytes;
@@ -65,11 +67,6 @@ pub struct RoutingMsg {
 }
 
 impl RoutingMsg {
-    /// Gets the message ID.
-    pub fn id(&self) -> MessageId {
-        self.id
-    }
-
     /// Convenience function to deserialize a 'RoutingMsg' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node message.
     pub fn from(bytes: Bytes) -> crate::Result<Self> {
@@ -86,10 +83,6 @@ impl RoutingMsg {
     /// serialize this RoutingMsg into bytes ready to be sent over the wire.
     pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
         WireMsg::serialize_routing_msg(self, dest, dest_section_pk)
-    }
-
-    pub fn section_pk(&self) -> BlsPublicKey {
-        self.section_pk
     }
 }
 

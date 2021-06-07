@@ -8,21 +8,21 @@
 
 use super::{
     agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven},
+    join::{JoinRequest, JoinResponse},
     network::Network,
-    relocation::{RelocateDetails, RelocatePayload, RelocatePromise},
-    section::{ElderCandidates, MemberInfo, Section, SectionAuthorityProvider},
+    relocation::{RelocateDetails, RelocatePromise},
+    section::{ElderCandidates, Section, SectionAuthorityProvider},
     signed::SignedShare,
     RoutingMsg,
 };
 use crate::DestInfo;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use ed25519_dalek::Signature;
 use hex_fmt::HexFmt;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::BTreeSet,
     fmt::{self, Debug, Formatter},
 };
 use threshold_crypto::PublicKey as BlsPublicKey;
@@ -42,14 +42,6 @@ pub enum Variant {
     /// User-facing message
     #[serde(with = "serde_bytes")]
     UserMessage(Vec<u8>),
-    /// Message sent to newly joined node containing the necessary info to become a member of our
-    /// section.
-    NodeApproval {
-        genesis_key: BlsPublicKey,
-        section_auth: Proven<SectionAuthorityProvider>,
-        member_info: Proven<MemberInfo>,
-        section_chain: SecuredLinkedList,
-    },
     /// Message sent to all members to update them about the state of our section.
     Sync {
         // Information about our section.
@@ -63,14 +55,10 @@ pub enum Variant {
     /// - from a section to a current elder to be relocated after they are demoted.
     /// - from the node to be relocated back to its section after it was demoted.
     RelocatePromise(RelocatePromise),
-    /// Sent from a bootstrapping peer to the section that responded with a
-    /// `GetSectionResponse::Succcess` to its `GetSectionQuery`.
+    /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(Box<JoinRequest>),
-    /// Response to outdated JoinRequest
-    JoinRetry {
-        section_auth: SectionAuthorityProvider,
-        section_key: BlsPublicKey,
-    },
+    /// Response to a `JoinRequest`
+    JoinResponse(Box<JoinResponse>),
     /// Sent from a node that can't establish the trust of the contained message to its original
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
@@ -105,13 +93,6 @@ pub enum Variant {
         content: Proposal,
         signed_share: SignedShare,
     },
-    /// Challenge sent from existing elder nodes to the joining peer for resource proofing.
-    ResourceChallenge {
-        data_size: usize,
-        difficulty: u8,
-        nonce: [u8; 32],
-        nonce_signature: Signature,
-    },
     /// Message sent by a node to indicate it received a message from a node which was ahead in knowledge.
     /// A reply is expected with a `SectionKnowledge` message.
     SectionKnowledgeQuery {
@@ -125,18 +106,6 @@ impl Debug for Variant {
         match self {
             Self::SectionKnowledge { .. } => f.debug_struct("SectionKnowledge").finish(),
             Self::UserMessage(payload) => write!(f, "UserMessage({:10})", HexFmt(payload)),
-            Self::NodeApproval {
-                genesis_key,
-                section_auth,
-                member_info,
-                section_chain,
-            } => f
-                .debug_struct("NodeApproval")
-                .field("genesis_key", genesis_key)
-                .field("section_auth", section_auth)
-                .field("member_info", member_info)
-                .field("section_chain", section_chain)
-                .finish(),
             Self::Sync { section, network } => f
                 .debug_struct("Sync")
                 .field("section_auth", &section.section_auth.value)
@@ -156,14 +125,7 @@ impl Debug for Variant {
             Self::Relocate(payload) => write!(f, "Relocate({:?})", payload),
             Self::RelocatePromise(payload) => write!(f, "RelocatePromise({:?})", payload),
             Self::JoinRequest(payload) => write!(f, "JoinRequest({:?})", payload),
-            Self::JoinRetry {
-                section_auth,
-                section_key,
-            } => f
-                .debug_struct("JoinRetry")
-                .field("section_auth", section_auth)
-                .field("section_key", section_key)
-                .finish(),
+            Self::JoinResponse(response) => write!(f, "JoinResponse({:?})", response),
             Self::BouncedUntrustedMessage { msg, dest_info } => f
                 .debug_struct("BouncedUntrustedMessage")
                 .field("message", msg)
@@ -203,59 +165,7 @@ impl Debug for Variant {
                 .field("content", content)
                 .field("signed_share", signed_share)
                 .finish(),
-            Self::ResourceChallenge {
-                data_size,
-                difficulty,
-                ..
-            } => f
-                .debug_struct("ResourceChallenge")
-                .field("data_size", data_size)
-                .field("difficulty", difficulty)
-                .finish(),
             Self::SectionKnowledgeQuery { .. } => write!(f, "SectionKnowledgeQuery"),
         }
-    }
-}
-
-/// Joining peer's proof of resolvement of given resource proofing challenge.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ResourceProofResponse {
-    pub solution: u64,
-    pub data: VecDeque<u8>,
-    pub nonce: [u8; 32],
-    pub nonce_signature: Signature,
-}
-
-/// Request to join a section
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct JoinRequest {
-    /// The public key of the section to join.
-    pub section_key: BlsPublicKey,
-    /// If the peer is being relocated, contains `RelocatePayload`. Otherwise contains `None`.
-    pub relocate_payload: Option<RelocatePayload>,
-    /// Proof of the resouce proofing.
-    pub resource_proof_response: Option<ResourceProofResponse>,
-}
-
-impl Debug for JoinRequest {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter
-            .debug_struct("JoinRequest")
-            .field("section_key", &self.section_key)
-            .field(
-                "relocate_payload",
-                &self
-                    .relocate_payload
-                    .as_ref()
-                    .map(|payload| &payload.details),
-            )
-            .field(
-                "resource_proof_response",
-                &self
-                    .resource_proof_response
-                    .as_ref()
-                    .map(|proof| proof.solution),
-            )
-            .finish()
     }
 }

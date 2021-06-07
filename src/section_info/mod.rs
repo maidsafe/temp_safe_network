@@ -22,10 +22,7 @@ use xor_name::{Prefix, XorName};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum Message {
     /// Message to request information about the section that matches the given name.
-    GetSectionQuery {
-        public_key: PublicKey,
-        is_node: bool,
-    },
+    GetSectionQuery(PublicKey),
     /// Response to `GetSectionQuery`.
     GetSectionResponse(GetSectionResponse),
     /// Updated info related to section
@@ -73,8 +70,6 @@ pub enum GetSectionResponse {
     /// Successful response to `GetSectionQuery`. Contains information about the requested
     /// section.
     Success(SectionInfo),
-    /// The requesting node is not externally reachable
-    NodeNotReachable,
     /// Response to `GetSectionQuery` containing addresses of nodes that are closer to the
     /// requested name than the recipient. The request should be repeated to these addresses.
     Redirect(Vec<(XorName, SocketAddr)>),

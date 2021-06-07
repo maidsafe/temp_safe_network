@@ -76,7 +76,7 @@ pub enum Proposal {
         // Previous name if relocated.
         previous_name: Option<XorName>,
         // The key of the destination section that the joining node knows, if any.
-        their_knowledge: Option<BlsPublicKey>,
+        destination_key: Option<BlsPublicKey>,
     },
 
     // Proposal to remove a node from our section
