@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [32.0.0](https://github.com/maidsafe/sn_messaging/compare/v31.0.0...v32.0.0) (2021-06-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* refactor of SAP
+removal of bls_signature_aggregator
+rename Proof to Signed
+
+### api
+
+* SAP refactor ([402fd3f](https://github.com/maidsafe/sn_messaging/commit/402fd3fd8fa1cf9721135f17c1ccb5ed35f6f081))
+
 ## [31.0.0](https://github.com/maidsafe/sn_messaging/compare/v30.0.0...v31.0.0) (2021-06-04)
 
 
