@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [33.0.0](https://github.com/maidsafe/sn_messaging/compare/v32.0.0...v33.0.0) (2021-06-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **join:** new Join messages are not backward compatible.
+
+* **join:** re-organising all messages related to node joining flow ([2a94692](https://github.com/maidsafe/sn_messaging/commit/2a94692e03d5bcfe04f700cf6b7f0090af5cdbaf))
+
 ## [32.0.0](https://github.com/maidsafe/sn_messaging/compare/v31.0.0...v32.0.0) (2021-06-07)
 
 
