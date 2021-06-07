@@ -9,8 +9,8 @@
 use super::{
     plain_message::PlainMessage,
     section::{MemberInfo, SectionAuthorityProvider},
+    signed::Signed,
 };
-use bls_signature_aggregator::Proof;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
 use secured_linked_list::SecuredLinkedList;
@@ -40,22 +40,22 @@ impl Debug for DkgKey {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct DkgFailureProof {
+pub struct DkgFailureSigned {
     pub public_key: PublicKey,
     pub signature: Signature,
 }
 
 #[derive(Default, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct DkgFailureProofSet {
-    pub proofs: Vec<DkgFailureProof>,
+pub struct DkgFailureSignedSet {
+    pub signeds: Vec<DkgFailureSigned>,
     pub non_participants: BTreeSet<XorName>,
 }
 
-/// A value together with the proof that it was agreed on by the majority of the section elders.
+/// A value together with the signed that it was agreed on by the majority of the section elders.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
 pub struct Proven<T: Serialize> {
     pub value: T,
-    pub proof: Proof,
+    pub signed: Signed,
 }
 
 impl<T> Borrow<Prefix> for Proven<T>

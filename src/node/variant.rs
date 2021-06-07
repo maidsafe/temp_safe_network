@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    agreement::{DkgFailureProof, DkgFailureProofSet, DkgKey, Proposal, Proven},
+    agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven},
     network::Network,
     relocation::{RelocateDetails, RelocatePayload, RelocatePromise},
     section::{ElderCandidates, MemberInfo, Section, SectionAuthorityProvider},
+    signed::SignedShare,
     RoutingMsg,
 };
 use crate::DestInfo;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use bls_signature_aggregator::ProofShare;
 use ed25519_dalek::Signature;
 use hex_fmt::HexFmt;
 use itertools::Itertools;
@@ -94,16 +94,16 @@ pub enum Variant {
     /// Broadcasted to the other DKG participants when a DKG failure is observed.
     DkgFailureObservation {
         dkg_key: DkgKey,
-        proof: DkgFailureProof,
+        signed: DkgFailureSigned,
         non_participants: BTreeSet<XorName>,
     },
     /// Sent to the current elders by the DKG participants when at least majority of them observe
     /// a DKG failure.
-    DkgFailureAgreement(DkgFailureProofSet),
+    DkgFailureAgreement(DkgFailureSignedSet),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         content: Proposal,
-        proof_share: ProofShare,
+        signed_share: SignedShare,
     },
     /// Challenge sent from existing elder nodes to the joining peer for resource proofing.
     ResourceChallenge {
@@ -184,12 +184,12 @@ impl Debug for Variant {
                 .finish(),
             Self::DkgFailureObservation {
                 dkg_key,
-                proof,
+                signed,
                 non_participants,
             } => f
                 .debug_struct("DkgFailureObservation")
                 .field("dkg_key", dkg_key)
-                .field("proof", proof)
+                .field("signed", signed)
                 .field("non_participants", non_participants)
                 .finish(),
             Self::DkgFailureAgreement(proofs) => {
@@ -197,11 +197,11 @@ impl Debug for Variant {
             }
             Self::Propose {
                 content,
-                proof_share,
+                signed_share,
             } => f
                 .debug_struct("Propose")
                 .field("content", content)
-                .field("proof_share", proof_share)
+                .field("signed_share", signed_share)
                 .finish(),
             Self::ResourceChallenge {
                 data_size,

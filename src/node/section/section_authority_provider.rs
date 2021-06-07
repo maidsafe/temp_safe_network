@@ -14,7 +14,7 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,
 };
-use threshold_crypto::{PublicKey as BlsPublicKey, PublicKeyShare};
+use threshold_crypto::PublicKeySet;
 use xor_name::{Prefix, XorName};
 
 /// The information about elder candidates in a DKG round.
@@ -32,10 +32,10 @@ pub struct ElderCandidates {
 pub struct SectionAuthorityProvider {
     /// The section prefix. It matches all the members' names.
     pub prefix: Prefix,
-    /// Public key of the section.
-    pub section_key: BlsPublicKey,
+    /// Public key set of the section.
+    pub public_key_set: PublicKeySet,
     // The section's complete set of elders as a map from their name to their socket address.
-    pub elders: BTreeMap<XorName, (PublicKeyShare, SocketAddr)>,
+    pub elders: BTreeMap<XorName, SocketAddr>,
 }
 
 impl Borrow<Prefix> for SectionAuthorityProvider {
@@ -50,7 +50,7 @@ impl Debug for SectionAuthorityProvider {
             formatter,
             "SectionAuthorityProvider {{ prefix: ({:b}), section_key: {:?}, elders: {{{:?}}} }}",
             self.prefix,
-            self.section_key,
+            self.public_key_set.public_key(),
             self.elders.iter().format(", "),
         )
     }

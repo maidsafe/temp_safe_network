@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bls_signature_aggregator::{Proof, ProofShare};
+use super::signed::{Signed, SignedShare};
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
@@ -33,7 +33,7 @@ pub enum SrcAuthority {
         /// Name in the source section
         src_name: XorName,
         /// Proof Share signed by the peer's BLS KeyShare
-        proof_share: ProofShare,
+        signed_share: SignedShare,
         /// SectionChain of the sender's section.
         section_chain: SecuredLinkedList,
     },
@@ -42,7 +42,7 @@ pub enum SrcAuthority {
         /// Name in the source section.
         src_name: XorName,
         /// BLS proof of the message corresponding to the source section.
-        proof: Proof,
+        signed: Signed,
         /// SectionChain of the sender's section.
         section_chain: SecuredLinkedList,
     },

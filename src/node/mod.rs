@@ -14,10 +14,12 @@ mod plain_message;
 mod prefix_map;
 mod relocation;
 mod section;
+mod signature_aggregator;
+mod signed;
 mod src_authority;
 mod variant;
 
-pub use agreement::{DkgFailureProof, DkgFailureProofSet, DkgKey, Proposal, Proven};
+pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
@@ -30,6 +32,8 @@ pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise, SignedRe
 pub use section::{
     ElderCandidates, MemberInfo, Peer, PeerState, Section, SectionAuthorityProvider, SectionPeers,
 };
+pub use signature_aggregator::{Error, SignatureAggregator};
+pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;
 pub use variant::{JoinRequest, ResourceProofResponse, Variant};
 

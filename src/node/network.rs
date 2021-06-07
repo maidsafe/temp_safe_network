@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::Proven, prefix_map::PrefixMap, section::SectionAuthorityProvider};
-use bls_signature_aggregator::Proof;
+use super::{
+    agreement::Proven, prefix_map::PrefixMap, section::SectionAuthorityProvider, signed::Signed,
+};
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use xor_name::Prefix;
@@ -21,11 +22,11 @@ pub struct Network {
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct OtherSection {
-    // If this is signed by our section, then `key_proof` is `None`. If this is signed by our
-    // sibling section, then `key_proof` contains the proof of the signing key itself signed by our
+    // If this is signed by our section, then `key_signed` is `None`. If this is signed by our
+    // sibling section, then `key_signed` contains the proof of the signing key itself signed by our
     // section.
     pub section_auth: Proven<SectionAuthorityProvider>,
-    pub key_proof: Option<Proof>,
+    pub key_signed: Option<Signed>,
 }
 
 impl Borrow<Prefix> for OtherSection {
