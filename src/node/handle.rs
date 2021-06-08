@@ -370,7 +370,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .credit_without_proof(transfer)
                             .await?,
@@ -420,7 +420,7 @@ impl Node {
                     Ok(NodeTask::from(
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .get_store_cost(bytes, msg_id, origin)
                             .await,
@@ -438,7 +438,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .register(&proof, msg_id, origin)
                             .await?,

@@ -96,8 +96,8 @@ impl Transfers {
     }
 
     ///
-    pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
-        self.replicas.user_wallets()
+    pub async fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
+        self.replicas.user_wallets().await
     }
 
     pub async fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
@@ -108,7 +108,7 @@ impl Transfers {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
+    pub async fn keep_keys_of(&mut self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         self.replicas.keep_keys_of(prefix).await
     }
@@ -120,7 +120,7 @@ impl Transfers {
     /// Get latest StoreCost for the given number of bytes.
     /// Also check for Section storage capacity and report accordingly.
     pub async fn get_store_cost(
-        &mut self,
+        &self,
         bytes: u64,
         msg_id: MessageId,
         origin: SrcLocation,
@@ -340,16 +340,17 @@ impl Transfers {
 
     pub async fn history(
         &self,
-        wallet_id: &PublicKey,
+        key: &PublicKey,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeDuty> {
         trace!("Handling GetHistory");
-        // validate signature
+        // TODO: validate signature
         let result = self
             .replicas
-            .history(*wallet_id)
-            .map_err(|_e| ErrorMessage::NoHistoryForPublicKey(*wallet_id));
+            .history(*key)
+            .await
+            .map_err(|_e| ErrorMessage::NoHistoryForPublicKey(*key));
 
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
@@ -490,7 +491,7 @@ impl Transfers {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn credit_without_proof(&mut self, transfer: Transfer) -> Result<NodeDuty> {
+    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeDuty> {
         self.replicas.credit_without_proof(transfer).await
     }
 }

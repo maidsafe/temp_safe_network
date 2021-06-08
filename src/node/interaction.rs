@@ -116,7 +116,7 @@ pub(crate) async fn push_state(
     msg_id: MessageId,
     peers: BTreeSet<XorName>,
 ) -> Result<NodeDuty> {
-    let user_wallets = elder.transfers.read().await.user_wallets();
+    let user_wallets = elder.transfers.read().await.user_wallets().await;
     let node_rewards = elder.section_funds.read().await.node_wallets();
 
     // only push that what should be in dst

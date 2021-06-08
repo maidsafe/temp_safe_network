@@ -26,6 +26,16 @@ pub struct TransferStore<TEvent: Debug + Serialize + DeserializeOwned> {
     _phantom: PhantomData<TEvent>,
 }
 
+pub struct DeletableStore {
+    db_path: PathBuf,
+}
+
+impl DeletableStore {
+    pub fn delete(&self) -> Result<()> {
+        std::fs::remove_file(self.db_path.as_path()).map_err(Error::Io)
+    }
+}
+
 impl<'a, TEvent: Debug + Serialize + DeserializeOwned> TransferStore<TEvent>
 where
     TEvent: 'a,
@@ -41,8 +51,10 @@ where
         })
     }
 
-    pub fn delete(&mut self) -> Result<()> {
-        std::fs::remove_file(self.db_path.as_path()).map_err(Error::Io)
+    pub fn as_deletable(&self) -> DeletableStore {
+        DeletableStore {
+            db_path: self.db_path.clone(),
+        }
     }
 
     ///

@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "addr2line"
-version = "0.15.1"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03345e98af8f3d786b6d9f656ccfa6ac316d954e92bc4841f0bba20789d5fb5a"
+checksum = "e7a2e47a1fbe209ee101dd6d61285226744c6c8d3c21c8dc878ba6cb9f467f3a"
 dependencies = [
  "gimli",
 ]
@@ -146,9 +146,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "backtrace"
-version = "0.3.59"
+version = "0.3.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4717cfcbfaa661a0fd48f8453951837ae7e8f81e481fbb136e3202d72805a744"
+checksum = "b7815ea54e4d821e791162e078acbebfd6d8c8939cd559c9335dceb1c8ca7282"
 dependencies = [
  "addr2line",
  "cc",
@@ -1090,9 +1090,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.8"
+version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3f71a7eea53a3f8257a7b4795373ff886397178cd634430ea94e12d7fe4fe34"
+checksum = "07d6baa1b441335f3ce5098ac421fb6547c46dda735ca1bc6d0153c838f9dd83"
 dependencies = [
  "bytes 1.0.1",
  "futures-channel",
@@ -1104,7 +1104,7 @@ dependencies = [
  "httparse",
  "httpdate 1.0.1",
  "itoa",
- "pin-project",
+ "pin-project-lite 0.2.6",
  "socket2 0.4.0",
  "tokio 1.6.1",
  "tower-service",
@@ -1166,7 +1166,7 @@ dependencies = [
  "bytes 1.0.1",
  "futures",
  "http",
- "hyper 0.14.8",
+ "hyper 0.14.9",
  "log",
  "rand 0.8.3",
  "tokio 1.6.1",
@@ -1524,9 +1524,12 @@ checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
 
 [[package]]
 name = "object"
-version = "0.24.0"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a5b3dd1c072ee7963717671d1ca129f1048fda25edea6b752bfc71ac8854170"
+checksum = "f8bc1d42047cf336f0f939c99e97183cf31551bf0f2865a2ec9c8d91fd4ffb5e"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "once_cell"
@@ -2274,9 +2277,9 @@ checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
 
 [[package]]
 name = "sn_data_types"
-version = "0.18.3"
+version = "0.18.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45f32f871d1643b8614e767568227b41e6022f2398bfd141cbdb7160fb5abd52"
+checksum = "7ab19392d2deda5cf309806b068f69d2e8040f848be6e640d81d3444048971fe"
 dependencies = [
  "bincode",
  "crdts",
@@ -2295,9 +2298,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb1e3099925addc0fc8b15f29a8964f818eeba6219e80c583b1d3ec6d7dc3713"
+checksum = "2080c06505e23c2af808d6f51264fef2c52eb874e8cd5c03e223d58d21d38507"
 dependencies = [
  "dirs-next 1.0.2",
  "env_logger 0.8.3",
@@ -2338,7 +2341,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.47.0"
+version = "0.47.1"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2413,9 +2416,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce56787ff31982ae2827bff8173bda20a28a4696f2fa024d205dcd37e97f0ca"
+checksum = "7c6c26013f7e643147ad0e4b749afedfdee60e564bf802c139e62a3bd940bbd7"
 dependencies = [
  "bincode",
  "crdts",
@@ -3134,9 +3137,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2d1a94c170b46bee1f49f71d811dc4841e5304498cd1340e8686cb8fdb7834c"
+checksum = "551e028355c64f759745e05992309f228343ecc89e44adcbbbacf80d41f9f647"
 dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -3191,9 +3194,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "0.5.12"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c83dc9b784d252127720168abd71ea82bf8c3d96b17dc565b5e2a02854f2b27"
+checksum = "93ab48844d61251bb3835145c521d88aa4031d7139e8485990f60ca911fa0815"
 dependencies = [
  "byteorder",
  "crc32fast",
