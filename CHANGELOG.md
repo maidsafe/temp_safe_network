@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [34.0.0](https://github.com/maidsafe/sn_messaging/compare/v33.0.0...v34.0.0) (2021-06-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **section_info:** SectionInfoMsg payload changed as well as it's name.
+
+* **section_info:** use SectionAuthorityProvider for SectionInfo messages payload ([5436fbf](https://github.com/maidsafe/sn_messaging/commit/5436fbfe545bbc5f723db93b82291ace36cdcca5))
+
 ## [33.0.0](https://github.com/maidsafe/sn_messaging/compare/v32.0.0...v33.0.0) (2021-06-07)
 
 
