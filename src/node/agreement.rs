@@ -6,11 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    plain_message::PlainMessage,
-    section::{MemberInfo, SectionAuthorityProvider},
-    signed::Signed,
-};
+use super::{plain_message::PlainMessage, section::MemberInfo, signed::Signed};
+use crate::SectionAuthorityProvider;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
 use secured_linked_list::SecuredLinkedList;

@@ -31,9 +31,7 @@ pub use node_msg::{
 pub use plain_message::PlainMessage;
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise, SignedRelocateDetails};
-pub use section::{
-    ElderCandidates, MemberInfo, Peer, PeerState, Section, SectionAuthorityProvider, SectionPeers,
-};
+pub use section::{ElderCandidates, MemberInfo, Peer, PeerState, Section, SectionPeers};
 pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;

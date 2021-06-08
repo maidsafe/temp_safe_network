@@ -11,11 +11,11 @@ use super::{
     join::{JoinRequest, JoinResponse},
     network::Network,
     relocation::{RelocateDetails, RelocatePromise},
-    section::{ElderCandidates, Section, SectionAuthorityProvider},
+    section::{ElderCandidates, Section},
     signed::SignedShare,
     RoutingMsg,
 };
-use crate::DestInfo;
+use crate::{DestInfo, SectionAuthorityProvider};
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use hex_fmt::HexFmt;
 use itertools::Itertools;

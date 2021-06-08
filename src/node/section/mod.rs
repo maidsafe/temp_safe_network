@@ -6,15 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod candidates;
 mod member_info;
 mod peer;
-mod section_authority_provider;
 
+pub use candidates::ElderCandidates;
 pub use member_info::{MemberInfo, PeerState};
 pub use peer::Peer;
-pub use section_authority_provider::{ElderCandidates, SectionAuthorityProvider};
 
-use crate::node::agreement::Proven;
+use crate::{node::agreement::Proven, SectionAuthorityProvider};
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{

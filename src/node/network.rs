@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    agreement::Proven, prefix_map::PrefixMap, section::SectionAuthorityProvider, signed::Signed,
-};
+use super::{agreement::Proven, prefix_map::PrefixMap, signed::Signed};
+use crate::SectionAuthorityProvider;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use xor_name::Prefix;

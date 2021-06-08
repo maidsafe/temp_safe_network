@@ -6,11 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    agreement::Proven,
-    relocation::RelocatePayload,
-    section::{MemberInfo, SectionAuthorityProvider},
-};
+use super::{agreement::Proven, relocation::RelocatePayload, section::MemberInfo};
+use crate::SectionAuthorityProvider;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};

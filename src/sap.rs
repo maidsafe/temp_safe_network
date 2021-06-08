@@ -1,4 +1,4 @@
-// Copyright 2018 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -16,15 +16,6 @@ use std::{
 };
 use threshold_crypto::PublicKeySet;
 use xor_name::{Prefix, XorName};
-
-/// The information about elder candidates in a DKG round.
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
-pub struct ElderCandidates {
-    /// The section's complete set of elders as a map from their name to their socket address.
-    pub elders: BTreeMap<XorName, SocketAddr>,
-    /// The section prefix. It matches all the members' names.
-    pub prefix: Prefix,
-}
 
 /// A new `SectionAuthorityProvider` is created whenever the elders change,
 /// due to an elder being added or removed, or the section splitting or merging.

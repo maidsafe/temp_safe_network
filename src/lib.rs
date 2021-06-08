@@ -13,6 +13,7 @@ pub mod location;
 mod msg_id;
 #[cfg(not(feature = "client-only"))]
 pub mod node;
+pub mod sap;
 pub mod section_info;
 pub mod serialisation;
 
@@ -20,6 +21,7 @@ pub use self::{
     errors::{Error, Result},
     location::{Aggregation, DstLocation, EndUser, Itinerary, SrcLocation},
     msg_id::{MessageId, MESSAGE_ID_LEN},
+    sap::SectionAuthorityProvider,
     serialisation::WireMsg,
 };
 use bytes::Bytes;
@@ -34,7 +36,7 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
     SectionInfo {
-        msg: section_info::Message,
+        msg: section_info::SectionInfoMsg,
         dest_info: DestInfo,
     },
     Client {
