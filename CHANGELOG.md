@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [35.0.0](https://github.com/maidsafe/sn_messaging/compare/v34.0.0...v35.0.0) (2021-06-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **routing:** adds a new routing message variant
+
+### Features
+
+* **routing:** add variant to signal elders to start the connectivity ([710c44e](https://github.com/maidsafe/sn_messaging/commit/710c44ef5d619aab8757f3a69f8e4e5959fd9456))
+
 ## [34.0.0](https://github.com/maidsafe/sn_messaging/compare/v33.0.0...v34.0.0) (2021-06-08)
 
 
