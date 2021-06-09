@@ -93,6 +93,9 @@ pub enum Variant {
         content: Proposal,
         signed_share: SignedShare,
     },
+    /// Message that notifies a section to test
+    /// the connectivity to a node
+    StartConnectivityTest(XorName),
     /// Message sent by a node to indicate it received a message from a node which was ahead in knowledge.
     /// A reply is expected with a `SectionKnowledge` message.
     SectionKnowledgeQuery {
@@ -123,6 +126,7 @@ impl Debug for Variant {
                 )
                 .finish(),
             Self::Relocate(payload) => write!(f, "Relocate({:?})", payload),
+            Self::StartConnectivityTest(name) => write!(f, "StartConnectivityTest({:?})", name),
             Self::RelocatePromise(payload) => write!(f, "RelocatePromise({:?})", payload),
             Self::JoinRequest(payload) => write!(f, "JoinRequest({:?})", payload),
             Self::JoinResponse(response) => write!(f, "JoinResponse({:?})", response),
