@@ -147,7 +147,7 @@ impl Network {
         self.routing
             .matching_section(name)
             .await
-            .map(|provider| provider.section_key)
+            .map(|provider| provider.section_key())
             .map_err(From::from)
     }
 
@@ -177,7 +177,7 @@ impl Network {
         self.routing
             .matching_section(name)
             .await
-            .map(|provider| PublicKey::from(provider.section_key))
+            .map(|provider| PublicKey::from(provider.section_key()))
             .map_err(From::from)
     }
 
