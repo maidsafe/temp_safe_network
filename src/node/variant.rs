@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven},
+    agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, SectionSigned},
     join::{JoinRequest, JoinResponse},
     network::Network,
     relocation::{RelocateDetails, RelocatePromise},
@@ -35,7 +35,7 @@ pub enum Variant {
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {
         /// `SectionAuthorityProvider` and `SecuredLinkedList` of the sender's section, with the proof chain.
-        src_info: (Proven<SectionAuthorityProvider>, SecuredLinkedList),
+        src_info: (SectionSigned<SectionAuthorityProvider>, SecuredLinkedList),
         /// Message
         msg: Option<Box<RoutingMsg>>,
     },

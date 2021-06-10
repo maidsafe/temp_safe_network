@@ -12,13 +12,13 @@ use xor_name::XorName;
 
 /// Information about a member of our section.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub struct MemberInfo {
+pub struct NodeState {
     pub peer: Peer,
-    pub state: PeerState,
+    pub state: MembershipState,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub enum PeerState {
+pub enum MembershipState {
     /// Node is active member of the section.
     Joined,
     /// Node went offline.

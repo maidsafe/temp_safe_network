@@ -20,7 +20,7 @@ mod signed;
 mod src_authority;
 mod variant;
 
-pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven};
+pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
@@ -31,7 +31,7 @@ pub use node_msg::{
 pub use plain_message::PlainMessage;
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise, SignedRelocateDetails};
-pub use section::{ElderCandidates, MemberInfo, Peer, PeerState, Section, SectionPeers};
+pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, SectionPeers};
 pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;
