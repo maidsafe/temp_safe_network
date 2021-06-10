@@ -3197,7 +3197,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "signature",
- "sn_launch_tool",
+ "sn_launch_tool 0.2.3",
  "structopt",
  "thiserror",
  "tiny-keccak 2.0.2",
@@ -3518,7 +3518,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.30.2"
+version = "0.31.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3555,7 +3555,7 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_data_types",
- "sn_launch_tool",
+ "sn_launch_tool 0.2.2",
  "structopt",
  "tokio 1.7.1",
  "walkdir",
@@ -3596,6 +3596,18 @@ dependencies = [
  "threshold_crypto",
  "tiny-keccak 2.0.2",
  "xor_name",
+]
+
+[[package]]
+name = "sn_launch_tool"
+version = "0.2.2"
+source = "git+https://github.com/yoga07/sn_launch_tool?branch=addr#7145282e34519996c65aa9459f87fee486d7c97a"
+dependencies = [
+ "dirs-next 1.0.2",
+ "env_logger 0.8.4",
+ "log",
+ "serde_json",
+ "structopt",
 ]
 
 [[package]]

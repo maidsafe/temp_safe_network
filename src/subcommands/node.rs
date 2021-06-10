@@ -50,6 +50,12 @@ pub enum NodeSubCommands {
         /// Hardcoded contacts (endpoints) to be used to bootstrap to an already running network (this overrides any value passed as 'network_name').
         #[structopt(short = "h", long = "hcc")]
         hard_coded_contacts: Vec<SocketAddr>,
+        /// Internal address provided for the node
+        #[structopt(short = "l", long)]
+        local_addr: Option<SocketAddr>,
+        #[structopt(short = "p", long)]
+        /// External address provided for the node
+        public_addr: Option<SocketAddr>,
     },
     #[structopt(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
@@ -106,6 +112,8 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
             node_path,
             verbosity,
             hard_coded_contacts,
+            local_addr,
+            public_addr,
         }) => {
             let network_contacts = if hard_coded_contacts.is_empty() {
                 if let Some(name) = network_name {
@@ -126,7 +134,14 @@ pub async fn node_commander(cmd: Option<NodeSubCommands>) -> Result<()> {
             debug!("{}", msg);
             println!("{}", msg);
 
-            node_join(node_path, LOCAL_NODE_DIR, verbosity, &network_contacts)
+            node_join(
+                node_path,
+                LOCAL_NODE_DIR,
+                verbosity,
+                &network_contacts,
+                local_addr,
+                public_addr,
+            )
         }
         Some(NodeSubCommands::Run {
             node_path,

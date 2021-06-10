@@ -231,6 +231,8 @@ pub fn node_join(
     node_data_dir: &str,
     verbosity: u8,
     contacts: &HashSet<SocketAddr>,
+    local_addr: Option<SocketAddr>,
+    public_addr: Option<SocketAddr>,
 ) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
@@ -256,6 +258,19 @@ pub fn node_join(
         &arg_nodes_dir,
     ];
 
+    let local_addr_str = local_addr.map(|addr| addr.to_string());
+    let public_addr_str = public_addr.map(|addr| addr.to_string());
+
+    if let Some(ref local) = local_addr_str {
+        sn_launch_tool_args.push("--local-addr");
+        sn_launch_tool_args.push(local);
+    }
+
+    if let Some(ref public) = public_addr_str {
+        sn_launch_tool_args.push("--public-addr");
+        sn_launch_tool_args.push(public);
+    }
+
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {
         let v = "y".repeat(verbosity as usize);
@@ -274,7 +289,7 @@ pub fn node_join(
         sn_launch_tool_args.push(peer);
     }
 
-    debug!(
+    println!(
         "Running network launch tool with args: {:?}",
         sn_launch_tool_args
     );
