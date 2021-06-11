@@ -1,0 +1,30 @@
+name: "Make PR and Merge"
+description: "Makes a version change PR, and trigger's its merge"
+runs:
+  using: "composite"
+  steps:
+  - uses: actions/checkout@v2
+    with:
+      fetch-depth: '0'
+
+  - name: get commit message
+    run: |
+      commitmsg=$(git log --format=%s -n 1 ${{ github.event.pull_request.head.sha }})
+      echo "commitmsg=${commitmsg}" >> $GITHUB_ENV
+
+  - name: show commit message
+    run : echo $commitmsg
+
+  - name: Merge Version change PR
+    if: startsWith( env.commitmsg, 'chore(release):')
+    uses: ridedott/merge-me-action@81667e6ae186ddbe6d3c3186d27d91afa7475e2c
+    with:
+      GITHUB_LOGIN: dirvine
+      GITHUB_TOKEN: ${{ secrets.MERGE_BUMP_BRANCH_TOKEN }}
+      MERGE_METHOD: REBASE
+
+  - name: Dependabot Merge
+    uses: ridedott/merge-me-action@master
+    with:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MERGE_METHOD: REBASE

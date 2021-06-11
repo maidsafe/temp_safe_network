@@ -1,0 +1,21 @@
+# auto merge workflow.
+#
+# Auto merge PR if commit msg begins with `chore(release):`,
+# or if it has been raised by Dependabot.
+# Uses https://github.com/ridedott/merge-me-action.
+
+name: Client Merge Version Change and Dependabot PRs automatically
+
+on: 
+  pull_request:
+    paths: sn_client
+
+defaults:
+  run:
+    working-directory: sn_client
+
+jobs:
+  merge:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: ${{ github.action_path }}/runs/auto-merge-make-pr
