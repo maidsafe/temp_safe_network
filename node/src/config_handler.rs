@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 #![allow(trivial_numeric_casts)] // FIXME
-// beep
+                                 // beep
 use crate::{Error, Result};
 use log::{debug, Level};
 use serde::{Deserialize, Serialize};

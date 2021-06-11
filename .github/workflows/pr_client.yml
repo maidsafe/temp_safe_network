@@ -8,7 +8,7 @@ on:
 
 defaults:
   run:
-    working-directory: client
+    working-directory: ./client
 
 
 env:
@@ -52,17 +52,6 @@ jobs:
       - shell: bash
         run: cargo clippy --all-targets
 
-  check_pr_size:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')" 
-    name: Check PR size doesn't break set limit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
-      - uses: maidsafe/pr_size_checker@v2
-        with:
-          max_lines_changed: 200
 
   # Run `cargo build` in the root directory to test all build scripts.
   build-script:

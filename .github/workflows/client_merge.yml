@@ -13,7 +13,7 @@ on:
 
 defaults:
   run:
-    working-directory: client
+    working-directory: ./client
 
 jobs:
   merge:

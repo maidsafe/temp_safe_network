@@ -7,7 +7,7 @@ name: Node Changes
 on: 
   pull_request:
     paths: 
-      - 'node/*'
+      - 'node/**'
 
 defaults:
   run:
@@ -24,7 +24,7 @@ env:
 jobs:
   clippy:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Rustfmt-Clippy
     runs-on: ubuntu-latest
@@ -50,6 +50,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
       
+
       # Check if the code is formatted correctly.
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -57,22 +58,10 @@ jobs:
       # Run Clippy.
       - name: Clippy checks
         run: cargo clippy --all-targets
-
-  check_pr_size:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Check PR size doesn't break set limit
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: '0'
-    - uses: maidsafe/pr_size_checker@v2
-      with:
-        max_lines_changed: 200
   
   coverage:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Code coverage check
     runs-on: ubuntu-latest
@@ -116,7 +105,7 @@ jobs:
 
   test:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Test
     runs-on: ${{ matrix.os }}
@@ -125,6 +114,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
       - uses: actions/checkout@v2
+      
 
       # Install Rust
       - uses: actions-rs/toolchain@v1
@@ -167,7 +157,7 @@ jobs:
   # list any unused dependencies using cargo-udeps
   cargo-udeps:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Unused dependency check
     runs-on: ubuntu-latest
@@ -189,7 +179,7 @@ jobs:
   # list all duplicate dependencies. Note that this does not error if duplicates found
   duplicate-dependencies:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: List Duplicate Dependencies
     runs-on: ubuntu-latest
@@ -209,7 +199,7 @@ jobs:
 
   cargo-deny:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     runs-on: ubuntu-latest
     steps:
@@ -224,7 +214,7 @@ jobs:
   # Test publish using --dry-run.
   test-publish:
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Test Publish
     runs-on: ubuntu-latest
