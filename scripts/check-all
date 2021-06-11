@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e -x;
+
+cargo check --release
+cargo check --release --lib --tests
