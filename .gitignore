@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Executables
 *.exe
 *.out
@@ -42,3 +43,32 @@ cargo-all.sh
 bindings
 tmp
 *.orig
+=======
+*.exe
+*.swp
+*.bk
+*.rsproj
+tags*
+artifacts/
+deploy/
+build/
+build-tests/
+target/*
+!target/release/
+target/release/*
+!target/release/README.md
+/.idea
+/.vscode
+/.project
+*.sublime-*
+*.bootstrap.cache
+/bin/
+packages/
+.DS_Store
+*.back.aip
+.env
+installer/docker/sn_node
+installer/docker/sn_node.*.config
+installer/docker/.env
+nodes
+>>>>>>> remotes/node/master

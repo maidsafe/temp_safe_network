@@ -1,0 +1,14 @@
+name: Commitlint
+on: [pull_request]
+
+jobs:
+  lint:
+    if: github.repository_owner == 'maidsafe'
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372

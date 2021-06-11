@@ -1,0 +1,132 @@
+// Copyright 2021 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
+use crate::{Error, Result};
+pub use ed25519_dalek::{Keypair, PublicKey, SecretKey, KEYPAIR_LENGTH, PUBLIC_KEY_LENGTH};
+use hex::{decode, encode};
+use std::path::Path;
+use tokio::fs;
+
+// Filename for storing the node's reward (Ed25519 hex-encoded) public key
+const REWARD_PUBLIC_KEY_FILENAME: &str = "reward_public_key";
+// Filename for storing the node's reward (Ed25519 hex-encoded) secret key
+const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
+
+const NETWORK_KEYPAIR_FILENAME: &str = "network_keypair";
+
+/// Writes the network keypair to disk.
+pub async fn store_network_keypair(
+    root_dir: &Path,
+    keypair_as_bytes: [u8; KEYPAIR_LENGTH],
+) -> Result<()> {
+    let keypair_path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
+    fs::write(keypair_path, encode(keypair_as_bytes)).await?;
+
+    Ok(())
+}
+
+/// Returns Some(KeyPair) or None if file doesn't exist.
+pub async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
+    let path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let keypair_hex_bytes = fs::read(path).await?;
+    let keypair_bytes = decode(keypair_hex_bytes).map_err(|err| {
+        Error::Logic(format!(
+            "Couldn't hex-decode network keypair bytes: {}",
+            err
+        ))
+    })?;
+
+    let keypair = Keypair::from_bytes(&keypair_bytes)
+        .map_err(|_| Error::Logic("Config error: Invalid network keypair bytes".to_string()))?;
+
+    Ok(Some(keypair))
+}
+
+/// Writes the public and secret key (hex-encoded) to different locations at disk.
+pub async fn store_new_reward_keypair(root_dir: &Path, keypair: &Keypair) -> Result<()> {
+    let secret_key_path = root_dir.join(REWARD_SECRET_KEY_FILENAME);
+    let public_key_path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
+    fs::write(secret_key_path, encode(keypair.secret.to_bytes())).await?;
+    fs::write(public_key_path, encode(keypair.public.to_bytes())).await?;
+
+    Ok(())
+}
+
+/// Returns Some(PublicKey) or None if file doesn't exist. It assumes it's hex-encoded.
+pub async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
+    let path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let pk_hex_bytes = fs::read(path).await?;
+    let pk_bytes = decode(pk_hex_bytes).map_err(|err| {
+        Error::Logic(format!(
+            "Couldn't hex-decode Ed25519 public key bytes: {}",
+            err
+        ))
+    })?;
+
+    let pk = PublicKey::from_bytes(&pk_bytes)
+        .map_err(|_| Error::Logic("Config error: Invalid Ed25519 public key bytes".to_string()))?;
+
+    Ok(Some(pk))
+}
+
+#[cfg(test)]
+mod test {
+    use super::{
+        get_network_keypair, get_reward_pk, store_network_keypair, store_new_reward_keypair,
+    };
+    use anyhow::{anyhow, Result};
+    use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
+    use tempdir::TempDir;
+
+    #[tokio::test]
+    async fn pubkey_to_and_from_file() -> Result<()> {
+        let mut rng = OsRng;
+        let keypair = ed25519_dalek::Keypair::generate(&mut rng);
+
+        let root = create_temp_root()?;
+        let root_dir = root.path();
+        store_new_reward_keypair(root_dir, &keypair).await?;
+        let pk_result = get_reward_pk(root_dir).await?;
+
+        assert_eq!(pk_result, Some(keypair.public));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn keypair_to_and_from_file() -> Result<()> {
+        let mut rng = OsRng;
+        let keypair = ed25519_dalek::Keypair::generate(&mut rng);
+
+        let root = create_temp_root()?;
+        let root_dir = root.path();
+
+        let keypair_result = get_network_keypair(root_dir).await?;
+        assert!(keypair_result.is_none());
+
+        store_network_keypair(root_dir, keypair.to_bytes()).await?;
+        let keypair_result = get_network_keypair(root_dir).await?;
+        if let Some(kp) = keypair_result {
+            assert_eq!(kp.public, keypair.public);
+            Ok(())
+        } else {
+            Err(anyhow!("Network keypair was not read from file"))
+        }
+    }
+
+    // creates a temp dir
+    fn create_temp_root() -> Result<TempDir> {
+        let rand_dir_name: String = thread_rng().sample_iter(&Alphanumeric).take(10).collect();
+        TempDir::new(&rand_dir_name).map_err(|e| anyhow!("Failed to create temp dir: {}", e))
+    }
+}

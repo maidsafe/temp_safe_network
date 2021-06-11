@@ -1,0 +1,235 @@
+# PR workflow.
+#
+# Runs full suite of checks, with warnings treated as errors.
+
+name: PR
+
+on: pull_request
+
+env:
+  # Run all cargo commands with --verbose.
+  CARGO_TERM_VERBOSE: true
+  RUST_BACKTRACE: 1
+  # Deny all compiler warnings.
+  RUSTFLAGS: "-D warnings"
+  TEST_STARTUP_INTERVAL: "40"
+
+jobs:
+  clippy:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Rustfmt-Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust & required components
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      
+      # Check if the code is formatted correctly.
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      # Run Clippy.
+      - name: Clippy checks
+        run: cargo clippy --all-targets
+
+  check_pr_size:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Check PR size doesn't break set limit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
+    - uses: maidsafe/pr_size_checker@v2
+      with:
+        max_lines_changed: 200
+  
+  coverage:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Code coverage check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      
+      # Run cargo tarpaulin & push result to coveralls.io
+      - name: rust-tarpaulin code coverage check
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          args: '-v --release --out Lcov'
+          timeout: 800
+      - name: Push code coverage results to coveralls.io
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel: true
+          path-to-lcov: ./lcov.info
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  test:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run tests.
+      # Currently do not run client tests on mac
+      - name: Cargo tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release  --features=simulated-payouts
+
+      - name: Configuration test
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --example config_handling -- --first 127.0.0.1:0 -h ${{ '["127.0.0.1:1234"]' }}
+
+      - name: Upload node data on fail
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@master
+        with:
+          name: nodes-data
+          path: nodes
+
+  # list any unused dependencies using cargo-udeps
+  cargo-udeps:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      # Install and run cargo udeps to find unused cargo dependencies
+      - name: cargo-udeps unused dependency check
+        run: |
+          cargo install cargo-udeps --locked
+          cargo +nightly udeps --all-targets
+  
+  # list all duplicate dependencies. Note that this does not error if duplicates found
+  duplicate-dependencies:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: List Duplicate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Run list duplicate dependencies script
+      - shell: bash
+        run: ./scripts/duplicate_dependency_check
+
+  cargo-deny:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    # wget the shared deny.toml file from the QA repo
+    - shell: bash
+      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
+
+    - uses: EmbarkStudios/cargo-deny-action@v1
+
+  # Test publish using --dry-run.
+  test-publish:
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Test Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Test publish
+        run: cargo publish --allow-dirty --dry-run
