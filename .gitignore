@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Executables
 *.exe
 *.out
@@ -72,3 +73,21 @@ installer/docker/sn_node.*.config
 installer/docker/.env
 nodes
 >>>>>>> remotes/node/master
+=======
+*.exe
+*.lock
+*.swp
+*.rs.bk
+*.rsproj
+tags*
+*bootstrap.cache
+build/
+build-tests/
+target/
+/.idea
+/.project
+/bin
+*.sublime-*
+.cargo/
+.DS_Store
+>>>>>>> remotes/routing/master
