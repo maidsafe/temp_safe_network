@@ -3,7 +3,8 @@ name: Client Changes
 
 on: 
   pull_request:
-    paths: client
+    paths: 
+      - 'client/*'
 
 defaults:
   run:

@@ -6,7 +6,8 @@ name: Node Changes
 
 on: 
   pull_request:
-    paths: node/*
+    paths: 
+      - 'node/*'
 
 defaults:
   run:
