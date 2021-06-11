@@ -1,0 +1,5 @@
+[workspace]
+
+members = [
+    "client", "messaging", "node", "routing"
+]
