@@ -2,10 +2,16 @@
 #
 # Runs full suite of checks, with warnings treated as errors.
 
-name: PR
+name: Node Changes
 
-on: pull_request
+on: 
+  pull_request:
+    paths: node
 
+defaults:
+  run:
+    working-directory: node
+    
 env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true

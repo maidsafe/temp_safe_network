@@ -1,6 +1,14 @@
-name: PR
+name: Client Changes
 
-on: [pull_request]
+
+on: 
+  pull_request:
+    paths: client
+
+defaults:
+  run:
+    working-directory: client
+
 
 env:
   # Run all cargo commands with --verbose.
