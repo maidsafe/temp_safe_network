@@ -8,11 +8,12 @@ name: Client Merge Version Change and Dependabot PRs automatically
 
 on: 
   pull_request:
-    paths: client
+    paths: 
+      - 'client/*'
 
 defaults:
   run:
-    working-directory: client
+    working-directory: ./client
 
 jobs:
   merge:

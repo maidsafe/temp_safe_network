@@ -3,9 +3,17 @@
 # Runs full suite of checks, with warnings treated as errors.
 # Gather code coverage stats and publish them on coveralls.io.
 
-name: PR
+name: Routing Changes
 
-on: pull_request
+
+on: 
+  pull_request:
+    paths: 
+      - 'sn_routing/*'
+
+defaults:
+  run:
+    working-directory: sn_routing
 
 env:
   # Run all cargo commands with --verbose.
@@ -47,17 +55,6 @@ jobs:
       - shell: bash
         run: ./scripts/clippy
 
-  check_pr_size:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Check PR size doesn't break set limit
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: '0'
-    - uses: maidsafe/pr_size_checker@v2
-      with:
-        max_lines_changed: 200
   
   coverage:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"

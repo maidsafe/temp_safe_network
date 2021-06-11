@@ -2596,7 +2596,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sn_data_types",
- "sn_messaging 35.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sn_messaging",
  "sn_transfers",
  "sn_url",
  "thiserror",
@@ -2672,35 +2672,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sn_messaging"
-version = "35.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07cfd83e3ddfd344a471b77bfc6170c7e831f13c4c6400bf96d172b62f0e2ef2"
-dependencies = [
- "bincode",
- "bls_dkg",
- "bytes 1.0.1",
- "cookie-factory",
- "crdts",
- "ed25519-dalek",
- "hex_fmt",
- "itertools 0.9.0",
- "multibase 0.8.0",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "rmp-serde",
- "secured_linked_list",
- "serde",
- "serde_bytes",
- "signature",
- "sn_data_types",
- "thiserror",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
- "xor_name",
-]
-
-[[package]]
 name = "sn_node"
 version = "0.48.0"
 dependencies = [
@@ -2733,8 +2704,8 @@ dependencies = [
  "signature",
  "sn_data_types",
  "sn_launch_tool",
- "sn_messaging 35.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "sn_routing 0.76.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sn_messaging",
+ "sn_routing",
  "sn_transfers",
  "structopt",
  "tempdir",
@@ -2766,7 +2737,7 @@ dependencies = [
  "secured_linked_list",
  "serde",
  "sn_data_types",
- "sn_messaging 35.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sn_messaging",
  "structopt",
  "thiserror",
  "threshold_crypto",
@@ -2778,36 +2749,6 @@ dependencies = [
  "tracing-subscriber",
  "xor_name",
  "yansi",
-]
-
-[[package]]
-name = "sn_routing"
-version = "0.76.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b21755139474dfaf4af48fef5989af4fadb6ec3a4937f153d2a8c22a21fef421"
-dependencies = [
- "bincode",
- "bls_dkg",
- "bytes 1.0.1",
- "dashmap 4.0.2",
- "ed25519-dalek",
- "futures",
- "hex_fmt",
- "itertools 0.9.0",
- "qp2p",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "resource_proof",
- "secured_linked_list",
- "serde",
- "sn_data_types",
- "sn_messaging 35.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
- "tokio 1.6.1",
- "tracing",
- "xor_name",
 ]
 
 [[package]]

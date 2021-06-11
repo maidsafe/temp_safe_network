@@ -1,5 +1,5 @@
 [workspace]
 
 members = [
-    "client", "messaging", "node", "routing"
+    "sn_client", "sn_messaging", "sn_node", "sn_routing"
 ]

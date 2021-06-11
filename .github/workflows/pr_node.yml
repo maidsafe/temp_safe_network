@@ -1,29 +1,39 @@
 # PR workflow.
 #
 # Runs full suite of checks, with warnings treated as errors.
-# Gather code coverage stats and publish them on coveralls.io.
 
-name: PR
+name: Node Changes
 
-on: pull_request
+on: 
+  pull_request:
+    paths: 
+      - 'sn_node/**'
 
+defaults:
+  run:
+    working-directory: sn_node
+    
 env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
+  TEST_STARTUP_INTERVAL: "40"
 
 jobs:
-  checks:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: fmt & clippy
+  clippy:
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Rustfmt-Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
-      - name: Install Rust and required components
-        uses: actions-rs/toolchain@v1
+
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust & required components
         with:
           profile: minimal
           toolchain: stable
@@ -39,6 +49,7 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      
 
       # Check if the code is formatted correctly.
       - name: Check formatting
@@ -46,26 +57,64 @@ jobs:
 
       # Run Clippy.
       - name: Clippy checks
-        run: cargo clippy --all-targets --all-features
-
-  check_pr_size:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Check PR size doesn't break set limit
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: '0'
-    - uses: maidsafe/pr_size_checker@v2
-      with:
-        max_lines_changed: 200
+        run: cargo clippy --all-targets
   
   coverage:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Code coverage check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+      
+      # Run cargo tarpaulin & push result to coveralls.io
+      - name: rust-tarpaulin code coverage check
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          args: '-v --release --out Lcov'
+          timeout: 800
+      - name: Push code coverage results to coveralls.io
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel: true
+          path-to-lcov: ./lcov.info
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  test:
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: Node Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v2
+      
 
       # Install Rust
       - uses: actions-rs/toolchain@v1
@@ -84,85 +133,29 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      # Run cargo tarpaulin & push result to coveralls.io
-      - name: rust-tarpaulin code coverage check
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          args: '-v --release --out Lcov'
-      - name: Push code coverage results to coveralls.io
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel: true
-          path-to-lcov: ./lcov.info
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
+      # Run tests.
+      # Currently do not run client tests on mac
+      - name: Cargo tests
+        run: cargo test --release --features=simulated-payouts
 
-  build:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - name: Configuration test
+        uses: actions-rs/cargo@v1
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
+          command: run
+          args: --release --example config_handling -- --first 127.0.0.1:0 -h ${{ '["127.0.0.1:1234"]' }}
 
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
+      - name: Upload node data on fail
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@master
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+          name: nodes-data
+          path: nodes
 
-      # Make sure the code builds.
-      - name: Run cargo build
-        run: cargo build --release
-
-  test:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Make sure tests pass.
-      - name: Run cargo test
-        run: cargo test --release
-
+  # list any unused dependencies using cargo-udeps
   cargo-udeps:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
@@ -179,9 +172,32 @@ jobs:
         run: |
           cargo install cargo-udeps --locked
           cargo +nightly udeps --all-targets
+  
+  # list all duplicate dependencies. Note that this does not error if duplicates found
+  duplicate-dependencies:
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
+    name: List Duplicate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Run list duplicate dependencies script
+      - shell: bash
+        run: ./scripts/duplicate_dependency_check
 
   cargo-deny:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -194,7 +210,9 @@ jobs:
 
   # Test publish using --dry-run.
   test-publish:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: |
+      github.repository_owner == 'joshuef' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Test Publish
     runs-on: ubuntu-latest
     steps:
@@ -208,4 +226,4 @@ jobs:
           override: true
 
       - name: Test publish
-        run: cargo publish --dry-run --allow-dirty
+        run: cargo publish --allow-dirty --dry-run
