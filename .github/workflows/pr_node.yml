@@ -107,7 +107,7 @@ jobs:
     if: |
       github.repository_owner == 'joshuef' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
-    name: Test
+    name: Node Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -136,10 +136,7 @@ jobs:
       # Run tests.
       # Currently do not run client tests on mac
       - name: Cargo tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release  --features=simulated-payouts
+        run: cargo test --release --features=simulated-payouts
 
       - name: Configuration test
         uses: actions-rs/cargo@v1
