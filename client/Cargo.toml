@@ -11,6 +11,9 @@ repository = "https://github.com/maidsafe/sn_client"
 version = "0.60.0"
 keywords = [ "Safe", "Network", "SafeNetwork" ]
 
+[package.metadata.workspaces]
+independent = true
+
 [package.metadata.docs.rs]
 features = [ "simulated-payouts" ]
 

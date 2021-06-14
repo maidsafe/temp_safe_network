@@ -14,6 +14,9 @@ version = "0.48.0"
 [package.metadata.cargo-udeps.ignore]
 development = [ "sn_client", "maplit" ]
 
+[package.metadata.workspaces]
+independent = true
+
 [dependencies]
 async-log = "2.0.0"
 base64 = "~0.10.1"

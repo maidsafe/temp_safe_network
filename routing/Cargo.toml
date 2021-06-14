@@ -10,6 +10,9 @@ repository = "https://github.com/maidsafe/sn_routing"
 version = "0.76.0"
 edition = "2018"
 
+[package.metadata.workspaces]
+independent = true
+
 [dependencies]
 bincode = "1.2.1"
 bls_dkg = "~0.3.1"
