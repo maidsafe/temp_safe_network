@@ -3,9 +3,17 @@
 # Runs full suite of checks, with warnings treated as errors.
 # Gather code coverage stats and publish them on coveralls.io.
 
-name: PR
+name: Messaging PR
 
-on: pull_request
+on: 
+  pull_request:
+    paths: 
+      - 'messaging/**'
+
+defaults:
+  run:
+    working-directory: ./messaging
+
 
 env:
   # Run all cargo commands with --verbose.
@@ -17,12 +25,13 @@ env:
 jobs:
   checks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Clippy & fmt
+    name: fmt & clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
+      
+      - name: Install Rust and required components
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -44,20 +53,8 @@ jobs:
         run: cargo fmt --all -- --check
 
       # Run Clippy.
-      - shell: bash
-        run: ./scripts/clippy
-
-  check_pr_size:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Check PR size doesn't break set limit
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: '0'
-    - uses: maidsafe/pr_size_checker@v2
-      with:
-        max_lines_changed: 200
+      - name: Clippy checks
+        run: cargo clippy --all-targets --all-features
   
   coverage:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -65,7 +62,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # Install Rust and required components
+
+      # Install Rust
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -99,6 +97,66 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           parallel-finished: true
 
+  build:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      # Make sure the code builds.
+      - name: Run cargo build
+        run: cargo build --release
+
+  test:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      # Make sure tests pass.
+      - name: Run cargo test
+        run: cargo test --release
+
   cargo-udeps:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
@@ -130,42 +188,6 @@ jobs:
 
     - uses: EmbarkStudios/cargo-deny-action@v1
 
-  test:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-    steps:
-      - uses: actions/checkout@v2
-      # Install Rust
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Run tests.
-      - shell: bash
-        run: ./scripts/tests
-
-      # Print CI machine disk space stats if the tests fail
-      - name: Print CI Machine df Stats on Failure
-        if: failure()
-        run: df -Ph
-        shell: bash
-
   # Test publish using --dry-run.
   test-publish:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -174,13 +196,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # Install Rust
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
 
-      # Cargo publish dry run
-      - name: Cargo Publish Dry Run
-        run: cargo publish --dry-run
+      - name: Test publish
+        run: cargo publish --dry-run --allow-dirty
