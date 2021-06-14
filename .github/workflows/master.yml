@@ -7,9 +7,9 @@
 
 
 # TODO:
-  # Move this to all
+  # bump version in any changed space
+  # do changelog there?
   # Bump versions across all crates and deps w/ cargo-workspaces
-  # Update changelogs in all crates
   # Commit all of that + pr...
   
 name: Master
@@ -50,6 +50,13 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      # https://github.com/pksunkara/cargo-workspaces
+      - name: Install cargo-workspaces
+        run: cargo install cargo-workspaces
+
+      - name: Update workspace
+        run: cargo ws ls | 
 
   build_win_mac:
     if: github.repository_owner == 'maidsafe'
