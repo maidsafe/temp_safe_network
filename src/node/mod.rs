@@ -9,6 +9,7 @@
 
 mod agreement;
 mod join;
+mod join_as_relocated;
 mod network;
 mod node_msg;
 mod plain_message;
@@ -22,6 +23,7 @@ mod variant;
 
 pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
+pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
