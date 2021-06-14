@@ -47,7 +47,7 @@ pub enum JoinAsRelocatedResponse {
     /// Up to date section information for a joining peer to retry its join request with
     Retry(SectionAuthorityProvider),
     /// Response redirecting a joining peer to join a different section,
-    /// containing addresses of nodes that are closer (than the recipient) to the
+    /// containing the section authority provider of the section that is closer to the
     /// requested name. The `JoinAsRelocatedRequest` should be re-sent to these addresses.
     Redirect(SectionAuthorityProvider),
     /// Message sent to joining peer containing the necessary
