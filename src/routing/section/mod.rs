@@ -23,7 +23,11 @@ pub use self::{
     section_peers::SectionPeersUtils,
 };
 
-use crate::{
+use crate::messaging::{
+    node::{ElderCandidates, MemberInfo, Peer, Proven, Section, SectionPeers, Signed},
+    SectionAuthorityProvider,
+};
+use crate::routing::{
     agreement::ProvenUtils,
     error::{Error, Result},
     peer::PeerUtils,
@@ -31,10 +35,6 @@ use crate::{
 };
 use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
 use serde::Serialize;
-use crate::messaging::{
-    node::{ElderCandidates, MemberInfo, Peer, Proven, Section, SectionPeers, Signed},
-    SectionAuthorityProvider,
-};
 use std::{collections::BTreeSet, convert::TryInto, iter, marker::Sized, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
@@ -309,7 +309,7 @@ impl SectionUtils for Section {
 
         if expected_names == current_names {
             vec![]
-        } else if expected_names.len() < crate::supermajority(current_names.len()) {
+        } else if expected_names.len() < crate::routing::supermajority(current_names.len()) {
             warn!("ignore attempt to reduce the number of elders too much");
             vec![]
         } else {

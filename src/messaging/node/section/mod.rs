@@ -14,14 +14,14 @@ pub use candidates::ElderCandidates;
 pub use member_info::{MemberInfo, PeerState};
 pub use peer::Peer;
 
-use crate::{node::agreement::Proven, SectionAuthorityProvider};
+use crate::messaging::{node::agreement::Proven, SectionAuthorityProvider};
+use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map, BTreeMap},
     hash::{Hash, Hasher},
 };
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

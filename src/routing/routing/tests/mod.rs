@@ -7,7 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Comm, Command, Core, Dispatcher};
-use crate::{
+use crate::messaging::{
+    location::{Aggregation, Itinerary},
+    node::{
+        JoinRequest, JoinResponse, MemberInfo, Network, Peer, PeerState, PlainMessage, Proposal,
+        Proven, RelocateDetails, RelocatePayload, ResourceProofResponse, RoutingMsg, Section,
+        Signed, SignedRelocateDetails, Variant,
+    },
+    section_info::{GetSectionResponse, SectionInfoMsg},
+    DestInfo, DstLocation, MessageType, SectionAuthorityProvider, SrcLocation,
+};
+use crate::routing::{
     agreement::{
         test_utils::{prove, proven},
         ProposalUtils,
@@ -33,16 +43,6 @@ use bytes::Bytes;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use sn_data_types::{Keypair, PublicKey};
-use crate::messaging::{
-    location::{Aggregation, Itinerary},
-    node::{
-        JoinRequest, JoinResponse, MemberInfo, Network, Peer, PeerState, PlainMessage, Proposal,
-        Proven, RelocateDetails, RelocatePayload, ResourceProofResponse, RoutingMsg, Section,
-        Signed, SignedRelocateDetails, Variant,
-    },
-    section_info::{GetSectionResponse, SectionInfoMsg},
-    DestInfo, DstLocation, MessageType, SectionAuthorityProvider, SrcLocation,
-};
 use std::{
     collections::{BTreeSet, HashSet},
     iter,

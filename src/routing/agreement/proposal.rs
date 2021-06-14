@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{SignatureAggregator, Signed, SignedShare};
-use crate::{error::Result, messages::PlainMessageUtils};
+use crate::messaging::{node::Error as NodeErrorMessage, node::Proposal};
+use crate::routing::{error::Result, messages::PlainMessageUtils};
 use serde::{Serialize, Serializer};
-use crate::messaging::node::Proposal;
 use thiserror::Error;
 
 pub trait ProposalUtils {
@@ -84,7 +84,7 @@ impl ProposalAggregator {
 #[derive(Debug, Error)]
 pub enum ProposalError {
     #[error("failed to aggregate signature shares: {0}")]
-    Aggregation(#[from] sn_messaging::node::Error),
+    Aggregation(#[from] NodeErrorMessage),
     #[error("invalid proposal")]
     Invalid,
 }
@@ -92,7 +92,7 @@ pub enum ProposalError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{agreement, section};
+    use crate::routing::{agreement, section};
     use anyhow::Result;
     use std::fmt::Debug;
     use xor_name::Prefix;

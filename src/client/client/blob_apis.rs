@@ -10,13 +10,13 @@ use super::{
     blob_storage::{BlobStorage, BlobStorageDryRun},
     Client,
 };
-use crate::Error;
+use crate::client::Error;
+use crate::messaging::client::{BlobRead, BlobWrite, DataCmd, DataQuery, Query, QueryResponse};
 use bincode::{deserialize, serialize};
 use log::{info, trace};
 use self_encryption::{DataMap, SelfEncryptor};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, PrivateBlob, PublicBlob, PublicKey};
-use crate::messaging::client::{BlobRead, BlobWrite, DataCmd, DataQuery, Query, QueryResponse};
 
 #[derive(Serialize, Deserialize)]
 enum DataMapLevel {
@@ -396,13 +396,14 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::{Blob, BlobAddress, Client, DataMap, DataMapLevel, Error};
-    use crate::utils::{generate_random_vector, test_utils::create_test_client};
-    use crate::{client::blob_storage::BlobStorage, retry_err_loop, retry_loop};
+    use crate::client::client::blob_storage::BlobStorage;
+    use crate::client::utils::{generate_random_vector, test_utils::create_test_client};
+    use crate::messaging::client::Error as ErrorMessage;
+    use crate::{retry_err_loop, retry_loop};
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use self_encryption::Storage;
     use sn_data_types::{PrivateBlob, PublicBlob, Token};
-    use crate::messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
 
     // Test putting and getting pub Blob.

@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::errors::Error;
+use crate::client::Error;
+use crate::messaging::client::{ClientSigned, Cmd};
 use log::debug;
 use sn_data_types::{PublicKey, Signature};
-use crate::messaging::client::{ClientSigned, Cmd};
 
 impl Client {
     /// Send a Cmd to the network

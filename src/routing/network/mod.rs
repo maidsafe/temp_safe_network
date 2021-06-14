@@ -6,23 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// TODO: remove prefix_map from sn_messaging::node
+// TODO: remove prefix_map from messaging::node
 // mod prefix_map;
 mod stats;
 
 use self::stats::NetworkStats;
-use crate::{
+use crate::routing::{
     agreement::{verify_signed, ProvenUtils, Signed},
     peer::PeerUtils,
     section::SectionAuthorityProviderUtils,
     Error, Result,
 };
 
-use secured_linked_list::SecuredLinkedList;
 use crate::messaging::{
     node::{Network, OtherSection, Peer, PrefixMap, Proven},
     SectionAuthorityProvider,
 };
+use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};
 
@@ -266,7 +266,7 @@ impl OtherSectionUtils for OtherSection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{agreement, section};
+    use crate::routing::{agreement, section};
     use rand::Rng;
 
     #[test]

@@ -10,16 +10,16 @@ mod handling;
 mod sending;
 
 use super::Core;
-use crate::{
+use crate::messaging::{
+    node::{Peer, Proposal, RoutingMsg, Variant},
+    DstLocation,
+};
+use crate::routing::{
     agreement::{ProposalUtils, SignedShare},
     error::Result,
     messages::RoutingMsgUtils,
     routing::command::Command,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
-};
-use crate::messaging::{
-    node::{Peer, Proposal, RoutingMsg, Variant},
-    DstLocation,
 };
 use std::net::SocketAddr;
 use xor_name::XorName;

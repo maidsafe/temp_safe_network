@@ -6,12 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    network::Network,
-    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
-    Node, Result,
-};
-use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use crate::messaging::{
     node::{
         NodeCmd, NodeMsg, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
@@ -19,7 +13,13 @@ use crate::messaging::{
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
+use crate::node::{
+    network::Network,
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
+    Node, Result,
+};
 use crate::routing::{Prefix, XorName};
+use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::role::ElderRole;

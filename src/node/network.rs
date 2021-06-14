@@ -6,9 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
+use crate::messaging::{Itinerary, MessageId};
+use crate::node::{
     state_db::{get_network_keypair, store_network_keypair},
     utils, Config as NodeConfig, Error, Result,
+};
+use crate::routing::{
+    Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
+    SectionAuthorityProviderUtils,
 };
 use bls::PublicKeySet;
 use bytes::Bytes;
@@ -17,11 +22,6 @@ use rand::{seq::SliceRandom, SeedableRng};
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
-use crate::messaging::{Itinerary, MessageId};
-use crate::routing::{
-    Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
-    SectionAuthorityProviderUtils,
-};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,

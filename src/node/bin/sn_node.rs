@@ -28,12 +28,13 @@
 )]
 
 use log::{self, error, info};
+use safe_network::node::{add_connection_info, set_connection_info, utils, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
-use sn_node::{self, add_connection_info, set_connection_info, utils, Config, Node};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
+use safe_network::routing;
 
 /// Runs a Safe Network node.
 fn main() {
@@ -113,13 +114,13 @@ async fn run_node() {
     let (mut node, event_stream) = loop {
         match Node::new(&config).await {
             Ok(result) => break result,
-            Err(sn_node::Error::Routing(sn_routing::Error::TryJoinLater)) => {
+            Err(Error::Routing(routing::Error::TryJoinLater)) => {
                 println!("{}", log);
                 info!("{}", log);
                 tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
                     .await;
             }
-            Err(sn_node::Error::Routing(sn_routing::Error::NodeNotReachable(_))) => {
+            Err(Error::Routing(routing::Error::NodeNotReachable(_))) => {
                 println!("Unfortunately we are unable to establish a connection to your machine either through a \
                 public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
                 if it is and you are still unable to add your node to the testnet, then skip adding a node for this \

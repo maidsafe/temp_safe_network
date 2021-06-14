@@ -7,19 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::{
+use crate::messaging::{
+    client::{CmdError, MapDataExchange, MapRead, MapWrite, QueryResponse},
+    EndUser, MessageId,
+};
+use crate::node::{
     chunk_store::MapChunkStore, error::convert_to_error_message, node_ops::NodeDuty, Error, Result,
 };
+use crate::routing::Prefix;
 use log::{debug, info};
 use sn_data_types::{
     Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
     PublicKey, Result as NdResult,
 };
-use crate::messaging::{
-    client::{CmdError, MapDataExchange, MapRead, MapWrite, QueryResponse},
-    EndUser, MessageId,
-};
-use crate::routing::Prefix;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,

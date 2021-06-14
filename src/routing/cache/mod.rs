@@ -166,7 +166,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::cache::Cache;
+    use crate::routing::cache::Cache;
     use std::time::Duration;
 
     const KEY: i8 = 0;

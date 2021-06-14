@@ -7,7 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::super::Core;
-use crate::{
+use crate::messaging::{
+    node::{
+        DkgKey, ElderCandidates, JoinResponse, MemberInfo, Network, Peer, PlainMessage, Proposal,
+        Proven, RelocateDetails, RelocatePromise, RoutingMsg, Section, Variant,
+    },
+    DestInfo, DstLocation,
+};
+use crate::routing::{
     agreement::DkgKeyUtils,
     error::Result,
     messages::RoutingMsgUtils,
@@ -18,13 +25,6 @@ use crate::{
     section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionUtils},
 };
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::{
-    node::{
-        DkgKey, ElderCandidates, JoinResponse, MemberInfo, Network, Peer, PlainMessage, Proposal,
-        Proven, RelocateDetails, RelocatePromise, RoutingMsg, Section, Variant,
-    },
-    DestInfo, DstLocation,
-};
 use std::{cmp::Ordering, iter, net::SocketAddr, slice};
 use xor_name::XorName;
 

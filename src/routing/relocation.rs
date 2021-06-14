@@ -8,19 +8,19 @@
 
 //! Relocation related types and utilities.
 
-use crate::{
-    crypto::{self, Keypair, Verifier},
-    error::Error,
-    network::NetworkUtils,
-    peer::PeerUtils,
-    section::{SectionPeersUtils, SectionUtils},
-};
 use crate::messaging::{
     node::{
         MemberInfo, Network, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
         Section, SignedRelocateDetails, Variant,
     },
     MessageType,
+};
+use crate::routing::{
+    crypto::{self, Keypair, Verifier},
+    error::Error,
+    network::NetworkUtils,
+    peer::PeerUtils,
+    section::{SectionPeersUtils, SectionUtils},
 };
 use std::{marker::Sized, net::SocketAddr};
 use tokio::sync::mpsc;
@@ -267,7 +267,8 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use crate::messaging::SectionAuthorityProvider;
+    use crate::routing::{
         agreement::test_utils::proven,
         peer::test_utils::arbitrary_unique_peers,
         routing::tests::SecretKeySet,
@@ -280,7 +281,6 @@ mod tests {
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
-    use crate::messaging::SectionAuthorityProvider;
     use xor_name::Prefix;
 
     #[test]

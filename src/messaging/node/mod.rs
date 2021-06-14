@@ -37,11 +37,11 @@ pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;
 pub use variant::Variant;
 
-use crate::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
+use crate::messaging::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Routing message sent over the network.
@@ -67,19 +67,23 @@ pub struct RoutingMsg {
 impl RoutingMsg {
     /// Convenience function to deserialize a 'RoutingMsg' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node message.
-    pub fn from(bytes: Bytes) -> crate::Result<Self> {
+    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
         if let MessageType::Routing { msg, .. } = deserialized {
             Ok(msg)
         } else {
-            Err(crate::Error::FailedToParse(
+            Err(crate::messaging::Error::FailedToParse(
                 "bytes as a node message".to_string(),
             ))
         }
     }
 
     /// serialize this RoutingMsg into bytes ready to be sent over the wire.
-    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
+    pub fn serialize(
+        &self,
+        dest: XorName,
+        dest_section_pk: BlsPublicKey,
+    ) -> crate::messaging::Result<Bytes> {
         WireMsg::serialize_routing_msg(self, dest, dest_section_pk)
     }
 }

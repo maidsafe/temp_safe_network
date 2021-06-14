@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::Error;
+use crate::client::Error;
+use crate::messaging::client::{
+    Cmd, DataCmd, DataQuery, Query, QueryResponse, SequenceRead, SequenceWrite,
+};
 use log::{debug, trace};
 use sn_data_types::{
     PublicKey, Sequence, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex,
     SequencePermissions, SequencePrivatePermissions, SequencePrivatePolicy,
     SequencePublicPermissions, SequencePublicPolicy, SequenceUser,
-};
-use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, Query, QueryResponse, SequenceRead, SequenceWrite,
 };
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -768,10 +768,10 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils::{create_test_client, gen_ed_keypair};
+    use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
+    use crate::messaging::client::Error as ErrorMessage;
     use anyhow::{anyhow, bail, Result};
     use sn_data_types::{Error as DtError, SequenceAction, SequencePrivatePermissions, Token};
-    use crate::messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
     use tokio::time::{sleep, Duration};
     use xor_name::XorName;

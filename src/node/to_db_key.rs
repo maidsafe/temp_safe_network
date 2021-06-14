@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Error, Result};
+use crate::node::{utils, Error, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{
     register::Address, BlobAddress, CreditId, DebitId, Keypair, MapAddress, PublicKey,
@@ -42,7 +42,7 @@ impl ToDbKey for DebitId {}
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Result;
+    use crate::node::Result;
     use bls::SecretKey;
     use sn_data_types::PublicKey;
 

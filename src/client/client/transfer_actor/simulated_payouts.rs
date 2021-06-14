@@ -15,7 +15,7 @@ use crate::messaging::client::{Cmd, TransferCmd};
 #[cfg(feature = "simulated-payouts")]
 use log::info;
 
-use crate::{Client, Error};
+use crate::client::{Client, Error};
 use sn_data_types::Token;
 
 /// Handle all token transfers and Write API requests for a given ClientId.
@@ -91,7 +91,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils::create_test_client;
+    use crate::client::utils::test_utils::create_test_client;
     use anyhow::Result;
     use std::str::FromStr;
     use tokio::time::{sleep, Duration};

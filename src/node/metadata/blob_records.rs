@@ -6,21 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    btree_set,
-    capacity::{Capacity, CHUNK_COPY_COUNT},
-    error::convert_to_error_message,
-    node_ops::{NodeDuties, NodeDuty},
-    Error, Result,
-};
-use log::{info, warn};
-use sn_data_types::{Blob, BlobAddress, PublicKey};
+use crate::btree_set;
 use crate::messaging::{
     client::{BlobDataExchange, BlobRead, BlobWrite, ClientSigned, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, EndUser, MessageId,
 };
+use crate::node::{
+    capacity::{Capacity, CHUNK_COPY_COUNT},
+    error::convert_to_error_message,
+    node_ops::{NodeDuties, NodeDuty},
+    Error, Result,
+};
 use crate::routing::Prefix;
+use log::{info, warn};
+use sn_data_types::{Blob, BlobAddress, PublicKey};
 
 use std::{
     collections::BTreeSet,

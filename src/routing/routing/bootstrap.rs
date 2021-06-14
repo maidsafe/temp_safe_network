@@ -7,7 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{comm::ConnectionEvent, Comm};
-use crate::{
+use crate::messaging::{
+    node::{
+        JoinRejectionReason, JoinRequest, JoinResponse, RelocatePayload, ResourceProofResponse,
+        RoutingMsg, Section, SignedRelocateDetails, Variant,
+    },
+    DestInfo, DstLocation, MessageType, WireMsg,
+};
+use crate::routing::{
     crypto::{self},
     error::{Error, Result},
     messages::{RoutingMsgUtils, VerifyStatus},
@@ -22,13 +29,6 @@ use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use sn_data_types::PublicKey;
-use crate::messaging::{
-    node::{
-        JoinRejectionReason, JoinRequest, JoinResponse, RelocatePayload, ResourceProofResponse,
-        RoutingMsg, Section, SignedRelocateDetails, Variant,
-    },
-    DestInfo, DstLocation, MessageType, WireMsg,
-};
 use std::{
     collections::{HashSet, VecDeque},
     net::SocketAddr,
@@ -579,7 +579,8 @@ async fn send_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use crate::messaging::{node::MemberInfo, SectionAuthorityProvider};
+    use crate::routing::{
         agreement::test_utils::*,
         error::Error as RoutingError,
         messages::RoutingMsgUtils,
@@ -594,7 +595,6 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    use crate::messaging::{node::MemberInfo, SectionAuthorityProvider};
     use std::collections::BTreeMap;
     use tokio::task;
 

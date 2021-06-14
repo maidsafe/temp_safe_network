@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::Error;
+use crate::client::Error;
 use log::trace;
 
 use sn_data_types::{
@@ -666,11 +666,11 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
+    use crate::messaging::client::{CmdError, Error as ErrorMessage};
     use crate::retry_loop_for_pattern;
-    use crate::utils::test_utils::{create_test_client, gen_ed_keypair};
     use anyhow::{anyhow, bail, Result};
     use sn_data_types::{MapAction, MapKind, Token};
-    use crate::messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
     use std::time::Duration;
     use xor_name::XorName;
@@ -865,9 +865,7 @@ mod tests {
         client.delete_map(mapref).await?;
 
         match client.expect_cmd_error().await {
-            Some(sn_messaging::client::CmdError::Data(
-                sn_messaging::client::Error::AccessDenied(_),
-            )) => Ok(()),
+            Some(CmdError::Data(ErrorMessage::AccessDenied(_))) => Ok(()),
             _ => bail!("Unexpected: Deletion by non-owners should fail"),
         }
     }

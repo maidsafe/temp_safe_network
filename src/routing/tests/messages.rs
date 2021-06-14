@@ -22,6 +22,7 @@ use crate::routing::{Config, Error, Event, NodeElderChange};
 use std::net::{IpAddr, Ipv4Addr};
 use utils::*;
 use xor_name::XorName;
+use crate::routing;
 
 #[tokio::test]
 async fn test_messages_client_node() -> Result<()> {
@@ -42,7 +43,7 @@ async fn test_messages_client_node() -> Result<()> {
     let id = MessageId::new();
 
     // create a client which sends a message to the node
-    let mut config = sn_routing::TransportConfig {
+    let mut config = routing::TransportConfig {
         local_ip: Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
         ..Default::default()
     };

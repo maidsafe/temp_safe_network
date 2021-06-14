@@ -9,14 +9,15 @@
 
 // FIXME: change NodeCmd defnintions to return Result and
 // Error defined for the crate::node instead of client Result/Error
-use crate::client::{CmdError, Error, Result};
-use crate::{
+use crate::messaging::client::{CmdError, Error, Result};
+use crate::messaging::{
     client::{
         BlobRead, BlobWrite, ClientSigned, DataCmd as NodeDataCmd, DataExchange,
         DataQuery as NodeDataQuery,
     },
     EndUser, MessageId, MessageType, WireMsg,
 };
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -24,7 +25,6 @@ use sn_data_types::{
     SectionElders, Signature,
 };
 use std::collections::BTreeMap;
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 // -------------- Node Cmd Messages --------------
@@ -104,12 +104,12 @@ impl NodeMsg {
 
     /// Convenience function to deserialize a 'NodeMsg' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a node command message.
-    pub fn from(bytes: Bytes) -> crate::Result<Self> {
+    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
         if let MessageType::Node { msg, .. } = deserialized {
             Ok(msg)
         } else {
-            Err(crate::Error::FailedToParse(
+            Err(crate::messaging::Error::FailedToParse(
                 "bytes as a node command message".to_string(),
             ))
         }
@@ -121,7 +121,7 @@ impl NodeMsg {
         dest: XorName,
         dest_section_pk: BlsPublicKey,
         src_section_pk: Option<BlsPublicKey>,
-    ) -> crate::Result<Bytes> {
+    ) -> crate::messaging::Result<Bytes> {
         WireMsg::serialize_node_msg(self, dest, dest_section_pk, src_section_pk)
     }
 }

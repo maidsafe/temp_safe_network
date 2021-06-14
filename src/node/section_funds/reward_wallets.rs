@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::routing::Prefix;
 use dashmap::DashMap;
 use log::debug;
 use sn_data_types::{NodeAge, PublicKey};
-use crate::routing::Prefix;
 use std::collections::BTreeMap;
 use xor_name::XorName;
 

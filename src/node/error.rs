@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node_ops::MsgType;
-use sn_data_types::{DataAddress, Error as DtError, PublicKey};
 use crate::messaging::{client::Error as ErrorMessage, MessageId};
+use crate::node::node_ops::MsgType;
 use crate::routing::Prefix;
+use sn_data_types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -126,13 +126,13 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network message error.
     #[error("Client message error:: {0}")]
-    ClientMsg(#[from] sn_messaging::client::Error),
+    ClientMsg(#[from] crate::messaging::client::Error),
     /// Network processing error message.
     #[error("Procesing error:: {0:?}")]
-    ProcessingError(sn_messaging::client::ProcessingError),
+    ProcessingError(crate::messaging::client::ProcessingError),
     /// Network message error.
     #[error("Network message error:: {0}")]
-    Message(#[from] sn_messaging::Error),
+    Message(#[from] crate::messaging::Error),
     /// PickleDb error.
     #[error("PickleDb error:: {0}")]
     PickleDb(#[from] pickledb::error::Error),
@@ -144,7 +144,7 @@ pub enum Error {
     Transfer(#[from] sn_transfers::Error),
     /// Routing error.
     #[error("Routing error:: {0}")]
-    Routing(#[from] sn_routing::Error),
+    Routing(#[from] crate::routing::Error),
     /// Transfer has already been registered
     #[error("Transfer has already been registered")]
     TransferAlreadyRegistered,
@@ -177,7 +177,7 @@ pub enum Error {
     UnableToSend(MsgType),
 }
 
-pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::client::Error {
+pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
     match error {
         Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
@@ -194,7 +194,7 @@ pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::client::Er
         }
     }
 }
-pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> sn_messaging::client::Error {
+pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> ErrorMessage {
     match error {
         DtError::InvalidOperation => {
             ErrorMessage::InvalidOperation("DtError::InvalidOperation".to_string())

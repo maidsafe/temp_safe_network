@@ -10,7 +10,12 @@ mod plain_message;
 mod src_authority;
 
 pub use self::{plain_message::PlainMessageUtils, src_authority::SrcAuthorityUtils};
-use crate::{
+use crate::messaging::node::{Signed, SignedShare};
+use crate::messaging::{
+    node::{JoinResponse, PlainMessage, RoutingMsg, SrcAuthority, Variant},
+    Aggregation, DstLocation, MessageId,
+};
+use crate::routing::{
     agreement::ProvenUtils,
     crypto::{self, Verifier},
     error::{Error, Result},
@@ -19,11 +24,6 @@ use crate::{
 };
 use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
 use serde::Serialize;
-use crate::messaging::node::{Signed, SignedShare};
-use crate::messaging::{
-    node::{JoinResponse, PlainMessage, RoutingMsg, SrcAuthority, Variant},
-    Aggregation, DstLocation, MessageId,
-};
 use std::fmt::Debug;
 use thiserror::Error;
 use xor_name::XorName;

@@ -6,12 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(feature = "simulated-payouts")]
-use sn_data_types::Transfer;
-use sn_data_types::{
-    ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
-    RewardProposal, SignedTransfer, TransferAgreementProof,
-};
 use crate::messaging::client::ClientMsg;
 use crate::messaging::{
     client::{
@@ -22,6 +16,12 @@ use crate::messaging::{
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use crate::routing::Prefix;
+#[cfg(feature = "simulated-payouts")]
+use sn_data_types::Transfer;
+use sn_data_types::{
+    ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
+    RewardProposal, SignedTransfer, TransferAgreementProof,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},

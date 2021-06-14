@@ -8,7 +8,11 @@
 
 use std::cmp;
 
-use crate::{
+use crate::messaging::{
+    node::{MemberInfo, PeerState, PlainMessage, Proposal, Proven, RoutingMsg, Signed, Variant},
+    DestInfo, DstLocation, SectionAuthorityProvider,
+};
+use crate::routing::{
     agreement::ProvenUtils,
     error::Result,
     messages::RoutingMsgUtils,
@@ -21,10 +25,6 @@ use crate::{
     Error, Event, MIN_AGE,
 };
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::{
-    node::{MemberInfo, PeerState, PlainMessage, Proposal, Proven, RoutingMsg, Signed, Variant},
-    DestInfo, DstLocation, SectionAuthorityProvider,
-};
 use xor_name::XorName;
 
 use super::Core;

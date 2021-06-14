@@ -10,7 +10,7 @@
 #[cfg(any(test, feature = "testing", feature = "simulated-payouts"))]
 pub mod test_utils;
 
-use crate::errors::Error;
+use crate::client::Error;
 use bincode::{deserialize, serialize};
 use miscreant::{Aead, Aes128SivAead};
 use rand::distributions::{Alphanumeric, Distribution, Standard};
@@ -29,42 +29,6 @@ pub type SymEncKey = [u8; SYM_ENC_KEY_LEN];
 
 /// Symmetric encryption nonce
 pub type SymEncNonce = [u8; SYM_ENC_NONCE_LEN];
-
-/// Easily create a `BTreeSet`.
-#[macro_export]
-macro_rules! btree_set {
-    ($($item:expr),*) => {{
-        let mut _set = ::std::collections::BTreeSet::new();
-        $(
-            let _ = _set.insert($item);
-        )*
-        _set
-    }};
-
-    ($($item:expr),*,) => {
-        btree_set![$($item),*]
-    };
-}
-
-/// Easily create a `BTreeMap` with the key => value syntax.
-#[macro_export]
-macro_rules! btree_map {
-    () => ({
-        ::std::collections::BTreeMap::new()
-    });
-
-    ($($key:expr => $value:expr),*) => {{
-        let mut _map = ::std::collections::BTreeMap::new();
-        $(
-            let _ = _map.insert($key, $value);
-        )*
-        _map
-    }};
-
-    ($($key:expr => $value:expr),*,) => {
-        btree_map![$($key => $value),*]
-    };
-}
 
 #[derive(Serialize, Deserialize)]
 struct SymmetricEnc {

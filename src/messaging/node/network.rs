@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{agreement::Proven, prefix_map::PrefixMap, signed::Signed};
-use crate::SectionAuthorityProvider;
+use crate::messaging::SectionAuthorityProvider;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use xor_name::Prefix;

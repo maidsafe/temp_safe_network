@@ -13,11 +13,11 @@ pub mod reward_stage;
 pub mod reward_wallets;
 
 use self::{reward_process::RewardProcess, reward_wallets::RewardWallets};
-use crate::{Error, Result};
+use crate::node::{Error, Result};
+use crate::routing::{Prefix, XorName};
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
-use crate::routing::{Prefix, XorName};
 use std::collections::BTreeMap;
 
 /// The management of section funds,

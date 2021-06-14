@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::routing::{Prefix, XorName};
 
-use crate::network::Network;
+use crate::node::network::Network;
 
 // Copyright 2021 MaidSafe.net limited.
 //

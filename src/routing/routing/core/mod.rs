@@ -13,7 +13,12 @@ mod delivery_group;
 mod messaging;
 
 use super::{command::Command, enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
-use crate::{
+use crate::messaging::node::SignatureAggregator;
+use crate::messaging::{
+    node::{Network, Proposal, Proven, RoutingMsg, Section, Variant},
+    DestInfo, DstLocation, MessageId, SectionAuthorityProvider,
+};
+use crate::routing::{
     agreement::{DkgVoter, ProposalAggregator},
     error::Result,
     event::{Elders, Event, NodeElderChange},
@@ -27,11 +32,6 @@ use crate::{
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::node::SignatureAggregator;
-use crate::messaging::{
-    node::{Network, Proposal, Proven, RoutingMsg, Section, Variant},
-    DestInfo, DstLocation, MessageId, SectionAuthorityProvider,
-};
 use std::collections::BTreeSet;
 use tokio::sync::mpsc;
 use xor_name::{Prefix, XorName};

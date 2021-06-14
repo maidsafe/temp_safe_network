@@ -9,9 +9,9 @@
 //! Relocation related types and utilities.
 
 use super::RoutingMsg;
+use bls::PublicKey as BlsPublicKey;
 pub use ed25519_dalek::{Keypair, Signature, Verifier};
 use serde::{Deserialize, Serialize};
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should

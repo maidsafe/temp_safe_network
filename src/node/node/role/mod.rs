@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Result};
+use crate::node::{Error, Result};
 use std::fmt;
 
 pub(crate) use adult_role::AdultRole;

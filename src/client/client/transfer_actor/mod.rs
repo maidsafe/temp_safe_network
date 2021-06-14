@@ -13,14 +13,14 @@ mod simulated_payouts;
 // Module containing all PUT apis
 mod write_apis;
 
-use crate::{Client, Error};
+use crate::client::{Client, Error};
+use crate::messaging::client::{
+    ClientSigned, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
+};
 use bincode::serialize;
 use log::{debug, error, info, trace, warn};
 use sn_data_types::{
     DebitId, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
-};
-use crate::messaging::client::{
-    ClientSigned, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
 };
 use sn_transfers::{ActorEvent, TransferInitiated};
 use tokio::sync::mpsc::channel;
@@ -343,8 +343,8 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
     use crate::retry_loop_for_pattern;
-    use crate::utils::test_utils::{create_test_client, create_test_client_with};
     use anyhow::{anyhow, Result};
     use rand::rngs::OsRng;
     use sn_data_types::Token;

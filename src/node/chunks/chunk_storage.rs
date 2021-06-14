@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node_ops::MsgType;
-use crate::{
-    chunk_store::BlobChunkStore,
-    node_ops::{NodeDuty, OutgoingMsg},
-    Error, Result,
-};
-use log::{error, info};
-use sn_data_types::{Blob, BlobAddress, DataAddress, PublicKey};
 use crate::messaging::{
     client::Error as ErrorMessage,
     node::{NodeDataQueryResponse, NodeMsg, NodeQueryResponse},
     Aggregation, DstLocation, MessageId,
 };
+use crate::node::{
+    chunk_store::BlobChunkStore,
+    node_ops::MsgType,
+    node_ops::{NodeDuty, OutgoingMsg},
+    Error, Result,
+};
+use log::{error, info};
+use sn_data_types::{Blob, BlobAddress, DataAddress, PublicKey};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -150,7 +150,7 @@ impl Display for ChunkStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::Result;
+    use crate::node::Result;
     use bls::SecretKey;
     use sn_data_types::{PrivateBlob, PublicBlob, PublicKey};
     use std::path::PathBuf;

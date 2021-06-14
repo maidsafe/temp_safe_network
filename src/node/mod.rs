@@ -26,8 +26,6 @@
     unused_qualifications,
     unused_results,
 )]
-// For quick_error
-#![recursion_limit = "256"]
 
 mod capacity;
 mod chaos;
@@ -49,7 +47,7 @@ pub mod state_db;
 
 pub mod utils;
 
-pub use crate::{
+pub use crate::node::{
     config_handler::{add_connection_info, set_connection_info, Config},
     error::{Error, Result},
     node::Node,

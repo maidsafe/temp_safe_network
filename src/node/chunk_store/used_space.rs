@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Result};
+use crate::node::{Error, Result};
 use std::{path::Path, sync::Arc};
 use tokio::{io::AsyncSeekExt, sync::Mutex};
 
@@ -299,7 +299,8 @@ mod tests {
         let id = used_space.add_local_store(&store_dir).await?;
         // get a random vec of u64 by adding u32 (avoid overflow)
         let mut rng = rand::thread_rng();
-        let bytes = crate::utils::random_vec(&mut rng, std::mem::size_of::<u32>() * NUMS_TO_ADD);
+        let bytes =
+            crate::node::utils::random_vec(&mut rng, std::mem::size_of::<u32>() * NUMS_TO_ADD);
         let mut nums = Vec::new();
         for chunk in bytes.as_slice().chunks_exact(std::mem::size_of::<u32>()) {
             let mut num = 0u32;

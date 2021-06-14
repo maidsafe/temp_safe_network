@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{peer::PeerUtils, Prefix, XorName};
-use bls::PublicKey;
-use sn_data_types::ReplicaPublicKeySet;
 use crate::messaging::{
     node::{ElderCandidates, Peer},
     SectionAuthorityProvider,
 };
+use crate::routing::{peer::PeerUtils, Prefix, XorName};
+use bls::PublicKey;
+use sn_data_types::ReplicaPublicKeySet;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -211,8 +211,8 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
-    use crate::routing::tests::SecretKeySet;
-    use crate::{crypto, node::Node, MIN_ADULT_AGE, MIN_AGE};
+    use crate::routing::routing::tests::SecretKeySet;
+    use crate::routing::{crypto, node::Node, MIN_ADULT_AGE, MIN_AGE};
     use itertools::Itertools;
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;

@@ -8,12 +8,12 @@
 
 mod errors;
 
-use crate::{MessageId, MessageType, SectionAuthorityProvider, WireMsg};
+use crate::messaging::{MessageId, MessageType, SectionAuthorityProvider, WireMsg};
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
 use sn_data_types::PublicKey;
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Messages for exchanging network info, specifically on a target section for a msg.
@@ -53,19 +53,23 @@ pub enum GetSectionResponse {
 impl SectionInfoMsg {
     /// Convenience function to deserialize a 'Query' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a network info query.
-    pub fn from(bytes: Bytes) -> crate::Result<Self> {
+    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
         if let MessageType::SectionInfo { msg, .. } = deserialized {
             Ok(msg)
         } else {
-            Err(crate::Error::FailedToParse(
+            Err(crate::messaging::Error::FailedToParse(
                 "bytes as a network info message".to_string(),
             ))
         }
     }
 
     /// serialize this Query into bytes ready to be sent over the wire.
-    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
+    pub fn serialize(
+        &self,
+        dest: XorName,
+        dest_section_pk: BlsPublicKey,
+    ) -> crate::messaging::Result<Bytes> {
         WireMsg::serialize_section_info_msg(self, dest, dest_section_pk)
     }
 }

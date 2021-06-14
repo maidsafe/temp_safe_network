@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    capacity::CHUNK_COPY_COUNT,
-    chunks::Chunks,
-    node_ops::{NodeDuties, NodeDuty},
-};
-use itertools::Itertools;
-use log::{info, trace, warn};
-use sn_data_types::{Blob, BlobAddress};
 use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
     Aggregation, MessageId,
 };
+use crate::node::{
+    capacity::CHUNK_COPY_COUNT,
+    chunks::Chunks,
+    node_ops::{NodeDuties, NodeDuty},
+};
 use crate::routing::XorName;
+use itertools::Itertools;
+use log::{info, trace, warn};
+use sn_data_types::{Blob, BlobAddress};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;

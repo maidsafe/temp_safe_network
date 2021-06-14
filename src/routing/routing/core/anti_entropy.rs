@@ -6,15 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
+use crate::messaging::{
+    node::{RoutingMsg, Section, Variant},
+    DestInfo,
+};
+use crate::routing::{
     error::Result,
     messages::{RoutingMsgUtils, SrcAuthorityUtils},
     node::Node,
     section::{SectionAuthorityProviderUtils, SectionUtils},
-};
-use crate::messaging::{
-    node::{RoutingMsg, Section, Variant},
-    DestInfo,
 };
 use std::cmp::Ordering;
 
@@ -74,7 +74,8 @@ pub(crate) struct Actions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use crate::messaging::DstLocation;
+    use crate::routing::{
         agreement::test_utils::proven,
         crypto,
         section::test_utils::{gen_addr, gen_section_authority_provider},
@@ -83,7 +84,6 @@ mod tests {
     use anyhow::{Context, Result};
     use assert_matches::assert_matches;
     use secured_linked_list::SecuredLinkedList;
-    use crate::messaging::DstLocation;
     use xor_name::Prefix;
 
     #[test]

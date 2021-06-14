@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{network::Network, Result};
+use crate::node::{network::Network, Result};
+use crate::routing;
 use async_trait::async_trait;
 use bls::PublicKeySet;
 use sn_data_types::{
@@ -31,7 +32,7 @@ pub trait ReplicaSigning {
 
     async fn known_replicas(
         &self,
-        wallet_name: &sn_routing::XorName,
+        wallet_name: &routing::XorName,
         section_key: bls::PublicKey,
     ) -> bool;
 }
@@ -88,7 +89,7 @@ impl ReplicaSigning for ReplicaSigningImpl {
     /// a valid section, since the query returns the current key..
     async fn known_replicas(
         &self,
-        wallet_name: &sn_routing::XorName,
+        wallet_name: &routing::XorName,
         section_key: bls::PublicKey,
     ) -> bool {
         if let Ok(key) = self.network.matching_section(wallet_name).await {

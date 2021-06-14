@@ -9,19 +9,19 @@
 mod listeners;
 mod messaging;
 
-use crate::Error;
+use crate::client::Error;
+use crate::messaging::client::CmdError;
+use crate::messaging::{client::QueryResponse, MessageId};
+use bls::PublicKeySet;
 use log::{debug, trace};
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
 use sn_data_types::{PublicKey, TransferValidated};
-use crate::messaging::client::CmdError;
-use crate::messaging::{client::QueryResponse, MessageId};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
     sync::Arc,
 };
-use threshold_crypto::PublicKeySet;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};

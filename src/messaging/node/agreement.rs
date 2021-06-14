@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{plain_message::PlainMessage, section::MemberInfo, signed::Signed};
-use crate::SectionAuthorityProvider;
+use crate::messaging::SectionAuthorityProvider;
+use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
 use secured_linked_list::SecuredLinkedList;
@@ -17,7 +18,6 @@ use std::{
     collections::BTreeSet,
     fmt::{self, Debug, Formatter},
 };
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
 
 /// SHA3-256 hash digest.

@@ -68,7 +68,7 @@ pub mod shared_box {
     use serde::{Deserialize, Serialize};
     use std::fmt::{self, Debug};
     use std::ops::Deref;
-    use threshold_crypto::{serde_impl::SerdeSecret, SecretKey as BlsSecretKey};
+    use bls::{serde_impl::SerdeSecret, SecretKey as BlsSecretKey};
 
     /// Shared secret encryption key.
     #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -81,7 +81,7 @@ pub mod shared_box {
         }
 
         /// Create new key from the given raw key data.
-        pub fn from_raw(data: &[u8]) -> Result<Self, crate::Error> {
+        pub fn from_raw(data: &[u8]) -> Result<Self, crate::client::Error> {
             // FIXME: this function subverts the purpose of this module - it
             // copies the sensitive data. Possible fix might be to take the input by
             // mutable reference and zero it afterwards.
@@ -91,14 +91,14 @@ pub mod shared_box {
     }
 
     /// Generate new random public/secret keypair.
-    pub fn gen_keypair() -> (SecretKey, threshold_crypto::PublicKey) {
-        let sk = threshold_crypto::SecretKey::random();
+    pub fn gen_keypair() -> (SecretKey, bls::PublicKey) {
+        let sk = bls::SecretKey::random();
         let pk = sk.public_key();
         (SecretKey::new(sk), pk)
     }
 
     impl Deref for SecretKey {
-        type Target = threshold_crypto::SecretKey;
+        type Target = bls::SecretKey;
 
         fn deref(&self) -> &Self::Target {
             &(*self.0)

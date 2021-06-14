@@ -18,9 +18,9 @@ pub(crate) use self::{
     dkg_msgs_utils::{DkgFailureSignedSetUtils, DkgFailureSignedUtils, DkgKeyUtils},
     proposal::{ProposalAggregator, ProposalError, ProposalUtils},
 };
+pub(crate) use crate::messaging::node::{SignatureAggregator, Signed, SignedShare};
 pub use proven::ProvenUtils;
 use serde::Serialize;
-pub(crate) use crate::messaging::node::{SignatureAggregator, Signed, SignedShare};
 
 // Verify the integrity of `message` against `signed`.
 pub(crate) fn verify_signed<T: Serialize>(signed: &Signed, message: &T) -> bool {

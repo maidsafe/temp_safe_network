@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
+use crate::messaging::{
+    client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, SrcLocation,
+};
+use crate::node::{
     network::Network,
     node_ops::{MsgType, OutgoingLazyError, OutgoingMsg, OutgoingSupportingInfo},
     Error, Result,
 };
-use log::{error, trace};
-use crate::messaging::{
-    client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, SrcLocation,
-};
 use crate::routing::XorName;
+use log::{error, trace};
 use std::collections::BTreeSet;
 
 pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {

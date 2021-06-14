@@ -17,8 +17,8 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
-    #[error(transparent)]
-    Client(#[from] client::Error),
+    #[error("Error received from a client")]
+    Client(String),
     #[error("Failed to serialize message: {0}")]
     Serialisation(String),
     /// Failed to parse a string.

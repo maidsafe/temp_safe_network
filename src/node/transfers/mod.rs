@@ -13,7 +13,18 @@ pub mod store;
 mod test_utils;
 
 use self::replicas::{ReplicaInfo, Replicas};
-use crate::{
+use crate::messaging::{
+    client::{
+        ClientMsg, ClientSigned, CmdError, DataCmd, Error as ErrorMessage, Event, ProcessMsg,
+        QueryResponse, TransferError,
+    },
+    node::{
+        NodeCmd, NodeCmdError, NodeMsg, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
+        NodeTransferQueryResponse,
+    },
+    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+};
+use crate::node::{
     capacity::StoreCost,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
@@ -27,17 +38,6 @@ use sn_data_types::Transfer;
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
     TransferAgreementProof,
-};
-use crate::messaging::{
-    client::{
-        ClientMsg, ClientSigned, CmdError, DataCmd, Error as ErrorMessage, Event, ProcessMsg,
-        QueryResponse, TransferError,
-    },
-    node::{
-        NodeCmd, NodeCmdError, NodeMsg, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
-        NodeTransferQueryResponse,
-    },
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Display, Formatter};

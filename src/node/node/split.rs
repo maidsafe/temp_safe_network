@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
+use crate::messaging::MessageId;
+use crate::node::{
     network::Network,
     node::interaction::push_state,
     node::role::ElderRole,
@@ -15,6 +16,7 @@ use crate::{
     transfers::get_replicas::replica_info,
     Error, Node, Result,
 };
+use crate::routing::{Prefix, XorName};
 use log::debug;
 use section_funds::{
     elder_signing::ElderSigning,
@@ -22,8 +24,6 @@ use section_funds::{
     reward_wallets::RewardWallets,
 };
 use sn_data_types::{NodeAge, PublicKey, Token};
-use crate::messaging::MessageId;
-use crate::routing::{Prefix, XorName};
 use std::collections::{BTreeMap, BTreeSet};
 
 impl Node {

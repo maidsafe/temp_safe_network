@@ -7,9 +7,9 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
+use bls;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
-use threshold_crypto as bls;
 
 /// Signed that a quorum of the section elders has agreed on something.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ impl Debug for SignedShare {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use threshold_crypto::SecretKey;
+    use bls::SecretKey;
 
     #[test]
     fn verify_signed() {

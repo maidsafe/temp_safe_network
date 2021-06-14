@@ -8,10 +8,10 @@
 
 #![allow(trivial_numeric_casts)] // FIXME
                                  // beep
-use crate::{Error, Result};
+use crate::node::{Error, Result};
+use crate::routing::TransportConfig as NetworkConfig;
 use log::{debug, Level};
 use serde::{Deserialize, Serialize};
-use crate::routing::TransportConfig as NetworkConfig;
 use std::{
     collections::HashSet,
     fs::{self, File},

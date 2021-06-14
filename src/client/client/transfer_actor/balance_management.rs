@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
 use crate::messaging::client::{Cmd, Event, Query, QueryResponse, TransferCmd, TransferQuery};
+use sn_data_types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
 use sn_transfers::{ActorEvent, TransferInitiated};
 
-use crate::{Client, Error};
+use crate::client::{Client, Error};
 
 use log::{debug, info, trace};
 
@@ -106,7 +106,7 @@ impl Client {
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // A random sk, to send token to
-    /// let sk = threshold_crypto::SecretKey::random();
+    /// let sk = bls::SecretKey::random();
     /// let pk = PublicKey::from(sk.public_key());
     /// // Next we create a random client.
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
@@ -195,10 +195,10 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::errors::TransfersError;
-    use crate::utils::{
+    use crate::client::utils::{
         generate_random_vector, test_utils::calculate_new_balance, test_utils::create_test_client,
     };
+    use crate::client::TransfersError;
     use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use rand::rngs::OsRng;

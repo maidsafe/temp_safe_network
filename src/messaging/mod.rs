@@ -24,9 +24,9 @@ pub use self::{
     sap::SectionAuthorityProvider,
     serialisation::WireMsg,
 };
+use bls::PublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use threshold_crypto::PublicKey;
 use xor_name::XorName;
 
 /// Type of message.

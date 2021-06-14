@@ -9,7 +9,7 @@
 use sn_data_types::TransferAgreementProof;
 use sn_transfers::ActorEvent;
 
-use crate::{Client, Error};
+use crate::client::{Client, Error};
 
 /// Handle Write API msg_contents for a given Client.
 impl Client {
@@ -33,7 +33,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{errors::TransfersError, utils::test_utils::create_test_client_with};
+    use crate::client::{errors::TransfersError, utils::test_utils::create_test_client_with};
     use anyhow::{bail, Result};
     use rand::rngs::OsRng;
     use sn_data_types::{Keypair, Sequence};

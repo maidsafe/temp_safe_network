@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::read_network_conn_info;
-use crate::{client::Client, retry_loop_for_pattern};
+use crate::client::Client;
+use crate::retry_loop_for_pattern;
 use anyhow::Result;
 use sn_data_types::{Keypair, Token};
 use std::str::FromStr;

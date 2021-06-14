@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CapacityReader, CHUNK_COPY_COUNT, MAX_CHUNK_SIZE, MAX_SUPPLY};
-use crate::{network::Network, Error, Result};
+use crate::node::{network::Network, Error, Result};
 use log::debug;
 use sn_data_types::Token;
 

@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Variant;
-use crate::DstLocation;
+use crate::messaging::DstLocation;
+use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Section-source message without signature and proof.

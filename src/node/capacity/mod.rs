@@ -11,11 +11,11 @@ mod store_cost;
 
 use std::collections::BTreeSet;
 
-pub use adult_storage_info::AdultsStorageInfo;
 use crate::routing::{Prefix, XorName};
+pub use adult_storage_info::AdultsStorageInfo;
 pub use store_cost::StoreCost;
 
-use crate::metadata::adult_reader::AdultReader;
+use crate::node::metadata::adult_reader::AdultReader;
 
 pub const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
 // The number of separate copies of a blob chunk which should be maintained.

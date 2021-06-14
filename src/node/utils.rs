@@ -8,7 +8,7 @@
 
 //! Utilities
 
-use crate::{config_handler::Config, Error, Result};
+use crate::node::{config_handler::Config, Error, Result};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
 use log::{Log, Metadata, Record};

@@ -18,12 +18,12 @@ mod transfer_actor;
 // sn_transfers wrapper
 pub use self::transfer_actor::SafeTransferActor;
 
-use crate::{config_handler::Config, connections::Session, errors::Error};
+use crate::client::{config_handler::Config, connections::Session, errors::Error};
+use crate::messaging::client::{Cmd, CmdError, DataCmd};
 use crdts::Dot;
 use log::{debug, info, trace, warn};
 use rand::rngs::OsRng;
 use sn_data_types::{Keypair, PublicKey, SectionElders, Token};
-use crate::messaging::client::{Cmd, CmdError, DataCmd};
 use std::{
     path::Path,
     str::FromStr,
@@ -246,7 +246,7 @@ async fn attempt_bootstrap(session: &mut Session, client_pk: PublicKey) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils::{create_test_client, create_test_client_with};
+    use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
     use anyhow::Result;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 

@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Error, Result};
+use crate::messaging::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tiny_keccak::{Hasher, Sha3};

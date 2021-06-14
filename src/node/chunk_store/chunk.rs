@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::to_db_key::ToDbKey;
+use crate::node::to_db_key::ToDbKey;
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::DataAddress;
 

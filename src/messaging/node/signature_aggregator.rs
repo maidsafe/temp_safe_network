@@ -8,13 +8,13 @@
 // Software.
 
 use super::signed::{Signed, SignedShare};
+use bls;
 use std::{
     collections::HashMap,
     fmt::Debug,
     time::{Duration, Instant},
 };
 use thiserror::Error;
-use threshold_crypto as bls;
 use tiny_keccak::{Hasher, Sha3};
 
 /// Default duration since their last modification after which all unaggregated entries expire.

@@ -14,7 +14,11 @@ use super::{
         RewardStage,
     },
 };
-use crate::{
+use crate::messaging::{
+    node::{NodeCmd, NodeMsg, NodeSystemCmd},
+    Aggregation, DstLocation, MessageId,
+};
+use crate::node::{
     capacity::MAX_SUPPLY,
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error, Result,
@@ -22,10 +26,6 @@ use crate::{
 use log::{debug, info};
 use sn_data_types::{
     Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
-};
-use crate::messaging::{
-    node::{NodeCmd, NodeMsg, NodeSystemCmd},
-    Aggregation, DstLocation, MessageId,
 };
 use std::collections::BTreeMap;
 use xor_name::{Prefix, XorName};

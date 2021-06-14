@@ -10,14 +10,14 @@ use super::{
     blob_records::BlobRecords, map_storage::MapStorage, register_storage::RegisterStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::{node_ops::NodeDuty, Error, Result};
-use log::info;
-use sn_data_types::PublicKey;
 use crate::messaging::{
     client::{ClientSigned, DataCmd, DataExchange, DataQuery},
     EndUser, MessageId,
 };
+use crate::node::{node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
+use log::info;
+use sn_data_types::PublicKey;
 
 /// The various data type stores,
 /// that are only managed at Elders.

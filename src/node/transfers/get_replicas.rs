@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{replica_signing::ReplicaSigningImpl, replicas::Replicas, ReplicaInfo};
-use crate::{network::Network, node::NodeInfo, Error, Result};
+use crate::node::{network::Network, node::NodeInfo, Error, Result};
 use sn_data_types::{ActorHistory, PublicKey};
 use std::collections::BTreeMap;
 

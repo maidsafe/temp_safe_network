@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::role::{ElderRole, Role};
-use crate::{
+use crate::messaging::client::DataExchange;
+use crate::node::{
     capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter, StoreCost},
     metadata::{adult_reader::AdultReader, Metadata},
     network::Network,
@@ -19,10 +20,9 @@ use crate::{
     },
     Node, Result,
 };
+use crate::routing::XorName;
 use log::info;
 use sn_data_types::{ActorHistory, NodeAge, PublicKey};
-use crate::messaging::client::DataExchange;
-use crate::routing::XorName;
 use std::collections::BTreeMap;
 
 impl Node {

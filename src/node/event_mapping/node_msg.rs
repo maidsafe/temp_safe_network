@@ -7,19 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Mapping, MsgContext};
-use crate::{
-    error::convert_to_error_message,
-    node_ops::{MsgType, NodeDuty, OutgoingMsg},
-    Error,
-};
-use log::debug;
 use crate::messaging::{
+    client::QueryResponse,
     node::{
         NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeRewardQuery,
         NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
+use crate::node::{
+    error::convert_to_error_message,
+    node_ops::{MsgType, NodeDuty, OutgoingMsg},
+    Error,
+};
+use log::debug;
 
 pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
     debug!(
@@ -221,7 +222,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             correlation_id,
             ..
         } => NodeDuty::RecordAdultReadLiveness {
-            response: sn_messaging::client::QueryResponse::GetBlob(res),
+            response: QueryResponse::GetBlob(res),
             correlation_id,
             src: origin.name(),
         },

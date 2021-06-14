@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{replica_signing::ReplicaSigning, store::TransferStore};
-use crate::{Error, Result};
+use crate::node::{Error, Result};
 use bls::PublicKeySet;
 use dashmap::DashMap;
 use log::info;
@@ -23,7 +23,7 @@ use xor_name::Prefix;
 
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::node_ops::NodeDuty,
+    crate::node::node_ops::NodeDuty,
     bls::{SecretKey, SecretKeySet},
     log::debug,
     rand::thread_rng,

@@ -55,7 +55,6 @@ target/release/*
 /.vscode
 /.project
 *.sublime-*
-/bin/
 *.back.aip
 .env
 installer/docker/sn_node

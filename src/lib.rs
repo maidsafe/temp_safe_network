@@ -29,8 +29,10 @@
 // For quick_error
 #![recursion_limit = "256"]
 
-mod messaging;
-mod routing;
-pub mod node;
-pub mod client;
+#[macro_use]
+extern crate tracing;
 
+pub mod client;
+pub mod messaging;
+pub mod node;
+pub mod routing;

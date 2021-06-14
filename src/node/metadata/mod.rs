@@ -14,17 +14,6 @@ mod map_storage;
 mod register_storage;
 mod sequence_storage;
 
-use crate::{
-    capacity::Capacity,
-    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
-    Result,
-};
-use blob_records::BlobRecords;
-use elder_stores::ElderStores;
-use map_storage::MapStorage;
-use register_storage::RegisterStorage;
-use sequence_storage::SequenceStorage;
-use sn_data_types::{Blob, PublicKey};
 use crate::messaging::{
     client::{
         ClientMsg, ClientSigned, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg,
@@ -32,7 +21,18 @@ use crate::messaging::{
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
+use crate::node::{
+    capacity::Capacity,
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
+    Result,
+};
 use crate::routing::Prefix;
+use blob_records::BlobRecords;
+use elder_stores::ElderStores;
+use map_storage::MapStorage;
+use register_storage::RegisterStorage;
+use sequence_storage::SequenceStorage;
+use sn_data_types::{Blob, PublicKey};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},

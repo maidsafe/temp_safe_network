@@ -13,7 +13,8 @@ mod messaging;
 mod role;
 mod split;
 
-use crate::{
+use crate::messaging::client::ClientMsg;
+use crate::node::{
     chunk_store::UsedSpace,
     chunks::Chunks,
     error::convert_to_error_message,
@@ -23,16 +24,15 @@ use crate::{
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
+use crate::routing::{
+    EventStream, {Prefix, XorName},
+};
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
 use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
-use crate::messaging::client::ClientMsg;
-use crate::routing::{
-    EventStream, {Prefix, XorName},
-};
 use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},

@@ -7,7 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{DkgFailureSignedSetUtils, DkgFailureSignedUtils};
-use crate::{
+use crate::messaging::{
+    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, RoutingMsg, Variant},
+    DestInfo, DstLocation, SectionAuthorityProvider,
+};
+use crate::routing::{
     crypto::{self, Keypair},
     error::Result,
     messages::RoutingMsgUtils,
@@ -18,10 +22,6 @@ use crate::{
 };
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use itertools::Itertools;
-use crate::messaging::{
-    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, RoutingMsg, Variant},
-    DestInfo, DstLocation, SectionAuthorityProvider,
-};
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
     fmt::Debug,
@@ -587,7 +587,7 @@ impl DkgCommands for Option<DkgCommand> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use crate::routing::{
         agreement::DkgKeyUtils, crypto, node::test_utils::arbitrary_unique_nodes,
         section::test_utils::gen_addr, ELDER_SIZE, MIN_ADULT_AGE,
     };

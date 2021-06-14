@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
-use crate::Error;
-use log::{debug, error, info, trace, warn};
-use qp2p::IncomingMessages;
-use sn_data_types::PublicKey;
+use crate::client::Error;
 use crate::messaging::{
     client::{ClientMsg, Event, ProcessMsg},
     section_info::{Error as SectionInfoError, GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
+use log::{debug, error, info, trace, warn};
+use qp2p::IncomingMessages;
+use sn_data_types::PublicKey;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,

@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::{
+use crate::messaging::node::{
+    Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
+};
+use crate::routing::{
     error::Result,
     peer::PeerUtils,
     relocation::{
@@ -16,9 +19,6 @@ use crate::{
     routing::command::Command,
     section::{MemberInfoUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
     Event, ELDER_SIZE,
-};
-use crate::messaging::node::{
-    Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
 };
 use tokio::sync::mpsc;
 use xor_name::XorName;

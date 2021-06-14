@@ -8,13 +8,13 @@ use std::collections::{BTreeSet, HashMap};
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use itertools::Itertools;
-use sn_data_types::BlobAddress;
 use crate::messaging::{EndUser, MessageId};
 use crate::routing::XorName;
+use itertools::Itertools;
+use sn_data_types::BlobAddress;
 use std::collections::hash_map::Entry;
 
-use crate::capacity::CHUNK_COPY_COUNT;
+use crate::node::capacity::CHUNK_COPY_COUNT;
 
 const NEIGHBOUR_COUNT: usize = 2;
 const MIN_PENDING_OPS: usize = 10;

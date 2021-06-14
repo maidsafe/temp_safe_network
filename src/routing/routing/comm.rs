@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::error::{Error, Result};
-use crate::XorName;
+use crate::messaging::MessageType;
+use crate::routing::{Error, Result};
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
 use hex_fmt::HexFmt;
 use qp2p::{Endpoint, QuicP2p};
-use crate::messaging::MessageType;
 use std::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
     sync::RwLock,
 };
 use tokio::{sync::mpsc, task};
+use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
 pub(crate) struct Comm {
@@ -347,12 +347,12 @@ pub enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::{section_info::SectionInfoMsg, DestInfo, WireMsg};
     use anyhow::Result;
     use assert_matches::assert_matches;
     use futures::future;
     use qp2p::Config;
     use sn_data_types::PublicKey;
-    use crate::messaging::{section_info::SectionInfoMsg, DestInfo, WireMsg};
     use std::{net::Ipv4Addr, slice, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
 

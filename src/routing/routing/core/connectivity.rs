@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::{
+use crate::messaging::node::{
+    DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, Proposal,
+};
+use crate::routing::{
     agreement::{DkgCommands, DkgFailureSignedSetUtils},
     error::Result,
     peer::PeerUtils,
@@ -16,9 +19,6 @@ use crate::{
     Error,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use crate::messaging::node::{
-    DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, Proposal,
-};
 use std::{collections::BTreeSet, iter, net::SocketAddr, slice};
 use xor_name::XorName;
 

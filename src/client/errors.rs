@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use qp2p::Error as QuicP2pError;
-use sn_data_types::{Error as DtError, PublicKey};
 pub use crate::messaging::{client::Error as ErrorMessage, Error as MessagingError};
 use crate::messaging::{
     client::{CmdError, Event, QueryResponse, TransferError},
     MessageId,
 };
+use qp2p::Error as QuicP2pError;
+use sn_data_types::{Error as DtError, PublicKey};
 pub use sn_transfers::Error as TransfersError;
 use std::io;
 

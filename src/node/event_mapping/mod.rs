@@ -9,21 +9,21 @@
 mod client_msg;
 mod node_msg;
 
-use crate::{
-    network::Network,
-    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
-};
-use client_msg::map_client_msg;
-use log::{debug, error, info, trace, warn};
-use node_msg::map_node_msg;
-use sn_data_types::PublicKey;
 use crate::messaging::{
     client::{Error as ErrorMessage, ProcessingError},
     node::NodeMsg,
     MessageId, SrcLocation,
 };
+use crate::node::{
+    network::Network,
+    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
+};
 use crate::routing::XorName;
 use crate::routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use client_msg::map_client_msg;
+use log::{debug, error, info, trace, warn};
+use node_msg::map_node_msg;
+use sn_data_types::PublicKey;
 use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]

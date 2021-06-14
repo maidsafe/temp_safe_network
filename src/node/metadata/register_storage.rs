@@ -7,7 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{build_client_error_response, build_client_query_response};
-use crate::{
+use crate::messaging::{
+    client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
+    EndUser, MessageId,
+};
+use crate::node::{
     chunk_store::RegisterChunkStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
     Result,
 };
@@ -15,10 +19,6 @@ use log::info;
 use sn_data_types::{
     register::{Action, Address, Entry, Register, RegisterOp, User},
     PublicKey,
-};
-use crate::messaging::{
-    client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
-    EndUser, MessageId,
 };
 use std::{
     fmt::{self, Display, Formatter},

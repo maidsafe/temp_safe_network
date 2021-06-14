@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::replica_signing::ReplicaSigning;
-use crate::{Error, Result};
+use crate::node::{Error, Result};
+use crate::routing;
 use async_trait::async_trait;
 use bls::{PublicKeySet, PublicKeyShare, SecretKeyShare};
 use sn_data_types::{
@@ -89,7 +90,7 @@ impl ReplicaSigning for TestReplicaSigning {
 
     async fn known_replicas(
         &self,
-        _wallet_name: &sn_routing::XorName,
+        _wallet_name: &routing::XorName,
         _section_key: bls::PublicKey,
     ) -> bool {
         true

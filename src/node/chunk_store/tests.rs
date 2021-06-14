@@ -10,11 +10,11 @@ use super::{
     chunk::{Chunk, ChunkId},
     ChunkStore, Result as ChunkStoreResult, Subdir,
 };
-use crate::{to_db_key::ToDbKey, Error, Result};
+use crate::node::{to_db_key::ToDbKey, Error, Result};
+use crate::routing::XorName;
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{BlobAddress, DataAddress};
-use crate::routing::XorName;
 use std::{path::Path, u64};
 use tempdir::TempDir;
 
@@ -141,7 +141,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
 
     match chunk_store.put(&data).await {
         Err(Error::NotEnoughSpace) => (),
-        x => return Err(crate::Error::Logic(format!("Unexpected: {:?}", x))),
+        x => return Err(crate::node::Error::Logic(format!("Unexpected: {:?}", x))),
     }
 
     Ok(())
@@ -227,7 +227,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let id = Id(new_rng().gen());
     match chunk_store.get(&id) {
         Err(Error::NoSuchChunk(_)) => (),
-        x => return Err(crate::Error::Logic(format!("Unexpected {:?}", x))),
+        x => return Err(crate::node::Error::Logic(format!("Unexpected {:?}", x))),
     }
 
     Ok(())

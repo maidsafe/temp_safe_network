@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::error::{Error, Result};
 use crate::messaging::EndUser;
+use crate::routing::{Error, Result};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     net::SocketAddr,

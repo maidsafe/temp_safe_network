@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::PublicKeySet;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,7 +15,6 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,
 };
-use threshold_crypto::PublicKeySet;
 use xor_name::{Prefix, XorName};
 
 /// A new `SectionAuthorityProvider` is created whenever the elders change,

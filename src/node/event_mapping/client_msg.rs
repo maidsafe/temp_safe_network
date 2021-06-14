@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Mapping, MsgContext};
-use crate::{
+use crate::messaging::{
+    client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery},
+    Aggregation, EndUser, MessageId, SrcLocation,
+};
+use crate::node::{
     error::convert_to_error_message,
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
 use log::warn;
-use crate::messaging::{
-    client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery},
-    Aggregation, EndUser, MessageId, SrcLocation,
-};
 
 pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
     match msg {

@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{agreement::Proven, relocation::RelocatePayload, section::MemberInfo};
-use crate::SectionAuthorityProvider;
+use crate::messaging::SectionAuthorityProvider;
+use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,6 @@ use std::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
 };
-use threshold_crypto::PublicKey as BlsPublicKey;
 
 /// Request to join a section
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]

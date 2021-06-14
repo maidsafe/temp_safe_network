@@ -13,7 +13,18 @@ mod relocation;
 mod resource_proof;
 
 use super::super::Core;
-use crate::{
+use crate::messaging::node::Error as AggregatorError;
+use crate::messaging::{
+    client::ClientMsg,
+    node::{
+        DkgFailureSignedSet, Error as NodeErrorMessage, JoinRejectionReason, JoinRequest,
+        JoinResponse, Network, Peer, Proposal, RoutingMsg, Section, SignedRelocateDetails,
+        SrcAuthority, Variant,
+    },
+    section_info::{GetSectionResponse, SectionInfoMsg},
+    DestInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
+};
+use crate::routing::{
     agreement::{DkgCommands, ProposalError, SignedShare},
     error::{Error, Result},
     event::Event,
@@ -28,16 +39,6 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use crate::messaging::node::Error as AggregatorError;
-use crate::messaging::{
-    client::ClientMsg,
-    node::{
-        DkgFailureSignedSet, JoinRejectionReason, JoinRequest, JoinResponse, Network, Peer,
-        Proposal, RoutingMsg, Section, SignedRelocateDetails, SrcAuthority, Variant,
-    },
-    section_info::{GetSectionResponse, SectionInfoMsg},
-    DestInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
-};
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
@@ -179,9 +180,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         match self.proposal_aggregator.add(proposal, signed_share) {
             Ok((proposal, signed)) => Ok(vec![Command::HandleAgreement { proposal, signed }]),
-            Err(ProposalError::Aggregation(sn_messaging::node::Error::NotEnoughShares)) => {
-                Ok(vec![])
-            }
+            Err(ProposalError::Aggregation(NodeErrorMessage::NotEnoughShares)) => Ok(vec![]),
             Err(error) => {
                 error!("Failed to add proposal: {}", error);
                 Err(Error::InvalidSignatureShare)

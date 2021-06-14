@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{QueryResult, Session};
-use crate::Error;
-use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
-use itertools::Itertools;
-use log::{debug, error, info, trace, warn};
-use sn_data_types::{Blob, PrivateBlob, PublicBlob, PublicKey, TransferValidated};
+use crate::client::Error;
 use crate::messaging::{
     client::{BlobRead, ClientMsg, ClientSigned, Cmd, DataQuery, ProcessMsg, Query, QueryResponse},
     section_info::SectionInfoMsg,
     MessageId,
 };
+use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
+use itertools::Itertools;
+use log::{debug, error, info, trace, warn};
+use sn_data_types::{Blob, PrivateBlob, PublicBlob, PublicKey, TransferValidated};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -484,7 +484,7 @@ impl Session {
         let dest_section_name = XorName::from(client_pk);
 
         // FIXME: we don't know our section PK. We must supply a pk for now we do a random one...
-        let random_section_pk = threshold_crypto::SecretKey::random().public_key();
+        let random_section_pk = bls::SecretKey::random().public_key();
 
         let msg = SectionInfoMsg::GetSectionQuery(client_pk)
             .serialize(dest_section_name, random_section_pk)?;

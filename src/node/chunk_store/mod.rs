@@ -17,8 +17,8 @@ mod sequence;
 mod tests;
 mod used_space;
 
-use crate::error::{Error, Result};
-use crate::utils;
+use crate::node::utils;
+use crate::node::{Error, Result};
 use chunk::{Chunk, ChunkId};
 use log::{info, trace};
 use sn_data_types::{register::Register, Blob, Map, Sequence};

@@ -8,17 +8,17 @@
 
 mod chunk_storage;
 
-use crate::{
+use crate::messaging::{
+    client::{BlobRead, BlobWrite},
+    MessageId,
+};
+use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
 use chunk_storage::ChunkStorage;
 use log::info;
 use sn_data_types::{Blob, BlobAddress, PublicKey};
-use crate::messaging::{
-    client::{BlobRead, BlobWrite},
-    MessageId,
-};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,

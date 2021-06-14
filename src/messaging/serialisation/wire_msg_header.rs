@@ -7,7 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crate::{Error, MessageId, Result, MESSAGE_ID_LEN};
+use crate::messaging::{Error, MessageId, Result, MESSAGE_ID_LEN};
+use bls::{PublicKey, PK_SIZE};
 use bytes::Bytes;
 use cookie_factory::{
     bytes::{be_u16, be_u8},
@@ -15,7 +16,6 @@ use cookie_factory::{
     gen,
 };
 use std::{convert::TryFrom, fmt::Debug, mem::size_of};
-use threshold_crypto::{PublicKey, PK_SIZE};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 // Current version of the messaging protocol.
@@ -185,7 +185,7 @@ impl WireMsgHeader {
         // and if the header size has the exact number of bytes to read a PublicKey from.
         // Once we move back to fixed-length header we won't need this check.
         let src_section_pk = if kind == MessageKind::Node
-            && HEADER_MIN_SIZE + HDR_SRC_PK_BYTES_LEN == header_size.into()
+            && HEADER_MIN_SIZE + HDR_SRC_PK_BYTES_LEN == header_size as usize
         {
             let mut src_pk_bytes = [0; HDR_SRC_PK_BYTES_LEN];
             src_pk_bytes[0..].copy_from_slice(&bytes[HDR_SRC_PK_BYTES_START..HDR_SRC_PK_BYTES_END]);

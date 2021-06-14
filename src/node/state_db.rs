@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Result};
+use crate::node::{Error, Result};
 pub use ed25519_dalek::{Keypair, PublicKey, SecretKey, KEYPAIR_LENGTH, PUBLIC_KEY_LENGTH};
 use hex::{decode, encode};
 use std::path::Path;

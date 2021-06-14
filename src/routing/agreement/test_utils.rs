@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{ProvenUtils, Signed};
-use crate::{Error, Result};
-use serde::Serialize;
 use crate::messaging::node::Proven;
+use crate::routing::{Error, Result};
+use serde::Serialize;
 
 // Create signed for the given payload using the given secret key.
 pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<Signed> {

@@ -7,7 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{delivery_group, Core};
-use crate::{
+use crate::messaging::{
+    node::{MemberInfo, Network, Peer, Proposal, RoutingMsg, Section, Variant},
+    section_info::Error as TargetSectionError,
+    DestInfo, EndUser, Itinerary, SectionAuthorityProvider, SrcLocation,
+};
+use crate::routing::{
     error::Result,
     messages::RoutingMsgUtils,
     network::NetworkUtils,
@@ -19,11 +24,6 @@ use crate::{
 };
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::{
-    node::{MemberInfo, Network, Peer, Proposal, RoutingMsg, Section, Variant},
-    section_info::Error as TargetSectionError,
-    DestInfo, EndUser, Itinerary, SectionAuthorityProvider, SrcLocation,
-};
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 use xor_name::{Prefix, XorName};

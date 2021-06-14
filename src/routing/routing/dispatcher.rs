@@ -7,18 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{bootstrap, Comm, Command, Core};
-use crate::{
-    error::Result, event::Event, messages::RoutingMsgUtils, peer::PeerUtils,
-    routing::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error, XorName,
-};
-use itertools::Itertools;
-use sn_data_types::PublicKey;
 use crate::messaging::{
     node::{
         JoinRejectionReason, JoinResponse, RoutingMsg, SignedRelocateDetails, SrcAuthority, Variant,
     },
     DstLocation, MessageType,
 };
+use crate::routing::{
+    error::Result, event::Event, messages::RoutingMsgUtils, peer::PeerUtils,
+    routing::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error, XorName,
+};
+use itertools::Itertools;
+use sn_data_types::PublicKey;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc, watch, RwLock},

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{to_db_key::ToDbKey, utils, Error, Result};
+use crate::node::{to_db_key::ToDbKey, utils, Error, Result};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -99,7 +99,7 @@ where
 #[cfg(test)]
 mod test {
     use super::TransferStore;
-    use crate::{Error, Result};
+    use crate::node::{Error, Result};
     use bls::SecretKeySet;
     use bls::{PublicKeySet, SecretKey, SecretKeyShare};
     use sn_data_types::{

@@ -36,7 +36,8 @@ pub use self::{
     transfer::{TransferCmd, TransferQuery},
 };
 
-use crate::{MessageId, MessageType, WireMsg};
+use crate::messaging::{MessageId, MessageType, WireMsg};
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -49,7 +50,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
 };
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Public key and signature provided by the client
@@ -165,19 +165,23 @@ impl ProcessingError {
 impl ClientMsg {
     /// Convenience function to deserialize a 'Message' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a client message.
-    pub fn from(bytes: Bytes) -> crate::Result<Self> {
+    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
         if let MessageType::Client { msg, .. } = deserialized {
             Ok(msg)
         } else {
-            Err(crate::Error::FailedToParse(
+            Err(crate::messaging::Error::FailedToParse(
                 "bytes as a client message".to_string(),
             ))
         }
     }
 
     /// Serialize this Message into bytes ready to be sent over the wire.
-    pub fn serialize(&self, dest: XorName, dest_section_pk: BlsPublicKey) -> crate::Result<Bytes> {
+    pub fn serialize(
+        &self,
+        dest: XorName,
+        dest_section_pk: BlsPublicKey,
+    ) -> crate::messaging::Result<Bytes> {
         WireMsg::serialize_client_msg(self, dest, dest_section_pk)
     }
 
@@ -489,7 +493,7 @@ mod tests {
 
     fn gen_keypairs() -> Vec<Keypair> {
         let mut rng = rand::thread_rng();
-        let bls_secret_key = threshold_crypto::SecretKeySet::random(1, &mut rng);
+        let bls_secret_key = bls::SecretKeySet::random(1, &mut rng);
         vec![
             Keypair::new_ed25519(&mut rng),
             Keypair::new_bls_share(
@@ -599,7 +603,7 @@ mod tests {
 
         let mut data = BTreeMap::new();
         let _ = data.insert(vec![1], vec![10]);
-        let owners = PublicKey::Bls(threshold_crypto::SecretKey::random().public_key());
+        let owners = PublicKey::Bls(bls::SecretKey::random().public_key());
         let m_data = Map::Unseq(UnseqMap::new_with_data(
             *i_data.name(),
             1,
@@ -638,7 +642,7 @@ mod tests {
 
         // test msgpack serialization
         let dest = XorName::random();
-        let dest_section_pk = threshold_crypto::SecretKey::random().public_key();
+        let dest_section_pk = bls::SecretKey::random().public_key();
         let serialized = message.serialize(dest, dest_section_pk)?;
         let deserialized = ClientMsg::from(serialized)?;
         assert_eq!(deserialized, message);

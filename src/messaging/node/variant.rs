@@ -15,7 +15,8 @@ use super::{
     signed::SignedShare,
     RoutingMsg,
 };
-use crate::{DestInfo, SectionAuthorityProvider};
+use crate::messaging::{DestInfo, SectionAuthorityProvider};
+use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use hex_fmt::HexFmt;
 use itertools::Itertools;
@@ -25,7 +26,6 @@ use std::{
     collections::BTreeSet,
     fmt::{self, Debug, Formatter},
 };
-use threshold_crypto::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]

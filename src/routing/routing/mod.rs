@@ -25,7 +25,12 @@ use self::{
     core::Core,
     dispatcher::Dispatcher,
 };
-use crate::{
+use crate::messaging::{
+    client::ClientMsg,
+    node::{Peer, RoutingMsg},
+    DestInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+};
+use crate::routing::{
     crypto,
     error::Result,
     event::{Elders, Event, NodeElderChange},
@@ -40,11 +45,6 @@ use bytes::Bytes;
 use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::{
-    client::ClientMsg,
-    node::{Peer, RoutingMsg},
-    DestInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
-};
 use std::{
     collections::BTreeSet,
     fmt::{self, Debug, Formatter},
@@ -82,7 +82,7 @@ impl Default for Config {
 /// A node is a part of the network that can route messages and be a member of a section or group
 /// location. Its methods can be used to send requests and responses as either an individual
 /// `Node` or as a part of a section or group location. Their `src` argument indicates that
-/// role, and can be `sn_messaging::SrcLocation::Node` or `sn_messaging::SrcLocation::Section`.
+/// role, and can be `crate::messaging::SrcLocation::Node` or `crate::messaging::SrcLocation::Section`.
 pub struct Routing {
     dispatcher: Arc<Dispatcher>,
 }

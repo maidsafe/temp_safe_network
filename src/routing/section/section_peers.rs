@@ -7,12 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::SectionAuthorityProviderUtils;
-use crate::{peer::PeerUtils, section::MemberInfoUtils};
-use itertools::Itertools;
 use crate::messaging::{
     node::{MemberInfo, Peer, PeerState, Proven, SectionPeers},
     SectionAuthorityProvider,
 };
+use crate::routing::{peer::PeerUtils, section::MemberInfoUtils};
+use itertools::Itertools;
 use std::{
     cmp::Ordering,
     collections::btree_map::{self, Entry},

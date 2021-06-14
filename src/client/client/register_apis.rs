@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::errors::Error;
+use crate::client::Error;
+use crate::messaging::client::{
+    Cmd, DataCmd, DataQuery, Query, QueryResponse, RegisterRead, RegisterWrite,
+};
 use log::{debug, trace};
 use sn_data_types::{
     register::{
@@ -15,9 +18,6 @@ use sn_data_types::{
         PublicPermissions, PublicPolicy, Register, User,
     },
     PublicKey,
-};
-use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, Query, QueryResponse, RegisterRead, RegisterWrite,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -238,17 +238,17 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        retry_loop, retry_loop_for_pattern,
+    use crate::client::{
         utils::test_utils::{create_test_client, gen_ed_keypair},
         Error,
     };
+    use crate::messaging::client::Error as ErrorMessage;
+    use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use sn_data_types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey, Token,
     };
-    use crate::messaging::client::Error as ErrorMessage;
     use std::{
         collections::{BTreeMap, BTreeSet},
         str::FromStr,

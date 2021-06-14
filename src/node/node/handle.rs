@@ -11,20 +11,20 @@ use super::{
     messaging::{send, send_error, send_support, send_to_nodes},
     role::{AdultRole, Role},
 };
-use crate::{
+use crate::messaging::{
+    client::{Cmd, ProcessMsg},
+    node::{NodeMsg, NodeQuery},
+    Aggregation, MessageId,
+};
+use crate::node::{
     chunks::Chunks,
     event_mapping::MsgContext,
     node_ops::{NodeDuties, NodeDuty},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
-use log::{debug, info};
-use crate::messaging::{
-    client::{Cmd, ProcessMsg},
-    node::{NodeMsg, NodeQuery},
-    Aggregation, MessageId,
-};
 use crate::routing::ELDER_SIZE;
+use log::{debug, info};
 use std::sync::Arc;
 use tokio::{sync::RwLock, task::JoinHandle};
 use xor_name::XorName;
