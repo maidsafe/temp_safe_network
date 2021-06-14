@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [36.0.0](https://github.com/maidsafe/sn_messaging/compare/v35.0.0...v36.0.0) (2021-06-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename Proven to SectionSigned, MemberInfo to NodeState, PeerState
+
+### api
+
+* rename Proven to SectionSigned, MemberInfo to NodeState, PeerState ([08d6929](https://github.com/maidsafe/sn_messaging/commit/08d69293713cb8caea4449dbca4d119961403b92))
+
 ## [35.0.0](https://github.com/maidsafe/sn_messaging/compare/v34.0.0...v35.0.0) (2021-06-09)
 
 
