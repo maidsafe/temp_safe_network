@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::error::{Error, Result};
-use sn_messaging::EndUser;
+use crate::messaging::EndUser;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     net::SocketAddr,

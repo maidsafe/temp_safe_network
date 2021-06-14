@@ -12,7 +12,7 @@ use crate::{
     Error, Result,
 };
 use log::{error, trace};
-use sn_messaging::{
+use crate::messaging::{
     client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, SrcLocation,
 };
 use sn_routing::XorName;

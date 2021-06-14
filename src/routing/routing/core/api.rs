@@ -19,7 +19,7 @@ use crate::{
 };
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
-use sn_messaging::{
+use crate::messaging::{
     node::{MemberInfo, Network, Peer, Proposal, RoutingMsg, Section, Variant},
     section_info::Error as TargetSectionError,
     DestInfo, EndUser, Itinerary, SectionAuthorityProvider, SrcLocation,

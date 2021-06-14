@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{error::Error, peer::PeerUtils};
-use sn_messaging::node::{MemberInfo, Peer, PeerState};
+use crate::messaging::node::{MemberInfo, Peer, PeerState};
 use xor_name::XorName;
 
 /// The minimum age a node can have. The Infants will start at age 4. This is to prevent frequent

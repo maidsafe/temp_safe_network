@@ -22,7 +22,7 @@ use section_funds::{
     reward_wallets::RewardWallets,
 };
 use sn_data_types::{NodeAge, PublicKey, Token};
-use sn_messaging::MessageId;
+use crate::messaging::MessageId;
 use sn_routing::{Prefix, XorName};
 use std::collections::{BTreeMap, BTreeSet};
 

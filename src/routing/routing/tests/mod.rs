@@ -33,7 +33,7 @@ use bytes::Bytes;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use sn_data_types::{Keypair, PublicKey};
-use sn_messaging::{
+use crate::messaging::{
     location::{Aggregation, Itinerary},
     node::{
         JoinRequest, JoinResponse, MemberInfo, Network, Peer, PeerState, PlainMessage, Proposal,

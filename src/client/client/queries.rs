@@ -10,7 +10,7 @@ use super::Client;
 use crate::{connections::QueryResult, errors::Error};
 use log::debug;
 use sn_data_types::{PublicKey, Signature};
-use sn_messaging::client::{ClientSigned, Query};
+use crate::messaging::client::{ClientSigned, Query};
 
 impl Client {
     /// Send a Query to the network and await a response

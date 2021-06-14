@@ -74,7 +74,7 @@ impl StoreCost {
 #[cfg(test)]
 mod test {
     use super::*;
-    use sn_messaging::client::DataCmd;
+    use crate::messaging::client::DataCmd;
     use std::mem;
 
     #[test]

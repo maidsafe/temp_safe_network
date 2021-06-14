@@ -16,7 +16,7 @@ use sn_data_types::{
     PublicKey, SeqMap, UnseqMap,
 };
 
-use sn_messaging::client::{DataCmd, DataQuery, MapRead, MapWrite, Query, QueryResponse};
+use crate::messaging::client::{DataCmd, DataQuery, MapRead, MapWrite, Query, QueryResponse};
 
 use xor_name::XorName;
 
@@ -670,7 +670,7 @@ mod tests {
     use crate::utils::test_utils::{create_test_client, gen_ed_keypair};
     use anyhow::{anyhow, bail, Result};
     use sn_data_types::{MapAction, MapKind, Token};
-    use sn_messaging::client::Error as ErrorMessage;
+    use crate::messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
     use std::time::Duration;
     use xor_name::XorName;

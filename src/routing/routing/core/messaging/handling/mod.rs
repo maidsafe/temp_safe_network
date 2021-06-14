@@ -28,8 +28,8 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use sn_messaging::node::Error as AggregatorError;
-use sn_messaging::{
+use crate::messaging::node::Error as AggregatorError;
+use crate::messaging::{
     client::ClientMsg,
     node::{
         DkgFailureSignedSet, JoinRejectionReason, JoinRequest, JoinResponse, Network, Peer,

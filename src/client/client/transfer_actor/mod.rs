@@ -19,7 +19,7 @@ use log::{debug, error, info, trace, warn};
 use sn_data_types::{
     DebitId, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
 };
-use sn_messaging::client::{
+use crate::messaging::client::{
     ClientSigned, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
 };
 use sn_transfers::{ActorEvent, TransferInitiated};

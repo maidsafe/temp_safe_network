@@ -19,7 +19,7 @@ use crate::{
     Error, Node, Result,
 };
 use log::{debug, info};
-use sn_messaging::{
+use crate::messaging::{
     client::{Cmd, ProcessMsg},
     node::{NodeMsg, NodeQuery},
     Aggregation, MessageId,

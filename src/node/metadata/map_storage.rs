@@ -15,7 +15,7 @@ use sn_data_types::{
     Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
     PublicKey, Result as NdResult,
 };
-use sn_messaging::{
+use crate::messaging::{
     client::{CmdError, MapDataExchange, MapRead, MapWrite, QueryResponse},
     EndUser, MessageId,
 };

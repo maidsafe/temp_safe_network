@@ -12,7 +12,7 @@ use crate::{
     Node, Result,
 };
 use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
-use sn_messaging::{
+use crate::messaging::{
     node::{
         NodeCmd, NodeMsg, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
         NodeTransferCmd,

@@ -21,7 +21,7 @@ use crate::{
 };
 use log::info;
 use sn_data_types::{ActorHistory, NodeAge, PublicKey};
-use sn_messaging::client::DataExchange;
+use crate::messaging::client::DataExchange;
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 

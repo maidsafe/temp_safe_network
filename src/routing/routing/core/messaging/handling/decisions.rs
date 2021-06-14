@@ -12,7 +12,7 @@ use crate::{
     section::{SectionAuthorityProviderUtils, SectionUtils},
     Result,
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{JoinResponse, Proposal, RelocatePromise, RoutingMsg, SignedShare, Variant},
     DstLocation,
 };

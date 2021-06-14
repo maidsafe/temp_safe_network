@@ -12,8 +12,8 @@ use sn_data_types::{
     ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
-use sn_messaging::client::ClientMsg;
-use sn_messaging::{
+use crate::messaging::client::ClientMsg;
+use crate::messaging::{
     client::{
         BlobRead, BlobWrite, ClientSigned, DataCmd, DataExchange, DataQuery, ProcessMsg,
         ProcessingError, QueryResponse, SupportingInfo,

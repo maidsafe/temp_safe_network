@@ -13,7 +13,7 @@ use crate::{
     Error,
 };
 use log::warn;
-use sn_messaging::{
+use crate::messaging::{
     client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery},
     Aggregation, EndUser, MessageId, SrcLocation,
 };

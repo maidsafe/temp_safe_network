@@ -14,7 +14,7 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress, DataAddress, PublicKey};
-use sn_messaging::{
+use crate::messaging::{
     client::Error as ErrorMessage,
     node::{NodeDataQueryResponse, NodeMsg, NodeQueryResponse},
     Aggregation, DstLocation, MessageId,

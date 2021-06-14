@@ -11,7 +11,7 @@ mod utils;
 use self::utils::*;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use sn_messaging::{Aggregation, DstLocation, Itinerary, SrcLocation};
+use crate::messaging::{Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::{Event, NodeElderChange};
 
 #[tokio::test]

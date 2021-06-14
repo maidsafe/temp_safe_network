@@ -9,7 +9,7 @@
 use crate::{peer::PeerUtils, Prefix, XorName};
 use bls::PublicKey;
 use sn_data_types::ReplicaPublicKeySet;
-use sn_messaging::{
+use crate::messaging::{
     node::{ElderCandidates, Peer},
     SectionAuthorityProvider,
 };

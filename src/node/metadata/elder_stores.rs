@@ -13,7 +13,7 @@ use super::{
 use crate::{node_ops::NodeDuty, Error, Result};
 use log::info;
 use sn_data_types::PublicKey;
-use sn_messaging::{
+use crate::messaging::{
     client::{ClientSigned, DataCmd, DataExchange, DataQuery},
     EndUser, MessageId,
 };

@@ -23,7 +23,7 @@ use log::{debug, info};
 use sn_data_types::{
     Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };

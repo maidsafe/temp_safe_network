@@ -13,7 +13,7 @@ use crate::{
     Error,
 };
 use log::debug;
-use sn_messaging::{
+use crate::messaging::{
     node::{
         NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeRewardQuery,
         NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,

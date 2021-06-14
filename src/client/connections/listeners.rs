@@ -11,7 +11,7 @@ use crate::Error;
 use log::{debug, error, info, trace, warn};
 use qp2p::IncomingMessages;
 use sn_data_types::PublicKey;
-use sn_messaging::{
+use crate::messaging::{
     client::{ClientMsg, Event, ProcessMsg},
     section_info::{Error as SectionInfoError, GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,

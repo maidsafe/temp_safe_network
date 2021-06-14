@@ -13,7 +13,7 @@ use crate::{
 };
 use itertools::Itertools;
 use sn_data_types::PublicKey;
-use sn_messaging::{
+use crate::messaging::{
     node::{
         JoinRejectionReason, JoinResponse, RoutingMsg, SignedRelocateDetails, SrcAuthority, Variant,
     },

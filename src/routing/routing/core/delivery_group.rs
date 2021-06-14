@@ -16,7 +16,7 @@ use crate::{
     supermajority, ELDER_SIZE,
 };
 use itertools::Itertools;
-use sn_messaging::{
+use crate::messaging::{
     node::{Network, Peer, Section},
     DstLocation,
 };
@@ -176,7 +176,7 @@ mod tests {
     use anyhow::{Context, Result};
     use rand::seq::IteratorRandom;
     use secured_linked_list::SecuredLinkedList;
-    use sn_messaging::{node::MemberInfo, SectionAuthorityProvider};
+    use crate::messaging::{node::MemberInfo, SectionAuthorityProvider};
     use xor_name::Prefix;
 
     #[test]

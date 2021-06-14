@@ -15,7 +15,7 @@ use crate::{
 use chunk_storage::ChunkStorage;
 use log::info;
 use sn_data_types::{Blob, BlobAddress, PublicKey};
-use sn_messaging::{
+use crate::messaging::{
     client::{BlobRead, BlobWrite},
     MessageId,
 };

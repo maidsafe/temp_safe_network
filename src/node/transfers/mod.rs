@@ -28,7 +28,7 @@ use sn_data_types::{
     ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
     TransferAgreementProof,
 };
-use sn_messaging::{
+use crate::messaging::{
     client::{
         ClientMsg, ClientSigned, CmdError, DataCmd, Error as ErrorMessage, Event, ProcessMsg,
         QueryResponse, TransferError,

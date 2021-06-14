@@ -16,7 +16,7 @@ use sn_data_types::{
     },
     PublicKey,
 };
-use sn_messaging::client::{
+use crate::messaging::client::{
     Cmd, DataCmd, DataQuery, Query, QueryResponse, RegisterRead, RegisterWrite,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -248,7 +248,7 @@ mod tests {
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey, Token,
     };
-    use sn_messaging::client::Error as ErrorMessage;
+    use crate::messaging::client::Error as ErrorMessage;
     use std::{
         collections::{BTreeMap, BTreeSet},
         str::FromStr,

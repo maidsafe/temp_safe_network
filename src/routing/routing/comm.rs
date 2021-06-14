@@ -12,7 +12,7 @@ use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
 use hex_fmt::HexFmt;
 use qp2p::{Endpoint, QuicP2p};
-use sn_messaging::MessageType;
+use crate::messaging::MessageType;
 use std::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
@@ -352,7 +352,7 @@ mod tests {
     use futures::future;
     use qp2p::Config;
     use sn_data_types::PublicKey;
-    use sn_messaging::{section_info::SectionInfoMsg, DestInfo, WireMsg};
+    use crate::messaging::{section_info::SectionInfoMsg, DestInfo, WireMsg};
     use std::{net::Ipv4Addr, slice, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
 

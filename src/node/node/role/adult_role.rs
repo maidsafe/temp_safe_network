@@ -14,7 +14,7 @@ use crate::{
 use itertools::Itertools;
 use log::{info, trace, warn};
 use sn_data_types::{Blob, BlobAddress};
-use sn_messaging::{
+use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
     Aggregation, MessageId,
 };

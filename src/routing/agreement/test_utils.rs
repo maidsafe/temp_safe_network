@@ -9,7 +9,7 @@
 use super::{ProvenUtils, Signed};
 use crate::{Error, Result};
 use serde::Serialize;
-use sn_messaging::node::Proven;
+use crate::messaging::node::Proven;
 
 // Create signed for the given payload using the given secret key.
 pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<Signed> {

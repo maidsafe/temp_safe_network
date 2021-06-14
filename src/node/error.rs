@@ -8,7 +8,7 @@
 
 use crate::node_ops::MsgType;
 use sn_data_types::{DataAddress, Error as DtError, PublicKey};
-use sn_messaging::{client::Error as ErrorMessage, MessageId};
+use crate::messaging::{client::Error as ErrorMessage, MessageId};
 use sn_routing::Prefix;
 use std::io;
 use thiserror::Error;

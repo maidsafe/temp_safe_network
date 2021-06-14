@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_data_types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
-use sn_messaging::client::{Cmd, Event, Query, QueryResponse, TransferCmd, TransferQuery};
+use crate::messaging::client::{Cmd, Event, Query, QueryResponse, TransferCmd, TransferQuery};
 use sn_transfers::{ActorEvent, TransferInitiated};
 
 use crate::{Client, Error};

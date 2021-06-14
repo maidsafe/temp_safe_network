@@ -14,7 +14,7 @@ use crate::{
     section::{SectionAuthorityProviderUtils, SectionUtils},
     Error, Result,
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{Peer, RoutingMsg, Variant},
     DestInfo, DstLocation,
 };

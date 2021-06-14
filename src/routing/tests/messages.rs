@@ -12,8 +12,8 @@ use anyhow::{anyhow, format_err, Result};
 use bytes::Bytes;
 use qp2p::QuicP2p;
 use sn_data_types::Keypair;
-use sn_messaging::client::ProcessMsg;
-use sn_messaging::{
+use crate::messaging::client::ProcessMsg;
+use crate::messaging::{
     client::{ClientMsg, ClientSigned, Query, TransferQuery},
     location::{Aggregation, Itinerary},
     DstLocation, MessageId, SrcLocation,

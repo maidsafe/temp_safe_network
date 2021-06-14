@@ -11,7 +11,7 @@ use crate::{
     error::{Error, Result},
     peer::PeerUtils,
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{Peer, SrcAuthority},
     SrcLocation,
 };

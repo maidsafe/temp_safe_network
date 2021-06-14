@@ -18,8 +18,8 @@ use rand::{
     Rng,
 };
 use serde::{Deserialize, Serialize};
-use sn_messaging::node::{SignatureAggregator, SignedShare};
-use sn_messaging::{
+use crate::messaging::node::{SignatureAggregator, SignedShare};
+use crate::messaging::{
     location::{Aggregation, Itinerary},
     DstLocation, SrcLocation,
 };

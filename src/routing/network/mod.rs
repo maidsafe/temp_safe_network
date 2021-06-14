@@ -19,7 +19,7 @@ use crate::{
 };
 
 use secured_linked_list::SecuredLinkedList;
-use sn_messaging::{
+use crate::messaging::{
     node::{Network, OtherSection, Peer, PrefixMap, Proven},
     SectionAuthorityProvider,
 };

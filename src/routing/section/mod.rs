@@ -31,7 +31,7 @@ use crate::{
 };
 use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
 use serde::Serialize;
-use sn_messaging::{
+use crate::messaging::{
     node::{ElderCandidates, MemberInfo, Peer, Proven, Section, SectionPeers, Signed},
     SectionAuthorityProvider,
 };

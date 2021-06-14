@@ -13,8 +13,8 @@ use crate::Error;
 use log::{debug, trace};
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
 use sn_data_types::{PublicKey, TransferValidated};
-use sn_messaging::client::CmdError;
-use sn_messaging::{client::QueryResponse, MessageId};
+use crate::messaging::client::CmdError;
+use crate::messaging::{client::QueryResponse, MessageId};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet, HashMap},

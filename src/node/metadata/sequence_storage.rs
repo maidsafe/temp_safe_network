@@ -16,7 +16,7 @@ use sn_data_types::{
     Error as DtError, PublicKey, Sequence, SequenceAction, SequenceAddress, SequenceEntry,
     SequenceIndex, SequenceOp, SequenceUser,
 };
-use sn_messaging::{
+use crate::messaging::{
     client::{CmdError, QueryResponse, SequenceDataExchange, SequenceRead, SequenceWrite},
     EndUser, MessageId,
 };

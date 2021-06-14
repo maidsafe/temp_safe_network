@@ -9,7 +9,7 @@
 use crate::peer::PeerUtils;
 use ed25519_dalek::Keypair;
 use sn_data_types::PublicKey;
-use sn_messaging::node::Peer;
+use crate::messaging::node::Peer;
 use std::{
     fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,

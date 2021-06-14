@@ -8,8 +8,8 @@
 
 use qp2p::Error as QuicP2pError;
 use sn_data_types::{Error as DtError, PublicKey};
-pub use sn_messaging::{client::Error as ErrorMessage, Error as MessagingError};
-use sn_messaging::{
+pub use crate::messaging::{client::Error as ErrorMessage, Error as MessagingError};
+use crate::messaging::{
     client::{CmdError, Event, QueryResponse, TransferError},
     MessageId,
 };

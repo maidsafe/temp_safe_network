@@ -12,7 +12,7 @@ use crate::{
     node::Node,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{RoutingMsg, Section, Variant},
     DestInfo,
 };
@@ -83,7 +83,7 @@ mod tests {
     use anyhow::{Context, Result};
     use assert_matches::assert_matches;
     use secured_linked_list::SecuredLinkedList;
-    use sn_messaging::DstLocation;
+    use crate::messaging::DstLocation;
     use xor_name::Prefix;
 
     #[test]

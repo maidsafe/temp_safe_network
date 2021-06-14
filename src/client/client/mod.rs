@@ -23,7 +23,7 @@ use crdts::Dot;
 use log::{debug, info, trace, warn};
 use rand::rngs::OsRng;
 use sn_data_types::{Keypair, PublicKey, SectionElders, Token};
-use sn_messaging::client::{Cmd, CmdError, DataCmd};
+use crate::messaging::client::{Cmd, CmdError, DataCmd};
 use std::{
     path::Path,
     str::FromStr,

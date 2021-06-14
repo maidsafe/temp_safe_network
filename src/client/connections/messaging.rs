@@ -12,7 +12,7 @@ use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use sn_data_types::{Blob, PrivateBlob, PublicBlob, PublicKey, TransferValidated};
-use sn_messaging::{
+use crate::messaging::{
     client::{BlobRead, ClientMsg, ClientSigned, Cmd, DataQuery, ProcessMsg, Query, QueryResponse},
     section_info::SectionInfoMsg,
     MessageId,

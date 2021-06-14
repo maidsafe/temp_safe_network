@@ -18,7 +18,7 @@ use crate::{
     Error, Result,
 };
 use ed25519_dalek::Verifier;
-use sn_messaging::node::{JoinResponse, Peer, ResourceProofResponse, Variant};
+use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, Variant};
 use xor_name::XorName;
 
 // Resource signed

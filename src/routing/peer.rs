@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_messaging::node::Peer;
+use crate::messaging::node::Peer;
 use std::net::SocketAddr;
 use xor_name::{XorName, XOR_NAME_LEN};
 

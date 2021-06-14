@@ -15,7 +15,7 @@ use crate::{
 };
 use log::{info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
-use sn_messaging::{
+use crate::messaging::{
     client::{BlobDataExchange, BlobRead, BlobWrite, ClientSigned, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, EndUser, MessageId,

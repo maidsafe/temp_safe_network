@@ -16,7 +16,7 @@ use sn_data_types::{
     register::{Action, Address, Entry, Register, RegisterOp, User},
     PublicKey,
 };
-use sn_messaging::{
+use crate::messaging::{
     client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
     EndUser, MessageId,
 };

@@ -17,7 +17,7 @@ use crate::{
     routing::command::Command,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{Peer, Proposal, RoutingMsg, Variant},
     DstLocation,
 };

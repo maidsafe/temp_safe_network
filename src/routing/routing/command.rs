@@ -9,7 +9,7 @@
 use crate::{routing::Peer, section::SectionKeyShare, XorName};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
-use sn_messaging::{
+use crate::messaging::{
     node::{DkgFailureSignedSet, Proposal, RoutingMsg, Signed, SignedRelocateDetails},
     section_info::SectionInfoMsg,
     DestInfo, Itinerary, MessageType, SectionAuthorityProvider,

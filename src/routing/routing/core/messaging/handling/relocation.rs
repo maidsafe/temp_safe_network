@@ -17,7 +17,7 @@ use crate::{
     section::{MemberInfoUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
     Event, ELDER_SIZE,
 };
-use sn_messaging::node::{
+use crate::messaging::node::{
     Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
 };
 use tokio::sync::mpsc;

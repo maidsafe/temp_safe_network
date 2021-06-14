@@ -9,7 +9,7 @@
 use super::SectionAuthorityProviderUtils;
 use crate::{peer::PeerUtils, section::MemberInfoUtils};
 use itertools::Itertools;
-use sn_messaging::{
+use crate::messaging::{
     node::{MemberInfo, Peer, PeerState, Proven, SectionPeers},
     SectionAuthorityProvider,
 };

@@ -12,7 +12,7 @@ use crate::{
     section::ElderCandidatesUtils,
     supermajority,
 };
-use sn_messaging::node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates};
+use crate::messaging::node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates};
 use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;

@@ -10,7 +10,7 @@ use super::Client;
 use crate::errors::Error;
 use log::debug;
 use sn_data_types::{PublicKey, Signature};
-use sn_messaging::client::{ClientSigned, Cmd};
+use crate::messaging::client::{ClientSigned, Cmd};
 
 impl Client {
     /// Send a Cmd to the network

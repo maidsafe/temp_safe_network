@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::cache::Cache;
-use sn_messaging::{node::RoutingMsg, DstLocation, MessageId};
+use crate::messaging::{node::RoutingMsg, DstLocation, MessageId};
 use std::time::Duration;
 use xor_name::XorName;
 

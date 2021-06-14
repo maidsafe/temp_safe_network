@@ -21,7 +21,7 @@ use crate::{
     Error, Event, MIN_AGE,
 };
 use secured_linked_list::SecuredLinkedList;
-use sn_messaging::{
+use crate::messaging::{
     node::{MemberInfo, PeerState, PlainMessage, Proposal, Proven, RoutingMsg, Signed, Variant},
     DestInfo, DstLocation, SectionAuthorityProvider,
 };

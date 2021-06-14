@@ -16,7 +16,7 @@ use crate::{
     Error,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use sn_messaging::node::{
+use crate::messaging::node::{
     DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, Proposal,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr, slice};

@@ -25,7 +25,7 @@ use map_storage::MapStorage;
 use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::{Blob, PublicKey};
-use sn_messaging::{
+use crate::messaging::{
     client::{
         ClientMsg, ClientSigned, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg,
         QueryResponse,

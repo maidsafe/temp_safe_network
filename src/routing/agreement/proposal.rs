@@ -9,7 +9,7 @@
 use super::{SignatureAggregator, Signed, SignedShare};
 use crate::{error::Result, messages::PlainMessageUtils};
 use serde::{Serialize, Serializer};
-use sn_messaging::node::Proposal;
+use crate::messaging::node::Proposal;
 use thiserror::Error;
 
 pub trait ProposalUtils {

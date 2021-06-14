@@ -16,7 +16,7 @@ use log::{info, trace};
 use self_encryption::{DataMap, SelfEncryptor};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, PrivateBlob, PublicBlob, PublicKey};
-use sn_messaging::client::{BlobRead, BlobWrite, DataCmd, DataQuery, Query, QueryResponse};
+use crate::messaging::client::{BlobRead, BlobWrite, DataCmd, DataQuery, Query, QueryResponse};
 
 #[derive(Serialize, Deserialize)]
 enum DataMapLevel {
@@ -402,7 +402,7 @@ mod tests {
     use bincode::deserialize;
     use self_encryption::Storage;
     use sn_data_types::{PrivateBlob, PublicBlob, Token};
-    use sn_messaging::client::Error as ErrorMessage;
+    use crate::messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
 
     // Test putting and getting pub Blob.

@@ -15,7 +15,7 @@ use crate::{
     peer::PeerUtils,
     section::{SectionPeersUtils, SectionUtils},
 };
-use sn_messaging::{
+use crate::messaging::{
     node::{
         MemberInfo, Network, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
         Section, SignedRelocateDetails, Variant,
@@ -280,7 +280,7 @@ mod tests {
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
-    use sn_messaging::SectionAuthorityProvider;
+    use crate::messaging::SectionAuthorityProvider;
     use xor_name::Prefix;
 
     #[test]

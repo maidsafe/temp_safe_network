@@ -10,7 +10,7 @@
 use sn_data_types::Transfer;
 
 #[cfg(feature = "simulated-payouts")]
-use sn_messaging::client::{Cmd, TransferCmd};
+use crate::messaging::client::{Cmd, TransferCmd};
 
 #[cfg(feature = "simulated-payouts")]
 use log::info;

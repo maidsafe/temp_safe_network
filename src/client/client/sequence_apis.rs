@@ -14,7 +14,7 @@ use sn_data_types::{
     SequencePermissions, SequencePrivatePermissions, SequencePrivatePolicy,
     SequencePublicPermissions, SequencePublicPolicy, SequenceUser,
 };
-use sn_messaging::client::{
+use crate::messaging::client::{
     Cmd, DataCmd, DataQuery, Query, QueryResponse, SequenceRead, SequenceWrite,
 };
 use std::collections::BTreeMap;
@@ -771,7 +771,7 @@ mod tests {
     use crate::utils::test_utils::{create_test_client, gen_ed_keypair};
     use anyhow::{anyhow, bail, Result};
     use sn_data_types::{Error as DtError, SequenceAction, SequencePrivatePermissions, Token};
-    use sn_messaging::client::Error as ErrorMessage;
+    use crate::messaging::client::Error as ErrorMessage;
     use std::str::FromStr;
     use tokio::time::{sleep, Duration};
     use xor_name::XorName;

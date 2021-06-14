@@ -27,8 +27,8 @@ use crate::{
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-use sn_messaging::node::SignatureAggregator;
-use sn_messaging::{
+use crate::messaging::node::SignatureAggregator;
+use crate::messaging::{
     node::{Network, Proposal, Proven, RoutingMsg, Section, Variant},
     DestInfo, DstLocation, MessageId, SectionAuthorityProvider,
 };

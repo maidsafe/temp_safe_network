@@ -10,7 +10,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use itertools::Itertools;
 use sn_data_types::BlobAddress;
-use sn_messaging::{EndUser, MessageId};
+use crate::messaging::{EndUser, MessageId};
 use sn_routing::XorName;
 use std::collections::hash_map::Entry;
 

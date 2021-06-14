@@ -22,7 +22,7 @@ use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use sn_data_types::PublicKey;
-use sn_messaging::{
+use crate::messaging::{
     node::{
         JoinRejectionReason, JoinRequest, JoinResponse, RelocatePayload, ResourceProofResponse,
         RoutingMsg, Section, SignedRelocateDetails, Variant,
@@ -594,7 +594,7 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    use sn_messaging::{node::MemberInfo, SectionAuthorityProvider};
+    use crate::messaging::{node::MemberInfo, SectionAuthorityProvider};
     use std::collections::BTreeMap;
     use tokio::task;
 

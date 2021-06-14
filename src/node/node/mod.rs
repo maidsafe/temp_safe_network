@@ -29,7 +29,7 @@ use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
-use sn_messaging::client::ClientMsg;
+use crate::messaging::client::ClientMsg;
 use sn_routing::{
     EventStream, {Prefix, XorName},
 };
