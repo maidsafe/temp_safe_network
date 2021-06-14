@@ -18,7 +18,7 @@ use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
     Aggregation, MessageId,
 };
-use sn_routing::XorName;
+use crate::routing::XorName;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;

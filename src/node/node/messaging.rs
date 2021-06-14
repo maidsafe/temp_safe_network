@@ -15,7 +15,7 @@ use log::{error, trace};
 use crate::messaging::{
     client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, SrcLocation,
 };
-use sn_routing::XorName;
+use crate::routing::XorName;
 use std::collections::BTreeSet;
 
 pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {

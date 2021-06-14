@@ -30,7 +30,7 @@ use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
 use crate::messaging::client::ClientMsg;
-use sn_routing::{
+use crate::routing::{
     EventStream, {Prefix, XorName},
 };
 use std::sync::Arc;

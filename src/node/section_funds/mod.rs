@@ -17,7 +17,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
-use sn_routing::{Prefix, XorName};
+use crate::routing::{Prefix, XorName};
 use std::collections::BTreeMap;
 
 /// The management of section funds,

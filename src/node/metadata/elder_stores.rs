@@ -17,7 +17,7 @@ use crate::messaging::{
     client::{ClientSigned, DataCmd, DataExchange, DataQuery},
     EndUser, MessageId,
 };
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 
 /// The various data type stores,
 /// that are only managed at Elders.

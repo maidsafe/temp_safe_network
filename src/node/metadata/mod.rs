@@ -32,7 +32,7 @@ use crate::messaging::{
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},

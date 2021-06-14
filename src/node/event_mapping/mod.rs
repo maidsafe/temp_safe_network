@@ -22,8 +22,8 @@ use crate::messaging::{
     node::NodeMsg,
     MessageId, SrcLocation,
 };
-use sn_routing::XorName;
-use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use crate::routing::XorName;
+use crate::routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]

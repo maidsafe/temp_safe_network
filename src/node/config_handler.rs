@@ -11,7 +11,7 @@
 use crate::{Error, Result};
 use log::{debug, Level};
 use serde::{Deserialize, Serialize};
-use sn_routing::TransportConfig as NetworkConfig;
+use crate::routing::TransportConfig as NetworkConfig;
 use std::{
     collections::HashSet,
     fs::{self, File},

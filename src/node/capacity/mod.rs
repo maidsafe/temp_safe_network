@@ -12,7 +12,7 @@ mod store_cost;
 use std::collections::BTreeSet;
 
 pub use adult_storage_info::AdultsStorageInfo;
-use sn_routing::{Prefix, XorName};
+use crate::routing::{Prefix, XorName};
 pub use store_cost::StoreCost;
 
 use crate::metadata::adult_reader::AdultReader;

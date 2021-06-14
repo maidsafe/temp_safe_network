@@ -18,7 +18,7 @@ use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use crate::messaging::{Itinerary, MessageId};
-use sn_routing::{
+use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
     SectionAuthorityProviderUtils,
 };

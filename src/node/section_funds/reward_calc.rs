@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_data_types::{NodeAge, PublicKey, Token};
-use sn_routing::XorName;
+use crate::routing::XorName;
 use std::collections::BTreeMap;
 
 const MIN_REWARD_AGE: u8 = 6;

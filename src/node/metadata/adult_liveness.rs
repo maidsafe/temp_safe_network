@@ -11,7 +11,7 @@ use std::collections::{BTreeSet, HashMap};
 use itertools::Itertools;
 use sn_data_types::BlobAddress;
 use crate::messaging::{EndUser, MessageId};
-use sn_routing::XorName;
+use crate::routing::XorName;
 use std::collections::hash_map::Entry;
 
 use crate::capacity::CHUNK_COPY_COUNT;

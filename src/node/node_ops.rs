@@ -21,7 +21,7 @@ use crate::messaging::{
     node::NodeMsg,
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},

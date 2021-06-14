@@ -12,7 +12,7 @@ use self::utils::*;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crate::messaging::{Aggregation, DstLocation, Itinerary, SrcLocation};
-use sn_routing::{Event, NodeElderChange};
+use crate::routing::{Event, NodeElderChange};
 
 #[tokio::test]
 async fn test_node_drop() -> Result<()> {

@@ -20,7 +20,7 @@ use crate::messaging::{
     client::{CmdError, QueryResponse, SequenceDataExchange, SequenceRead, SequenceWrite},
     EndUser, MessageId,
 };
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,

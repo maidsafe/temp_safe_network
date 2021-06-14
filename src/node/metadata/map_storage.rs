@@ -19,7 +19,7 @@ use crate::messaging::{
     client::{CmdError, MapDataExchange, MapRead, MapWrite, QueryResponse},
     EndUser, MessageId,
 };
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,

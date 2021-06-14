@@ -1040,7 +1040,7 @@ change
 
 ### ⚠ BREAKING CHANGES
 
-* use `use sn_routing::Event;` instead of `use sn_routing::event::Event;`.
+* use `use crate::routing::Event;` instead of `use crate::routing::event::Event;`.
 * `Event` changes:
 
 - Remove `Event::Connected` - not needed because `Routing::new` now returns fully connected routing instance.

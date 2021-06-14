@@ -24,7 +24,7 @@ use crate::messaging::{
     node::{NodeMsg, NodeQuery},
     Aggregation, MessageId,
 };
-use sn_routing::ELDER_SIZE;
+use crate::routing::ELDER_SIZE;
 use std::sync::Arc;
 use tokio::{sync::RwLock, task::JoinHandle};
 use xor_name::XorName;

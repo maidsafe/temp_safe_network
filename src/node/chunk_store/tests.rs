@@ -14,7 +14,7 @@ use crate::{to_db_key::ToDbKey, Error, Result};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{BlobAddress, DataAddress};
-use sn_routing::XorName;
+use crate::routing::XorName;
 use std::{path::Path, u64};
 use tempdir::TempDir;
 

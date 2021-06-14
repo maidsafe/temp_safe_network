@@ -20,7 +20,7 @@ use crate::messaging::{
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, EndUser, MessageId,
 };
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 
 use std::{
     collections::BTreeSet,

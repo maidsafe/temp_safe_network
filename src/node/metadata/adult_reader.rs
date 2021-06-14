@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use sn_routing::{Prefix, XorName};
+use crate::routing::{Prefix, XorName};
 
 use crate::network::Network;
 

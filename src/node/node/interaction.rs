@@ -19,7 +19,7 @@ use crate::messaging::{
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
-use sn_routing::{Prefix, XorName};
+use crate::routing::{Prefix, XorName};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::role::ElderRole;

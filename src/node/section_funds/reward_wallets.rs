@@ -9,7 +9,7 @@
 use dashmap::DashMap;
 use log::debug;
 use sn_data_types::{NodeAge, PublicKey};
-use sn_routing::Prefix;
+use crate::routing::Prefix;
 use std::collections::BTreeMap;
 use xor_name::XorName;
 

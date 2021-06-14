@@ -23,7 +23,7 @@ use section_funds::{
 };
 use sn_data_types::{NodeAge, PublicKey, Token};
 use crate::messaging::MessageId;
-use sn_routing::{Prefix, XorName};
+use crate::routing::{Prefix, XorName};
 use std::collections::{BTreeMap, BTreeSet};
 
 impl Node {
