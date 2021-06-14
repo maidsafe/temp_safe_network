@@ -57,6 +57,12 @@ sn_url = "1.1.2"
 url = "2.2.0"
 dashmap = "~4.0.2"
 
+
+  [dependencies.tracing]
+  version = "~0.1.22"
+  default-features = false
+  features = [ "log", "std" ]
+  
   [dependencies.ed25519-dalek]
   version = "1.0.0"
   features = [ "serde" ]

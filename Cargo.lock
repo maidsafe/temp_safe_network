@@ -2175,6 +2175,7 @@ dependencies = [
  "threshold_crypto",
  "tiny-keccak 2.0.2",
  "tokio 1.6.1",
+ "tracing",
  "url",
  "xor_name",
 ]
