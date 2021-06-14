@@ -4,11 +4,11 @@ name: Client Changes
 on: 
   pull_request:
     paths: 
-      - 'client/*'
+      - 'sn_client/*'
 
 defaults:
   run:
-    working-directory: client
+    working-directory: sn_client
 
 
 env:

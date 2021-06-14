@@ -8,11 +8,11 @@ name: Messaging PR
 on: 
   pull_request:
     paths: 
-      - 'messaging/**'
+      - 'sn_messaging/**'
 
 defaults:
   run:
-    working-directory: ./messaging
+    working-directory: ./sn_messaging
 
 
 env:

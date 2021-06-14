@@ -9,11 +9,11 @@ name: Routing Changes
 on: 
   pull_request:
     paths: 
-      - 'routing/*'
+      - 'sn_routing/*'
 
 defaults:
   run:
-    working-directory: client
+    working-directory: sn_routing
 
 env:
   # Run all cargo commands with --verbose.

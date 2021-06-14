@@ -7,11 +7,11 @@ name: Node Changes
 on: 
   pull_request:
     paths: 
-      - 'node/**'
+      - 'sn_node/**'
 
 defaults:
   run:
-    working-directory: node
+    working-directory: sn_node
     
 env:
   # Run all cargo commands with --verbose.
