@@ -7,20 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+use crate::messaging::node::{
+    Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
+};
 use crate::routing::{
     error::Result,
     peer::PeerUtils,
     relocation::{
         self, RelocateAction, RelocateDetailsUtils, RelocateState, SignedRelocateDetailsUtils,
     },
-    routing::command::Command,
+    routing::{bootstrap::JoiningAsRelocated, command::Command},
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
     Event, ELDER_SIZE,
 };
-use crate::messaging::node::{
-    Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
-};
-use tokio::sync::mpsc;
 use xor_name::XorName;
 
 // Relocation
@@ -119,16 +118,18 @@ impl Core {
             }
         }
 
-        let (message_tx, message_rx) = mpsc::channel(1);
-        self.relocate_state = Some(RelocateState::InProgress(message_tx));
-
+        // Create a new instance of JoiningAsRelocated to start the relocation
+        // flow. This same instance will handle responses till relocation is complete.
+        let genesis_key = *self.section.genesis_key();
         let bootstrap_addrs = self.section.authority_provider().addresses();
+        let mut joining_as_relocated =
+            JoiningAsRelocated::new(self.node.clone(), genesis_key, details)?;
 
-        Ok(Some(Command::Relocate {
-            bootstrap_addrs,
-            details,
-            message_rx,
-        }))
+        let cmd = joining_as_relocated.start(bootstrap_addrs)?;
+
+        self.relocate_state = Some(RelocateState::InProgress(Box::new(joining_as_relocated)));
+
+        Ok(Some(cmd))
     }
 
     pub(crate) async fn handle_relocate_promise(

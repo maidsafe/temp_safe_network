@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::peer::PeerUtils;
+use crate::messaging::node::Peer;
+use crate::routing::peer::PeerUtils;
 use ed25519_dalek::Keypair;
 use sn_data_types::PublicKey;
-use crate::messaging::node::Peer;
 use std::{
     fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,

@@ -6,22 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{bootstrap, Comm, Command, Core};
+use super::{Comm, Command, Core};
+use crate::messaging::{
+    node::{
+        JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, RoutingMsg, Section,
+        SrcAuthority, Variant,
+    },
+    DstLocation, MessageType,
+};
 use crate::routing::{
-    error::Result, event::Event, messages::RoutingMsgUtils, peer::PeerUtils,
+    error::Result, event::Event, messages::RoutingMsgUtils, node::Node, peer::PeerUtils,
     routing::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error, XorName,
 };
 use itertools::Itertools;
 use sn_data_types::PublicKey;
-use crate::messaging::{
-    node::{
-        JoinRejectionReason, JoinResponse, RoutingMsg, SignedRelocateDetails, SrcAuthority, Variant,
-    },
-    DstLocation, MessageType,
-};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    sync::{mpsc, watch, RwLock},
+    sync::{watch, RwLock},
     time,
 };
 use tracing::Instrument;
@@ -38,9 +39,6 @@ pub(crate) struct Dispatcher {
 impl Dispatcher {
     pub fn new(state: Core, comm: Comm) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
-
-        // Take out the initial value.
-
         Self {
             core: RwLock::new(state),
             comm,
@@ -107,17 +105,37 @@ impl Dispatcher {
                 message,
                 dest_info,
             } => {
-                if let (Variant::JoinRequest(join_request), Some(sender)) =
-                    (&message.variant, &sender)
-                {
-                    // Do this check only for the initial join request
-                    if join_request.relocate_payload.is_none()
-                        && join_request.resource_proof_response.is_none()
-                        && self.comm.is_reachable(sender).await.is_err()
-                    {
-                        let variant = Variant::JoinResponse(Box::new(JoinResponse::Rejected(
-                            JoinRejectionReason::NodeNotReachable(*sender),
-                        )));
+                if let Some(sender) = &sender {
+                    // let's then see if we need to do a reachability test
+                    let failure = match &message.variant {
+                        Variant::JoinRequest(join_request) => {
+                            // Do this check only for the initial join request
+                            if join_request.resource_proof_response.is_none()
+                                && self.comm.is_reachable(sender).await.is_err()
+                            {
+                                Some(Variant::JoinResponse(Box::new(JoinResponse::Rejected(
+                                    JoinRejectionReason::NodeNotReachable(*sender),
+                                ))))
+                            } else {
+                                None
+                            }
+                        }
+                        Variant::JoinAsRelocatedRequest(join_request) => {
+                            // Do this check only for the initial join request
+                            if join_request.relocate_payload.is_none()
+                                && self.comm.is_reachable(sender).await.is_err()
+                            {
+                                Some(Variant::JoinAsRelocatedResponse(Box::new(
+                                    JoinAsRelocatedResponse::NodeNotReachable(*sender),
+                                )))
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(variant) = failure {
                         let section_key = *self.core.read().await.section().chain.last_key();
                         if let SrcAuthority::Node { public_key, .. } = message.src {
                             trace!("Sending {:?} to {}", variant, sender);
@@ -129,6 +147,7 @@ impl Dispatcher {
                         }
                     }
                 }
+
                 self.core
                     .write()
                     .await
@@ -195,13 +214,8 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Command::Relocate {
-                bootstrap_addrs,
-                details,
-                message_rx,
-            } => {
-                self.handle_relocate(bootstrap_addrs, details, message_rx)
-                    .await
+            Command::HandlelocationComplete { node, section } => {
+                self.handle_relocation_complete(node, section).await
             }
             Command::SetJoinsAllowed(joins_allowed) => {
                 self.core.read().await.set_joins_allowed(joins_allowed)
@@ -340,32 +354,17 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_relocate(
+    async fn handle_relocation_complete(
         &self,
-        bootstrap_addrs: Vec<SocketAddr>,
-        details: SignedRelocateDetails,
-        message_rx: mpsc::Receiver<(MessageType, SocketAddr)>,
+        new_node: Node,
+        new_section: Section,
     ) -> Result<Vec<Command>> {
-        let (genesis_key, node) = {
-            let state = self.core.read().await;
-            (*state.section().genesis_key(), state.node().clone())
-        };
-        let previous_name = node.name();
-
-        let (node, section, backlog) = bootstrap::relocate(
-            node,
-            &self.comm,
-            message_rx,
-            bootstrap_addrs,
-            genesis_key,
-            details,
-        )
-        .await?;
+        let previous_name = self.core.read().await.node().name();
+        let new_keypair = new_node.keypair.clone();
 
         let mut state = self.core.write().await;
         let event_tx = state.event_tx.clone();
-        let new_keypair = node.keypair.clone();
-        *state = Core::new(node, section, None, event_tx);
+        *state = Core::new(new_node, new_section, None, event_tx);
 
         state
             .send_event(Event::Relocated {
@@ -374,14 +373,6 @@ impl Dispatcher {
             })
             .await;
 
-        let commands = backlog
-            .into_iter()
-            .map(|(message, sender, dest_info)| Command::HandleMessage {
-                message,
-                sender: Some(sender),
-                dest_info,
-            })
-            .collect();
-        Ok(commands)
+        Ok(vec![])
     }
 }

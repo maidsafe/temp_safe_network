@@ -20,9 +20,9 @@ pub(crate) use self::{
     proposal::{ProposalAggregator, ProposalError, ProposalUtils},
     voter::DkgVoter,
 };
+pub(crate) use crate::messaging::node::{SignatureAggregator, Signed, SignedShare};
 pub use section_signed::SectionSignedUtils;
 use serde::Serialize;
-pub(crate) use crate::messaging::node::{SignatureAggregator, Signed, SignedShare};
 
 // Verify the integrity of `message` against `signed`.
 pub(crate) fn verify_signed<T: Serialize>(signed: &Signed, message: &T) -> bool {

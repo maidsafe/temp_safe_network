@@ -6,6 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::{
+    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates},
+    SectionAuthorityProvider,
+};
 use crate::routing::{
     dkg::{
         commands::DkgCommand,
@@ -17,10 +21,6 @@ use crate::routing::{
 };
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use itertools::Itertools;
-use crate::messaging::{
-    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates},
-    SectionAuthorityProvider,
-};
 use std::{
     collections::{BTreeSet, VecDeque},
     iter, mem,

@@ -7,6 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Comm, Command, Core, Dispatcher};
+use crate::messaging::{
+    location::{Aggregation, Itinerary},
+    node::{
+        JoinAsRelocatedRequest, JoinRequest, JoinResponse, MembershipState, Network, NodeState,
+        Peer, PlainMessage, Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse,
+        RoutingMsg, Section, SectionSigned, Signed, SignedRelocateDetails, Variant,
+    },
+    section_info::{GetSectionResponse, SectionInfoMsg},
+    DestInfo, DstLocation, MessageType, SectionAuthorityProvider, SrcLocation,
+};
 use crate::routing::{
     dkg::{
         test_utils::{prove, section_signed},
@@ -33,16 +43,6 @@ use bytes::Bytes;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use sn_data_types::{Keypair, PublicKey};
-use crate::messaging::{
-    location::{Aggregation, Itinerary},
-    node::{
-        JoinRequest, JoinResponse, MembershipState, Network, NodeState, Peer, PlainMessage,
-        Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse, RoutingMsg, Section,
-        SectionSigned, Signed, SignedRelocateDetails, Variant,
-    },
-    section_info::{GetSectionResponse, SectionInfoMsg},
-    DestInfo, DstLocation, MessageType, SectionAuthorityProvider, SrcLocation,
-};
 use std::{
     collections::{BTreeSet, HashSet},
     iter,
@@ -189,7 +189,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         DstLocation::DirectAndUnrouted,
         Variant::JoinRequest(Box::new(JoinRequest {
             section_key,
-            relocate_payload: None,
             resource_proof_response: None,
         })),
         section_key,
@@ -360,10 +359,9 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let join_request = RoutingMsg::single_src(
         &relocated_node,
         DstLocation::DirectAndUnrouted,
-        Variant::JoinRequest(Box::new(JoinRequest {
+        Variant::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
             section_key,
             relocate_payload: Some(relocate_payload),
-            resource_proof_response: None,
         })),
         section_key,
     )?;

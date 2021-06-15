@@ -18,11 +18,11 @@ use crate::routing::{
     Error, Result,
 };
 
-use secured_linked_list::SecuredLinkedList;
 use crate::messaging::{
     node::{Network, OtherSection, Peer, PrefixMap, SectionSigned},
     SectionAuthorityProvider,
 };
+use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};
 

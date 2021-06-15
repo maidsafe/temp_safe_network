@@ -8,6 +8,7 @@
 
 use super::{agreement::SectionSigned, section::NodeState};
 use crate::messaging::SectionAuthorityProvider;
+use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};

@@ -8,22 +8,20 @@
 
 //! Relocation related types and utilities.
 
+use crate::messaging::node::{
+    Network, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
+    Section, SignedRelocateDetails, Variant,
+};
 use crate::routing::{
     ed25519::{self, Keypair, Verifier},
     error::Error,
     network::NetworkUtils,
     peer::PeerUtils,
+    routing::bootstrap::JoiningAsRelocated,
     section::{SectionPeersUtils, SectionUtils},
 };
-use crate::messaging::{
-    node::{
-        Network, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
-        Section, SignedRelocateDetails, Variant,
-    },
-    MessageType,
-};
-use std::{marker::Sized, net::SocketAddr};
-use tokio::sync::mpsc;
+use bls::PublicKey as BlsPublicKey;
+use std::marker::Sized;
 use xor_name::XorName;
 
 /// Find all nodes to relocate after a churn event and create the relocate actions for them.
@@ -115,6 +113,8 @@ pub trait SignedRelocateDetailsUtils {
     fn signed_msg(&self) -> &RoutingMsg;
 
     fn destination(&self) -> Result<&XorName, Error>;
+
+    fn destination_key(&self) -> Result<BlsPublicKey, Error>;
 }
 
 impl SignedRelocateDetailsUtils for SignedRelocateDetails {
@@ -141,6 +141,10 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
 
     fn destination(&self) -> Result<&XorName, Error> {
         Ok(&self.relocate_details()?.destination)
+    }
+
+    fn destination_key(&self) -> Result<BlsPublicKey, Error> {
+        Ok(self.relocate_details()?.destination_key)
     }
 }
 
@@ -191,8 +195,8 @@ pub(crate) enum RelocateState {
     // can send the bytes (which are serialized `RelocatePromise` message) back to the elders who
     // will exchange it for an actual `Relocate` message.
     Delayed(RoutingMsg),
-    // Relocation in progress. The sender is used to pass messages to the bootstrap task.
-    InProgress(mpsc::Sender<(MessageType, SocketAddr)>),
+    // Relocation in progress.
+    InProgress(Box<JoiningAsRelocated>),
 }
 
 /// Action to relocate a node.
@@ -267,7 +271,8 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::{
+    use crate::messaging::SectionAuthorityProvider;
+    use crate::{
         dkg::test_utils::section_signed,
         peer::test_utils::arbitrary_unique_peers,
         routing::tests::SecretKeySet,
@@ -280,7 +285,6 @@ mod tests {
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
-    use crate::messaging::SectionAuthorityProvider;
     use xor_name::Prefix;
 
     #[test]

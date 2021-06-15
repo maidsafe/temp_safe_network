@@ -24,7 +24,7 @@ pub struct OtherSection {
     // If this is signed by our section, then `key_signed` is `None`. If this is signed by our
     // sibling section, then `key_signed` contains the proof of the signing key itself signed by our
     // section.
-    pub section_auth: Proven<SectionAuthorityProvider>,
+    pub section_auth: SectionSigned<SectionAuthorityProvider>,
     pub key_signed: Option<Signed>,
 }
 

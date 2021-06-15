@@ -8,6 +8,7 @@
 
 use super::{plain_message::PlainMessage, section::NodeState, signed::Signed};
 use crate::messaging::SectionAuthorityProvider;
+use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
 use secured_linked_list::SecuredLinkedList;

@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{verify_signed, Signed};
+use crate::messaging::node::SectionSigned;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use crate::messaging::node::SectionSigned;
 
 pub trait SectionSignedUtils<T: Serialize> {
     fn new(value: T, signed: Signed) -> Self;
