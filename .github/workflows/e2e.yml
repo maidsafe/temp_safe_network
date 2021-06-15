@@ -4,11 +4,11 @@
 
 name: E2E
 
-# on: pull_request
-on: 
-  pull_request:
-    paths: 
-      - 'clienttt/*'
+on: pull_request
+# on: '
+#   pull_request:
+#     paths: 
+#       - 'clienttt/*''
 
 env:
   # Run all cargo commands with --verbose.
@@ -28,8 +28,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, windows-latest, macos-latest]
+        # os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -61,8 +61,7 @@ jobs:
       - run: ./target/release/launch_network
 
       - name: Client Tests
-        working-directory: ./client
-        run: cargo test --release
+        run: cargo test --release client
 
 
       # TODO: Upload all logs as artifacts....

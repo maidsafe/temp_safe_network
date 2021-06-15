@@ -9,11 +9,8 @@ name: Routing Changes
 on: 
   pull_request:
     paths: 
-      - 'sn_routing/*'
-
-defaults:
-  run:
-    working-directory: sn_routing
+      - 'src/routing/**'
+      - 'src/messaging/**'
 
 env:
   # Run all cargo commands with --verbose.
@@ -23,110 +20,7 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  checks:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Clippy & fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Check if the code is formatted correctly.
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      # Run Clippy.
-      - shell: bash
-        run: ./scripts/clippy
-
-  
-  coverage:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Code coverage check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Run cargo tarpaulin & push result to coveralls.io
-      - name: rust-tarpaulin code coverage check
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          args: '-v --release --out Lcov'
-      - name: Push code coverage results to coveralls.io
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel: true
-          path-to-lcov: ./lcov.info
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
-
-  cargo-udeps:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Unused dependency check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-
-      # Install and run cargo udeps to find unused cargo dependencies
-      - name: cargo-udeps unused dependency check
-        run: |
-          cargo install cargo-udeps --locked
-          cargo +nightly udeps --all-targets
-
-  cargo-deny:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-
-    # wget the shared deny.toml file from the QA repo
-    - shell: bash
-      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
-
-    - uses: EmbarkStudios/cargo-deny-action@v1
-
+ 
   test:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Test
@@ -155,29 +49,10 @@ jobs:
 
       # Run tests.
       - shell: bash
-        run: ./scripts/tests
+        run: cargo test --release routing
 
       # Print CI machine disk space stats if the tests fail
       - name: Print CI Machine df Stats on Failure
         if: failure()
         run: df -Ph
         shell: bash
-
-  # Test publish using --dry-run.
-  test-publish:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test Publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Cargo publish dry run
-      - name: Cargo Publish Dry Run
-        run: cargo publish --dry-run

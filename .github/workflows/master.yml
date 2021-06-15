@@ -5,13 +5,6 @@
 # 1. Generates a release build.
 # 2. If the last commit is a chore(release), publish.
 
-
-# TODO:
-  # bump version in any changed space
-  # do changelog there?
-  # Bump versions across all crates and deps w/ cargo-workspaces
-  # Commit all of that + pr...
-  
 name: Master
 
 on:

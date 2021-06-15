@@ -4,11 +4,8 @@ name: Client Changes
 on: 
   pull_request:
     paths: 
-      - 'sn_client/*'
-
-defaults:
-  run:
-    working-directory: sn_client
+      - 'src/client/**'
+      - 'src/messaging/**'
 
 
 env:
@@ -19,100 +16,7 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  checks:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Rustfmt-Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Check if the code is formatted correctly.
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      # Run Clippy.
-      - shell: bash
-        run: cargo clippy --all-targets
-
-
-  # Run `cargo build` in the root directory to test all build scripts.
-  build-script:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Build Scripts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # Test build scripts.
-      - name: Build
-        run: cargo build
-
-  cargo-udeps:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Unused dependency check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      # Install Rust and required components
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-
-      # Install and run cargo udeps to find unused cargo dependencies
-      - name: cargo-udeps unused dependency check
-        run: |
-          cargo install cargo-udeps --locked
-          cargo +nightly udeps --all-targets
-
-  cargo-deny:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-
-    # wget the shared deny.toml file from the QA repo
-    - shell: bash
-      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
-
-    - uses: EmbarkStudios/cargo-deny-action@v1
-
+  
   # Run test suite.
   test:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -143,22 +47,5 @@ jobs:
 
       - name: Run Doc Tests
         shell: bash
+        # e2e client tests are run in the separate e2e.yml action
         run: cargo test --release --doc
-
-  # Test publish using --dry-run.
-  test-publish:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test Publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Publish Dry Run
-        run: cargo publish --dry-run
