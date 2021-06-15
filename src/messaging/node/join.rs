@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::Proven, relocation::RelocatePayload, section::MemberInfo};
+use super::{agreement::SectionSigned, section::NodeState};
 use crate::messaging::SectionAuthorityProvider;
-use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
@@ -23,8 +22,6 @@ use std::{
 pub struct JoinRequest {
     /// The public key of the section to join.
     pub section_key: BlsPublicKey,
-    /// If the peer is being relocated, contains `RelocatePayload`. Otherwise contains `None`.
-    pub relocate_payload: Option<RelocatePayload>,
     /// Proof of the resouce proofing.
     pub resource_proof_response: Option<ResourceProofResponse>,
 }
@@ -34,13 +31,6 @@ impl Debug for JoinRequest {
         formatter
             .debug_struct("JoinRequest")
             .field("section_key", &self.section_key)
-            .field(
-                "relocate_payload",
-                &self
-                    .relocate_payload
-                    .as_ref()
-                    .map(|payload| &payload.details),
-            )
             .field(
                 "resource_proof_response",
                 &self
@@ -81,8 +71,8 @@ pub enum JoinResponse {
     /// info to become a member of the section.
     Approval {
         genesis_key: BlsPublicKey,
-        section_auth: Proven<SectionAuthorityProvider>,
-        member_info: Proven<MemberInfo>,
+        section_auth: SectionSigned<SectionAuthorityProvider>,
+        node_state: SectionSigned<NodeState>,
         section_chain: SecuredLinkedList,
     },
     Rejected(JoinRejectionReason),
@@ -105,13 +95,13 @@ impl Debug for JoinResponse {
             Self::Approval {
                 genesis_key,
                 section_auth,
-                member_info,
+                node_state,
                 section_chain,
             } => f
                 .debug_struct("Approval")
                 .field("genesis_key", genesis_key)
                 .field("section_auth", section_auth)
-                .field("member_info", member_info)
+                .field("node_state", node_state)
                 .field("section_chain", section_chain)
                 .finish(),
             Self::Rejected(reason) => write!(f, "Rejected({:?})", reason),

@@ -1,5 +1,3 @@
-// Copyright 2021 MaidSafe.net limited.
-//
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // https://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
 // https://opensource.org/licenses/BSD-3-Clause>, at your option. This file may not be copied,
@@ -9,6 +7,7 @@
 
 mod agreement;
 mod join;
+mod join_as_relocated;
 mod network;
 mod node_msg;
 mod plain_message;
@@ -20,8 +19,9 @@ mod signed;
 mod src_authority;
 mod variant;
 
-pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven};
+pub use agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
+pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
     NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
@@ -31,17 +31,17 @@ pub use node_msg::{
 pub use plain_message::PlainMessage;
 pub use prefix_map::PrefixMap;
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise, SignedRelocateDetails};
-pub use section::{ElderCandidates, MemberInfo, Peer, PeerState, Section, SectionPeers};
+pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, SectionPeers};
 pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;
 pub use variant::Variant;
 
 use crate::messaging::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
-use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
+use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Routing message sent over the network.
@@ -108,4 +108,13 @@ impl Debug for RoutingMsg {
             .field("variant", &self.variant)
             .finish()
     }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+pub struct OtherSection {
+    // If this is signed by our section, then `key_signed` is `None`. If this is signed by our
+    // sibling section, then `key_signed` contains the proof of the signing key itself signed by our
+    // section.
+    pub section_auth: SectionSigned<SectionAuthorityProvider>,
+    pub key_signed: Option<Signed>,
 }

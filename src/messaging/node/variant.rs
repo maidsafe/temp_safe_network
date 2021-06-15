@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, Proven},
+    agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, SectionSigned},
     join::{JoinRequest, JoinResponse},
+    join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse},
     network::Network,
     relocation::{RelocateDetails, RelocatePromise},
     section::{ElderCandidates, Section},
@@ -35,7 +36,7 @@ pub enum Variant {
     /// Inform other sections about our section or vice-versa.
     SectionKnowledge {
         /// `SectionAuthorityProvider` and `SecuredLinkedList` of the sender's section, with the proof chain.
-        src_info: (Proven<SectionAuthorityProvider>, SecuredLinkedList),
+        src_info: (SectionSigned<SectionAuthorityProvider>, SecuredLinkedList),
         /// Message
         msg: Option<Box<RoutingMsg>>,
     },
@@ -59,6 +60,10 @@ pub enum Variant {
     JoinRequest(Box<JoinRequest>),
     /// Response to a `JoinRequest`
     JoinResponse(Box<JoinResponse>),
+    /// Sent from a peer to the section requesting to join as relocated from another section
+    JoinAsRelocatedRequest(Box<JoinAsRelocatedRequest>),
+    /// Response to a `JoinAsRelocatedRequest`
+    JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
     /// Sent from a node that can't establish the trust of the contained message to its original
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
@@ -130,6 +135,12 @@ impl Debug for Variant {
             Self::RelocatePromise(payload) => write!(f, "RelocatePromise({:?})", payload),
             Self::JoinRequest(payload) => write!(f, "JoinRequest({:?})", payload),
             Self::JoinResponse(response) => write!(f, "JoinResponse({:?})", response),
+            Self::JoinAsRelocatedRequest(payload) => {
+                write!(f, "JoinAsRelocatedRequest({:?})", payload)
+            }
+            Self::JoinAsRelocatedResponse(response) => {
+                write!(f, "JoinAsRelocatedResponse({:?})", response)
+            }
             Self::BouncedUntrustedMessage { msg, dest_info } => f
                 .debug_struct("BouncedUntrustedMessage")
                 .field("message", msg)

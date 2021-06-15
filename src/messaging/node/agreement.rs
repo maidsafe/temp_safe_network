@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{plain_message::PlainMessage, section::MemberInfo, signed::Signed};
+use super::{plain_message::PlainMessage, section::NodeState, signed::Signed};
 use crate::messaging::SectionAuthorityProvider;
-use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
 use secured_linked_list::SecuredLinkedList;
@@ -50,12 +49,12 @@ pub struct DkgFailureSignedSet {
 
 /// A value together with the signed that it was agreed on by the majority of the section elders.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
-pub struct Proven<T: Serialize> {
+pub struct SectionSigned<T: Serialize> {
     pub value: T,
     pub signed: Signed,
 }
 
-impl<T> Borrow<Prefix> for Proven<T>
+impl<T> Borrow<Prefix> for SectionSigned<T>
 where
     T: Borrow<Prefix> + Serialize,
 {
@@ -69,7 +68,7 @@ where
 pub enum Proposal {
     // Proposal to add a node to oursection
     Online {
-        member_info: MemberInfo,
+        node_state: NodeState,
         // Previous name if relocated.
         previous_name: Option<XorName>,
         // The key of the destination section that the joining node knows, if any.
@@ -77,7 +76,7 @@ pub enum Proposal {
     },
 
     // Proposal to remove a node from our section
-    Offline(MemberInfo),
+    Offline(NodeState),
 
     // Proposal to update info about a section. This has two purposes:
     //
@@ -97,7 +96,7 @@ pub enum Proposal {
     //   4. the signature of the new key using the current key
     // Which we can use to update the section section authority provider and the section chain at
     // the same time as a single atomic operation without needing to cache anything.
-    OurElders(Proven<SectionAuthorityProvider>),
+    OurElders(SectionSigned<SectionAuthorityProvider>),
 
     // Proposal to accumulate the message at the source (that is, our section) and then send it to
     // its destination.

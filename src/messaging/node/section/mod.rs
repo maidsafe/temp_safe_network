@@ -7,15 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod candidates;
-mod member_info;
+mod node_state;
 mod peer;
 
 pub use candidates::ElderCandidates;
-pub use member_info::{MemberInfo, PeerState};
+pub use node_state::{MembershipState, NodeState};
 pub use peer::Peer;
 
-use crate::messaging::{node::agreement::Proven, SectionAuthorityProvider};
-use bls::PublicKey as BlsPublicKey;
+use crate::messaging::{node::agreement::SectionSigned, SectionAuthorityProvider};
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -28,14 +27,14 @@ use xor_name::XorName;
 pub struct Section {
     pub genesis_key: BlsPublicKey,
     pub chain: SecuredLinkedList,
-    pub section_auth: Proven<SectionAuthorityProvider>,
+    pub section_auth: SectionSigned<SectionAuthorityProvider>,
     pub members: SectionPeers,
 }
 
 /// Container for storing information about members of our section.
 #[derive(Clone, Default, Debug, Eq, Serialize, Deserialize)]
 pub struct SectionPeers {
-    pub members: BTreeMap<XorName, Proven<MemberInfo>>,
+    pub members: BTreeMap<XorName, SectionSigned<NodeState>>,
 }
 
 impl PartialEq for SectionPeers {
@@ -50,10 +49,10 @@ impl Hash for SectionPeers {
     }
 }
 
-pub struct IntoIter(btree_map::IntoIter<XorName, Proven<MemberInfo>>);
+pub struct IntoIter(btree_map::IntoIter<XorName, SectionSigned<NodeState>>);
 
 impl Iterator for IntoIter {
-    type Item = Proven<MemberInfo>;
+    type Item = SectionSigned<NodeState>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(_, info)| info)
