@@ -82,7 +82,6 @@ pub use qp2p::Config as QuicP2pConfig;
 pub mod client;
 /// Config file handling.
 pub mod config_handler;
-/// Cryptographic utilities.
-pub mod crypto;
+
 /// Utility functions.
 pub mod utils;
