@@ -12,13 +12,13 @@ use crate::messaging::{
     Aggregation, DstLocation, MessageId,
 };
 use crate::node::{
-    chunk_store::BlobChunkStore,
+    data_store::ChunkDataStore,
     node_ops::MsgType,
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{error, info};
-use sn_data_types::{Blob, BlobAddress, DataAddress, PublicKey};
+use sn_data_types::{Chunk, ChunkAddress, DataAddress, PublicKey};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -26,27 +26,27 @@ use std::{
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
-    chunks: BlobChunkStore,
+    chunks: ChunkDataStore,
 }
 
 impl ChunkStorage {
     #[allow(dead_code)]
     pub(crate) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = BlobChunkStore::new(path, max_capacity).await?;
+        let chunks = ChunkDataStore::new(path, max_capacity).await?;
         Ok(Self { chunks })
     }
 
-    pub fn keys(&self) -> Vec<BlobAddress> {
+    pub fn keys(&self) -> Vec<ChunkAddress> {
         self.chunks.keys()
     }
 
-    pub(crate) async fn store(&mut self, data: &Blob) -> Result<NodeDuty> {
+    pub(crate) async fn store(&mut self, data: &Chunk) -> Result<NodeDuty> {
         self.try_store(data).await?;
 
         Ok(NodeDuty::NoOp)
     }
 
-    async fn try_store(&mut self, data: &Blob) -> Result<()> {
+    async fn try_store(&mut self, data: &Chunk) -> Result<()> {
         if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -58,18 +58,18 @@ impl ChunkStorage {
         self.chunks.put(&data).await
     }
 
-    pub(crate) fn get_chunk(&self, address: &BlobAddress) -> Result<Blob> {
+    pub(crate) fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         self.chunks.get(address)
     }
 
-    pub(crate) async fn delete_chunk(&mut self, address: &BlobAddress) -> Result<()> {
+    pub(crate) async fn delete_chunk(&mut self, address: &ChunkAddress) -> Result<()> {
         self.chunks.delete(&address).await
     }
 
-    pub(crate) fn get(&self, address: &BlobAddress, msg_id: MessageId) -> NodeDuty {
+    pub(crate) fn get(&self, address: &ChunkAddress, msg_id: MessageId) -> NodeDuty {
         let result = self
             .get_chunk(address)
-            .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Blob(*address)));
+            .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address)));
 
         NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
@@ -84,17 +84,17 @@ impl ChunkStorage {
     }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<()> {
-        if self.chunks.has(blob.address()) {
+    pub async fn store_for_replication(&mut self, chunk: Chunk) -> Result<()> {
+        if self.chunks.has(chunk.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
-                blob.address()
+                chunk.address()
             );
             return Ok(());
         }
 
-        self.chunks.put(&blob).await?;
+        self.chunks.put(&chunk).await?;
 
         Ok(())
     }
@@ -105,19 +105,22 @@ impl ChunkStorage {
 
     pub(crate) async fn delete(
         &mut self,
-        address: BlobAddress,
+        head_address: ChunkAddress,
         msg_id: MessageId,
         requester: PublicKey,
     ) -> Result<NodeDuty> {
-        if !self.chunks.has(&address) {
-            info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
+        if !self.chunks.has(&head_address) {
+            info!(
+                "{}: Immutable chunk doesn't exist: {:?}",
+                self, head_address
+            );
             return Ok(NodeDuty::NoOp);
         }
 
-        match self.chunks.get(&address) {
-            Ok(Blob::Private(data)) => {
+        match self.chunks.get(&head_address) {
+            Ok(Chunk::Private(data)) => {
                 if data.owner() == &requester {
-                    self.delete_chunk(&address)
+                    self.delete_chunk(&head_address)
                         .await
                         .map_err(|_error| ErrorMessage::FailedToDelete)
                 } else {
@@ -126,11 +129,11 @@ impl ChunkStorage {
             }
             Ok(_) => {
                 error!(
-                    "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
+                    "{}: Invalid DeletePrivate(Chunk::Public) encountered: {:?}",
                     self, msg_id
                 );
                 Err(ErrorMessage::InvalidOperation(format!(
-                    "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
+                    "{}: Invalid DeletePrivate(Chunk::Public) encountered: {:?}",
                     self, msg_id
                 )))
             }
@@ -152,7 +155,7 @@ mod tests {
     use super::*;
     use crate::node::Result;
     use bls::SecretKey;
-    use sn_data_types::{PrivateBlob, PublicBlob, PublicKey};
+    use sn_data_types::{PrivateChunk, PublicChunk, PublicKey};
     use std::path::PathBuf;
     use tempdir::TempDir;
 
@@ -165,26 +168,26 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn try_store_stores_public_blob() -> Result<()> {
+    pub async fn try_store_stores_public_chunk() -> Result<()> {
         let path = PathBuf::from(temp_dir()?.path());
         let mut storage = ChunkStorage::new(&path, u64::MAX).await?;
         let value = "immutable data value".to_owned().into_bytes();
-        let blob = Blob::Public(PublicBlob::new(value));
-        assert!(storage.try_store(&blob).await.is_ok());
-        assert!(storage.chunks.has(blob.address()));
+        let chunk = Chunk::Public(PublicChunk::new(value));
+        assert!(storage.try_store(&chunk).await.is_ok());
+        assert!(storage.chunks.has(chunk.address()));
 
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn try_store_stores_private_blob() -> Result<()> {
+    pub async fn try_store_stores_private_chunk() -> Result<()> {
         let path = PathBuf::from(temp_dir()?.path());
         let mut storage = ChunkStorage::new(&path, u64::MAX).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let key = get_random_pk();
-        let blob = Blob::Private(PrivateBlob::new(value, key));
-        assert!(storage.try_store(&blob).await.is_ok());
-        assert!(storage.chunks.has(blob.address()));
+        let chunk = Chunk::Private(PrivateChunk::new(value, key));
+        assert!(storage.try_store(&chunk).await.is_ok());
+        assert!(storage.chunks.has(chunk.address()));
 
         Ok(())
     }

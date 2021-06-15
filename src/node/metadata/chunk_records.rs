@@ -8,7 +8,7 @@
 
 use crate::btree_set;
 use crate::messaging::{
-    client::{BlobDataExchange, BlobRead, BlobWrite, ClientSigned, CmdError, QueryResponse},
+    client::{ChunkDataExchange, ChunkRead, ChunkWrite, ClientSigned, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, EndUser, MessageId,
 };
@@ -20,7 +20,7 @@ use crate::node::{
 };
 use crate::routing::Prefix;
 use log::{info, warn};
-use sn_data_types::{Blob, BlobAddress, PublicKey};
+use sn_data_types::{Chunk, ChunkAddress, PublicKey};
 
 use std::{
     collections::BTreeSet,
@@ -33,12 +33,12 @@ use super::{
 };
 
 /// Operations over the data type Blob.
-pub(super) struct BlobRecords {
+pub(super) struct ChunkRecords {
     capacity: Capacity,
     adult_liveness: AdultLiveness,
 }
 
-impl BlobRecords {
+impl ChunkRecords {
     pub(super) fn new(capacity: Capacity) -> Self {
         Self {
             capacity,
@@ -46,14 +46,14 @@ impl BlobRecords {
         }
     }
 
-    pub async fn get_data_of(&self, prefix: Prefix) -> BlobDataExchange {
+    pub async fn get_data_of(&self, prefix: Prefix) -> ChunkDataExchange {
         // Prepare full_adult details
         let full_adults = self.capacity.full_adults_matching(prefix).await;
-        BlobDataExchange { full_adults }
+        ChunkDataExchange { full_adults }
     }
 
-    pub async fn update(&self, blob_data: BlobDataExchange) {
-        let BlobDataExchange { full_adults } = blob_data;
+    pub async fn update(&self, chunk_data: ChunkDataExchange) {
+        let ChunkDataExchange { full_adults } = chunk_data;
         self.capacity.insert_full_adults(full_adults).await
     }
 
@@ -71,12 +71,12 @@ impl BlobRecords {
 
     pub(super) async fn write(
         &mut self,
-        write: BlobWrite,
+        write: ChunkWrite,
         msg_id: MessageId,
         client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        use BlobWrite::*;
+        use ChunkWrite::*;
         match write {
             New(data) => self.store(data, msg_id, client_signed, origin).await,
             DeletePrivate(address) => self.delete(address, msg_id, client_signed, origin).await,
@@ -110,14 +110,14 @@ impl BlobRecords {
 
     async fn send_chunks_to_adults(
         &mut self,
-        data: Blob,
+        chunk: Chunk,
         msg_id: MessageId,
         client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let target_holders = self.capacity.get_chunk_holder_adults(data.name()).await;
+        let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
 
-        info!("Storing {} copies of the data", target_holders.len());
+        info!("Storing {} copies of the chunk", target_holders.len());
 
         if CHUNK_COPY_COUNT > target_holders.len() {
             return self
@@ -129,7 +129,7 @@ impl BlobRecords {
                 .await;
         }
 
-        let blob_write = BlobWrite::New(data);
+        let blob_write = ChunkWrite::New(chunk);
 
         Ok(NodeDuty::SendToNodes {
             targets: target_holders,
@@ -147,16 +147,16 @@ impl BlobRecords {
 
     async fn store(
         &mut self,
-        data: Blob,
+        chunk: Chunk,
         msg_id: MessageId,
         client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_data_owner(&data, &client_signed.public_key) {
+        if let Err(error) = validate_chunk_owner(&chunk, &client_signed.public_key) {
             return self.send_error(error, msg_id, origin).await;
         }
 
-        self.send_chunks_to_adults(data, msg_id, client_signed, origin)
+        self.send_chunks_to_adults(chunk, msg_id, client_signed, origin)
             .await
     }
 
@@ -166,9 +166,9 @@ impl BlobRecords {
         response: QueryResponse,
         src: XorName,
     ) -> Result<NodeDuties> {
-        if !matches!(response, QueryResponse::GetBlob(_)) {
+        if !matches!(response, QueryResponse::GetChunk(_)) {
             return Err(Error::Logic(format!(
-                "Got {:?}, but only `GetBlob` query responses are supposed to exist in this flow.",
+                "Got {:?}, but only `GetChunk` query responses are supposed to exist in this flow.",
                 response
             )));
         }
@@ -220,7 +220,7 @@ impl BlobRecords {
 
     async fn delete(
         &mut self,
-        address: BlobAddress,
+        address: ChunkAddress,
         msg_id: MessageId,
         client_signed: ClientSigned,
         origin: EndUser,
@@ -229,7 +229,7 @@ impl BlobRecords {
 
         let msg = NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks {
-                cmd: BlobWrite::DeletePrivate(address),
+                cmd: ChunkWrite::DeletePrivate(address),
                 client_signed,
                 origin,
             },
@@ -242,15 +242,15 @@ impl BlobRecords {
         })
     }
 
-    pub(super) async fn republish_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
-        let owner = data.owner();
-        let target_holders = self.capacity.get_chunk_holder_adults(data.name()).await;
+    pub(super) async fn republish_chunk(&mut self, chunk: Chunk) -> Result<NodeDuty> {
+        let owner = chunk.owner();
+        let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
         // deterministic msg id for aggregation
-        let msg_id = MessageId::from_content(&(*data.name(), owner, &target_holders))?;
+        let msg_id = MessageId::from_content(&(*chunk.name(), owner, &target_holders))?;
 
         info!(
             "Republishing chunk {:?} to holders {:?} with MessageId {:?}",
-            data.address(),
+            chunk.address(),
             &target_holders,
             msg_id
         );
@@ -258,7 +258,7 @@ impl BlobRecords {
         Ok(NodeDuty::SendToNodes {
             targets: target_holders,
             msg: NodeMsg::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk)),
                 id: msg_id,
             },
             aggregation: Aggregation::None,
@@ -267,18 +267,18 @@ impl BlobRecords {
 
     pub(super) async fn read(
         &mut self,
-        read: &BlobRead,
+        read: &ChunkRead,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         match read {
-            BlobRead::Get(address) => self.get(*address, msg_id, origin).await,
+            ChunkRead::Get(address) => self.get(*address, msg_id, origin).await,
         }
     }
 
     async fn get(
         &mut self,
-        address: BlobAddress,
+        address: ChunkAddress,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
@@ -300,7 +300,7 @@ impl BlobRecords {
         {
             let msg = NodeMsg::NodeQuery {
                 query: NodeQuery::Chunks {
-                    query: BlobRead::Get(address),
+                    query: ChunkRead::Get(address),
                     origin,
                 },
                 id: msg_id,
@@ -321,12 +321,13 @@ impl BlobRecords {
     }
 }
 
-fn validate_data_owner(data: &Blob, requester: &PublicKey) -> Result<()> {
-    if data.is_private() {
-        data.owner()
+fn validate_chunk_owner(chunk: &Chunk, requester: &PublicKey) -> Result<()> {
+    if chunk.is_private() {
+        chunk
+            .owner()
             .ok_or_else(|| Error::InvalidOwner(*requester))
-            .and_then(|data_owner| {
-                if data_owner != requester {
+            .and_then(|chunk_owner| {
+                if chunk_owner != requester {
                     Err(Error::InvalidOwner(*requester))
                 } else {
                     Ok(())
@@ -337,8 +338,8 @@ fn validate_data_owner(data: &Blob, requester: &PublicKey) -> Result<()> {
     }
 }
 
-impl Display for BlobRecords {
+impl Display for ChunkRecords {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "BlobRecords")
+        write!(formatter, "ChunkRecords")
     }
 }

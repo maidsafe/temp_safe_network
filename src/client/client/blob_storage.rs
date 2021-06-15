@@ -10,7 +10,7 @@ use super::Client;
 use async_trait::async_trait;
 use log::trace;
 use self_encryption::{SelfEncryptionError, Storage};
-use sn_data_types::{Blob, BlobAddress, PrivateBlob, PublicBlob, PublicKey};
+use sn_data_types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network storage is the concrete type which self_encryption crate will use
@@ -44,12 +44,12 @@ impl Storage for BlobStorage {
         };
 
         let address = if self.public {
-            BlobAddress::Public(name)
+            ChunkAddress::Public(name)
         } else {
-            BlobAddress::Private(name)
+            ChunkAddress::Private(name)
         };
 
-        trace!("Self encrypt invoked GetBlob({:?})", &address);
+        trace!("Self encrypt invoked GetChunk({:?})", &address);
 
         match self.client.fetch_blob_from_network(address).await {
             Ok(data) => Ok(data.value().clone()),
@@ -75,36 +75,36 @@ impl Storage for BlobStorage {
                 "Cannot delete on a public storage".to_owned(),
             ));
         } else {
-            BlobAddress::Private(name)
+            ChunkAddress::Private(name)
         };
         trace!("Self encrypt invoked DeleteBlob({:?})", &address);
 
-        match self.client.delete_blob_from_network(address).await {
+        match self.client.delete_chunk_from_network(address).await {
             Ok(_) => Ok(()),
             Err(error) => Err(SelfEncryptionError::Generic(format!("{}", error))),
         }
     }
 
     async fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionError> {
-        let blob: Blob = if self.public {
-            PublicBlob::new(data).into()
+        let chunk: Chunk = if self.public {
+            PublicChunk::new(data).into()
         } else {
-            PrivateBlob::new(data, self.client.public_key()).into()
+            PrivateChunk::new(data, self.client.public_key()).into()
         };
-        trace!("Self encrypt invoked PutBlob({:?})", &blob);
+        trace!("Self encrypt invoked StoreChunk({:?})", &chunk);
         self.client
-            .store_blob_on_network(blob)
+            .store_chunk_on_network(chunk)
             .await
             .map_err(|err| SelfEncryptionError::Generic(format!("{}", err)))
     }
 
     async fn generate_address(&self, data: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        let blob: Blob = if self.public {
-            PublicBlob::new(data.to_vec()).into()
+        let chunk: Chunk = if self.public {
+            PublicChunk::new(data.to_vec()).into()
         } else {
-            PrivateBlob::new(data.to_vec(), self.client.public_key()).into()
+            PrivateChunk::new(data.to_vec(), self.client.public_key()).into()
         };
-        Ok(blob.name().0.to_vec())
+        Ok(chunk.name().0.to_vec())
     }
 }
 
@@ -125,32 +125,32 @@ impl BlobStorageDryRun {
 #[async_trait]
 impl Storage for BlobStorageDryRun {
     async fn get(&mut self, _name: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        trace!("Self encrypt invoked GetBlob dry run.");
+        trace!("Self encrypt invoked GetChunk dry run.");
         Err(SelfEncryptionError::Generic(
             "Cannot get from storage since it's a dry run.".to_owned(),
         ))
     }
 
     async fn put(&mut self, _: Vec<u8>, _data: Vec<u8>) -> Result<(), SelfEncryptionError> {
-        trace!("Self encrypt invoked PutBlob dry run.");
+        trace!("Self encrypt invoked StoreChunk dry run.");
         // We do nothing here just return ok so self_encrpytion can finish
         // and generate chunk addresses and datamap if required
         Ok(())
     }
 
     async fn delete(&mut self, _name: &[u8]) -> Result<(), SelfEncryptionError> {
-        trace!("Self encrypt invoked DeleteBlob dry run.");
+        trace!("Self encrypt invoked DeleteChunk dry run.");
 
         Ok(())
     }
 
     async fn generate_address(&self, data: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
-        let blob: Blob = if let Some(owner) = self.privately_owned {
-            PrivateBlob::new(data.to_vec(), owner).into()
+        let chunk: Chunk = if let Some(owner) = self.privately_owned {
+            PrivateChunk::new(data.to_vec(), owner).into()
         } else {
-            PublicBlob::new(data.to_vec()).into()
+            PublicChunk::new(data.to_vec()).into()
         };
 
-        Ok(blob.name().0.to_vec())
+        Ok(chunk.name().0.to_vec())
     }
 }

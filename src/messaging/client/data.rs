@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob::{BlobRead, BlobWrite},
+    chunk::{ChunkRead, ChunkWrite},
     map::{MapRead, MapWrite},
     register::{RegisterRead, RegisterWrite},
     sequence::{SequenceRead, SequenceWrite},
@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum DataCmd {
     /// Blob write operation
-    Blob(BlobWrite),
+    Blob(ChunkWrite),
     /// Map write operation
     Map(MapWrite),
     /// Sequence write operation
@@ -72,7 +72,7 @@ impl DataCmd {
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum DataQuery {
     /// TODO: docs
-    Blob(BlobRead),
+    Blob(ChunkRead),
     /// TODO: docs
     Map(MapRead),
     /// TODO: docs

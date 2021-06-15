@@ -31,7 +31,7 @@ pub enum Error {
     /// No Adults in the section to perform Chunk operation
     #[error("No Adults available in Section({0:?})")]
     NoAdults(Prefix),
-    /// Not enough space in `ChunkStore` to perform `put`.
+    /// Not enough space in `DataStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
     /// Not enough storage available on the network.
@@ -97,7 +97,7 @@ pub enum Error {
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,
-    /// Key, Value pair not found in `ChunkStore`.
+    /// Key, Value pair not found in `DataStore`.
     #[error("No such chunk: {0:?}")]
     NoSuchChunk(DataAddress),
     /// Unable to process fund churn message.

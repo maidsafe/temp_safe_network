@@ -187,14 +187,14 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
         },
         // this cmd is accumulated, thus has authority
         NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+            cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(chunk)),
             id,
-        } => NodeDuty::ReplicateChunk { data, msg_id: id },
+        } => NodeDuty::ReplicateChunk { chunk, msg_id: id },
         NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
+            cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
             id,
         } => NodeDuty::ProcessRepublish {
-            chunk: data,
+            chunk: chunk,
             msg_id: id,
         },
         // Aggregated by us, for security
@@ -222,7 +222,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             correlation_id,
             ..
         } => NodeDuty::RecordAdultReadLiveness {
-            response: QueryResponse::GetBlob(res),
+            response: QueryResponse::GetChunk(res),
             correlation_id,
             src: origin.name(),
         },

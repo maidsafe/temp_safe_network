@@ -6,21 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::chunk::{Chunk, ChunkId};
-use sn_data_types::{DataAddress, Map, MapAddress};
+use super::data::{Data, DataId};
+use sn_data_types::{
+    register::{Address, Register},
+    DataAddress,
+};
 
-impl Chunk for Map {
-    type Id = MapAddress;
+impl Data for Register {
+    type Id = Address;
     fn id(&self) -> &Self::Id {
-        match self {
-            Map::Seq(ref chunk) => chunk.address(),
-            Map::Unseq(ref chunk) => chunk.address(),
-        }
+        self.address()
     }
 }
 
-impl ChunkId for MapAddress {
+impl DataId for Address {
     fn to_data_address(&self) -> DataAddress {
-        DataAddress::Map(*self)
+        DataAddress::Register(*self)
     }
 }

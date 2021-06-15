@@ -12,7 +12,7 @@ use crate::messaging::{
     EndUser, MessageId,
 };
 use crate::node::{
-    chunk_store::SequenceChunkStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
+    data_store::SequenceDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
     Result,
 };
 use crate::routing::Prefix;
@@ -28,12 +28,12 @@ use std::{
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
-    chunks: SequenceChunkStore,
+    chunks: SequenceDataStore,
 }
 
 impl SequenceStorage {
     pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = SequenceChunkStore::new(path, max_capacity).await?;
+        let chunks = SequenceDataStore::new(path, max_capacity).await?;
         Ok(Self { chunks })
     }
 
@@ -51,12 +51,12 @@ impl SequenceStorage {
     }
 
     pub async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
-        debug!("Updating Sequence chunkstore");
-        let chunkstore = &mut self.chunks;
+        debug!("Updating Sequence DataStore");
+        let data_store = &mut self.chunks;
         let SequenceDataExchange(data) = seq_data;
 
         for (_key, value) in data {
-            chunkstore.put(&value).await?;
+            data_store.put(&value).await?;
         }
 
         Ok(())

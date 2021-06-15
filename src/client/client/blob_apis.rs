@@ -11,12 +11,12 @@ use super::{
     Client,
 };
 use crate::client::Error;
-use crate::messaging::client::{BlobRead, BlobWrite, DataCmd, DataQuery, Query, QueryResponse};
+use crate::messaging::client::{ChunkRead, ChunkWrite, DataCmd, DataQuery, Query, QueryResponse};
 use bincode::{deserialize, serialize};
 use log::{info, trace};
 use self_encryption::{DataMap, SelfEncryptor};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Blob, BlobAddress, PrivateBlob, PublicBlob, PublicKey};
+use sn_data_types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 
 #[derive(Serialize, Deserialize)]
 enum DataMapLevel {
@@ -30,7 +30,7 @@ enum DataMapLevel {
 
 impl Client {
     /// Read the contents of a blob from the network. The contents might be spread across
-    /// different blobs in the network. This function invokes the self-encryptor and returns
+    /// different chunks in the network. This function invokes the self-encryptor and returns
     /// the data that was initially stored.
     ///
     /// Takes `position` and `len` arguments which specify the start position
@@ -45,20 +45,20 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use sn_client::utils::test_utils::read_network_conn_info;
     /// use sn_client::Client;
-    /// use sn_data_types::BlobAddress;
+    /// use sn_data_types::ChunkAddress;
     /// use xor_name::XorName;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
-    /// let target_blob = BlobAddress::Public(XorName::random());
+    /// let head_chunk = ChunkAddress::Public(XorName::random());
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
     /// let client = Client::new(None, None, bootstrap_contacts).await?;
     ///
-    /// // grab the random blob from the network
-    /// let _data = client.read_blob(target_blob, None, None).await?;
+    /// // grab the random head of the blob from the network
+    /// let _data = client.read_blob(head_chunk, None, None).await?;
     /// # Ok(())} );}
     /// ```
     pub async fn read_blob(
         &self,
-        address: BlobAddress,
+        head_address: ChunkAddress,
         position: Option<usize>,
         len: Option<usize>,
     ) -> Result<Vec<u8>, Error>
@@ -66,15 +66,15 @@ impl Client {
         Self: Sized,
     {
         trace!(
-            "Fetch Blob: {:?} Position: {:?} Len: {:?}",
-            &address,
+            "Fetch head chunk of blob at: {:?} Position: {:?} Len: {:?}",
+            &head_address,
             &position,
             &len
         );
 
-        let data = self.fetch_blob_from_network(address).await?;
-        let public = address.is_public();
-        let data_map = self.unpack(data).await?;
+        let chunk = self.fetch_blob_from_network(head_address).await?;
+        let public = head_address.is_public();
+        let data_map = self.unpack(chunk).await?;
 
         let raw_data = self
             .read_using_data_map(data_map, public, position, len)
@@ -83,9 +83,10 @@ impl Client {
         Ok(raw_data)
     }
 
-    /// Store data in public blobs on the network.
+    /// Store data in public chunks on the network.
     ///
-    /// This performs self encrypt on the data itself and returns a single address using which the data can be read.
+    /// This performs self encrypt on the data itself and returns a single address pointing to the head chunk of the blob,
+    /// and with which the data can be read.
     /// It performs data storage as well as all necessary payment validation and checks against the client's AT2 actor.
     ///
     /// # Examples
@@ -104,18 +105,19 @@ impl Client {
     /// let mut client = Client::new(None, None, bootstrap_contacts).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let data = b"some data".to_vec();
-    /// // grab the random blob from the network
+    /// // grab the random head of the blob from the network
     /// let _address = client.store_public_blob(&data).await?;
     ///
     /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
     /// ```
-    pub async fn store_public_blob(&self, data: &[u8]) -> Result<BlobAddress, Error> {
+    pub async fn store_public_blob(&self, data: &[u8]) -> Result<ChunkAddress, Error> {
         self.create_new_blob(data, true).await
     }
 
-    /// Store data in private blobs on the network.
+    /// Store data in private chunks on the network.
     ///
-    /// This performs self encrypt on the data itself and returns a single address using which the data can be read.
+    /// This performs self encrypt on the data itself and returns a single address pointing to the head chunk of the blob,
+    /// and with which the data can be read.
     /// It performs data storage as well as all necessary payment validation and checks against the client's AT2 actor.
     ///
     /// # Examples
@@ -134,64 +136,67 @@ impl Client {
     /// let mut client = Client::new(None, None, bootstrap_contacts).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let data = b"some data".to_vec();
-    /// // grab the random blob from the network
+    /// // grab the random head of the blob from the network
     /// let fetched_data = client.store_private_blob(&data).await?;
     ///
     /// println!( "{:?}", fetched_data ); // prints "some data"
     /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
     /// ```
-    pub async fn store_private_blob(&self, data: &[u8]) -> Result<BlobAddress, Error> {
+    pub async fn store_private_blob(&self, data: &[u8]) -> Result<ChunkAddress, Error> {
         self.create_new_blob(data, false).await
     }
 
-    async fn create_new_blob(&self, data: &[u8], public: bool) -> Result<BlobAddress, Error> {
+    async fn create_new_blob(&self, data: &[u8], public: bool) -> Result<ChunkAddress, Error> {
         let data_map = self.write_to_network(data, public).await?;
 
-        let blob_content = serialize(&DataMapLevel::Root(data_map))?;
-        let blob = self.pack(blob_content, public).await?;
-        let blob_address = *blob.address();
+        let chunk_content = serialize(&DataMapLevel::Root(data_map))?;
+        let chunk = self.pack(chunk_content, public).await?;
+        let blob_head = *chunk.address();
 
-        self.store_blob_on_network(blob).await?;
+        self.store_chunk_on_network(chunk).await?;
 
-        Ok(blob_address)
+        Ok(blob_head)
     }
 
     pub(crate) async fn fetch_blob_from_network(
         &self,
-        address: BlobAddress,
-    ) -> Result<Blob, Error> {
+        head_address: ChunkAddress,
+    ) -> Result<Chunk, Error> {
         let res = self
-            .send_query(Query::Data(DataQuery::Blob(BlobRead::Get(address))))
+            .send_query(Query::Data(DataQuery::Blob(ChunkRead::Get(head_address))))
             .await?;
         let msg_id = res.msg_id;
-        let data: Blob = match res.response {
-            QueryResponse::GetBlob(result) => result.map_err(|err| Error::from((err, msg_id))),
+        let chunk: Chunk = match res.response {
+            QueryResponse::GetChunk(result) => result.map_err(|err| Error::from((err, msg_id))),
             _ => return Err(Error::ReceivedUnexpectedEvent),
         }?;
 
-        Ok(data)
+        Ok(chunk)
     }
 
-    pub(crate) async fn delete_blob_from_network(&self, address: BlobAddress) -> Result<(), Error> {
-        let cmd = DataCmd::Blob(BlobWrite::DeletePrivate(address));
+    pub(crate) async fn delete_chunk_from_network(
+        &self,
+        address: ChunkAddress,
+    ) -> Result<(), Error> {
+        let cmd = DataCmd::Blob(ChunkWrite::DeletePrivate(address));
         self.pay_and_send_data_command(cmd).await?;
 
         Ok(())
     }
 
-    // Private function that actually stores the given blob on the network.
-    // Self Encryption is NOT APPLIED ON the blob that is passed to this function.
+    // Private function that actually stores the given chunk on the network.
+    // Self Encryption is NOT APPLIED ON the chunk that is passed to this function.
     // Clients should not call this function directly.
-    pub(crate) async fn store_blob_on_network(&self, blob: Blob) -> Result<(), Error> {
-        if !blob.validate_size() {
+    pub(crate) async fn store_chunk_on_network(&self, chunk: Chunk) -> Result<(), Error> {
+        if !chunk.validate_size() {
             return Err(Error::NetworkDataError(sn_data_types::Error::ExceededSize));
         }
-        let cmd = DataCmd::Blob(BlobWrite::New(blob));
+        let cmd = DataCmd::Blob(ChunkWrite::New(chunk));
         self.pay_and_send_data_command(cmd).await?;
         Ok(())
     }
 
-    /// Delete blob can only be performed on Private Blobs. But on those private blobs this will remove the data
+    /// Delete blob can only be performed on private chunks. But on those private chunks this will remove the data
     /// from the network.
     ///
     /// # Examples
@@ -222,24 +227,24 @@ impl Client {
     /// };
     /// #  Ok(())} );}
     /// ```
-    pub async fn delete_blob(&self, address: BlobAddress) -> Result<(), Error> {
-        info!("Deleting blob at given address: {:?}", address);
+    pub async fn delete_blob(&self, head_chunk: ChunkAddress) -> Result<(), Error> {
+        info!("Deleting blob at given address: {:?}", head_chunk);
 
-        let mut data = self.fetch_blob_from_network(address).await?;
-        self.delete_blob_from_network(address).await?;
+        let mut chunk = self.fetch_blob_from_network(head_chunk).await?;
+        self.delete_chunk_from_network(head_chunk).await?;
 
         loop {
-            match deserialize(data.value())? {
+            match deserialize(chunk.value())? {
                 DataMapLevel::Root(data_map) => {
                     self.delete_using_data_map(data_map).await?;
                     return Ok(());
                 }
                 DataMapLevel::Child(data_map) => {
-                    let serialized_blob = self
+                    let serialized_chunk = self
                         .read_using_data_map(data_map.clone(), false, None, None)
                         .await?;
                     self.delete_using_data_map(data_map).await?;
-                    data = deserialize(&serialized_blob)?;
+                    chunk = deserialize(&serialized_chunk)?;
                 }
             }
         }
@@ -250,11 +255,11 @@ impl Client {
     pub async fn blob_data_map(
         mut data: Vec<u8>,
         privately_owned: Option<PublicKey>,
-    ) -> Result<(DataMap, BlobAddress), Error> {
+    ) -> Result<(DataMap, ChunkAddress), Error> {
         // We generate a random public key as owner since this is used for dry-run only
         let mut is_original_data = true;
 
-        let (data_map, blob) = loop {
+        let (data_map, head_chunk) = loop {
             let blob_storage = BlobStorageDryRun::new(privately_owned);
             let self_encryptor =
                 SelfEncryptor::new(blob_storage, DataMap::None).map_err(Error::SelfEncryption)?;
@@ -267,28 +272,28 @@ impl Client {
                 .await
                 .map_err(Error::SelfEncryption)?;
 
-            let blob_content = if is_original_data {
+            let chunk_content = if is_original_data {
                 is_original_data = false;
                 serialize(&DataMapLevel::Root(data_map.clone()))?
             } else {
                 serialize(&DataMapLevel::Child(data_map.clone()))?
             };
 
-            let blob: Blob = if let Some(owner) = privately_owned {
-                PrivateBlob::new(blob_content, owner).into()
+            let chunk: Chunk = if let Some(owner) = privately_owned {
+                PrivateChunk::new(chunk_content, owner).into()
             } else {
-                PublicBlob::new(blob_content).into()
+                PublicChunk::new(chunk_content).into()
             };
 
-            // If Blob (data map) is bigger than 1MB we need to break it down
-            if blob.validate_size() {
-                break (data_map, blob);
+            // If the chunk (data map) is bigger than 1MB we need to break it down
+            if chunk.validate_size() {
+                break (data_map, chunk);
             } else {
-                data = serialize(&blob)?;
+                data = serialize(&chunk)?;
             }
         };
 
-        Ok((data_map, *blob.address()))
+        Ok((data_map, *head_chunk.address()))
     }
 
     // --------------------------------------------
@@ -349,44 +354,44 @@ impl Client {
         }
     }
 
-    /// Takes the "Root data map" and returns a Blob that is acceptable by the network
+    /// Takes the "Root data map" and returns a chunk that is acceptable by the network
     ///
-    /// If the root data map blob is too big, the whole blob is self-encrypted and the child data map is put into a blob.
-    /// The above step is repeated as many times as required until the blob size is valid.
-    async fn pack(&self, mut contents: Vec<u8>, public: bool) -> Result<Blob, Error> {
+    /// If the root data map chunk is too big, it is self-encrypted and the resulting data map is put into a chunk.
+    /// The above step is repeated as many times as required until the chunk size is valid.
+    async fn pack(&self, mut contents: Vec<u8>, public: bool) -> Result<Chunk, Error> {
         loop {
-            let data: Blob = if public {
-                PublicBlob::new(contents).into()
+            let chunk: Chunk = if public {
+                PublicChunk::new(contents).into()
             } else {
-                PrivateBlob::new(contents, self.public_key()).into()
+                PrivateChunk::new(contents, self.public_key()).into()
             };
 
-            // If data map blob is less thatn 1MB return it so it can be directly sent to the network
-            if data.validate_size() {
-                return Ok(data);
+            // If data map chunk is less thatn 1MB return it so it can be directly sent to the network
+            if chunk.validate_size() {
+                return Ok(chunk);
             } else {
-                let serialized_blob = serialize(&data)?;
-                let data_map = self.write_to_network(&serialized_blob, public).await?;
+                let serialized_chunk = serialize(&chunk)?;
+                let data_map = self.write_to_network(&serialized_chunk, public).await?;
                 contents = serialize(&DataMapLevel::Child(data_map))?;
             }
         }
     }
 
-    /// Takes a blob and fetches the data map from it.
+    /// Takes a chunk and fetches the data map from it.
     /// If the data map is not the root data map of the user's contents,
     /// the process repeats itself until it obtains the root data map.
-    async fn unpack(&self, mut data: Blob) -> Result<DataMap, Error> {
+    async fn unpack(&self, mut chunk: Chunk) -> Result<DataMap, Error> {
         loop {
-            let public = data.is_public();
-            match deserialize(data.value())? {
+            let public = chunk.is_public();
+            match deserialize(chunk.value())? {
                 DataMapLevel::Root(data_map) => {
                     return Ok(data_map);
                 }
                 DataMapLevel::Child(data_map) => {
-                    let serialized_blob = self
+                    let serialized_chunk = self
                         .read_using_data_map(data_map, public, None, None)
                         .await?;
-                    data = deserialize(&serialized_blob)?;
+                    chunk = deserialize(&serialized_chunk)?;
                 }
             }
         }
@@ -395,7 +400,7 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::{Blob, BlobAddress, Client, DataMap, DataMapLevel, Error};
+    use super::{Chunk, ChunkAddress, Client, DataMap, DataMapLevel, Error};
     use crate::client::client::blob_storage::BlobStorage;
     use crate::client::utils::{generate_random_vector, test_utils::create_test_client};
     use crate::messaging::client::Error as ErrorMessage;
@@ -403,10 +408,10 @@ mod tests {
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use self_encryption::Storage;
-    use sn_data_types::{PrivateBlob, PublicBlob, Token};
+    use sn_data_types::{PrivateChunk, PublicChunk, Token};
     use std::str::FromStr;
 
-    // Test putting and getting pub Blob.
+    // Test storing and getting public Blob.
     #[tokio::test]
     pub async fn public_blob_test() -> Result<()> {
         let client = create_test_client().await?;
@@ -415,7 +420,7 @@ mod tests {
 
         // Get non-existent Blob
         match client.read_blob(expected_address, None, None).await {
-            Ok(data) => bail!("Public Blob should not exist yet: {:?}", data),
+            Ok(data) => bail!("public chunk should not exist yet: {:?}", data),
             Err(Error::ErrorMessage {
                 source: ErrorMessage::DataNotFound(_),
                 ..
@@ -423,24 +428,24 @@ mod tests {
             Err(e) => bail!("Unexpected: {:?}", e),
         }
 
-        // Put blob
-        let pub_address = client.store_public_blob(&value).await?;
+        // Store blob
+        let public_address = client.store_public_blob(&value).await?;
         // check it's the expected Blob address
-        assert_eq!(expected_address, pub_address);
+        assert_eq!(expected_address, public_address);
 
         // Assert that the blob was written
-        let fetched_data = retry_loop!(client.read_blob(pub_address, None, None));
+        let fetched_data = retry_loop!(client.read_blob(public_address, None, None));
         assert_eq!(value, fetched_data);
 
-        // Test putting public Blob with the same value.
+        // Test storing public chunk with the same value.
         // Should not conflict and return same address
         let addr = client.store_public_blob(&value).await?;
-        assert_eq!(addr, pub_address);
+        assert_eq!(addr, public_address);
 
         Ok(())
     }
 
-    // Test putting, getting, and deleting private blob.
+    // Test storing, getting, and deleting private chunk.
     #[tokio::test]
     pub async fn private_blob_test() -> Result<()> {
         let client = create_test_client().await?;
@@ -452,7 +457,7 @@ mod tests {
 
         // Get non-existent Blob
         match client.read_blob(expected_address, None, None).await {
-            Ok(_) => bail!("Private Blob should not exist yet"),
+            Ok(_) => bail!("private chunk should not exist yet"),
             Err(Error::ErrorMessage {
                 source: ErrorMessage::DataNotFound(_),
                 ..
@@ -460,7 +465,7 @@ mod tests {
             Err(e) => bail!("Expecting DataNotFound error, got: {:?}", e),
         }
 
-        // Put Blob
+        // Store Blob
         let priv_address = client.store_private_blob(&value).await?;
         // check it's the expected Blob address
         assert_eq!(expected_address, priv_address);
@@ -469,16 +474,16 @@ mod tests {
         let fetched_data = retry_loop!(client.read_blob(priv_address, None, None));
         assert_eq!(value, fetched_data);
 
-        // Test putting private Blob with the same value.
+        // Test storing private chunk with the same value.
         // Should not conflict and return same address
         let addr = client.store_private_blob(&value).await?;
         assert_eq!(addr, priv_address);
 
-        // Test putting public Blob with the same value. Should not conflict.
-        let pub_address = client.store_public_blob(&value).await?;
+        // Test storing public chunk with the same value. Should not conflict.
+        let public_address = client.store_public_blob(&value).await?;
 
-        // Assert that the pub Blob is stored.
-        let fetched_data = retry_loop!(client.read_blob(pub_address, None, None));
+        // Assert that the public Blob is stored.
+        let fetched_data = retry_loop!(client.read_blob(public_address, None, None));
         assert_eq!(value, fetched_data);
 
         // Delete Blob
@@ -489,13 +494,13 @@ mod tests {
         while client.read_blob(priv_address, None, None).await.is_ok() {
             tokio::time::sleep(tokio::time::Duration::from_millis(4000)).await;
             if attempts == 0 {
-                bail!("The private Blob was not deleted: {:?}", priv_address);
+                bail!("The private chunk was not deleted: {:?}", priv_address);
             } else {
                 attempts -= 1;
             }
         }
 
-        // Test putting private Blob with the same value again. Should not conflict.
+        // Test storing private chunk with the same value again. Should not conflict.
         let new_addr = client.store_private_blob(&value).await?;
         assert_eq!(new_addr, priv_address);
 
@@ -591,12 +596,12 @@ mod tests {
         let client = create_test_client().await?;
         let address = client.store_public_blob(&data).await?;
 
-        // let's make sure the public Blob is stored
+        // let's make sure the public chunk is stored
         let _ = retry_loop!(client.read_blob(address, None, None));
 
-        // and now trying to read a private Blob with same address should fail
+        // and now trying to read a private chunk with same address should fail
         let res = client
-            .read_blob(BlobAddress::Private(*address.name()), None, None)
+            .read_blob(ChunkAddress::Private(*address.name()), None, None)
             .await;
         assert!(res.is_err());
 
@@ -613,12 +618,12 @@ mod tests {
 
         let address = client.store_private_blob(&value).await?;
 
-        // let's make sure the private Blob is stored
+        // let's make sure the private chunk is stored
         let _ = retry_loop!(client.read_blob(address, None, None));
 
-        // and now trying to read a public Blob with same address should fail
+        // and now trying to read a public chunk with same address should fail
         let res = client
-            .read_blob(BlobAddress::Public(*address.name()), None, None)
+            .read_blob(ChunkAddress::Public(*address.name()), None, None)
             .await;
         assert!(res.is_err());
 
@@ -690,14 +695,14 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        // gen address without putting to the network (public and unencrypted)
-        let blob = if public {
-            Blob::Public(PublicBlob::new(raw_data.clone()))
+        // generate address without storing to the network (public and unencrypted)
+        let chunk = if public {
+            Chunk::Public(PublicChunk::new(raw_data.clone()))
         } else {
-            Blob::Private(PrivateBlob::new(raw_data.clone(), client.public_key()))
+            Chunk::Private(PrivateChunk::new(raw_data.clone(), client.public_key()))
         };
 
-        let address_before = blob.address();
+        let address_before = chunk.address();
 
         // attempt to retrieve it with generated address (it should error)
         let res = client.read_blob(*address_before, None, None).await;
@@ -723,14 +728,14 @@ mod tests {
         // then the content should be what we put
         assert_eq!(fetched_data, raw_data);
 
-        // now let's test Blob data map generation utility returns the correct Blob address
+        // now let's test Blob data map generation utility returns the correct chunk address
         let privately_owned = if public {
             None
         } else {
             Some(client.public_key())
         };
-        let (_, blob_address) = Client::blob_data_map(raw_data, privately_owned).await?;
-        assert_eq!(blob_address, address);
+        let (_, head_chunk_address) = Client::blob_data_map(raw_data, privately_owned).await?;
+        assert_eq!(head_chunk_address, address);
 
         Ok(())
     }

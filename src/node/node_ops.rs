@@ -9,7 +9,7 @@
 use crate::messaging::client::ClientMsg;
 use crate::messaging::{
     client::{
-        BlobRead, BlobWrite, ClientSigned, DataCmd, DataExchange, DataQuery, ProcessMsg,
+        ChunkRead, ChunkWrite, ClientSigned, DataCmd, DataExchange, DataQuery, ProcessMsg,
         ProcessingError, QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
@@ -19,7 +19,7 @@ use crate::routing::Prefix;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
+    ActorHistory, Chunk, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use std::{
@@ -84,16 +84,16 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
     ReadChunk {
-        read: BlobRead,
+        read: ChunkRead,
         msg_id: MessageId,
     },
     WriteChunk {
-        write: BlobWrite,
+        write: ChunkWrite,
         msg_id: MessageId,
         client_signed: ClientSigned,
     },
     ProcessRepublish {
-        chunk: Blob,
+        chunk: Chunk,
         msg_id: MessageId,
     },
     /// Run at data-section Elders on receiving the result of
@@ -229,7 +229,7 @@ pub enum NodeDuty {
     /// Receive a chunk that is being replicated.
     /// This is run at an Adult (the new holder).
     ReplicateChunk {
-        data: Blob,
+        chunk: Chunk,
         msg_id: MessageId,
     },
     /// Create proposals to vote unresponsive nodes as offline

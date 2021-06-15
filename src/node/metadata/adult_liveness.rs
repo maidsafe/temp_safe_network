@@ -9,7 +9,7 @@
 use crate::messaging::{EndUser, MessageId};
 use crate::routing::XorName;
 use itertools::Itertools;
-use sn_data_types::BlobAddress;
+use sn_data_types::ChunkAddress;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap};
 
@@ -21,7 +21,7 @@ const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 
 #[derive(Clone, Debug)]
 struct ReadOperation {
-    address: BlobAddress,
+    head_address: ChunkAddress,
     origin: EndUser,
     targets: BTreeSet<XorName>,
     responded_with_success: bool,
@@ -47,13 +47,13 @@ impl AdultLiveness {
     pub fn new_read(
         &mut self,
         msg_id: MessageId,
-        address: BlobAddress,
+        head_address: ChunkAddress,
         origin: EndUser,
         targets: BTreeSet<XorName>,
     ) -> bool {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(ReadOperation {
-                address,
+                head_address,
                 origin,
                 targets: targets.clone(),
                 responded_with_success: false,
@@ -108,12 +108,12 @@ impl AdultLiveness {
         correlation_id: MessageId,
         src: &XorName,
         success: bool,
-    ) -> Option<(BlobAddress, EndUser)> {
+    ) -> Option<(ChunkAddress, EndUser)> {
         self.remove_target(correlation_id, src);
         let op = self.ops.get_mut(&correlation_id);
         op.and_then(|op| {
             let ReadOperation {
-                address,
+                head_address,
                 origin,
                 targets,
                 responded_with_success,
@@ -123,7 +123,7 @@ impl AdultLiveness {
                 None
             } else {
                 *responded_with_success = success;
-                Some((*address, *origin))
+                Some((*head_address, *origin))
             }
         })
     }

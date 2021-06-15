@@ -12,7 +12,7 @@ use crate::messaging::{
     EndUser, MessageId,
 };
 use crate::node::{
-    chunk_store::RegisterChunkStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
+    data_store::RegisterDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
     Result,
 };
 use log::info;
@@ -27,12 +27,12 @@ use std::{
 
 /// Operations over the data type Register.
 pub(super) struct RegisterStorage {
-    chunks: RegisterChunkStore,
+    chunks: RegisterDataStore,
 }
 
 impl RegisterStorage {
     pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = RegisterChunkStore::new(path, max_capacity).await?;
+        let chunks = RegisterDataStore::new(path, max_capacity).await?;
 
         Ok(Self { chunks })
     }

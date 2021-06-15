@@ -9,14 +9,16 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    client::{BlobRead, ClientMsg, ClientSigned, Cmd, DataQuery, ProcessMsg, Query, QueryResponse},
+    client::{
+        ChunkRead, ClientMsg, ClientSigned, Cmd, DataQuery, ProcessMsg, Query, QueryResponse,
+    },
     section_info::SectionInfoMsg,
     MessageId,
 };
 use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
-use sn_data_types::{Blob, PrivateBlob, PublicBlob, PublicKey, TransferValidated};
+use sn_data_types::{Chunk, PrivateChunk, PublicChunk, PublicKey, TransferValidated};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -251,7 +253,7 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
         let pending_queries = self.pending_queries.clone();
 
-        let chunk_addr = if let Query::Data(DataQuery::Blob(BlobRead::Get(address))) = query {
+        let chunk_addr = if let Query::Data(DataQuery::Blob(ChunkRead::Get(address))) = query {
             Some(address)
         } else {
             None
@@ -379,24 +381,24 @@ impl Session {
                 timeout(Duration::from_secs(QUERY_TIMEOUT_SECONDS), receiver.recv()).await,
                 chunk_addr,
             ) {
-                (Ok(Some(QueryResponse::GetBlob(Ok(blob)))), Some(chunk_addr)) => {
+                (Ok(Some(QueryResponse::GetChunk(Ok(blob)))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
                     debug!("Chunk QueryResponse received is: {:#?}", blob);
 
                     let xorname = match &blob {
-                        Blob::Private(priv_chunk) => {
-                            *PrivateBlob::new(priv_chunk.value().clone(), *priv_chunk.owner())
+                        Chunk::Private(priv_chunk) => {
+                            *PrivateChunk::new(priv_chunk.value().clone(), *priv_chunk.owner())
                                 .name()
                         }
-                        Blob::Public(pub_chunk) => {
-                            *PublicBlob::new(pub_chunk.value().clone()).name()
+                        Chunk::Public(pub_chunk) => {
+                            *PublicChunk::new(pub_chunk.value().clone()).name()
                         }
                     };
 
                     if *chunk_addr.name() == xorname {
                         trace!("Valid Chunk received for {}", msg_id);
-                        break Some(QueryResponse::GetBlob(Ok(blob)));
+                        break Some(QueryResponse::GetChunk(Ok(blob)));
                     } else {
                         // the Chunk content doesn't match its Xorname,
                         // this is suspicious and it could be a byzantine node
@@ -407,7 +409,7 @@ impl Session {
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
-                (Ok(response @ Some(QueryResponse::GetBlob(Err(_)))), Some(_))
+                (Ok(response @ Some(QueryResponse::GetChunk(Err(_)))), Some(_))
                 | (Ok(response @ Some(QueryResponse::GetBalance(Err(_)))), None)
                 | (Ok(response @ Some(QueryResponse::GetMap(Err(_)))), None)
                 | (Ok(response @ Some(QueryResponse::GetRegister(Err(_)))), None)

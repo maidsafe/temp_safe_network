@@ -9,7 +9,7 @@
 mod chunk_storage;
 
 use crate::messaging::{
-    client::{BlobRead, BlobWrite},
+    client::{ChunkRead, ChunkWrite},
     MessageId,
 };
 use crate::node::{
@@ -18,7 +18,7 @@ use crate::node::{
 };
 use chunk_storage::ChunkStorage;
 use log::info;
-use sn_data_types::{Blob, BlobAddress, PublicKey};
+use sn_data_types::{Chunk, ChunkAddress, PublicKey};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -39,32 +39,32 @@ impl Chunks {
         })
     }
 
-    pub fn keys(&self) -> Vec<BlobAddress> {
+    pub fn keys(&self) -> Vec<ChunkAddress> {
         self.chunk_storage.keys()
     }
 
-    pub async fn remove_chunk(&mut self, address: &BlobAddress) -> Result<()> {
+    pub async fn remove_chunk(&mut self, address: &ChunkAddress) -> Result<()> {
         self.chunk_storage.delete_chunk(address).await
     }
 
-    pub fn get_chunk(&self, address: &BlobAddress) -> Result<Blob> {
+    pub fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         self.chunk_storage.get_chunk(address)
     }
 
-    pub fn read(&self, read: &BlobRead, msg_id: MessageId) -> NodeDuty {
-        let BlobRead::Get(address) = read;
+    pub fn read(&self, read: &ChunkRead, msg_id: MessageId) -> NodeDuty {
+        let ChunkRead::Get(address) = read;
         self.chunk_storage.get(address, msg_id)
     }
 
     pub async fn write(
         &mut self,
-        write: &BlobWrite,
+        write: &ChunkWrite,
         msg_id: MessageId,
         requester: PublicKey,
     ) -> Result<NodeDuty> {
         match &write {
-            BlobWrite::New(data) => self.chunk_storage.store(&data).await,
-            BlobWrite::DeletePrivate(address) => {
+            ChunkWrite::New(data) => self.chunk_storage.store(&data).await,
+            ChunkWrite::DeletePrivate(address) => {
                 self.chunk_storage.delete(*address, msg_id, requester).await
             }
         }
@@ -80,8 +80,8 @@ impl Chunks {
     }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeDuty> {
-        self.chunk_storage.store_for_replication(blob).await?;
+    pub async fn store_for_replication(&mut self, chunk: Chunk) -> Result<NodeDuty> {
+        self.chunk_storage.store_for_replication(chunk).await?;
         Ok(NodeDuty::NoOp)
     }
 }

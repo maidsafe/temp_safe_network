@@ -15,8 +15,8 @@ mod split;
 
 use crate::messaging::client::ClientMsg;
 use crate::node::{
-    chunk_store::UsedSpace,
     chunks::Chunks,
+    data_store::UsedSpace,
     error::convert_to_error_message,
     event_mapping::{map_routing_event, Mapping, MsgContext},
     network::Network,

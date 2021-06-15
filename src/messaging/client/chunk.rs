@@ -8,43 +8,43 @@
 
 use super::{CmdError, Error, QueryResponse};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Blob, BlobAddress, PublicKey};
+use sn_data_types::{Chunk, ChunkAddress, PublicKey};
 use xor_name::XorName;
 
 /// TODO: docs
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub enum BlobRead {
+pub enum ChunkRead {
     /// TODO: docs
-    Get(BlobAddress),
+    Get(ChunkAddress),
 }
 
 /// TODO: docs
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub enum BlobWrite {
+pub enum ChunkWrite {
     /// TODO: docs
-    New(Blob),
+    New(Chunk),
     /// TODO: docs
-    DeletePrivate(BlobAddress),
+    DeletePrivate(ChunkAddress),
 }
 
-impl BlobRead {
+impl ChunkRead {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> QueryResponse {
-        QueryResponse::GetBlob(Err(error))
+        QueryResponse::GetChunk(Err(error))
     }
 
     /// Returns the address of the destination for `request`.
     pub fn dst_address(&self) -> XorName {
-        use BlobRead::*;
+        use ChunkRead::*;
         match self {
             Get(address) => *address.name(),
         }
     }
 }
 
-impl BlobWrite {
+impl ChunkWrite {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> CmdError {
@@ -53,17 +53,17 @@ impl BlobWrite {
 
     /// Returns the address of the destination for `request`.
     pub fn dst_address(&self) -> XorName {
-        use BlobWrite::*;
+        use ChunkWrite::*;
         match self {
             New(ref data) => *data.name(),
             DeletePrivate(ref address) => *address.name(),
         }
     }
 
-    /// Returns the owner of the data on a New Blob write.
+    /// Returns the owner of the chunk on a new chunk write.
     pub fn owner(&self) -> Option<PublicKey> {
         match self {
-            Self::New(data) => data.owner().cloned(),
+            Self::New(chunk) => chunk.owner().cloned(),
             Self::DeletePrivate(_) => None,
         }
     }
