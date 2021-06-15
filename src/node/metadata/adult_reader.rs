@@ -1,9 +1,3 @@
-use std::collections::BTreeSet;
-
-use crate::routing::{Prefix, XorName};
-
-use crate::node::network::Network;
-
 // Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
@@ -11,6 +5,12 @@ use crate::node::network::Network;
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
+
+use std::collections::BTreeSet;
+
+use crate::routing::{Prefix, XorName};
+
+use crate::node::network::Network;
 
 #[derive(Clone)]
 pub struct AdultReader {
