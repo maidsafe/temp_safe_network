@@ -68,7 +68,7 @@ impl Debug for Node {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
-    use crate::ed25519;
+    use crate::routing::ed25519;
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
 

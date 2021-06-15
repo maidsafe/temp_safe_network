@@ -251,7 +251,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         DstLocation::DirectAndUnrouted,
         Variant::JoinRequest(Box::new(JoinRequest {
             section_key,
-            relocate_payload: None,
             resource_proof_response: Some(ResourceProofResponse {
                 solution,
                 data,
