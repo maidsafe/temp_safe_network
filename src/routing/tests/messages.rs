@@ -18,7 +18,7 @@ use crate::messaging::{
     location::{Aggregation, Itinerary},
     DstLocation, MessageId, SrcLocation,
 };
-use crate::routing::{Config, Error, Event, NodeElderChange};
+use crate::routing::routing::{Config, Error, Event, NodeElderChange};
 use std::net::{IpAddr, Ipv4Addr};
 use utils::*;
 use xor_name::XorName;

@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, Variant};
 use crate::routing::{
-    crypto,
+    ed25519,
     peer::PeerUtils,
     routing::{
         command::Command,
@@ -19,6 +18,7 @@ use crate::routing::{
     Error, Result,
 };
 use ed25519_dalek::Verifier;
+use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, Variant};
 use xor_name::XorName;
 
 // Resource signed
@@ -56,7 +56,7 @@ impl Core {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,
-            nonce_signature: crypto::sign(&serialized, &self.node.keypair),
+            nonce_signature: ed25519::sign(&serialized, &self.node.keypair),
         }));
 
         self.send_direct_message(

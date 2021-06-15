@@ -6,23 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// TODO: remove prefix_map from messaging::node
+// TODO: remove prefix_map from crate::messaging::node
 // mod prefix_map;
 mod stats;
 
 use self::stats::NetworkStats;
 use crate::routing::{
-    agreement::{verify_signed, ProvenUtils, Signed},
+    dkg::{verify_signed, SectionSignedUtils, Signed},
     peer::PeerUtils,
     section::SectionAuthorityProviderUtils,
     Error, Result,
 };
 
+use secured_linked_list::SecuredLinkedList;
 use crate::messaging::{
-    node::{Network, OtherSection, Peer, PrefixMap, Proven},
+    node::{Network, OtherSection, Peer, PrefixMap, SectionSigned},
     SectionAuthorityProvider,
 };
-use secured_linked_list::SecuredLinkedList;
 use std::iter;
 use xor_name::{Prefix, XorName};
 
@@ -59,7 +59,7 @@ pub trait NetworkUtils {
     /// needed in that case.
     fn update_section(
         &mut self,
-        section_auth: Proven<SectionAuthorityProvider>,
+        section_auth: SectionSigned<SectionAuthorityProvider>,
         key_signed: Option<Signed>,
         section_chain: &SecuredLinkedList,
     ) -> bool;
@@ -153,7 +153,7 @@ impl NetworkUtils for Network {
     /// needed in that case.
     fn update_section(
         &mut self,
-        section_auth: Proven<SectionAuthorityProvider>,
+        section_auth: SectionSigned<SectionAuthorityProvider>,
         key_signed: Option<Signed>,
         section_chain: &SecuredLinkedList,
     ) -> bool {
@@ -266,11 +266,11 @@ impl OtherSectionUtils for OtherSection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::{agreement, section};
+    use crate::routing::{dkg, section};
     use rand::Rng;
 
     #[test]
-    fn closest() {
+    fn closest() -> Result<()> {
         let sk = bls::SecretKey::random();
         let chain = SecuredLinkedList::new(sk.public_key());
 
@@ -280,8 +280,8 @@ mod tests {
 
         // Create map containing sections (00), (01) and (10)
         let mut map = Network::new();
-        let _ = map.update_section(gen_proven_section_auth(&sk, p01), None, &chain);
-        let _ = map.update_section(gen_proven_section_auth(&sk, p10), None, &chain);
+        let _ = map.update_section(gen_section_auth(&sk, p01)?, None, &chain);
+        let _ = map.update_section(gen_section_auth(&sk, p10)?, None, &chain);
 
         let mut rng = rand::thread_rng();
         let n01 = p01.substituted_in(rng.gen());
@@ -291,13 +291,15 @@ mod tests {
         assert_eq!(map.closest(&n01).map(|i| &i.prefix), Some(&p01));
         assert_eq!(map.closest(&n10).map(|i| &i.prefix), Some(&p10));
         assert_eq!(map.closest(&n11).map(|i| &i.prefix), Some(&p10));
+
+        Ok(())
     }
 
-    fn gen_proven_section_auth(
+    fn gen_section_auth(
         sk: &bls::SecretKey,
         prefix: Prefix,
-    ) -> Proven<SectionAuthorityProvider> {
+    ) -> Result<SectionSigned<SectionAuthorityProvider>> {
         let (section_auth, _, _) = section::test_utils::gen_section_authority_provider(prefix, 5);
-        agreement::test_utils::proven(sk, section_auth).unwrap()
+        dkg::test_utils::section_signed(sk, section_auth)
     }
 }

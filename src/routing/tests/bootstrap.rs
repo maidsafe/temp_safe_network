@@ -11,7 +11,7 @@ mod utils;
 use anyhow::{Error, Result};
 use ed25519_dalek::Keypair;
 use futures::future;
-use crate::routing::{Config, Event, NodeElderChange, ELDER_SIZE};
+use crate::routing::routing::{Config, Event, NodeElderChange, ELDER_SIZE};
 use std::collections::HashSet;
 use tokio::time;
 use utils::*;

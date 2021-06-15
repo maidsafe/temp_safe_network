@@ -6,15 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    node::{RoutingMsg, Section, Variant},
-    DestInfo,
-};
 use crate::routing::{
     error::Result,
     messages::{RoutingMsgUtils, SrcAuthorityUtils},
     node::Node,
     section::{SectionAuthorityProviderUtils, SectionUtils},
+};
+use crate::messaging::{
+    node::{RoutingMsg, Section, Variant},
+    DestInfo,
 };
 use std::cmp::Ordering;
 
@@ -47,7 +47,7 @@ pub(crate) fn process(
         let chain = section
             .chain()
             .get_proof_chain_to_current(&dest_info.dest_section_pk)?;
-        let section_auth = section.proven_authority_provider();
+        let section_auth = section.section_signed_authority_provider();
         let variant = Variant::SectionKnowledge {
             src_info: (section_auth.clone(), chain),
             msg: Some(Box::new(msg.clone())),
@@ -74,16 +74,16 @@ pub(crate) struct Actions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::DstLocation;
     use crate::routing::{
-        agreement::test_utils::proven,
-        crypto,
+        dkg::test_utils::section_signed,
+        ed25519,
         section::test_utils::{gen_addr, gen_section_authority_provider},
         XorName, ELDER_SIZE, MIN_ADULT_AGE,
     };
     use anyhow::{Context, Result};
     use assert_matches::assert_matches;
     use secured_linked_list::SecuredLinkedList;
+    use crate::messaging::DstLocation;
     use xor_name::Prefix;
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
             let (section_auth0, mut nodes, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
             let node = nodes.remove(0);
 
-            let section_auth0 = proven(&our_sk, section_auth0)?;
+            let section_auth0 = section_signed(&our_sk, section_auth0)?;
             let section = Section::new(*chain.root_key(), chain, section_auth0)
                 .context("failed to create section")?;
 
@@ -207,7 +207,7 @@ mod tests {
             section_pk: bls::PublicKey,
         ) -> Result<RoutingMsg> {
             let sender = Node::new(
-                crypto::gen_keypair(&src_section.range_inclusive(), MIN_ADULT_AGE),
+                ed25519::gen_keypair(&src_section.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 

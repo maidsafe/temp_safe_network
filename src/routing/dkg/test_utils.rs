@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{ProvenUtils, Signed};
-use crate::messaging::node::Proven;
-use crate::routing::routing::{Error, Result};
+use super::{SectionSignedUtils, Signed};
+use crate::routing::{Error, Result};
 use serde::Serialize;
+use crate::messaging::node::SectionSigned;
 
 // Create signed for the given payload using the given secret key.
 pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<Signed> {
@@ -20,8 +20,11 @@ pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<S
     })
 }
 
-// Wrap the given payload in `Proven`
-pub fn proven<T: Serialize>(secret_key: &bls::SecretKey, payload: T) -> Result<Proven<T>> {
+// Wrap the given payload in `SectionSigned`
+pub fn section_signed<T: Serialize>(
+    secret_key: &bls::SecretKey,
+    payload: T,
+) -> Result<SectionSigned<T>> {
     let signed = prove(secret_key, &payload)?;
-    Ok(Proven::new(payload, signed))
+    Ok(SectionSigned::new(payload, signed))
 }

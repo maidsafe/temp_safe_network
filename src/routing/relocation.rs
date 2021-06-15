@@ -8,19 +8,19 @@
 
 //! Relocation related types and utilities.
 
-use crate::messaging::{
-    node::{
-        MemberInfo, Network, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
-        Section, SignedRelocateDetails, Variant,
-    },
-    MessageType,
-};
 use crate::routing::{
-    crypto::{self, Keypair, Verifier},
+    ed25519::{self, Keypair, Verifier},
     error::Error,
     network::NetworkUtils,
     peer::PeerUtils,
     section::{SectionPeersUtils, SectionUtils},
+};
+use crate::messaging::{
+    node::{
+        Network, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
+        Section, SignedRelocateDetails, Variant,
+    },
+    MessageType,
 };
 use std::{marker::Sized, net::SocketAddr};
 use tokio::sync::mpsc;
@@ -32,7 +32,7 @@ pub(crate) fn actions(
     network: &Network,
     churn_name: &XorName,
     churn_signature: &bls::Signature,
-) -> Vec<(MemberInfo, RelocateAction)> {
+) -> Vec<(NodeState, RelocateAction)> {
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     let candidates: Vec<_> = section
@@ -154,7 +154,7 @@ pub trait RelocatePayloadUtils {
 
 impl RelocatePayloadUtils for RelocatePayload {
     fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self {
-        let signature_of_new_name_with_old_key = crypto::sign(&new_name.0, old_keypair);
+        let signature_of_new_name_with_old_key = ed25519::sign(&new_name.0, old_keypair);
 
         Self {
             details,
@@ -169,7 +169,7 @@ impl RelocatePayloadUtils for RelocatePayload {
             return false;
         };
 
-        let pub_key = if let Ok(pub_key) = crypto::pub_key(&details.pub_id) {
+        let pub_key = if let Ok(pub_key) = ed25519::pub_key(&details.pub_id) {
             pub_key
         } else {
             return false;
@@ -267,12 +267,11 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::SectionAuthorityProvider;
     use crate::routing::{
-        agreement::test_utils::proven,
+        dkg::test_utils::section_signed,
         peer::test_utils::arbitrary_unique_peers,
         routing::tests::SecretKeySet,
-        section::{MemberInfoUtils, SectionAuthorityProviderUtils},
+        section::{NodeStateUtils, SectionAuthorityProviderUtils},
         ELDER_SIZE, MIN_AGE,
     };
     use anyhow::Result;
@@ -281,6 +280,7 @@ mod tests {
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
+    use crate::messaging::SectionAuthorityProvider;
     use xor_name::Prefix;
 
     #[test]
@@ -331,13 +331,13 @@ mod tests {
             Prefix::default(),
             sk_set.public_keys(),
         );
-        let section_auth = proven(sk, section_auth)?;
+        let section_auth = section_signed(sk, section_auth)?;
 
         let mut section = Section::new(pk, SecuredLinkedList::new(pk), section_auth)?;
 
         for peer in &peers {
-            let info = MemberInfo::joined(*peer);
-            let info = proven(sk, info)?;
+            let info = NodeState::joined(*peer);
+            let info = section_signed(sk, info)?;
 
             assert!(section.update_member(info));
         }

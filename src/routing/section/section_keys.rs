@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::{Error, Result};
+use crate::error::{Error, Result};
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{self, Debug, Formatter},

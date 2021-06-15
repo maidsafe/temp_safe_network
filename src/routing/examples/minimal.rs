@@ -35,7 +35,7 @@
 
 use futures::future::join_all;
 use hex_fmt::HexFmt;
-use crate::routing::{Config, Event, EventStream, Routing, TransportConfig};
+use crate::routing::routing::{Config, Event, EventStream, Routing, TransportConfig};
 use std::{
     collections::HashSet,
     convert::TryInto,
