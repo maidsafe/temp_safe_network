@@ -7,15 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{comm::ConnectionEvent, Comm};
-use crate::messaging::{
-    node::{
-        JoinRejectionReason, JoinRequest, JoinResponse, RelocatePayload, ResourceProofResponse,
-        RoutingMsg, Section, SignedRelocateDetails, Variant,
-    },
-    DestInfo, DstLocation, MessageType, WireMsg,
-};
 use crate::routing::{
-    crypto::{self},
+    ed25519::{self},
     error::{Error, Result},
     messages::{RoutingMsgUtils, VerifyStatus},
     node::Node,
@@ -29,6 +22,13 @@ use futures::future;
 use rand::seq::IteratorRandom;
 use resource_proof::ResourceProof;
 use sn_data_types::PublicKey;
+use crate::messaging::{
+    node::{
+        JoinRejectionReason, JoinRequest, JoinResponse, RelocatePayload, ResourceProofResponse,
+        RoutingMsg, Section, SignedRelocateDetails, Variant,
+    },
+    DestInfo, DstLocation, MessageType, WireMsg,
+};
 use std::{
     collections::{HashSet, VecDeque},
     net::SocketAddr,
@@ -157,7 +157,7 @@ impl<'a> State<'a> {
         );
 
         let age = relocate_details.relocate_details()?.age;
-        let new_keypair = crypto::gen_keypair(&name_prefix.range_inclusive(), age);
+        let new_keypair = ed25519::gen_keypair(&name_prefix.range_inclusive(), age);
         let new_name = XorName::from(PublicKey::from(new_keypair.public));
         let relocate_payload =
             RelocatePayload::new(relocate_details, &new_name, &self.node.keypair);
@@ -246,8 +246,8 @@ impl<'a> State<'a> {
                             .unwrap_or(FIRST_SECTION_MAX_AGE);
 
                         let new_keypair =
-                            crypto::gen_keypair(&Prefix::default().range_inclusive(), age);
-                        let new_name = crypto::name(&new_keypair.public);
+                            ed25519::gen_keypair(&Prefix::default().range_inclusive(), age);
+                        let new_name = ed25519::name(&new_keypair.public);
 
                         info!("Setting Node name to {}", new_name);
                         self.node = Node::new(new_keypair, self.node.addr);
@@ -461,10 +461,10 @@ impl<'a> State<'a> {
                 JoinResponse::Approval {
                     genesis_key,
                     ref section_auth,
-                    ref member_info,
+                    ref node_state,
                     ..
                 } => {
-                    if member_info.value.peer.name() != &self.node.name() {
+                    if node_state.value.peer.name() != &self.node.name() {
                         trace!("Ignore NodeApproval not for us");
                         continue;
                     }
@@ -579,13 +579,12 @@ async fn send_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::MemberInfo, SectionAuthorityProvider};
     use crate::routing::{
-        agreement::test_utils::*,
+        dkg::test_utils::*,
         error::Error as RoutingError,
         messages::RoutingMsgUtils,
         section::test_utils::*,
-        section::{MemberInfoUtils, SectionAuthorityProviderUtils},
+        section::{NodeStateUtils, SectionAuthorityProviderUtils},
         ELDER_SIZE, MIN_ADULT_AGE, MIN_AGE,
     };
     use anyhow::{anyhow, Error, Result};
@@ -595,6 +594,7 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
+    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
     use std::collections::BTreeMap;
     use tokio::task;
 
@@ -616,7 +616,7 @@ mod tests {
         // Otherwise during the bootstrap process, node will change its id and age.
         let node_age = MIN_AGE + 2;
         let node = Node::new(
-            crypto::gen_keypair(&Prefix::default().range_inclusive(), node_age),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), node_age),
             gen_addr(),
         );
         let peer = node.peer();
@@ -683,15 +683,15 @@ mod tests {
             });
 
             // Send JoinResponse::Approval
-            let section_auth = proven(sk, section_auth.clone())?;
-            let member_info = proven(sk, MemberInfo::joined(peer))?;
+            let section_auth = section_signed(sk, section_auth.clone())?;
+            let node_state = section_signed(sk, NodeState::joined(peer))?;
             let proof_chain = SecuredLinkedList::new(pk);
             send_response(
                 &recv_tx,
                 Variant::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: pk,
                     section_auth: section_auth.clone(),
-                    member_info,
+                    node_state,
                     section_chain: proof_chain,
                 })),
                 &bootstrap_node,
@@ -724,7 +724,7 @@ mod tests {
         let pk_set = sk_set.public_keys();
 
         let node = Node::new(
-            crypto::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
         let name = node.name();
@@ -816,7 +816,7 @@ mod tests {
         let pk_set = sk_set.public_keys();
 
         let node = Node::new(
-            crypto::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
         let node_name = node.name();
@@ -893,7 +893,7 @@ mod tests {
         let bootstrap_node = nodes.remove(0);
 
         let node = Node::new(
-            crypto::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
 
@@ -940,12 +940,12 @@ mod tests {
         let recv_rx = MessageReceiver::Deserialized(recv_rx);
 
         let bootstrap_node = Node::new(
-            crypto::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
 
         let node = Node::new(
-            crypto::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
         let node_name = node.name();

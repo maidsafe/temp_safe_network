@@ -13,19 +13,8 @@ mod relocation;
 mod resource_proof;
 
 use super::super::Core;
-use crate::messaging::node::Error as AggregatorError;
-use crate::messaging::{
-    client::ClientMsg,
-    node::{
-        DkgFailureSignedSet, Error as NodeErrorMessage, JoinRejectionReason, JoinRequest,
-        JoinResponse, Network, Peer, Proposal, RoutingMsg, Section, SignedRelocateDetails,
-        SrcAuthority, Variant,
-    },
-    section_info::{GetSectionResponse, SectionInfoMsg},
-    DestInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
-};
 use crate::routing::{
-    agreement::{DkgCommands, ProposalError, SignedShare},
+    dkg::{commands::DkgCommands, ProposalError, SignedShare},
     error::{Error, Result},
     event::Event,
     messages::{MessageStatus, RoutingMsgUtils, SrcAuthorityUtils, VerifyStatus},
@@ -39,6 +28,16 @@ use crate::routing::{
     },
 };
 use bytes::Bytes;
+use crate::messaging::node::Error as AggregatorError;
+use crate::messaging::{
+    client::ClientMsg,
+    node::{
+        DkgFailureSignedSet, JoinRejectionReason, JoinRequest, JoinResponse, Network, Peer,
+        Proposal, RoutingMsg, Section, SignedRelocateDetails, SrcAuthority, Variant,
+    },
+    section_info::{GetSectionResponse, SectionInfoMsg},
+    DestInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
+};
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
@@ -180,7 +179,9 @@ impl Core {
     ) -> Result<Vec<Command>> {
         match self.proposal_aggregator.add(proposal, signed_share) {
             Ok((proposal, signed)) => Ok(vec![Command::HandleAgreement { proposal, signed }]),
-            Err(ProposalError::Aggregation(NodeErrorMessage::NotEnoughShares)) => Ok(vec![]),
+            Err(ProposalError::Aggregation(crate::messaging::node::Error::NotEnoughShares)) => {
+                Ok(vec![])
+            }
             Err(error) => {
                 error!("Failed to add proposal: {}", error);
                 Err(Error::InvalidSignatureShare)
@@ -393,7 +394,7 @@ impl Core {
             *self.section_chain().root_key()
         };
         let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
-        let section_auth = self.section.proven_authority_provider();
+        let section_auth = self.section.section_signed_authority_provider();
         let variant = Variant::SectionKnowledge {
             src_info: (section_auth.clone(), truncated_chain),
             msg: Some(msg),

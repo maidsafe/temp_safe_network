@@ -8,10 +8,6 @@
 
 //! Utilities for sn_routing messages through the network.
 
-use crate::messaging::{
-    node::{Network, Peer, Section},
-    DstLocation,
-};
 use crate::routing::{
     error::{Error, Result},
     network::NetworkUtils,
@@ -20,6 +16,10 @@ use crate::routing::{
     supermajority, ELDER_SIZE,
 };
 use itertools::Itertools;
+use crate::messaging::{
+    node::{Network, Peer, Section},
+    DstLocation,
+};
 use std::{cmp, iter};
 use xor_name::XorName;
 
@@ -165,18 +165,18 @@ fn get_peer(name: &XorName, section: &Section, network: &Network) -> Option<Peer
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{node::MemberInfo, SectionAuthorityProvider};
     use crate::routing::{
-        agreement::test_utils::proven,
-        crypto,
+        dkg::test_utils::section_signed,
+        ed25519,
         section::{
             test_utils::{gen_addr, gen_section_authority_provider},
-            MemberInfoUtils, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
+            NodeStateUtils, SectionAuthorityProviderUtils, MIN_ADULT_AGE,
         },
     };
     use anyhow::{Context, Result};
     use rand::seq::IteratorRandom;
     use secured_linked_list::SecuredLinkedList;
+    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
     use xor_name::Prefix;
 
     #[test]
@@ -205,12 +205,12 @@ mod tests {
     fn delivery_targets_elder_to_our_adult() -> Result<()> {
         let (our_name, mut section, network, sk) = setup_elder()?;
 
-        let name = crypto::gen_name_with_age(MIN_ADULT_AGE);
+        let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = section.prefix().substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
-        let member_info = MemberInfo::joined(peer);
-        let member_info = proven(&sk, member_info)?;
-        assert!(section.update_member(member_info));
+        let node_state = NodeState::joined(peer);
+        let node_state = section_signed(&sk, node_state)?;
+        assert!(section.update_member(node_state));
 
         let dst = DstLocation::Node(dst_name);
         let (recipients, dg_size) = delivery_targets(&dst, &our_name, &section, &network)?;
@@ -456,20 +456,20 @@ mod tests {
 
         let (section_auth0, _, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
         let elders0: Vec<_> = section_auth0.peers().collect();
-        let section_auth0 = proven(&sk, section_auth0)?;
+        let section_auth0 = section_signed(&sk, section_auth0)?;
 
         let mut section = Section::new(pk, chain, section_auth0)?;
 
         for peer in elders0 {
-            let member_info = MemberInfo::joined(peer);
-            let member_info = proven(&sk, member_info)?;
-            assert!(section.update_member(member_info));
+            let node_state = NodeState::joined(peer);
+            let node_state = section_signed(&sk, node_state)?;
+            assert!(section.update_member(node_state));
         }
 
         let mut network = Network::new();
 
         let (section_auth1, _, _) = gen_section_authority_provider(prefix1, ELDER_SIZE);
-        let section_auth1 = proven(&sk, section_auth1)?;
+        let section_auth1 = section_signed(&sk, section_auth1)?;
         assert!(network.update_section(section_auth1, None, section.chain()));
 
         let our_name = choose_elder_name(section.authority_provider())?;
@@ -485,7 +485,7 @@ mod tests {
         let chain = SecuredLinkedList::new(pk);
 
         let (section_auth, _, _) = gen_section_authority_provider(prefix0, ELDER_SIZE);
-        let section_auth = proven(&sk, section_auth)?;
+        let section_auth = section_signed(&sk, section_auth)?;
         let section = Section::new(pk, chain, section_auth)?;
 
         let network = Network::new();

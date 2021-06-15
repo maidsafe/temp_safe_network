@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::{
-    node::{JoinResponse, Proposal, RelocatePromise, RoutingMsg, SignedShare, Variant},
-    DstLocation,
-};
 use crate::routing::{
     messages::{MessageStatus, SrcAuthorityUtils},
     section::{SectionAuthorityProviderUtils, SectionUtils},
     Result,
+};
+use crate::messaging::{
+    node::{JoinResponse, Proposal, RelocatePromise, RoutingMsg, SignedShare, Variant},
+    DstLocation,
 };
 use xor_name::XorName;
 

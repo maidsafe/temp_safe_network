@@ -15,7 +15,7 @@ use std::hash::Hash;
 use std::time::Duration;
 use tokio::sync::RwLock;
 
-///
+/// A [`BTreeMap`]-backed cache supporting capacity- and duration-based expiry.
 #[derive(Debug)]
 pub struct Cache<T, V>
 where
@@ -58,17 +58,17 @@ where
         }
     }
 
-    ///
+    /// Returns the number of items in the cache.
     pub async fn len(&self) -> usize {
         self.items.read().await.len()
     }
 
-    ///
+    /// Returns `true` if the cache contains no items.
     pub async fn is_empty(&self) -> bool {
         self.items.read().await.is_empty()
     }
 
-    ///
+    /// Returns the number of items in the cache that match the given predicate.
     pub async fn count<P>(&self, predicate: P) -> usize
     where
         P: FnMut(&(&T, &Item<V>)) -> bool,
@@ -76,7 +76,9 @@ where
         self.items.read().await.iter().filter(predicate).count()
     }
 
+    /// Get a value from the cache if one is set and not expired.
     ///
+    /// A clone of the value is returned, so this is only implemented when `V: Clone`.
     pub async fn get(&self, key: &T) -> Option<V>
     where
         T: Eq + Hash,
@@ -90,7 +92,11 @@ where
             .map(|k| k.object.clone())
     }
 
+    /// Set a value in the cache and return the previous value, if any.
     ///
+    /// This will override an existing value for the same key, if there is one. `custom_duration`
+    /// can be set to override `self.item_duration`. If the new item causes the cache to exceed its
+    /// capacity, the oldest entry in the cache will be removed.
     pub async fn set(&self, key: T, value: V, custom_duration: Option<Duration>) -> Option<V>
     where
         T: Eq + Hash + Clone,
@@ -103,16 +109,15 @@ where
                 key,
                 Item::new(value, custom_duration.or(self.item_duration)),
             )
-            .map(|item| item.object);
+            .and_then(|item| (!item.expired()).then(|| item.object));
         self.remove_expired().await;
         self.drop_excess().await;
         replaced
     }
 
-    ///
-    #[allow(unused_assignments)]
+    /// Remove expired items from the cache storage.
     pub async fn remove_expired(&self) {
-        let mut expired_keys = Vec::new();
+        let expired_keys: Vec<_>;
         {
             let read_items = self.items.read().await;
             expired_keys = read_items
@@ -127,13 +132,12 @@ where
         }
     }
 
-    /// removes keys beyond capacity
-    #[allow(unused_assignments)]
+    /// Remove items that exceed capacity, oldest first.
     async fn drop_excess(&self) {
         let len = self.len().await;
         if len > self.capacity {
             let excess = len - self.capacity;
-            let mut excess_keys = Vec::new();
+            let excess_keys: Vec<_>;
             {
                 let read_items = self.items.read().await;
                 let mut items = read_items.iter().collect_vec();
@@ -150,7 +154,7 @@ where
         }
     }
 
-    ///
+    /// Remove an item from the cache, returning the removed value.
     pub async fn remove(&self, key: &T) -> Option<V>
     where
         T: Eq + Hash,
@@ -158,7 +162,7 @@ where
         self.items.write().await.remove(key).map(|item| item.object)
     }
 
-    ///
+    /// Clear the cache, removing all items.
     pub async fn clear(&self) {
         self.items.write().await.clear()
     }
@@ -166,7 +170,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::routing::cache::Cache;
+    use crate::cache::Cache;
     use std::time::Duration;
 
     const KEY: i8 = 0;
@@ -202,6 +206,18 @@ mod tests {
         let _ = cache.set(KEY, VALUE, None).await;
         let value = cache.get(&KEY).await;
         assert!(value.is_none(), "found expired value in cache");
+    }
+
+    #[tokio::test]
+    async fn set_do_not_return_expired_value() {
+        let timeout = Duration::from_millis(1);
+        let cache = Cache::with_expiry_duration(timeout);
+        let _ = cache.set(KEY, VALUE, None).await;
+        tokio::time::sleep(timeout).await;
+        let value = cache.get(&KEY).await;
+        assert!(value.is_none(), "found expired value in cache");
+        let value = cache.set(KEY, VALUE, None).await;
+        assert!(value.is_none(), "exposed expired value from cache");
     }
 
     #[tokio::test]

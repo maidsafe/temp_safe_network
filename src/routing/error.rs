@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging;
 use crate::routing::{
-    agreement::ProposalError,
+    dkg::ProposalError,
     messages::{CreateError, ExtendSignedChainError},
 };
 use qp2p::Error as Qp2pError;
@@ -64,7 +63,7 @@ pub enum Error {
     #[error("Invalid section chain: {0}")]
     InvalidSectionChain(#[from] SecuredLinkedListError),
     #[error("Messaging protocol error: {0}")]
-    Messaging(#[from] messaging::Error),
+    Messaging(#[from] crate::messaging::Error),
     #[error("proposal error: {0}")]
     ProposalError(#[from] ProposalError),
     #[error("create error: {0}")]

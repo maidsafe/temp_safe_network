@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{SignatureAggregator, Signed, SignedShare};
-use crate::messaging::{node::Error as NodeErrorMessage, node::Proposal};
-use crate::routing::routing::{error::Result, messages::PlainMessageUtils};
+use crate::routing::{error::Result, messages::PlainMessageUtils};
 use serde::{Serialize, Serializer};
+use crate::messaging::node::Proposal;
 use thiserror::Error;
 
 pub trait ProposalUtils {
@@ -50,8 +50,8 @@ pub struct SignableView<'a>(pub &'a Proposal);
 impl<'a> Serialize for SignableView<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self.0 {
-            Proposal::Online { member_info, .. } => member_info.serialize(serializer),
-            Proposal::Offline(member_info) => member_info.serialize(serializer),
+            Proposal::Online { node_state, .. } => node_state.serialize(serializer),
+            Proposal::Offline(node_state) => node_state.serialize(serializer),
             Proposal::SectionInfo(info) => info.serialize(serializer),
             Proposal::OurElders(info) => info.signed.public_key.serialize(serializer),
             // Proposal::TheirKey { prefix, key } => (prefix, key).serialize(serializer),
@@ -84,7 +84,7 @@ impl ProposalAggregator {
 #[derive(Debug, Error)]
 pub enum ProposalError {
     #[error("failed to aggregate signature shares: {0}")]
-    Aggregation(#[from] NodeErrorMessage),
+    Aggregation(#[from] crate::messaging::node::Error),
     #[error("invalid proposal")]
     Invalid,
 }
@@ -92,7 +92,7 @@ pub enum ProposalError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::routing::{agreement, section};
+    use crate::routing::{dkg, section};
     use anyhow::Result;
     use std::fmt::Debug;
     use xor_name::Prefix;
@@ -108,8 +108,8 @@ mod tests {
         // Proposal::OurElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
-        let proven_section_auth = agreement::test_utils::proven(&new_sk, section_auth)?;
-        let proposal = Proposal::OurElders(proven_section_auth);
+        let section_signed_auth = dkg::test_utils::section_signed(&new_sk, section_auth)?;
+        let proposal = Proposal::OurElders(section_signed_auth);
         verify_serialize_for_signing(&proposal, &new_pk)?;
 
         Ok(())

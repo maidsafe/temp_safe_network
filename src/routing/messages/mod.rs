@@ -10,20 +10,20 @@ mod plain_message;
 mod src_authority;
 
 pub use self::{plain_message::PlainMessageUtils, src_authority::SrcAuthorityUtils};
-use crate::messaging::node::{Signed, SignedShare};
-use crate::messaging::{
-    node::{JoinResponse, PlainMessage, RoutingMsg, SrcAuthority, Variant},
-    Aggregation, DstLocation, MessageId,
-};
 use crate::routing::{
-    agreement::ProvenUtils,
-    crypto::{self, Verifier},
+    dkg::SectionSignedUtils,
+    ed25519::{self, Verifier},
     error::{Error, Result},
     node::Node,
     section::{SectionKeyShare, SectionUtils},
 };
 use secured_linked_list::{error::Error as SecuredLinkedListError, SecuredLinkedList};
 use serde::Serialize;
+use crate::messaging::node::{Signed, SignedShare};
+use crate::messaging::{
+    node::{JoinResponse, PlainMessage, RoutingMsg, SrcAuthority, Variant},
+    Aggregation, DstLocation, MessageId,
+};
 use std::fmt::Debug;
 use thiserror::Error;
 use xor_name::XorName;
@@ -257,7 +257,7 @@ impl RoutingMsgUtils for RoutingMsg {
         })
         .map_err(|_| Error::InvalidMessage)?;
 
-        let signature = crypto::sign(&serialized, &node.keypair);
+        let signature = ed25519::sign(&serialized, &node.keypair);
         let src = SrcAuthority::Node {
             public_key: node.keypair.public,
             signature,
@@ -365,7 +365,7 @@ impl RoutingMsgUtils for RoutingMsg {
             Variant::JoinResponse(resp) => {
                 if let JoinResponse::Approval {
                     ref section_auth,
-                    ref member_info,
+                    ref node_state,
                     ref section_chain,
                     ..
                 } = **resp
@@ -374,7 +374,7 @@ impl RoutingMsgUtils for RoutingMsg {
                         return Err(Error::InvalidMessage);
                     }
 
-                    if !member_info.verify(section_chain) {
+                    if !node_state.verify(section_chain) {
                         return Err(Error::InvalidMessage);
                     }
 
