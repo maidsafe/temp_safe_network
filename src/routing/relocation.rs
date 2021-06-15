@@ -266,7 +266,7 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider;
-    use crate::{
+    use crate::routing::{
         dkg::test_utils::section_signed,
         peer::test_utils::arbitrary_unique_peers,
         routing::tests::SecretKeySet,

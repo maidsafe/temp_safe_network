@@ -39,7 +39,7 @@ pub use src_authority::SrcAuthority;
 pub use variant::Variant;
 
 use crate::messaging::{
-    Aggregation, DstLocation, MessageId, MessageType, SectionAuthorityProvider, WireMsg,
+    Aggregation, DstLocation, MessageId, MessageType, WireMsg,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

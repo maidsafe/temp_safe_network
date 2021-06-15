@@ -433,7 +433,7 @@ async fn send_messages(
 mod tests {
     use super::*;
     use crate::messaging::{node::NodeState, SectionAuthorityProvider};
-    use crate::{
+    use crate::routing::{
         dkg::test_utils::*,
         error::Error as RoutingError,
         messages::RoutingMsgUtils,
