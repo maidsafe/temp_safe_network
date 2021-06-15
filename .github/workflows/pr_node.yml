@@ -25,7 +25,7 @@ jobs:
  
   test:
     if: |
-      github.repository_owner == 'joshuef' &&
+      github.repository_owner == 'maidsafe' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Node Tests
     runs-on: ${{ matrix.os }}
