@@ -19,48 +19,6 @@
 //!  * Upgrade capable nodes.
 //!  * All network messages signed via ED25519 and/or BLS
 //!  * Section consensus via an ABFT algorithm (PARSEC)
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "https://maidsafe.net/img/favicon.ico",
-    test(attr(forbid(warnings)))
-)]
-// For explanation of lint checks, run `rustc -W help` or see
-// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(
-    arithmetic_overflow,
-    mutable_transmutes,
-    no_mangle_const_items,
-    unknown_crate_types,
-    unsafe_code
-)]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    unused_results,
-    bad_style,
-    improper_ctypes,
-    missing_docs,
-    non_shorthand_field_patterns,
-    overflowing_literals,
-    stable_features,
-    unconditional_recursion,
-    unknown_lints,
-    unused,
-    unused_allocation,
-    unused_attributes,
-    unused_comparisons,
-    unused_features,
-    unused_parens,
-    while_true,
-    clippy::unicode_not_nfc,
-    clippy::wrong_pub_self_convention,
-    deprecated
-)]
 
 // ############################################################################
 // Public API
