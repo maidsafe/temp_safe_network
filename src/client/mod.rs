@@ -52,23 +52,6 @@
 //! # Ok(()) } ); }
 //! ```
 
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-    test(attr(forbid(warnings)))
-)]
-// For explanation of lint checks, run `rustc -W help`.
-#![deny(unsafe_code)]
-#![warn(
-    missing_docs,
-    trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    unused_results
-)]
-
 mod connections;
 mod errors;
 
