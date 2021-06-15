@@ -1,5 +1,3 @@
-use std::collections::{BTreeSet, HashMap};
-
 // Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
@@ -13,6 +11,7 @@ use crate::routing::XorName;
 use itertools::Itertools;
 use sn_data_types::BlobAddress;
 use std::collections::hash_map::Entry;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::node::capacity::CHUNK_COPY_COUNT;
 
