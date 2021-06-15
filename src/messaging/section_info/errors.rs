@@ -12,6 +12,7 @@ use thiserror::Error;
 
 #[derive(Error, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
+/// SectionInfo Errors
 pub enum Error {
     /// Target section key provided with message is out of date. Current PK Set is provided in error
     #[error("Target section's public key is outdated. New information has been provided.")]

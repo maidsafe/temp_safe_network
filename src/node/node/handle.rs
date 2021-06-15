@@ -31,6 +31,7 @@ use xor_name::XorName;
 
 const DATA_SECTION_TARGET_COUNT: usize = 3;
 
+#[derive(Debug)]
 pub enum NodeTask {
     None,
     Result(Box<(NodeDuties, Option<MsgContext>)>),

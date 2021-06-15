@@ -26,15 +26,20 @@ use xor_name::XorName;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Section {
+    /// network genesis key
     pub genesis_key: BlsPublicKey,
+    /// The secured linked list of previous section keys
     pub chain: SecuredLinkedList,
+    /// Signed section authority
     pub section_auth: SectionSigned<SectionAuthorityProvider>,
+    /// memebers of the section
     pub members: SectionPeers,
 }
 
 /// Container for storing information about members of our section.
 #[derive(Clone, Default, Debug, Eq, Serialize, Deserialize)]
 pub struct SectionPeers {
+    /// memebers of the section
     pub members: BTreeMap<XorName, SectionSigned<NodeState>>,
 }
 
@@ -50,6 +55,7 @@ impl Hash for SectionPeers {
     }
 }
 
+#[derive(Debug)]
 pub struct IntoIter(btree_map::IntoIter<XorName, SectionSigned<NodeState>>);
 
 impl Iterator for IntoIter {

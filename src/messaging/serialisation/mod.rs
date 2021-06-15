@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+/// WireMsg Header
 pub mod wire_msg_header;
 
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
@@ -18,10 +19,10 @@ use cookie_factory::{combinator::slice, gen_simple};
 use std::fmt::Debug;
 use xor_name::XorName;
 
-// In order to send a message over the wire, it needs to be serialized
-// along with a header (WireMsgHeader) which contains the information needed
-// by the recipient to properly deserialize it.
-// The WireMsg struct provides the utilities to serialize and deserialize messages.
+/// In order to send a message over the wire, it needs to be serialized
+/// along with a header (WireMsgHeader) which contains the information needed
+/// by the recipient to properly deserialize it.
+/// The WireMsg struct provides the utilities to serialize and deserialize messages.
 #[derive(Debug, PartialEq, Clone)]
 pub struct WireMsg {
     header: WireMsgHeader,

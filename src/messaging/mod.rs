@@ -12,8 +12,11 @@ pub mod location;
 mod msg_id;
 #[cfg(not(feature = "client-only"))]
 pub mod node;
+/// SectionAuthorityProvider
 pub mod sap;
 pub mod section_info;
+
+/// Functionality for serialising and deserialising messages
 pub mod serialisation;
 
 pub use self::{
@@ -34,23 +37,36 @@ use xor_name::XorName;
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageType {
+    /// Message about infrastructure (may be directed at nodes or clients)
     SectionInfo {
+        /// the message
         msg: section_info::SectionInfoMsg,
+        /// destination info
         dst_info: DstInfo,
     },
+    /// Client message
     Client {
+        /// the message
         msg: client::ClientMsg,
+        /// destination info
         dst_info: DstInfo,
     },
     #[cfg(not(feature = "client-only"))]
+    /// Routing layer messages
     Routing {
+        /// the message
         msg: node::RoutingMsg,
+        /// destination info
         dst_info: DstInfo,
     },
     #[cfg(not(feature = "client-only"))]
+    /// Node to node message
     Node {
+        /// the message
         msg: node::NodeMsg,
+        /// destination info
         dst_info: DstInfo,
+        /// source section pk
         src_section_pk: Option<PublicKey>,
     },
 }
@@ -59,7 +75,11 @@ pub enum MessageType {
 /// serialised with a valid 'WireMsgHeader'
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Ord, PartialOrd, Eq)]
 pub struct DstInfo {
+    /// destination xorname
     pub dst: XorName,
+    /// Destination section pk
+    /// This is used to check we are communicating with the correct section.
+    /// An out of date key here will result in Anti-Entropy updates being received.
     pub dst_section_pk: PublicKey,
 }
 
@@ -91,6 +111,7 @@ impl MessageType {
         }
     }
 
+    /// Returns a WireMsg built from this MessageType
     pub fn to_wire_msg(&self) -> Result<WireMsg> {
         match self {
             Self::SectionInfo { msg, dst_info } => {
@@ -112,6 +133,7 @@ impl MessageType {
         }
     }
 
+    /// Update the destination info on the contained message
     pub fn update_dst_info(&mut self, dst_pk: Option<PublicKey>, dst: Option<XorName>) {
         #[cfg(not(feature = "client-only"))]
         match self {

@@ -19,11 +19,13 @@ use xor_name::XorName;
 /// from being connected at the network layer, which currently is handled by quic-p2p.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct Peer {
+    /// Peer's xorname
     pub name: XorName,
+    /// Peer's SocketAddr
     pub addr: SocketAddr,
-    // A node's connectivity will be checked when first time join the network or got relocated.
-    // An adult can only got promoted to elder when this flag is set to `true`.
-    // Taking a default of `false` to enforce the connectivity check.
+    /// A node's connectivity will be checked when first time join the network or got relocated.
+    /// An adult can only got promoted to elder when this flag is set to `true`.
+    /// Taking a default of `false` to enforce the connectivity check.
     pub reachable: bool,
 }
 

@@ -45,9 +45,9 @@ pub enum Variant {
     UserMessage(Vec<u8>),
     /// Message sent to all members to update them about the state of our section.
     Sync {
-        // Information about our section.
+        /// Information about our section.
         section: Section,
-        // Information about the rest of the network that we know of.
+        /// Information about the rest of the network that we know of.
         network: Network,
     },
     /// Send from a section to the node to be immediately relocated.
@@ -67,7 +67,9 @@ pub enum Variant {
     /// Sent from a node that can't establish the trust of the contained message to its original
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
+        /// Routing message
         msg: Box<RoutingMsg>,
+        /// Destination info
         dst_info: DstInfo,
     },
     /// Sent to the new elder candidates to start the DKG process.
@@ -86,8 +88,11 @@ pub enum Variant {
     },
     /// Broadcasted to the other DKG participants when a DKG failure is observed.
     DkgFailureObservation {
+        /// The DKG key
         dkg_key: DkgKey,
+        /// Signature over the failure
         signed: DkgFailureSigned,
+        /// Nodes that did not participate
         non_participants: BTreeSet<XorName>,
     },
     /// Sent to the current elders by the DKG participants when at least majority of them observe
@@ -95,7 +100,9 @@ pub enum Variant {
     DkgFailureAgreement(DkgFailureSignedSet),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
+        /// The content of the proposal
         content: Proposal,
+        /// BLS signed share
         signed_share: SignedShare,
     },
     /// Message that notifies a section to test
@@ -104,7 +111,9 @@ pub enum Variant {
     /// Message sent by a node to indicate it received a message from a node which was ahead in knowledge.
     /// A reply is expected with a `SectionKnowledge` message.
     SectionKnowledgeQuery {
+        /// Last known key by our node, used to get any newer keys
         last_known_key: Option<BlsPublicKey>,
+        /// Routing message
         msg: Box<RoutingMsg>,
     },
 }
