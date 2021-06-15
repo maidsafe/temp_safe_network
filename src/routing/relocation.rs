@@ -60,43 +60,37 @@ pub(crate) fn actions(
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
 /// get once relocated.
 pub trait RelocateDetailsUtils {
-    fn new(section: &Section, network: &Network, peer: &Peer, destination: XorName) -> Self;
+    fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self;
 
     fn with_age(
         section: &Section,
         network: &Network,
         peer: &Peer,
-        destination: XorName,
+        dst: XorName,
         age: u8,
     ) -> RelocateDetails;
 }
 
 impl RelocateDetailsUtils for RelocateDetails {
-    fn new(section: &Section, network: &Network, peer: &Peer, destination: XorName) -> Self {
-        Self::with_age(
-            section,
-            network,
-            peer,
-            destination,
-            peer.age().saturating_add(1),
-        )
+    fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self {
+        Self::with_age(section, network, peer, dst, peer.age().saturating_add(1))
     }
 
     fn with_age(
         section: &Section,
         network: &Network,
         peer: &Peer,
-        destination: XorName,
+        dst: XorName,
         age: u8,
     ) -> RelocateDetails {
-        let destination_key = network
-            .key_by_name(&destination)
+        let dst_key = network
+            .key_by_name(&dst)
             .unwrap_or_else(|_| *section.chain().root_key());
 
         RelocateDetails {
             pub_id: *peer.name(),
-            destination,
-            destination_key,
+            dst,
+            dst_key,
             age,
         }
     }
@@ -112,9 +106,9 @@ pub trait SignedRelocateDetailsUtils {
 
     fn signed_msg(&self) -> &RoutingMsg;
 
-    fn destination(&self) -> Result<&XorName, Error>;
+    fn dst(&self) -> Result<&XorName, Error>;
 
-    fn destination_key(&self) -> Result<BlsPublicKey, Error>;
+    fn dst_key(&self) -> Result<BlsPublicKey, Error>;
 }
 
 impl SignedRelocateDetailsUtils for SignedRelocateDetails {
@@ -139,12 +133,12 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
         &self.signed_msg
     }
 
-    fn destination(&self) -> Result<&XorName, Error> {
-        Ok(&self.relocate_details()?.destination)
+    fn dst(&self) -> Result<&XorName, Error> {
+        Ok(&self.relocate_details()?.dst)
     }
 
-    fn destination_key(&self) -> Result<BlsPublicKey, Error> {
-        Ok(self.relocate_details()?.destination_key)
+    fn dst_key(&self) -> Result<BlsPublicKey, Error> {
+        Ok(self.relocate_details()?.dst_key)
     }
 }
 
@@ -210,22 +204,22 @@ pub(crate) enum RelocateAction {
 
 impl RelocateAction {
     pub fn new(section: &Section, network: &Network, peer: &Peer, churn_name: &XorName) -> Self {
-        let destination = destination(peer.name(), churn_name);
+        let dst = dst(peer.name(), churn_name);
 
         if section.is_elder(peer.name()) {
             RelocateAction::Delayed(RelocatePromise {
                 name: *peer.name(),
-                destination,
+                dst,
             })
         } else {
-            RelocateAction::Instant(RelocateDetails::new(section, network, peer, destination))
+            RelocateAction::Instant(RelocateDetails::new(section, network, peer, dst))
         }
     }
 
-    pub fn destination(&self) -> &XorName {
+    pub fn dst(&self) -> &XorName {
         match self {
-            Self::Instant(details) => &details.destination,
-            Self::Delayed(promise) => &promise.destination,
+            Self::Instant(details) => &details.dst,
+            Self::Delayed(promise) => &promise.dst,
         }
     }
 
@@ -248,7 +242,7 @@ pub(crate) fn check(age: u8, churn_signature: &bls::Signature) -> bool {
 
 // Compute the destination for the node with `relocating_name` to be relocated to. `churn_name` is
 // the name of the joined/left node that triggered the relocation.
-fn destination(relocating_name: &XorName, churn_name: &XorName) -> XorName {
+fn dst(relocating_name: &XorName, churn_name: &XorName) -> XorName {
     XorName::from_content(&[&relocating_name.0, &churn_name.0])
 }
 

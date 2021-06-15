@@ -13,7 +13,7 @@ use crate::messaging::{
         MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned, Signed,
         Variant,
     },
-    DestInfo, DstLocation, SectionAuthorityProvider,
+    DstInfo, DstLocation, SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::SectionSignedUtils,
@@ -60,7 +60,7 @@ impl Core {
                 self.handle_our_elders_agreement(section_auth, signed).await
             }
             Proposal::AccumulateAtSrc { message, .. } => {
-                let dest_name = if let Some(name) = message.dst.name() {
+                let dst_name = if let Some(name) = message.dst.name() {
                     name
                 } else {
                     error!(
@@ -69,14 +69,14 @@ impl Core {
                     );
                     return Err(Error::InvalidDstLocation);
                 };
-                let dest_section_pk = message.dst_key;
+                let dst_section_pk = message.dst_key;
                 Ok(vec![self.handle_accumulate_at_src_agreement(
                     *message,
                     self.section.chain().clone(),
                     signed,
-                    DestInfo {
-                        dest: dest_name,
-                        dest_section_pk,
+                    DstInfo {
+                        dst: dst_name,
+                        dst_section_pk,
                     },
                 )?])
             }
@@ -241,9 +241,9 @@ impl Core {
                     sync_recipients,
                     len,
                     sync_message,
-                    DestInfo {
-                        dest: XorName::random(),
-                        dest_section_pk: signed.public_key,
+                    DstInfo {
+                        dst: XorName::random(),
+                        dst_section_pk: signed.public_key,
                     },
                 ));
             }
@@ -299,14 +299,14 @@ impl Core {
         message: PlainMessage,
         section_chain: SecuredLinkedList,
         signed: Signed,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     ) -> Result<Command> {
         let message = RoutingMsg::section_src(message, signed, section_chain)?;
 
         Ok(Command::HandleMessage {
             message,
             sender: None,
-            dest_info,
+            dst_info,
         })
     }
 }

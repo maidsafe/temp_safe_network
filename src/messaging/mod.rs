@@ -37,21 +37,21 @@ use xor_name::XorName;
 pub enum MessageType {
     SectionInfo {
         msg: section_info::SectionInfoMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     },
     Client {
         msg: client::ClientMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     },
     #[cfg(not(feature = "client-only"))]
     Routing {
         msg: node::RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     },
     #[cfg(not(feature = "client-only"))]
     Node {
         msg: node::NodeMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
         src_section_pk: Option<PublicKey>,
     },
 }
@@ -59,34 +59,34 @@ pub enum MessageType {
 /// This is information kept by 'MessageType' so it can be properly
 /// serialised with a valid 'WireMsgHeader'
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Ord, PartialOrd, Eq)]
-pub struct DestInfo {
-    pub dest: XorName,
-    pub dest_section_pk: PublicKey,
+pub struct DstInfo {
+    pub dst: XorName,
+    pub dst_section_pk: PublicKey,
 }
 
 impl MessageType {
     /// serialize the message type into bytes ready to be sent over the wire.
     pub fn serialize(&self) -> Result<Bytes> {
         match self {
-            Self::SectionInfo { msg, dest_info } => {
-                WireMsg::serialize_section_info_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::SectionInfo { msg, dst_info } => {
+                WireMsg::serialize_section_info_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
-            Self::Client { msg, dest_info } => {
-                WireMsg::serialize_client_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::Client { msg, dst_info } => {
+                WireMsg::serialize_client_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
-            Self::Routing { msg, dest_info } => {
-                WireMsg::serialize_routing_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::Routing { msg, dst_info } => {
+                WireMsg::serialize_routing_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
             Self::Node {
                 msg,
-                dest_info,
+                dst_info,
                 src_section_pk,
             } => WireMsg::serialize_node_msg(
                 msg,
-                dest_info.dest,
-                dest_info.dest_section_pk,
+                dst_info.dst,
+                dst_info.dst_section_pk,
                 *src_section_pk,
             ),
         }
@@ -94,69 +94,64 @@ impl MessageType {
 
     pub fn to_wire_msg(&self) -> Result<WireMsg> {
         match self {
-            Self::SectionInfo { msg, dest_info } => {
-                WireMsg::new_section_info_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::SectionInfo { msg, dst_info } => {
+                WireMsg::new_section_info_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
-            Self::Client { msg, dest_info } => {
-                WireMsg::new_client_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::Client { msg, dst_info } => {
+                WireMsg::new_client_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
-            Self::Routing { msg, dest_info } => {
-                WireMsg::new_routing_msg(msg, dest_info.dest, dest_info.dest_section_pk)
+            Self::Routing { msg, dst_info } => {
+                WireMsg::new_routing_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
             Self::Node {
                 msg,
-                dest_info,
+                dst_info,
                 src_section_pk,
-            } => WireMsg::new_node_msg(
-                msg,
-                dest_info.dest,
-                dest_info.dest_section_pk,
-                *src_section_pk,
-            ),
+            } => WireMsg::new_node_msg(msg, dst_info.dst, dst_info.dst_section_pk, *src_section_pk),
         }
     }
 
-    pub fn update_dest_info(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
+    pub fn update_dst_info(&mut self, dst_pk: Option<PublicKey>, dst: Option<XorName>) {
         #[cfg(not(feature = "client-only"))]
         match self {
-            Self::Client { dest_info, .. } | Self::SectionInfo { dest_info, .. } => {
-                if let Some(dest) = dest {
-                    dest_info.dest = dest
+            Self::Client { dst_info, .. } | Self::SectionInfo { dst_info, .. } => {
+                if let Some(dst) = dst {
+                    dst_info.dst = dst
                 }
-                if let Some(dest_pk) = dest_pk {
-                    dest_info.dest_section_pk = dest_pk
-                }
-            }
-            #[cfg(not(feature = "client-only"))]
-            Self::Routing { dest_info, .. } => {
-                if let Some(dest) = dest {
-                    dest_info.dest = dest
-                }
-                if let Some(dest_pk) = dest_pk {
-                    dest_info.dest_section_pk = dest_pk
+                if let Some(dst_pk) = dst_pk {
+                    dst_info.dst_section_pk = dst_pk
                 }
             }
             #[cfg(not(feature = "client-only"))]
-            Self::Node { dest_info, .. } => {
-                if let Some(dest) = dest {
-                    dest_info.dest = dest
+            Self::Routing { dst_info, .. } => {
+                if let Some(dst) = dst {
+                    dst_info.dst = dst
                 }
-                if let Some(dest_pk) = dest_pk {
-                    dest_info.dest_section_pk = dest_pk
+                if let Some(dst_pk) = dst_pk {
+                    dst_info.dst_section_pk = dst_pk
+                }
+            }
+            #[cfg(not(feature = "client-only"))]
+            Self::Node { dst_info, .. } => {
+                if let Some(dst) = dst {
+                    dst_info.dst = dst
+                }
+                if let Some(dst_pk) = dst_pk {
+                    dst_info.dst_section_pk = dst_pk
                 }
             }
         }
 
         #[cfg(feature = "client-only")]
         match self {
-            Self::Client { dest_info, .. } | Self::SectionInfo { dest_info, .. } => {
-                if let Some(dest) = dest {
-                    dest_info.dest = dest
+            Self::Client { dst_info, .. } | Self::SectionInfo { dst_info, .. } => {
+                if let Some(dst) = dst {
+                    dst_info.dst = dst
                 }
-                if let Some(dest_pk) = dest_pk {
-                    dest_info.dest_section_pk = dest_pk
+                if let Some(dst_pk) = dst_pk {
+                    dst_info.dst_section_pk = dst_pk
                 }
             }
         }

@@ -141,7 +141,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Bug Fixes
 
-* update message bytes directly for dest change ([d253690](https://github.com/maidsafe/sn_routing/commit/d2536909c25f1981a31d47eea9cd8016ed5a012a))
+* update message bytes directly for dst change ([d253690](https://github.com/maidsafe/sn_routing/commit/d2536909c25f1981a31d47eea9cd8016ed5a012a))
 
 ## [0.71.0](https://github.com/maidsafe/sn_routing/compare/v0.70.0...v0.71.0) (2021-05-25)
 
@@ -691,7 +691,7 @@ a public struct but won't trigger the version update automatically.
 
 * respond with GetSectionResponse::Redirect on missing pk set ([69a1fb8](https://github.com/maidsafe/sn_routing/commit/69a1fb840cbbb54b8ccb5af8856e3991d3ac46dd))
 * **bootstrap:** avoid duplicate GetSectionRequest ([84327e2](https://github.com/maidsafe/sn_routing/commit/84327e2521dfcace503886e3d4b79c3118cc4464))
-* **bootstrap:** require GetSectionResponse to match our destination, not name ([4f484f1](https://github.com/maidsafe/sn_routing/commit/4f484f1ea93f5d83180d5c77fcb5b3a680322d31))
+* **bootstrap:** require GetSectionResponse to match our dst, not name ([4f484f1](https://github.com/maidsafe/sn_routing/commit/4f484f1ea93f5d83180d5c77fcb5b3a680322d31))
 * **stress-test:** fix probe message sending ([a8a184c](https://github.com/maidsafe/sn_routing/commit/a8a184c70f57801140d4fb521b230485ab353727))
 
 ### [0.47.2](https://github.com/maidsafe/sn_routing/compare/v0.47.1...v0.47.2) (2021-03-02)
@@ -747,7 +747,7 @@ change
 
 ### Features
 
-* **accumulation:** add support for accumlation at dest node ([f892838](https://github.com/maidsafe/sn_routing/commit/f892838c994f243e6be17b5276b1c80ff10f5c3a))
+* **accumulation:** add support for accumlation at dst node ([f892838](https://github.com/maidsafe/sn_routing/commit/f892838c994f243e6be17b5276b1c80ff10f5c3a))
 
 
 ### Bug Fixes

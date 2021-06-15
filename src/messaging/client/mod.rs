@@ -179,10 +179,10 @@ impl ClientMsg {
     /// Serialize this Message into bytes ready to be sent over the wire.
     pub fn serialize(
         &self,
-        dest: XorName,
-        dest_section_pk: BlsPublicKey,
+        dst: XorName,
+        dst_section_pk: BlsPublicKey,
     ) -> crate::messaging::Result<Bytes> {
-        WireMsg::serialize_client_msg(self, dest, dest_section_pk)
+        WireMsg::serialize_client_msg(self, dst, dst_section_pk)
     }
 
     /// Gets the message ID.
@@ -641,9 +641,9 @@ mod tests {
         });
 
         // test msgpack serialization
-        let dest = XorName::random();
-        let dest_section_pk = bls::SecretKey::random().public_key();
-        let serialized = message.serialize(dest, dest_section_pk)?;
+        let dst = XorName::random();
+        let dst_section_pk = bls::SecretKey::random().public_key();
+        let serialized = message.serialize(dst, dst_section_pk)?;
         let deserialized = ClientMsg::from(serialized)?;
         assert_eq!(deserialized, message);
 

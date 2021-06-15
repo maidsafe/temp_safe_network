@@ -103,7 +103,7 @@ impl Dispatcher {
             Command::HandleMessage {
                 sender,
                 message,
-                dest_info,
+                dst_info,
             } => {
                 if let Some(sender) = &sender {
                     // let's then see if we need to do a reachability test
@@ -151,18 +151,18 @@ impl Dispatcher {
                 self.core
                     .write()
                     .await
-                    .handle_message(sender, message, dest_info)
+                    .handle_message(sender, message, dst_info)
                     .await
             }
             Command::HandleSectionInfoMsg {
                 sender,
                 message,
-                dest_info,
+                dst_info,
             } => Ok(self
                 .core
                 .write()
                 .await
-                .handle_section_info_msg(sender, message, dest_info)
+                .handle_section_info_msg(sender, message, dst_info)
                 .await),
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
             Command::HandleAgreement { proposal, signed } => {
@@ -223,14 +223,14 @@ impl Dispatcher {
             Command::ProposeOnline {
                 mut peer,
                 previous_name,
-                destination_key,
+                dst_key,
             } => {
                 // The reachability check was completed during the initial bootstrap phase
                 peer.set_reachable(true);
                 self.core
                     .read()
                     .await
-                    .make_online_proposal(peer, previous_name, destination_key)
+                    .make_online_proposal(peer, previous_name, dst_key)
                     .await
             }
             Command::ProposeOffline(name) => self.core.read().await.propose_offline(name),

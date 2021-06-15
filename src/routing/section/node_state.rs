@@ -35,7 +35,7 @@ pub trait NodeStateUtils {
     fn leave(self) -> Result<NodeState, Error>;
 
     // Convert this info into one with the state changed to `Relocated`.
-    fn relocate(self, destination: XorName) -> NodeState;
+    fn relocate(self, dst: XorName) -> NodeState;
 }
 
 impl NodeStateUtils for NodeState {
@@ -65,9 +65,9 @@ impl NodeStateUtils for NodeState {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    fn relocate(self, destination: XorName) -> NodeState {
+    fn relocate(self, dst: XorName) -> NodeState {
         NodeState {
-            state: MembershipState::Relocated(destination),
+            state: MembershipState::Relocated(dst),
             ..self
         }
     }

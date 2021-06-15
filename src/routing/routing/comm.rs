@@ -120,7 +120,7 @@ impl Comm {
         recipient: (XorName, SocketAddr),
         mut msg: MessageType,
     ) -> Result<(), Error> {
-        msg.update_dest_info(None, Some(recipient.0));
+        msg.update_dst_info(None, Some(recipient.0));
 
         let bytes = msg.serialize()?;
         self.endpoint
@@ -198,7 +198,7 @@ impl Comm {
         }
         // Use the first Xor address recipient to represent the destination section.
         // So that only one copy of MessageType need to be constructed.
-        msg.update_dest_info(None, Some(recipients[0].0));
+        msg.update_dst_info(None, Some(recipients[0].0));
 
         let msg_bytes = msg.serialize().map_err(Error::Messaging)?;
 
@@ -347,7 +347,7 @@ pub enum SendStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messaging::{section_info::SectionInfoMsg, DestInfo, WireMsg};
+    use crate::messaging::{section_info::SectionInfoMsg, DstInfo, WireMsg};
     use anyhow::Result;
     use assert_matches::assert_matches;
     use futures::future;
@@ -379,7 +379,7 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.update_dest_info(None, Some(peer0._name));
+            original_message.update_dst_info(None, Some(peer0._name));
             assert_eq!(WireMsg::deserialize(bytes)?, original_message.clone());
         }
 
@@ -410,7 +410,7 @@ mod tests {
         assert_matches!(status, SendStatus::AllRecipients);
 
         if let Some(bytes) = peer0.rx.recv().await {
-            original_message.update_dest_info(None, Some(peer0._name));
+            original_message.update_dst_info(None, Some(peer0._name));
             assert_eq!(WireMsg::deserialize(bytes)?, original_message);
         }
 
@@ -478,7 +478,7 @@ mod tests {
 
         // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.update_dest_info(None, Some(name));
+            message.update_dst_info(None, Some(name));
             assert_eq!(WireMsg::deserialize(bytes)?, message);
         }
         Ok(())
@@ -515,7 +515,7 @@ mod tests {
 
         // Using first name of the recipients to represent section_name.
         if let Some(bytes) = peer.rx.recv().await {
-            message.update_dest_info(None, Some(name));
+            message.update_dst_info(None, Some(name));
             assert_eq!(WireMsg::deserialize(bytes)?, message);
         }
         Ok(())
@@ -535,9 +535,9 @@ mod tests {
         let key0 = bls::SecretKey::random().public_key();
         let msg0 = MessageType::SectionInfo {
             msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key0)),
-            dest_info: DestInfo {
-                dest: name,
-                dest_section_pk: key0,
+            dst_info: DstInfo {
+                dst: name,
+                dst_section_pk: key0,
             },
         };
         let _ = send_comm
@@ -560,9 +560,9 @@ mod tests {
         let key1 = bls::SecretKey::random().public_key();
         let msg1 = MessageType::SectionInfo {
             msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(key1)),
-            dest_info: DestInfo {
-                dest: name,
-                dest_section_pk: key1,
+            dst_info: DstInfo {
+                dst: name,
+                dst_section_pk: key1,
             },
         };
         let _ = send_comm
@@ -623,9 +623,9 @@ mod tests {
         let random_bls_pk = bls::SecretKey::random().public_key();
         MessageType::SectionInfo {
             msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk)),
-            dest_info: DestInfo {
-                dest: XorName::random(),
-                dest_section_pk: bls::SecretKey::random().public_key(),
+            dst_info: DstInfo {
+                dst: XorName::random(),
+                dst_section_pk: bls::SecretKey::random().public_key(),
             },
         }
     }

@@ -10,7 +10,7 @@ use super::{delivery_group, Core};
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, RoutingMsg, Section, Variant},
     section_info::Error as TargetSectionError,
-    DestInfo, EndUser, Itinerary, SectionAuthorityProvider, SrcLocation,
+    DstInfo, EndUser, Itinerary, SectionAuthorityProvider, SrcLocation,
 };
 use crate::routing::{
     error::Result,
@@ -141,7 +141,7 @@ impl Core {
         )?;
 
         let target_name = msg.dst.name().ok_or(Error::CannotRoute)?;
-        let dest_pk = self.section_key_by_name(&target_name);
+        let dst_pk = self.section_key_by_name(&target_name);
 
         let mut targets = vec![];
 
@@ -172,9 +172,9 @@ impl Core {
             targets,
             dg_size,
             msg.clone(),
-            DestInfo {
-                dest: XorName::random(),
-                dest_section_pk: dest_pk,
+            DstInfo {
+                dst: XorName::random(),
+                dst_section_pk: dst_pk,
             },
         );
 
@@ -243,7 +243,7 @@ impl Core {
             );
             return Err(Error::InvalidDstLocation);
         };
-        let dest_section_pk = self.section_key_by_name(&dst_name);
+        let dst_section_pk = self.section_key_by_name(&dst_name);
 
         let variant = Variant::UserMessage(content.to_vec());
 
@@ -278,9 +278,9 @@ impl Core {
             commands.push(Command::HandleMessage {
                 sender: Some(self.node.addr),
                 message: msg.clone(),
-                dest_info: DestInfo {
-                    dest: dst_name,
-                    dest_section_pk,
+                dst_info: DstInfo {
+                    dst: dst_name,
+                    dst_section_pk,
                 },
             });
         }
@@ -303,12 +303,12 @@ impl Core {
         &self,
         peer: Peer,
         previous_name: Option<XorName>,
-        destination_key: Option<bls::PublicKey>,
+        dst_key: Option<bls::PublicKey>,
     ) -> Result<Vec<Command>> {
         self.propose(Proposal::Online {
             node_state: NodeState::joined(peer),
             previous_name,
-            destination_key,
+            dst_key,
         })
     }
 }

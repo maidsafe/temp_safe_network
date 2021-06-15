@@ -28,7 +28,7 @@ use self::{
 use crate::messaging::{
     client::ClientMsg,
     node::{Peer, RoutingMsg},
-    DestInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+    DstInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::{
     ed25519,
@@ -154,13 +154,13 @@ impl Routing {
         info!("{} Bootstrapped!", node_name);
 
         // Process message backlog
-        for (message, sender, dest_info) in backlog {
+        for (message, sender, dst_info) in backlog {
             dispatcher
                 .clone()
                 .handle_commands(Command::HandleMessage {
                     message,
                     sender: Some(sender),
-                    dest_info,
+                    dst_info,
                 })
                 .await?;
         }
@@ -413,9 +413,9 @@ impl Routing {
             delivery_group_size: 1,
             message: MessageType::Client {
                 msg: message,
-                dest_info: DestInfo {
-                    dest: user_xorname,
-                    dest_section_pk: *self.section_chain().await.last_key(),
+                dst_info: DstInfo {
+                    dst: user_xorname,
+                    dst_section_pk: *self.section_chain().await.last_key(),
                 },
             },
         };
@@ -510,15 +510,15 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
     };
 
     match message_type {
-        MessageType::SectionInfo { msg, dest_info } => {
+        MessageType::SectionInfo { msg, dst_info } => {
             let command = Command::HandleSectionInfoMsg {
                 sender,
                 message: msg,
-                dest_info,
+                dst_info,
             };
             let _ = task::spawn(dispatcher.handle_commands(command));
         }
-        MessageType::Routing { msg, dest_info } => {
+        MessageType::Routing { msg, dst_info } => {
             if let Err(err) = RoutingMsg::check_signature(&msg) {
                 error!(
                     "Discarding message received ({:?}) due to invalid signature: {:?}",
@@ -530,13 +530,13 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             let command = Command::HandleMessage {
                 message: msg,
                 sender: Some(sender),
-                dest_info,
+                dst_info,
             };
             let _ = task::spawn(dispatcher.handle_commands(command));
         }
         MessageType::Node {
             msg: _,
-            dest_info: _,
+            dst_info: _,
             src_section_pk: _,
         } => unimplemented!(),
         MessageType::Client { msg, .. } => {

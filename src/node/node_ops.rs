@@ -39,7 +39,7 @@ use xor_name::XorName;
 /// is also an internal message.
 /// Finally, an internal message might be destined for messaging
 /// module, by which it leaves the process boundary of this node
-/// and is sent on the wire to some other destination(s) on the network.
+/// and is sent on the wire to some other dst(s) on the network.
 
 /// Vec of NodeDuty
 pub type NodeDuties = Vec<NodeDuty>;

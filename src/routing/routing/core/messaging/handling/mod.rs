@@ -22,7 +22,7 @@ use crate::messaging::{
         SignedRelocateDetails, SrcAuthority, Variant,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DestInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
+    DstInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{commands::DkgCommands, ProposalError, SignedShare},
@@ -48,7 +48,7 @@ impl Core {
         &mut self,
         sender: Option<SocketAddr>,
         msg: RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
@@ -71,16 +71,16 @@ impl Core {
             MessageStatus::Useful => {
                 trace!("Useful message from {:?}: {:?}", sender, msg);
                 let (entropy_commands, shall_be_handled) =
-                    self.check_for_entropy(&msg, dest_info.clone()).await?;
+                    self.check_for_entropy(&msg, dst_info.clone()).await?;
                 commands.extend(entropy_commands);
                 if shall_be_handled {
                     info!("Entropy check passed. Handling useful msg!");
-                    commands.extend(self.handle_useful_message(sender, msg, dest_info).await?);
+                    commands.extend(self.handle_useful_message(sender, msg, dst_info).await?);
                 }
             }
             MessageStatus::Untrusted => {
                 debug!("Untrusted message from {:?}: {:?} ", sender, msg);
-                commands.push(self.handle_untrusted_message(sender, msg, dest_info)?);
+                commands.push(self.handle_untrusted_message(sender, msg, dst_info)?);
             }
             MessageStatus::Useless => {
                 debug!("Useless message from {:?}: {:?}", sender, msg);
@@ -94,13 +94,13 @@ impl Core {
         &mut self,
         sender: SocketAddr,
         message: SectionInfoMsg,
-        dest_info: DestInfo, // The DestInfo contains the XorName of the sender and a random PK during the initial SectionQuery,
+        dst_info: DstInfo, // The DstInfo contains the XorName of the sender and a random PK during the initial SectionQuery,
     ) -> Vec<Command> {
-        // Provide our PK as the dest PK, only redundant as the message
+        // Provide our PK as the dst PK, only redundant as the message
         // itself contains details regarding relocation/registration.
-        let dest_info = DestInfo {
-            dest: dest_info.dest,
-            dest_section_pk: *self.section().chain().last_key(),
+        let dst_info = DstInfo {
+            dst: dst_info.dst,
+            dst_section_pk: *self.section().chain().last_key(),
         };
 
         match message {
@@ -140,7 +140,7 @@ impl Core {
                     delivery_group_size: 1,
                     message: MessageType::SectionInfo {
                         msg: response,
-                        dest_info,
+                        dst_info,
                     },
                 }]
             }
@@ -230,7 +230,7 @@ impl Core {
             }
             Err(AggregatorError::NotEnoughShares) => Ok(None),
             Err(err) => {
-                error!("Error accumulating message at destination: {:?}", err);
+                error!("Error accumulating message at dst: {:?}", err);
                 Err(Error::InvalidSignatureShare)
             }
         }
@@ -240,7 +240,7 @@ impl Core {
         &mut self,
         sender: Option<SocketAddr>,
         msg: RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     ) -> Result<Vec<Command>> {
         let msg = if let Some(msg) = self.aggregate_message(msg)? {
             msg
@@ -257,7 +257,7 @@ impl Core {
                     Ok(vec![Command::HandleMessage {
                         sender,
                         message: *bounced_msg.clone(),
-                        dest_info,
+                        dst_info,
                     }])
                 } else {
                     Ok(vec![])
@@ -296,12 +296,12 @@ impl Core {
             }
             Variant::BouncedUntrustedMessage {
                 msg: bounced_msg,
-                dest_info,
+                dst_info,
             } => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 Ok(vec![self.handle_bounced_untrusted_message(
                     msg.src.peer(sender)?,
-                    dest_info.dest_section_pk,
+                    dst_info.dst_section_pk,
                     *bounced_msg.clone(),
                 )?])
             }
@@ -404,9 +404,9 @@ impl Core {
         Ok(Command::send_message_to_node(
             (src_name, sender),
             msg,
-            DestInfo {
-                dest: src_name,
-                dest_section_pk: key,
+            DstInfo {
+                dst: src_name,
+                dst_section_pk: key,
             },
         ))
     }
@@ -449,9 +449,9 @@ impl Core {
                     delivery_group_size: 1,
                     message: MessageType::Client {
                         msg: ClientMsg::from(content)?,
-                        dest_info: DestInfo {
-                            dest: xor_name,
-                            dest_section_pk: *self.section.chain().last_key(),
+                        dst_info: DstInfo {
+                            dst: xor_name,
+                            dst_section_pk: *self.section.chain().last_key(),
                         },
                     },
                 }]);
@@ -629,7 +629,7 @@ impl Core {
         Ok(vec![Command::ProposeOnline {
             peer,
             previous_name: None,
-            destination_key: None,
+            dst_key: None,
         }])
     }
 
@@ -693,12 +693,12 @@ impl Core {
 
         let details = payload.relocate_details()?;
 
-        if !self.section.prefix().matches(&details.destination) {
+        if !self.section.prefix().matches(&details.dst) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
                          our prefix {:?}.",
                 peer,
-                details.destination,
+                details.dst,
                 self.section.prefix()
             );
             return Ok(vec![]);
@@ -723,12 +723,12 @@ impl Core {
         }
 
         let previous_name = Some(details.pub_id);
-        let destination_key = Some(details.destination_key);
+        let dst_key = Some(details.dst_key);
 
         Ok(vec![Command::ProposeOnline {
             peer,
             previous_name,
-            destination_key,
+            dst_key,
         }])
     }
 
