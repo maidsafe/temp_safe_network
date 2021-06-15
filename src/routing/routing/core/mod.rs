@@ -16,7 +16,7 @@ use super::{command::Command, enduser_registry::EndUserRegistry, split_barrier::
 use crate::messaging::node::SignatureAggregator;
 use crate::messaging::{
     node::{Network, Proposal, RoutingMsg, Section, SectionSigned, Variant},
-    DestInfo, DstLocation, MessageId, SectionAuthorityProvider,
+    DstInfo, DstLocation, MessageId, SectionAuthorityProvider,
 };
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
@@ -98,7 +98,7 @@ impl Core {
     async fn check_for_entropy(
         &self,
         msg: &RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     ) -> Result<(Vec<Command>, bool)> {
         if !self.is_elder() {
             // Adult nodes do need to carry out entropy checking, however the message shall always
@@ -107,7 +107,7 @@ impl Core {
         }
 
         let (actions, can_be_executed) =
-            anti_entropy::process(&self.node, &self.section, msg, dest_info)?;
+            anti_entropy::process(&self.node, &self.section, msg, dst_info)?;
         let mut commands = vec![];
 
         for msg in actions.send {
@@ -192,12 +192,12 @@ impl Core {
                         .map(|(name, addr)| (*name, *addr))
                         .collect();
                     let len = targets.len();
-                    let dest_info = DestInfo {
-                        dest: XorName::random(),
-                        dest_section_pk: sap.section_key(),
+                    let dst_info = DstInfo {
+                        dst: XorName::random(),
+                        dst_section_pk: sap.section_key(),
                     };
                     trace!("Sending updated SectionInfo to all known sections");
-                    commands.push(Command::send_message_to_nodes(targets, len, msg, dest_info));
+                    commands.push(Command::send_message_to_nodes(targets, len, msg, dst_info));
                 }
             }
 

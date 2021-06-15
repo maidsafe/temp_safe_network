@@ -30,11 +30,11 @@ use xor_name::XorName;
 ///
 /// * If the destination is a `DstLocation::Section` OR `DstLocation::EndUser`:
 ///     - if our section is the closest on the network (i.e. our section's prefix is a prefix of
-///       the destination), returns all other members of our section; otherwise
+///       the dst), returns all other members of our section; otherwise
 ///     - returns the `N/3` closest members to the target
 ///
 /// * If the destination is an individual node:
-///     - if our name *is* the destination, returns an empty set; otherwise
+///     - if our name *is* the dst, returns an empty set; otherwise
 ///     - if the destination name is an entry in the routing table, returns it; otherwise
 ///     - returns the `N/3` closest members of the RT to the target
 pub(crate) fn delivery_targets(

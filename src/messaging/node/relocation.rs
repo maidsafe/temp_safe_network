@@ -22,9 +22,9 @@ pub struct RelocateDetails {
     pub pub_id: XorName,
     /// Relocation destination - the node will be relocated to a section whose prefix matches this
     /// name.
-    pub destination: XorName,
+    pub dst: XorName,
     /// The BLS key of the destination section used by the relocated node to verify messages.
-    pub destination_key: BlsPublicKey,
+    pub dst_key: BlsPublicKey,
     /// The age the node will have post-relocation.
     pub age: u8,
 }
@@ -47,5 +47,5 @@ pub struct RelocatePayload {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct RelocatePromise {
     pub name: XorName,
-    pub destination: XorName,
+    pub dst: XorName,
 }

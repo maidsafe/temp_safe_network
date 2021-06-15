@@ -9,7 +9,7 @@
 use super::Core;
 use crate::messaging::{
     node::{Peer, RoutingMsg, Variant},
-    DestInfo, DstLocation,
+    DstInfo, DstLocation,
 };
 use crate::routing::{
     messages::{RoutingMsgUtils, SrcAuthorityUtils},
@@ -28,26 +28,26 @@ impl Core {
         &self,
         sender: Option<SocketAddr>,
         msg: RoutingMsg,
-        received_dest_info: DestInfo,
+        received_dst_info: DstInfo,
     ) -> Result<Command> {
         let src_name = msg.src.name();
         let bounce_dst_key = self.section_key_by_name(&src_name);
-        let dest_info = DestInfo {
-            dest: src_name,
-            dest_section_pk: bounce_dst_key,
+        let dst_info = DstInfo {
+            dst: src_name,
+            dst_section_pk: bounce_dst_key,
         };
         let bounce_msg = RoutingMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
             Variant::BouncedUntrustedMessage {
                 msg: Box::new(msg),
-                dest_info: received_dest_info,
+                dst_info: received_dst_info,
             },
             self.section.authority_provider().section_key(),
         )?;
 
         let cmd = if let Some(sender) = sender {
-            Command::send_message_to_node((src_name, sender), bounce_msg, dest_info)
+            Command::send_message_to_node((src_name, sender), bounce_msg, dst_info)
         } else {
             self.send_message_to_our_elders(bounce_msg)
         };
@@ -91,15 +91,15 @@ impl Core {
             }
         };
 
-        let dest_info = DestInfo {
-            dest: *sender.name(),
-            dest_section_pk: dst_key,
+        let dst_info = DstInfo {
+            dst: *sender.name(),
+            dst_section_pk: dst_key,
         };
         trace!("resending with extended signed");
         Ok(Command::send_message_to_node(
             (*sender.name(), *sender.addr()),
             resend_msg,
-            dest_info,
+            dst_info,
         ))
     }
 }

@@ -12,7 +12,7 @@ pub mod wire_msg_header;
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
 #[cfg(not(feature = "client-only"))]
 use super::node;
-use super::{client, section_info, DestInfo, Error, MessageId, MessageType, Result};
+use super::{client, section_info, DstInfo, Error, MessageId, MessageType, Result};
 use bls::PublicKey;
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen_simple};
@@ -33,8 +33,8 @@ impl WireMsg {
     /// Creates a new instance keeping a (serialized) copy of the 'SectionInfo' message provided.
     pub fn new_section_info_msg(
         query: &section_info::SectionInfoMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
     ) -> Result<Self> {
         let payload_vec = rmp_serde::to_vec_named(&query).map_err(|err| {
             Error::Serialisation(format!(
@@ -47,8 +47,8 @@ impl WireMsg {
             header: WireMsgHeader::new(
                 MessageId::new(),
                 MessageKind::SectionInfo,
-                dest,
-                dest_section_pk,
+                dst,
+                dst_section_pk,
                 None,
             ),
             payload: Bytes::from(payload_vec),
@@ -58,8 +58,8 @@ impl WireMsg {
     /// Creates a new instance keeping a (serialized) copy of the client 'Message' message provided.
     pub fn new_client_msg(
         msg: &client::ClientMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
     ) -> Result<Self> {
         let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
             Error::Serialisation(format!(
@@ -70,7 +70,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(msg.id(), MessageKind::Client, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(msg.id(), MessageKind::Client, dst, dst_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -79,8 +79,8 @@ impl WireMsg {
     #[cfg(not(feature = "client-only"))]
     pub fn new_routing_msg(
         msg: &node::RoutingMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
     ) -> Result<Self> {
         let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
             Error::Serialisation(format!(
@@ -90,7 +90,7 @@ impl WireMsg {
         })?;
 
         Ok(Self {
-            header: WireMsgHeader::new(msg.id, MessageKind::Routing, dest, dest_section_pk, None),
+            header: WireMsgHeader::new(msg.id, MessageKind::Routing, dst, dst_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
     }
@@ -99,8 +99,8 @@ impl WireMsg {
     #[cfg(not(feature = "client-only"))]
     pub fn new_node_msg(
         msg: &node::NodeMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
     ) -> Result<Self> {
         let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
@@ -114,8 +114,8 @@ impl WireMsg {
             header: WireMsgHeader::new(
                 msg.id(),
                 MessageKind::Node,
-                dest,
-                dest_section_pk,
+                dst,
+                dst_section_pk,
                 src_section_pk,
             ),
             payload: Bytes::from(payload_vec),
@@ -152,9 +152,9 @@ impl WireMsg {
 
     /// Deserialize the payload from this WireMsg returning a Message instance.
     pub fn to_message(&self) -> Result<MessageType> {
-        let dest_info = DestInfo {
-            dest: self.dest(),
-            dest_section_pk: self.dest_section_pk(),
+        let dst_info = DstInfo {
+            dst: self.dst(),
+            dst_section_pk: self.dst_section_pk(),
         };
 
         match self.header.kind() {
@@ -167,7 +167,7 @@ impl WireMsg {
                         ))
                     })?;
 
-                Ok(MessageType::SectionInfo{msg, dest_info})
+                Ok(MessageType::SectionInfo{msg, dst_info})
             }
             MessageKind::Client => {
                 let msg: client::ClientMsg =
@@ -178,7 +178,7 @@ impl WireMsg {
                         ))
                     })?;
 
-                Ok(MessageType::Client{msg, dest_info})
+                Ok(MessageType::Client{msg, dst_info})
             }
             #[cfg(feature = "client-only")]
             MessageKind::Routing => {
@@ -191,7 +191,7 @@ impl WireMsg {
                         Error::FailedToParse(format!("Node message payload as Msgpack: {}", err))
                     })?;
 
-                Ok(MessageType::Routing{msg, dest_info})
+                Ok(MessageType::Routing{msg, dst_info})
             }
             #[cfg(feature = "client-only")]
             MessageKind::Node => {
@@ -206,7 +206,7 @@ impl WireMsg {
 
                 Ok(MessageType::Node{
                     msg: node_cmd,
-                    dest_info,
+                    dst_info,
                     src_section_pk: self.src_section_pk()
                 })
             }
@@ -219,13 +219,13 @@ impl WireMsg {
     }
 
     /// Return the destination section PublicKey for this message
-    pub fn dest_section_pk(&self) -> PublicKey {
-        self.header.dest_section_pk()
+    pub fn dst_section_pk(&self) -> PublicKey {
+        self.header.dst_section_pk()
     }
 
     /// Return the destination for this message
-    pub fn dest(&self) -> XorName {
-        self.header.dest()
+    pub fn dst(&self) -> XorName {
+        self.header.dst()
     }
 
     /// Return the source section PublicKey for this
@@ -248,20 +248,20 @@ impl WireMsg {
     /// MsgEnvelope, returning the serialized WireMsg.
     pub fn serialize_section_info_msg(
         query: &section_info::SectionInfoMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
     ) -> Result<Bytes> {
-        Self::new_section_info_msg(query, dest, dest_section_pk)?.serialize()
+        Self::new_section_info_msg(query, dst, dst_section_pk)?.serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
     /// Message, returning the serialized WireMsg.
     pub fn serialize_client_msg(
         msg: &client::ClientMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
     ) -> Result<Bytes> {
-        Self::new_client_msg(msg, dest, dest_section_pk)?.serialize()
+        Self::new_client_msg(msg, dst, dst_section_pk)?.serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
@@ -269,10 +269,10 @@ impl WireMsg {
     #[cfg(not(feature = "client-only"))]
     pub fn serialize_routing_msg(
         msg: &node::RoutingMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
     ) -> Result<Bytes> {
-        Self::new_routing_msg(msg, dest, dest_section_pk)?.serialize()
+        Self::new_routing_msg(msg, dst, dst_section_pk)?.serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
@@ -280,11 +280,11 @@ impl WireMsg {
     #[cfg(not(feature = "client-only"))]
     pub fn serialize_node_msg(
         msg: &node::NodeMsg,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
     ) -> Result<Bytes> {
-        Self::new_node_msg(msg, dest, dest_section_pk, src_section_pk)?.serialize()
+        Self::new_node_msg(msg, dst, dst_section_pk, src_section_pk)?.serialize()
     }
 
     // Private function which returns the bytes size of this WireMsg
@@ -293,13 +293,13 @@ impl WireMsg {
         self.header.size() as usize + self.payload.len()
     }
 
-    /// Update dest_pk and or dest in the WireMsg
-    pub fn update_dest_info(&mut self, dest_pk: Option<PublicKey>, dest: Option<XorName>) {
-        if let Some(dest) = dest {
-            self.header.dest = dest
+    /// Update dst_pk and or dst in the WireMsg
+    pub fn update_dst_info(&mut self, dst_pk: Option<PublicKey>, dst: Option<XorName>) {
+        if let Some(dst) = dst {
+            self.header.dst = dst
         }
-        if let Some(dest_pk) = dest_pk {
-            self.header.dest_section_pk = dest_pk
+        if let Some(dst_pk) = dst_pk {
+            self.header.dst_section_pk = dst_pk
         }
     }
 }
@@ -313,19 +313,19 @@ mod tests {
 
     #[test]
     fn serialisation_section_info_msg() -> Result<()> {
-        let dest = XorName::random();
-        let dest_section_pk = SecretKey::random().public_key();
+        let dst = XorName::random();
+        let dst_section_pk = SecretKey::random().public_key();
 
-        let query = section_info::SectionInfoMsg::GetSectionQuery(dest_section_pk.into());
-        let wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
+        let query = section_info::SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
+        let wire_msg = WireMsg::new_section_info_msg(&query, dst, dst_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dest(), dest);
-        assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
+        assert_eq!(deserialized.dst(), dst);
+        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -333,9 +333,9 @@ mod tests {
             deserialized.to_message()?,
             MessageType::SectionInfo {
                 msg: query,
-                dest_info: DestInfo {
-                    dest,
-                    dest_section_pk
+                dst_info: DstInfo {
+                    dst,
+                    dst_section_pk
                 }
             }
         );
@@ -344,17 +344,17 @@ mod tests {
     }
 
     #[test]
-    fn serialisation_and_update_dest_for_section_info_msg() -> Result<()> {
-        let dest = XorName::random();
-        let dest_section_pk = SecretKey::random().public_key();
+    fn serialisation_and_update_dst_for_section_info_msg() -> Result<()> {
+        let dst = XorName::random();
+        let dst_section_pk = SecretKey::random().public_key();
 
-        let query = section_info::SectionInfoMsg::GetSectionQuery(dest_section_pk.into());
-        let mut wire_msg = WireMsg::new_section_info_msg(&query, dest, dest_section_pk)?;
+        let query = section_info::SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
+        let mut wire_msg = WireMsg::new_section_info_msg(&query, dst, dst_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
         let wire_msg2 = wire_msg.clone();
-        let dest_new = XorName::random();
-        wire_msg.update_dest_info(None, Some(dest_new));
+        let dst_new = XorName::random();
+        wire_msg.update_dst_info(None, Some(dst_new));
         let serialised_second_msg = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -362,8 +362,8 @@ mod tests {
 
         assert_ne!(serialized, serialised_second_msg);
         assert_ne!(wire_msg2, wire_msg);
-        assert_eq!(deserialized.dest(), dest_new);
-        assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
+        assert_eq!(deserialized.dst(), dst_new);
+        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -371,9 +371,9 @@ mod tests {
             deserialized.to_message()?,
             MessageType::SectionInfo {
                 msg: query,
-                dest_info: DestInfo {
-                    dest: dest_new,
-                    dest_section_pk
+                dst_info: DstInfo {
+                    dst: dst_new,
+                    dst_section_pk
                 }
             }
         );
@@ -387,25 +387,25 @@ mod tests {
         use crate::messaging::MessageId;
         use node::{NodeCmd, NodeMsg, NodeSystemCmd};
 
-        let dest = XorName::random();
+        let dst = XorName::random();
         let src_section_pk = SecretKey::random().public_key();
-        let dest_section_pk = SecretKey::random().public_key();
+        let dst_section_pk = SecretKey::random().public_key();
 
         let node_cmd = NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(dest_section_pk.into())),
+            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(dst_section_pk.into())),
             id: MessageId::new(),
         };
 
         // first test without including a source section public key in the header
-        let wire_msg = WireMsg::new_node_msg(&node_cmd, dest, dest_section_pk, None)?;
+        let wire_msg = WireMsg::new_node_msg(&node_cmd, dst, dst_section_pk, None)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dest(), dest);
-        assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
+        assert_eq!(deserialized.dst(), dst);
+        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -413,9 +413,9 @@ mod tests {
             deserialized.to_message()?,
             MessageType::Node {
                 msg: node_cmd.clone(),
-                dest_info: DestInfo {
-                    dest,
-                    dest_section_pk
+                dst_info: DstInfo {
+                    dst,
+                    dst_section_pk
                 },
                 src_section_pk: None
             }
@@ -423,15 +423,15 @@ mod tests {
 
         // let's now test including a source section public key in the header
         let wire_msg_with_src_pk =
-            WireMsg::new_node_msg(&node_cmd, dest, dest_section_pk, Some(src_section_pk))?;
+            WireMsg::new_node_msg(&node_cmd, dst, dst_section_pk, Some(src_section_pk))?;
         let serialized = wire_msg_with_src_pk.serialize()?;
 
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg_with_src_pk);
         assert_eq!(deserialized.msg_id(), wire_msg_with_src_pk.msg_id());
-        assert_eq!(deserialized.dest(), dest);
-        assert_eq!(deserialized.dest_section_pk(), dest_section_pk);
+        assert_eq!(deserialized.dst(), dst);
+        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
         assert_eq!(deserialized.src_section_pk(), Some(src_section_pk));
 
         // test deserialisation of payload
@@ -439,9 +439,9 @@ mod tests {
             deserialized.to_message()?,
             MessageType::Node {
                 msg: node_cmd,
-                dest_info: DestInfo {
-                    dest,
-                    dest_section_pk
+                dst_info: DstInfo {
+                    dst,
+                    dst_section_pk
                 },
                 src_section_pk: Some(src_section_pk)
             }

@@ -30,8 +30,8 @@ pub(crate) struct WireMsgHeader {
     header_size: u16,
     version: u16,
     kind: MessageKind,
-    pub(crate) dest: XorName,
-    pub(crate) dest_section_pk: PublicKey,
+    pub(crate) dst: XorName,
+    pub(crate) dst_section_pk: PublicKey,
     src_section_pk: Option<PublicKey>,
 }
 
@@ -57,7 +57,7 @@ const HDR_DEST_BYTES_START: usize = HDR_KIND_BYTES_START + HDR_KIND_BYTES_LEN;
 const HDR_DEST_BYTES_LEN: usize = XOR_NAME_LEN;
 const HDR_DEST_BYTES_END: usize = HDR_DEST_BYTES_START + HDR_DEST_BYTES_LEN;
 
-// Bytes index in the header for the 'dest_section_pk' field
+// Bytes index in the header for the 'dst_section_pk' field
 const HDR_DEST_PK_BYTES_START: usize = HDR_DEST_BYTES_END;
 const HDR_DEST_PK_BYTES_LEN: usize = PK_SIZE;
 const HDR_DEST_PK_BYTES_END: usize = HDR_DEST_PK_BYTES_START + HDR_DEST_PK_BYTES_LEN;
@@ -79,8 +79,8 @@ impl WireMsgHeader {
     pub fn new(
         msg_id: MessageId,
         kind: MessageKind,
-        dest: XorName,
-        dest_section_pk: PublicKey,
+        dst: XorName,
+        dst_section_pk: PublicKey,
         src_section_pk: Option<PublicKey>,
     ) -> Self {
         Self {
@@ -88,8 +88,8 @@ impl WireMsgHeader {
             header_size: Self::bytes_size(src_section_pk.is_some()) as u16,
             version: MESSAGING_PROTO_VERSION,
             kind,
-            dest,
-            dest_section_pk,
+            dst,
+            dst_section_pk,
             src_section_pk,
         }
     }
@@ -105,13 +105,13 @@ impl WireMsgHeader {
     }
 
     // Return the destination section PublicKey for this message
-    pub fn dest_section_pk(&self) -> PublicKey {
-        self.dest_section_pk
+    pub fn dst_section_pk(&self) -> PublicKey {
+        self.dst_section_pk
     }
 
     // Return the destination for this message
-    pub fn dest(&self) -> XorName {
-        self.dest
+    pub fn dst(&self) -> XorName {
+        self.dst
     }
 
     // Return the source section PublicKey for this message
@@ -167,14 +167,14 @@ impl WireMsgHeader {
         let kind = MessageKind::try_from(bytes[HDR_KIND_BYTES_START])?;
 
         // ...now let's read the destination bytes
-        let mut dest_bytes = [0; HDR_DEST_BYTES_LEN];
-        dest_bytes[0..].copy_from_slice(&bytes[HDR_DEST_BYTES_START..HDR_DEST_BYTES_END]);
-        let dest = XorName(dest_bytes);
+        let mut dst_bytes = [0; HDR_DEST_BYTES_LEN];
+        dst_bytes[0..].copy_from_slice(&bytes[HDR_DEST_BYTES_START..HDR_DEST_BYTES_END]);
+        let dst = XorName(dst_bytes);
 
         // ...read the destination section pubic key bytes
-        let mut dest_pk_bytes = [0; HDR_DEST_PK_BYTES_LEN];
-        dest_pk_bytes[0..].copy_from_slice(&bytes[HDR_DEST_PK_BYTES_START..HDR_DEST_PK_BYTES_END]);
-        let dest_section_pk = PublicKey::from_bytes(&dest_pk_bytes).map_err(|err| {
+        let mut dst_pk_bytes = [0; HDR_DEST_PK_BYTES_LEN];
+        dst_pk_bytes[0..].copy_from_slice(&bytes[HDR_DEST_PK_BYTES_START..HDR_DEST_PK_BYTES_END]);
+        let dst_section_pk = PublicKey::from_bytes(&dst_pk_bytes).map_err(|err| {
             Error::FailedToParse(format!(
                 "destination section PublicKey couldn't be deserialized from header: {}",
                 err
@@ -205,8 +205,8 @@ impl WireMsgHeader {
             header_size,
             version,
             kind,
-            dest,
-            dest_section_pk,
+            dst,
+            dst_section_pk,
             src_section_pk,
         };
 
@@ -243,7 +243,7 @@ impl WireMsgHeader {
             })?;
 
         // ...now let's write the value signaling the message kind
-        let (buf_at_dest, _) = gen(be_u8(self.kind.into()), buf_at_msg_kind).map_err(|err| {
+        let (buf_at_dst, _) = gen(be_u8(self.kind.into()), buf_at_msg_kind).map_err(|err| {
             Error::Serialisation(format!(
                 "message kind field couldn't be serialized in header: {}",
                 err
@@ -251,7 +251,7 @@ impl WireMsgHeader {
         })?;
 
         // ...write the destination bytes
-        let (buf_at_dest_pk, _) = gen(slice(&self.dest), buf_at_dest).map_err(|err| {
+        let (buf_at_dst_pk, _) = gen(slice(&self.dst), buf_at_dst).map_err(|err| {
             Error::Serialisation(format!(
                 "destination field couldn't be serialized in header: {}",
                 err
@@ -259,7 +259,7 @@ impl WireMsgHeader {
         })?;
 
         // ...now let's write the destination section public key
-        let (buf_at_src_pk, _) = gen(slice(self.dest_section_pk.to_bytes()), buf_at_dest_pk)
+        let (buf_at_src_pk, _) = gen(slice(self.dst_section_pk.to_bytes()), buf_at_dst_pk)
             .map_err(|err| {
                 Error::Serialisation(format!(
                     "destination section public key field couldn't be serialized in header: {}",

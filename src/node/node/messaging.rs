@@ -33,14 +33,14 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     };
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
-    let dest_section_pk = network
+    let dst_section_pk = network
         .get_section_pk_by_name(&dst_name)
         .await?
         .bls()
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
     let content = match msg.msg.clone() {
-        MsgType::Client(msg) => msg.serialize(dst_name, dest_section_pk)?,
+        MsgType::Client(msg) => msg.serialize(dst_name, dst_section_pk)?,
         MsgType::Node(msg) => {
             let src_section_pk = if itinerary.aggregate_at_dst() {
                 Some(
@@ -53,7 +53,7 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
             } else {
                 None
             };
-            msg.serialize(dst_name, dest_section_pk, src_section_pk)?
+            msg.serialize(dst_name, dst_section_pk, src_section_pk)?
         }
     };
 

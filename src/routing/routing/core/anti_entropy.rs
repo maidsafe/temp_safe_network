@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{RoutingMsg, Section, Variant},
-    DestInfo,
+    DstInfo,
 };
 use crate::routing::{
     error::Result,
@@ -26,7 +26,7 @@ pub(crate) fn process(
     node: &Node,
     section: &Section,
     msg: &RoutingMsg,
-    dest_info: DestInfo,
+    dst_info: DstInfo,
 ) -> Result<(Actions, bool)> {
     let mut actions = Actions::default();
 
@@ -41,12 +41,12 @@ pub(crate) fn process(
 
     if let Ordering::Less = section
         .chain()
-        .cmp_by_position(&dest_info.dest_section_pk, section.chain().last_key())
+        .cmp_by_position(&dst_info.dst_section_pk, section.chain().last_key())
     {
         info!("Anti-Entropy: Source's knowledge of our key is outdated, send them an update.");
         let chain = section
             .chain()
-            .get_proof_chain_to_current(&dest_info.dest_section_pk)?;
+            .get_proof_chain_to_current(&dst_info.dst_section_pk)?;
         let section_auth = section.section_signed_authority_provider();
         let variant = Variant::SectionKnowledge {
             src_info: (section_auth.clone(), chain),
@@ -94,12 +94,12 @@ mod tests {
             &env.their_prefix,
             env.section.authority_provider().section_key(),
         )?;
-        let dest_info = DestInfo {
-            dest: XorName::random(),
-            dest_section_pk: *env.section.chain().last_key(),
+        let dst_info = DstInfo {
+            dst: XorName::random(),
+            dst_section_pk: *env.section.chain().last_key(),
         };
 
-        let (actions, _) = process(&env.node, &env.section, &msg, dest_info)?;
+        let (actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
         assert_eq!(actions.send, vec![]);
 
         Ok(())
@@ -116,12 +116,12 @@ mod tests {
             env.section.prefix(),
             env.section.authority_provider().section_key(),
         )?;
-        let dest_info = DestInfo {
-            dest: env.node.name(),
-            dest_section_pk: our_new_pk,
+        let dst_info = DstInfo {
+            dst: env.node.name(),
+            dst_section_pk: our_new_pk,
         };
 
-        let (actions, _) = process(&env.node, &env.section, &msg, dest_info)?;
+        let (actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
 
         assert_eq!(actions.send, vec![]);
 
@@ -136,12 +136,12 @@ mod tests {
             &env.their_prefix,
             env.section.authority_provider().section_key(),
         )?;
-        let dest_info = DestInfo {
-            dest: XorName::random(),
-            dest_section_pk: *env.section.chain().root_key(),
+        let dst_info = DstInfo {
+            dst: XorName::random(),
+            dst_section_pk: *env.section.chain().root_key(),
         };
 
-        let (mut actions, _) = process(&env.node, &env.section, &msg, dest_info)?;
+        let (mut actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
 
         assert_matches!(&actions.send.pop(), Some(message) => {
             assert_matches!(message.variant, Variant::SectionKnowledge { ref src_info, .. } => {
@@ -161,12 +161,12 @@ mod tests {
             env.section.prefix(),
             env.section.authority_provider().section_key(),
         )?;
-        let dest_info = DestInfo {
-            dest: XorName::random(),
-            dest_section_pk: *env.section.chain().root_key(),
+        let dst_info = DstInfo {
+            dst: XorName::random(),
+            dst_section_pk: *env.section.chain().root_key(),
         };
 
-        let (actions, _) = process(&env.node, &env.section, &msg, dest_info)?;
+        let (actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
 
         assert_eq!(actions.send, vec![]);
 

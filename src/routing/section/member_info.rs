@@ -35,7 +35,7 @@ pub trait MemberInfoUtils {
     fn leave(self) -> Result<MemberInfo, Error>;
 
     // Convert this info into one with the state changed to `Relocated`.
-    fn relocate(self, destination: XorName) -> MemberInfo;
+    fn relocate(self, dst: XorName) -> MemberInfo;
 }
 
 impl MemberInfoUtils for MemberInfo {
@@ -65,9 +65,9 @@ impl MemberInfoUtils for MemberInfo {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    fn relocate(self, destination: XorName) -> MemberInfo {
+    fn relocate(self, dst: XorName) -> MemberInfo {
         MemberInfo {
-            state: PeerState::Relocated(destination),
+            state: PeerState::Relocated(dst),
             ..self
         }
     }

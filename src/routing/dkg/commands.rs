@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, RoutingMsg, Variant},
-    DestInfo, DstLocation, SectionAuthorityProvider,
+    DstInfo, DstLocation, SectionAuthorityProvider,
 };
 use crate::routing::{
     error::Result, messages::RoutingMsgUtils, node::Node, routing::command::Command,
@@ -57,9 +57,9 @@ impl DkgCommand {
                     recipients.clone(),
                     recipients.len(),
                     message,
-                    DestInfo {
-                        dest: XorName::random(),
-                        dest_section_pk: key,
+                    DstInfo {
+                        dst: XorName::random(),
+                        dst_section_pk: key,
                     },
                 ))
             }
@@ -91,9 +91,9 @@ impl DkgCommand {
                     recipients.clone(),
                     recipients.len(),
                     message,
-                    DestInfo {
-                        dest: XorName::random(),
-                        dest_section_pk: key,
+                    DstInfo {
+                        dst: XorName::random(),
+                        dst_section_pk: key,
                     },
                 ))
             }

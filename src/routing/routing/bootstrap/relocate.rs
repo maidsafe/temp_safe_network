@@ -12,7 +12,7 @@ use crate::messaging::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocatePayload, RoutingMsg, Section,
         SignedRelocateDetails, Variant,
     },
-    DestInfo, DstLocation, MessageType,
+    DstInfo, DstLocation, MessageType,
 };
 use crate::routing::{
     ed25519,
@@ -46,7 +46,7 @@ impl JoiningAsRelocated {
         genesis_key: BlsPublicKey,
         relocate_details: SignedRelocateDetails,
     ) -> Result<Self> {
-        let section_key = relocate_details.destination_key()?;
+        let section_key = relocate_details.dst_key()?;
 
         Ok(Self {
             node,
@@ -61,10 +61,10 @@ impl JoiningAsRelocated {
     // Generates the first command to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
     pub fn start(&mut self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
-        let dest_xorname = *self.relocate_details.destination()?;
+        let dst_xorname = *self.relocate_details.dst()?;
         let recipients: Vec<(XorName, SocketAddr)> = bootstrap_addrs
             .iter()
-            .map(|addr| (dest_xorname, *addr))
+            .map(|addr| (dst_xorname, *addr))
             .collect();
 
         self.used_recipient.extend(bootstrap_addrs);
@@ -183,7 +183,7 @@ impl JoiningAsRelocated {
         let extra_split_count = 3;
         let name_prefix = Prefix::new(
             prefix.bit_count() + extra_split_count,
-            *self.relocate_details.destination()?,
+            *self.relocate_details.dst()?,
         );
 
         let age = self.relocate_details.relocate_details()?.age;
@@ -219,9 +219,9 @@ impl JoiningAsRelocated {
 
         let message = MessageType::Routing {
             msg: routing_msg,
-            dest_info: DestInfo {
-                dest: recipients[0].0,
-                dest_section_pk: self.section_key,
+            dst_info: DstInfo {
+                dst: recipients[0].0,
+                dst_section_pk: self.section_key,
             },
         };
 
@@ -238,8 +238,8 @@ impl JoiningAsRelocated {
         &mut self,
         routing_msg: RoutingMsg,
     ) -> Result<Option<JoinAsRelocatedResponse>> {
-        let destination = match &self.relocate_payload {
-            Some(payload) => *payload.details.destination()?,
+        let dst = match &self.relocate_payload {
+            Some(payload) => *payload.details.dst()?,
             None => self.node.name(),
         };
 
@@ -249,7 +249,7 @@ impl JoiningAsRelocated {
                 JoinAsRelocatedResponse::NodeNotReachable(_) => Ok(Some(*join_response.clone())),
                 JoinAsRelocatedResponse::Retry(ref section_auth)
                 | JoinAsRelocatedResponse::Redirect(ref section_auth) => {
-                    if !section_auth.prefix.matches(&destination) {
+                    if !section_auth.prefix.matches(&dst) {
                         error!("Invalid JoinResponse bad prefix: {:?}", join_response);
                         return Ok(None);
                     }
@@ -284,7 +284,7 @@ impl JoiningAsRelocated {
                     }
 
                     let trusted_key = if let Some(payload) = &self.relocate_payload {
-                        Some(&payload.relocate_details()?.destination_key)
+                        Some(&payload.relocate_details()?.dst_key)
                     } else {
                         None
                     };

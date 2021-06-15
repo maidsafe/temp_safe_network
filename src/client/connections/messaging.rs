@@ -138,7 +138,7 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dest_section_name = XorName::from(client_signed.public_key);
+        let dst_section_name = XorName::from(client_signed.public_key);
 
         let msg = ClientMsg::Process(ProcessMsg::Cmd {
             id: msg_id,
@@ -146,7 +146,7 @@ impl Session {
             client_signed,
         });
 
-        let msg_bytes = msg.serialize(dest_section_name, section_pk)?;
+        let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
 
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
@@ -204,14 +204,14 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dest_section_name = XorName::from(client_signed.public_key);
+        let dst_section_name = XorName::from(client_signed.public_key);
 
         let msg = ClientMsg::Process(ProcessMsg::Cmd {
             id: msg_id,
             cmd,
             client_signed,
         });
-        let msg_bytes = msg.serialize(dest_section_name, section_pk)?;
+        let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
 
         let _ = pending_transfers.write().await.insert(msg_id, sender);
 
@@ -262,7 +262,7 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dest_section_name = XorName::from(client_signed.public_key);
+        let dst_section_name = XorName::from(client_signed.public_key);
 
         let msg_id = MessageId::new();
         let msg = ClientMsg::Process(ProcessMsg::Query {
@@ -271,7 +271,7 @@ impl Session {
             client_signed,
         });
 
-        let msg_bytes = msg.serialize(dest_section_name, section_pk)?;
+        let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
 
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest
         // connected Elders to the data we are querying
@@ -481,13 +481,13 @@ impl Session {
             bootstrapped_peer
         );
 
-        let dest_section_name = XorName::from(client_pk);
+        let dst_section_name = XorName::from(client_pk);
 
         // FIXME: we don't know our section PK. We must supply a pk for now we do a random one...
         let random_section_pk = bls::SecretKey::random().public_key();
 
         let msg = SectionInfoMsg::GetSectionQuery(client_pk)
-            .serialize(dest_section_name, random_section_pk)?;
+            .serialize(dst_section_name, random_section_pk)?;
 
         self.endpoint()?
             .send_message(msg, bootstrapped_peer)

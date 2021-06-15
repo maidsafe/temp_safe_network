@@ -12,7 +12,7 @@ use crate::messaging::{
         DkgKey, ElderCandidates, JoinResponse, Network, NodeState, Peer, PlainMessage, Proposal,
         RelocateDetails, RelocatePromise, RoutingMsg, Section, SectionSigned, Variant,
     },
-    DestInfo, DstLocation,
+    DstInfo, DstLocation,
 };
 use crate::routing::{
     dkg::DkgKeyUtils,
@@ -61,9 +61,9 @@ impl Core {
         Ok(Command::send_message_to_node(
             (name, addr),
             message,
-            DestInfo {
-                dest: name,
-                dest_section_pk: *self.section.chain().last_key(),
+            DstInfo {
+                dst: name,
+                dst_section_pk: *self.section.chain().last_key(),
             },
         ))
     }
@@ -78,15 +78,15 @@ impl Core {
                 variant,
                 self.section.authority_provider().section_key(),
             )?;
-            let dest_info = DestInfo {
-                dest: XorName::random(),
-                dest_section_pk: *self.section.chain().last_key(),
+            let dst_info = DstInfo {
+                dst: XorName::random(),
+                dst_section_pk: *self.section.chain().last_key(),
             };
             Ok(Command::send_message_to_nodes(
                 recipients.clone(),
                 recipients.len(),
                 message,
-                dest_info,
+                dst_info,
             ))
         };
 
@@ -129,9 +129,9 @@ impl Core {
                 recipients.clone(),
                 recipients.len(),
                 message,
-                DestInfo {
-                    dest: XorName::random(),
-                    dest_section_pk: *self.section_chain().last_key(),
+                DstInfo {
+                    dst: XorName::random(),
+                    dst_section_pk: *self.section_chain().last_key(),
                 },
             ))
         };
@@ -308,14 +308,14 @@ impl Core {
 
         if !others.is_empty() {
             let count = others.len();
-            let dest_section_pk = self.section_key_by_name(&others[0].0);
+            let dst_section_pk = self.section_key_by_name(&others[0].0);
             commands.push(Command::send_message_to_nodes(
                 others,
                 count,
                 message.clone(),
-                DestInfo {
-                    dest: XorName::random(), // will be updated when sending
-                    dest_section_pk,
+                DstInfo {
+                    dst: XorName::random(), // will be updated when sending
+                    dst_section_pk,
                 },
             ));
         }
@@ -324,9 +324,9 @@ impl Core {
             commands.push(Command::HandleMessage {
                 sender: Some(self.node.addr),
                 message,
-                dest_info: DestInfo {
-                    dest: self.node.name(),
-                    dest_section_pk: *self.section_chain().last_key(),
+                dst_info: DstInfo {
+                    dst: self.node.name(),
+                    dst_section_pk: *self.section_chain().last_key(),
                 },
             });
         }
@@ -374,9 +374,9 @@ impl Core {
         Ok(Command::send_message_to_node(
             recipient,
             message,
-            DestInfo {
-                dest: recipient.0,
-                dest_section_pk: dst_pk,
+            DstInfo {
+                dst: recipient.0,
+                dst_section_pk: dst_pk,
             },
         ))
     }
@@ -392,13 +392,13 @@ impl Core {
             .map(|(name, address)| (*name, *address))
             .collect();
 
-        let dest_section_pk = *self.section_chain().last_key();
+        let dst_section_pk = *self.section_chain().last_key();
 
-        let dest_info = DestInfo {
-            dest: self.section.prefix().name(),
-            dest_section_pk,
+        let dst_info = DstInfo {
+            dst: self.section.prefix().name(),
+            dst_section_pk,
         };
 
-        Command::send_message_to_nodes(targets.clone(), targets.len(), msg, dest_info)
+        Command::send_message_to_nodes(targets.clone(), targets.len(), msg, dst_info)
     }
 }

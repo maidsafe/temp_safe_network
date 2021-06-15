@@ -9,7 +9,7 @@
 use crate::messaging::{
     node::{DkgFailureSignedSet, Proposal, RoutingMsg, Section, Signed},
     section_info::SectionInfoMsg,
-    DestInfo, Itinerary, MessageType, SectionAuthorityProvider,
+    DstInfo, Itinerary, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{node::Node, routing::Peer, section::SectionKeyShare, XorName};
 use bytes::Bytes;
@@ -30,13 +30,13 @@ pub(crate) enum Command {
     HandleMessage {
         sender: Option<SocketAddr>,
         message: RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     },
     /// Handle network info message.
     HandleSectionInfoMsg {
         sender: SocketAddr,
         message: SectionInfoMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
@@ -84,7 +84,7 @@ pub(crate) enum Command {
         // Previous name if relocated.
         previous_name: Option<XorName>,
         // The key of the destination section that the joining node knows, if any.
-        destination_key: Option<bls::PublicKey>,
+        dst_key: Option<bls::PublicKey>,
     },
     /// Proposes a peer as offline
     ProposeOffline(XorName),
@@ -100,9 +100,9 @@ impl Command {
     pub fn send_message_to_node(
         recipient: (XorName, SocketAddr),
         routing_msg: RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     ) -> Self {
-        Self::send_message_to_nodes(vec![recipient], 1, routing_msg, dest_info)
+        Self::send_message_to_nodes(vec![recipient], 1, routing_msg, dst_info)
     }
 
     /// Convenience method to create `Command::SendMessage` with multiple recipients.
@@ -110,12 +110,12 @@ impl Command {
         recipients: Vec<(XorName, SocketAddr)>,
         delivery_group_size: usize,
         msg: RoutingMsg,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     ) -> Self {
         Self::SendMessage {
             recipients,
             delivery_group_size,
-            message: MessageType::Routing { dest_info, msg },
+            message: MessageType::Routing { dst_info, msg },
         }
     }
 }
@@ -126,22 +126,22 @@ impl Debug for Command {
             Self::HandleMessage {
                 sender,
                 message,
-                dest_info,
+                dst_info,
             } => f
                 .debug_struct("HandleMessage")
                 .field("sender", sender)
                 .field("message", message)
-                .field("dest_info", dest_info)
+                .field("dst_info", dst_info)
                 .finish(),
             Self::HandleSectionInfoMsg {
                 sender,
                 message,
-                dest_info,
+                dst_info,
             } => f
                 .debug_struct("HandleSectionInfoMsg")
                 .field("sender", sender)
                 .field("message", message)
-                .field("dest_info", dest_info)
+                .field("dst_info", dst_info)
                 .finish(),
             Self::HandleTimeout(token) => f.debug_tuple("HandleTimeout").field(token).finish(),
             Self::HandleConnectionLost(addr) => {

@@ -16,7 +16,7 @@ use super::{
     signed::SignedShare,
     RoutingMsg,
 };
-use crate::messaging::{DestInfo, SectionAuthorityProvider};
+use crate::messaging::{DstInfo, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use hex_fmt::HexFmt;
@@ -68,7 +68,7 @@ pub enum Variant {
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
         msg: Box<RoutingMsg>,
-        dest_info: DestInfo,
+        dst_info: DstInfo,
     },
     /// Sent to the new elder candidates to start the DKG process.
     DkgStart {
@@ -141,10 +141,10 @@ impl Debug for Variant {
             Self::JoinAsRelocatedResponse(response) => {
                 write!(f, "JoinAsRelocatedResponse({:?})", response)
             }
-            Self::BouncedUntrustedMessage { msg, dest_info } => f
+            Self::BouncedUntrustedMessage { msg, dst_info } => f
                 .debug_struct("BouncedUntrustedMessage")
                 .field("message", msg)
-                .field("dest_info", dest_info)
+                .field("dst_info", dst_info)
                 .finish(),
             Self::DkgStart {
                 dkg_key,

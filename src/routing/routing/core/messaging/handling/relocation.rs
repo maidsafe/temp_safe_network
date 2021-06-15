@@ -56,11 +56,11 @@ impl Core {
             debug!(
                 "Relocating {:?} to {} (on churn of {})",
                 peer,
-                action.destination(),
+                action.dst(),
                 churn_name
             );
 
-            commands.extend(self.propose(Proposal::Offline(info.relocate(*action.destination())))?);
+            commands.extend(self.propose(Proposal::Offline(info.relocate(*action.dst())))?);
 
             match action {
                 RelocateAction::Instant(details) => {
@@ -82,7 +82,7 @@ impl Core {
         trace!(
             "Relocating {:?} to {} with age {} due to rejoin",
             peer,
-            details.destination,
+            details.dst,
             details.age
         );
 
@@ -101,7 +101,7 @@ impl Core {
 
         debug!(
             "Received Relocate message to join the section at {}",
-            details.relocate_details()?.destination
+            details.relocate_details()?.dst
         );
 
         match self.relocate_state {
@@ -144,10 +144,7 @@ impl Core {
             // Keep it around even if we are not elder anymore, in case we need to resend it.
             match self.relocate_state {
                 None => {
-                    trace!(
-                        "Received RelocatePromise to section at {}",
-                        promise.destination
-                    );
+                    trace!("Received RelocatePromise to section at {}", promise.dst);
                     self.relocate_state = Some(RelocateState::Delayed(msg.clone()));
                     self.send_event(Event::RelocationStarted {
                         previous_name: self.node.name(),
@@ -179,12 +176,8 @@ impl Core {
         }
 
         if let Some(info) = self.section.members().get(&promise.name) {
-            let details = RelocateDetails::new(
-                &self.section,
-                &self.network,
-                &info.peer,
-                promise.destination,
-            );
+            let details =
+                RelocateDetails::new(&self.section, &self.network, &info.peer, promise.dst);
             commands.extend(self.send_relocate(&info.peer, details)?);
         } else {
             error!(
