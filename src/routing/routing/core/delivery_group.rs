@@ -8,6 +8,10 @@
 
 //! Utilities for sn_routing messages through the network.
 
+use crate::messaging::{
+    node::{Network, Peer, Section},
+    DstLocation,
+};
 use crate::routing::{
     error::{Error, Result},
     network::NetworkUtils,
@@ -16,10 +20,6 @@ use crate::routing::{
     supermajority, ELDER_SIZE,
 };
 use itertools::Itertools;
-use crate::messaging::{
-    node::{Network, Peer, Section},
-    DstLocation,
-};
 use std::{cmp, iter};
 use xor_name::XorName;
 
@@ -165,6 +165,7 @@ fn get_peer(name: &XorName, section: &Section, network: &Network) -> Option<Peer
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
     use crate::routing::{
         dkg::test_utils::section_signed,
         ed25519,
@@ -176,7 +177,6 @@ mod tests {
     use anyhow::{Context, Result};
     use rand::seq::IteratorRandom;
     use secured_linked_list::SecuredLinkedList;
-    use crate::messaging::{node::NodeState, SectionAuthorityProvider};
     use xor_name::Prefix;
 
     #[test]

@@ -37,11 +37,13 @@ pub use signed::{Signed, SignedShare};
 pub use src_authority::SrcAuthority;
 pub use variant::Variant;
 
-use crate::messaging::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
+use crate::messaging::{
+    Aggregation, DstLocation, MessageId, MessageType, SectionAuthorityProvider, WireMsg,
+};
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
-use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 /// Routing message sent over the network.
@@ -108,13 +110,4 @@ impl Debug for RoutingMsg {
             .field("variant", &self.variant)
             .finish()
     }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
-pub struct OtherSection {
-    // If this is signed by our section, then `key_signed` is `None`. If this is signed by our
-    // sibling section, then `key_signed` contains the proof of the signing key itself signed by our
-    // section.
-    pub section_auth: SectionSigned<SectionAuthorityProvider>,
-    pub key_signed: Option<Signed>,
 }

@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{SignatureAggregator, Signed, SignedShare};
+use crate::messaging::node::Proposal;
 use crate::routing::{error::Result, messages::PlainMessageUtils};
 use serde::{Serialize, Serializer};
-use crate::messaging::node::Proposal;
 use thiserror::Error;
 
 pub trait ProposalUtils {

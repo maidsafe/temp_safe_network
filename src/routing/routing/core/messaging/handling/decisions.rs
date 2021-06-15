@@ -7,14 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
+use crate::messaging::{
+    node::{
+        JoinAsRelocatedResponse, JoinResponse, Proposal, RelocatePromise, RoutingMsg, SignedShare,
+        Variant,
+    },
+    DstLocation,
+};
 use crate::routing::{
     messages::{MessageStatus, SrcAuthorityUtils},
     section::{SectionAuthorityProviderUtils, SectionUtils},
     Result,
-};
-use crate::messaging::{
-    node::{JoinResponse, Proposal, RelocatePromise, RoutingMsg, SignedShare, Variant},
-    DstLocation,
 };
 use xor_name::XorName;
 
@@ -47,6 +50,11 @@ impl Core {
                     return Ok(MessageStatus::Useless);
                 }
             }
+            Variant::JoinAsRelocatedRequest(req) => {
+                if !self.is_elder() && req.section_key == *self.section.chain().last_key() {
+                    return Ok(MessageStatus::Useless);
+                }
+            }
             Variant::DkgStart {
                 elder_candidates, ..
             } => {
@@ -63,6 +71,15 @@ impl Core {
                     return Ok(MessageStatus::Useful);
                 }
                 JoinResponse::ResourceChallenge { .. } => {}
+            },
+            Variant::JoinAsRelocatedResponse(resp) => match **resp {
+                JoinAsRelocatedResponse::Approval { .. }
+                | JoinAsRelocatedResponse::Retry(_)
+                | JoinAsRelocatedResponse::Redirect(_)
+                | JoinAsRelocatedResponse::NodeNotReachable(_) => {
+                    // Skip validation of these. We will validate them inside the relocation task.
+                    return Ok(MessageStatus::Useful);
+                }
             },
             Variant::Sync { section, .. } => {
                 // Ignore `Sync` not for our section.

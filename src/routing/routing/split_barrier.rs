@@ -8,8 +8,8 @@
 
 use std::mem;
 
-use crate::dkg::Signed;
 use crate::messaging::{node::SectionSigned, SectionAuthorityProvider};
+use crate::routing::dkg::Signed;
 use xor_name::Prefix;
 
 type Entry = (SectionSigned<SectionAuthorityProvider>, Signed);

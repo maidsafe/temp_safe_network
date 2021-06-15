@@ -8,6 +8,13 @@
 
 use std::cmp;
 
+use crate::messaging::{
+    node::{
+        MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned, Signed,
+        Variant,
+    },
+    DestInfo, DstLocation, SectionAuthorityProvider,
+};
 use crate::routing::{
     dkg::SectionSignedUtils,
     error::Result,
@@ -21,13 +28,6 @@ use crate::routing::{
     Error, Event, MIN_AGE,
 };
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::{
-    node::{
-        MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned, Signed,
-        Variant,
-    },
-    DestInfo, DstLocation, SectionAuthorityProvider,
-};
 use xor_name::XorName;
 
 use super::Core;

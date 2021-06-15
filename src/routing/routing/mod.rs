@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub(crate) mod bootstrap;
 pub(crate) mod command;
 
-mod bootstrap;
 mod comm;
 mod core;
 mod dispatcher;
@@ -25,6 +25,11 @@ use self::{
     core::Core,
     dispatcher::Dispatcher,
 };
+use crate::messaging::{
+    client::ClientMsg,
+    node::{Peer, RoutingMsg},
+    DestInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+};
 use crate::routing::{
     ed25519,
     error::Result,
@@ -40,11 +45,6 @@ use bytes::Bytes;
 use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use crate::messaging::{
-    client::ClientMsg,
-    node::{Peer, RoutingMsg},
-    DestInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
-};
 use std::{
     collections::BTreeSet,
     fmt::{self, Debug, Formatter},
@@ -143,7 +143,7 @@ impl Routing {
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
             let (node, section, backlog) =
-                bootstrap::initial(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
+                bootstrap::join(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
             let state = Core::new(node, section, None, event_tx);
 
             (state, comm, backlog)
