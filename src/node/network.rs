@@ -32,7 +32,7 @@ use std::{
 use xor_name::{Prefix, XorName};
 
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Network {
     routing: Arc<RoutingNode>,
 }

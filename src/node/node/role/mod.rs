@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-use std::fmt;
+use std::fmt::{self, Debug, Formatter};
 
 pub(crate) use adult_role::AdultRole;
 pub(crate) use elder_role::ElderRole;
@@ -16,9 +16,20 @@ mod adult_role;
 mod elder_role;
 
 #[allow(clippy::large_enum_variant)]
+
 pub(crate) enum Role {
     Adult(AdultRole),
     Elder(ElderRole),
+}
+
+impl Debug for Role {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        let role = match self {
+            Role::Adult(_) => "Adult".to_string(),
+            Role::Elder(_) => "Elder".to_string(),
+        };
+        write!(formatter, "Role is {:?}", role)
+    }
 }
 
 impl Role {
