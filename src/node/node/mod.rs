@@ -43,7 +43,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 /// Static info about the node.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NodeInfo {
     ///
     pub root_dir: PathBuf,
@@ -59,6 +59,7 @@ impl NodeInfo {
 }
 
 /// Main node struct.
+#[derive(Debug)]
 pub struct Node {
     network_api: Network,
     node_info: NodeInfo,

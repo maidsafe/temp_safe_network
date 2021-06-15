@@ -46,6 +46,8 @@ pub struct RelocatePayload {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct RelocatePromise {
+    /// Xorname
     pub name: XorName,
+    /// Relocation destination xorname
     pub dst: XorName,
 }

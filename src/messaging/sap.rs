@@ -25,7 +25,7 @@ pub struct SectionAuthorityProvider {
     pub prefix: Prefix,
     /// Public key set of the section.
     pub public_key_set: PublicKeySet,
-    // The section's complete set of elders as a map from their name to their socket address.
+    /// The section's complete set of elders as a map from their name to their socket address.
     pub elders: BTreeMap<XorName, SocketAddr>,
 }
 

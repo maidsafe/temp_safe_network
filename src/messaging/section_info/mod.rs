@@ -28,7 +28,7 @@ pub enum SectionInfoMsg {
     SectionInfoUpdate(ErrorResponse),
 }
 
-// Infrastructure error wrapper to add correltion info for triggering message
+/// Infrastructure error wrapper to add correltion info for triggering message
 #[derive(Debug, Serialize, Deserialize, Hash, PartialEq, PartialOrd, Ord, Eq, Clone)]
 pub struct ErrorResponse {
     /// Optional correlation id if this messge is in response to some non network info query/cmd

@@ -13,23 +13,8 @@
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",
     test(attr(forbid(warnings)))
 )]
-// For explanation of lint checks, run `rustc -W help`.
-#![warn(
-    // TODO: add missing debug implementations for structs?
-    // missing_debug_implementations,
-    unsafe_code,
-    missing_docs,
-    trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    unused_results,
-)]
 // For quick_error
 #![recursion_limit = "256"]
-
-
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",
@@ -44,6 +29,7 @@
     unknown_crate_types,
     unsafe_code
 )]
+// For explanation of lint checks, run `rustc -W help`.
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -72,7 +58,6 @@
     clippy::wrong_pub_self_convention,
     deprecated
 )]
-
 
 #[macro_use]
 extern crate tracing;
