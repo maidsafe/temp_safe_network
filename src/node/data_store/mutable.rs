@@ -6,15 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::to_db_key::ToDbKey;
-use serde::{de::DeserializeOwned, Serialize};
-use sn_data_types::DataAddress;
+use super::data::{Data, DataId};
+use sn_data_types::{DataAddress, Map, MapAddress};
 
-pub(crate) trait Chunk: Serialize + DeserializeOwned {
-    type Id: ChunkId;
-    fn id(&self) -> &Self::Id;
+impl Data for Map {
+    type Id = MapAddress;
+    fn id(&self) -> &Self::Id {
+        match self {
+            Map::Seq(ref chunk) => chunk.address(),
+            Map::Unseq(ref chunk) => chunk.address(),
+        }
+    }
 }
 
-pub(crate) trait ChunkId: ToDbKey + PartialEq + Eq + DeserializeOwned {
-    fn to_data_address(&self) -> DataAddress;
+impl DataId for MapAddress {
+    fn to_data_address(&self) -> DataAddress {
+        DataAddress::Map(*self)
+    }
 }

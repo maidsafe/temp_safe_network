@@ -8,7 +8,7 @@
 
 //! A simple, persistent, disk-based key-value store.
 
-mod chunk;
+mod data;
 mod immutable;
 mod mutable;
 mod register;
@@ -19,9 +19,9 @@ mod used_space;
 
 use crate::node::utils;
 use crate::node::{Error, Result};
-use chunk::{Chunk, ChunkId};
+use data::{Data, DataId};
 use log::{info, trace};
-use sn_data_types::{register::Register, Blob, Map, Sequence};
+use sn_data_types::{register::Register, Chunk, Map, Sequence};
 use std::{
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
@@ -36,33 +36,33 @@ const CHUNK_STORE_DIR: &str = "chunks";
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 
-pub(crate) type BlobChunkStore = ChunkStore<Blob>;
-pub(crate) type MapChunkStore = ChunkStore<Map>;
-pub(crate) type SequenceChunkStore = ChunkStore<Sequence>;
-pub(crate) type RegisterChunkStore = ChunkStore<Register>;
+pub(crate) type ChunkDataStore = DataStore<Chunk>;
+pub(crate) type MapDataStore = DataStore<Map>;
+pub(crate) type SequenceDataStore = DataStore<Sequence>;
+pub(crate) type RegisterDataStore = DataStore<Register>;
 
-/// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
+/// `DataStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
-pub(crate) struct ChunkStore<T: Chunk> {
+pub(crate) struct DataStore<T: Data> {
     dir: PathBuf,
-    // Maximum space allowed for all `ChunkStore`s to consume.
+    // Maximum space allowed for all `DataStore`s to consume.
     used_space: UsedSpace,
     id: StoreId,
     _phantom: PhantomData<T>,
 }
 
-impl<T> ChunkStore<T>
+impl<T> DataStore<T>
 where
-    T: Chunk,
+    T: Data,
     Self: Subdir,
 {
-    /// Creates a new `ChunkStore` at location `root/CHUNK_STORE_DIR/<chunk type>`.
+    /// Creates a new `DataStore` at location `root/CHUNK_STORE_DIR/<chunk type>`.
     ///
-    /// If the location specified already exists, the previous ChunkStore there is opened, otherwise
+    /// If the location specified already exists, the previous DataStore there is opened, otherwise
     /// the required folder structure is created.
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
-    /// _all_ `ChunkStores`, not per `ChunkStore`.
+    /// _all_ `DataStores`, not per `DataStore`.
     pub async fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
@@ -72,7 +72,7 @@ where
 
         let used_space = UsedSpace::new(max_capacity);
         let id = used_space.add_local_store(&dir).await?;
-        Ok(ChunkStore {
+        Ok(DataStore {
             dir,
             used_space,
             id,
@@ -81,7 +81,7 @@ where
     }
 }
 
-impl<T: Chunk> ChunkStore<T> {
+impl<T: Data> DataStore<T> {
     fn create_new_root(root: &Path) -> Result<()> {
         fs::create_dir_all(root)?;
 
@@ -218,31 +218,31 @@ pub(crate) trait Subdir {
     fn subdir() -> &'static Path;
 }
 
-impl Subdir for BlobChunkStore {
+impl Subdir for ChunkDataStore {
     fn subdir() -> &'static Path {
         Path::new("immutable")
     }
 }
 
-impl Subdir for MapChunkStore {
+impl Subdir for MapDataStore {
     fn subdir() -> &'static Path {
         Path::new("mutable")
     }
 }
 
-impl Subdir for SequenceChunkStore {
+impl Subdir for SequenceDataStore {
     fn subdir() -> &'static Path {
         Path::new("sequence")
     }
 }
 
-impl Subdir for RegisterChunkStore {
+impl Subdir for RegisterDataStore {
     fn subdir() -> &'static Path {
         Path::new("register")
     }
 }
 
-fn to_chunk_id<T: ChunkId>(entry: &DirEntry) -> Option<T> {
+fn to_chunk_id<T: DataId>(entry: &DirEntry) -> Option<T> {
     let file_name = entry.file_name();
     let file_name = file_name.into_string().ok()?;
     let bytes = hex::decode(file_name).ok()?;

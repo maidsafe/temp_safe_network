@@ -669,7 +669,7 @@ impl Node {
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ProcessDataPayment { .. } => Ok(NodeTask::None),
-            NodeDuty::ReplicateChunk { data, .. } => {
+            NodeDuty::ReplicateChunk { chunk, .. } => {
                 let adult = self.role.as_adult_mut()?.clone();
                 let handle = tokio::spawn(async move {
                     Ok(NodeTask::from(vec![
@@ -677,7 +677,7 @@ impl Node {
                             .chunks
                             .write()
                             .await
-                            .store_for_replication(data)
+                            .store_for_replication(chunk)
                             .await?,
                     ]))
                 });

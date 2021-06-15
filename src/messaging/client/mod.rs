@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod blob;
+mod chunk;
 mod cmd;
 mod data;
 mod data_exchange;
@@ -19,11 +19,11 @@ mod sequence;
 mod transfer;
 
 pub use self::{
-    blob::{BlobRead, BlobWrite},
+    chunk::{ChunkRead, ChunkWrite},
     cmd::Cmd,
     data::{DataCmd, DataQuery},
     data_exchange::{
-        BlobDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
+        ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
         SequenceDataExchange,
     },
     duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
@@ -41,7 +41,7 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
-    ActorHistory, Blob, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
+    ActorHistory, Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
     SequencePublicPolicy, Signature, Token, TransferAgreementProof, TransferValidated,
 };
@@ -335,10 +335,10 @@ pub enum Event {
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
     //
-    // ===== Blob =====
+    // ===== Chunk =====
     //
-    /// Get Blob.
-    GetBlob(Result<Blob>),
+    /// Get Chunk.
+    GetChunk(Result<Chunk>),
     //
     // ===== Map =====
     //
@@ -404,7 +404,7 @@ impl QueryResponse {
     pub fn is_success(&self) -> bool {
         use QueryResponse::*;
         match self {
-            GetBlob(result) => result.is_ok(),
+            GetChunk(result) => result.is_ok(),
             GetMap(result) => result.is_ok(),
             GetMapShell(result) => result.is_ok(),
             GetMapVersion(result) => result.is_ok(),
@@ -460,7 +460,7 @@ macro_rules! try_from {
     };
 }
 
-try_from!(Blob, GetBlob);
+try_from!(Chunk, GetChunk);
 try_from!(Map, GetMap, GetMapShell);
 try_from!(u64, GetMapVersion);
 try_from!(MapEntries, ListMapEntries);
@@ -487,7 +487,7 @@ try_from!(ActorHistory, GetHistory);
 mod tests {
     use super::*;
     use anyhow::{anyhow, Result};
-    use sn_data_types::{BlobAddress, DataAddress, Keypair, PublicBlob, UnseqMap};
+    use sn_data_types::{ChunkAddress, DataAddress, Keypair, PublicChunk, UnseqMap};
     use std::convert::{TryFrom, TryInto};
 
     fn gen_keypairs() -> Vec<Keypair> {
@@ -533,7 +533,7 @@ mod tests {
                     signature,
                 },
             };
-            let random_addr = DataAddress::Blob(BlobAddress::Public(XorName::random()));
+            let random_addr = DataAddress::Blob(ChunkAddress::Public(XorName::random()));
             let lazy_error =
                 msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
 
@@ -555,7 +555,7 @@ mod tests {
             let public_key = keypair.public_key();
             let signature = keypair.sign(b"the query");
 
-            let random_addr = DataAddress::Blob(BlobAddress::Public(XorName::random()));
+            let random_addr = DataAddress::Blob(ChunkAddress::Public(XorName::random()));
             let errored_response = ProcessingError {
                 reason: Some(Error::DataNotFound(random_addr.clone())),
                 source_message: Some(ProcessMsg::Query {
@@ -587,17 +587,17 @@ mod tests {
             None => return Err(anyhow!("Could not generate public key")),
         };
 
-        let i_data = Blob::Public(PublicBlob::new(vec![1, 3, 1, 4]));
+        let i_data = Chunk::Public(PublicChunk::new(vec![1, 3, 1, 4]));
         let e = Error::AccessDenied(key);
         assert_eq!(
             i_data,
-            GetBlob(Ok(i_data.clone()))
+            GetChunk(Ok(i_data.clone()))
                 .try_into()
                 .map_err(|_| anyhow!("Mismatched types".to_string()))?
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),
-            Blob::try_from(GetBlob(Err(e.clone())))
+            Chunk::try_from(GetChunk(Err(e.clone())))
         );
 
         let mut data = BTreeMap::new();

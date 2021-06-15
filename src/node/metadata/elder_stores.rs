@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_records::BlobRecords, map_storage::MapStorage, register_storage::RegisterStorage,
+    chunk_records::ChunkRecords, map_storage::MapStorage, register_storage::RegisterStorage,
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
@@ -22,7 +22,7 @@ use sn_data_types::PublicKey;
 /// The various data type stores,
 /// that are only managed at Elders.
 pub(super) struct ElderStores {
-    blob_records: BlobRecords,
+    chunk_records: ChunkRecords,
     map_storage: MapStorage,
     sequence_storage: SequenceStorage,
     register_storage: RegisterStorage,
@@ -30,13 +30,13 @@ pub(super) struct ElderStores {
 
 impl ElderStores {
     pub fn new(
-        blob_records: BlobRecords,
+        chunk_records: ChunkRecords,
         map_storage: MapStorage,
         sequence_storage: SequenceStorage,
         register_storage: RegisterStorage,
     ) -> Self {
         Self {
-            blob_records,
+            chunk_records,
             map_storage,
             sequence_storage,
             register_storage,
@@ -51,7 +51,7 @@ impl ElderStores {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         match &query {
-            DataQuery::Blob(read) => self.blob_records.read(read, msg_id, origin).await,
+            DataQuery::Blob(read) => self.chunk_records.read(read, msg_id, origin).await,
             DataQuery::Map(read) => self.map_storage.read(read, msg_id, requester, origin).await,
             DataQuery::Sequence(read) => {
                 self.sequence_storage
@@ -77,7 +77,7 @@ impl ElderStores {
         match cmd {
             DataCmd::Blob(write) => {
                 info!("Writing Blob");
-                self.blob_records
+                self.chunk_records
                     .write(write, msg_id, client_signed, origin)
                     .await
             }
@@ -102,19 +102,19 @@ impl ElderStores {
         }
     }
 
-    pub fn blob_records_mut(&mut self) -> &mut BlobRecords {
-        &mut self.blob_records
+    pub fn chunk_records_mut(&mut self) -> &mut ChunkRecords {
+        &mut self.chunk_records
     }
 
     // NB: Not yet including Register metadata.
     pub async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
-        // Prepare blob_records, map and sequence data
-        let blob_data = self.blob_records.get_data_of(prefix).await;
+        // Prepare chunk_records, map and sequence data
+        let chunk_data = self.chunk_records.get_data_of(prefix).await;
         let map_data = self.map_storage.get_data_of(prefix);
         let seq_data = self.sequence_storage.get_data_of(prefix);
 
         Ok(DataExchange {
-            blob_data,
+            chunk_data,
             map_data,
             seq_data,
         })
@@ -123,7 +123,7 @@ impl ElderStores {
     pub async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
         self.map_storage.update(data.map_data).await?;
         self.sequence_storage.update(data.seq_data).await?;
-        self.blob_records.update(data.blob_data).await;
+        self.chunk_records.update(data.chunk_data).await;
 
         Ok(())
     }

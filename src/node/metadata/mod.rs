@@ -8,7 +8,7 @@
 
 mod adult_liveness;
 pub mod adult_reader;
-mod blob_records;
+mod chunk_records;
 mod elder_stores;
 mod map_storage;
 mod register_storage;
@@ -27,12 +27,12 @@ use crate::node::{
     Result,
 };
 use crate::routing::Prefix;
-use blob_records::BlobRecords;
+use chunk_records::ChunkRecords;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
-use sn_data_types::{Blob, PublicKey};
+use sn_data_types::{Chunk, PublicKey};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -52,12 +52,12 @@ pub struct Metadata {
 
 impl Metadata {
     pub async fn new(path: &Path, max_capacity: u64, capacity: Capacity) -> Result<Self> {
-        let blob_records = BlobRecords::new(capacity);
+        let chunk_records = ChunkRecords::new(capacity);
         let map_storage = MapStorage::new(path, max_capacity).await?;
         let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
         let register_storage = RegisterStorage::new(path, max_capacity).await?;
         let elder_stores = ElderStores::new(
-            blob_records,
+            chunk_records,
             map_storage,
             sequence_storage,
             register_storage,
@@ -82,14 +82,14 @@ impl Metadata {
         src: XorName,
     ) -> Result<NodeDuties> {
         self.elder_stores
-            .blob_records_mut()
+            .chunk_records_mut()
             .record_adult_read_liveness(correlation_id, result, src)
             .await
     }
 
     pub async fn retain_members_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
         self.elder_stores
-            .blob_records_mut()
+            .chunk_records_mut()
             .retain_members_only(members)
             .await?;
         Ok(())
@@ -110,16 +110,16 @@ impl Metadata {
     /// Adds a given node to the list of full nodes.
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
         self.elder_stores
-            .blob_records_mut()
+            .chunk_records_mut()
             .increase_full_node_count(node_id)
             .await
     }
 
     // When receiving the chunk from remaining holders, we ask new holders to store it.
-    pub async fn republish_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
+    pub async fn republish_chunk(&mut self, chunk: Chunk) -> Result<NodeDuty> {
         self.elder_stores
-            .blob_records_mut()
-            .republish_chunk(data)
+            .chunk_records_mut()
+            .republish_chunk(chunk)
             .await
     }
 

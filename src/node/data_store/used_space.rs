@@ -12,23 +12,23 @@ use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 const USED_SPACE_FILENAME: &str = "used_space";
 
-/// This holds a record (in-memory and on-disk) of the space used by a single `ChunkStore`, and also
-/// an in-memory record of the total space used by all `ChunkStore`s.
+/// This holds a record (in-memory and on-disk) of the space used by a single `DataStore`, and also
+/// an in-memory record of the total space used by all `DataStore`s.
 #[derive(Debug)]
 pub struct UsedSpace {
     inner: Arc<Mutex<inner::UsedSpace>>,
 }
 
-/// Identifies a `ChunkStore` within the larger
+/// Identifies a `DataStore` within the larger
 /// used space tracking
 pub type StoreId = u64;
 
 impl UsedSpace {
     /// construct a new used space instance
     /// NOTE: this constructs a new async-safe instance,
-    /// If you intend to create a new local `ChunkStore` tracking,
+    /// If you intend to create a new local `DataStore` tracking,
     /// then use `clone()` and `add_local_store()` to ensure
-    /// consistency across local `ChunkStore`s
+    /// consistency across local `DataStore`s
     pub fn new(max_capacity: u64) -> Self {
         Self {
             inner: Arc::new(Mutex::new(inner::UsedSpace::new(max_capacity))),
@@ -65,7 +65,7 @@ impl UsedSpace {
     }
 
     /// Add an object and file store to track used space of a single
-    /// `ChunkStore`
+    /// `DataStore`
     #[allow(dead_code)]
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
         self.inner.lock().await.add_local_store(dir).await
@@ -91,24 +91,24 @@ mod inner {
         io::{AsyncReadExt, AsyncWriteExt},
     };
 
-    /// Tracks the Used Space of all `ChunkStore` objects
+    /// Tracks the Used Space of all `DataStore` objects
     /// registered with it, as well as the combined amount
     #[derive(Debug)]
     pub struct UsedSpace {
         /// the maximum value (inclusive) that `total_value` can attain
         max_capacity: u64,
-        /// Total space consumed across all `ChunkStore`s, including this one
+        /// Total space consumed across all `DataStore`s, including this one
         total_value: u64,
         /// the used space tracking for each chunk store
         local_stores: HashMap<StoreId, LocalUsedSpace>,
-        /// next local `ChunkStore` id to use
+        /// next local `DataStore` id to use
         next_id: StoreId,
     }
 
-    /// An entry used to track the used space of a single `ChunkStore`
+    /// An entry used to track the used space of a single `DataStore`
     #[derive(Debug)]
     struct LocalUsedSpace {
-        // Space consumed by this one `ChunkStore`.
+        // Space consumed by this one `DataStore`.
         pub local_value: u64,
         // File used to maintain on-disk record of `local_value`.
         // TODO: maybe a good idea to maintain a journal that is only flushed occasionally

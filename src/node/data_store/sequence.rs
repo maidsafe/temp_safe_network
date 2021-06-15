@@ -6,21 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::chunk::{Chunk, ChunkId};
-use sn_data_types::{Blob, BlobAddress, DataAddress};
+use super::data::{Data, DataId};
+use sn_data_types::{DataAddress, Sequence, SequenceAddress};
 
-impl Chunk for Blob {
-    type Id = BlobAddress;
+impl Data for Sequence {
+    type Id = SequenceAddress;
     fn id(&self) -> &Self::Id {
-        match self {
-            Blob::Public(ref chunk) => chunk.address(),
-            Blob::Private(ref chunk) => chunk.address(),
-        }
+        self.address()
     }
 }
 
-impl ChunkId for BlobAddress {
+impl DataId for SequenceAddress {
     fn to_data_address(&self) -> DataAddress {
-        DataAddress::Blob(*self)
+        DataAddress::Sequence(*self)
     }
 }

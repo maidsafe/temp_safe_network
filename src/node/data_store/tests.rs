@@ -7,24 +7,24 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    chunk::{Chunk, ChunkId},
-    ChunkStore, Result as ChunkStoreResult, Subdir,
+    data::{Data, DataId},
+    DataStore, Result as DataStoreResult, Subdir,
 };
 use crate::node::{to_db_key::ToDbKey, Error, Result};
 use crate::routing::XorName;
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{BlobAddress, DataAddress};
+use sn_data_types::{ChunkAddress, DataAddress};
 use std::{path::Path, u64};
 use tempdir::TempDir;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct Data {
+struct TestData {
     id: Id,
     value: Vec<u8>,
 }
 
-impl Chunk for Data {
+impl Data for TestData {
     type Id = Id;
 
     fn id(&self) -> &Self::Id {
@@ -36,15 +36,15 @@ impl Chunk for Data {
 struct Id(u64);
 
 impl ToDbKey for Id {}
-impl ChunkId for Id {
+impl DataId for Id {
     fn to_data_address(&self) -> DataAddress {
-        DataAddress::Blob(BlobAddress::Public(XorName::from_content(&[&self
+        DataAddress::Blob(ChunkAddress::Public(XorName::from_content(&[&self
             .0
             .to_be_bytes()])))
     }
 }
 
-impl Subdir for ChunkStore<Data> {
+impl Subdir for DataStore<TestData> {
     fn subdir() -> &'static Path {
         Path::new("test")
     }
@@ -55,7 +55,7 @@ fn new_rng() -> ThreadRng {
     rand::thread_rng()
 }
 
-fn temp_dir() -> ChunkStoreResult<TempDir> {
+fn temp_dir() -> DataStoreResult<TempDir> {
     TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
 }
 
@@ -75,7 +75,7 @@ impl Chunks {
         let chunk_count: u8 = rng.gen();
         for _ in 0..chunk_count {
             let size: u8 = rng.gen();
-            let data = Data {
+            let data = TestData {
                 id: Id(0),
                 value: rng.sample_iter(&Standard).take(size as usize).collect(),
             };
@@ -94,25 +94,25 @@ async fn successful_put() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut chunk_store = ChunkStore::<Data>::new(root.path(), u64::MAX).await?;
+    let mut data_store = DataStore::<TestData>::new(root.path(), u64::MAX).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
-        let the_data = &Data {
+        let the_data = &TestData {
             id: Id(index as u64),
             value: data.clone(),
         };
-        let used_space_before = chunk_store.total_used_space().await;
-        assert!(!chunk_store.has(&the_data.id));
-        chunk_store.put(the_data).await?;
-        let used_space_after = chunk_store.total_used_space().await;
+        let used_space_before = data_store.total_used_space().await;
+        assert!(!data_store.has(&the_data.id));
+        data_store.put(the_data).await?;
+        let used_space_after = data_store.total_used_space().await;
         assert_eq!(used_space_after, used_space_before + size);
-        assert!(chunk_store.has(&the_data.id));
+        assert!(data_store.has(&the_data.id));
         assert!(used_space_after <= chunks.total_size);
     }
 
-    assert_eq!(chunk_store.total_used_space().await, chunks.total_size);
+    assert_eq!(data_store.total_used_space().await, chunks.total_size);
 
-    let mut keys = chunk_store.keys();
+    let mut keys = data_store.keys();
     keys.sort();
     assert_eq!(
         (0..chunks.data_and_sizes.len())
@@ -129,9 +129,9 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir()?;
     let capacity = 32;
-    let mut chunk_store = ChunkStore::new(root.path(), capacity).await?;
+    let mut data_store = DataStore::new(root.path(), capacity).await?;
 
-    let data = Data {
+    let data = TestData {
         id: Id(rng.gen()),
         value: rng
             .sample_iter(&Standard)
@@ -139,7 +139,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
             .collect(),
     };
 
-    match chunk_store.put(&data).await {
+    match data_store.put(&data).await {
         Err(Error::NotEnoughSpace) => (),
         x => return Err(crate::node::Error::Logic(format!("Unexpected: {:?}", x))),
     }
@@ -153,19 +153,19 @@ async fn delete() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut chunk_store = ChunkStore::new(root.path(), u64::MAX).await?;
+    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
-        let the_data = &Data {
+        let the_data = &TestData {
             id: Id(index as u64),
             value: data.clone(),
         };
-        chunk_store.put(the_data).await?;
-        assert_eq!(chunk_store.total_used_space().await, *size);
-        assert!(chunk_store.has(&the_data.id));
-        chunk_store.delete(&the_data.id).await?;
-        assert!(!chunk_store.has(&the_data.id));
-        assert_eq!(chunk_store.total_used_space().await, 0);
+        data_store.put(the_data).await?;
+        assert_eq!(data_store.total_used_space().await, *size);
+        assert!(data_store.has(&the_data.id));
+        data_store.delete(&the_data.id).await?;
+        assert!(!data_store.has(&the_data.id));
+        assert_eq!(data_store.total_used_space().await, 0);
     }
 
     Ok(())
@@ -177,11 +177,11 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut chunk_store = ChunkStore::new(root.path(), u64::MAX).await?;
+    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        chunk_store
-            .put(&Data {
+        data_store
+            .put(&TestData {
                 id: Id(index as u64),
                 value: data.clone(),
             })
@@ -189,7 +189,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        let retrieved_value = chunk_store.get(&Id(index as u64))?;
+        let retrieved_value = data_store.get(&Id(index as u64))?;
         assert_eq!(*data, retrieved_value.value);
     }
 
@@ -202,17 +202,17 @@ async fn overwrite_value() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut chunk_store = ChunkStore::new(root.path(), u64::MAX).await?;
+    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (data, size) in chunks.data_and_sizes {
-        chunk_store
-            .put(&Data {
+        data_store
+            .put(&TestData {
                 id: Id(0),
                 value: data.clone(),
             })
             .await?;
-        assert_eq!(chunk_store.total_used_space().await, size);
-        let retrieved_data = chunk_store.get(&Id(0))?;
+        assert_eq!(data_store.total_used_space().await, size);
+        let retrieved_data = data_store.get(&Id(0))?;
         assert_eq!(data, retrieved_data.value);
     }
 
@@ -222,10 +222,10 @@ async fn overwrite_value() -> Result<()> {
 #[tokio::test]
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir()?;
-    let chunk_store: ChunkStore<Data> = ChunkStore::new(root.path(), u64::MAX).await?;
+    let data_store: DataStore<TestData> = DataStore::new(root.path(), u64::MAX).await?;
 
     let id = Id(new_rng().gen());
-    match chunk_store.get(&id) {
+    match data_store.get(&id) {
         Err(Error::NoSuchChunk(_)) => (),
         x => return Err(crate::node::Error::Logic(format!("Unexpected {:?}", x))),
     }
@@ -239,19 +239,19 @@ async fn keys() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let mut chunk_store = ChunkStore::new(root.path(), u64::MAX).await?;
+    let mut data_store = DataStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
-        assert!(!chunk_store.keys().contains(&id));
-        chunk_store
-            .put(&Data {
+        assert!(!data_store.keys().contains(&id));
+        data_store
+            .put(&TestData {
                 id,
                 value: data.clone(),
             })
             .await?;
 
-        let keys = chunk_store.keys();
+        let keys = data_store.keys();
         assert!(keys.contains(&id));
         assert_eq!(keys.len(), index + 1);
     }
@@ -259,10 +259,10 @@ async fn keys() -> Result<()> {
     for (index, _) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
 
-        assert!(chunk_store.keys().contains(&id));
-        chunk_store.delete(&id).await?;
+        assert!(data_store.keys().contains(&id));
+        data_store.delete(&id).await?;
 
-        let keys = chunk_store.keys();
+        let keys = data_store.keys();
         assert!(!keys.contains(&id));
         assert_eq!(keys.len(), chunks.data_and_sizes.len() - index - 1);
     }

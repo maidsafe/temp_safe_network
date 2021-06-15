@@ -6,21 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::chunk::{Chunk, ChunkId};
-use sn_data_types::{
-    register::{Address, Register},
-    DataAddress,
-};
+use crate::node::to_db_key::ToDbKey;
+use serde::{de::DeserializeOwned, Serialize};
+use sn_data_types::DataAddress;
 
-impl Chunk for Register {
-    type Id = Address;
-    fn id(&self) -> &Self::Id {
-        self.address()
-    }
+pub(crate) trait Data: Serialize + DeserializeOwned {
+    type Id: DataId;
+    fn id(&self) -> &Self::Id;
 }
 
-impl ChunkId for Address {
-    fn to_data_address(&self) -> DataAddress {
-        DataAddress::Register(*self)
-    }
+pub(crate) trait DataId: ToDbKey + PartialEq + Eq + DeserializeOwned {
+    fn to_data_address(&self) -> DataAddress;
 }

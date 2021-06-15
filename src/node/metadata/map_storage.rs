@@ -12,7 +12,7 @@ use crate::messaging::{
     EndUser, MessageId,
 };
 use crate::node::{
-    chunk_store::MapChunkStore, error::convert_to_error_message, node_ops::NodeDuty, Error, Result,
+    data_store::MapDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error, Result,
 };
 use crate::routing::Prefix;
 use log::{debug, info};
@@ -27,12 +27,12 @@ use std::{
 
 /// Operations over the data type Map.
 pub(super) struct MapStorage {
-    chunks: MapChunkStore,
+    chunks: MapDataStore,
 }
 
 impl MapStorage {
     pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
-        let chunks = MapChunkStore::new(path, max_capacity).await?;
+        let chunks = MapDataStore::new(path, max_capacity).await?;
         Ok(Self { chunks })
     }
 
@@ -50,12 +50,12 @@ impl MapStorage {
     }
 
     pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
-        debug!("Updating Map chunkstore");
-        let chunkstore = &mut self.chunks;
+        debug!("Updating Map DataStore");
+        let data_store = &mut self.chunks;
         let MapDataExchange(data) = map_data;
 
         for (_key, value) in data {
-            chunkstore.put(&value).await?;
+            data_store.put(&value).await?;
         }
         Ok(())
     }
