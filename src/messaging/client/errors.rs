@@ -41,7 +41,7 @@ pub enum Error {
     DataNotFound(DataAddress),
     /// No history found for PublicKey
     #[error("No history found for PublicKey: {0}")]
-    NoHistoryForPublicKey(sn_data_types::PublicKey),
+    NoHistoryForPublicKey(PublicKey),
     /// Failed to write file, likely due to a system Io error
     #[error("Failed to write file")]
     FailedToWriteFile,
@@ -65,7 +65,7 @@ pub enum Error {
     DuplicateEntryKeys,
     /// The list of owner keys is invalid
     #[error("Invalid owner key: {0}")]
-    InvalidOwners(sn_data_types::PublicKey),
+    InvalidOwners(PublicKey),
     /// No Policy has been set to the data
     #[error("No policy has been set for this data")]
     PolicyNotSet,

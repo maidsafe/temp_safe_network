@@ -11,17 +11,24 @@ use sn_data_types::{ChunkAddress, MapAddress, PublicKey, SequenceAddress};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
+/// Information about a chunk.
 #[derive(Default, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct ChunkMetadata {
+    /// `XorName`s of the holders of the chunk.
     pub holders: BTreeSet<XorName>,
+
+    /// Chunk owner.
     pub owner: Option<PublicKey>,
 }
 
+/// Information about a holder.
 #[derive(Default, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct HolderMetadata {
+    /// Held chunks.
     pub chunks: BTreeSet<ChunkAddress>,
 }
 
+/// Aggregate of chunk, map, and sequence data exchanges.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataExchange {
     ///
@@ -32,14 +39,17 @@ pub struct DataExchange {
     pub seq_data: SequenceDataExchange,
 }
 
+/// Chunk data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChunkDataExchange {
     /// Full Adults register
     pub full_adults: BTreeSet<XorName>,
 }
 
+/// Map data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MapDataExchange(pub BTreeMap<MapAddress, sn_data_types::Map>);
 
+/// Sequence data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequenceDataExchange(pub BTreeMap<SequenceAddress, sn_data_types::Sequence>);

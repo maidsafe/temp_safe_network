@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Client messaging.
+
 mod chunk;
 mod cmd;
 mod data;
@@ -54,15 +56,26 @@ use xor_name::XorName;
 /// Public key and signature provided by the client
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ClientSigned {
+    /// Client public key.
     pub public_key: PublicKey,
+
+    /// Client signature.
     pub signature: Signature,
 }
 
+/// Message envelope containing a Safe message payload,
+/// This struct also provides utilities to obtain the serialized bytes
+/// ready to send them over the wire.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ClientMsg {
+    /// Process message.
     Process(ProcessMsg),
+
+    /// Processing error.
     ProcessingError(ProcessingError),
+
+    /// Supporting information.
     SupportingInfo(SupportingInfo),
 }
 
@@ -87,6 +100,7 @@ pub struct SupportingInfo {
 pub enum SupportingInfoFor {}
 
 impl SupportingInfo {
+    /// Construct a wrapper for the given information and metadata.
     pub fn new(
         info: SupportingInfoFor,
         source_message: ProcessMsg,
@@ -137,6 +151,7 @@ pub struct ProcessingError {
 }
 
 impl ProcessingError {
+    /// Construct a new error with the given reason and metadata.
     pub fn new(reason: Option<Error>, source_message: Option<ProcessMsg>, id: MessageId) -> Self {
         Self {
             reason,
@@ -145,22 +160,22 @@ impl ProcessingError {
         }
     }
 
+    /// Get the message ID.
     pub fn id(&self) -> MessageId {
         self.id
     }
 
+    /// Get the [`ProcessMsg`] that caused the error.
     pub fn source_message(&self) -> &Option<ProcessMsg> {
         &self.source_message
     }
 
+    /// The reason the error occurred (supplied by the recipient).
     pub fn reason(&self) -> &Option<Error> {
         &self.reason
     }
 }
 
-/// Message envelope containing a Safe message payload,
-/// This struct also provides utilities to obtain the serialized bytes
-/// ready to send them over the wire.
 impl ClientMsg {
     /// Convenience function to deserialize a 'Message' from bytes received over the wire.
     /// It returns an error if the bytes don't correspond to a client message.
@@ -270,6 +285,9 @@ pub enum ProcessMsg {
 }
 
 impl ProcessMsg {
+    /// Create a [`ProcessingError`] to indicate that this message could not be processed.
+    ///
+    /// Context for the error can optionally be supplied in `reason`.
     pub fn create_processing_error(&self, reason: Option<Error>) -> ProcessingError {
         ProcessingError {
             source_message: Some(self.clone()),
