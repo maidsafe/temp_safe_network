@@ -1,16 +1,16 @@
-# Master workflow
+# main workflow
 #
-# Runs when a PR has been merged to the master branch.
+# Runs when a PR has been merged to the main branch.
 #
 # 1. Generates a release build.
 # 2. If the last commit is a chore(release), publish.
 
-name: Master
+name: Main
 
 on:
   push:
     branches:
-      - master
+      - main
 
 env:
   # Run all cargo commands with --verbose.
