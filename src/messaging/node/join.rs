@@ -44,11 +44,15 @@ impl Debug for JoinRequest {
 }
 
 /// Joining peer's proof of resolvement of given resource proofing challenge.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct ResourceProofResponse {
+    #[allow(missing_docs)]
     pub solution: u64,
+    #[allow(missing_docs)]
     pub data: VecDeque<u8>,
+    #[allow(missing_docs)]
     pub nonce: [u8; 32],
+    #[allow(missing_docs)]
     pub nonce_signature: Signature,
 }
 
@@ -57,9 +61,13 @@ pub struct ResourceProofResponse {
 pub enum JoinResponse {
     /// Challenge sent from existing elder nodes to the joining peer for resource proofing.
     ResourceChallenge {
+        #[allow(missing_docs)]
         data_size: usize,
+        /// how hard the challenge should be to solve
         difficulty: u8,
+        #[allow(missing_docs)]
         nonce: [u8; 32],
+        #[allow(missing_docs)]
         nonce_signature: Signature,
     },
     /// Up to date section information for a joining peer to retry its join request with
@@ -71,11 +79,16 @@ pub enum JoinResponse {
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
     Approval {
+        /// Network genesis key (needed to validate) section_chain
         genesis_key: BlsPublicKey,
+        /// SectionAuthorityProvider Signed by (current section)
         section_auth: SectionSigned<SectionAuthorityProvider>,
+        /// Current node's state
         node_state: SectionSigned<NodeState>,
+        /// Full verifiable section chain
         section_chain: SecuredLinkedList,
     },
+    /// Join was rejected
     Rejected(JoinRejectionReason),
 }
 

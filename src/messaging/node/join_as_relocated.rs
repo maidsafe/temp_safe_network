@@ -53,8 +53,11 @@ pub enum JoinAsRelocatedResponse {
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
     Approval {
+        /// Section Authority over this message for validation
         section_auth: SectionSigned<SectionAuthorityProvider>,
+        /// info on current members of the section
         member_info: SectionSigned<NodeState>,
+        /// The secured (signed) and verifiable section chain
         section_chain: SecuredLinkedList,
     },
     /// The requesting node is not externally reachable

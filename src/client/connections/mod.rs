@@ -38,7 +38,7 @@ pub(crate) struct QueryResult {
     pub msg_id: MessageId,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Session {
     qp2p: QuicP2p,
     pending_queries: PendingQueryResponses,

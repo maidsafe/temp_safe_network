@@ -25,6 +25,7 @@ use std::{
 use xor_name::XorName;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// All information about a section
 pub struct Section {
     /// network genesis key
     pub genesis_key: BlsPublicKey,
