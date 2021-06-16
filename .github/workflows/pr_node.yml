@@ -22,8 +22,7 @@ env:
 
 jobs:
  
- 
-  test:
+  node-tests:
     if: |
       github.repository_owner == 'maidsafe' &&
       !startsWith(github.event.pull_request.title, 'Automated version bump')

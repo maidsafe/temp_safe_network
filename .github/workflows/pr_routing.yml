@@ -21,9 +21,9 @@ env:
 
 jobs:
  
-  test:
+  routing-tests:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test
+    name: Routing Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
