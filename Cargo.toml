@@ -126,7 +126,6 @@ proptest = "0.10.1"
 rand_xorshift = "~0.2.0"
 structopt = "~0.3.17"
 tempdir = "~0.3.7"
-tracing-appender = "~0.1.2"
 tracing-subscriber = "~0.2.15"
 yansi = "~0.5.0"
 
