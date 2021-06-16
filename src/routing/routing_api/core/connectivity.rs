@@ -14,7 +14,7 @@ use crate::routing::{
     dkg::{commands::DkgCommands, DkgFailureSignedSetUtils},
     error::Result,
     peer::PeerUtils,
-    routing::command::Command,
+    routing_api::command::Command,
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
     Error,
 };

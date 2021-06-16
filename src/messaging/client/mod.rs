@@ -551,7 +551,7 @@ mod tests {
                     signature,
                 },
             };
-            let random_addr = DataAddress::Blob(ChunkAddress::Public(XorName::random()));
+            let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
             let lazy_error =
                 msg.create_processing_error(Some(Error::DataNotFound(random_addr.clone())));
 
@@ -573,7 +573,7 @@ mod tests {
             let public_key = keypair.public_key();
             let signature = keypair.sign(b"the query");
 
-            let random_addr = DataAddress::Blob(ChunkAddress::Public(XorName::random()));
+            let random_addr = DataAddress::Chunk(ChunkAddress::Public(XorName::random()));
             let errored_response = ProcessingError {
                 reason: Some(Error::DataNotFound(random_addr.clone())),
                 source_message: Some(ProcessMsg::Query {

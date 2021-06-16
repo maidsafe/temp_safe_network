@@ -8,7 +8,7 @@
 
 use super::{ProvenUtils, Signed};
 use crate::messaging::node::Proven;
-use crate::routing::routing::{Error, Result};
+use crate::routing::routing_api::{Error, Result};
 use serde::Serialize;
 
 // Create signed for the given payload using the given secret key.

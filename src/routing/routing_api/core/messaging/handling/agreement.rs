@@ -21,7 +21,7 @@ use crate::routing::{
     messages::RoutingMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
-    routing::command::Command,
+    routing_api::command::Command,
     section::{
         ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils,
     },

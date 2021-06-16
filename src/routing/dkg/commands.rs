@@ -11,7 +11,7 @@ use crate::messaging::{
     DstInfo, DstLocation, SectionAuthorityProvider,
 };
 use crate::routing::{
-    error::Result, messages::RoutingMsgUtils, node::Node, routing::command::Command,
+    error::Result, messages::RoutingMsgUtils, node::Node, routing_api::command::Command,
     section::SectionKeyShare,
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;

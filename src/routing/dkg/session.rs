@@ -16,7 +16,7 @@ use crate::routing::{
         dkg_msgs_utils::{DkgFailureSignedSetUtils, DkgFailureSignedUtils},
     },
     ed25519::{self, Keypair},
-    routing::command,
+    routing_api::command,
     section::{SectionAuthorityProviderUtils, SectionKeyShare},
 };
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};

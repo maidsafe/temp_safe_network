@@ -32,7 +32,7 @@ use crate::routing::{
     network::NetworkUtils,
     peer::PeerUtils,
     relocation::{RelocatePayloadUtils, RelocateState, SignedRelocateDetailsUtils},
-    routing::command::Command,
+    routing_api::command::Command,
     section::{
         SectionAuthorityProviderUtils, SectionKeyShare, SectionPeersUtils, SectionUtils,
         FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,

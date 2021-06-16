@@ -38,7 +38,7 @@ struct Id(u64);
 impl ToDbKey for Id {}
 impl DataId for Id {
     fn to_data_address(&self) -> DataAddress {
-        DataAddress::Blob(ChunkAddress::Public(XorName::from_content(&[&self
+        DataAddress::Chunk(ChunkAddress::Public(XorName::from_content(&[&self
             .0
             .to_be_bytes()])))
     }

@@ -18,7 +18,7 @@ use crate::routing::{
     dkg::{ProposalUtils, SignedShare},
     error::Result,
     messages::RoutingMsgUtils,
-    routing::command::Command,
+    routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
 };
 use std::net::SocketAddr;
