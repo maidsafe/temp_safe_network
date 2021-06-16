@@ -37,12 +37,12 @@ use crate::routing::{
     },
     supermajority, ELDER_SIZE,
 };
+use crate::types::{Keypair, PublicKey};
 use anyhow::Result;
 use assert_matches::assert_matches;
 use bytes::Bytes;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-use sn_data_types::{Keypair, PublicKey};
 use std::{
     collections::{BTreeSet, HashSet},
     iter,

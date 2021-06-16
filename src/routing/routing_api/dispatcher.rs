@@ -19,8 +19,8 @@ use crate::routing::{
     routing_api::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error,
     XorName,
 };
+use crate::types::PublicKey;
 use itertools::Itertools;
-use sn_data_types::PublicKey;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::{watch, RwLock},

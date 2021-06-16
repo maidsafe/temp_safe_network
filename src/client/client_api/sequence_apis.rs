@@ -11,12 +11,12 @@ use crate::client::Error;
 use crate::messaging::client::{
     Cmd, DataCmd, DataQuery, Query, QueryResponse, SequenceRead, SequenceWrite,
 };
-use log::{debug, trace};
-use sn_data_types::{
+use crate::types::{
     PublicKey, Sequence, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex,
     SequencePermissions, SequencePrivatePermissions, SequencePrivatePolicy,
     SequencePublicPermissions, SequencePublicPolicy, SequenceUser,
 };
+use log::{debug, trace};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 
@@ -45,7 +45,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -116,7 +116,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
+    /// use crate::types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -183,7 +183,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -236,7 +236,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -309,7 +309,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -358,7 +358,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -405,7 +405,7 @@ impl Client {
         // TODO: do we need to query with some specific PK?
         match sequence.last_entry(None)? {
             Some(entry) => Ok((sequence.len(None)? - 1, entry.to_vec())),
-            None => Err(Error::from(sn_data_types::Error::NoSuchEntry)),
+            None => Err(Error::from(crate::types::Error::NoSuchEntry)),
         }
     }
 
@@ -416,7 +416,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -464,7 +464,7 @@ impl Client {
         let index = SequenceIndex::FromStart(index_from_start);
         match sequence.get(index, None)? {
             Some(entry) => Ok(entry.to_vec()),
-            None => Err(Error::from(sn_data_types::Error::NoSuchEntry)),
+            None => Err(Error::from(crate::types::Error::NoSuchEntry)),
         }
     }
 
@@ -475,7 +475,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -525,7 +525,7 @@ impl Client {
         // TODO: do we need to query with some specific PK?
         sequence
             .in_range(range.0, range.1, None)?
-            .ok_or_else(|| Error::from(sn_data_types::Error::NoSuchEntry))
+            .ok_or_else(|| Error::from(crate::types::Error::NoSuchEntry))
     }
 
     //----------------------
@@ -539,7 +539,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -596,7 +596,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
+    /// use crate::types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -657,7 +657,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -716,7 +716,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -770,8 +770,8 @@ mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
     use crate::messaging::client::Error as ErrorMessage;
+    use crate::types::{Error as DtError, SequenceAction, SequencePrivatePermissions, Token};
     use anyhow::{anyhow, bail, Result};
-    use sn_data_types::{Error as DtError, SequenceAction, SequencePrivatePermissions, Token};
     use std::str::FromStr;
     use tokio::time::{sleep, Duration};
     use xor_name::XorName;

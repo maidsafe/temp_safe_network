@@ -17,11 +17,11 @@ mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
 use crate::messaging::client::{Cmd, CmdError, DataCmd};
+use crate::transfers::TransferActor;
+use crate::types::{Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
 use log::{debug, info, trace, warn};
 use rand::rngs::OsRng;
-use sn_data_types::{Keypair, PublicKey, SectionElders, Token};
-use sn_transfers::TransferActor;
 use std::{
     path::Path,
     str::FromStr,

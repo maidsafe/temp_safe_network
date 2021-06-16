@@ -12,9 +12,9 @@ use super::{
 };
 use crate::node::{to_db_key::ToDbKey, Error, Result};
 use crate::routing::XorName;
+use crate::types::{ChunkAddress, DataAddress};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{ChunkAddress, DataAddress};
 use std::{path::Path, u64};
 use tempdir::TempDir;
 

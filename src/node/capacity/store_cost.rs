@@ -8,8 +8,8 @@
 
 use super::{CapacityReader, CHUNK_COPY_COUNT, MAX_CHUNK_SIZE, MAX_SUPPLY};
 use crate::node::{network::Network, Error, Result};
+use crate::types::Token;
 use log::debug;
-use sn_data_types::Token;
 
 /// Calculation of rate limit for writes.
 #[derive(Clone)]

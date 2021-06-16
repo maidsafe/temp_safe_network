@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 #[cfg(feature = "simulated-payouts")]
-use sn_data_types::Transfer;
+use crate::types::Transfer;
 
 #[cfg(feature = "simulated-payouts")]
 use crate::messaging::client::{Cmd, TransferCmd};
@@ -16,7 +16,7 @@ use crate::messaging::client::{Cmd, TransferCmd};
 use log::info;
 
 use crate::client::{Client, Error};
-use sn_data_types::Token;
+use crate::types::Token;
 
 /// Handle all token transfers and Write API requests for a given ClientId.
 impl Client {
@@ -41,7 +41,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, Token};
+    /// use crate::types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {

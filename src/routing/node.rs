@@ -8,8 +8,8 @@
 
 use crate::messaging::node::Peer;
 use crate::routing::peer::PeerUtils;
+use crate::types::PublicKey;
 use ed25519_dalek::Keypair;
-use sn_data_types::PublicKey;
 use std::{
     fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,

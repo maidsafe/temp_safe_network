@@ -10,15 +10,15 @@ use super::{
     wallet::{Wallet, WalletSnapshot},
     Error, Outcome, Result, TernaryResult,
 };
-use bls::{PublicKeySet, PublicKeyShare};
-use log::{debug, error};
 #[cfg(feature = "simulated-payouts")]
-use sn_data_types::Credit;
-use sn_data_types::{
+use crate::types::Credit;
+use crate::types::{
     CreditAgreementProof, Debit, OwnerType, ReplicaEvent, Signature, SignedCredit, SignedDebit,
     SignedTransfer, SignedTransferShare, Token, TransferAgreementProof, TransferRegistered,
     TransferValidationProposed,
 };
+use bls::{PublicKeySet, PublicKeyShare};
+use log::{debug, error};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
@@ -336,7 +336,7 @@ impl WalletReplica {
             Err(_) => return Err(Error::Serialisation("Could not serialise transfer".into())),
         };
         // Check if proof is signed by our peers.
-        let public_key = sn_data_types::PublicKey::Bls(self.peer_replicas.public_key());
+        let public_key = crate::types::PublicKey::Bls(self.peer_replicas.public_key());
         let valid_debit = public_key.verify(&proof.debit_sig, &debit_bytes).is_ok();
         let valid_credit = public_key.verify(&proof.credit_sig, &credit_bytes).is_ok();
         if valid_debit && valid_credit {
@@ -352,7 +352,7 @@ impl WalletReplica {
         match bincode::serialize(&proof.signed_credit) {
             Err(_) => Err(Error::Serialisation("Could not serialise transfer".into())),
             Ok(credit_bytes) => {
-                let key = sn_data_types::PublicKey::Bls(proof.debiting_replicas_keys.public_key());
+                let key = crate::types::PublicKey::Bls(proof.debiting_replicas_keys.public_key());
                 key.verify(&proof.debiting_replicas_sig, &credit_bytes)
                     .map_err(|_| Error::InvalidSignature)
             }

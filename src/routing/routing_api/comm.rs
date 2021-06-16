@@ -348,11 +348,11 @@ pub enum SendStatus {
 mod tests {
     use super::*;
     use crate::messaging::{section_info::SectionInfoMsg, DstInfo, WireMsg};
+    use crate::types::PublicKey;
     use anyhow::Result;
     use assert_matches::assert_matches;
     use futures::future;
     use qp2p::Config;
-    use sn_data_types::PublicKey;
     use std::{net::Ipv4Addr, slice, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
 

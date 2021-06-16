@@ -30,15 +30,15 @@ use crate::node::{
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     utils, Error, Result,
 };
-use futures::lock::Mutex;
-use log::{debug, error, info, trace, warn};
-use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
-use sn_data_types::Transfer;
-use sn_data_types::{
+use crate::types::Transfer;
+use crate::types::{
     ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
     TransferAgreementProof,
 };
+use futures::lock::Mutex;
+use log::{debug, error, info, trace, warn};
+use replica_signing::ReplicaSigningImpl;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
@@ -468,7 +468,7 @@ impl Transfers {
                 }
             }
             Err(Error::UnknownSectionKey(_))
-            | Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted)) => {
+            | Err(Error::Transfer(crate::transfers::Error::SectionKeyNeverExisted)) => {
                 error!(">> UnknownSectionKey at receive_propagated");
                 NodeMsg::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),

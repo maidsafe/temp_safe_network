@@ -17,12 +17,12 @@ use crate::client::{Client, Error};
 use crate::messaging::client::{
     ClientSig, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
 };
-use bincode::serialize;
-use log::{debug, error, info, trace, warn};
-use sn_data_types::{
+use crate::transfers::{ActorEvent, TransferInitiated};
+use crate::types::{
     DebitId, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
 };
-use sn_transfers::{ActorEvent, TransferInitiated};
+use bincode::serialize;
+use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::channel;
 
 impl Client {
@@ -35,7 +35,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, Token};
+    /// use crate::types::{Keypair, Token};
     /// use rand::rngs::OsRng;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -78,7 +78,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{Keypair, Token};
+    /// use crate::types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -112,7 +112,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::Keypair;
+    /// use crate::types::Keypair;
     /// use rand::rngs::OsRng;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // Let's check the balance of a random client.
@@ -151,7 +151,7 @@ impl Client {
                 }
             }
 
-            Err(sn_transfers::Error::NoActorHistory) => {
+            Err(crate::transfers::Error::NoActorHistory) => {
                 warn!(
                     "No new transfer history by TransferActor for pk: {:?}",
                     public_key
@@ -342,14 +342,14 @@ impl Client {
 mod tests {
     use crate::client::utils::test_utils::{create_test_client, create_test_client_with};
     use crate::retry_loop_for_pattern;
+    use crate::types::Token;
     use anyhow::{anyhow, Result};
     use rand::rngs::OsRng;
-    use sn_data_types::Token;
     use std::str::FromStr;
 
     #[tokio::test]
     pub async fn transfer_actor_creation_hydration_for_nonexistant_balance() -> Result<()> {
-        let keypair = sn_data_types::Keypair::new_ed25519(&mut OsRng);
+        let keypair = crate::types::Keypair::new_ed25519(&mut OsRng);
 
         match create_test_client_with(Some(keypair)).await {
             Ok(actor) => {
@@ -385,7 +385,7 @@ mod tests {
     #[tokio::test]
     pub async fn transfer_actor_creation_hydration_for_existing_balance() -> Result<()> {
         // small delay for starting this test, which seems to have a problem when nodes are under stress..
-        let keypair = sn_data_types::Keypair::new_ed25519(&mut OsRng);
+        let keypair = crate::types::Keypair::new_ed25519(&mut OsRng);
 
         {
             let mut initial_actor = create_test_client_with(Some(keypair.clone())).await?;

@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, QueryResponse, TransferError};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "simulated-payouts")]
-use sn_data_types::Transfer;
-use sn_data_types::{PublicKey, SignedTransfer, TransferAgreementProof};
+use crate::types::Transfer;
+use crate::types::{PublicKey, SignedTransfer, TransferAgreementProof};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use xor_name::XorName;
 

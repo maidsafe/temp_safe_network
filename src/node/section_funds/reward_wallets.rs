@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::routing::Prefix;
+use crate::types::{NodeAge, PublicKey};
 use dashmap::DashMap;
 use log::debug;
-use sn_data_types::{NodeAge, PublicKey};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 

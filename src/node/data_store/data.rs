@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::to_db_key::ToDbKey;
+use crate::types::DataAddress;
 use serde::{de::DeserializeOwned, Serialize};
-use sn_data_types::DataAddress;
 
 pub(crate) trait Data: Serialize + DeserializeOwned {
     type Id: DataId;

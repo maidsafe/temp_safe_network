@@ -11,9 +11,9 @@ use crate::messaging::{
     client::{CmdError, Event, QueryResponse, TransferError},
     MessageId,
 };
+pub use crate::transfers::Error as TransfersError;
+use crate::types::{Error as DtError, PublicKey};
 use qp2p::Error as QuicP2pError;
-use sn_data_types::{Error as DtError, PublicKey};
-pub use sn_transfers::Error as TransfersError;
 use std::io;
 
 use thiserror::Error;
@@ -112,7 +112,7 @@ pub enum Error {
     /// Not in testnet "simulated payout" mode
     #[error("Simulated payouts unavailable without 'simualted-payouts' feature flag at build")]
     NotBuiltWithSimulatedPayouts,
-    /// Other sn_data_types errors
+    /// Other types errors
     #[error(transparent)]
     NetworkDataError(#[from] DtError),
     /// Transfers errors
@@ -136,7 +136,7 @@ pub enum Error {
     /// self_enryption errors
     #[error(transparent)]
     SelfEncryption(#[from] self_encryption::SelfEncryptionError),
-    /// Other sn_data_types errors
+    /// Other types errors
     #[error(transparent)]
     ConfigError(#[from] serde_json::Error),
     /// Io error.

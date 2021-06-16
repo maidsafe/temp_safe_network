@@ -15,13 +15,13 @@ use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
     SectionAuthorityProviderUtils,
 };
+use crate::types::{PublicKey, Signature, SignatureShare};
 use bls::PublicKeySet;
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use rand::{seq::SliceRandom, SeedableRng};
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use sn_data_types::{PublicKey, Signature, SignatureShare};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,

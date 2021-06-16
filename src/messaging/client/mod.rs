@@ -38,15 +38,15 @@ pub use self::{
 };
 
 use crate::messaging::{MessageId, MessageType, WireMsg};
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use sn_data_types::{
+use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
     SequencePublicPolicy, Signature, Token, TransferAgreementProof, TransferValidated,
 };
+use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
@@ -503,8 +503,8 @@ try_from!(ActorHistory, GetHistory);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{ChunkAddress, DataAddress, Keypair, PublicChunk, UnseqMap};
     use anyhow::{anyhow, Result};
-    use sn_data_types::{ChunkAddress, DataAddress, Keypair, PublicChunk, UnseqMap};
     use std::convert::{TryFrom, TryInto};
 
     fn gen_keypairs() -> Vec<Keypair> {

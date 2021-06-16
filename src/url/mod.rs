@@ -13,11 +13,11 @@ mod errors;
 mod url_parts;
 mod xorurl_media_types;
 
+use crate::types::register;
 pub use errors::{Error, Result};
 use log::{info, trace, warn};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
-use sn_data_types::register;
 use std::fmt;
 use url::Url;
 use url_parts::SafeUrlParts;
@@ -1863,16 +1863,16 @@ mod tests {
 
         // note: ?? is actually ok in a standard url.  I suppose no harm in allowing for safe
         // see:  https://stackoverflow.com/questions/2924160/is-it-valid-to-have-more-than-one-question-mark-in-a-url
-        SafeUrl::from_url("safe://name??foo=bar")?;
+        let _ = SafeUrl::from_url("safe://name??foo=bar")?;
 
         // note: ## and #frag1#frag2 are accepted by rust URL parser.
         // tbd: if we want to disallow.
         // see: https://stackoverflow.com/questions/10850781/multiple-hash-signs-in-url
-        SafeUrl::from_url("safe://name?foo=bar##fragment")?;
+        let _ = SafeUrl::from_url("safe://name?foo=bar##fragment")?;
 
         // note: single%percent/in/path is accepted by rust URL parser.
         // tbd: if we want to disallow.
-        SafeUrl::from_nrsurl("safe://name/single%percent/in/path")?;
+        let _ = SafeUrl::from_nrsurl("safe://name/single%percent/in/path")?;
 
         Ok(())
     }

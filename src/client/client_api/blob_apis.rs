@@ -12,11 +12,11 @@ use super::{
 };
 use crate::client::Error;
 use crate::messaging::client::{ChunkRead, ChunkWrite, DataCmd, DataQuery, Query, QueryResponse};
+use crate::types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use bincode::{deserialize, serialize};
 use log::{info, trace};
 use self_encryption::{DataMap, SelfEncryptor};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 
 #[derive(Serialize, Deserialize)]
 enum DataMapLevel {
@@ -45,7 +45,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::ChunkAddress;
+    /// use crate::types::ChunkAddress;
     /// use xor_name::XorName;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// let head_chunk = ChunkAddress::Public(XorName::random());
@@ -97,7 +97,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::Token;
+    /// use crate::types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
@@ -128,7 +128,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::Token;
+    /// use crate::types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
@@ -189,7 +189,7 @@ impl Client {
     // Clients should not call this function directly.
     pub(crate) async fn store_chunk_on_network(&self, chunk: Chunk) -> Result<(), Error> {
         if !chunk.validate_size() {
-            return Err(Error::NetworkDataError(sn_data_types::Error::ExceededSize));
+            return Err(Error::NetworkDataError(crate::types::Error::ExceededSize));
         }
         let cmd = DataCmd::Blob(ChunkWrite::New(chunk));
         self.pay_and_send_data_command(cmd).await?;
@@ -206,7 +206,7 @@ impl Client {
     /// ```no_run
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::Token;
+    /// use crate::types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: anyhow::Result<()> = futures::executor::block_on( async {
     ///
@@ -404,11 +404,11 @@ mod tests {
     use crate::client::client_api::blob_storage::BlobStorage;
     use crate::client::utils::{generate_random_vector, test_utils::create_test_client};
     use crate::messaging::client::Error as ErrorMessage;
+    use crate::types::{PrivateChunk, PublicChunk, Token};
     use crate::{retry_err_loop, retry_loop};
     use anyhow::{anyhow, bail, Result};
     use bincode::deserialize;
     use self_encryption::Storage;
-    use sn_data_types::{PrivateChunk, PublicChunk, Token};
     use std::str::FromStr;
 
     // Test storing and getting public Blob.

@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{network::Network, Error, Result};
+use crate::types::{OwnerType, Result as DtResult, Signing};
 use bls::PublicKeySet;
 use futures::executor::block_on as block;
-use sn_data_types::{OwnerType, Result as DtResult, Signing};
 
 #[derive(Clone)]
 pub struct ElderSigning {
@@ -45,19 +45,19 @@ impl Signing for ElderSigning {
         self.id.clone()
     }
 
-    fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<sn_data_types::Signature> {
-        use sn_data_types::Error as DtError;
-        Ok(sn_data_types::Signature::BlsShare(
+    fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<crate::types::Signature> {
+        use crate::types::Error as DtError;
+        Ok(crate::types::Signature::BlsShare(
             block(self.network.sign_as_elder(data)).map_err(|_| DtError::InvalidOperation)?,
         ))
     }
 
-    fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {
+    fn verify<T: serde::Serialize>(&self, sig: &crate::types::Signature, data: &T) -> bool {
         let data = match bincode::serialize(data) {
             Ok(data) => data,
             Err(_) => return false,
         };
-        use sn_data_types::Signature::*;
+        use crate::types::Signature::*;
         match sig {
             Bls(sig) => {
                 if let OwnerType::Multi(set) = self.id() {

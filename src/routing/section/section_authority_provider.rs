@@ -11,8 +11,8 @@ use crate::messaging::{
     SectionAuthorityProvider,
 };
 use crate::routing::{peer::PeerUtils, Prefix, XorName};
+use crate::types::ReplicaPublicKeySet;
 use bls::PublicKey;
-use sn_data_types::ReplicaPublicKeySet;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,

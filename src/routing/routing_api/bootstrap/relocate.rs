@@ -24,8 +24,8 @@ use crate::routing::{
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
+use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
-use sn_data_types::PublicKey;
 use std::{collections::HashSet, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 

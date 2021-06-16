@@ -21,8 +21,8 @@ use crate::node::{
     Node, Result,
 };
 use crate::routing::XorName;
+use crate::types::{ActorHistory, NodeAge, PublicKey};
 use log::info;
-use sn_data_types::{ActorHistory, NodeAge, PublicKey};
 use std::collections::BTreeMap;
 
 impl Node {

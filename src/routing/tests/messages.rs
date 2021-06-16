@@ -11,7 +11,7 @@ mod utils;
 use anyhow::{anyhow, format_err, Result};
 use bytes::Bytes;
 use qp2p::QuicP2p;
-use sn_data_types::Keypair;
+use crate::types::Keypair;
 use crate::messaging::client::ProcessMsg;
 use crate::messaging::{
     client::{ClientMsg, ClientSig, Query, TransferQuery},

@@ -18,11 +18,11 @@ pub use self::{
     actor::Actor as TransferActor, error::Error, wallet::Wallet, wallet_replica::WalletReplica,
 };
 
-use serde::{Deserialize, Serialize};
-use sn_data_types::{
+use crate::types::{
     ActorHistory, CreditId, DebitId, PublicKey, SignedCredit, SignedDebit, Token,
     TransferAgreementProof, TransferValidated,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -138,15 +138,15 @@ mod test {
         actor::Actor, test_utils, test_utils::*, wallet, wallet_replica::WalletReplica, ActorEvent,
         Error, Result, TransferInitiated, Wallet,
     };
+    use crate::types::{
+        ActorHistory, Credit, CreditAgreementProof, CreditId, Debit, Keypair, OwnerType, PublicKey,
+        ReplicaEvent, SectionElders, SignatureShare, SignedCredit, SignedDebit, SignedTransfer,
+        Token, Transfer, TransferAgreementProof,
+    };
     use bls::{PublicKeySet, PublicKeyShare, SecretKey, SecretKeySet, SecretKeyShare};
     use crdts::{
         quickcheck::{quickcheck, TestResult},
         Dot,
-    };
-    use sn_data_types::{
-        ActorHistory, Credit, CreditAgreementProof, CreditId, Debit, Keypair, OwnerType, PublicKey,
-        ReplicaEvent, SectionElders, SignatureShare, SignedCredit, SignedDebit, SignedTransfer,
-        Token, Transfer, TransferAgreementProof,
     };
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
@@ -195,7 +195,7 @@ mod test {
             .genesis(&genesis_credit)?
             .ok_or(Error::GenesisFailed)?;
 
-        let event = ReplicaEvent::TransferPropagated(sn_data_types::TransferPropagated {
+        let event = ReplicaEvent::TransferPropagated(crate::types::TransferPropagated {
             credit_proof: genesis_credit.clone(),
         });
         wallet_replica.apply(event)?;
@@ -250,7 +250,7 @@ mod test {
             .ok_or(Error::GenesisFailed)?;
 
         wallet_replica.apply(ReplicaEvent::TransferPropagated(
-            sn_data_types::TransferPropagated {
+            crate::types::TransferPropagated {
                 credit_proof: genesis_credit.clone(),
             },
         ))?;
@@ -280,7 +280,7 @@ mod test {
             .ok_or(Error::GenesisFailed)?;
 
         wallet_replica.apply(ReplicaEvent::TransferPropagated(
-            sn_data_types::TransferPropagated {
+            crate::types::TransferPropagated {
                 credit_proof: genesis_credit.clone(),
             },
         ))?;
@@ -406,7 +406,7 @@ mod test {
             };
             let (replica_debit_sig, replica_credit_sig) =
                 elder.signing.sign_transfer(&signed_transfer)?;
-            let validation = sn_data_types::TransferValidated {
+            let validation = crate::types::TransferValidated {
                 signed_credit: signed_transfer.credit,
                 signed_debit: signed_transfer.debit,
                 replica_debit_sig,
@@ -472,7 +472,7 @@ mod test {
                     .receive_propagated(&credit_proof)?
                     .ok_or(Error::ReceivePropagationFailed)?;
 
-                let propagated = sn_data_types::TransferPropagated {
+                let propagated = crate::types::TransferPropagated {
                     credit_proof: credit_proof.clone(),
                 };
                 // then apply to inmem state
@@ -720,7 +720,7 @@ mod test {
         let bls_secret_key = SecretKeySet::random(threshold, &mut rng);
         let peer_replicas = bls_secret_key.public_keys();
         let id = PublicKey::Bls(peer_replicas.public_key());
-        let keypair = sn_data_types::Keypair::new_bls_share(
+        let keypair = crate::types::Keypair::new_bls_share(
             0,
             bls_secret_key.secret_key_share(0),
             peer_replicas.clone(),

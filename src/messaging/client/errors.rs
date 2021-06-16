@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::section_info::Error as TargetSectionError;
+use crate::types::DataAddress;
+use crate::types::PublicKey;
 use serde::{Deserialize, Serialize};
-use sn_data_types::DataAddress;
-use sn_data_types::PublicKey;
 use std::result;
 use thiserror::Error;
 

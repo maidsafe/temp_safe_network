@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::types::{Keypair, Token};
 use anyhow::{anyhow, Result};
-use sn_data_types::{Keypair, Token};
 
 /// Generates a random BLS secret and public keypair.
 pub fn gen_ed_keypair() -> Keypair {

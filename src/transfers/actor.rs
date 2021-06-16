@@ -11,15 +11,15 @@ use super::{
     TransferInitiated, TransferRegistrationSent, TransferValidated, TransferValidationReceived,
     TransfersSynched,
 };
-use bls::PublicKeySet;
-use crdts::Dot;
-use itertools::Itertools;
-use log::debug;
-use sn_data_types::{
+use crate::types::{
     ActorHistory, Credit, CreditAgreementProof, CreditId, Debit, DebitId, OwnerType, PublicKey,
     SectionElders, SignatureShare, SignedCredit, SignedDebit, Signing, Token,
     TransferAgreementProof, WalletHistory,
 };
+use bls::PublicKeySet;
+use crdts::Dot;
+use itertools::Itertools;
+use log::debug;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 
@@ -290,9 +290,9 @@ impl<S: Signing> Actor<S> {
             if valid_debit && valid_credit {
                 proof = Some(TransferAgreementProof {
                     signed_debit: signed_debit.clone(),
-                    debit_sig: sn_data_types::Signature::Bls(debit_sig),
+                    debit_sig: crate::types::Signature::Bls(debit_sig),
                     signed_credit: signed_credit.clone(),
-                    credit_sig: sn_data_types::Signature::Bls(credit_sig),
+                    credit_sig: crate::types::Signature::Bls(credit_sig),
                     debiting_replicas_keys: self.replicas.key_set.clone(),
                 });
             } // else, we have some corrupt data. (todo: Do we need to act on that fact?)
@@ -548,7 +548,7 @@ impl<S: Signing> Actor<S> {
         let valid_debit = match bincode::serialize(&proof.signed_debit) {
             Err(_) => return Err(Error::Serialisation("Could not serialise debit".into())),
             Ok(data) => {
-                let public_key = sn_data_types::PublicKey::Bls(self.replicas.key_set.public_key());
+                let public_key = crate::types::PublicKey::Bls(self.replicas.key_set.public_key());
                 public_key.verify(&proof.debit_sig, &data).is_ok()
             }
         };
@@ -556,7 +556,7 @@ impl<S: Signing> Actor<S> {
         let valid_credit = match bincode::serialize(&proof.signed_credit) {
             Err(_) => return Err(Error::Serialisation("Could not serialise credit".into())),
             Ok(data) => {
-                let public_key = sn_data_types::PublicKey::Bls(self.replicas.key_set.public_key());
+                let public_key = crate::types::PublicKey::Bls(self.replicas.key_set.public_key());
                 public_key.verify(&proof.credit_sig, &data).is_ok()
             }
         };
@@ -632,13 +632,13 @@ mod test {
         Actor, ActorEvent, Error, OwnerType, Result, TransferInitiated, TransferRegistrationSent,
         Wallet,
     };
-    use bls::{SecretKey, SecretKeySet};
-    use crdts::Dot;
-    use serde::Serialize;
-    use sn_data_types::{
+    use crate::types::{
         Credit, Debit, Keypair, PublicKey, SectionElders, Signature, SignatureShare, Token,
         TransferAgreementProof, TransferValidated,
     };
+    use bls::{SecretKey, SecretKeySet};
+    use crdts::Dot;
+    use serde::Serialize;
     use std::collections::BTreeMap;
     use xor_name::Prefix;
 

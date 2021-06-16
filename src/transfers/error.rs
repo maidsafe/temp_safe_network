@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::types::{Credit, Debit, Error as DtError, PublicKey, Token};
 use crdts::Dot;
-use sn_data_types::{Credit, Debit, Error as DtError, PublicKey, Token};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Clone)]
@@ -142,7 +142,7 @@ pub enum Error {
     /// Balance key already exists.
     #[error("Key already exists")]
     KeyExists,
-    /// Other sn_data_types errors
+    /// Other types errors
     #[error(transparent)]
     NetworkDataError(#[from] DtError),
     /// Serialisation

@@ -23,10 +23,10 @@ use crate::node::{
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error, Result,
 };
-use log::{debug, info};
-use sn_data_types::{
+use crate::types::{
     Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
 };
+use log::{debug, info};
 use std::collections::BTreeMap;
 use xor_name::{Prefix, XorName};
 
@@ -169,7 +169,7 @@ impl RewardProcess {
     // TODO: validate the credit...
     pub async fn receive_churn_proposal(&mut self, proposal: RewardProposal) -> Result<NodeDuty> {
         if proposal.section_key != self.section.wallet_key() {
-            return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
+            return Err(Error::Transfer(crate::transfers::Error::InvalidOwner));
         }
         match &mut self.stage {
             RewardStage::AwaitingThreshold => {
@@ -240,7 +240,7 @@ impl RewardProcess {
         new_acc: RewardAccumulation,
     ) -> Result<NodeDuty> {
         if new_acc.section_key != self.section.wallet_key() {
-            return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
+            return Err(Error::Transfer(crate::transfers::Error::InvalidOwner));
         }
         match &mut self.stage {
             RewardStage::AwaitingThreshold => {

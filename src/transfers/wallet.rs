@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
+use crate::types::{Credit, CreditId, Debit, OwnerType, Token};
 use log::debug;
-use sn_data_types::{Credit, CreditId, Debit, OwnerType, Token};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -150,9 +150,9 @@ impl Wallet {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::types::PublicKey;
     use bls::SecretKey;
     use crdts::Dot;
-    use sn_data_types::PublicKey;
     use xor_name::XorName;
 
     #[test]

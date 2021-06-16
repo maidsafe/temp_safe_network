@@ -11,14 +11,14 @@ use crate::client::Error;
 use crate::messaging::client::{
     Cmd, DataCmd, DataQuery, Query, QueryResponse, RegisterRead, RegisterWrite,
 };
-use log::{debug, trace};
-use sn_data_types::{
+use crate::types::{
     register::{
         Address, Entry, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
         PublicPermissions, PublicPolicy, Register, User,
     },
     PublicKey,
 };
+use log::{debug, trace};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -185,7 +185,7 @@ impl Client {
         let register = self.get_register(address).await?;
         let entry = register
             .get(hash, None)?
-            .ok_or_else(|| Error::from(sn_data_types::Error::NoSuchEntry))?;
+            .ok_or_else(|| Error::from(crate::types::Error::NoSuchEntry))?;
 
         Ok(entry.to_vec())
     }
@@ -243,12 +243,12 @@ mod tests {
         Error,
     };
     use crate::messaging::client::Error as ErrorMessage;
-    use crate::{retry_loop, retry_loop_for_pattern};
-    use anyhow::{anyhow, bail, Result};
-    use sn_data_types::{
+    use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey, Token,
     };
+    use crate::{retry_loop, retry_loop_for_pattern};
+    use anyhow::{anyhow, bail, Result};
     use std::{
         collections::{BTreeMap, BTreeSet},
         str::FromStr,

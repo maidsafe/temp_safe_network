@@ -9,24 +9,6 @@
 
 //! SAFE network data types.
 
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "https://maidsafe.net/img/favicon.ico"
-)]
-// For explanation of lint checks, run `rustc -W help`.
-#![forbid(unsafe_code)]
-#![warn(
-    // TODO: add missing debug implementations for structs?
-    // missing_debug_implementations,
-    missing_docs,
-    trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    unused_results
-)]
-
 mod chunk;
 mod errors;
 mod keys;

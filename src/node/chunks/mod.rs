@@ -16,9 +16,9 @@ use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
     Result,
 };
+use crate::types::{Chunk, ChunkAddress, PublicKey};
 use chunk_storage::ChunkStorage;
 use log::info;
-use sn_data_types::{Chunk, ChunkAddress, PublicKey};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,

@@ -9,8 +9,8 @@
 use super::Client;
 use crate::client::Error;
 use crate::messaging::client::{ClientSig, Cmd};
+use crate::types::{PublicKey, Signature};
 use log::debug;
-use sn_data_types::{PublicKey, Signature};
 
 impl Client {
     /// Send a signed Cmd to the network

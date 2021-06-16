@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, QueryResponse};
-use sn_data_types::{
+use crate::types::{
     Map, MapAddress as Address, MapEntryActions as Changes, MapPermissionSet as PermissionSet,
     PublicKey,
 };

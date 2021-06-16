@@ -9,8 +9,8 @@
 use super::read_network_conn_info;
 use crate::client::Client;
 use crate::retry_loop_for_pattern;
+use crate::types::{Keypair, Token};
 use anyhow::Result;
-use sn_data_types::{Keypair, Token};
 use std::str::FromStr;
 use std::sync::Once;
 use tracing_subscriber::{fmt, EnvFilter};

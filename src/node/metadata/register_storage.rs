@@ -15,11 +15,11 @@ use crate::node::{
     data_store::RegisterDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
     Result,
 };
-use log::info;
-use sn_data_types::{
+use crate::types::{
     register::{Action, Address, Entry, Register, RegisterOp, User},
     PublicKey,
 };
+use log::info;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
