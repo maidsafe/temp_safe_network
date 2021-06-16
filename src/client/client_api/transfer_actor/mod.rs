@@ -15,7 +15,7 @@ mod write_apis;
 
 use crate::client::{Client, Error};
 use crate::messaging::client::{
-    ClientSigned, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
+    ClientSig, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
 };
 use bincode::serialize;
 use log::{debug, error, info, trace, warn};
@@ -264,14 +264,14 @@ impl Client {
 
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
-        let client_signed = ClientSigned {
+        let client_sig = ClientSig {
             public_key: client_pk,
             signature,
         };
 
         let msg_id = self
             .session
-            .send_transfer_validation(cmd, client_signed, sender)
+            .send_transfer_validation(cmd, client_sig, sender)
             .await?;
 
         let mut returned_errors = vec![];

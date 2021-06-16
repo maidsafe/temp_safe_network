@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{plain_message::PlainMessage, section::NodeState, signed::Signed};
+use super::{plain_message::PlainMessage, section::NodeState, signed::KeyedSig};
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
@@ -23,12 +23,12 @@ use xor_name::{Prefix, XorName};
 /// SHA3-256 hash digest.
 pub type Digest256 = [u8; 32];
 
-/// Unique identified of a DKG session.
+/// Unique identifier of a DKG session.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct DkgKey {
-    #[allow(missing_docs)]
+    /// A hash of the peers and prefix of the specific session.
     pub hash: Digest256,
-    #[allow(missing_docs)]
+    /// The generation, as in the length of the section chain main branch.
     pub generation: u64,
 }
 
@@ -40,7 +40,7 @@ impl Debug for DkgKey {
 
 /// One signed failure for a DKG round by a given PublicKey
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct DkgFailureSigned {
+pub struct DkgFailureSig {
     #[allow(missing_docs)]
     pub public_key: PublicKey,
     #[allow(missing_docs)]
@@ -49,11 +49,11 @@ pub struct DkgFailureSigned {
 
 /// Dkg failure info for a round
 #[derive(Default, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct DkgFailureSignedSet {
+pub struct DkgFailureSigSet {
     #[allow(missing_docs)]
-    pub signeds: Vec<DkgFailureSigned>,
+    pub sigs: Vec<DkgFailureSig>,
     #[allow(missing_docs)]
-    pub non_participants: BTreeSet<XorName>,
+    pub failed_participants: BTreeSet<XorName>,
 }
 
 /// A value together with the signature that it was agreed on by the majority of the section elders.
@@ -62,7 +62,7 @@ pub struct SectionSigned<T: Serialize> {
     /// some value to be agreed upon by elders
     pub value: T,
     /// signature over the value
-    pub signed: Signed,
+    pub sig: KeyedSig,
 }
 
 impl<T> Borrow<Prefix> for SectionSigned<T>
@@ -74,6 +74,7 @@ where
     }
 }
 
+/// A step in the Propose-Broadcast-Aggregate-Execute workflow.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 /// A proposal about the state of the network
@@ -89,10 +90,8 @@ pub enum Proposal {
         /// The key of the destination section that the joining node knows, if any.
         dst_key: Option<BlsPublicKey>,
     },
-
     /// Proposal to remove a node from our section
     Offline(NodeState),
-
     /// Proposal to update info about a section. This has two purposes:
     ///
     /// 1. To signal the completion of a DKG by the elder candidates to the current elders.
@@ -100,7 +99,6 @@ pub enum Proposal {
     /// 2. To update information about other section in the network. In this case the proposal is
     ///    signed by an existing key from the chain.
     SectionInfo(SectionAuthorityProvider),
-
     /// Proposal to change the elders (and possibly the prefix) of our section.
     /// NOTE: the `SectionAuthorityProvider` is already signed with the new key. This proposal is only to signs the
     /// new key with the current key. That way, when it aggregates, we obtain all the following
@@ -112,16 +110,14 @@ pub enum Proposal {
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
     OurElders(SectionSigned<SectionAuthorityProvider>),
-
     /// Proposal to accumulate the message at the source (that is, our section) and then send it to
     /// its destination.
     AccumulateAtSrc {
-        /// The message
+        /// Message to be accumulated
         message: Box<PlainMessage>,
         /// Verifiable section chain
         proof_chain: SecuredLinkedList,
     },
-
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed(bool),
 }

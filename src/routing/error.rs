@@ -68,8 +68,8 @@ pub enum Error {
     ProposalError(#[from] ProposalError),
     #[error("create error: {0}")]
     CreateError(#[from] CreateError),
-    #[error("extend signed error: {0}")]
-    ExtendSignedError(#[from] ExtendSignedChainError),
+    #[error("extend signed chain error: {0}")]
+    ExtendSignedChainError(#[from] ExtendSignedChainError),
     #[error("invalid payload")]
     InvalidPayload,
     #[error("Routing is set to not allow taking any new node")]

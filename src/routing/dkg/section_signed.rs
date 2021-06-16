@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{verify_signed, Signed};
+use super::{verify_sig, KeyedSig};
 use crate::messaging::node::SectionSigned;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 
 pub trait SectionSignedUtils<T: Serialize> {
-    fn new(value: T, signed: Signed) -> Self;
+    fn new(value: T, sig: KeyedSig) -> Self;
 
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
 
@@ -20,15 +20,15 @@ pub trait SectionSignedUtils<T: Serialize> {
 }
 
 impl<T: Serialize> SectionSignedUtils<T> for SectionSigned<T> {
-    fn new(value: T, signed: Signed) -> Self {
-        Self { value, signed }
+    fn new(value: T, sig: KeyedSig) -> Self {
+        Self { value, sig }
     }
 
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool {
-        section_chain.has_key(&self.signed.public_key) && self.self_verify()
+        section_chain.has_key(&self.sig.public_key) && self.self_verify()
     }
 
     fn self_verify(&self) -> bool {
-        verify_signed(&self.signed, &self.value)
+        verify_sig(&self.sig, &self.value)
     }
 }

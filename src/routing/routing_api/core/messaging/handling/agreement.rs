@@ -10,7 +10,7 @@ use std::cmp;
 
 use crate::messaging::{
     node::{
-        MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned, Signed,
+        KeyedSig, MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned,
         Variant,
     },
     DstInfo, DstLocation, SectionAuthorityProvider,
@@ -37,7 +37,7 @@ impl Core {
     pub(crate) async fn handle_agreement(
         &mut self,
         proposal: Proposal,
-        signed: Signed,
+        sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         debug!("handle agreement on {:?}", proposal);
 
@@ -47,17 +47,15 @@ impl Core {
                 previous_name,
                 ..
             } => {
-                self.handle_online_agreement(node_state, previous_name, signed)
+                self.handle_online_agreement(node_state, previous_name, sig)
                     .await
             }
-            Proposal::Offline(node_state) => {
-                self.handle_offline_agreement(node_state, signed).await
-            }
+            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
-                self.handle_section_info_agreement(section_auth, signed)
+                self.handle_section_info_agreement(section_auth, sig)
             }
             Proposal::OurElders(section_auth) => {
-                self.handle_our_elders_agreement(section_auth, signed).await
+                self.handle_our_elders_agreement(section_auth, sig).await
             }
             Proposal::AccumulateAtSrc { message, .. } => {
                 let dst_name = if let Some(name) = message.dst.name() {
@@ -73,7 +71,7 @@ impl Core {
                 Ok(vec![self.handle_accumulate_at_src_agreement(
                     *message,
                     self.section.chain().clone(),
-                    signed,
+                    sig,
                     DstInfo {
                         dst: dst_name,
                         dst_section_pk,
@@ -91,7 +89,7 @@ impl Core {
         &mut self,
         new_info: NodeState,
         previous_name: Option<XorName>,
-        signed: Signed,
+        sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
@@ -126,7 +124,7 @@ impl Core {
 
         let new_info = SectionSigned {
             value: new_info,
-            signed,
+            sig,
         };
 
         if !self.section.update_member(new_info.clone()) {
@@ -143,8 +141,7 @@ impl Core {
         })
         .await;
 
-        commands
-            .extend(self.relocate_peers(new_info.value.peer.name(), &new_info.signed.signature)?);
+        commands.extend(self.relocate_peers(new_info.value.peer.name(), &new_info.sig.signature)?);
 
         let result = self.promote_and_demote_elders()?;
         if result.is_empty() {
@@ -162,17 +159,17 @@ impl Core {
     async fn handle_offline_agreement(
         &mut self,
         node_state: NodeState,
-        signed: Signed,
+        sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
         let peer = node_state.peer;
         let age = peer.age();
-        let signature = signed.signature.clone();
+        let signature = sig.signature.clone();
 
         if !self.section.update_member(SectionSigned {
             value: node_state,
-            signed,
+            sig,
         }) {
             info!("ignore Offline: {:?}", peer);
             return Ok(commands);
@@ -201,13 +198,13 @@ impl Core {
     fn handle_section_info_agreement(
         &mut self,
         section_auth: SectionAuthorityProvider,
-        signed: Signed,
+        sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
         let equal_or_extension = section_auth.prefix() == *self.section.prefix()
             || section_auth.prefix().is_extension_of(self.section.prefix());
-        let section_auth = SectionSigned::new(section_auth, signed.clone());
+        let section_auth = SectionSigned::new(section_auth, sig.clone());
 
         if equal_or_extension {
             // Our section of sub-section
@@ -243,7 +240,7 @@ impl Core {
                     sync_message,
                     DstInfo {
                         dst: XorName::random(),
-                        dst_section_pk: signed.public_key,
+                        dst_section_pk: sig.public_key,
                     },
                 ));
             }
@@ -268,26 +265,24 @@ impl Core {
     async fn handle_our_elders_agreement(
         &mut self,
         section_auth: SectionSigned<SectionAuthorityProvider>,
-        key_signed: Signed,
+        key_sig: KeyedSig,
     ) -> Result<Vec<Command>> {
         let updates = self
             .split_barrier
-            .process(self.section.prefix(), section_auth, key_signed);
+            .process(self.section.prefix(), section_auth, key_sig);
         if updates.is_empty() {
             return Ok(vec![]);
         }
 
         let snapshot = self.state_snapshot();
 
-        for (section_auth, key_signed) in updates {
+        for (section_auth, key_sig) in updates {
             if section_auth.value.prefix.matches(&self.node.name()) {
-                let _ = self.section.update_elders(section_auth, key_signed);
+                let _ = self.section.update_elders(section_auth, key_sig);
             } else {
-                let _ = self.network.update_section(
-                    section_auth,
-                    Some(key_signed),
-                    self.section.chain(),
-                );
+                let _ =
+                    self.network
+                        .update_section(section_auth, Some(key_sig), self.section.chain());
             }
         }
 
@@ -298,10 +293,10 @@ impl Core {
         &self,
         message: PlainMessage,
         section_chain: SecuredLinkedList,
-        signed: Signed,
+        sig: KeyedSig,
         dst_info: DstInfo,
     ) -> Result<Command> {
-        let message = RoutingMsg::section_src(message, signed, section_chain)?;
+        let message = RoutingMsg::section_src(message, sig, section_chain)?;
 
         Ok(Command::HandleMessage {
             message,

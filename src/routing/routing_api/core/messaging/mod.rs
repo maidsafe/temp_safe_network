@@ -15,7 +15,7 @@ use crate::messaging::{
     DstLocation,
 };
 use crate::routing::{
-    dkg::{ProposalUtils, SignedShare},
+    dkg::{ProposalUtils, SigShare},
     error::Result,
     messages::RoutingMsgUtils,
     routing_api::command::Command,
@@ -57,7 +57,7 @@ impl Core {
             recipients,
         );
 
-        let signed_share = proposal.prove(
+        let sig_share = proposal.prove(
             key_share.public_key_set.clone(),
             key_share.index,
             &key_share.secret_key_share,
@@ -66,7 +66,7 @@ impl Core {
         // Broadcast the proposal to the rest of the section elders.
         let variant = Variant::Propose {
             content: proposal,
-            signed_share,
+            sig_share,
         };
         let message = RoutingMsg::single_src(
             &self.node,
@@ -84,9 +84,9 @@ impl Core {
     pub(crate) fn check_lagging(
         &self,
         peer: (XorName, SocketAddr),
-        signed_share: &SignedShare,
+        sig_share: &SigShare,
     ) -> Result<Option<Command>> {
-        let public_key = signed_share.public_key_set.public_key();
+        let public_key = sig_share.public_key_set.public_key();
 
         if self.section.chain().has_key(&public_key)
             && public_key != *self.section.chain().last_key()
@@ -100,7 +100,7 @@ impl Core {
                     section: self.section.clone(),
                     network: self.network.clone(),
                 },
-                signed_share.public_key_set.public_key(),
+                sig_share.public_key_set.public_key(),
             )?))
         } else {
             Ok(None)

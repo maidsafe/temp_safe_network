@@ -14,7 +14,7 @@ use qp2p::QuicP2p;
 use sn_data_types::Keypair;
 use crate::messaging::client::ProcessMsg;
 use crate::messaging::{
-    client::{ClientMsg, ClientSigned, Query, TransferQuery},
+    client::{ClientMsg, ClientSig, Query, TransferQuery},
     location::{Aggregation, Itinerary},
     DstLocation, MessageId, SrcLocation,
 };
@@ -36,7 +36,7 @@ async fn test_messages_client_node() -> Result<()> {
     let mut rng = rand::thread_rng();
     let keypair = Keypair::new_ed25519(&mut rng);
     let pk = keypair.public_key();
-    let client_signed = ClientSigned {
+    let client_sig = ClientSig {
         public_key: pk,
         signature: keypair.sign(b"the msg"),
     };
@@ -60,7 +60,7 @@ async fn test_messages_client_node() -> Result<()> {
     let query = ClientMsg::Process(ProcessMsg::Query {
         id,
         query: Query::Transfer(TransferQuery::GetBalance(pk)),
-        client_signed,
+        client_sig,
     });
     let query_clone = query.clone();
 

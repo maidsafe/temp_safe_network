@@ -16,8 +16,7 @@ mod sequence_storage;
 
 use crate::messaging::{
     client::{
-        ClientMsg, ClientSigned, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg,
-        QueryResponse,
+        ClientMsg, ClientSig, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -99,12 +98,10 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores
-            .write(cmd, id, client_signed, origin)
-            .await
+        self.elder_stores.write(cmd, id, client_sig, origin).await
     }
 
     /// Adds a given node to the list of full nodes.

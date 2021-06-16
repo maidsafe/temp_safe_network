@@ -10,9 +10,9 @@ use super::{Comm, Command, Core, Dispatcher};
 use crate::messaging::{
     location::{Aggregation, Itinerary},
     node::{
-        JoinAsRelocatedRequest, JoinRequest, JoinResponse, MembershipState, Network, NodeState,
-        Peer, PlainMessage, Proposal, RelocateDetails, RelocatePayload, ResourceProofResponse,
-        RoutingMsg, Section, SectionSigned, Signed, SignedRelocateDetails, Variant,
+        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
+        NodeState, Peer, PlainMessage, Proposal, RelocateDetails, RelocatePayload,
+        ResourceProofResponse, RoutingMsg, Section, SectionSigned, SignedRelocateDetails, Variant,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
     DstInfo, DstLocation, MessageType, SectionAuthorityProvider, SrcLocation,
@@ -342,7 +342,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let proof_chain = SecuredLinkedList::new(section_key);
     let relocate_message = RoutingMsg::section_src(
         relocate_message,
-        Signed {
+        KeyedSig {
             public_key: section_key,
             signature,
         },
@@ -421,14 +421,13 @@ async fn aggregate_proposals() -> Result<()> {
     };
 
     for index in 0..THRESHOLD {
-        let signed_share =
-            proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
+        let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
         let message = RoutingMsg::single_src(
             &nodes[index],
             DstLocation::DirectAndUnrouted,
             Variant::Propose {
                 content: proposal.clone(),
-                signed_share,
+                sig_share,
             },
             section_auth.section_key(),
         )?;
@@ -446,7 +445,7 @@ async fn aggregate_proposals() -> Result<()> {
         assert!(commands.is_empty());
     }
 
-    let signed_share = proposal.prove(
+    let sig_share = proposal.prove(
         pk_set.clone(),
         THRESHOLD,
         &sk_set.secret_key_share(THRESHOLD),
@@ -456,7 +455,7 @@ async fn aggregate_proposals() -> Result<()> {
         DstLocation::DirectAndUnrouted,
         Variant::Propose {
             content: proposal.clone(),
-            signed_share,
+            sig_share,
         },
         section_auth.section_key(),
     )?;
@@ -530,10 +529,10 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         let mut peer = peer;
         peer.set_reachable(true);
         let node_state = NodeState::joined(peer);
-        let signed = prove(sk_set.secret_key(), &node_state)?;
+        let sig = prove(sk_set.secret_key(), &node_state)?;
         let _ = section.update_member(SectionSigned {
             value: node_state,
-            signed,
+            sig,
         });
         if peer.age() == MIN_AGE + 2 {
             let _ = expected_new_elders.insert(peer);
@@ -560,10 +559,10 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         previous_name: Some(XorName::random()),
         dst_key: Some(sk_set.secret_key().public_key()),
     };
-    let signed = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, signed })
+        .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -616,10 +615,10 @@ async fn handle_online_command(
         previous_name: None,
         dst_key: None,
     };
-    let signed = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, signed })
+        .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -760,10 +759,10 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         state: MembershipState::Left,
     };
     let proposal = Proposal::Offline(node_state);
-    let signed = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let _ = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, signed })
+        .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberLeft { name, age, }) => {
@@ -804,10 +803,10 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::Offline(remove_node_state);
-    let signed = prove(sk_set.secret_key(), &proposal.as_signable())?;
+    let sig = prove(sk_set.secret_key(), &proposal.as_signable())?;
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, signed })
+        .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -930,7 +929,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
     let signature = sk1.sign(&bincode::serialize(&message.as_signable())?);
     let original_message = RoutingMsg::section_src(
         message,
-        Signed {
+        KeyedSig {
             public_key: pk1,
             signature,
         },
@@ -1023,7 +1022,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
     let proof_chain = chain.truncate(1);
     let original_message = RoutingMsg::section_src(
         original_message,
-        Signed {
+        KeyedSig {
             public_key: pk1,
             signature,
         },
@@ -1397,9 +1396,9 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         RelocatedPeerRole::NonElder => non_elder_peer,
     };
 
-    let (proposal, signed) = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
+    let (proposal, sig) = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, signed })
+        .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
     let mut relocate_sent = false;
@@ -1553,7 +1552,7 @@ async fn handle_elders_update() -> Result<()> {
     let signature = sk_set0
         .secret_key()
         .sign(&bincode::serialize(&proposal.as_signable())?);
-    let signed = Signed {
+    let sig = KeyedSig {
         signature,
         public_key: pk0,
     };
@@ -1563,7 +1562,7 @@ async fn handle_elders_update() -> Result<()> {
     let dispatcher = Dispatcher::new(state, create_comm().await?);
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, signed })
+        .handle_command(Command::HandleAgreement { proposal, sig })
         .await?;
 
     let mut sync_actual_recipients = HashSet::new();
@@ -1667,12 +1666,12 @@ async fn handle_demote_during_split() -> Result<()> {
         let signature = sk_set_v0
             .secret_key()
             .sign(&bincode::serialize(&proposal.as_signable())?);
-        let signed = Signed {
+        let sig = KeyedSig {
             signature,
             public_key: sk_set_v0.secret_key().public_key(),
         };
 
-        Ok(Command::HandleAgreement { proposal, signed })
+        Ok(Command::HandleAgreement { proposal, sig })
     };
 
     // Handle agreement on `OurElders` for prefix-0.
@@ -1815,7 +1814,7 @@ fn create_section(
 // NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
 // to complete because it needs to generate a signature with the number of trailing zeroes equal to
 // (or greater that) `age`.
-fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, Signed)> {
+fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, KeyedSig)> {
     loop {
         let proposal = Proposal::Online {
             node_state: NodeState::joined(create_peer(MIN_ADULT_AGE)),
@@ -1826,12 +1825,12 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<(Proposal, 
         let signature = sk.sign(&bincode::serialize(&proposal.as_signable())?);
 
         if relocation::check(age, &signature) && !relocation::check(age + 1, &signature) {
-            let signed = Signed {
+            let sig = KeyedSig {
                 public_key: sk.public_key(),
                 signature,
             };
 
-            return Ok((proposal, signed));
+            return Ok((proposal, sig));
         }
     }
 }

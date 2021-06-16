@@ -228,7 +228,7 @@ fn cmp_elder_candidates(
                 _ => Ordering::Equal,
             }
         })
-        .then_with(|| lhs.signed.signature.cmp(&rhs.signed.signature))
+        .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
 }
 
 // Compare candidates for the next elders according to their peer state. The one comparing `Less`

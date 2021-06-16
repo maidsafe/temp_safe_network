@@ -24,6 +24,7 @@ use std::{
 };
 use xor_name::XorName;
 
+/// Container for storing information about a section.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// All information about a section
 pub struct Section {

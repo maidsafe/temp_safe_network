@@ -130,7 +130,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             query:
                 NodeQuery::Metadata {
                     query,
-                    client_signed,
+                    client_sig,
                     origin,
                 },
             id,
@@ -141,7 +141,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             NodeDuty::ProcessRead {
                 query,
                 msg_id: id,
-                client_signed,
+                client_sig,
                 origin,
             }
         }
@@ -149,7 +149,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             cmd:
                 NodeCmd::Metadata {
                     cmd,
-                    client_signed,
+                    client_sig,
                     origin,
                 },
             id,
@@ -160,7 +160,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             NodeDuty::ProcessWrite {
                 cmd,
                 msg_id: id,
-                client_signed,
+                client_sig,
                 origin,
             }
         }
@@ -176,14 +176,14 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
         },
         NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks {
-                cmd, client_signed, ..
+                cmd, client_sig, ..
             },
             id,
             ..
         } => NodeDuty::WriteChunk {
             write: cmd,
             msg_id: id,
-            client_signed,
+            client_sig,
         },
         // this cmd is accumulated, thus has authority
         NodeMsg::NodeCmd {

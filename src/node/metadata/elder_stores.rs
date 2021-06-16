@@ -11,7 +11,7 @@ use super::{
     sequence_storage::SequenceStorage,
 };
 use crate::messaging::{
-    client::{ClientSigned, DataCmd, DataExchange, DataQuery},
+    client::{ClientSig, DataCmd, DataExchange, DataQuery},
     EndUser, MessageId,
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
@@ -70,7 +70,7 @@ impl ElderStores {
         &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         info!("Writing Data");
@@ -78,25 +78,25 @@ impl ElderStores {
             DataCmd::Blob(write) => {
                 info!("Writing Blob");
                 self.chunk_records
-                    .write(write, msg_id, client_signed, origin)
+                    .write(write, msg_id, client_sig, origin)
                     .await
             }
             DataCmd::Map(write) => {
                 info!("Writing Map");
                 self.map_storage
-                    .write(write, msg_id, client_signed.public_key, origin)
+                    .write(write, msg_id, client_sig.public_key, origin)
                     .await
             }
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
                 self.sequence_storage
-                    .write(write, msg_id, client_signed.public_key, origin)
+                    .write(write, msg_id, client_sig.public_key, origin)
                     .await
             }
             DataCmd::Register(write) => {
                 info!("Writing Register");
                 self.register_storage
-                    .write(write, msg_id, client_signed.public_key, origin)
+                    .write(write, msg_id, client_sig.public_key, origin)
                     .await
             }
         }

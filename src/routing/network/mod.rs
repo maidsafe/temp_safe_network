@@ -12,7 +12,7 @@ mod stats;
 
 use self::stats::NetworkStats;
 use crate::routing::{
-    dkg::{verify_signed, SectionSignedUtils, Signed},
+    dkg::{verify_sig, KeyedSig, SectionSignedUtils},
     peer::PeerUtils,
     section::SectionAuthorityProviderUtils,
     Error, Result,
@@ -52,15 +52,15 @@ pub trait NetworkUtils {
     ///
     /// If this is for our sibling section, then `section_auth` is signed by them and so the signing
     /// key is not in our `section_chain`. To prove the key is valid, it must be accompanied by an
-    /// additional `key_signed` which signs it using a key that is present in `section_chain`.
+    /// additional `key_sig` which signs it using a key that is present in `section_chain`.
     ///
     /// If this is for a non-sibling section, then currently we require the info to be signed by our
-    /// section (so we need to accumulate the signature for it first) and so `key_signed` is not
+    /// section (so we need to accumulate the signature for it first) and so `key_sig` is not
     /// needed in that case.
     fn update_section(
         &mut self,
         section_auth: SectionSigned<SectionAuthorityProvider>,
-        key_signed: Option<Signed>,
+        key_sig: Option<KeyedSig>,
         section_chain: &SecuredLinkedList,
     ) -> bool;
 
@@ -146,20 +146,20 @@ impl NetworkUtils for Network {
     ///
     /// If this is for our sibling section, then `section_auth` is signed by them and so the signing
     /// key is not in our `section_chain`. To prove the key is valid, it must be accompanied by an
-    /// additional `key_signed` which signs it using a key that is present in `section_chain`.
+    /// additional `key_sig` which signs it using a key that is present in `section_chain`.
     ///
     /// If this is for a non-sibling section, then currently we require the info to be signed by our
-    /// section (so we need to accumulate the signature for it first) and so `key_signed` is not
+    /// section (so we need to accumulate the signature for it first) and so `key_sig` is not
     /// needed in that case.
     fn update_section(
         &mut self,
         section_auth: SectionSigned<SectionAuthorityProvider>,
-        key_signed: Option<Signed>,
+        key_sig: Option<KeyedSig>,
         section_chain: &SecuredLinkedList,
     ) -> bool {
         let info = OtherSection {
             section_auth: section_auth.clone(),
-            key_signed,
+            key_sig,
         };
 
         if !info.verify(section_chain) {
@@ -253,9 +253,9 @@ pub trait OtherSectionUtils {
 
 impl OtherSectionUtils for OtherSection {
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool {
-        if let Some(key_signed) = &self.key_signed {
-            section_chain.has_key(&key_signed.public_key)
-                && verify_signed(key_signed, &self.section_auth.signed.public_key)
+        if let Some(key_sig) = &self.key_sig {
+            section_chain.has_key(&key_sig.public_key)
+                && verify_sig(key_sig, &self.section_auth.sig.public_key)
                 && self.section_auth.self_verify()
         } else {
             self.section_auth.verify(section_chain)

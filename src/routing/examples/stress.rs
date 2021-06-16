@@ -18,7 +18,7 @@ use rand::{
     Rng,
 };
 use serde::{Deserialize, Serialize};
-use crate::messaging::node::{SignatureAggregator, SignedShare};
+use crate::messaging::node::{SignatureAggregator, SigShare};
 use crate::messaging::{
     location::{Aggregation, Itinerary},
     DstLocation, SrcLocation,
@@ -369,7 +369,7 @@ impl Network {
                         }
                     };
 
-                    self.probe_tracker.receive(&dst, message.signed_share).await;
+                    self.probe_tracker.receive(&dst, message.sig_share).await;
                 }
                 _ => {
                     // Currently ignore the other event variants. This might change in the future,
@@ -466,7 +466,7 @@ impl Network {
             .with_context(|| format!("failed to retrieve key share index by {}", src))?;
 
         let message = ProbeMessage {
-            signed_share: SignedShare {
+            sig_share: SigShare {
                 public_key_set,
                 index,
                 signature_share,
@@ -758,7 +758,7 @@ struct Stats {
 
 #[derive(Serialize, Deserialize)]
 struct ProbeMessage {
-    signed_share: SignedShare,
+    sig_share: SigShare,
 }
 
 #[derive(Clone)]
@@ -791,7 +791,7 @@ impl ProbeTracker {
         }
     }
 
-    async fn receive(&mut self, dst: &XorName, signed_share: SignedShare) {
+    async fn receive(&mut self, dst: &XorName, sig_share: SigShare) {
         let result = &self
             .sections
             .iter()
@@ -805,7 +805,7 @@ impl ProbeTracker {
             ProbeState::Success => return,
         };
 
-        if aggregator.lock().await.add(dst, signed_share).is_ok() {
+        if aggregator.lock().await.add(dst, sig_share).is_ok() {
             cache.set(*dst, ProbeState::Success, None).await;
         }
     }

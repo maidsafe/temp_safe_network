@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    agreement::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, Proposal, SectionSigned},
+    agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionSigned},
     join::{JoinRequest, JoinResponse},
     join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse},
     network::Network,
     relocation::{RelocateDetails, RelocatePromise},
     section::{ElderCandidates, Section},
-    signed::SignedShare,
+    signed::SigShare,
     RoutingMsg,
 };
 use crate::messaging::{DstInfo, SectionAuthorityProvider};
@@ -86,24 +86,24 @@ pub enum Variant {
         /// The DKG message.
         message: DkgMessage,
     },
-    /// Broadcasted to the other DKG participants when a DKG failure is observed.
+    /// Broadcast to the other DKG participants when a DKG failure is observed.
     DkgFailureObservation {
         /// The DKG key
         dkg_key: DkgKey,
         /// Signature over the failure
-        signed: DkgFailureSigned,
-        /// Nodes that did not participate
-        non_participants: BTreeSet<XorName>,
+        sig: DkgFailureSig,
+        /// Nodes that failed to participate
+        failed_participants: BTreeSet<XorName>,
     },
     /// Sent to the current elders by the DKG participants when at least majority of them observe
     /// a DKG failure.
-    DkgFailureAgreement(DkgFailureSignedSet),
+    DkgFailureAgreement(DkgFailureSigSet),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal
         content: Proposal,
-        /// BLS signed share
-        signed_share: SignedShare,
+        /// BLS signature share
+        sig_share: SigShare,
     },
     /// Message that notifies a section to test
     /// the connectivity to a node
@@ -170,24 +170,21 @@ impl Debug for Variant {
                 .finish(),
             Self::DkgFailureObservation {
                 dkg_key,
-                signed,
-                non_participants,
+                sig,
+                failed_participants,
             } => f
                 .debug_struct("DkgFailureObservation")
                 .field("dkg_key", dkg_key)
-                .field("signed", signed)
-                .field("non_participants", non_participants)
+                .field("sig", sig)
+                .field("failed_participants", failed_participants)
                 .finish(),
             Self::DkgFailureAgreement(proofs) => {
                 f.debug_tuple("DkgFailureAgreement").field(proofs).finish()
             }
-            Self::Propose {
-                content,
-                signed_share,
-            } => f
+            Self::Propose { content, sig_share } => f
                 .debug_struct("Propose")
                 .field("content", content)
-                .field("signed_share", signed_share)
+                .field("sig_share", sig_share)
                 .finish(),
             Self::SectionKnowledgeQuery { .. } => write!(f, "SectionKnowledgeQuery"),
         }

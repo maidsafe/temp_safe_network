@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, RoutingMsg, Variant},
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, RoutingMsg, Variant},
     DstInfo, DstLocation, SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -35,10 +35,10 @@ pub(crate) enum DkgCommand {
     SendFailureObservation {
         recipients: Vec<(XorName, SocketAddr)>,
         dkg_key: DkgKey,
-        signed: DkgFailureSigned,
-        non_participants: BTreeSet<XorName>,
+        sig: DkgFailureSig,
+        failed_participants: BTreeSet<XorName>,
     },
-    HandleFailureAgreement(DkgFailureSignedSet),
+    HandleFailureAgreement(DkgFailureSigSet),
 }
 
 impl DkgCommand {
@@ -76,13 +76,13 @@ impl DkgCommand {
             Self::SendFailureObservation {
                 recipients,
                 dkg_key,
-                signed,
-                non_participants,
+                sig,
+                failed_participants,
             } => {
                 let variant = Variant::DkgFailureObservation {
                     dkg_key,
-                    signed,
-                    non_participants,
+                    sig,
+                    failed_participants,
                 };
                 let message =
                     RoutingMsg::single_src(node, DstLocation::DirectAndUnrouted, variant, key)?;

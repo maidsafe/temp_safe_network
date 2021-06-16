@@ -16,17 +16,17 @@ pub mod test_utils;
 mod voter;
 
 pub(crate) use self::{
-    dkg_msgs_utils::{DkgFailureSignedSetUtils, DkgKeyUtils},
+    dkg_msgs_utils::{DkgFailureSigSetUtils, DkgKeyUtils},
     proposal::{ProposalAggregator, ProposalError, ProposalUtils},
     voter::DkgVoter,
 };
-pub(crate) use crate::messaging::node::{SignatureAggregator, Signed, SignedShare};
+pub(crate) use crate::messaging::node::{KeyedSig, SigShare, SignatureAggregator};
 pub use section_signed::SectionSignedUtils;
 use serde::Serialize;
 
-// Verify the integrity of `message` against `signed`.
-pub(crate) fn verify_signed<T: Serialize>(signed: &Signed, message: &T) -> bool {
+// Verify the integrity of `message` against `sig`.
+pub(crate) fn verify_sig<T: Serialize>(sig: &KeyedSig, message: &T) -> bool {
     bincode::serialize(message)
-        .map(|bytes| signed.verify(&bytes))
+        .map(|bytes| sig.verify(&bytes))
         .unwrap_or(false)
 }

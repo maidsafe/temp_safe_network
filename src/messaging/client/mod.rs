@@ -55,10 +55,9 @@ use xor_name::XorName;
 
 /// Public key and signature provided by the client
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct ClientSigned {
+pub struct ClientSig {
     /// Client public key.
     pub public_key: PublicKey,
-
     /// Client signature.
     pub signature: Signature,
 }
@@ -244,7 +243,7 @@ pub enum ProcessMsg {
         /// Cmd.
         cmd: Cmd,
         /// Public key and corresponding signature over the command
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
     },
     /// Queries is a read-only operation.
     Query {
@@ -253,7 +252,7 @@ pub enum ProcessMsg {
         /// Query.
         query: Query,
         /// Public key and corresponding signature over the query
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
     },
     /// An Event is a fact about something that happened.
     Event {
@@ -546,7 +545,7 @@ mod tests {
             let msg = ProcessMsg::Query {
                 id: MessageId::new(),
                 query: Query::Transfer(TransferQuery::GetBalance(public_key)),
-                client_signed: ClientSigned {
+                client_sig: ClientSig {
                     public_key,
                     signature,
                 },
@@ -579,7 +578,7 @@ mod tests {
                 source_message: Some(ProcessMsg::Query {
                     id: MessageId::new(),
                     query: Query::Transfer(TransferQuery::GetBalance(public_key)),
-                    client_signed: ClientSigned {
+                    client_sig: ClientSig {
                         public_key,
                         signature,
                     },
@@ -651,7 +650,7 @@ mod tests {
         let message = ClientMsg::Process(ProcessMsg::Query {
             id,
             query: Query::Transfer(TransferQuery::GetBalance(public_key)),
-            client_signed: ClientSigned {
+            client_sig: ClientSig {
                 public_key,
                 signature,
             },

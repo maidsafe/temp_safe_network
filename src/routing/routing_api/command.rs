@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSignedSet, Proposal, RoutingMsg, Section, Signed},
+    node::{DkgFailureSigSet, KeyedSig, Proposal, RoutingMsg, Section},
     section_info::SectionInfoMsg,
     DstInfo, Itinerary, MessageType, SectionAuthorityProvider,
 };
@@ -45,7 +45,7 @@ pub(crate) enum Command {
     /// Handle peer that's been detected as lost.
     HandlePeerLost(SocketAddr),
     /// Handle agreement on a proposal.
-    HandleAgreement { proposal: Proposal, signed: Signed },
+    HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {
@@ -53,7 +53,7 @@ pub(crate) enum Command {
         outcome: SectionKeyShare,
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
-    HandleDkgFailure(DkgFailureSignedSet),
+    HandleDkgFailure(DkgFailureSigSet),
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessage {
         recipients: Vec<(XorName, SocketAddr)>,
@@ -148,10 +148,10 @@ impl Debug for Command {
                 f.debug_tuple("HandleConnectionLost").field(addr).finish()
             }
             Self::HandlePeerLost(addr) => f.debug_tuple("HandlePeerLost").field(addr).finish(),
-            Self::HandleAgreement { proposal, signed } => f
+            Self::HandleAgreement { proposal, sig } => f
                 .debug_struct("HandleAgreement")
                 .field("proposal", proposal)
-                .field("signed.public_key", &signed.public_key)
+                .field("sig.public_key", &sig.public_key)
                 .finish(),
             Self::HandleDkgOutcome {
                 section_auth,

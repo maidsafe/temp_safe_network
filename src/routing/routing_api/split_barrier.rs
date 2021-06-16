@@ -9,10 +9,10 @@
 use std::mem;
 
 use crate::messaging::{node::SectionSigned, SectionAuthorityProvider};
-use crate::routing::dkg::Signed;
+use crate::routing::dkg::KeyedSig;
 use xor_name::Prefix;
 
-type Entry = (SectionSigned<SectionAuthorityProvider>, Signed);
+type Entry = (SectionSigned<SectionAuthorityProvider>, KeyedSig);
 
 // Helper structure to make sure we process a split by updating info about both our section and the
 // sibling section at the same time.
@@ -33,11 +33,11 @@ impl SplitBarrier {
         &mut self,
         our_prefix: &Prefix,
         section_auth: SectionSigned<SectionAuthorityProvider>,
-        key_signed: Signed,
+        keyed_sig: KeyedSig,
     ) -> Vec<Entry> {
         if !section_auth.value.prefix.is_extension_of(our_prefix) {
             // Not a split, no need to cache.
-            return vec![(section_auth, key_signed)];
+            return vec![(section_auth, keyed_sig)];
         }
 
         // Split detected. Find all cached siblings.
@@ -51,11 +51,11 @@ impl SplitBarrier {
 
         if give.is_empty() {
             // No sibling found. Cache this update until we see the sibling update.
-            self.0.push((section_auth, key_signed));
+            self.0.push((section_auth, keyed_sig));
             vec![]
         } else {
             // Sibling found. We can proceed with the update.
-            give.push((section_auth, key_signed));
+            give.push((section_auth, keyed_sig));
             give
         }
     }

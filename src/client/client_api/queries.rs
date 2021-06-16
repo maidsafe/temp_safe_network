@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::{connections::QueryResult, errors::Error};
-use crate::messaging::client::{ClientSigned, Query};
+use crate::messaging::client::{ClientSig, Query};
 use log::debug;
 use sn_data_types::{PublicKey, Signature};
 
@@ -21,12 +21,12 @@ impl Client {
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
-        let client_signed = ClientSigned {
+        let client_sig = ClientSig {
             public_key: client_pk,
             signature,
         };
 
-        self.session.send_query(query, client_signed).await
+        self.session.send_query(query, client_sig).await
     }
 
     // Send a Query to the network and await a response.

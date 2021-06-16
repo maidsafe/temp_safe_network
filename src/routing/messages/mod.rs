@@ -10,7 +10,7 @@ mod plain_message;
 mod src_authority;
 
 pub use self::{plain_message::PlainMessageUtils, src_authority::SrcAuthorityUtils};
-use crate::messaging::node::{Signed, SignedShare};
+use crate::messaging::node::{KeyedSig, SigShare};
 use crate::messaging::{
     node::{JoinResponse, PlainMessage, RoutingMsg, SrcAuthority, Variant},
     Aggregation, DstLocation, MessageId,
@@ -52,7 +52,7 @@ pub trait RoutingMsgUtils {
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(self, signed: Signed) -> Result<RoutingMsg>;
+    fn into_dst_accumulated(self, sig: KeyedSig) -> Result<RoutingMsg>;
 
     fn signable_view(&self) -> SignableView;
 
@@ -68,7 +68,7 @@ pub trait RoutingMsgUtils {
     /// Note: `signed` isn't verified and is assumed valid.
     fn section_src(
         plain: PlainMessage,
-        signed: Signed,
+        sig: KeyedSig,
         section_chain: SecuredLinkedList,
     ) -> Result<RoutingMsg>;
 
@@ -79,7 +79,7 @@ pub trait RoutingMsgUtils {
     ) -> Result<VerifyStatus>;
 
     /// Getter
-    fn signed(&self) -> Option<Signed>;
+    fn keyed_sig(&self) -> Option<KeyedSig>;
 
     fn verify_variant<'a, I: IntoIterator<Item = &'a bls::PublicKey>>(
         &self,
@@ -110,13 +110,13 @@ impl RoutingMsgUtils for RoutingMsg {
                     return Err(Error::CreateError(CreateError::FailedSignature));
                 }
             }
-            SrcAuthority::BlsShare { signed_share, .. } => {
-                if !signed_share.verify(&signed_bytes) {
+            SrcAuthority::BlsShare { sig_share, .. } => {
+                if !sig_share.verify(&signed_bytes) {
                     error!("Failed signature: {:?}", msg);
                     return Err(Error::CreateError(CreateError::FailedSignature));
                 }
 
-                if signed_share.public_key_set.public_key() != msg.section_pk {
+                if sig_share.public_key_set.public_key() != msg.section_pk {
                     error!(
                         "Signed share public key doesn't match signed chain last key: {:?}",
                         msg
@@ -124,8 +124,8 @@ impl RoutingMsgUtils for RoutingMsg {
                     return Err(Error::CreateError(CreateError::FailedSignature));
                 }
             }
-            SrcAuthority::Section { signed, .. } => {
-                if !msg.section_pk.verify(&signed.signature, &signed_bytes) {
+            SrcAuthority::Section { sig, .. } => {
+                if !msg.section_pk.verify(&sig.signature, &signed_bytes) {
                     error!(
                         "Failed signature: {:?} (Section PK: {:?})",
                         msg, msg.section_pk
@@ -148,10 +148,10 @@ impl RoutingMsgUtils for RoutingMsg {
         // Create message id from src authority signature
         let id = match &src {
             SrcAuthority::Node { signature, .. } => MessageId::from_content(signature),
-            SrcAuthority::BlsShare { signed_share, .. } => {
-                MessageId::from_content(&signed_share.signature_share.0)
+            SrcAuthority::BlsShare { sig_share, .. } => {
+                MessageId::from_content(&sig_share.signature_share.0)
             }
-            SrcAuthority::Section { signed, .. } => MessageId::from_content(&signed.signature),
+            SrcAuthority::Section { sig, .. } => MessageId::from_content(&sig.signature),
         }
         .unwrap_or_default();
 
@@ -182,7 +182,7 @@ impl RoutingMsgUtils for RoutingMsg {
         .map_err(|_| Error::InvalidMessage)?;
 
         let signature_share = key_share.secret_key_share.sign(&serialized);
-        let signed_share = SignedShare {
+        let sig_share = SigShare {
             public_key_set: key_share.public_key_set.clone(),
             index: key_share.index,
             signature_share,
@@ -190,7 +190,7 @@ impl RoutingMsgUtils for RoutingMsg {
 
         let src = SrcAuthority::BlsShare {
             src_name,
-            signed_share,
+            sig_share,
             section_chain: section_chain.clone(),
         };
 
@@ -199,37 +199,37 @@ impl RoutingMsgUtils for RoutingMsg {
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(mut self, signed: Signed) -> Result<Self> {
-        let (signed_share, src_name, section_chain) = if let SrcAuthority::BlsShare {
-            signed_share,
+    fn into_dst_accumulated(mut self, sig: KeyedSig) -> Result<Self> {
+        let (sig_share, src_name, section_chain) = if let SrcAuthority::BlsShare {
+            sig_share,
             src_name,
             section_chain,
         } = &self.src
         {
-            (signed_share.clone(), *src_name, section_chain)
+            (sig_share.clone(), *src_name, section_chain)
         } else {
             error!("not a message for dst accumulation");
             return Err(Error::InvalidMessage);
         };
 
-        if signed_share.public_key_set.public_key() != signed.public_key {
+        if sig_share.public_key_set.public_key() != sig.public_key {
             error!("signed public key doesn't match signed share public key");
             return Err(Error::InvalidMessage);
         }
 
-        if signed.public_key != self.section_pk {
+        if sig.public_key != self.section_pk {
             error!("signed public key doesn't match the attached section PK");
             return Err(Error::InvalidMessage);
         }
 
         let bytes = bincode::serialize(&self.signable_view()).map_err(|_| Error::InvalidMessage)?;
 
-        if !signed.verify(&bytes) {
+        if !sig.verify(&bytes) {
             return Err(Error::FailedSignature);
         }
 
         self.src = SrcAuthority::Section {
-            signed,
+            sig,
             src_name,
             section_chain: section_chain.clone(),
         };
@@ -270,13 +270,13 @@ impl RoutingMsgUtils for RoutingMsg {
     /// Note: `signed` isn't verified and is assumed valid.
     fn section_src(
         plain: PlainMessage,
-        signed: Signed,
+        sig: KeyedSig,
         section_chain: SecuredLinkedList,
     ) -> Result<Self> {
         Self::new_signed(
             SrcAuthority::Section {
                 src_name: plain.src,
-                signed,
+                sig,
                 section_chain: section_chain.clone(),
             },
             plain.dst,
@@ -310,16 +310,16 @@ impl RoutingMsgUtils for RoutingMsg {
                 self.verify_variant(trusted_keys)
             }
             SrcAuthority::BlsShare {
-                signed_share,
+                sig_share,
                 section_chain,
                 ..
             } => {
                 // Signed chain is required for accumulation at destination.
-                if signed_share.public_key_set.public_key() != self.section_pk {
+                if sig_share.public_key_set.public_key() != self.section_pk {
                     return Err(Error::InvalidMessage);
                 }
 
-                if !signed_share.verify(&bytes) {
+                if !sig_share.verify(&bytes) {
                     return Err(Error::FailedSignature);
                 }
 
@@ -330,12 +330,10 @@ impl RoutingMsgUtils for RoutingMsg {
                 }
             }
             SrcAuthority::Section {
-                signed,
-                section_chain,
-                ..
+                sig, section_chain, ..
             } => {
                 // Signed chain is required for section-src messages.
-                if !self.section_pk.verify(&signed.signature, &bytes) {
+                if !self.section_pk.verify(&sig.signature, &bytes) {
                     return Err(Error::FailedSignature);
                 }
 
@@ -349,9 +347,9 @@ impl RoutingMsgUtils for RoutingMsg {
     }
 
     /// Getter
-    fn signed(&self) -> Option<Signed> {
-        if let SrcAuthority::Section { signed, .. } = &self.src {
-            Some(signed.clone())
+    fn keyed_sig(&self) -> Option<KeyedSig> {
+        if let SrcAuthority::Section { sig, .. } = &self.src {
+            Some(sig.clone())
         } else {
             None
         }
