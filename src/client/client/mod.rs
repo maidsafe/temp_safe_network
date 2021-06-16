@@ -36,7 +36,7 @@ use tokio::sync::RwLock;
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;
 
 /// Client object
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
     keypair: Keypair,
     transfer_actor: Arc<RwLock<SafeTransferActor<Keypair>>>,

@@ -14,9 +14,12 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
+/// Error messages across the network
 pub enum Error {
+    /// Error message sent from a client
     #[error("Error received from a client")]
     Client(String),
+    /// Serialisation error
     #[error("Failed to serialize message: {0}")]
     Serialisation(String),
     /// Failed to parse a string.

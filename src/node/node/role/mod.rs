@@ -64,7 +64,7 @@ impl Role {
 }
 
 impl fmt::Display for Role {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Elder(_) => write!(f, "Elder"),
             Self::Adult(_) => write!(f, "Adult"),
