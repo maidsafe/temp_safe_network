@@ -70,7 +70,7 @@ pub(crate) enum Command {
     /// command is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
     /// Relocation process is complete, switch to new section
-    HandlelocationComplete {
+    HandleRelocationComplete {
         /// New Node state and information
         node: Node,
         /// New section where we relocated
@@ -189,8 +189,8 @@ impl Debug for Command {
                 .field("duration", duration)
                 .field("token", token)
                 .finish(),
-            Self::HandlelocationComplete { node, section } => f
-                .debug_struct("HandlelocationComplete")
+            Self::HandleRelocationComplete { node, section } => f
+                .debug_struct("HandleRelocationComplete")
                 .field("node", node)
                 .field("section", section)
                 .finish(),

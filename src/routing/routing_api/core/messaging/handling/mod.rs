@@ -13,13 +13,12 @@ mod relocation;
 mod resource_proof;
 
 use super::super::Core;
-use crate::messaging::node::Error as AggregatorError;
 use crate::messaging::{
     client::ClientMsg,
     node::{
-        DkgFailureSigSet, JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason,
-        JoinRequest, JoinResponse, Network, Peer, Proposal, RoutingMsg, Section,
-        SignedRelocateDetails, SrcAuthority, Variant,
+        DkgFailureSigSet, Error as AggregatorError, JoinAsRelocatedRequest,
+        JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest, JoinResponse, Network, Peer,
+        Proposal, RoutingMsg, Section, SignedRelocateDetails, SrcAuthority, Variant,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
     DstInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
@@ -192,9 +191,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         match self.proposal_aggregator.add(proposal, sig_share) {
             Ok((proposal, sig)) => Ok(vec![Command::HandleAgreement { proposal, sig }]),
-            Err(ProposalError::Aggregation(crate::messaging::node::Error::NotEnoughShares)) => {
-                Ok(vec![])
-            }
+            Err(ProposalError::Aggregation(AggregatorError::NotEnoughShares)) => Ok(vec![]),
             Err(error) => {
                 error!("Failed to add proposal: {}", error);
                 Err(Error::InvalidSignatureShare)
@@ -262,17 +259,17 @@ impl Core {
     pub(crate) async fn handle_useful_message(
         &mut self,
         sender: Option<SocketAddr>,
-        msg: RoutingMsg,
+        routing_msg: RoutingMsg,
         dst_info: DstInfo,
     ) -> Result<Vec<Command>> {
-        let msg = if let Some(msg) = self.aggregate_message(msg)? {
+        let routing_msg = if let Some(msg) = self.aggregate_message(routing_msg)? {
             msg
         } else {
             return Ok(vec![]);
         };
-        let src_name = msg.src.name();
+        let src_name = routing_msg.src.name();
 
-        match msg.variant {
+        match routing_msg.variant {
             Variant::SectionKnowledge { src_info, msg } => {
                 self.update_section_knowledge(src_info.0, src_info.1);
                 if let Some(message) = msg {
@@ -287,8 +284,8 @@ impl Core {
             }
             Variant::Sync { section, network } => self.handle_sync(section, network).await,
             Variant::Relocate(_) => {
-                if msg.src.is_section() {
-                    let signed_relocate = SignedRelocateDetails::new(msg)?;
+                if routing_msg.src.is_section() {
+                    let signed_relocate = SignedRelocateDetails::new(routing_msg)?;
                     Ok(self
                         .handle_relocate(signed_relocate)
                         .await?
@@ -298,19 +295,21 @@ impl Core {
                     Err(Error::InvalidSrcLocation)
                 }
             }
-            Variant::RelocatePromise(promise) => self.handle_relocate_promise(promise, msg).await,
+            Variant::RelocatePromise(promise) => {
+                self.handle_relocate_promise(promise, routing_msg).await
+            }
             Variant::StartConnectivityTest(name) => Ok(vec![Command::TestConnectivity(name)]),
             Variant::JoinRequest(join_request) => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
-                self.handle_join_request(msg.src.peer(sender)?, *join_request)
+                self.handle_join_request(routing_msg.src.peer(sender)?, *join_request)
             }
             Variant::JoinAsRelocatedRequest(join_request) => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
-                self.handle_join_as_relocated_request(msg.src.peer(sender)?, *join_request)
+                self.handle_join_as_relocated_request(routing_msg.src.peer(sender)?, *join_request)
             }
             Variant::UserMessage(ref content) => {
                 let bytes = Bytes::from(content.clone());
-                self.handle_user_message(msg, bytes).await
+                self.handle_user_message(routing_msg, bytes).await
             }
             Variant::BouncedUntrustedMessage {
                 msg: bounced_msg,
@@ -318,7 +317,7 @@ impl Core {
             } => {
                 let sender = sender.ok_or(Error::InvalidSrcLocation)?;
                 Ok(vec![self.handle_bounced_untrusted_message(
-                    msg.src.peer(sender)?,
+                    routing_msg.src.peer(sender)?,
                     dst_info.dst_section_pk,
                     *bounced_msg,
                 )?])
@@ -333,7 +332,7 @@ impl Core {
                     returned_msg,
                     sender,
                     src_name,
-                    msg.src.src_location().to_dst(),
+                    routing_msg.src.src_location().to_dst(),
                 )?])
             }
             Variant::DkgStart {
@@ -366,21 +365,21 @@ impl Core {
                 debug!("Ignoring unexpected message: {:?}", join_response);
                 Ok(vec![])
             }
-            Variant::JoinAsRelocatedResponse(_) => {
+            Variant::JoinAsRelocatedResponse(join_response) => {
                 match (sender, self.relocate_state.as_mut()) {
                     (
                         Some(sender),
                         Some(RelocateState::InProgress(ref mut joining_as_relocated)),
                     ) => {
                         if let Some(cmd) = joining_as_relocated
-                            .handle_join_response(msg, sender)
+                            .handle_join_response(*join_response, sender)
                             .await?
                         {
                             return Ok(vec![cmd]);
                         }
                     }
                     (Some(_), _) => {}
-                    (None, _) => error!("Missing sender of {:?}", msg),
+                    (None, _) => error!("Missing sender of {:?}", join_response),
                 }
 
                 Ok(vec![])
@@ -700,7 +699,6 @@ impl Core {
             return Ok(vec![]);
         }
 
-        // This joining node is being relocated to us.
         if !payload.verify_identity(peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature.",
