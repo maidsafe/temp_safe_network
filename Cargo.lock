@@ -2391,7 +2391,9 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uhttp_uri",
  "url",
+ "urlencoding",
  "xor_name",
  "yansi",
 ]
