@@ -18,9 +18,9 @@ env:
 jobs:
   
   # Run test suite.
-  test:
+  client-tests:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Doc Test
+    name: Client Doc Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -48,4 +48,4 @@ jobs:
       - name: Run Doc Tests
         shell: bash
         # e2e client tests are run in the separate e2e.yml action
-        run: cargo test --release --doc
+        run: cargo test --release client --doc
