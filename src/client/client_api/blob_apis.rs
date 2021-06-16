@@ -43,8 +43,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::ChunkAddress;
     /// use xor_name::XorName;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -95,8 +95,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -126,8 +126,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -204,8 +204,8 @@ impl Client {
     /// Remove data
     ///
     /// ```no_run
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: anyhow::Result<()> = futures::executor::block_on( async {

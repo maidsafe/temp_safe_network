@@ -24,8 +24,8 @@
 //! ```no_run
 //! # // The Safe Client is an sync library so will need some kind of runtime. Here we use tokio.
 //! # extern crate tokio; use anyhow::Result;
-//! # use sn_client::utils::test_utils::read_network_conn_info;
-//! use sn_client::Client;
+//! # use safe_network::client::utils::test_utils::read_network_conn_info;
+//! use safe_network::client::Client;
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
 //! # let bootstrap_contacts = Some(read_network_conn_info()?);
 //! let client = Client::new(None, None, bootstrap_contacts).await?;
@@ -39,8 +39,8 @@
 //! ```no_run
 //! # // The Safe Client is an sync library so will need some kind of runtime. Here we use tokio.
 //! # extern crate tokio; use anyhow::Result;
-//! # use sn_client::utils::test_utils::read_network_conn_info;
-//! use sn_client::Client;
+//! # use safe_network::client::utils::test_utils::read_network_conn_info;
+//! use safe_network::client::Client;
 //! use rand::rngs::OsRng;
 //! use sn_data_types::Keypair;
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {

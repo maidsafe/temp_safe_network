@@ -36,8 +36,8 @@ impl Client {
     /// Retrieve an existing balance
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, Token};
     /// use rand::rngs::OsRng;
     /// use std::str::FromStr;
@@ -79,8 +79,8 @@ impl Client {
     /// Retrieve an existing balance
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;
@@ -113,8 +113,8 @@ impl Client {
     /// Retrieving an existing balance history
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::Keypair;
     /// use rand::rngs::OsRng;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {

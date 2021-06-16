@@ -37,8 +37,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{ Keypair, Token, MapAction, MapPermissionSet, MapSeqValue, MapSeqEntries};
     /// use rand::rngs::OsRng;
     /// use std::collections::BTreeMap;
@@ -91,8 +91,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
     /// use rand::rngs::OsRng;
     /// use std::collections::BTreeMap;
@@ -146,8 +146,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
     /// use rand::rngs::OsRng;
     /// use std::collections::BTreeMap;
@@ -234,8 +234,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -282,8 +282,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{ Keypair, Token, MapAction, MapValue, MapPermissionSet, MapUnseqEntries};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -352,8 +352,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{ Keypair, Token, MapAction, MapPermissionSet, MapUnseqEntries};
     /// use rand::rngs::OsRng;
     /// use std::collections::BTreeMap;
