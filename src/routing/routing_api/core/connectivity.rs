@@ -7,11 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Core;
-use crate::messaging::node::{
-    DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, Proposal,
-};
+use crate::messaging::node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal};
 use crate::routing::{
-    dkg::{commands::DkgCommands, DkgFailureSignedSetUtils},
+    dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
     error::Result,
     peer::PeerUtils,
     routing_api::command::Command,
@@ -50,18 +48,18 @@ impl Core {
     pub(crate) fn handle_dkg_failure_observation(
         &mut self,
         dkg_key: DkgKey,
-        non_participants: &BTreeSet<XorName>,
-        signed: DkgFailureSigned,
+        failed_participants: &BTreeSet<XorName>,
+        signed: DkgFailureSig,
     ) -> Result<Vec<Command>> {
         self.dkg_voter
-            .process_failure(&dkg_key, non_participants, signed)
+            .process_failure(&dkg_key, failed_participants, signed)
             .into_commands(&self.node, *self.section_chain().last_key())
     }
 
     pub(crate) fn handle_dkg_failure_agreement(
         &self,
         sender: &XorName,
-        signeds: &DkgFailureSignedSet,
+        failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Command>> {
         let sender = &self
             .section
@@ -75,7 +73,7 @@ impl Core {
             .section
             .promote_and_demote_elders(&self.node.name())
             .into_iter()
-            .find(|elder_candidates| signeds.verify(elder_candidates, generation));
+            .find(|elder_candidates| failure_set.verify(elder_candidates, generation));
         let elder_candidates = if let Some(elder_candidates) = elder_candidates {
             elder_candidates
         } else {
@@ -83,7 +81,7 @@ impl Core {
             return Ok(vec![]);
         };
 
-        if signeds.non_participants.is_empty() {
+        if failure_set.failed_participants.is_empty() {
             // The DKG failure is a corrupted one due to lagging.
             trace!(
                 "Received DKG failure agreement - restarting: {:?}",
@@ -92,14 +90,14 @@ impl Core {
 
             self.send_dkg_start_to(elder_candidates, slice::from_ref(sender))
         } else {
-            // The DKG failure is regarding non_participants, i.e. potential unresponsive node.
+            // The DKG failure is regarding failed_participants, i.e. potential unresponsive node.
             trace!(
-                "Received DKG failure agreement of non_participants {:?} , DKG generation({}) {:?}",
-                signeds.non_participants,
+                "Received DKG failure agreement of failed_participants {:?} , DKG generation({}) {:?}",
+                failure_set.failed_participants,
                 generation,
                 elder_candidates
             );
-            self.cast_offline_proposals(&signeds.non_participants)
+            self.cast_offline_proposals(&failure_set.failed_participants)
         }
     }
 

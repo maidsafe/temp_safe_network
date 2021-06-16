@@ -8,7 +8,7 @@
 
 use crate::btree_set;
 use crate::messaging::{
-    client::{ChunkDataExchange, ChunkRead, ChunkWrite, ClientSigned, CmdError, QueryResponse},
+    client::{ChunkDataExchange, ChunkRead, ChunkWrite, ClientSig, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, EndUser, MessageId,
 };
@@ -73,13 +73,13 @@ impl ChunkRecords {
         &mut self,
         write: ChunkWrite,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use ChunkWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, client_signed, origin).await,
-            DeletePrivate(address) => self.delete(address, msg_id, client_signed, origin).await,
+            New(data) => self.store(data, msg_id, client_sig, origin).await,
+            DeletePrivate(address) => self.delete(address, msg_id, client_sig, origin).await,
         }
     }
 
@@ -112,7 +112,7 @@ impl ChunkRecords {
         &mut self,
         chunk: Chunk,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let target_holders = self.capacity.get_chunk_holder_adults(chunk.name()).await;
@@ -136,7 +136,7 @@ impl ChunkRecords {
             msg: NodeMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: blob_write,
-                    client_signed,
+                    client_sig,
                     origin,
                 },
                 id: msg_id,
@@ -149,14 +149,14 @@ impl ChunkRecords {
         &mut self,
         chunk: Chunk,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, &client_signed.public_key) {
+        if let Err(error) = validate_chunk_owner(&chunk, &client_sig.public_key) {
             return self.send_error(error, msg_id, origin).await;
         }
 
-        self.send_chunks_to_adults(chunk, msg_id, client_signed, origin)
+        self.send_chunks_to_adults(chunk, msg_id, client_sig, origin)
             .await
     }
 
@@ -222,7 +222,7 @@ impl ChunkRecords {
         &mut self,
         address: ChunkAddress,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.capacity.get_chunk_holder_adults(address.name()).await;
@@ -230,7 +230,7 @@ impl ChunkRecords {
         let msg = NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks {
                 cmd: ChunkWrite::DeletePrivate(address),
-                client_signed,
+                client_sig,
                 origin,
             },
             id: msg_id,

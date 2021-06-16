@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{client::ClientMsg, node::Signed, DstLocation, EndUser, SrcLocation};
+use crate::messaging::{client::ClientMsg, node::KeyedSig, DstLocation, EndUser, SrcLocation};
 use bytes::Bytes;
 use ed25519_dalek::Keypair;
 use hex_fmt::HexFmt;
@@ -63,8 +63,8 @@ pub enum Event {
         src: SrcLocation,
         /// The destination location that receives the message.
         dst: DstLocation,
-        /// The signed if the message was set to be aggregated at source.
-        signed: Option<Signed>,
+        /// The signature if the message was set to be aggregated at source.
+        sig: Option<KeyedSig>,
         /// The Sender's Section PK.
         section_pk: bls::PublicKey,
     },

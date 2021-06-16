@@ -460,7 +460,7 @@ impl Node {
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
-                client_signed,
+                client_sig,
             } => {
                 let adult = self.role.as_adult()?.clone();
                 let handle = tokio::spawn(async move {
@@ -469,7 +469,7 @@ impl Node {
                             .chunks
                             .write()
                             .await
-                            .write(&write, msg_id, client_signed.public_key)
+                            .write(&write, msg_id, client_sig.public_key)
                             .await?,
                     ];
                     ops.extend(adult.chunks.read().await.check_storage().await?);
@@ -563,7 +563,7 @@ impl Node {
             NodeDuty::ProcessRead {
                 query,
                 msg_id,
-                client_signed,
+                client_sig,
                 origin,
             } => {
                 // TODO: remove this conditional branching
@@ -579,7 +579,7 @@ impl Node {
                                 // this is a write here as we write the liveness check for each adult
                                 .write()
                                 .await
-                                .read(query, msg_id, client_signed.public_key, origin)
+                                .read(query, msg_id, client_sig.public_key, origin)
                                 .await?,
                         ]
                     } else {
@@ -594,7 +594,7 @@ impl Node {
                             msg: NodeMsg::NodeQuery {
                                 query: NodeQuery::Metadata {
                                     query,
-                                    client_signed,
+                                    client_sig,
                                     origin,
                                 },
                                 id: msg_id,
@@ -611,7 +611,7 @@ impl Node {
                 cmd,
                 msg_id,
                 origin,
-                client_signed,
+                client_sig,
             } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
@@ -620,7 +620,7 @@ impl Node {
                             .meta_data
                             .write()
                             .await
-                            .write(cmd, msg_id, client_signed, origin)
+                            .write(cmd, msg_id, client_sig, origin)
                             .await?,
                     ]))
                 });
@@ -650,7 +650,7 @@ impl Node {
                     ProcessMsg::Cmd {
                         id,
                         cmd: Cmd::Data { payment, cmd },
-                        client_signed,
+                        client_sig,
                     },
                 origin,
                 ..
@@ -662,7 +662,7 @@ impl Node {
                             .transfers
                             .write()
                             .await
-                            .process_payment(id, payment, cmd, client_signed, origin)
+                            .process_payment(id, payment, cmd, client_sig, origin)
                             .await?,
                     ))
                 });

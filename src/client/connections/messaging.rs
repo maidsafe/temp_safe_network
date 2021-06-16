@@ -9,9 +9,7 @@
 use super::{QueryResult, Session};
 use crate::client::Error;
 use crate::messaging::{
-    client::{
-        ChunkRead, ClientMsg, ClientSigned, Cmd, DataQuery, ProcessMsg, Query, QueryResponse,
-    },
+    client::{ChunkRead, ClientMsg, ClientSig, Cmd, DataQuery, ProcessMsg, Query, QueryResponse},
     section_info::SectionInfoMsg,
     MessageId,
 };
@@ -116,7 +114,7 @@ impl Session {
     }
 
     /// Send a `ClientMsg` to the network without awaiting for a response.
-    pub async fn send_cmd(&self, cmd: Cmd, client_signed: ClientSigned) -> Result<(), Error> {
+    pub async fn send_cmd(&self, cmd: Cmd, client_sig: ClientSig) -> Result<(), Error> {
         let msg_id = MessageId::new();
         let endpoint = self.endpoint()?.clone();
 
@@ -140,12 +138,12 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = XorName::from(client_signed.public_key);
+        let dst_section_name = XorName::from(client_sig.public_key);
 
         let msg = ClientMsg::Process(ProcessMsg::Cmd {
             id: msg_id,
             cmd,
-            client_signed,
+            client_sig,
         });
 
         let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
@@ -189,7 +187,7 @@ impl Session {
     pub async fn send_transfer_validation(
         &self,
         cmd: Cmd,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         sender: Sender<Result<TransferValidated, Error>>,
     ) -> Result<MessageId, Error> {
         let msg_id = MessageId::new();
@@ -206,12 +204,12 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = XorName::from(client_signed.public_key);
+        let dst_section_name = XorName::from(client_sig.public_key);
 
         let msg = ClientMsg::Process(ProcessMsg::Cmd {
             id: msg_id,
             cmd,
-            client_signed,
+            client_sig,
         });
         let msg_bytes = msg.serialize(dst_section_name, section_pk)?;
 
@@ -246,7 +244,7 @@ impl Session {
     pub(crate) async fn send_query(
         &self,
         query: Query,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
     ) -> Result<QueryResult, Error> {
         let data_name = query.dst_address();
 
@@ -264,13 +262,13 @@ impl Session {
             .await?
             .bls()
             .ok_or(Error::NoBlsSectionKey)?;
-        let dst_section_name = XorName::from(client_signed.public_key);
+        let dst_section_name = XorName::from(client_sig.public_key);
 
         let msg_id = MessageId::new();
         let msg = ClientMsg::Process(ProcessMsg::Query {
             id: msg_id,
             query,
-            client_signed,
+            client_sig,
         });
 
         let msg_bytes = msg.serialize(dst_section_name, section_pk)?;

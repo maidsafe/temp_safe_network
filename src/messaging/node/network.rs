@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionSigned, prefix_map::PrefixMap, signed::Signed};
+use super::{agreement::SectionSigned, prefix_map::PrefixMap, signed::KeyedSig};
 use crate::messaging::SectionAuthorityProvider;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -24,10 +24,10 @@ pub struct Network {
 pub struct OtherSection {
     /// Section authority so we know this info was valid
     pub section_auth: SectionSigned<SectionAuthorityProvider>,
-    /// If this is signed by our section, then `key_signed` is `None`. If this is signed by our
-    /// sibling section, then `key_signed` contains the proof of the signing key itself signed by our
+    /// If this is signed by our section, then `key_sig` is `None`. If this is signed by our
+    /// sibling section, then `key_sig` contains the proof of the signing key itself signed by our
     /// section.
-    pub key_signed: Option<Signed>,
+    pub key_sig: Option<KeyedSig>,
 }
 
 impl Borrow<Prefix> for OtherSection {

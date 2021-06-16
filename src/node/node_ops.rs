@@ -9,7 +9,7 @@
 use crate::messaging::client::ClientMsg;
 use crate::messaging::{
     client::{
-        ChunkRead, ChunkWrite, ClientSigned, DataCmd, DataExchange, DataQuery, ProcessMsg,
+        ChunkRead, ChunkWrite, ClientSig, DataCmd, DataExchange, DataQuery, ProcessMsg,
         ProcessingError, QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
@@ -90,7 +90,7 @@ pub enum NodeDuty {
     WriteChunk {
         write: ChunkWrite,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
     },
     ProcessRepublish {
         chunk: Chunk,
@@ -211,14 +211,14 @@ pub enum NodeDuty {
     ProcessRead {
         query: DataQuery,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     },
     /// Process write of data
     ProcessWrite {
         cmd: DataCmd,
         msg_id: MessageId,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     },
     /// Process Payment for a DataCmd

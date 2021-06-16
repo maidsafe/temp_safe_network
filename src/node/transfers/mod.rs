@@ -15,7 +15,7 @@ mod test_utils;
 use self::replicas::{ReplicaInfo, Replicas};
 use crate::messaging::{
     client::{
-        ClientMsg, ClientSigned, CmdError, DataCmd, Error as ErrorMessage, Event, ProcessMsg,
+        ClientMsg, ClientSig, CmdError, DataCmd, Error as ErrorMessage, Event, ProcessMsg,
         QueryResponse, TransferError,
     },
     node::{
@@ -165,7 +165,7 @@ impl Transfers {
         msg_id: MessageId,
         payment: TransferAgreementProof,
         data_cmd: DataCmd,
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         origin: EndUser,
     ) -> Result<NodeDuties> {
         let num_bytes = utils::serialise(&data_cmd)?.len() as u64;
@@ -253,7 +253,7 @@ impl Transfers {
                     msg: MsgType::Node(NodeMsg::NodeCmd {
                         cmd: NodeCmd::Metadata {
                             cmd: data_cmd.clone(),
-                            client_signed,
+                            client_sig,
                             origin,
                         },
                         id: MessageId::in_response_to(&msg_id),

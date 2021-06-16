@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{DkgFailureSignedSetUtils, DkgFailureSignedUtils};
+use super::{DkgFailureSigSetUtils, DkgFailureSigUtils};
 use crate::messaging::{
-    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates, RoutingMsg, Variant},
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, RoutingMsg, Variant},
     DstInfo, DstLocation, SectionAuthorityProvider,
 };
 use crate::routing::routing_api::{
@@ -123,7 +123,7 @@ impl DkgVoter {
                     elder_candidates,
                     participant_index,
                     timer_token: 0,
-                    failures: DkgFailureSignedSet::default(),
+                    failures: DkgFailureSigSet::default(),
                     complete: false,
                 };
 
@@ -185,12 +185,12 @@ impl DkgVoter {
     pub fn process_failure(
         &mut self,
         dkg_key: &DkgKey,
-        non_participants: &BTreeSet<XorName>,
-        signed: DkgFailureSigned,
+        failed_participants: &BTreeSet<XorName>,
+        sig: DkgFailureSig,
     ) -> Option<DkgCommand> {
         self.sessions
             .get_mut(dkg_key)?
-            .process_failure(dkg_key, non_participants, signed)
+            .process_failure(dkg_key, failed_participants, sig)
     }
 }
 
@@ -200,7 +200,7 @@ struct Session {
     participant_index: usize,
     key_gen: KeyGen,
     timer_token: u64,
-    failures: DkgFailureSignedSet,
+    failures: DkgFailureSigSet,
     // Flag to track whether this session has completed (either with success or failure). We don't
     // remove complete sessions because the other participants might still need us to respond to
     // their messages.
@@ -316,7 +316,7 @@ impl Session {
                 participants.iter().format(", ")
             );
 
-            let non_participants: BTreeSet<_> = self
+            let failed_participants: BTreeSet<_> = self
                 .elder_candidates
                 .elders
                 .keys()
@@ -329,7 +329,7 @@ impl Session {
                 })
                 .collect();
 
-            return self.report_failure(dkg_key, non_participants, keypair);
+            return self.report_failure(dkg_key, failed_participants, keypair);
         }
 
         // Corrupted DKG outcome. This can happen when a DKG session is restarted using the same set
@@ -375,12 +375,12 @@ impl Session {
     fn report_failure(
         &mut self,
         dkg_key: &DkgKey,
-        non_participants: BTreeSet<XorName>,
+        failed_participants: BTreeSet<XorName>,
         keypair: &Keypair,
     ) -> Vec<DkgCommand> {
-        let signed = DkgFailureSigned::new(keypair, &non_participants, dkg_key);
+        let sig = DkgFailureSig::new(keypair, &failed_participants, dkg_key);
 
-        if !self.failures.insert(signed, &non_participants) {
+        if !self.failures.insert(signed, &failed_participants) {
             return vec![];
         }
 
@@ -389,8 +389,8 @@ impl Session {
             .chain(iter::once(DkgCommand::SendFailureObservation {
                 recipients: self.recipients(),
                 dkg_key: *dkg_key,
-                signed,
-                non_participants,
+                sig,
+                failed_participants,
             }))
             .collect()
     }
@@ -398,8 +398,8 @@ impl Session {
     fn process_failure(
         &mut self,
         dkg_key: &DkgKey,
-        non_participants: &BTreeSet<XorName>,
-        signed: DkgFailureSigned,
+        failed_participants: &BTreeSet<XorName>,
+        signed: DkgFailureSig,
     ) -> Option<DkgCommand> {
         if !self
             .elder_candidates
@@ -409,11 +409,11 @@ impl Session {
             return None;
         }
 
-        if !signed.verify(dkg_key, non_participants) {
+        if !signed.verify(dkg_key, failed_participants) {
             return None;
         }
 
-        if !self.failures.insert(signed, non_participants) {
+        if !self.failures.insert(signed, failed_participants) {
             return None;
         }
 
@@ -497,10 +497,10 @@ pub(crate) enum DkgCommand {
     SendFailureObservation {
         recipients: Vec<(XorName, SocketAddr)>,
         dkg_key: DkgKey,
-        signed: DkgFailureSigned,
-        non_participants: BTreeSet<XorName>,
+        signed: DkgFailureSig,
+        failed_participants: BTreeSet<XorName>,
     },
-    HandleFailureAgreement(DkgFailureSignedSet),
+    HandleFailureAgreement(DkgFailureSigSet),
 }
 
 impl DkgCommand {
@@ -538,13 +538,13 @@ impl DkgCommand {
             Self::SendFailureObservation {
                 recipients,
                 dkg_key,
-                signed,
-                non_participants,
+                sig,
+                failed_participants,
             } => {
                 let variant = Variant::DkgFailureObservation {
                     dkg_key,
-                    signed,
-                    non_participants,
+                    sig,
+                    failed_participants,
                 };
                 let message =
                     RoutingMsg::single_src(node, DstLocation::DirectAndUnrouted, variant, key)?;

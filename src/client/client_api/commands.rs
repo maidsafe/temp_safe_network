@@ -8,7 +8,7 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::client::{ClientSigned, Cmd};
+use crate::messaging::client::{ClientSig, Cmd};
 use log::debug;
 use sn_data_types::{PublicKey, Signature};
 
@@ -21,12 +21,12 @@ impl Client {
         signature: Signature,
     ) -> Result<(), Error> {
         debug!("Sending Cmd: {:?}", cmd);
-        let client_signed = ClientSigned {
+        let client_sig = ClientSig {
             public_key: client_pk,
             signature,
         };
 
-        self.session.send_cmd(cmd, client_signed).await
+        self.session.send_cmd(cmd, client_sig).await
     }
 
     // Send a Cmd to the network without awaiting for a response.

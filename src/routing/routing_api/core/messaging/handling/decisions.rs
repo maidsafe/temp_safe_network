@@ -9,7 +9,7 @@
 use super::Core;
 use crate::messaging::{
     node::{
-        JoinAsRelocatedResponse, JoinResponse, Proposal, RelocatePromise, RoutingMsg, SignedShare,
+        JoinAsRelocatedResponse, JoinResponse, Proposal, RelocatePromise, RoutingMsg, SigShare,
         Variant,
     },
     DstLocation,
@@ -88,12 +88,10 @@ impl Core {
                 }
             }
             Variant::Propose {
-                content,
-                signed_share,
-                ..
+                content, sig_share, ..
             } => {
                 if let Some(status) =
-                    self.decide_propose_status(&msg.src.name(), content, signed_share)
+                    self.decide_propose_status(&msg.src.name(), content, sig_share)
                 {
                     return Ok(status);
                 }
@@ -123,7 +121,7 @@ impl Core {
         &self,
         sender: &XorName,
         proposal: &Proposal,
-        signed_share: &SignedShare,
+        sig_share: &SigShare,
     ) -> Option<MessageStatus> {
         match proposal {
             Proposal::SectionInfo(section_auth)
@@ -144,7 +142,7 @@ impl Core {
                 if self
                     .section
                     .chain()
-                    .has_key(&signed_share.public_key_set.public_key())
+                    .has_key(&sig_share.public_key_set.public_key())
                 {
                     None
                 } else {

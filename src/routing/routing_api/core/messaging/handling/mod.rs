@@ -17,7 +17,7 @@ use crate::messaging::node::Error as AggregatorError;
 use crate::messaging::{
     client::ClientMsg,
     node::{
-        DkgFailureSignedSet, JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason,
+        DkgFailureSigSet, JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason,
         JoinRequest, JoinResponse, Network, Peer, Proposal, RoutingMsg, Section,
         SignedRelocateDetails, SrcAuthority, Variant,
     },
@@ -25,7 +25,7 @@ use crate::messaging::{
     DstInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{
-    dkg::{commands::DkgCommands, ProposalError, SignedShare},
+    dkg::{commands::DkgCommands, ProposalError, SigShare},
     error::{Error, Result},
     event::Event,
     messages::{MessageStatus, RoutingMsgUtils, SrcAuthorityUtils, VerifyStatus},
@@ -165,10 +165,10 @@ impl Core {
     pub(crate) fn handle_proposal(
         &mut self,
         proposal: Proposal,
-        signed_share: SignedShare,
+        sig_share: SigShare,
     ) -> Result<Vec<Command>> {
-        match self.proposal_aggregator.add(proposal, signed_share) {
-            Ok((proposal, signed)) => Ok(vec![Command::HandleAgreement { proposal, signed }]),
+        match self.proposal_aggregator.add(proposal, sig_share) {
+            Ok((proposal, sig)) => Ok(vec![Command::HandleAgreement { proposal, sig }]),
             Err(ProposalError::Aggregation(crate::messaging::node::Error::NotEnoughShares)) => {
                 Ok(vec![])
             }
@@ -199,8 +199,8 @@ impl Core {
         result
     }
 
-    pub(crate) fn handle_dkg_failure(&mut self, signeds: DkgFailureSignedSet) -> Result<Command> {
-        let variant = Variant::DkgFailureAgreement(signeds);
+    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
+        let variant = Variant::DkgFailureAgreement(failure_set);
         let message = RoutingMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
@@ -211,8 +211,8 @@ impl Core {
     }
 
     pub(crate) fn aggregate_message(&mut self, msg: RoutingMsg) -> Result<Option<RoutingMsg>> {
-        let signed_share = if let SrcAuthority::BlsShare { signed_share, .. } = &msg.src {
-            signed_share
+        let sig_share = if let SrcAuthority::BlsShare { sig_share, .. } = &msg.src {
+            sig_share
         } else {
             // Not an aggregating message, return unchanged.
             return Ok(Some(msg));
@@ -222,11 +222,11 @@ impl Core {
             bincode::serialize(&msg.signable_view()).map_err(|_| Error::InvalidMessage)?;
         match self
             .message_aggregator
-            .add(&signed_bytes, signed_share.clone())
+            .add(&signed_bytes, sig_share.clone())
         {
-            Ok(signed) => {
+            Ok(sig) => {
                 trace!("Successfully accumulated signatures for message: {:?}", msg);
-                Ok(Some(msg.into_dst_accumulated(signed)?))
+                Ok(Some(msg.into_dst_accumulated(sig)?))
             }
             Err(AggregatorError::NotEnoughShares) => Ok(None),
             Err(err) => {
@@ -322,21 +322,18 @@ impl Core {
             }
             Variant::DkgFailureObservation {
                 dkg_key,
-                signed,
-                non_participants,
-            } => self.handle_dkg_failure_observation(dkg_key, &non_participants, signed),
-            Variant::DkgFailureAgreement(signeds) => {
-                self.handle_dkg_failure_agreement(&src_name, &signeds)
+                sig,
+                failed_participants,
+            } => self.handle_dkg_failure_observation(dkg_key, &failed_participants, sig),
+            Variant::DkgFailureAgreement(sig_set) => {
+                self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
-            Variant::Propose {
-                content,
-                signed_share,
-            } => {
+            Variant::Propose { content, sig_share } => {
                 let mut commands = vec![];
-                let result = self.handle_proposal(content, signed_share.clone());
+                let result = self.handle_proposal(content, sig_share.clone());
 
                 if let Some(addr) = sender {
-                    commands.extend(self.check_lagging((src_name, addr), &signed_share)?);
+                    commands.extend(self.check_lagging((src_name, addr), &sig_share)?);
                 }
 
                 commands.extend(result?);
@@ -463,7 +460,7 @@ impl Core {
             content,
             src: msg.src.src_location(),
             dst: msg.dst,
-            signed: msg.signed(),
+            sig: msg.keyed_sig(),
             section_pk: msg.section_pk,
         })
         .await;

@@ -166,11 +166,11 @@ impl Dispatcher {
                 .handle_section_info_msg(sender, message, dst_info)
                 .await),
             Command::HandleTimeout(token) => self.core.write().await.handle_timeout(token),
-            Command::HandleAgreement { proposal, signed } => {
+            Command::HandleAgreement { proposal, sig } => {
                 self.core
                     .write()
                     .await
-                    .handle_agreement(proposal, signed)
+                    .handle_agreement(proposal, sig)
                     .await
             }
             Command::HandleConnectionLost(addr) => {

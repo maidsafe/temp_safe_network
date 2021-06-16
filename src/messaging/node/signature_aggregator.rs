@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::signed::{Signed, SignedShare};
+use super::signed::{KeyedSig, SigShare};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -53,23 +53,23 @@ impl SignatureAggregator {
     }
 
     /// Add new share into the aggregator. If enough valid signature shares were collected, returns
-    /// its `Signed` (signature + public key). Otherwise returns error which details why the
+    /// its `KeyedSig` (signature + public key). Otherwise returns error which details why the
     /// aggregation did not succeed yet.
     ///
     /// Note: returned `Error::NotEnoughShares` does not indicate a failure. It simply means more
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [Error] for more info.
-    pub fn add(&mut self, payload: &[u8], signed_share: SignedShare) -> Result<Signed, Error> {
+    pub fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
         self.remove_expired();
 
-        if !signed_share.verify(payload) {
+        if !sig_share.verify(payload) {
             return Err(Error::InvalidShare);
         }
 
         // Use the hash of the payload + the public key as the key in the map to avoid mixing
         // entries that have the same payload but are signed using different keys.
-        let public_key = signed_share.public_key_set.public_key();
+        let public_key = sig_share.public_key_set.public_key();
 
         let mut hasher = Sha3::v256();
         let mut hash = Digest256::default();
@@ -80,8 +80,8 @@ impl SignatureAggregator {
         self.map
             .entry(hash)
             .or_insert_with(State::new)
-            .add(signed_share)
-            .map(|signature| Signed {
+            .add(sig_share)
+            .map(|signature| KeyedSig {
                 public_key,
                 signature,
             })
@@ -131,10 +131,10 @@ impl State {
         }
     }
 
-    fn add(&mut self, signed_share: SignedShare) -> Result<bls::Signature, Error> {
+    fn add(&mut self, sig_share: SigShare) -> Result<bls::Signature, Error> {
         if self
             .shares
-            .insert(signed_share.index, signed_share.signature_share)
+            .insert(sig_share.index, sig_share.signature_share)
             .is_none()
         {
             self.modified = Instant::now();
@@ -143,8 +143,8 @@ impl State {
             return Err(Error::NotEnoughShares);
         }
 
-        if self.shares.len() > signed_share.public_key_set.threshold() {
-            let signature = signed_share
+        if self.shares.len() > sig_share.public_key_set.threshold() {
+            let signature = sig_share
                 .public_key_set
                 .combine_signatures(self.shares.iter().map(|(&index, share)| (index, share)))
                 .map_err(Error::Combine)?;
@@ -174,9 +174,9 @@ mod tests {
 
         // Not enough shares yet
         for index in 0..threshold {
-            let signed_share = create_signed_share(&sk_set, index, payload);
-            println!("{:?}", signed_share);
-            let result = aggregator.add(payload, signed_share);
+            let sig_share = create_sig_share(&sk_set, index, payload);
+            println!("{:?}", sig_share);
+            let result = aggregator.add(payload, sig_share);
 
             match result {
                 Err(Error::NotEnoughShares) => (),
@@ -185,14 +185,14 @@ mod tests {
         }
 
         // Enough shares now
-        let signed_share = create_signed_share(&sk_set, threshold, payload);
-        let signed = aggregator.add(payload, signed_share).unwrap();
+        let sig_share = create_sig_share(&sk_set, threshold, payload);
+        let sig = aggregator.add(payload, sig_share).unwrap();
 
-        assert!(signed.verify(payload));
+        assert!(sig.verify(payload));
 
         // Extra shares start another round
-        let signed_share = create_signed_share(&sk_set, threshold + 1, payload);
-        let result = aggregator.add(payload, signed_share);
+        let sig_share = create_sig_share(&sk_set, threshold + 1, payload);
+        let result = aggregator.add(payload, sig_share);
 
         match result {
             Err(Error::NotEnoughShares) => (),
@@ -211,13 +211,13 @@ mod tests {
 
         // First insert less than threshold + 1 valid shares.
         for index in 0..threshold {
-            let signed_share = create_signed_share(&sk_set, index, payload);
-            let _ = aggregator.add(payload, signed_share);
+            let sig_share = create_sig_share(&sk_set, index, payload);
+            let _ = aggregator.add(payload, sig_share);
         }
 
         // Then try to insert invalid share.
-        let invalid_signed_share = create_signed_share(&sk_set, threshold, b"bad");
-        let result = aggregator.add(payload, invalid_signed_share);
+        let invalid_sig_share = create_sig_share(&sk_set, threshold, b"bad");
+        let result = aggregator.add(payload, invalid_sig_share);
 
         match result {
             Err(Error::InvalidShare) => (),
@@ -226,9 +226,9 @@ mod tests {
 
         // The invalid share doesn't spoil the aggregation - we can still aggregate once enough
         // valid shares are inserted.
-        let signed_share = create_signed_share(&sk_set, threshold + 1, payload);
-        let signed = aggregator.add(payload, signed_share).unwrap();
-        assert!(signed.verify(payload))
+        let sig_share = create_sig_share(&sk_set, threshold + 1, payload);
+        let sig = aggregator.add(payload, sig_share).unwrap();
+        assert!(sig.verify(payload))
     }
 
     #[test]
@@ -241,15 +241,15 @@ mod tests {
         let payload = b"hello";
 
         for index in 0..threshold {
-            let signed_share = create_signed_share(&sk_set, index, payload);
-            let _ = aggregator.add(payload, signed_share);
+            let sig_share = create_sig_share(&sk_set, index, payload);
+            let _ = aggregator.add(payload, sig_share);
         }
 
         sleep(Duration::from_secs(1));
 
         // Adding another share does nothing now, because the previous shares expired.
-        let signed_share = create_signed_share(&sk_set, threshold, payload);
-        let result = aggregator.add(payload, signed_share);
+        let sig_share = create_sig_share(&sk_set, threshold, payload);
+        let result = aggregator.add(payload, sig_share);
 
         match result {
             Err(Error::NotEnoughShares) => (),
@@ -270,32 +270,28 @@ mod tests {
         // round 1
 
         for index in 0..threshold {
-            let signed_share = create_signed_share(&sk_set, index, payload);
-            assert!(aggregator.add(payload, signed_share).is_err());
+            let sig_share = create_sig_share(&sk_set, index, payload);
+            assert!(aggregator.add(payload, sig_share).is_err());
         }
 
-        let signed_share = create_signed_share(&sk_set, threshold, payload);
-        assert!(aggregator.add(payload, signed_share).is_ok());
+        let sig_share = create_sig_share(&sk_set, threshold, payload);
+        assert!(aggregator.add(payload, sig_share).is_ok());
 
         // round 2
 
         let offset = 2;
 
         for index in offset..(threshold + offset) {
-            let signed_share = create_signed_share(&sk_set, index, payload);
-            assert!(aggregator.add(payload, signed_share).is_err());
+            let sig_share = create_sig_share(&sk_set, index, payload);
+            assert!(aggregator.add(payload, sig_share).is_err());
         }
 
-        let signed_share = create_signed_share(&sk_set, threshold + offset + 1, payload);
-        assert!(aggregator.add(payload, signed_share).is_ok());
+        let sig_share = create_sig_share(&sk_set, threshold + offset + 1, payload);
+        assert!(aggregator.add(payload, sig_share).is_ok());
     }
 
-    fn create_signed_share(
-        sk_set: &bls::SecretKeySet,
-        index: usize,
-        payload: &[u8],
-    ) -> SignedShare {
+    fn create_sig_share(sk_set: &bls::SecretKeySet, index: usize, payload: &[u8]) -> SigShare {
         let sk_share = sk_set.secret_key_share(index);
-        SignedShare::new(sk_set.public_keys(), index, &sk_share, &payload)
+        SigShare::new(sk_set.public_keys(), index, &sk_share, &payload)
     }
 }

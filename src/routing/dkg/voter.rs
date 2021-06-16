@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    node::{DkgFailureSigned, DkgFailureSignedSet, DkgKey, ElderCandidates},
+    node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates},
     SectionAuthorityProvider,
 };
 use crate::routing::{
@@ -109,7 +109,7 @@ impl DkgVoter {
                     elder_candidates,
                     participant_index,
                     timer_token: 0,
-                    failures: DkgFailureSignedSet::default(),
+                    failures: DkgFailureSigSet::default(),
                     complete: false,
                 };
 
@@ -171,11 +171,11 @@ impl DkgVoter {
     pub fn process_failure(
         &mut self,
         dkg_key: &DkgKey,
-        non_participants: &BTreeSet<XorName>,
-        signed: DkgFailureSigned,
+        failed_participants: &BTreeSet<XorName>,
+        signed: DkgFailureSig,
     ) -> Option<DkgCommand> {
         self.sessions
             .get_mut(dkg_key)?
-            .process_failure(dkg_key, non_participants, signed)
+            .process_failure(dkg_key, failed_participants, signed)
     }
 }

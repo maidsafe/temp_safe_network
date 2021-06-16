@@ -11,7 +11,7 @@
 use crate::messaging::client::{CmdError, Error, Result};
 use crate::messaging::{
     client::{
-        ChunkRead, ChunkWrite, ClientSigned, DataCmd as NodeDataCmd, DataExchange,
+        ChunkRead, ChunkWrite, ClientSig, DataCmd as NodeDataCmd, DataExchange,
         DataQuery as NodeDataQuery,
     },
     EndUser, MessageId, MessageType, WireMsg,
@@ -134,7 +134,7 @@ pub enum NodeCmd {
         /// The contianed command
         cmd: NodeDataCmd,
         /// Client pk and signature
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         /// Message source
         origin: EndUser,
     },
@@ -143,7 +143,7 @@ pub enum NodeCmd {
         /// The contianed command
         cmd: ChunkWrite,
         /// Client pk and signature
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         /// Message source
         origin: EndUser,
     },
@@ -222,7 +222,7 @@ pub enum NodeQuery {
         /// The actual query message
         query: NodeDataQuery,
         /// Client signature
-        client_signed: ClientSigned,
+        client_sig: ClientSig,
         /// The user that has initiated this query
         origin: EndUser,
     },

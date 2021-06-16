@@ -9,35 +9,35 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
 
-/// Signed that a quorum of the section elders has agreed on something.
+/// Signature created when a quorum of the section elders has agreed on something.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
-pub struct Signed {
+pub struct KeyedSig {
     /// The BLS public key.
     pub public_key: bls::PublicKey,
     /// The BLS signature corresponding to the public key.
     pub signature: bls::Signature,
 }
 
-impl Signed {
-    /// Verifies this signed against the payload.
+impl KeyedSig {
+    /// Verifies this signature against the payload.
     pub fn verify(&self, payload: &[u8]) -> bool {
         self.public_key.verify(&self.signature, payload)
     }
 }
 
-/// Single share of `Signed`.
+/// Single share of `KeyedSig`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SignedShare {
+pub struct SigShare {
     /// BLS public key set.
     pub public_key_set: bls::PublicKeySet,
-    /// Index of the node that created this signed share.
+    /// Index of the node that created this signature share.
     pub index: usize,
     /// BLS signature share corresponding to the `index`-th public key share of the public key set.
     pub signature_share: bls::SignatureShare,
 }
 
-impl SignedShare {
-    /// Creates new signed share.
+impl SigShare {
+    /// Creates new signature share.
     pub fn new(
         public_key_set: bls::PublicKeySet,
         index: usize,
@@ -51,7 +51,7 @@ impl SignedShare {
         }
     }
 
-    /// Verifies this signed share against the payload.
+    /// Verifies this signature share against the payload.
     pub fn verify(&self, payload: &[u8]) -> bool {
         self.public_key_set
             .public_key_share(self.index)
@@ -59,11 +59,11 @@ impl SignedShare {
     }
 }
 
-impl Debug for SignedShare {
+impl Debug for SigShare {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(
             formatter,
-            "SignedShare {{ public_key: {:?}, index: {}, .. }}",
+            "SigShare {{ public_key: {:?}, index: {}, .. }}",
             self.public_key_set.public_key(),
             self.index
         )
@@ -76,15 +76,15 @@ mod tests {
     use bls::SecretKey;
 
     #[test]
-    fn verify_signed() {
+    fn verify_keyed_sig() {
         let sk = SecretKey::random();
         let public_key = sk.public_key();
         let data = "hello".to_string();
         let signature = sk.sign(&data);
-        let signed = Signed {
+        let sig = KeyedSig {
             public_key,
             signature,
         };
-        assert!(signed.verify(&data.as_bytes()));
+        assert!(sig.verify(&data.as_bytes()));
     }
 }
