@@ -10,7 +10,7 @@ use super::{delivery_group, Core};
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, RoutingMsg, Section, Variant},
     section_info::Error as TargetSectionError,
-    DstInfo, EndUser, Itinerary, SectionAuthorityProvider, SrcLocation,
+    DstInfo, EndUser, Itinerary, MessageId, SectionAuthorityProvider, SrcLocation,
 };
 use crate::routing::{
     error::Result,
@@ -294,7 +294,13 @@ impl Core {
     pub fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
         let mut commands = Vec::new();
         if self.is_elder() && joins_allowed != self.joins_allowed {
-            commands.extend(self.propose(Proposal::JoinsAllowed(joins_allowed))?);
+            let active_members: Vec<XorName> = self
+                .section
+                .active_members()
+                .map(|peer| *peer.name())
+                .collect();
+            let msg_id = MessageId::from_content(&active_members)?;
+            commands.extend(self.propose(Proposal::JoinsAllowed((msg_id, joins_allowed)))?);
         }
         Ok(commands)
     }

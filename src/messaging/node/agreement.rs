@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{plain_message::PlainMessage, section::NodeState, signed::KeyedSig};
-use crate::messaging::SectionAuthorityProvider;
+use crate::messaging::{MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
@@ -119,5 +119,5 @@ pub enum Proposal {
         proof_chain: SecuredLinkedList,
     },
     /// Proposal to change whether new nodes are allowed to join our section.
-    JoinsAllowed(bool),
+    JoinsAllowed((MessageId, bool)),
 }
