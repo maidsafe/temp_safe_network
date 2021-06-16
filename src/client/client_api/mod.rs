@@ -13,10 +13,7 @@ mod map_apis;
 mod queries;
 mod register_apis;
 mod sequence_apis;
-mod transfer_actor;
-
-// sn_transfers wrapper
-pub use self::transfer_actor::SafeTransferActor;
+mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
 use crate::messaging::client::{Cmd, CmdError, DataCmd};
@@ -24,6 +21,7 @@ use crdts::Dot;
 use log::{debug, info, trace, warn};
 use rand::rngs::OsRng;
 use sn_data_types::{Keypair, PublicKey, SectionElders, Token};
+use sn_transfers::TransferActor;
 use std::{
     path::Path,
     str::FromStr,
@@ -39,7 +37,7 @@ const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;
 #[derive(Clone, Debug)]
 pub struct Client {
     keypair: Keypair,
-    transfer_actor: Arc<RwLock<SafeTransferActor<Keypair>>>,
+    transfer_actor: Arc<RwLock<TransferActor<Keypair>>>,
     simulated_farming_payout_dot: Dot<PublicKey>,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
@@ -109,29 +107,31 @@ impl Client {
         debug!("Bootstrapping to the network...");
         attempt_bootstrap(&mut session, client_pk).await?;
 
-        // random PK used for from payment
+        // Random PK used for from payment
         let random_payment_id = Keypair::new_ed25519(&mut rng);
         let random_payment_pk = random_payment_id.public_key();
 
         let simulated_farming_payout_dot = Dot::new(random_payment_pk, 0);
 
-        let elder_pk_set = session
+        let key_set = session
             .section_key_set
             .read()
             .await
             .clone()
             .ok_or(Error::NotBootstrapped)?;
-        let elder_names = session.get_elder_names().await;
+        let names = session.get_elder_names().await;
+        let prefix = session
+            .section_prefix()
+            .await
+            .ok_or(Error::NoSectionPrefixKnown)?;
+
         let elders = SectionElders {
-            prefix: session
-                .section_prefix()
-                .await
-                .ok_or(Error::NoSectionPrefixKnown)?,
-            names: elder_names,
-            key_set: elder_pk_set,
+            prefix,
+            names,
+            key_set,
         };
 
-        let transfer_actor = Arc::new(RwLock::new(SafeTransferActor::new(keypair.clone(), elders)));
+        let transfer_actor = Arc::new(RwLock::new(TransferActor::new(keypair.clone(), elders)));
 
         let mut client = Self {
             keypair,
@@ -224,8 +224,7 @@ impl Client {
 async fn attempt_bootstrap(session: &mut Session, client_pk: PublicKey) -> Result<(), Error> {
     let mut attempts: u8 = 0;
     loop {
-        let res = session.bootstrap(client_pk).await;
-        match res {
+        match session.bootstrap(client_pk).await {
             Ok(()) => return Ok(()),
             Err(err) => {
                 attempts += 1;

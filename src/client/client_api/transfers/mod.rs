@@ -25,9 +25,6 @@ use sn_data_types::{
 use sn_transfers::{ActorEvent, TransferInitiated};
 use tokio::sync::mpsc::channel;
 
-/// Actual Transfer Actor
-pub use sn_transfers::TransferActor as SafeTransferActor;
-
 impl Client {
     /// Get the client's current coin balance from the network
     ///
@@ -156,7 +153,7 @@ impl Client {
 
             Err(sn_transfers::Error::NoActorHistory) => {
                 warn!(
-                    "No new transfer history  by TransferActor for pk: {:?}",
+                    "No new transfer history by TransferActor for pk: {:?}",
                     public_key
                 );
             }
