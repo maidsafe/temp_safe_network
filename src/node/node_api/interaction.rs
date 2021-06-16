@@ -19,7 +19,7 @@ use crate::node::{
     Node, Result,
 };
 use crate::routing::{Prefix, XorName};
-use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
+use crate::types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::role::ElderRole;

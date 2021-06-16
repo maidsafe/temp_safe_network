@@ -8,15 +8,15 @@
 
 use super::{replica_signing::ReplicaSigning, store::TransferStore};
 use crate::node::{Error, Result};
+use crate::transfers::WalletReplica;
+use crate::types::{
+    ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer, Token,
+    TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
+};
 use bls::PublicKeySet;
 use dashmap::DashMap;
 use log::info;
 use secured_linked_list::SecuredLinkedList;
-use sn_data_types::{
-    ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer, Token,
-    TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
-};
-use sn_transfers::WalletReplica;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::Prefix;
@@ -24,10 +24,10 @@ use xor_name::Prefix;
 #[cfg(feature = "simulated-payouts")]
 use {
     crate::node::node_ops::NodeDuty,
+    crate::types::{Signature, SignedCredit, SignedDebit, Transfer},
     bls::{SecretKey, SecretKeySet},
     log::debug,
     rand::thread_rng,
-    sn_data_types::{Signature, SignedCredit, SignedDebit, Transfer},
 };
 
 type Stores = DashMap<PublicKey, Arc<RwLock<TransferStore<ReplicaEvent>>>>;
@@ -90,7 +90,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             }
             for credit_proof in wallet.credits {
                 let id = credit_proof.recipient();
-                let e = TransferPropagated(sn_data_types::TransferPropagated { credit_proof });
+                let e = TransferPropagated(crate::types::TransferPropagated { credit_proof });
                 // Acquire lock of the store.
                 let store_ref = self.get_load_or_create_store(id).await?;
                 let mut store = store_ref.write().await;
@@ -99,7 +99,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             }
             for transfer_proof in wallet.debits {
                 let id = transfer_proof.sender();
-                let e = TransferRegistered(sn_data_types::TransferRegistered { transfer_proof });
+                let e = TransferRegistered(crate::types::TransferRegistered { transfer_proof });
                 // Acquire lock of the store.
                 let store_ref = self.get_load_or_create_store(id).await?;
                 let mut store = store_ref.write().await;
@@ -266,7 +266,7 @@ impl<T: ReplicaSigning> Replicas<T> {
 
         let store_ref = match self.stores.get(&key) {
             Some(store) => store,
-            None => return Err(Error::Transfer(sn_transfers::Error::NoSuchSender)),
+            None => return Err(Error::Transfer(crate::transfers::Error::NoSuchSender)),
         };
         let mut store = store_ref.write().await;
 
@@ -310,12 +310,14 @@ impl<T: ReplicaSigning> Replicas<T> {
         // should only have been signed by our section
         let known_key = self.exists_in_chain(&transfer_proof.replica_keys().public_key());
         if !known_key {
-            return Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted));
+            return Err(Error::Transfer(
+                crate::transfers::Error::SectionKeyNeverExisted,
+            ));
         }
 
         // Acquire lock of the store.
         let store_ref = match self.stores.get(&key) {
-            None => return Err(Error::Transfer(sn_transfers::Error::NoSuchSender)),
+            None => return Err(Error::Transfer(crate::transfers::Error::NoSuchSender)),
             Some(store) => store,
         };
         let mut store = store_ref.write().await;

@@ -9,7 +9,7 @@
 use crate::messaging::{client::Error as ErrorMessage, MessageId};
 use crate::node::node_ops::MsgType;
 use crate::routing::Prefix;
-use sn_data_types::{DataAddress, Error as DtError, PublicKey};
+use crate::types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -138,10 +138,10 @@ pub enum Error {
     PickleDb(#[from] pickledb::error::Error),
     /// NetworkData error.
     #[error("Network data error:: {0}")]
-    NetworkData(#[from] sn_data_types::Error),
-    /// sn_transfers error.
+    NetworkData(#[from] crate::types::Error),
+    /// transfers error.
     #[error("Transfer data error:: {0}")]
-    Transfer(#[from] sn_transfers::Error),
+    Transfer(#[from] crate::transfers::Error),
     /// Routing error.
     #[error("Routing error:: {0}")]
     Routing(#[from] crate::routing::Error),
@@ -153,7 +153,7 @@ pub enum Error {
     InvalidSignedTransfer(crdts::Dot<PublicKey>),
     /// Transfer message is invalid.
     #[error("Propagated Credit Agreement proof is not valid. Proof received: {0:?}")]
-    InvalidPropagatedTransfer(sn_data_types::CreditAgreementProof),
+    InvalidPropagatedTransfer(crate::types::CreditAgreementProof),
     /// Message is invalid.
     #[error("Message with id: '{0:?}' is invalid. {1}")]
     InvalidMessage(MessageId, String),

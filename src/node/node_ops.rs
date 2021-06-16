@@ -17,10 +17,9 @@ use crate::messaging::{
 };
 use crate::routing::Prefix;
 #[cfg(feature = "simulated-payouts")]
-use sn_data_types::Transfer;
-use sn_data_types::{
+use crate::types::{
     ActorHistory, Chunk, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
-    RewardProposal, SignedTransfer, TransferAgreementProof,
+    RewardProposal, SignedTransfer, Transfer, TransferAgreementProof,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

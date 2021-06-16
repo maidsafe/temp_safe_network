@@ -26,12 +26,12 @@ use crate::node::{
     Result,
 };
 use crate::routing::Prefix;
+use crate::types::{Chunk, PublicKey};
 use chunk_records::ChunkRecords;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
-use sn_data_types::{Chunk, PublicKey};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},

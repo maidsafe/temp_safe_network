@@ -20,10 +20,10 @@ use crate::node::{
 };
 use crate::routing::XorName;
 use crate::routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use crate::types::PublicKey;
 use client_msg::map_client_msg;
 use log::{debug, error, info, trace, warn};
 use node_msg::map_node_msg;
-use sn_data_types::PublicKey;
 use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]

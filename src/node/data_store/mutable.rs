@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
-use sn_data_types::{DataAddress, Map, MapAddress};
+use crate::types::{DataAddress, Map, MapAddress};
 
 impl Data for Map {
     type Id = MapAddress;

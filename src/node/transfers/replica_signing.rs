@@ -8,11 +8,11 @@
 
 use crate::node::{network::Network, Result};
 use crate::routing;
-use async_trait::async_trait;
-use bls::PublicKeySet;
-use sn_data_types::{
+use crate::types::{
     CreditAgreementProof, SignatureShare, SignedCredit, SignedDebit, SignedTransfer,
 };
+use async_trait::async_trait;
+use bls::PublicKeySet;
 
 #[async_trait]
 pub trait ReplicaSigning {

@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::client::{Cmd, Event, Query, QueryResponse, TransferCmd, TransferQuery};
-use sn_data_types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
-use sn_transfers::{ActorEvent, TransferInitiated};
+use crate::transfers::{ActorEvent, TransferInitiated};
+use crate::types::{PublicKey, SignedTransfer, Token, TransferAgreementProof};
 
 use crate::client::{Client, Error};
 
@@ -26,7 +26,7 @@ impl Client {
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
     /// use std::str::FromStr;
-    /// use sn_data_types::Token;
+    /// use crate::types::Token;
     /// # #[tokio::main]async fn main() {let _: Result<()> = futures::executor::block_on( async {
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
     /// let client = Client::new(None, None, bootstrap_contacts).await?;
@@ -102,7 +102,7 @@ impl Client {
     /// # extern crate tokio;use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use sn_data_types::{PublicKey, Token};
+    /// use crate::types::{PublicKey, Token};
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // A random sk, to send token to
@@ -199,10 +199,10 @@ mod tests {
         generate_random_vector, test_utils::calculate_new_balance, test_utils::create_test_client,
     };
     use crate::client::TransfersError;
+    use crate::types::{Keypair, Token};
     use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use rand::rngs::OsRng;
-    use sn_data_types::{Keypair, Token};
     use std::str::FromStr;
 
     #[tokio::test]

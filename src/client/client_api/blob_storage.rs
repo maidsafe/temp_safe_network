@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
+use crate::types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use async_trait::async_trait;
 use log::trace;
 use self_encryption::{SelfEncryptionError, Storage};
-use sn_data_types::{Chunk, ChunkAddress, PrivateChunk, PublicChunk, PublicKey};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network storage is the concrete type which self_encryption crate will use

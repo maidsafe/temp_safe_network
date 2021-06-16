@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-use log::{debug, warn};
-use sn_data_types::{
+use crate::types::{
     Credit, CreditAgreementProof, CreditId, PublicKey, ReplicaPublicKeySet, SignatureShare,
     SignedCredit, SignedCreditShare,
 };
+use log::{debug, warn};
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
@@ -86,8 +86,8 @@ impl RewardProposalDetails {
         &self,
         section_key: PublicKey,
         index: usize,
-    ) -> sn_data_types::RewardProposal {
-        sn_data_types::RewardProposal {
+    ) -> crate::types::RewardProposal {
+        crate::types::RewardProposal {
             section_key,
             rewards: self
                 .rewards
@@ -119,7 +119,7 @@ impl RewardProposalDetails {
         let min_count = 1 + self.pk_set.threshold();
         if credit.signatures.len() >= min_count {
             // Combine shares to produce the main signature.
-            let actor_signature = sn_data_types::Signature::Bls(
+            let actor_signature = crate::types::Signature::Bls(
                 self.pk_set
                     .combine_signatures(&credit.signatures)
                     .map_err(|_| Error::CouldNotCombineSignatures)?,
@@ -173,15 +173,15 @@ impl RewardAccumulationDetails {
         &self,
         section_key: PublicKey,
         index: usize,
-    ) -> sn_data_types::RewardAccumulation {
-        sn_data_types::RewardAccumulation {
+    ) -> crate::types::RewardAccumulation {
+        crate::types::RewardAccumulation {
             section_key,
             rewards: self
                 .rewards
                 .iter()
                 .map(|(_, credit)| {
                     let share = credit.signatures.get(&index)?;
-                    Some(sn_data_types::AccumulatingReward {
+                    Some(crate::types::AccumulatingReward {
                         signed_credit: credit.agreed_proposal.clone(),
                         sig: SignatureShare {
                             share: share.clone(),
@@ -206,7 +206,7 @@ impl RewardAccumulationDetails {
         let min_count = 1 + self.pk_set.threshold();
         if credit.signatures.len() >= min_count {
             // Combine shares to produce the main signature.
-            let debiting_replicas_sig = sn_data_types::Signature::Bls(
+            let debiting_replicas_sig = crate::types::Signature::Bls(
                 self.pk_set
                     .combine_signatures(&credit.signatures)
                     .map_err(|_| Error::CouldNotCombineSignatures)?,

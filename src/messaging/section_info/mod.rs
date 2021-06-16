@@ -9,11 +9,11 @@
 mod errors;
 
 use crate::messaging::{MessageId, MessageType, SectionAuthorityProvider, WireMsg};
+use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 pub use errors::Error;
 use serde::{Deserialize, Serialize};
-use sn_data_types::PublicKey;
 use xor_name::XorName;
 
 /// Messages for exchanging network info, specifically on a target section for a msg.

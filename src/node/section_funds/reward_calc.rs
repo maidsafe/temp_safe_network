@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::routing::XorName;
-use sn_data_types::{NodeAge, PublicKey, Token};
+use crate::types::{NodeAge, PublicKey, Token};
 use std::collections::BTreeMap;
 
 const MIN_REWARD_AGE: u8 = 6;
@@ -145,8 +145,8 @@ fn distribute(
 
 #[cfg(test)]
 mod test {
+    use crate::types::NodeAge;
     use itertools::Itertools;
-    use sn_data_types::NodeAge;
 
     use super::*;
 

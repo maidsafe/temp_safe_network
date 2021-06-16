@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
-use sn_data_types::{Chunk, ChunkAddress, DataAddress};
+use crate::types::{Chunk, ChunkAddress, DataAddress};
 
 impl Data for Chunk {
     type Id = ChunkAddress;

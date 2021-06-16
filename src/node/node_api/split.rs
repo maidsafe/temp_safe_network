@@ -17,13 +17,13 @@ use crate::node::{
     Error, Node, Result,
 };
 use crate::routing::{Prefix, XorName};
+use crate::types::{NodeAge, PublicKey, Token};
 use log::debug;
 use section_funds::{
     elder_signing::ElderSigning,
     reward_process::{OurSection, RewardProcess},
     reward_wallets::RewardWallets,
 };
-use sn_data_types::{NodeAge, PublicKey, Token};
 use std::collections::{BTreeMap, BTreeSet};
 
 impl Node {

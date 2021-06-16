@@ -9,11 +9,11 @@
 use super::replica_signing::ReplicaSigning;
 use crate::node::{Error, Result};
 use crate::routing;
-use async_trait::async_trait;
-use bls::{PublicKeySet, PublicKeyShare, SecretKeyShare};
-use sn_data_types::{
+use crate::types::{
     CreditAgreementProof, SignatureShare, SignedCredit, SignedDebit, SignedTransfer,
 };
+use async_trait::async_trait;
+use bls::{PublicKeySet, PublicKeyShare, SecretKeyShare};
 
 /// An impl of ReplicaSigningTrait.
 #[derive(Debug, Clone, PartialEq, Eq)]

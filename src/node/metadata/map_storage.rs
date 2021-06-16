@@ -15,11 +15,11 @@ use crate::node::{
     data_store::MapDataStore, error::convert_to_error_message, node_ops::NodeDuty, Error, Result,
 };
 use crate::routing::Prefix;
-use log::{debug, info};
-use sn_data_types::{
+use crate::types::{
     Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
     PublicKey, Result as NdResult,
 };
+use log::{debug, info};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,

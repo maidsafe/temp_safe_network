@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, QueryResponse};
-use serde::{Deserialize, Serialize};
-use sn_data_types::{
+use crate::types::{
     register::{Address, Entry, Register, RegisterOp, User},
     PublicKey,
 };
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use xor_name::XorName;
 

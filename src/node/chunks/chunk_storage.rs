@@ -17,8 +17,8 @@ use crate::node::{
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
+use crate::types::{Chunk, ChunkAddress, DataAddress, PublicKey};
 use log::{error, info};
-use sn_data_types::{Chunk, ChunkAddress, DataAddress, PublicKey};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -154,8 +154,8 @@ impl Display for ChunkStorage {
 mod tests {
     use super::*;
     use crate::node::Result;
+    use crate::types::{PrivateChunk, PublicChunk, PublicKey};
     use bls::SecretKey;
-    use sn_data_types::{PrivateChunk, PublicChunk, PublicKey};
     use std::path::PathBuf;
     use tempdir::TempDir;
 

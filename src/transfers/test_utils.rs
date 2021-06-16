@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result, TransferActor as Actor, Wallet, WalletReplica};
-use bls::{PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare};
-use sn_data_types::{
+use crate::types::{
     Credit, CreditAgreementProof, Keypair, PublicKey, SignatureShare, SignedCredit, SignedDebit,
     SignedTransfer, Token,
 };
+use bls::{PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare};
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -63,7 +63,7 @@ pub fn get_genesis(
     println!("Aggregating actor signature..");
 
     // Combine shares to produce the main signature.
-    let actor_signature = sn_data_types::Signature::Bls(
+    let actor_signature = crate::types::Signature::Bls(
         peer_replicas
             .combine_signatures(&credit_sig_shares)
             .map_err(|_| Error::CannotAggregate)?,
@@ -85,7 +85,7 @@ pub fn get_genesis(
 
     println!("Aggregating replica signature..");
 
-    let debiting_replicas_sig = sn_data_types::Signature::Bls(
+    let debiting_replicas_sig = crate::types::Signature::Bls(
         peer_replicas
             .combine_signatures(&credit_sig_shares)
             .map_err(|_| Error::CannotAggregate)?,
@@ -127,7 +127,7 @@ pub fn get_multi_genesis(
     let peer_replicas = secret_key_set.public_keys();
 
     // Combine shares to produce the main signature.
-    let actor_signature = sn_data_types::Signature::Bls(
+    let actor_signature = crate::types::Signature::Bls(
         peer_replicas
             .combine_signatures(&credit_sig_shares)
             .map_err(|_| Error::CannotAggregate)?,
@@ -151,7 +151,7 @@ pub fn get_multi_genesis(
         let _ = credit_sig_shares.insert(0, credit_sig_share);
     }
 
-    let debiting_replicas_sig = sn_data_types::Signature::Bls(
+    let debiting_replicas_sig = crate::types::Signature::Bls(
         peer_replicas
             .combine_signatures(&credit_sig_shares)
             .map_err(|_| Error::CannotAggregate)?,

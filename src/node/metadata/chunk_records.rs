@@ -19,8 +19,8 @@ use crate::node::{
     Error, Result,
 };
 use crate::routing::Prefix;
+use crate::types::{Chunk, ChunkAddress, PublicKey};
 use log::{info, warn};
-use sn_data_types::{Chunk, ChunkAddress, PublicKey};
 
 use std::{
     collections::BTreeSet,

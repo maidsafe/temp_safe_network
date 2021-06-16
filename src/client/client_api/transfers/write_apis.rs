@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::TransferAgreementProof;
-use sn_transfers::ActorEvent;
+use crate::transfers::ActorEvent;
+use crate::types::TransferAgreementProof;
 
 use crate::client::{Client, Error};
 
@@ -34,9 +34,9 @@ impl Client {
 mod tests {
     use super::*;
     use crate::client::{errors::TransfersError, utils::test_utils::create_test_client_with};
+    use crate::types::{Keypair, Sequence};
     use anyhow::{bail, Result};
     use rand::rngs::OsRng;
-    use sn_data_types::{Keypair, Sequence};
     use xor_name::XorName;
 
     #[cfg(feature = "simulated-payouts")]

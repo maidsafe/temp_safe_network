@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{data::DataCmd, transfer::TransferCmd};
+use crate::types::TransferAgreementProof;
 use serde::{Deserialize, Serialize};
-use sn_data_types::TransferAgreementProof;
 use xor_name::XorName;
 
 /// Command messages for data or transfer operations

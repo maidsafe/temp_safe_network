@@ -8,8 +8,8 @@
 
 use crate::messaging::{EndUser, MessageId};
 use crate::routing::XorName;
+use crate::types::ChunkAddress;
 use itertools::Itertools;
-use sn_data_types::ChunkAddress;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap};
 

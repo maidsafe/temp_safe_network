@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, QueryResponse};
+use crate::types::{Chunk, ChunkAddress, PublicKey};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Chunk, ChunkAddress, PublicKey};
 use xor_name::XorName;
 
 /// TODO: docs

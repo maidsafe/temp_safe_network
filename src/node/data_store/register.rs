@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
-use sn_data_types::{
+use crate::types::{
     register::{Address, Register},
     DataAddress,
 };

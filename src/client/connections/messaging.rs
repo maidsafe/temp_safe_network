@@ -13,10 +13,10 @@ use crate::messaging::{
     section_info::SectionInfoMsg,
     MessageId,
 };
+use crate::types::{Chunk, PrivateChunk, PublicChunk, PublicKey, TransferValidated};
 use futures::{future::join_all, stream::FuturesUnordered, StreamExt};
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
-use sn_data_types::{Chunk, PrivateChunk, PublicChunk, PublicKey, TransferValidated};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},

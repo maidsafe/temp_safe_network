@@ -27,12 +27,12 @@ use crate::node::{
 use crate::routing::{
     EventStream, {Prefix, XorName},
 };
+use crate::types::PublicKey;
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
 use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
-use sn_data_types::PublicKey;
 use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},

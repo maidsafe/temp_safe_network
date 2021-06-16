@@ -16,8 +16,8 @@ use crate::messaging::{
 };
 use crate::node::{node_ops::NodeDuty, Error, Result};
 use crate::routing::Prefix;
+use crate::types::PublicKey;
 use log::info;
-use sn_data_types::PublicKey;
 
 /// The various data type stores,
 /// that are only managed at Elders.

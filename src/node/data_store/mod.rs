@@ -19,9 +19,9 @@ mod used_space;
 
 use crate::node::utils;
 use crate::node::{Error, Result};
+use crate::types::{register::Register, Chunk, Map, Sequence};
 use data::{Data, DataId};
 use log::{info, trace};
-use sn_data_types::{register::Register, Chunk, Map, Sequence};
 use std::{
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},

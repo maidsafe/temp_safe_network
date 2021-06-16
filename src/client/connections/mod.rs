@@ -12,10 +12,10 @@ mod messaging;
 use crate::client::Error;
 use crate::messaging::client::CmdError;
 use crate::messaging::{client::QueryResponse, MessageId};
+use crate::types::{PublicKey, TransferValidated};
 use bls::PublicKeySet;
 use log::{debug, trace};
 use qp2p::{Config as QuicP2pConfig, Endpoint, QuicP2p};
-use sn_data_types::{PublicKey, TransferValidated};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet, HashMap},

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
-use sn_data_types::{DataAddress, Sequence, SequenceAddress};
+use crate::types::{DataAddress, Sequence, SequenceAddress};
 
 impl Data for Sequence {
     type Id = SequenceAddress;

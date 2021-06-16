@@ -13,7 +13,7 @@ use super::{
     sequence::{SequenceRead, SequenceWrite},
     CmdError, Error, QueryResponse,
 };
-use sn_data_types::PublicKey;
+use crate::types::PublicKey;
 use xor_name::XorName;
 
 use serde::{Deserialize, Serialize};

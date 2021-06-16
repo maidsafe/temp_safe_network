@@ -15,9 +15,9 @@ pub mod reward_wallets;
 use self::{reward_process::RewardProcess, reward_wallets::RewardWallets};
 use crate::node::{Error, Result};
 use crate::routing::{Prefix, XorName};
+use crate::types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
 use dashmap::DashMap;
 use log::info;
-use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
 use std::collections::BTreeMap;
 
 /// The management of section funds,

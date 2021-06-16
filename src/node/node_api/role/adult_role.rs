@@ -16,9 +16,9 @@ use crate::node::{
     node_ops::{NodeDuties, NodeDuty},
 };
 use crate::routing::XorName;
+use crate::types::{Chunk, ChunkAddress};
 use itertools::Itertools;
 use log::{info, trace, warn};
-use sn_data_types::{Chunk, ChunkAddress};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;

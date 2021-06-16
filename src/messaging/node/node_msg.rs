@@ -16,13 +16,13 @@ use crate::messaging::{
     },
     EndUser, MessageId, MessageType, WireMsg,
 };
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use sn_data_types::{
+use crate::types::{
     ActorHistory, Chunk, ChunkAddress, CreditAgreementProof, NodeAge, PublicKey, ReplicaEvent,
     SectionElders, Signature,
 };
+use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 
@@ -171,9 +171,9 @@ pub enum NodeSystemCmd {
     /// Tells the Elders to re-publish a chunk in the data section
     RepublishChunk(Chunk),
     /// When new section key, all propose a reward payout.
-    ProposeRewardPayout(sn_data_types::RewardProposal),
+    ProposeRewardPayout(crate::types::RewardProposal),
     /// When proposal has been agreed, they all accumulate the reward payout.
-    AccumulateRewardPayout(sn_data_types::RewardAccumulation),
+    AccumulateRewardPayout(crate::types::RewardAccumulation),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveExistingData {

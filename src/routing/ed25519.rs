@@ -50,7 +50,7 @@ pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
 
     loop {
         let keypair = Keypair::generate(&mut rng);
-        let new_name = XorName::from(sn_data_types::PublicKey::Ed25519(keypair.public));
+        let new_name = XorName::from(crate::types::PublicKey::Ed25519(keypair.public));
         if range.contains(&new_name) && age == new_name[XOR_NAME_LEN - 1] {
             return keypair;
         }

@@ -100,12 +100,12 @@ where
 mod test {
     use super::TransferStore;
     use crate::node::{Error, Result};
-    use bls::SecretKeySet;
-    use bls::{PublicKeySet, SecretKey, SecretKeyShare};
-    use sn_data_types::{
+    use crate::types::{
         Credit, CreditAgreementProof, CreditId, PublicKey, ReplicaEvent, SignedCredit, Token,
         TransferPropagated,
     };
+    use bls::SecretKeySet;
+    use bls::{PublicKeySet, SecretKey, SecretKeyShare};
     use std::collections::BTreeMap;
     use tempdir::TempDir;
 
@@ -175,7 +175,7 @@ mod test {
         println!("Aggregating actor signature..");
 
         // Combine shares to produce the main signature.
-        let actor_signature = sn_data_types::Signature::Bls(
+        let actor_signature = crate::types::Signature::Bls(
             peer_replicas
                 .combine_signatures(&credit_sig_shares)
                 .map_err(|_| Error::CouldNotCombineSignatures)?,
@@ -196,7 +196,7 @@ mod test {
 
         println!("Aggregating replica signature..");
 
-        let debiting_replicas_sig = sn_data_types::Signature::Bls(
+        let debiting_replicas_sig = crate::types::Signature::Bls(
             peer_replicas
                 .combine_signatures(&credit_sig_shares)
                 .map_err(|_| Error::CouldNotCombineSignatures)?,
