@@ -44,9 +44,24 @@ pub(crate) fn process(
         .cmp_by_position(&dst_info.dst_section_pk, section.chain().last_key())
     {
         info!("Anti-Entropy: Source's knowledge of our key is outdated, send them an update.");
-        let chain = section
+        let chain = if let Ok(chain) = section
             .chain()
-            .get_proof_chain_to_current(&dst_info.dst_section_pk)?;
+            .get_proof_chain_to_current(&dst_info.dst_section_pk)
+        {
+            chain
+        } else {
+            trace!(
+                "Cannot find section_key {:?} within the chain",
+                dst_info.dst_section_pk
+            );
+            // In case a new node is trying to bootstrap from us, not being its matching section.
+            // Reply with empty actions with false flag to send back a JoinResponse::Redirect.
+            if let Variant::JoinRequest(_) = msg.variant {
+                return Ok((actions, false));
+            }
+            section.chain().clone()
+        };
+
         let section_auth = section.section_signed_authority_provider();
         let variant = Variant::SectionKnowledge {
             src_info: (section_auth.clone(), chain),

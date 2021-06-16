@@ -350,7 +350,10 @@ impl<'a> Join<'a> {
                 }
                 JoinResponse::Retry(ref section_auth) => {
                     if !section_auth.prefix.matches(&dst) {
-                        error!("Invalid JoinResponse::Retry bad prefix: {:?}", join_response);
+                        error!(
+                            "Invalid JoinResponse::Retry bad prefix: {:?}",
+                            join_response
+                        );
                         continue;
                     }
 
