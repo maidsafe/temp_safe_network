@@ -5,10 +5,8 @@
 
 name: Messaging PR
 
-on: 
-  pull_request:
-    paths: 
-      - 'src/messaging/**'
+on: pull_request
+
 
 env:
   # Run all cargo commands with --verbose.
@@ -28,7 +26,16 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
       - uses: actions/checkout@v2
+      # test for changes. (dont use baked in GHA pr/paths filter as then job wont run and we can't require itz)
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'src/messaging/**'
+
       - name: Install Rust
+        if: steps.changes.outputs.src == 'true'
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -37,6 +44,7 @@ jobs:
 
       # Cache.
       - name: Cargo cache registry, index and build
+        if: steps.changes.outputs.src == 'true'
         uses: actions/cache@v2.1.4
         with:
           path: |
@@ -47,5 +55,6 @@ jobs:
 
       # Make sure tests pass.
       - name: Run cargo test
+        if: steps.changes.outputs.src == 'true'
         run: cargo test --release messaging
 

@@ -1,11 +1,6 @@
 name: Client Changes
 
-
-on: 
-  pull_request:
-    paths: 
-      - 'src/client/**'
-      - 'src/messaging/**'
+on: pull_request
 
 
 env:
@@ -27,9 +22,18 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
+      # test for changes. (dont use baked in GHA pr/paths filter as then job wont run and we can't require itz)
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'src/client/**'
+              - 'src/messaging/**'
 
       # Install Rust
       - uses: actions-rs/toolchain@v1
+        if: steps.changes.outputs.src == 'true'
         with:
           profile: minimal
           toolchain: stable
@@ -37,6 +41,7 @@ jobs:
 
       # Cache.
       - name: Cargo cache registry, index and build
+        if: steps.changes.outputs.src == 'true'
         uses: actions/cache@v2.1.4
         with:
           path: |
@@ -46,6 +51,7 @@ jobs:
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run Doc Tests
+        if: steps.changes.outputs.src == 'true'
         shell: bash
         # e2e client tests are run in the separate e2e.yml action
         run: cargo test --release client --doc
