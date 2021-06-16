@@ -6,15 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::verify_message;
 use crate::messaging::{
     node::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocatePayload, RoutingMsg, Section,
         SignedRelocateDetails, Variant,
     },
-    DstInfo, DstLocation, MessageType,
+    DstInfo, DstLocation, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{
+    dkg::SectionSignedUtils,
     ed25519,
     error::{Error, Result},
     messages::RoutingMsgUtils,
@@ -37,7 +37,7 @@ pub(crate) struct JoiningAsRelocated {
     relocate_payload: Option<RelocatePayload>,
     relocate_details: SignedRelocateDetails,
     // Avoid sending more than one request to the same peer.
-    used_recipient: HashSet<SocketAddr>,
+    used_recipients: HashSet<SocketAddr>,
 }
 
 impl JoiningAsRelocated {
@@ -54,7 +54,7 @@ impl JoiningAsRelocated {
             section_key,
             relocate_payload: None,
             relocate_details,
-            used_recipient: HashSet::<SocketAddr>::new(),
+            used_recipients: HashSet::<SocketAddr>::new(),
         })
     }
 
@@ -67,7 +67,7 @@ impl JoiningAsRelocated {
             .map(|addr| (dst_xorname, *addr))
             .collect();
 
-        self.used_recipient.extend(bootstrap_addrs);
+        self.used_recipients.extend(bootstrap_addrs);
 
         // We send a first join request to obtain the section prefix, which
         // we will then use to generate the relocation payload and send the
@@ -83,20 +83,62 @@ impl JoiningAsRelocated {
     // - `NodeNotReachable`: returns an error, completing the relocation attempt.
     pub async fn handle_join_response(
         &mut self,
-        routing_msg: RoutingMsg,
+        join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,
     ) -> Result<Option<Command>> {
-        match self.receive_join_response(routing_msg).await? {
-            None => Ok(None),
-            Some(JoinAsRelocatedResponse::Approval {
+        match join_response {
+            JoinAsRelocatedResponse::Approval {
                 section_auth,
                 section_chain,
-                ..
-            }) => Ok(Some(Command::HandlelocationComplete {
-                node: self.node.clone(),
-                section: Section::new(self.genesis_key, section_chain, section_auth)?,
-            })),
-            Some(JoinAsRelocatedResponse::Retry(section_auth)) => {
+                node_state,
+            } => {
+                if node_state.value.peer.name() != &self.node.name() {
+                    trace!("Ignore NodeApproval not for us");
+                    return Ok(None);
+                }
+
+                if self.genesis_key != *section_chain.root_key() {
+                    trace!("Genesis key doesn't match");
+                    return Ok(None);
+                }
+
+                if !section_auth.verify(&section_chain) || !node_state.verify(&section_chain) {
+                    return Err(Error::InvalidMessage);
+                }
+
+                let trusted_key = if let Some(payload) = &self.relocate_payload {
+                    Some(&payload.relocate_details()?.dst_key)
+                } else {
+                    // Note this should never be the case, and it will be fixed once we
+                    // make the relocation payload nono-optional for JoinAsRelocatedRequest.
+                    return Err(Error::InvalidState);
+                };
+
+                if !section_chain.check_trust(trusted_key) {
+                    error!("Verification failed - untrusted Join approval message",);
+                    return Ok(None);
+                }
+
+                trace!(
+                    "This node has been approved to join the network at {:?}!",
+                    section_auth.value.prefix,
+                );
+
+                Ok(Some(Command::HandleRelocationComplete {
+                    node: self.node.clone(),
+                    section: Section::new(self.genesis_key, section_chain, section_auth)?,
+                }))
+            }
+            JoinAsRelocatedResponse::Retry(section_auth) => {
+                let dst = match &self.relocate_payload {
+                    Some(payload) => *payload.details.dst()?,
+                    None => self.node.name(),
+                };
+
+                if !self.check_autority_provider(&section_auth, &dst) {
+                    return Ok(None);
+                }
+
                 if section_auth.section_key() == self.section_key {
                     return Ok(None);
                 }
@@ -120,12 +162,21 @@ impl JoiningAsRelocated {
                 self.section_key = section_auth.section_key();
 
                 let cmd = self.build_join_request_cmd(&new_recipients)?;
-                self.used_recipient
+                self.used_recipients
                     .extend(new_recipients.iter().map(|(_, addr)| addr));
 
                 Ok(Some(cmd))
             }
-            Some(JoinAsRelocatedResponse::Redirect(section_auth)) => {
+            JoinAsRelocatedResponse::Redirect(section_auth) => {
+                let dst = match &self.relocate_payload {
+                    Some(payload) => *payload.details.dst()?,
+                    None => self.node.name(),
+                };
+
+                if !self.check_autority_provider(&section_auth, &dst) {
+                    return Ok(None);
+                }
+
                 if section_auth.section_key() == self.section_key {
                     return Ok(None);
                 }
@@ -134,7 +185,7 @@ impl JoiningAsRelocated {
                 let new_recipients: Vec<(XorName, SocketAddr)> = section_auth
                     .elders
                     .iter()
-                    .filter(|(_, addr)| !self.used_recipient.contains(addr))
+                    .filter(|(_, addr)| !self.used_recipients.contains(addr))
                     .map(|(name, addr)| (*name, *addr))
                     .collect();
 
@@ -161,12 +212,12 @@ impl JoiningAsRelocated {
                 self.section_key = section_auth.section_key();
 
                 let cmd = self.build_join_request_cmd(&new_recipients)?;
-                self.used_recipient
+                self.used_recipients
                     .extend(new_recipients.iter().map(|(_, addr)| addr));
 
                 Ok(Some(cmd))
             }
-            Some(JoinAsRelocatedResponse::NodeNotReachable(addr)) => {
+            JoinAsRelocatedResponse::NodeNotReachable(addr) => {
                 error!(
                     "Node cannot join as relocated since it is not externally reachable: {}",
                     addr
@@ -234,75 +285,22 @@ impl JoiningAsRelocated {
         Ok(cmd)
     }
 
-    async fn receive_join_response(
-        &mut self,
-        routing_msg: RoutingMsg,
-    ) -> Result<Option<JoinAsRelocatedResponse>> {
-        let dst = match &self.relocate_payload {
-            Some(payload) => *payload.details.dst()?,
-            None => self.node.name(),
-        };
-
-        // we are interested only in `JoinAsRelocatedResponse` type of messages
-        if let Variant::JoinAsRelocatedResponse(join_response) = &routing_msg.variant {
-            match **join_response {
-                JoinAsRelocatedResponse::NodeNotReachable(_) => Ok(Some(*join_response.clone())),
-                JoinAsRelocatedResponse::Retry(ref section_auth)
-                | JoinAsRelocatedResponse::Redirect(ref section_auth) => {
-                    if !section_auth.prefix.matches(&dst) {
-                        error!("Invalid JoinResponse bad prefix: {:?}", join_response);
-                        return Ok(None);
-                    }
-
-                    if section_auth.elders.is_empty() {
-                        error!(
-                            "Invalid JoinResponse, empty list of Elders: {:?}",
-                            join_response
-                        );
-                        return Ok(None);
-                    }
-
-                    if !verify_message(&routing_msg, None) {
-                        return Ok(None);
-                    }
-
-                    return Ok(Some(*join_response.clone()));
-                }
-                JoinAsRelocatedResponse::Approval {
-                    ref section_auth,
-                    ref member_info,
-                    ref section_chain,
-                } => {
-                    if member_info.value.peer.name() != &self.node.name() {
-                        trace!("Ignore NodeApproval not for us");
-                        return Ok(None);
-                    }
-
-                    if self.genesis_key != *section_chain.root_key() {
-                        trace!("Genesis key doesn't match");
-                        return Ok(None);
-                    }
-
-                    let trusted_key = if let Some(payload) = &self.relocate_payload {
-                        Some(&payload.relocate_details()?.dst_key)
-                    } else {
-                        None
-                    };
-
-                    if !verify_message(&routing_msg, trusted_key) {
-                        return Ok(None);
-                    }
-
-                    trace!(
-                        "This node has been approved to join the network at {:?}!",
-                        section_auth.value.prefix,
-                    );
-
-                    Ok(Some(*join_response.clone()))
-                }
-            }
+    fn check_autority_provider(
+        &self,
+        section_auth: &SectionAuthorityProvider,
+        dst: &XorName,
+    ) -> bool {
+        if !section_auth.prefix.matches(dst) {
+            error!("Invalid JoinResponse bad prefix: {:?}", section_auth);
+            false
+        } else if section_auth.elders.is_empty() {
+            error!(
+                "Invalid JoinResponse, empty list of Elders: {:?}",
+                section_auth
+            );
+            false
         } else {
-            Ok(None)
+            true
         }
     }
 }

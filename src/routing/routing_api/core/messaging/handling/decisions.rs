@@ -8,10 +8,7 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{
-        JoinAsRelocatedResponse, JoinResponse, Proposal, RelocatePromise, RoutingMsg, SigShare,
-        Variant,
-    },
+    node::{JoinResponse, Proposal, RelocatePromise, RoutingMsg, SigShare, Variant},
     DstLocation,
 };
 use crate::routing::{
@@ -72,15 +69,6 @@ impl Core {
                 }
                 JoinResponse::ResourceChallenge { .. } => {}
             },
-            Variant::JoinAsRelocatedResponse(resp) => match **resp {
-                JoinAsRelocatedResponse::Approval { .. }
-                | JoinAsRelocatedResponse::Retry(_)
-                | JoinAsRelocatedResponse::Redirect(_)
-                | JoinAsRelocatedResponse::NodeNotReachable(_) => {
-                    // Skip validation of these. We will validate them inside the relocation task.
-                    return Ok(MessageStatus::Useful);
-                }
-            },
             Variant::Sync { section, .. } => {
                 // Ignore `Sync` not for our section.
                 if !section.prefix().matches(&self.node.name()) {
@@ -102,6 +90,7 @@ impl Core {
                 }
             }
             Variant::Relocate(_)
+            | Variant::JoinAsRelocatedResponse { .. }
             | Variant::BouncedUntrustedMessage { .. }
             | Variant::DkgMessage { .. }
             | Variant::DkgFailureObservation { .. }

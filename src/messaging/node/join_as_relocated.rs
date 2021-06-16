@@ -57,7 +57,7 @@ pub enum JoinAsRelocatedResponse {
         /// Section Authority over this message for validation
         section_auth: SectionSigned<SectionAuthorityProvider>,
         /// info on current members of the section
-        member_info: SectionSigned<NodeState>,
+        node_state: SectionSigned<NodeState>,
         /// The secured (signed) and verifiable section chain
         section_chain: SecuredLinkedList,
     },
@@ -72,12 +72,12 @@ impl Debug for JoinAsRelocatedResponse {
             Self::Redirect(section_auth) => write!(f, "Redirect({:?})", section_auth),
             Self::Approval {
                 section_auth,
-                member_info,
+                node_state,
                 section_chain,
             } => f
                 .debug_struct("Approval")
                 .field("section_auth", section_auth)
-                .field("member_info", member_info)
+                .field("node_state", node_state)
                 .field("section_chain", section_chain)
                 .finish(),
             Self::NodeNotReachable(addr) => write!(f, "NodeNotReachable({})", addr),

@@ -215,7 +215,7 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Command::HandlelocationComplete { node, section } => {
+            Command::HandleRelocationComplete { node, section } => {
                 self.handle_relocation_complete(node, section).await
             }
             Command::SetJoinsAllowed(joins_allowed) => {
