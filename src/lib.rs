@@ -67,4 +67,5 @@ pub mod client;
 pub mod messaging;
 pub mod node;
 pub mod routing;
+pub mod transfers;
 pub mod types;
