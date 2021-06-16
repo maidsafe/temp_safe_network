@@ -8,7 +8,7 @@
 // Software.
 
 use super::ipc::IpcError;
-use sn_client::Error as ClientError;
+use safe_network::client::Error as ClientError;
 use sn_url::Error as SafeUrlError;
 use thiserror::Error;
 

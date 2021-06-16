@@ -11,10 +11,10 @@ use super::fetch::Range;
 use crate::{ipc::BootstrapConfig, Error, Result};
 use hex::encode;
 use log::{debug, info};
-use sn_client::{Client, Error as ClientError, ErrorMessage, TransfersError};
+use safe_network::client::{Client, Error as ClientError, ErrorMessage, TransfersError};
 use sn_data_types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
-    BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
+    ChunkAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
 };
@@ -217,7 +217,7 @@ impl SafeAppClient {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let client = self.get_safe_client()?;
-        let blob_address = BlobAddress::Public(xorname);
+        let blob_address = ChunkAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = end.map(|end_index| end_index - start.unwrap_or(0));
             client

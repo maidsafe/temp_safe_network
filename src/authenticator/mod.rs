@@ -20,7 +20,7 @@ use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
 use sha3::Sha3_256;
-use sn_client::{client::Client, Error as ClientError, ErrorMessage::NoSuchEntry};
+use safe_network::client::{client_api::Client, Error as ClientError, ErrorMessage::NoSuchEntry};
 use sn_data_types::{
     Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
     MapValue, Token,
