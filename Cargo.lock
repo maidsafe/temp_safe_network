@@ -2387,6 +2387,7 @@ dependencies = [
  "threshold_crypto",
  "tiny-keccak 2.0.2",
  "tokio 1.7.0",
+ "tokio-util 0.6.7",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -3025,6 +3026,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.2.6",
+ "slab",
  "tokio 1.7.0",
 ]
 

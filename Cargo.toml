@@ -88,6 +88,10 @@ tempdir = "~0.3.7"
   version = "~0.7.3"
   features = [ "small_rng" ]
 
+  [dev-dependencies.tokio-util]
+  version = "~0.6.4"
+  features = [ "time" ]
+
   [dependencies.tracing]
   version = "~0.1.22"
   default-features = false
