@@ -39,8 +39,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;

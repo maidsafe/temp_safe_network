@@ -43,8 +43,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -114,8 +114,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -181,8 +181,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -234,8 +234,8 @@ impl Client {
     /// # Examples
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -307,8 +307,8 @@ impl Client {
     /// # Examples
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -356,8 +356,8 @@ impl Client {
     /// # Examples
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -414,8 +414,8 @@ impl Client {
     /// # Examples
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -473,8 +473,8 @@ impl Client {
     /// # Examples
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -537,8 +537,8 @@ impl Client {
     /// # Examples
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -594,8 +594,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -655,8 +655,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -714,8 +714,8 @@ impl Client {
     ///
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;

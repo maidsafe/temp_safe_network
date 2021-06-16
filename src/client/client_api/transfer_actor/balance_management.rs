@@ -23,8 +23,8 @@ impl Client {
     /// Create a random client
     /// ```no_run
     /// # extern crate tokio;use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use std::str::FromStr;
     /// use sn_data_types::Token;
     /// # #[tokio::main]async fn main() {let _: Result<()> = futures::executor::block_on( async {
@@ -100,8 +100,8 @@ impl Client {
     /// (This test uses "simulated payouts" to generate test token. This of course would not be avaiable on a live network.)
     /// ```no_run
     /// # extern crate tokio;use anyhow::Result;
-    /// # use sn_client::utils::test_utils::read_network_conn_info;
-    /// use sn_client::Client;
+    /// # use safe_network::client::utils::test_utils::read_network_conn_info;
+    /// use safe_network::client::Client;
     /// use sn_data_types::{PublicKey, Token};
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
