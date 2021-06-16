@@ -21,7 +21,7 @@ use crate::routing::{
     network::NetworkUtils,
     peer::PeerUtils,
     relocation::RelocateState,
-    routing::command::Command,
+    routing_api::command::Command,
     section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionUtils},
 };
 use secured_linked_list::SecuredLinkedList;

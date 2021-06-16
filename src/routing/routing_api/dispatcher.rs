@@ -16,7 +16,7 @@ use crate::messaging::{
 };
 use crate::routing::{
     error::Result, event::Event, messages::RoutingMsgUtils, node::Node, peer::PeerUtils,
-    routing::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error, XorName,
+    routing_api::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error, XorName,
 };
 use itertools::Itertools;
 use sn_data_types::PublicKey;

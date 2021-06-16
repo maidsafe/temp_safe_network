@@ -18,7 +18,7 @@ use crate::routing::{
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
-    routing::{command::Command, enduser_registry::SocketId},
+    routing_api::{command::Command, enduser_registry::SocketId},
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionUtils},
     Error, Event,
 };

@@ -8,7 +8,7 @@
 
 use super::{SignatureAggregator, Signed, SignedShare};
 use crate::messaging::{node::Error as NodeErrorMessage, node::Proposal};
-use crate::routing::routing::{error::Result, messages::PlainMessageUtils};
+use crate::routing::routing_api::{error::Result, messages::PlainMessageUtils};
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
@@ -92,7 +92,7 @@ pub enum ProposalError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::routing::{agreement, section};
+    use crate::routing::routing_api::{agreement, section};
     use anyhow::Result;
     use std::fmt::Debug;
     use xor_name::Prefix;

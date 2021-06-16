@@ -17,7 +17,7 @@ mod error;
 mod event_mapping;
 mod metadata;
 mod network;
-mod node;
+mod node_api;
 mod node_ops;
 mod section_funds;
 mod to_db_key;
@@ -31,5 +31,5 @@ pub mod utils;
 pub use crate::node::{
     config_handler::{add_connection_info, set_connection_info, Config},
     error::{Error, Result},
-    node::Node,
+    node_api::Node,
 };

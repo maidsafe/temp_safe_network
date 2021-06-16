@@ -9,8 +9,8 @@
 use crate::messaging::MessageId;
 use crate::node::{
     network::Network,
-    node::interaction::push_state,
-    node::role::ElderRole,
+    node_api::interaction::push_state,
+    node_api::role::ElderRole,
     node_ops::NodeDuties,
     section_funds::{self, SectionFunds},
     transfers::get_replicas::replica_info,
