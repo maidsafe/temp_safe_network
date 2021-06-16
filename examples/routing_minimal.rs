@@ -35,7 +35,6 @@
 
 use futures::future::join_all;
 use hex_fmt::HexFmt;
-use crate::routing::routing_api::{Config, Event, EventStream, Routing, TransportConfig};
 use std::{
     collections::HashSet,
     convert::TryInto,
@@ -46,6 +45,8 @@ use structopt::StructOpt;
 use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+
+use safe_network::routing::{Config, Event, EventStream, Routing, TransportConfig};
 
 /// Minimal example node.
 #[derive(Debug, StructOpt)]
@@ -298,11 +299,13 @@ async fn handle_event(index: usize, node: &mut Routing, event: Event) -> bool {
 }
 
 fn init_log(verbosity: u8) {
+    const BIN_NAME: &str = module_path!();
+    const CRATE_NAME: &str = "safe_network";
     let filter = match verbosity {
-        0 => EnvFilter::new("minimal=info,sn_routing=warn"),
-        1 => EnvFilter::new("minimal,sn_routing=info"),
-        2 => EnvFilter::new("minimal,sn_routing=debug"),
-        3 => EnvFilter::new("minimal,sn_routing=trace"),
+        0 => EnvFilter::new(format!("{}=info,{}=warn", BIN_NAME, CRATE_NAME)),
+        1 => EnvFilter::new(format!("{},{}=info", BIN_NAME, CRATE_NAME)),
+        2 => EnvFilter::new(format!("{},{}=debug", BIN_NAME, CRATE_NAME)),
+        3 => EnvFilter::new(format!("{},{}=trace", BIN_NAME, CRATE_NAME)),
         _ => EnvFilter::new("trace"),
     };
 

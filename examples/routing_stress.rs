@@ -18,15 +18,6 @@ use rand::{
     Rng,
 };
 use serde::{Deserialize, Serialize};
-use crate::messaging::node::{SignatureAggregator, SigShare};
-use crate::messaging::{
-    location::{Aggregation, Itinerary},
-    DstLocation, SrcLocation,
-};
-use crate::routing::routing_api::{
-    Cache, Config, Error as RoutingError, Event as RoutingEvent, NodeElderChange, Routing,
-    TransportConfig,
-};
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -47,6 +38,16 @@ use tokio_util::time::delay_queue::DelayQueue;
 use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
+
+use safe_network::messaging::node::{SigShare, SignatureAggregator};
+use safe_network::messaging::{
+    location::{Aggregation, Itinerary},
+    DstLocation, SrcLocation,
+};
+use safe_network::routing::{
+    Cache, Config, Error as RoutingError, Event as RoutingEvent, NodeElderChange, Routing,
+    TransportConfig,
+};
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
