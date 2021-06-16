@@ -193,10 +193,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
         NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
             id,
-        } => NodeDuty::ProcessRepublish {
-            chunk,
-            msg_id: id,
-        },
+        } => NodeDuty::ProcessRepublish { chunk, msg_id: id },
         // Aggregated by us, for security
         NodeMsg::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
