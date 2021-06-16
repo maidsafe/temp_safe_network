@@ -50,7 +50,6 @@ impl Session {
             .to_vec()
             .into_iter()
             .collect::<BTreeSet<_>>();
-        // let connected_elders = self.connected_elders.clone();
 
         let cloned_endpoint = endpoint.clone();
         let _ = tokio::spawn(async move {

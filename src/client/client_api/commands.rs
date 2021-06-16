@@ -13,7 +13,7 @@ use log::debug;
 use sn_data_types::{PublicKey, Signature};
 
 impl Client {
-    /// Send a Cmd to the network
+    /// Send a signed Cmd to the network
     pub(crate) async fn send_signed_command(
         &self,
         cmd: Cmd,
