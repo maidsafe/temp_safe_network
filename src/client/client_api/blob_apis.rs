@@ -401,7 +401,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::{Chunk, ChunkAddress, Client, DataMap, DataMapLevel, Error};
-    use crate::client::client::blob_storage::BlobStorage;
+    use crate::client::client_api::blob_storage::BlobStorage;
     use crate::client::utils::{generate_random_vector, test_utils::create_test_client};
     use crate::messaging::client::Error as ErrorMessage;
     use crate::{retry_err_loop, retry_loop};

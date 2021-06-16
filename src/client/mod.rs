@@ -57,12 +57,12 @@ mod errors;
 
 // Export public API.
 
-pub use client::Client;
+pub use client_api::Client;
 pub use errors::{Error, ErrorMessage, TransfersError};
 pub use qp2p::Config as QuicP2pConfig;
 
 /// Client trait and related constants.
-pub mod client;
+pub mod client_api;
 /// Config file handling.
 pub mod config_handler;
 

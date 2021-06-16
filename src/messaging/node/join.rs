@@ -58,6 +58,7 @@ pub struct ResourceProofResponse {
 
 /// Response to a request to join a section
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum JoinResponse {
     /// Challenge sent from existing elder nodes to the joining peer for resource proofing.
     ResourceChallenge {
