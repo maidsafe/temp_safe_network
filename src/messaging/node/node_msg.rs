@@ -131,14 +131,20 @@ impl NodeMsg {
 pub enum NodeCmd {
     /// Metadata is handled by Elders
     Metadata {
+        /// The contianed command
         cmd: NodeDataCmd,
+        /// Client pk and signature
         client_signed: ClientSigned,
+        /// Message source
         origin: EndUser,
     },
     /// Chunks are handled by Adults
     Chunks {
+        /// The contianed command
         cmd: ChunkWrite,
+        /// Client pk and signature
         client_signed: ClientSigned,
+        /// Message source
         origin: EndUser,
     },
     /// Transfers are handled by Elders
@@ -208,17 +214,25 @@ pub enum NodeEvent {
     ChunkWriteHandled(Result<(), CmdError>),
 }
 
-///
+/// Query originating at a node
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQuery {
     /// Metadata is handled by Elders
     Metadata {
+        /// The actual query message
         query: NodeDataQuery,
+        /// Client signature
         client_signed: ClientSigned,
+        /// The user that has initiated this query
         origin: EndUser,
     },
     /// Chunks are handled by Adults
-    Chunks { query: ChunkRead, origin: EndUser },
+    Chunks {
+        /// The actual query message
+        query: ChunkRead,
+        /// The user that has initiated this query
+        origin: EndUser,
+    },
     /// Rewards handled by Elders
     Rewards(NodeRewardQuery),
     /// Transfers handled by Elders
@@ -231,6 +245,7 @@ pub enum NodeQuery {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeRewardQuery {
+    /// Get the wallet key of a given node for receiving rewards
     GetNodeWalletKey(XorName),
     /// A new Section Actor share (i.e. a new Elder) needs to query
     /// its peer Elders for the replicas' public key set

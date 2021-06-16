@@ -328,7 +328,7 @@ const ROUTING_MSG_KIND: u8 = 0x02;
 const NODE_MSG_KIND: u8 = 0x03;
 
 impl TryFrom<u8> for MessageKind {
-    type Error = super::Error;
+    type Error = Error;
 
     fn try_from(input: u8) -> Result<Self, Self::Error> {
         match input {

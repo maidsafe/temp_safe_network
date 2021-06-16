@@ -6,14 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+/// Messages to/from the client
 pub mod client;
 mod errors;
+/// Source and destination structs for messages
 pub mod location;
 mod msg_id;
 #[cfg(not(feature = "client-only"))]
+/// Node to node messages
 pub mod node;
 /// SectionAuthorityProvider
 pub mod sap;
+/// Queries and responses for section info
 pub mod section_info;
 
 /// Functionality for serialising and deserialising messages

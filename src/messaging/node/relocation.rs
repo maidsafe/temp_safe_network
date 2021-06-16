@@ -36,7 +36,8 @@ pub struct SignedRelocateDetails {
     pub signed_msg: RoutingMsg,
 }
 
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+/// Details of a node relocation and new signed name
 pub struct RelocatePayload {
     /// The Relocate Signed message.
     pub details: SignedRelocateDetails,
@@ -44,6 +45,7 @@ pub struct RelocatePayload {
     pub signature_of_new_name_with_old_key: Signature,
 }
 
+/// Relocate node of <name> to section <dst>
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct RelocatePromise {
     /// Xorname

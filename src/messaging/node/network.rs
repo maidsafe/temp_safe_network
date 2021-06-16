@@ -15,16 +15,18 @@ use xor_name::Prefix;
 /// Container for storing information about other sections in the network.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Network {
-    // Other sections: maps section prefixes to their latest signed section authority providers.
+    /// Other sections: maps section prefixes to their latest signed section authority providers.
     pub sections: PrefixMap<OtherSection>,
 }
 
+/// Information on our sibling section
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct OtherSection {
-    // If this is signed by our section, then `key_signed` is `None`. If this is signed by our
-    // sibling section, then `key_signed` contains the proof of the signing key itself signed by our
-    // section.
+    /// Section authority so we know this info was valid
     pub section_auth: SectionSigned<SectionAuthorityProvider>,
+    /// If this is signed by our section, then `key_signed` is `None`. If this is signed by our
+    /// sibling section, then `key_signed` contains the proof of the signing key itself signed by our
+    /// section.
     pub key_signed: Option<Signed>,
 }
 

@@ -31,6 +31,7 @@ use xor_name::{Prefix, XorName};
 ///    `get_matching`, ...)
 ///
 #[derive(Clone, Serialize, Deserialize)]
+#[allow(missing_debug_implementations)]
 pub struct PrefixMap<T>(BTreeSet<Entry<T>>)
 where
     T: Borrow<Prefix>;
@@ -163,6 +164,7 @@ where
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct IntoIter<T>(btree_set::IntoIter<Entry<T>>);
 
 impl<T> Iterator for IntoIter<T> {
