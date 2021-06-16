@@ -211,7 +211,7 @@ impl SectionAuthorityProviderUtils for SectionAuthorityProvider {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
-    use crate::routing::routing::tests::SecretKeySet;
+    use crate::routing::routing_api::tests::SecretKeySet;
     use crate::routing::{ed25519, node::Node, MIN_ADULT_AGE, MIN_AGE};
     use itertools::Itertools;
     use std::{cell::Cell, net::SocketAddr};

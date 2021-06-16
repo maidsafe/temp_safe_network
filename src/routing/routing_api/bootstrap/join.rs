@@ -20,7 +20,7 @@ use crate::routing::{
     messages::RoutingMsgUtils,
     node::Node,
     peer::PeerUtils,
-    routing::comm::{Comm, ConnectionEvent, SendStatus},
+    routing_api::comm::{Comm, ConnectionEvent, SendStatus},
     section::{SectionAuthorityProviderUtils, SectionUtils},
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
 };

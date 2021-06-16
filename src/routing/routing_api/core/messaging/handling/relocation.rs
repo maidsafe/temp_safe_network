@@ -16,7 +16,7 @@ use crate::routing::{
     relocation::{
         self, RelocateAction, RelocateDetailsUtils, RelocateState, SignedRelocateDetailsUtils,
     },
-    routing::{bootstrap::JoiningAsRelocated, command::Command},
+    routing_api::{bootstrap::JoiningAsRelocated, command::Command},
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
     Event, ELDER_SIZE,
 };

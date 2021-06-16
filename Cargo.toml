@@ -69,7 +69,7 @@ regex = "1.4.3"
 rmp-serde = "~0.15.4"
 self_encryption = "~0.24.1"
 sn_transfers = "0.7.6"
-sn_url = "1.1.2"
+sn_url = {path="../sn_url"}
 url = "2.2.0"
 dashmap = "~4.0.2"
 

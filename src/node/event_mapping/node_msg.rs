@@ -194,7 +194,7 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
             id,
         } => NodeDuty::ProcessRepublish {
-            chunk: chunk,
+            chunk,
             msg_id: id,
         },
         // Aggregated by us, for security

@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bls;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
 

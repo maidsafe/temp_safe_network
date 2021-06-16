@@ -28,7 +28,7 @@ pub use self::{
     error::{Error, Result},
     event::{Event, NodeElderChange, SendStream},
     peer::PeerUtils,
-    routing::{Config, EventStream, Routing},
+    routing_api::{Config, EventStream, Routing},
     section::{
         SectionAuthorityProviderUtils, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
         MIN_AGE,
@@ -53,7 +53,7 @@ mod network;
 mod node;
 mod peer;
 mod relocation;
-mod routing;
+mod routing_api;
 mod section;
 
 /// Recommended section size. sn_routing will keep adding nodes until the section reaches this size.

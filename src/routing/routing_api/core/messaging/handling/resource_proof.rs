@@ -11,7 +11,7 @@ use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, Variant}
 use crate::routing::{
     ed25519,
     peer::PeerUtils,
-    routing::{
+    routing_api::{
         command::Command,
         core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     },

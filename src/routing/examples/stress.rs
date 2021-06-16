@@ -23,7 +23,7 @@ use crate::messaging::{
     location::{Aggregation, Itinerary},
     DstLocation, SrcLocation,
 };
-use crate::routing::routing::{
+use crate::routing::routing_api::{
     Cache, Config, Error as RoutingError, Event as RoutingEvent, NodeElderChange, Routing,
     TransportConfig,
 };

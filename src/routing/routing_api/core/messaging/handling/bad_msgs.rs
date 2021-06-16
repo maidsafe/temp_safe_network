@@ -14,7 +14,7 @@ use crate::messaging::{
 use crate::routing::{
     messages::{RoutingMsgUtils, SrcAuthorityUtils},
     peer::PeerUtils,
-    routing::command::Command,
+    routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
     Error, Result,
 };

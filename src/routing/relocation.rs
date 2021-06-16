@@ -17,7 +17,7 @@ use crate::routing::{
     error::Error,
     network::NetworkUtils,
     peer::PeerUtils,
-    routing::bootstrap::JoiningAsRelocated,
+    routing_api::bootstrap::JoiningAsRelocated,
     section::{SectionPeersUtils, SectionUtils},
 };
 use bls::PublicKey as BlsPublicKey;
@@ -269,7 +269,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::section_signed,
         peer::test_utils::arbitrary_unique_peers,
-        routing::tests::SecretKeySet,
+        routing_api::tests::SecretKeySet,
         section::{NodeStateUtils, SectionAuthorityProviderUtils},
         ELDER_SIZE, MIN_AGE,
     };

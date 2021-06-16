@@ -21,7 +21,7 @@ use crate::routing::{
     node::Node,
     peer::PeerUtils,
     relocation::{RelocatePayloadUtils, SignedRelocateDetailsUtils},
-    routing::command::Command,
+    routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
 use bls::PublicKey as BlsPublicKey;

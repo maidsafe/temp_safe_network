@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::signed::{Signed, SignedShare};
-use bls;
 use std::{
     collections::HashMap,
     fmt::Debug,
