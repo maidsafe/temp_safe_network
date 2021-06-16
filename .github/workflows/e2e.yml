@@ -63,6 +63,9 @@ jobs:
       - name: Client Tests
         run: cargo test --release client
 
+      - name: Client Blob Example
+        run: cargo run --release --example client_blob
+
 
       # TODO: Upload all logs as artifacts....
       - name: Node Logs

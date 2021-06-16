@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use anyhow::{anyhow, Result};
-use sn_node::Config;
+use safe_network::node::Config;
 use std::{fs::remove_file, io};
 use structopt::StructOpt;
 

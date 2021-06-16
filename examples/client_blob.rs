@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use anyhow::{Context, Result};
-use sn_client::{utils::test_utils::read_network_conn_info, Client};
+use safe_network::client::{utils::test_utils::read_network_conn_info, Client};
 use sn_url::{SafeContentType, SafeUrl, DEFAULT_XORURL_BASE};
 use std::{
     io::{stdout, Write},
