@@ -1,4 +1,4 @@
-# sn
+# safe_network
 
 The Safe Network Core. API message definitions, routing and nodes, client core api.
 
@@ -12,7 +12,7 @@ This Safe Network repository is licensed under the General Public License (GPL),
 
 ### Linking exception
 
-sn is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify sn, you must distribute the source to your modified version under the terms of the GPLv3.
+safe_network is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify safe_network, you must distribute the source to your modified version under the terms of the GPLv3.
 
 See the [LICENSE](LICENSE) file for more details.
 
