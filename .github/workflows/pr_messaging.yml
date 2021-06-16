@@ -19,9 +19,9 @@ env:
 
 jobs:
   
-  test:
+  messaging-tests:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test
+    name: Messaging Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
