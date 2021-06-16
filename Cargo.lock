@@ -2128,9 +2128,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "742739e41cd49414de871ea5e549afb7e2a3ac77b589bcbebe8c82fab37147fc"
+checksum = "5ab49abadf3f9e1c4bc499e8845e152ad87d2ad2d30371841171169e9d75feee"
 dependencies = [
  "bitflags",
 ]
@@ -2630,9 +2630,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.7.6"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ffc86b4eb92557286599248272ebe5bdbb58d87cd54a14c0eff87bf8aa6e39e"
+checksum = "7af8559fb0b2c415529ca3920696c604141ccbea7d20538e266009342d2122c6"
 dependencies = [
  "bincode",
  "crdts",
