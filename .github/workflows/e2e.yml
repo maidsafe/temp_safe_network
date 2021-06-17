@@ -72,7 +72,7 @@ jobs:
 
       - name: Run example app for Blob API against local network
         shell: bash
-        run: timeout 15m cargo run --release --example blob
+        run: timeout 15m cargo run --release --example client_blob
 
 
       # TODO: Upload all logs as artifacts....
