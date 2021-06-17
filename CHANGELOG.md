@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.29.0](https://github.com/maidsafe/sn_cli/compare/v0.28.1...v0.29.0) (2021-06-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* update to sn_api v0.29 is a breaking change
+
+* Update dependencies ([459c70d](https://github.com/maidsafe/sn_cli/commit/459c70d1ce7c6974796928cb986d98e0c99b32dc))
+
 ### [0.28.1](https://github.com/maidsafe/sn_cli/compare/v0.28.0...v0.28.1) (2021-06-15)
 
 ## [0.28.0](https://github.com/maidsafe/sn_cli/compare/v0.27.1...v0.28.0) (2021-06-11)
