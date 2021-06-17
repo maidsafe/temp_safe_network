@@ -2870,9 +2870,9 @@ checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
 
 [[package]]
 name = "sn_api"
-version = "0.29.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "936268783ae66a08605f3cd82ed729bcdc3b421f089c6ca172f6b1958d50d07f"
+checksum = "f53e4ad5f3e38d609549f5ddfce56814f5c1b556d7abd27e9a98629068d8f695"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2911,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.28.1"
+version = "0.29.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2957,9 +2957,9 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.60.0"
+version = "0.61.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50f0167d7329b6f55dec6e0c4dab4c7f62149df64bc9068fc1a2d8653225bb36"
+checksum = "77305418bfaac4738061e066a6a5a0d495963c3a1568c99dd78c35334e4b8a8f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3045,9 +3045,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "35.0.0"
+version = "37.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07cfd83e3ddfd344a471b77bfc6170c7e831f13c4c6400bf96d172b62f0e2ef2"
+checksum = "38cb964f687a22879f9dbf9ce91e401f1e0363002836cecf310ddcea1ae7f11e"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -3360,9 +3360,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.7.0"
+version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c79ba603c337335df6ba6dd6afc38c38a7d5e1b0c871678439ea973cd62a118e"
+checksum = "aea337f72e96efe29acc234d803a5981cd9a2b6ed21655cd7fc21cfe021e8ec7"
 dependencies = [
  "autocfg",
  "bytes",
@@ -3372,7 +3372,6 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "tokio-macros",
- "winapi",
 ]
 
 [[package]]
