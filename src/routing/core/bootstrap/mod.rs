@@ -9,7 +9,7 @@
 mod join;
 mod relocate;
 
-pub(crate) use join::join;
+pub(crate) use join::join_network;
 pub(crate) use relocate::JoiningAsRelocated;
 
 use crate::messaging::node::RoutingMsg;

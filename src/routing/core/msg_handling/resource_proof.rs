@@ -9,12 +9,10 @@
 use super::Core;
 use crate::messaging::node::{JoinResponse, Peer, ResourceProofResponse, Variant};
 use crate::routing::{
+    core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519,
     peer::PeerUtils,
-    routing_api::{
-        command::Command,
-        core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
-    },
+    routing_api::command::Command,
     section::SectionUtils,
     Error, Result,
 };

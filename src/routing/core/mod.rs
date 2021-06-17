@@ -6,23 +6,29 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod anti_entropy;
 mod api;
+mod bootstrap;
 mod connectivity;
 mod delivery_group;
+mod enduser_registry;
+mod message_filter;
 mod messaging;
+mod msg_handling;
+mod split_barrier;
 
-use super::{command::Command, enduser_registry::EndUserRegistry, split_barrier::SplitBarrier};
+use self::{
+    enduser_registry::EndUserRegistry, message_filter::MessageFilter, split_barrier::SplitBarrier,
+};
 use crate::messaging::node::SignatureAggregator;
 use crate::messaging::{
     node::{Network, Proposal, RoutingMsg, Section, SectionSigned, Variant},
     DstInfo, DstLocation, MessageId, SectionAuthorityProvider,
 };
+use crate::routing::routing_api::command::Command;
 use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
     event::{Elders, Event, NodeElderChange},
-    message_filter::MessageFilter,
     messages::RoutingMsgUtils,
     network::NetworkUtils,
     node::Node,
@@ -30,6 +36,7 @@ use crate::routing::{
     relocation::RelocateState,
     section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionKeysProvider, SectionUtils},
 };
+pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
@@ -91,32 +98,6 @@ impl Core {
     ////////////////////////////////////////////////////////////////////////////
     // Miscellaneous
     ////////////////////////////////////////////////////////////////////////////
-
-    pub async fn add_to_filter(&mut self, msg_id: &MessageId) -> bool {
-        self.msg_filter.add_to_filter(msg_id).await
-    }
-
-    async fn check_for_entropy(
-        &self,
-        msg: &RoutingMsg,
-        dst_info: DstInfo,
-    ) -> Result<(Vec<Command>, bool)> {
-        if !self.is_elder() {
-            // Adult nodes do need to carry out entropy checking, however the message shall always
-            // be handled.
-            return Ok((vec![], true));
-        }
-
-        let (actions, can_be_executed) =
-            anti_entropy::process(&self.node, &self.section, msg, dst_info)?;
-        let mut commands = vec![];
-
-        for msg in actions.send {
-            commands.extend(self.relay_message(&msg).await?);
-        }
-
-        Ok((commands, can_be_executed))
-    }
 
     pub(crate) fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {

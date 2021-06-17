@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::Core;
 use crate::messaging::{
     node::{RoutingMsg, Section, Variant},
     DstInfo,
@@ -14,27 +15,48 @@ use crate::routing::{
     error::Result,
     messages::{RoutingMsgUtils, SrcAuthorityUtils},
     node::Node,
+    routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
 use std::cmp::Ordering;
 
-/// On reception of an incoming message, determine the actions that need to be taken in order to
-/// bring ours and the senders knowledge about each other up to date. Returns a tuple of
-/// `Actions` and `bool`. The boolean is flag for executing the message. If entropy is found, we do
-/// not execute the message by returning `false`.
-pub(crate) fn process(
+impl Core {
+    pub async fn check_for_entropy(
+        &self,
+        msg: &RoutingMsg,
+        dst_info: DstInfo,
+    ) -> Result<(Option<Command>, bool)> {
+        if !self.is_elder() {
+            // Adult nodes do need to carry out entropy checking, however the message shall always
+            // be handled.
+            return Ok((None, true));
+        }
+
+        match process(&self.node, &self.section, msg, dst_info)? {
+            (Some(msg_to_send), shall_be_handled) => {
+                let command = self.relay_message(&msg_to_send).await?;
+                Ok((command, shall_be_handled))
+            }
+            (None, shall_be_handled) => Ok((None, shall_be_handled)),
+        }
+    }
+}
+
+// On reception of an incoming message, determine the msg to send in order to
+// bring our's and the sender's knowledge about each other up to date. Returns a tuple of
+// `RoutingMsg` and `bool`. The boolean signals if the incoming message shall still be processed.
+// If entropy is found, we do not process the incoming message by returning `false`.
+fn process(
     node: &Node,
     section: &Section,
     msg: &RoutingMsg,
     dst_info: DstInfo,
-) -> Result<(Actions, bool)> {
-    let mut actions = Actions::default();
-
+) -> Result<(Option<RoutingMsg>, bool)> {
     let src_name = msg.src.name();
     if section.prefix().matches(&src_name) {
         // This message is from our section. We update our members via the `Sync` message which is
         // done elsewhere.
-        return Ok((actions, true));
+        return Ok((None, true));
     }
 
     let dst = msg.src.src_location().to_dst();
@@ -55,9 +77,9 @@ pub(crate) fn process(
                 dst_info.dst_section_pk
             );
             // In case a new node is trying to bootstrap from us, not being its matching section.
-            // Reply with empty actions with false flag to send back a JoinResponse::Redirect.
+            // Reply with no msg and with false flag to send back a JoinResponse::Redirect.
             if let Variant::JoinRequest(_) = msg.variant {
-                return Ok((actions, false));
+                return Ok((None, false));
             }
             section.chain().clone()
         };
@@ -73,17 +95,11 @@ pub(crate) fn process(
             variant,
             section.authority_provider().section_key(),
         )?;
-        actions.send.push(msg);
-        return Ok((actions, false));
+
+        return Ok((Some(msg), false));
     }
 
-    Ok((actions, true))
-}
-
-#[derive(Default)]
-pub(crate) struct Actions {
-    // RoutingMsg to send.
-    pub send: Vec<RoutingMsg>,
+    Ok((None, true))
 }
 
 #[cfg(test)]
@@ -114,8 +130,8 @@ mod tests {
             dst_section_pk: *env.section.chain().last_key(),
         };
 
-        let (actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
-        assert_eq!(actions.send, vec![]);
+        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        assert_eq!(msg_to_send, None);
 
         Ok(())
     }
@@ -136,9 +152,9 @@ mod tests {
             dst_section_pk: our_new_pk,
         };
 
-        let (actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
 
-        assert_eq!(actions.send, vec![]);
+        assert_eq!(msg_to_send, None);
 
         Ok(())
     }
@@ -156,9 +172,9 @@ mod tests {
             dst_section_pk: *env.section.chain().root_key(),
         };
 
-        let (mut actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
 
-        assert_matches!(&actions.send.pop(), Some(message) => {
+        assert_matches!(msg_to_send, Some(message) => {
             assert_matches!(message.variant, Variant::SectionKnowledge { ref src_info, .. } => {
                 assert_eq!(src_info.0.value, *env.section.authority_provider());
                 assert_eq!(src_info.1, *env.section.chain());
@@ -181,9 +197,9 @@ mod tests {
             dst_section_pk: *env.section.chain().root_key(),
         };
 
-        let (actions, _) = process(&env.node, &env.section, &msg, dst_info)?;
+        let (msg_to_send, _) = process(&env.node, &env.section, &msg, dst_info)?;
 
-        assert_eq!(actions.send, vec![]);
+        assert_eq!(msg_to_send, None);
 
         Ok(())
     }

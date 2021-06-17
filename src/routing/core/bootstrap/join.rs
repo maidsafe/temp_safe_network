@@ -42,7 +42,7 @@ const BACKLOG_CAPACITY: usize = 100;
 /// NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
 /// lost in transit or other reasons. It's the responsibility of the caller to handle this case,
 /// for example by using a timeout.
-pub(crate) async fn join(
+pub(crate) async fn join_network(
     node: Node,
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,

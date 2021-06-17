@@ -11,12 +11,13 @@ use crate::messaging::node::{
     Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
 };
 use crate::routing::{
+    core::bootstrap::JoiningAsRelocated,
     error::Result,
     peer::PeerUtils,
     relocation::{
         self, RelocateAction, RelocateDetailsUtils, RelocateState, SignedRelocateDetailsUtils,
     },
-    routing_api::{bootstrap::JoiningAsRelocated, command::Command},
+    routing_api::command::Command,
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
     Event, ELDER_SIZE,
 };

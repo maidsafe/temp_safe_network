@@ -6,18 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
-use crate::messaging::node::{DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal};
+use super::super::Core;
+use crate::messaging::{
+    node::{
+        DkgFailureSig, DkgFailureSigSet, DkgKey, ElderCandidates, Proposal, RoutingMsg, Variant,
+    },
+    DstLocation, SectionAuthorityProvider,
+};
 use crate::routing::{
     dkg::{commands::DkgCommands, DkgFailureSigSetUtils},
-    error::Result,
-    peer::PeerUtils,
+    error::{Error, Result},
+    messages::RoutingMsgUtils,
     routing_api::command::Command,
-    section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionPeersUtils, SectionUtils},
-    Error,
+    section::{SectionAuthorityProviderUtils, SectionKeyShare, SectionPeersUtils, SectionUtils},
 };
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::{collections::BTreeSet, iter, net::SocketAddr, slice};
+use std::{collections::BTreeSet, slice};
 use xor_name::XorName;
 
 impl Core {
@@ -101,64 +105,34 @@ impl Core {
         }
     }
 
-    pub fn handle_connection_lost(&self, addr: SocketAddr) -> Result<Vec<Command>> {
-        if let Some(peer) = self.section.find_joined_member_by_addr(&addr) {
-            debug!(
-                "Possible connection loss detected with known peer {:?}",
-                peer
-            )
-        } else if let Some(end_user) = self.get_enduser_by_addr(&addr) {
-            debug!(
-                "Possible connection loss detected with known client {:?}",
-                end_user
-            )
-        } else {
-            debug!("Possible connection loss detected with addr: {:?}", addr);
-        }
-        Ok(vec![])
-    }
+    pub(crate) fn handle_dkg_outcome(
+        &mut self,
+        section_auth: SectionAuthorityProvider,
+        key_share: SectionKeyShare,
+    ) -> Result<Vec<Command>> {
+        let proposal = Proposal::SectionInfo(section_auth);
+        let recipients: Vec<_> = self.section.authority_provider().peers().collect();
+        let result = self.send_proposal_with(&recipients, proposal, &key_share);
 
-    pub fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Command>> {
-        let name = if let Some(peer) = self.section.find_joined_member_by_addr(addr) {
-            debug!("Lost known peer {}", peer);
-            *peer.name()
-        } else {
-            trace!("Lost unknown peer {}", addr);
-            return Ok(vec![]);
-        };
+        let public_key = key_share.public_key_set.public_key();
 
-        if !self.is_elder() {
-            // Adults cannot complain about connectivity.
-            return Ok(vec![]);
+        self.section_keys_provider.insert_dkg_outcome(key_share);
+
+        if self.section.chain().has_key(&public_key) {
+            self.section_keys_provider.finalise_dkg(&public_key)
         }
 
-        let mut commands = self.propose_offline(name)?;
-        commands.push(Command::StartConnectivityTest(name));
-        Ok(commands)
+        result
     }
 
-    pub fn propose_offline(&self, name: XorName) -> Result<Vec<Command>> {
-        self.cast_offline_proposals(&iter::once(name).collect())
-    }
-
-    fn cast_offline_proposals(&self, names: &BTreeSet<XorName>) -> Result<Vec<Command>> {
-        // Don't send the `Offline` proposal to the peer being lost as that send would fail,
-        // triggering a chain of further `Offline` proposals.
-        let elders: Vec<_> = self
-            .section
-            .authority_provider()
-            .peers()
-            .filter(|peer| !names.contains(peer.name()))
-            .collect();
-        let mut result: Vec<Command> = Vec::new();
-        for name in names.iter() {
-            if let Some(info) = self.section.members().get(name) {
-                let info = info.clone().leave()?;
-                if let Ok(commands) = self.send_proposal(&elders, Proposal::Offline(info)) {
-                    result.extend(commands);
-                }
-            }
-        }
-        Ok(result)
+    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
+        let variant = Variant::DkgFailureAgreement(failure_set);
+        let message = RoutingMsg::single_src(
+            &self.node,
+            DstLocation::DirectAndUnrouted,
+            variant,
+            self.section.authority_provider().section_key(),
+        )?;
+        Ok(self.send_message_to_our_elders(message))
     }
 }

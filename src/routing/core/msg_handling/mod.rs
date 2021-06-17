@@ -7,21 +7,24 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod agreement;
+mod anti_entropy;
 mod bad_msgs;
 mod decisions;
+mod dkg;
+mod join;
 mod relocation;
 mod resource_proof;
+mod section_info;
 
-use super::super::Core;
+use super::Core;
+use crate::messaging::node::Error as AggregatorError;
 use crate::messaging::{
     client::ClientMsg,
     node::{
-        DkgFailureSigSet, Error as AggregatorError, JoinAsRelocatedRequest,
-        JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest, JoinResponse, Network, Peer,
-        Proposal, RoutingMsg, Section, SignedRelocateDetails, SrcAuthority, Variant,
+        JoinResponse, Network, Proposal, RoutingMsg, Section, SignedRelocateDetails, SrcAuthority,
+        Variant,
     },
-    section_info::{GetSectionResponse, SectionInfoMsg},
-    DstInfo, DstLocation, EndUser, MessageType, SectionAuthorityProvider,
+    DstInfo, DstLocation, EndUser, MessageType,
 };
 use crate::routing::{
     dkg::{commands::DkgCommands, ProposalError, SigShare},
@@ -30,12 +33,9 @@ use crate::routing::{
     messages::{MessageStatus, RoutingMsgUtils, SrcAuthorityUtils, VerifyStatus},
     network::NetworkUtils,
     peer::PeerUtils,
-    relocation::{RelocatePayloadUtils, RelocateState, SignedRelocateDetailsUtils},
+    relocation::{RelocateState, SignedRelocateDetailsUtils},
     routing_api::command::Command,
-    section::{
-        SectionAuthorityProviderUtils, SectionKeyShare, SectionPeersUtils, SectionUtils,
-        FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
-    },
+    section::{SectionAuthorityProviderUtils, SectionUtils},
 };
 use bytes::Bytes;
 use std::{collections::BTreeSet, iter, net::SocketAddr};
@@ -60,8 +60,7 @@ impl Core {
             if let Some(cmds) = self.relay_message(&msg).await? {
                 commands.push(cmds);
             }
-        }
-        if !in_dst_location {
+
             // RoutingMsg not for us.
             return Ok(commands);
         }
@@ -69,10 +68,16 @@ impl Core {
         match self.decide_message_status(&msg)? {
             MessageStatus::Useful => {
                 trace!("Useful message from {:?}: {:?}", sender, msg);
-                let (entropy_commands, shall_be_handled) =
+                let (ae_command, shall_be_handled) =
                     self.check_for_entropy(&msg, dst_info.clone()).await?;
-                let no_ae_commands = entropy_commands.is_empty();
-                commands.extend(entropy_commands);
+
+                let no_ae_commands = if let Some(cmd) = ae_command {
+                    commands.push(cmd);
+                    false
+                } else {
+                    true
+                };
+
                 if shall_be_handled {
                     info!("Entropy check passed. Handling useful msg!");
                     commands.extend(self.handle_useful_message(sender, msg, dst_info).await?);
@@ -112,71 +117,6 @@ impl Core {
         Ok(commands)
     }
 
-    pub(crate) async fn handle_section_info_msg(
-        &mut self,
-        sender: SocketAddr,
-        message: SectionInfoMsg,
-        dst_info: DstInfo, // The DstInfo contains the XorName of the sender and a random PK during the initial SectionQuery,
-    ) -> Vec<Command> {
-        // Provide our PK as the dst PK, only redundant as the message
-        // itself contains details regarding relocation/registration.
-        let dst_info = DstInfo {
-            dst: dst_info.dst,
-            dst_section_pk: *self.section().chain().last_key(),
-        };
-
-        match message {
-            SectionInfoMsg::GetSectionQuery(public_key) => {
-                let name = XorName::from(public_key);
-
-                debug!("Received GetSectionQuery({}) from {}", name, sender);
-
-                let response = if let (true, Ok(pk_set)) =
-                    (self.section.prefix().matches(&name), self.public_key_set())
-                {
-                    GetSectionResponse::Success(SectionAuthorityProvider {
-                        prefix: self.section.authority_provider().prefix(),
-                        public_key_set: pk_set,
-                        elders: self
-                            .section
-                            .authority_provider()
-                            .peers()
-                            .map(|peer| (*peer.name(), *peer.addr()))
-                            .collect(),
-                    })
-                } else {
-                    // If we are elder, we should know a section that is closer to `name` that us.
-                    // Otherwise redirect to our elders.
-                    let section_auth = self
-                        .network
-                        .closest(&name)
-                        .unwrap_or_else(|| self.section.authority_provider());
-                    GetSectionResponse::Redirect(section_auth.clone())
-                };
-
-                let response = SectionInfoMsg::GetSectionResponse(response);
-                debug!("Sending {:?} to {}", response, sender);
-
-                vec![Command::SendMessage {
-                    recipients: vec![(name, sender)],
-                    delivery_group_size: 1,
-                    message: MessageType::SectionInfo {
-                        msg: response,
-                        dst_info,
-                    },
-                }]
-            }
-            SectionInfoMsg::GetSectionResponse(response) => {
-                error!("GetSectionResponse unexpectedly received: {:?}", response);
-                vec![]
-            }
-            SectionInfoMsg::SectionInfoUpdate(error) => {
-                error!("SectionInfoUpdate received: {:?}", error);
-                vec![]
-            }
-        }
-    }
-
     pub(crate) fn handle_timeout(&mut self, token: u64) -> Result<Vec<Command>> {
         self.dkg_voter
             .handle_timeout(&self.node.keypair, token)
@@ -197,37 +137,6 @@ impl Core {
                 Err(Error::InvalidSignatureShare)
             }
         }
-    }
-
-    pub(crate) fn handle_dkg_outcome(
-        &mut self,
-        section_auth: SectionAuthorityProvider,
-        key_share: SectionKeyShare,
-    ) -> Result<Vec<Command>> {
-        let proposal = Proposal::SectionInfo(section_auth);
-        let recipients: Vec<_> = self.section.authority_provider().peers().collect();
-        let result = self.send_proposal_with(&recipients, proposal, &key_share);
-
-        let public_key = key_share.public_key_set.public_key();
-
-        self.section_keys_provider.insert_dkg_outcome(key_share);
-
-        if self.section.chain().has_key(&public_key) {
-            self.section_keys_provider.finalise_dkg(&public_key)
-        }
-
-        result
-    }
-
-    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Command> {
-        let variant = Variant::DkgFailureAgreement(failure_set);
-        let message = RoutingMsg::single_src(
-            &self.node,
-            DstLocation::DirectAndUnrouted,
-            variant,
-            self.section.authority_provider().section_key(),
-        )?;
-        Ok(self.send_message_to_our_elders(message))
     }
 
     pub(crate) fn aggregate_message(&mut self, msg: RoutingMsg) -> Result<Option<RoutingMsg>> {
@@ -537,226 +446,5 @@ impl Core {
         }
 
         self.update_state(snapshot).await
-    }
-
-    pub(crate) fn handle_join_request(
-        &mut self,
-        peer: Peer,
-        join_request: JoinRequest,
-    ) -> Result<Vec<Command>> {
-        debug!("Received {:?} from {}", join_request, peer);
-
-        if !self.section.prefix().matches(peer.name())
-            || join_request.section_key != *self.section.chain().last_key()
-        {
-            debug!(
-                "JoinRequest from {} - name doesn't match our prefix {:?}.",
-                peer,
-                self.section.prefix()
-            );
-
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Retry(
-                self.section.authority_provider().clone(),
-            )));
-            trace!("Sending {:?} to {}", variant, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                variant,
-                *self.section.chain().last_key(),
-            )?]);
-        }
-
-        if self.section.members().is_joined(peer.name()) {
-            debug!(
-                "Ignoring JoinRequest from {} - already member of our section.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
-        if !self.joins_allowed {
-            debug!(
-                "Rejecting JoinRequest from {} - joins currently not allowed.",
-                peer,
-            );
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::JoinsDisallowed,
-            )));
-
-            trace!("Sending {:?} to {}", variant, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                variant,
-                *self.section.chain().last_key(),
-            )?]);
-        }
-
-        // Start as Adult as long as passed resource signed.
-        let mut age = MIN_ADULT_AGE;
-
-        // During the first section, node shall use ranged age to avoid too many nodes got
-        // relocated at the same time. After the first section got split, later on nodes shall
-        // only start with age of MIN_ADULT_AGE
-        if self.section.prefix().is_empty() {
-            if peer.age() < FIRST_SECTION_MIN_AGE || peer.age() > FIRST_SECTION_MAX_AGE {
-                debug!(
-                    "Ignoring JoinRequest from {} - first-section node having wrong age {:?}",
-                    peer,
-                    peer.age(),
-                );
-                return Ok(vec![]);
-            } else {
-                age = peer.age();
-            }
-        } else if peer.age() != MIN_ADULT_AGE {
-            // After section split, new node has to join with age of MIN_ADULT_AGE.
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Retry(
-                self.section.authority_provider().clone(),
-            )));
-            trace!("New node after section split must join with age of MIN_ADULT_AGE. Sending {:?} to {}", variant, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                variant,
-                *self.section.chain().last_key(),
-            )?]);
-        }
-
-        // Requires the node name matches the age.
-        if age != peer.age() {
-            debug!(
-                "Ignoring JoinRequest from {} - required age {:?} not presented.",
-                peer, age,
-            );
-            return Ok(vec![]);
-        }
-
-        // Require resource signed if joining as a new node.
-        if let Some(response) = join_request.resource_proof_response {
-            if !self.validate_resource_proof_response(peer.name(), response) {
-                debug!(
-                    "Ignoring JoinRequest from {} - invalid resource signed response",
-                    peer
-                );
-                return Ok(vec![]);
-            }
-        } else {
-            return Ok(vec![self.send_resource_proof_challenge(&peer)?]);
-        }
-
-        Ok(vec![Command::ProposeOnline {
-            peer,
-            previous_name: None,
-            dst_key: None,
-        }])
-    }
-
-    pub(crate) fn handle_join_as_relocated_request(
-        &mut self,
-        peer: Peer,
-        join_request: JoinAsRelocatedRequest,
-    ) -> Result<Vec<Command>> {
-        debug!("Received {:?} from {}", join_request, peer);
-        let payload = if let Some(payload) = join_request.relocate_payload {
-            payload
-        } else {
-            let variant = Variant::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
-            ));
-
-            trace!("Sending {:?} to {}", variant, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                variant,
-                *self.section.chain().last_key(),
-            )?]);
-        };
-
-        if !self.section.prefix().matches(peer.name())
-            || join_request.section_key != *self.section.chain().last_key()
-        {
-            debug!(
-                "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
-                peer,
-                self.section.prefix()
-            );
-
-            let variant = Variant::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
-            ));
-            trace!("Sending {:?} to {}", variant, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                variant,
-                *self.section.chain().last_key(),
-            )?]);
-        }
-
-        if self.section.members().is_joined(peer.name()) {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - already member of our section.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
-        if !payload.verify_identity(peer.name()) {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - invalid signature.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
-        let details = payload.relocate_details()?;
-
-        if !self.section.prefix().matches(&details.dst) {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
-                         our prefix {:?}.",
-                peer,
-                details.dst,
-                self.section.prefix()
-            );
-            return Ok(vec![]);
-        }
-
-        if !self
-            .verify_message(payload.details.signed_msg())
-            .unwrap_or(false)
-        {
-            debug!("Ignoring JoinAsRelocatedRequest from {} - untrusted.", peer);
-            return Ok(vec![]);
-        }
-
-        // Requires the node name matches the age.
-        let age = details.age;
-        if age != peer.age() {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - required age {:?} not presented.",
-                peer, age,
-            );
-            return Ok(vec![]);
-        }
-
-        let previous_name = Some(details.pub_id);
-        let dst_key = Some(details.dst_key);
-
-        Ok(vec![Command::ProposeOnline {
-            peer,
-            previous_name,
-            dst_key,
-        }])
-    }
-
-    // Generate a new section info based on the current set of members and if it differs from the
-    // current elders, trigger a DKG.
-    pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
-        let mut commands = vec![];
-
-        for info in self.section.promote_and_demote_elders(&self.node.name()) {
-            commands.extend(self.send_dkg_start(info)?);
-        }
-
-        Ok(commands)
     }
 }
