@@ -33,6 +33,7 @@ jobs:
           filters: |
             src:
               - 'src/messaging/**'
+              - 'src/types/**'
 
       - name: Install Rust
         if: steps.changes.outputs.src == 'true'
