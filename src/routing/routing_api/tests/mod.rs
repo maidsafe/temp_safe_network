@@ -324,8 +324,8 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     );
 
     let relocate_details = RelocateDetails {
-        pub_id: relocated_node_old_name,
-        dst: rand::random(),
+        name: relocated_node_old_name,
+        new_name: rand::random(),
         dst_key: section_key,
         age: relocated_node.age(),
     };
@@ -349,18 +349,14 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         proof_chain,
     )?;
     let relocate_details = SignedRelocateDetails::new(relocate_message)?;
-    let relocate_payload = RelocatePayload::new(
-        relocate_details,
-        &relocated_node.name(),
-        &relocated_node_old_keypair,
-    );
+    let relocate_payload = RelocatePayload::new(relocate_details, &relocated_node_old_keypair)?;
 
     let join_request = RoutingMsg::single_src(
         &relocated_node,
         DstLocation::DirectAndUnrouted,
         Variant::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
             section_key,
-            relocate_payload: Some(relocate_payload),
+            relocate_payload,
         })),
         section_key,
     )?;
@@ -649,7 +645,7 @@ async fn handle_online_command(
                 }
             }
             Variant::Relocate(details) => {
-                if details.pub_id != *peer.name() {
+                if details.name != *peer.name() {
                     continue;
                 }
 
@@ -710,7 +706,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
 
     assert!(status.node_approval_sent);
     assert_matches!(status.relocate_details, Some(details) => {
-        assert_eq!(details.dst, *peer.name());
+        assert_eq!(details.new_name, *peer.name());
         assert_eq!(details.age, (age / 2).max(MIN_AGE));
     });
 
@@ -1428,7 +1424,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                     _ => continue,
                 };
 
-                assert_eq!(details.pub_id, *relocated_peer.name());
+                assert_eq!(details.name, *relocated_peer.name());
                 assert_eq!(details.age, relocated_peer.age() + 1);
             }
             RelocatedPeerRole::Elder => {

@@ -121,11 +121,9 @@ impl Dispatcher {
                                 None
                             }
                         }
-                        Variant::JoinAsRelocatedRequest(join_request) => {
+                        Variant::JoinAsRelocatedRequest(_) => {
                             // Do this check only for the initial join request
-                            if join_request.relocate_payload.is_none()
-                                && self.comm.is_reachable(sender).await.is_err()
-                            {
+                            if self.comm.is_reachable(sender).await.is_err() {
                                 Some(Variant::JoinAsRelocatedResponse(Box::new(
                                     JoinAsRelocatedResponse::NodeNotReachable(*sender),
                                 )))

@@ -24,7 +24,9 @@ use bls::PublicKey as BlsPublicKey;
 use std::marker::Sized;
 use xor_name::XorName;
 
-/// Find all nodes to relocate after a churn event and create the relocate actions for them.
+// Find all nodes to relocate after a churn event and create the relocate actions for them.
+// Find the peers that pass the relocation check and take only the oldest ones to avoid
+// relocating too many nodes at the same time.
 pub(crate) fn actions(
     section: &Section,
     network: &Network,
@@ -39,7 +41,11 @@ pub(crate) fn actions(
         .filter(|info| check(info.peer.age(), churn_signature))
         .collect();
 
-    let max_age = if let Some(age) = candidates.iter().map(|info| (*info).peer.age()).max() {
+    let max_age = if let Some(age) = candidates
+        .iter()
+        .map(|candidate| (*candidate).peer.age())
+        .max()
+    {
         age
     } else {
         return vec![];
@@ -47,11 +53,11 @@ pub(crate) fn actions(
 
     candidates
         .into_iter()
-        .filter(|info| info.peer.age() == max_age)
-        .map(|info| {
+        .filter(|candidate| candidate.peer.age() == max_age)
+        .map(|candidate| {
             (
-                *info,
-                RelocateAction::new(section, network, &info.peer, churn_name),
+                *candidate,
+                RelocateAction::new(section, network, &candidate.peer, churn_name),
             )
         })
         .collect()
@@ -60,36 +66,42 @@ pub(crate) fn actions(
 /// Details of a relocation: which node to relocate, where to relocate it to and what age it should
 /// get once relocated.
 pub trait RelocateDetailsUtils {
-    fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self;
+    fn new(section: &Section, network: &Network, peer: &Peer, new_name: XorName) -> Self;
 
     fn with_age(
         section: &Section,
         network: &Network,
         peer: &Peer,
-        dst: XorName,
+        new_name: XorName,
         age: u8,
     ) -> RelocateDetails;
 }
 
 impl RelocateDetailsUtils for RelocateDetails {
-    fn new(section: &Section, network: &Network, peer: &Peer, dst: XorName) -> Self {
-        Self::with_age(section, network, peer, dst, peer.age().saturating_add(1))
+    fn new(section: &Section, network: &Network, peer: &Peer, new_name: XorName) -> Self {
+        Self::with_age(
+            section,
+            network,
+            peer,
+            new_name,
+            peer.age().saturating_add(1),
+        )
     }
 
     fn with_age(
         section: &Section,
         network: &Network,
         peer: &Peer,
-        dst: XorName,
+        new_name: XorName,
         age: u8,
     ) -> RelocateDetails {
         let dst_key = network
-            .key_by_name(&dst)
+            .key_by_name(&new_name)
             .unwrap_or_else(|_| *section.chain().root_key());
 
         RelocateDetails {
-            pub_id: *peer.name(),
-            dst,
+            name: *peer.name(),
+            new_name,
             dst_key,
             age,
         }
@@ -106,7 +118,7 @@ pub trait SignedRelocateDetailsUtils {
 
     fn signed_msg(&self) -> &RoutingMsg;
 
-    fn dst(&self) -> Result<&XorName, Error>;
+    fn new_name(&self) -> Result<&XorName, Error>;
 
     fn dst_key(&self) -> Result<BlsPublicKey, Error>;
 }
@@ -133,8 +145,8 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
         &self.signed_msg
     }
 
-    fn dst(&self) -> Result<&XorName, Error> {
-        Ok(&self.relocate_details()?.dst)
+    fn new_name(&self) -> Result<&XorName, Error> {
+        Ok(&self.relocate_details()?.new_name)
     }
 
     fn dst_key(&self) -> Result<BlsPublicKey, Error> {
@@ -143,7 +155,9 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
 }
 
 pub trait RelocatePayloadUtils {
-    fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self;
+    fn new(details: SignedRelocateDetails, old_keypair: &Keypair) -> Result<Self, Error>
+    where
+        Self: Sized;
 
     fn verify_identity(&self, new_name: &XorName) -> bool;
 
@@ -151,13 +165,17 @@ pub trait RelocatePayloadUtils {
 }
 
 impl RelocatePayloadUtils for RelocatePayload {
-    fn new(details: SignedRelocateDetails, new_name: &XorName, old_keypair: &Keypair) -> Self {
+    fn new(details: SignedRelocateDetails, old_keypair: &Keypair) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let new_name = details.new_name()?;
         let signature_of_new_name_with_old_key = ed25519::sign(&new_name.0, old_keypair);
 
-        Self {
+        Ok(Self {
             details,
             signature_of_new_name_with_old_key,
-        }
+        })
     }
 
     fn verify_identity(&self, new_name: &XorName) -> bool {
@@ -167,7 +185,7 @@ impl RelocatePayloadUtils for RelocatePayload {
             return false;
         };
 
-        let pub_key = if let Ok(pub_key) = ed25519::pub_key(&details.pub_id) {
+        let pub_key = if let Ok(pub_key) = ed25519::pub_key(&details.name) {
             pub_key
         } else {
             return false;
@@ -204,29 +222,31 @@ pub(crate) enum RelocateAction {
 
 impl RelocateAction {
     pub fn new(section: &Section, network: &Network, peer: &Peer, churn_name: &XorName) -> Self {
-        let dst = dst(peer.name(), churn_name);
+        // Compute the new name for the node based on current peer's name and `churn_name`, which
+        // is the name of the joined/left node that triggered the relocation.
+        let new_name = XorName::from_content(&[&peer.name().0, &churn_name.0]);
 
         if section.is_elder(peer.name()) {
             RelocateAction::Delayed(RelocatePromise {
                 name: *peer.name(),
-                dst,
+                new_name,
             })
         } else {
-            RelocateAction::Instant(RelocateDetails::new(section, network, peer, dst))
+            RelocateAction::Instant(RelocateDetails::new(section, network, peer, new_name))
         }
     }
 
-    pub fn dst(&self) -> &XorName {
+    pub fn new_name(&self) -> &XorName {
         match self {
-            Self::Instant(details) => &details.dst,
-            Self::Delayed(promise) => &promise.dst,
+            Self::Instant(details) => &details.new_name,
+            Self::Delayed(promise) => &promise.new_name,
         }
     }
 
     #[cfg(test)]
     pub fn name(&self) -> &XorName {
         match self {
-            Self::Instant(details) => &details.pub_id,
+            Self::Instant(details) => &details.name,
             Self::Delayed(promise) => &promise.name,
         }
     }
@@ -238,12 +258,6 @@ pub(crate) fn check(age: u8, churn_signature: &bls::Signature) -> bool {
     // Evaluate the formula: `signature % 2^age == 0` Which is the same as checking the signature
     // has at least `age` trailing zero bits.
     trailing_zeros(&churn_signature.to_bytes()[..]) >= age as u32
-}
-
-// Compute the destination for the node with `relocating_name` to be relocated to. `churn_name` is
-// the name of the joined/left node that triggered the relocation.
-fn dst(relocating_name: &XorName, churn_name: &XorName) -> XorName {
-    XorName::from_content(&[&relocating_name.0, &churn_name.0])
 }
 
 // Returns the number of trailing zero bits of the byte slice.

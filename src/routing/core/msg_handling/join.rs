@@ -141,21 +141,6 @@ impl Core {
         join_request: JoinAsRelocatedRequest,
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
-        let payload = if let Some(payload) = join_request.relocate_payload {
-            payload
-        } else {
-            let variant = Variant::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::Retry(self.section.authority_provider().clone()),
-            ));
-
-            trace!("Sending {:?} to {}", variant, peer);
-            return Ok(vec![self.send_direct_message(
-                (*peer.name(), *peer.addr()),
-                variant,
-                *self.section.chain().last_key(),
-            )?]);
-        };
-
         if !self.section.prefix().matches(peer.name())
             || join_request.section_key != *self.section.chain().last_key()
         {
@@ -184,6 +169,7 @@ impl Core {
             return Ok(vec![]);
         }
 
+        let payload = join_request.relocate_payload;
         if !payload.verify_identity(peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - invalid signature.",
@@ -194,12 +180,12 @@ impl Core {
 
         let details = payload.relocate_details()?;
 
-        if !self.section.prefix().matches(&details.dst) {
+        if !self.section.prefix().matches(&details.new_name) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
                          our prefix {:?}.",
                 peer,
-                details.dst,
+                details.new_name,
                 self.section.prefix()
             );
             return Ok(vec![]);
@@ -223,7 +209,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        let previous_name = Some(details.pub_id);
+        let previous_name = Some(details.name);
         let dst_key = Some(details.dst_key);
 
         Ok(vec![Command::ProposeOnline {

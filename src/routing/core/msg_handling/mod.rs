@@ -280,6 +280,7 @@ impl Core {
                         Some(sender),
                         Some(RelocateState::InProgress(ref mut joining_as_relocated)),
                     ) => {
+                        // FIXME: verify routing_msg but not its variant
                         if let Some(cmd) = joining_as_relocated
                             .handle_join_response(*join_response, sender)
                             .await?

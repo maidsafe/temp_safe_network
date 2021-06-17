@@ -240,8 +240,8 @@ impl Core {
         recipient: &Peer,
         details: RelocateDetails,
     ) -> Result<Vec<Command>> {
-        let src = details.pub_id;
-        let dst = DstLocation::Node(details.pub_id);
+        let src = details.name;
+        let dst = DstLocation::Node(details.name);
         let variant = Variant::Relocate(details);
 
         self.send_message_for_dst_accumulation(src, dst, variant, slice::from_ref(recipient))

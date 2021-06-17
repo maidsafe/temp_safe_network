@@ -55,13 +55,13 @@ impl Core {
             }
 
             debug!(
-                "Relocating {:?} to {} (on churn of {})",
+                "Relocating {:?} with new name {} (on churn of {})",
                 peer,
-                action.dst(),
+                action.new_name(),
                 churn_name
             );
 
-            commands.extend(self.propose(Proposal::Offline(info.relocate(*action.dst())))?);
+            commands.extend(self.propose(Proposal::Offline(info.relocate(*action.new_name())))?);
 
             match action {
                 RelocateAction::Instant(details) => {
@@ -81,9 +81,9 @@ impl Core {
             RelocateDetails::with_age(&self.section, &self.network, peer, *peer.name(), age);
 
         trace!(
-            "Relocating {:?} to {} with age {} due to rejoin",
+            "Relocating {:?} with new name {} with age {} due to rejoin",
             peer,
-            details.dst,
+            details.new_name,
             details.age
         );
 
@@ -94,15 +94,15 @@ impl Core {
         &mut self,
         details: SignedRelocateDetails,
     ) -> Result<Option<Command>> {
-        if details.relocate_details()?.pub_id != self.node.name() {
+        if details.relocate_details()?.name != self.node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
             // message that we already handled.
             return Ok(None);
         }
 
         debug!(
-            "Received Relocate message to join the section at {}",
-            details.relocate_details()?.dst
+            "Received Relocate message to join a new section with new name: {}",
+            details.relocate_details()?.new_name
         );
 
         match self.relocate_state {
@@ -145,7 +145,10 @@ impl Core {
             // Keep it around even if we are not elder anymore, in case we need to resend it.
             match self.relocate_state {
                 None => {
-                    trace!("Received RelocatePromise to section at {}", promise.dst);
+                    trace!(
+                        "Received RelocatePromise to section at {}",
+                        promise.new_name
+                    );
                     self.relocate_state = Some(RelocateState::Delayed(msg.clone()));
                     self.send_event(Event::RelocationStarted {
                         previous_name: self.node.name(),
@@ -178,7 +181,7 @@ impl Core {
 
         if let Some(info) = self.section.members().get(&promise.name) {
             let details =
-                RelocateDetails::new(&self.section, &self.network, &info.peer, promise.dst);
+                RelocateDetails::new(&self.section, &self.network, &info.peer, promise.new_name);
             commands.extend(self.send_relocate(&info.peer, details)?);
         } else {
             error!(

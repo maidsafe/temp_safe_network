@@ -22,7 +22,7 @@ pub struct JoinAsRelocatedRequest {
     /// The public key of the section to join.
     pub section_key: BlsPublicKey,
     /// The relocation details signed by the previous section.
-    pub relocate_payload: Option<RelocatePayload>,
+    pub relocate_payload: RelocatePayload,
 }
 
 impl Debug for JoinAsRelocatedRequest {
@@ -30,13 +30,7 @@ impl Debug for JoinAsRelocatedRequest {
         formatter
             .debug_struct("JoinAsRelocatedRequest")
             .field("section_key", &self.section_key)
-            .field(
-                "relocate_payload",
-                &self
-                    .relocate_payload
-                    .as_ref()
-                    .map(|payload| &payload.details),
-            )
+            .field("relocate_payload", &self.relocate_payload.details)
             .finish()
     }
 }

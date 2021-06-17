@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Relocation related types and utilities.
+//! Relocation related types.
 
 use super::RoutingMsg;
 use bls::PublicKey as BlsPublicKey;
@@ -14,15 +14,15 @@ pub use ed25519_dalek::{Keypair, Signature, Verifier};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// Details of a relocation: which node to relocate, where to relocate it to and what age it should
-/// get once relocated.
+/// Details of a relocation: which node to relocate, new node's name,
+/// and what age it should get once relocated.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct RelocateDetails {
-    /// Public id of the node to relocate.
-    pub pub_id: XorName,
-    /// Relocation destination - the node will be relocated to a section whose prefix matches this
-    /// name.
-    pub dst: XorName,
+    /// Name of the node to relocate.
+    pub name: XorName,
+    /// New name the node will adopt, it will be relocated to
+    /// the closest section whose prefix matches this name.
+    pub new_name: XorName,
     /// The BLS key of the destination section used by the relocated node to verify messages.
     pub dst_key: BlsPublicKey,
     /// The age the node will have post-relocation.
@@ -51,5 +51,5 @@ pub struct RelocatePromise {
     /// Xorname
     pub name: XorName,
     /// Relocation destination xorname
-    pub dst: XorName,
+    pub new_name: XorName,
 }

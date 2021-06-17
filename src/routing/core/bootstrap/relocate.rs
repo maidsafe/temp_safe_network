@@ -24,7 +24,6 @@ use crate::routing::{
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
 };
-use crate::types::PublicKey;
 use bls::PublicKey as BlsPublicKey;
 use std::{collections::HashSet, net::SocketAddr};
 use xor_name::{Prefix, XorName};
@@ -34,26 +33,40 @@ pub(crate) struct JoiningAsRelocated {
     node: Node,
     genesis_key: BlsPublicKey,
     section_key: BlsPublicKey,
-    relocate_payload: Option<RelocatePayload>,
-    relocate_details: SignedRelocateDetails,
+    relocate_payload: RelocatePayload,
     // Avoid sending more than one request to the same peer.
     used_recipients: HashSet<SocketAddr>,
 }
 
 impl JoiningAsRelocated {
     pub fn new(
-        node: Node,
+        mut node: Node,
         genesis_key: BlsPublicKey,
         relocate_details: SignedRelocateDetails,
     ) -> Result<Self> {
         let section_key = relocate_details.dst_key()?;
 
+        // FIXME: we need to be provided with the keypair, generating a random one
+        let extra_split_count = 3;
+        let prefix = Prefix::default();
+        let name_prefix = Prefix::new(
+            prefix.bit_count() + extra_split_count,
+            *relocate_details.new_name()?,
+        );
+
+        let age = relocate_details.relocate_details()?.age;
+        let new_keypair = ed25519::gen_keypair(&name_prefix.range_inclusive(), age);
+        //let new_name = XorName::from(PublicKey::from(new_keypair.public));
+        let relocate_payload = RelocatePayload::new(relocate_details.clone(), &node.keypair)?;
+
+        info!("Changing name to {}", relocate_details.new_name()?);
+        node = Node::new(new_keypair, node.addr);
+
         Ok(Self {
             node,
             genesis_key,
             section_key,
-            relocate_payload: None,
-            relocate_details,
+            relocate_payload,
             used_recipients: HashSet::<SocketAddr>::new(),
         })
     }
@@ -61,7 +74,7 @@ impl JoiningAsRelocated {
     // Generates the first command to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
     pub fn start(&mut self, bootstrap_addrs: Vec<SocketAddr>) -> Result<Command> {
-        let dst_xorname = *self.relocate_details.dst()?;
+        let dst_xorname = self.relocate_payload.relocate_details()?.new_name;
         let recipients: Vec<(XorName, SocketAddr)> = bootstrap_addrs
             .iter()
             .map(|addr| (dst_xorname, *addr))
@@ -106,13 +119,7 @@ impl JoiningAsRelocated {
                     return Err(Error::InvalidMessage);
                 }
 
-                let trusted_key = if let Some(payload) = &self.relocate_payload {
-                    Some(&payload.relocate_details()?.dst_key)
-                } else {
-                    // Note this should never be the case, and it will be fixed once we
-                    // make the relocation payload nono-optional for JoinAsRelocatedRequest.
-                    return Err(Error::InvalidState);
-                };
+                let trusted_key = Some(&self.relocate_payload.relocate_details()?.dst_key);
 
                 if !section_chain.check_trust(trusted_key) {
                     error!("Verification failed - untrusted Join approval message",);
@@ -130,12 +137,9 @@ impl JoiningAsRelocated {
                 }))
             }
             JoinAsRelocatedResponse::Retry(section_auth) => {
-                let dst = match &self.relocate_payload {
-                    Some(payload) => *payload.details.dst()?,
-                    None => self.node.name(),
-                };
+                let new_name = self.relocate_payload.details.new_name()?;
 
-                if !self.check_autority_provider(&section_auth, &dst) {
+                if !self.check_autority_provider(&section_auth, &new_name) {
                     return Ok(None);
                 }
 
@@ -148,12 +152,6 @@ impl JoiningAsRelocated {
                     .iter()
                     .map(|(name, addr)| (*name, *addr))
                     .collect();
-
-                // if we are relocating, and we didn't generate
-                // the relocation payload yet, we do it now
-                if self.relocate_payload.is_none() {
-                    self.build_relocation_payload(&section_auth.prefix)?;
-                }
 
                 info!(
                     "Newer Join response for our prefix {:?} from {:?}",
@@ -168,12 +166,9 @@ impl JoiningAsRelocated {
                 Ok(Some(cmd))
             }
             JoinAsRelocatedResponse::Redirect(section_auth) => {
-                let dst = match &self.relocate_payload {
-                    Some(payload) => *payload.details.dst()?,
-                    None => self.node.name(),
-                };
+                let new_name = self.relocate_payload.details.new_name()?;
 
-                if !self.check_autority_provider(&section_auth, &dst) {
+                if !self.check_autority_provider(&section_auth, &new_name) {
                     return Ok(None);
                 }
 
@@ -199,12 +194,6 @@ impl JoiningAsRelocated {
                     );
                 }
 
-                // if we are relocating, and we didn't generate
-                // the relocation payload yet, we do it now
-                if self.relocate_payload.is_none() {
-                    self.build_relocation_payload(&section_auth.prefix)?;
-                }
-
                 info!(
                     "Newer Join response for our prefix {:?} from {:?}",
                     section_auth, sender
@@ -225,31 +214,6 @@ impl JoiningAsRelocated {
                 Err(Error::NodeNotReachable(addr))
             }
         }
-    }
-
-    // Change our name to fit the destination section and apply the new age.
-    fn build_relocation_payload(&mut self, prefix: &Prefix) -> Result<()> {
-        // We are relocating so we need to change our name.
-        // Use a name that will match the destination even after multiple splits
-        let extra_split_count = 3;
-        let name_prefix = Prefix::new(
-            prefix.bit_count() + extra_split_count,
-            *self.relocate_details.dst()?,
-        );
-
-        let age = self.relocate_details.relocate_details()?.age;
-        let new_keypair = ed25519::gen_keypair(&name_prefix.range_inclusive(), age);
-        let new_name = XorName::from(PublicKey::from(new_keypair.public));
-        self.relocate_payload = Some(RelocatePayload::new(
-            self.relocate_details.clone(),
-            &new_name,
-            &self.node.keypair,
-        ));
-
-        info!("Changing name to {}", new_name);
-        self.node = Node::new(new_keypair, self.node.addr);
-
-        Ok(())
     }
 
     fn build_join_request_cmd(&self, recipients: &[(XorName, SocketAddr)]) -> Result<Command> {
@@ -288,9 +252,9 @@ impl JoiningAsRelocated {
     fn check_autority_provider(
         &self,
         section_auth: &SectionAuthorityProvider,
-        dst: &XorName,
+        new_name: &XorName,
     ) -> bool {
-        if !section_auth.prefix.matches(dst) {
+        if !section_auth.prefix.matches(new_name) {
             error!("Invalid JoinResponse bad prefix: {:?}", section_auth);
             false
         } else if section_auth.elders.is_empty() {
