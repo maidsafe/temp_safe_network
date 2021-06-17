@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.29.0](https://github.com/maidsafe/sn_api/compare/v0.28.1...v0.29.0) (2021-06-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* previous commit should have been a breaking change
+but commit msg got lost in a rebase
+
+* add breaking_change commit ([38fdcaf](https://github.com/maidsafe/sn_api/commit/38fdcaf3a131b9cd7e6ae4cddd6adcd0cab87c1e))
+
 ### [0.28.1](https://github.com/maidsafe/sn_api/compare/v0.28.0...v0.28.1) (2021-06-15)
 
 ## [0.28.0](https://github.com/maidsafe/sn_api/compare/v0.27.0...v0.28.0) (2021-06-11)
