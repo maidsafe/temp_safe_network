@@ -41,6 +41,11 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Mac setup timeout
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install coreutils
+          alias timeout=gtimeout
 
       # Cache.
       - name: Cargo cache registry, index and build
@@ -60,11 +65,14 @@ jobs:
       
       - run: ./target/release/launch_network
 
-      - name: Client Tests
-        run: cargo test --release client
+      - name: Client tests against local network
+        shell: bash
+        run: timeout 45m cargo test --release -- client && sleep 5
 
-      # - name: Client Blob Example
-      #   run: cargo run --release --example client_blob
+
+      - name: Run example app for Blob API against local network
+        shell: bash
+        run: timeout 15m cargo run --release --example client_blob
 
 
       # TODO: Upload all logs as artifacts....
