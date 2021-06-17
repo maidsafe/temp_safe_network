@@ -3,7 +3,7 @@
 | [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
-## Table of contents
+## Table of contents 
 
 - [The Safe API](#the-safe-api)
   - [Table of contents](#table-of-contents)
