@@ -42,7 +42,7 @@
 //! # use safe_network::client::utils::test_utils::read_network_conn_info;
 //! use safe_network::client::Client;
 //! use rand::rngs::OsRng;
-//! use crate::types::Keypair;
+//! use safe_network::types::Keypair;
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
 //! let id = Keypair::new_ed25519(&mut OsRng);
 //! # let bootstrap_contacts = Some(read_network_conn_info()?);

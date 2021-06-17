@@ -41,7 +41,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, Token};
+    /// use safe_network::types::{Keypair, Token};
     /// use std::str::FromStr;
     /// use rand::rngs::OsRng;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {

@@ -26,7 +26,7 @@ impl Client {
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
     /// use std::str::FromStr;
-    /// use crate::types::Token;
+    /// use safe_network::types::Token;
     /// # #[tokio::main]async fn main() {let _: Result<()> = futures::executor::block_on( async {
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
     /// let client = Client::new(None, None, bootstrap_contacts).await?;
@@ -102,7 +102,7 @@ impl Client {
     /// # extern crate tokio;use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{PublicKey, Token};
+    /// use safe_network::types::{PublicKey, Token};
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // A random sk, to send token to
