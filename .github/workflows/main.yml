@@ -19,38 +19,6 @@ env:
 
 jobs:
 
-  # Update intra-workspace deps
-  deps-and-publish: 
-    if: github.repository_owner == 'maidsafe'
-    name: Update workspace deps
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      # Cache.
-      - name: Cargo cache registry, index and build
-        uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
-
-      # https://github.com/pksunkara/cargo-workspaces
-      - name: Install cargo-workspaces
-        run: cargo install cargo-workspaces
-
-      - name: Update workspace
-        run: cargo ws ls | 
-
   build_win_mac:
     if: github.repository_owner == 'maidsafe'
     name: Build Windows & macOS
