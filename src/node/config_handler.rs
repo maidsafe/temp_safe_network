@@ -136,6 +136,12 @@ impl Config {
             command_line_args.local_addr = Some(socket_addr);
         }
 
+        if command_line_args.hard_coded_contacts.is_empty() {
+            debug!("Using node connection config file as no hard coded contacts were passed in");
+            let contacts_config = read_conn_info_from_file()?;
+            command_line_args.hard_coded_contacts = contacts_config;
+        }
+
         config.merge(command_line_args);
 
         config.clear_data_from_disk().unwrap_or_else(|_| {
