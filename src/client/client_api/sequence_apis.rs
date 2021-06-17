@@ -45,7 +45,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -116,7 +116,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
+    /// use safe_network::types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -183,7 +183,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -236,7 +236,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -309,7 +309,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -358,7 +358,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -416,7 +416,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -475,7 +475,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -539,7 +539,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -596,7 +596,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
+    /// use safe_network::types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -657,7 +657,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
@@ -716,7 +716,7 @@ impl Client {
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
     /// use safe_network::client::Client;
-    /// use crate::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
+    /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
     /// use rand::rngs::OsRng;
