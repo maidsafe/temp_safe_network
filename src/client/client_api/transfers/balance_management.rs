@@ -270,7 +270,6 @@ mod tests {
                 .checked_sub(amount_to_send)
                 .ok_or_else(|| anyhow!("No more money to send"))?;
 
-            // Initial 10 token on creation from farming simulation minus 1
             // Assert locally
             assert_eq!(client.get_local_balance().await, correct_balance);
 
