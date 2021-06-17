@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::Core;
+use super::Core;
 use crate::messaging::{
     node::{
         DkgKey, ElderCandidates, JoinResponse, Network, NodeState, Peer, PlainMessage, Proposal,
@@ -15,21 +15,102 @@ use crate::messaging::{
     DstInfo, DstLocation,
 };
 use crate::routing::{
-    dkg::DkgKeyUtils,
+    dkg::{DkgKeyUtils, ProposalUtils, SigShare},
     error::Result,
     messages::RoutingMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     relocation::RelocateState,
     routing_api::command::Command,
-    section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionUtils},
+    section::{ElderCandidatesUtils, SectionAuthorityProviderUtils, SectionKeyShare, SectionUtils},
 };
 use secured_linked_list::SecuredLinkedList;
 use std::{cmp::Ordering, iter, net::SocketAddr, slice};
 use xor_name::XorName;
 
-// RoutingMsg sending
 impl Core {
+    // Send proposal to all our elders.
+    pub(crate) fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
+        let elders: Vec<_> = self.section.authority_provider().peers().collect();
+        self.send_proposal(&elders, proposal)
+    }
+
+    // Send `proposal` to `recipients`.
+    pub(crate) fn send_proposal(
+        &self,
+        recipients: &[Peer],
+        proposal: Proposal,
+    ) -> Result<Vec<Command>> {
+        let key_share = self.section_keys_provider.key_share().map_err(|err| {
+            trace!("Can't propose {:?}: {}", proposal, err);
+            err
+        })?;
+        self.send_proposal_with(recipients, proposal, key_share)
+    }
+
+    pub(crate) fn send_proposal_with(
+        &self,
+        recipients: &[Peer],
+        proposal: Proposal,
+        key_share: &SectionKeyShare,
+    ) -> Result<Vec<Command>> {
+        trace!(
+            "Propose {:?}, key_share: {:?}, aggregators: {:?}",
+            proposal,
+            key_share,
+            recipients,
+        );
+
+        let sig_share = proposal.prove(
+            key_share.public_key_set.clone(),
+            key_share.index,
+            &key_share.secret_key_share,
+        )?;
+
+        // Broadcast the proposal to the rest of the section elders.
+        let variant = Variant::Propose {
+            content: proposal,
+            sig_share,
+        };
+        let message = RoutingMsg::single_src(
+            &self.node,
+            DstLocation::DirectAndUnrouted,
+            variant,
+            self.section.authority_provider().section_key(),
+        )?;
+
+        Ok(self.send_or_handle(message, recipients))
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // ------------------------------------------------------------------------------------------------------------
+
+    pub(crate) fn check_lagging(
+        &self,
+        peer: (XorName, SocketAddr),
+        sig_share: &SigShare,
+    ) -> Result<Option<Command>> {
+        let public_key = sig_share.public_key_set.public_key();
+
+        if self.section.chain().has_key(&public_key)
+            && public_key != *self.section.chain().last_key()
+        {
+            // The key is recognized as non-last, indicating the peer is lagging.
+            Ok(Some(self.send_direct_message(
+                peer,
+                // TODO: consider sending only those parts of section that are new
+                // since `public_key` was the latest key.
+                Variant::Sync {
+                    section: self.section.clone(),
+                    network: self.network.clone(),
+                },
+                sig_share.public_key_set.public_key(),
+            )?))
+        } else {
+            Ok(None)
+        }
+    }
+
     // Send NodeApproval to a joining node which makes them a section member
     pub(crate) fn send_node_approval(
         &self,

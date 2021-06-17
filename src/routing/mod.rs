@@ -43,11 +43,11 @@ pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API upd
 // ############################################################################
 
 mod cache;
+mod core;
 mod dkg;
 mod ed25519;
 mod error;
 mod event;
-mod message_filter;
 mod messages;
 mod network;
 mod node;

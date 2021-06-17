@@ -6,23 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub(crate) mod bootstrap;
-pub(crate) mod command;
-
-mod comm;
-mod core;
-mod dispatcher;
-mod enduser_registry;
-mod event_stream;
-mod split_barrier;
 #[cfg(test)]
 pub(crate) mod tests;
+
+pub(crate) mod comm;
+pub(crate) mod command;
+
+mod dispatcher;
+mod event_stream;
 
 pub use self::event_stream::EventStream;
 use self::{
     comm::{Comm, ConnectionEvent},
     command::Command,
-    core::Core,
     dispatcher::Dispatcher,
 };
 use crate::messaging::{
@@ -30,6 +26,7 @@ use crate::messaging::{
     node::{Peer, RoutingMsg},
     DstInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
 };
+use crate::routing::core::{join_network, Core};
 use crate::routing::{
     ed25519,
     error::Result,
@@ -143,7 +140,7 @@ impl Routing {
                 Comm::bootstrap(config.transport_config, connection_event_tx).await?;
             let node = Node::new(keypair, comm.our_connection_info());
             let (node, section, backlog) =
-                bootstrap::join(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
+                join_network(node, &comm, &mut connection_event_rx, bootstrap_addr).await?;
             let state = Core::new(node, section, None, event_tx);
 
             (state, comm, backlog)

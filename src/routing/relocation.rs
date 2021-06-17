@@ -13,11 +13,11 @@ use crate::messaging::node::{
     Section, SignedRelocateDetails, Variant,
 };
 use crate::routing::{
+    core::JoiningAsRelocated,
     ed25519::{self, Keypair, Verifier},
     error::Error,
     network::NetworkUtils,
     peer::PeerUtils,
-    routing_api::bootstrap::JoiningAsRelocated,
     section::{SectionPeersUtils, SectionUtils},
 };
 use bls::PublicKey as BlsPublicKey;

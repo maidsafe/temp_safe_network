@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Core};
+use super::{delivery_group, enduser_registry::SocketId, Core};
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, RoutingMsg, Section, Variant},
-    section_info::Error as TargetSectionError,
     DstInfo, EndUser, Itinerary, MessageId, SectionAuthorityProvider, SrcLocation,
 };
 use crate::routing::{
@@ -18,7 +17,7 @@ use crate::routing::{
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
-    routing_api::{command::Command, enduser_registry::SocketId},
+    routing_api::command::Command,
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionUtils},
     Error, Event,
 };
@@ -131,6 +130,10 @@ impl Core {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
+    pub async fn add_to_filter(&mut self, msg_id: &MessageId) -> bool {
+        self.msg_filter.add_to_filter(msg_id).await
+    }
+
     // Send message over the network.
     pub async fn relay_message(&self, msg: &RoutingMsg) -> Result<Option<Command>> {
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
@@ -179,41 +182,6 @@ impl Core {
         );
 
         Ok(Some(command))
-    }
-
-    #[allow(unused)]
-    pub fn check_key_status(&self, bls_pk: &bls::PublicKey) -> Result<(), TargetSectionError> {
-        let elders_candidates = self.section.promote_and_demote_elders(&self.node.name());
-        // Whenever there is a elders candidate, it is considered as having ongoing DKG.
-        if !elders_candidates.is_empty() {
-            trace!("Non empty elder candidates {:?}", elders_candidates);
-            trace!(
-                "Current authority_provider {:?}",
-                self.section.authority_provider()
-            );
-            return Err(TargetSectionError::DkgInProgress);
-        }
-        if !self.section.chain().has_key(bls_pk) {
-            return Err(TargetSectionError::UnrecognizedSectionKey);
-        }
-        if bls_pk != self.section.chain().last_key() {
-            return if let Ok(public_key_set) = self.public_key_set() {
-                Err(TargetSectionError::TargetSectionInfoOutdated(
-                    SectionAuthorityProvider {
-                        prefix: *self.section.prefix(),
-                        public_key_set,
-                        elders: self
-                            .section
-                            .section_signed_authority_provider()
-                            .value
-                            .elders(),
-                    },
-                ))
-            } else {
-                Err(TargetSectionError::DkgInProgress)
-            };
-        }
-        Ok(())
     }
 
     pub async fn send_user_message(
@@ -302,6 +270,18 @@ impl Core {
             let msg_id = MessageId::from_content(&active_members)?;
             commands.extend(self.propose(Proposal::JoinsAllowed((msg_id, joins_allowed)))?);
         }
+        Ok(commands)
+    }
+
+    // Generate a new section info based on the current set of members and if it differs from the
+    // current elders, trigger a DKG.
+    pub(crate) fn promote_and_demote_elders(&mut self) -> Result<Vec<Command>> {
+        let mut commands = vec![];
+
+        for info in self.section.promote_and_demote_elders(&self.node.name()) {
+            commands.extend(self.send_dkg_start(info)?);
+        }
+
         Ok(commands)
     }
 
