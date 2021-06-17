@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.2](https://github.com/maidsafe/sn_cli/compare/v0.29.1...v0.29.2) (2021-06-17)
+
+
+### Bug Fixes
+
+* update launch tool for new log locations ([4213661](https://github.com/maidsafe/sn_cli/commit/4213661b8ee884433359ccc6d2fc8afc829d5c8e))
+
 ### [0.29.1](https://github.com/maidsafe/sn_cli/compare/v0.29.0...v0.29.1) (2021-06-17)
 
 
