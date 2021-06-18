@@ -9,7 +9,7 @@
 use super::{delivery_group, enduser_registry::SocketId, Core};
 use crate::messaging::{
     node::{Network, NodeState, Peer, Proposal, RoutingMsg, Section, Variant},
-    DstInfo, EndUser, Itinerary, MessageId, SectionAuthorityProvider, SrcLocation,
+    DstInfo, EndUser, Itinerary, MessageId, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
     error::Result,
@@ -130,8 +130,11 @@ impl Core {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub async fn add_to_filter(&mut self, msg_id: &MessageId) -> bool {
-        self.msg_filter.add_to_filter(msg_id).await
+    pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
+        if let Ok(true) = wire_msg.is_join_request() {
+            return true;
+        }
+        self.msg_filter.add_to_filter(&wire_msg.msg_id()).await
     }
 
     // Send message over the network.
