@@ -428,7 +428,7 @@ impl UnseqData {
 
     /// Removes and returns all entries.
     pub fn take_entries(&mut self) -> UnseqEntries {
-        mem::replace(&mut self.data, BTreeMap::new())
+        mem::take(&mut self.data)
     }
 
     /// Mutates entries based on `actions` for the provided user.
@@ -562,7 +562,7 @@ impl SeqData {
 
     /// Removes and returns all entries
     pub fn take_entries(&mut self) -> SeqEntries {
-        mem::replace(&mut self.data, BTreeMap::new())
+        mem::take(&mut self.data)
     }
 
     /// Mutates entries (key + value pairs) in bulk.

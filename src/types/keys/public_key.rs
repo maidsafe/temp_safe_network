@@ -89,7 +89,7 @@ impl PublicKey {
     }
 
     /// Returns the bytes of the underlying public key
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(self) -> Vec<u8> {
         match self {
             PublicKey::Ed25519(pub_key) => pub_key.to_bytes().into(),
             PublicKey::Bls(pub_key) => pub_key.to_bytes().into(),
