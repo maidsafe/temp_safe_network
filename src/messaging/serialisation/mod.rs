@@ -132,6 +132,7 @@ impl WireMsg {
         Ok(Self { header, payload })
     }
 
+    /// Returns `true` if the message is a JoinRequest.
     #[cfg(not(feature = "client-only"))]
     pub fn is_join_request(&self) -> Result<bool> {
         if let MessageKind::Routing = self.header.kind() {
