@@ -11,7 +11,7 @@ pub mod wire_msg_header;
 
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
 #[cfg(not(feature = "client-only"))]
-use super::node;
+use super::node::{self, Variant};
 use super::{client, section_info, DstInfo, Error, MessageId, MessageType, Result};
 use bls::PublicKey;
 use bytes::Bytes;
@@ -130,6 +130,23 @@ impl WireMsg {
 
         // We can now create a deserialized WireMsg using the read bytes
         Ok(Self { header, payload })
+    }
+
+    #[cfg(not(feature = "client-only"))]
+    pub fn is_join_request(&self) -> Result<bool> {
+        if let MessageKind::Routing = self.header.kind() {
+            if let MessageType::Routing { msg, .. } = self.to_message()? {
+                if let Variant::JoinRequest(_) = msg.variant {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(false)
+        }
     }
 
     /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
