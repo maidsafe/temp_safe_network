@@ -44,8 +44,10 @@ pub enum TransferQuery {
     GetStoreCost {
         /// The requester's key.
         requester: PublicKey,
-        ///
+        /// Number of bytes to write.
         bytes: u64,
+        /// The hash of the data.
+        name: XorName,
     },
 }
 

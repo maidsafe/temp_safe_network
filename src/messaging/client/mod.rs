@@ -37,12 +37,15 @@ pub use self::{
     transfer::{TransferCmd, TransferQuery},
 };
 
-use crate::messaging::{MessageId, MessageType, WireMsg};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
     SequencePublicPolicy, Signature, Token, TransferAgreementProof, TransferValidated,
+};
+use crate::{
+    messaging::{MessageId, MessageType, WireMsg},
+    types::SignatureShare,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -314,6 +317,18 @@ pub enum CmdError {
     Data(Error), // DataError enum for better differentiation?
     ///
     Transfer(TransferError),
+    ///
+    Payment(PaymentError),
+}
+
+///
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct PaymentError(pub Error);
+
+impl From<sn_dbc::Error> for PaymentError {
+    fn from(e: sn_dbc::Error) -> Self {
+        Self(Error::InvalidOperation(e.to_string()))
+    }
 }
 
 ///
@@ -412,8 +427,70 @@ pub enum QueryResponse {
     GetBalance(Result<Token>),
     /// Get key transfer history.
     GetHistory(Result<ActorHistory>),
-    /// Get Store Cost.
-    GetStoreCost(Result<(u64, Token, PublicKey)>),
+    /// Get a quote for payment, with a guaranteed store cost.
+    GetStoreCost(Result<PaymentQuote>),
+}
+
+/// A given piece of data, which must match the name and bytes specified,
+/// is guaranteed to be accepted, if payment matching this quote
+/// is provided together with the quote.
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct PaymentQuote {
+    ///
+    pub bytes: u64,
+    ///
+    pub data: BTreeSet<XorName>,
+    ///
+    pub payable: BTreeMap<PublicKey, Token>,
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct GuaranteedQuoteShare {
+    ///
+    pub quote: PaymentQuote,
+    ///
+    pub sig: SignatureShare,
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct GuaranteedQuote {
+    ///
+    pub quote: PaymentQuote,
+    ///
+    pub sig: Signature,
+}
+
+/// The provided data must match the name and bytes specified
+/// in the quote.
+/// Also the quote must be signed by a known section key (this is at DbcSection).
+/// It is then guaranteed to be accepted (at DataSection), if payment provided
+/// matches the quote, and the dbcs are valid.
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct NetworkCmd {
+    ///
+    pub op: DebitableOp,
+    ///
+    pub quote: GuaranteedQuote,
+    ///
+    pub payment: BTreeMap<PublicKey, sn_dbc::Dbc>,
+}
+
+impl NetworkCmd {
+    ///
+    pub fn dst_address(&self) -> XorName {
+        match &self.op {
+            DebitableOp::Data(cmd) => cmd.dst_address(),
+        }
+    }
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub enum DebitableOp {
+    ///
+    Data(DataCmd),
 }
 
 impl QueryResponse {

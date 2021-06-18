@@ -13,33 +13,35 @@ pub mod store;
 mod test_utils;
 
 use self::replicas::{ReplicaInfo, Replicas};
-use crate::messaging::{
-    client::{
-        ClientMsg, ClientSig, CmdError, DataCmd, Error as ErrorMessage, Event, ProcessMsg,
-        QueryResponse, TransferError,
-    },
-    node::{
-        NodeCmd, NodeCmdError, NodeMsg, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
-        NodeTransferQueryResponse,
-    },
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
-};
-use crate::node::{
-    capacity::StoreCost,
-    error::{convert_dt_error_to_error_message, convert_to_error_message},
-    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
-    utils, Error, Result,
-};
 #[cfg(feature = "simulated-payouts")]
 use crate::types::Transfer;
-use crate::types::{
-    ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
-    TransferAgreementProof,
+use crate::{
+    messaging::{
+        client::{
+            ClientMsg, ClientSig, CmdError, DataCmd, Error as ErrorMessage, Event, PaymentQuote,
+            ProcessMsg, QueryResponse, TransferError,
+        },
+        node::{
+            NodeCmd, NodeCmdError, NodeMsg, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
+            NodeTransferQueryResponse,
+        },
+        Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    },
+    node::{
+        capacity::StoreCost,
+        error::{convert_dt_error_to_error_message, convert_to_error_message},
+        node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
+        utils, Error, Result,
+    },
+    types::{
+        ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
+        TransferAgreementProof,
+    },
 };
 use futures::lock::Mutex;
 use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
 use xor_name::Prefix;
@@ -133,9 +135,13 @@ impl Transfers {
             match self.store_cost.from(bytes).await {
                 Ok(store_cost) => {
                     info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
-                    Ok((bytes, store_cost, self.section_wallet_id()))
+                    Ok(PaymentQuote {
+                        bytes,
+                        data: BTreeSet::new(),
+                        payable: BTreeMap::new(),
+                    })
                 }
-                Err(e) => Err(ErrorMessage::InvalidOperation(e.to_string())), // TODO: Add `NetworkFull` error to sn_messaging
+                Err(e) => Err(ErrorMessage::InvalidOperation(e.to_string())), // TODO: Add `NetworkFull` error to messaging
             }
         };
 
@@ -160,6 +166,7 @@ impl Transfers {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the section funds.
+    #[allow(unused)]
     pub async fn process_payment(
         &self,
         msg_id: MessageId,
@@ -225,7 +232,7 @@ impl Transfers {
                     }
                     Err(e) => (
                         Token::from_nano(u64::MAX),
-                        Some(ErrorMessage::InvalidOperation(e.to_string())), // TODO: Add `NetworkFull` error to sn_messaging
+                        Some(ErrorMessage::InvalidOperation(e.to_string())), // TODO: Add `NetworkFull` error to messaging
                     ),
                 };
                 info!("Payment: registration and propagation succeeded. (Store cost: {}, paid amount: {}.)", total_cost, payment.amount());

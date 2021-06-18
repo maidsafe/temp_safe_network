@@ -118,7 +118,7 @@ pub enum Error {
     /// Transfers errors
     #[error(transparent)]
     Transfer(#[from] TransfersError),
-    /// Errors received from the network via sn_messaging
+    /// Errors received from the network via messaging
     #[error(
         "Error received from the network: {:?} MessageId: {:?}",
         source,
@@ -158,6 +158,7 @@ impl From<(CmdError, MessageId)> for Error {
                 TransferError::TransferValidation(err) => err,
                 TransferError::TransferRegistration(err) => err,
             },
+            CmdError::Payment(err) => err.0,
         };
         Error::ErrorMessage { source, msg_id }
     }

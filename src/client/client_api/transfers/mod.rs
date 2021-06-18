@@ -13,17 +13,18 @@ mod simulated_payouts;
 // Module containing all PUT apis
 mod write_apis;
 
+use std::collections::BTreeMap;
+
 use crate::client::{Client, Error};
 use crate::messaging::client::{
-    ClientSig, Cmd, DataCmd, Query, QueryResponse, TransferCmd, TransferQuery,
+    ClientSig, Cmd, GuaranteedQuote, Query, QueryResponse, TransferQuery,
 };
-use crate::transfers::{ActorEvent, TransferInitiated};
-use crate::types::{
-    DebitId, PublicKey, SignedTransfer, Token, TransferAgreementProof, TransferValidated,
-};
-use bincode::serialize;
+use crate::transfers::ActorEvent;
+use crate::types::{DebitId, PublicKey, Token, TransferAgreementProof, TransferValidated};
 use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::channel;
+
+type Payment = BTreeMap<PublicKey, sn_dbc::Dbc>;
 
 impl Client {
     /// Get the client's current coin balance from the network
@@ -165,88 +166,14 @@ impl Client {
         Ok(())
     }
 
-    /// Fetch latest StoreCost for given number of bytes from the network.
-    pub async fn get_store_cost(&self, bytes: u64) -> Result<(u64, Token, PublicKey), Error> {
-        info!("Sending Query for latest StoreCost");
-
-        let public_key = self.public_key();
-
-        let query = Query::Transfer(TransferQuery::GetStoreCost {
-            requester: public_key,
-            bytes,
-        });
-
-        // This is a normal response manager request. We want quorum on this for now...
-        let query_result = self.send_query(query).await?;
-        let msg_id = query_result.msg_id;
-
-        let (bytes, cost_of_put, section_key) = match query_result.response {
-            QueryResponse::GetStoreCost(cost) => cost.map_err(|err| Error::from((err, msg_id))),
-            _ => Err(Error::UnexpectedStoreCostResponse(query_result.response)),
-        }?;
-        trace!("Cost of put returned was: {:?}", cost_of_put);
-
-        let current_nano = cost_of_put.as_nano();
-        let buffered_cost = Token::from_nano(
-            current_nano
-                .checked_add(current_nano / 5)
-                .unwrap_or(current_nano),
-        );
-        trace!(
-            "Payment buffer applied if possible, paying: {:?}",
-            buffered_cost
-        );
-
-        Ok((bytes, buffered_cost, section_key))
+    ///
+    pub async fn get_quote(&self) -> Result<GuaranteedQuote, Error> {
+        unimplemented!()
     }
 
-    /// Validates a transaction for paying store_cost
-    pub(crate) async fn create_write_payment_proof(
-        &self,
-        cmd: &DataCmd,
-    ) -> Result<TransferAgreementProof, Error> {
-        info!("Sending requests for payment for write operation");
-
-        // Compute number of bytes
-        let bytes = serialize(cmd)?.len() as u64;
-
-        self.get_history().await?;
-
-        let (bytes, cost_of_put, section_key) = self.get_store_cost(bytes).await?;
-        info!(
-            "Current store cost for {} bytes reported by section {}: {}",
-            bytes, section_key, cost_of_put
-        );
-
-        let initiated = self
-            .transfer_actor
-            .read()
-            .await
-            .transfer(cost_of_put, section_key, "".to_string())?
-            .ok_or(Error::NoTransferEventsForLocalActor)?;
-
-        let signed_transfer = SignedTransfer {
-            debit: initiated.signed_debit,
-            credit: initiated.signed_credit,
-        };
-
-        let cmd = Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer.clone()));
-
-        debug!("Transfer to be sent: {:?}", &signed_transfer);
-
-        self.transfer_actor
-            .write()
-            .await
-            .apply(ActorEvent::TransferInitiated(TransferInitiated {
-                signed_debit: signed_transfer.debit.clone(),
-                signed_credit: signed_transfer.credit.clone(),
-            }))?;
-
-        let payment_proof: TransferAgreementProof =
-            self.await_validation(cmd, signed_transfer.id()).await?;
-
-        debug!("Payment proof retrieved");
-        Ok(payment_proof)
+    ///
+    pub async fn generate_payment(&self) -> Result<Payment, Error> {
+        Ok(BTreeMap::new())
     }
 
     /// Send message and await validation and constructing of TransferAgreementProof

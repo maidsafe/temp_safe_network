@@ -7,23 +7,28 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::role::{ElderRole, Role};
-use crate::messaging::client::DataExchange;
-use crate::node::{
-    capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter, StoreCost},
-    metadata::{adult_reader::AdultReader, Metadata},
-    network::Network,
-    node_ops::NodeDuty,
-    section_funds::{reward_wallets::RewardWallets, SectionFunds},
-    transfers::{
-        get_replicas::{replica_info, transfer_replicas},
-        Transfers,
+use crate::{
+    messaging::client::DataExchange,
+    node::{
+        capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter, StoreCost},
+        metadata::{adult_reader::AdultReader, Metadata},
+        network::Network,
+        node_api::BlsKeyManager,
+        node_ops::NodeDuty,
+        payments::Payments,
+        section_funds::{reward_wallets::RewardWallets, SectionFunds},
+        transfers::{
+            get_replicas::{replica_info, transfer_replicas},
+            Transfers,
+        },
+        Node, Result,
     },
-    Node, Result,
+    routing::XorName,
+    types::{ActorHistory, NodeAge, PublicKey},
 };
-use crate::routing::XorName;
-use crate::types::{ActorHistory, NodeAge, PublicKey};
 use log::info;
-use std::collections::BTreeMap;
+use sn_dbc::Mint;
+use std::{collections::BTreeMap, sync::Arc};
 
 impl Node {
     /// If we are an oldie we'll have a transfer instance,
@@ -52,7 +57,7 @@ impl Node {
 
         //
         // start handling transfers
-        let store_cost = StoreCost::new(self.network_api.clone(), capacity_reader);
+        let store_cost = StoreCost::new(self.network_api.clone(), capacity_reader.clone());
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, store_cost);
@@ -64,7 +69,24 @@ impl Node {
             (NodeAge, PublicKey),
         >::new()));
 
-        self.role = Role::Elder(ElderRole::new(meta_data, transfers, section_funds, false));
+        //
+        // start handling payments
+        let store_cost = StoreCost::new(self.network_api.clone(), capacity_reader.clone());
+        let reward_wallets = crate::node::payments::RewardWallets::new(BTreeMap::<
+            XorName,
+            (NodeAge, PublicKey),
+        >::new());
+        let key_mgr = BlsKeyManager::new(self.network_api.clone());
+        let mint = Mint::new(Arc::new(key_mgr));
+        let payments = Payments::new(store_cost, reward_wallets, mint);
+
+        self.role = Role::Elder(ElderRole::new(
+            meta_data,
+            payments,
+            transfers,
+            section_funds,
+            false,
+        ));
 
         Ok(())
     }

@@ -12,7 +12,6 @@ use super::{
     role::{AdultRole, Role},
 };
 use crate::messaging::{
-    client::{Cmd, ProcessMsg},
     node::{NodeMsg, NodeQuery},
     Aggregation, MessageId,
 };
@@ -646,29 +645,24 @@ impl Node {
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ProcessDataPayment {
-                msg:
-                    ProcessMsg::Cmd {
-                        id,
-                        cmd: Cmd::Data { payment, cmd },
-                        client_sig,
-                    },
+                id,
+                cmd,
+                client_sig,
                 origin,
-                ..
             } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(NodeTask::from(
+                    Ok(NodeTask::from(vec![
                         elder
-                            .transfers
+                            .payments
                             .write()
                             .await
-                            .process_payment(id, payment, cmd, client_sig, origin)
+                            .process_payment(cmd, client_sig, id, origin)
                             .await?,
-                    ))
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ProcessDataPayment { .. } => Ok(NodeTask::None),
             NodeDuty::ReplicateChunk { chunk, .. } => {
                 let adult = self.role.as_adult_mut()?.clone();
                 let handle = tokio::spawn(async move {

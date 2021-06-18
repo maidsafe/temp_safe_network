@@ -16,7 +16,7 @@ mod sequence_apis;
 mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{Cmd, CmdError, DataCmd};
+use crate::messaging::client::{Cmd, CmdError, DataCmd, DebitableOp, NetworkCmd};
 use crate::transfers::TransferActor;
 use crate::types::{Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
@@ -199,18 +199,22 @@ impl Client {
     // Private helper to obtain payment proof for a data command, send it to the network,
     // and also apply the payment to local replica actor.
     async fn pay_and_send_data_command(&self, cmd: DataCmd) -> Result<(), Error> {
-        // Payment for PUT
-        let payment_proof = self.create_write_payment_proof(&cmd).await?;
+        // Get quote for write
+        let quote = self.get_quote().await?;
+
+        // Generate payment matching the quote
+        let payment = self.generate_payment().await?;
 
         // The _actual_ message
-        let cmd = Cmd::Data {
-            cmd,
-            payment: payment_proof.clone(),
-        };
+        let cmd = Cmd::Debitable(NetworkCmd {
+            op: DebitableOp::Data(cmd),
+            quote,
+            payment,
+        });
 
-        self.send_cmd(cmd).await?;
+        self.send_cmd(cmd).await
 
-        self.apply_write_payment_to_local_actor(payment_proof).await
+        //self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     #[cfg(test)]

@@ -69,6 +69,10 @@ urlencoding = "1.1.1"
 url = "2.2.0"
 dashmap = "~4.0.2"
 
+  [dependencies.sn_dbc]
+  git = "https://github.com/oetyng/sn_dbc"
+  branch = "integrate-to-sn"
+
   [dependencies.tracing]
   version = "~0.1.22"
   default-features = false

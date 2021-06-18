@@ -14,6 +14,7 @@ use crate::client::{Client, Error};
 /// Handle Write API msg_contents for a given Client.
 impl Client {
     /// Apply a successfull payment locally after TransferRegistration has been sent to the network.
+    #[allow(unused)]
     pub(crate) async fn apply_write_payment_to_local_actor(
         &self,
         debit_proof: TransferAgreementProof,

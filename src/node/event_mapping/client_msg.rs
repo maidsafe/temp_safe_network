@@ -71,10 +71,13 @@ fn map_client_process_msg(process_msg: ProcessMsg, origin: EndUser) -> NodeDuty 
             origin,
         },
         ProcessMsg::Cmd {
-            cmd: Cmd::Data { .. },
-            ..
+            id,
+            cmd: Cmd::Debitable(cmd),
+            client_sig,
         } => NodeDuty::ProcessDataPayment {
-            msg: process_msg.clone(),
+            id,
+            cmd,
+            client_sig,
             origin,
         },
         ProcessMsg::Cmd {

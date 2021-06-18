@@ -9,7 +9,8 @@
 use super::Client;
 use crate::client::Error;
 use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, Query, QueryResponse, RegisterRead, RegisterWrite,
+    Cmd, DataCmd, DataQuery, DebitableOp, NetworkCmd, Query, QueryResponse, RegisterRead,
+    RegisterWrite,
 };
 use crate::types::{
     register::{
@@ -83,18 +84,22 @@ impl Client {
     /// You're only able to delete a PrivateRegister. Public data can no be removed from the network.
     pub async fn delete_register(&self, address: Address) -> Result<(), Error> {
         let cmd = DataCmd::Register(RegisterWrite::Delete(address));
-        // Payment for PUT
-        let payment_proof = self.create_write_payment_proof(&cmd).await?;
+        // Get quote for write
+        let quote = self.get_quote().await?;
+
+        // Generate payment matching the quote
+        let payment = self.generate_payment().await?;
 
         // The _actual_ message
-        let cmd = Cmd::Data {
-            cmd,
-            payment: payment_proof.clone(),
-        };
+        let cmd = Cmd::Debitable(NetworkCmd {
+            op: DebitableOp::Data(cmd),
+            quote,
+            payment,
+        });
 
-        self.send_cmd(cmd).await?;
+        self.send_cmd(cmd).await
 
-        self.apply_write_payment_to_local_actor(payment_proof).await
+        //self.apply_write_payment_to_local_actor(payment_proof).await
     }
 
     /// Write to Register

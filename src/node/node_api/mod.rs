@@ -13,26 +13,30 @@ mod messaging;
 mod role;
 mod split;
 
-use crate::messaging::client::ClientMsg;
-use crate::node::{
-    chunks::Chunks,
-    data_store::UsedSpace,
-    error::convert_to_error_message,
-    event_mapping::{map_routing_event, Mapping, MsgContext},
-    network::Network,
-    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
-    state_db::{get_reward_pk, store_new_reward_keypair},
-    Config, Error, Result,
+use crate::{
+    messaging::client::ClientMsg,
+    node::{
+        chunks::Chunks,
+        data_store::UsedSpace,
+        error::convert_to_error_message,
+        event_mapping::{map_routing_event, Mapping, MsgContext},
+        network::Network,
+        node_ops::{MsgType, NodeDuty, OutgoingLazyError},
+        state_db::{get_reward_pk, store_new_reward_keypair},
+        Config, Error, Result,
+    },
+    routing::{
+        EventStream, {Prefix, XorName},
+    },
+    types::PublicKey,
 };
-use crate::routing::{
-    EventStream, {Prefix, XorName},
-};
-use crate::types::PublicKey;
+//use async_trait::async_trait;
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
 use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
+use sn_dbc::{Hash, KeyManager, NodeSignature, Signature};
 use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
@@ -58,6 +62,49 @@ impl NodeInfo {
     ///
     pub fn path(&self) -> &Path {
         self.root_dir.as_path()
+    }
+}
+
+///
+pub struct BlsKeyManager {
+    network: Network,
+}
+
+impl BlsKeyManager {
+    pub fn new(network: Network) -> Self {
+        Self { network }
+    }
+}
+
+use futures::executor::block_on as block;
+
+//#[async_trait]
+impl KeyManager for BlsKeyManager {
+    type Error = Error;
+
+    fn sign(&self, msg_hash: &Hash) -> Result<NodeSignature> {
+        let index = block(self.network.our_index())? as u64;
+        let sig = block(self.network.sign_bytes_as_elder_raw(&(*msg_hash)))?;
+        Ok(NodeSignature::new(index, sig))
+    }
+
+    fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+        block(self.network.our_public_key_set())
+    }
+
+    fn verify(&self, msg_hash: &Hash, key: &bls::PublicKey, signature: &Signature) -> Result<()> {
+        self.verify_known_key(&key)
+            .map_err(|e| Error::InvalidOperation(e.to_string()))?;
+        if key.verify(signature, *msg_hash) {
+            Ok(())
+        } else {
+            Err(Error::InvalidOperation("Invalid signature.".to_string()))
+        }
+    }
+
+    fn verify_known_key(&self, _key: &bls::PublicKey) -> Result<()> {
+        Ok(())
+        //self.network.known_key(name)
     }
 }
 

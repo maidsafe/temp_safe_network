@@ -19,6 +19,7 @@ mod metadata;
 mod network;
 mod node_api;
 mod node_ops;
+mod payments;
 mod section_funds;
 mod to_db_key;
 mod transfers;

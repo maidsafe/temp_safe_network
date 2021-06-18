@@ -170,7 +170,7 @@ impl Session {
     async fn update_session_info(&mut self, sap: &SectionAuthorityProvider) -> Result<(), Error> {
         let original_known_elders = self.all_known_elders.read().await.clone();
 
-        // Change this once sn_messaging is updated
+        // Change this once messaging is updated
         let received_elders = sap
             .elders
             .iter()

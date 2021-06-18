@@ -109,6 +109,22 @@ impl Network {
         Ok(share)
     }
 
+    pub async fn sign_bytes_as_elder_raw(&self, msg: &[u8]) -> Result<bls::SignatureShare> {
+        let bls_pk = self
+            .routing
+            .public_key_set()
+            .await
+            .map_err(|_| Error::NoSectionPublicKey)?
+            .public_key();
+
+        let share = self
+            .routing
+            .sign_as_elder(&msg, &bls_pk)
+            .await
+            .map_err(Error::Routing)?;
+        Ok(share)
+    }
+
     pub async fn age(&self) -> u8 {
         self.routing.age().await
     }
