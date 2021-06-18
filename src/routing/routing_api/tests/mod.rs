@@ -1497,7 +1497,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         assert_eq!(dst_info.dst, dst_name);
         assert_matches!(
             &message.variant,
-            Variant::UserMessage(actual_content) if Bytes::from(actual_content.clone()) == content
+            Variant::UserMessage(actual_content) if actual_content.clone() == content
         );
     });
 
