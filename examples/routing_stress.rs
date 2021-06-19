@@ -456,15 +456,10 @@ impl Network {
 
         // The message dst is unique so we use it also as its indentifier.
         let bytes = bincode::serialize(&dst)?;
-        let signature_share = node
+        let (index, signature_share) = node
             .sign_as_elder(&bytes, &public_key_set.public_key())
             .await
             .with_context(|| format!("failed to sign probe by {}", src))?;
-
-        let index = node
-            .our_index()
-            .await
-            .with_context(|| format!("failed to retrieve key share index by {}", src))?;
 
         let message = ProbeMessage {
             sig_share: SigShare {
