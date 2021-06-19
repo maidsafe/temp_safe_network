@@ -2616,8 +2616,10 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 [[package]]
 name = "sn_dbc"
 version = "1.6.7"
-source = "git+https://github.com/oetyng/sn_dbc?branch=integrate-to-sn#609149e976beecbaa5fa24421cb17ed322ac228f"
+source = "git+https://github.com/oetyng/sn_dbc?branch=impl-async-keymanager#34b172cde128ec89b0ef589d295062e78c2b06dc"
 dependencies = [
+ "async-trait",
+ "futures",
  "hex 0.4.3",
  "quickcheck 1.0.3",
  "quickcheck_macros",

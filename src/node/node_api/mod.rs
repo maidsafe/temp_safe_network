@@ -30,7 +30,7 @@ use crate::{
     },
     types::PublicKey,
 };
-//use async_trait::async_trait;
+use async_trait::async_trait;
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
 use log::{error, warn};
@@ -76,24 +76,28 @@ impl BlsKeyManager {
     }
 }
 
-use futures::executor::block_on as block;
-
-//#[async_trait]
+#[async_trait]
 impl KeyManager for BlsKeyManager {
     type Error = Error;
 
-    fn sign(&self, msg_hash: &Hash) -> Result<NodeSignature> {
-        let index = block(self.network.our_index())? as u64;
-        let sig = block(self.network.sign_bytes_as_elder_raw(&(*msg_hash)))?;
+    async fn sign(&self, msg_hash: &Hash) -> Result<NodeSignature> {
+        let index = self.network.our_index().await? as u64;
+        let sig = self.network.sign_bytes_as_elder_raw(&(*msg_hash)).await?;
         Ok(NodeSignature::new(index, sig))
     }
 
-    fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        block(self.network.our_public_key_set())
+    async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+        self.network.our_public_key_set().await
     }
 
-    fn verify(&self, msg_hash: &Hash, key: &bls::PublicKey, signature: &Signature) -> Result<()> {
+    async fn verify(
+        &self,
+        msg_hash: &Hash,
+        key: &bls::PublicKey,
+        signature: &Signature,
+    ) -> Result<()> {
         self.verify_known_key(&key)
+            .await
             .map_err(|e| Error::InvalidOperation(e.to_string()))?;
         if key.verify(signature, *msg_hash) {
             Ok(())
@@ -102,7 +106,7 @@ impl KeyManager for BlsKeyManager {
         }
     }
 
-    fn verify_known_key(&self, _key: &bls::PublicKey) -> Result<()> {
+    async fn verify_known_key(&self, _key: &bls::PublicKey) -> Result<()> {
         Ok(())
         //self.network.known_key(name)
     }
