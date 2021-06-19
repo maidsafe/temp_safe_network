@@ -73,7 +73,7 @@ impl Core {
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
-    ) -> Result<bls::SignatureShare> {
+    ) -> Result<(usize, bls::SignatureShare)> {
         self.section_keys_provider.sign_with(data, public_key)
     }
 

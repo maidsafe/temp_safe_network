@@ -221,7 +221,7 @@ impl Routing {
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
-    ) -> Result<bls::SignatureShare> {
+    ) -> Result<(usize, bls::SignatureShare)> {
         self.dispatcher
             .core
             .read()
