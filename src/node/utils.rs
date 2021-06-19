@@ -10,7 +10,7 @@
 
 use crate::node::{config_handler::Config, Error, Result};
 use bytes::Bytes;
-use flexi_logger::{DeferredNow, Logger};
+use flexi_logger::{Cleanup, Criterion, DeferredNow, FileSpec, Logger, Naming};
 use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -91,7 +91,7 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 }
 
 /// Initialize logging
-pub fn init_logging(config: &Config) {
+pub fn init_logging(config: &Config) -> Result<()> {
     // Custom formatter for logs
     let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
         let handle = std::thread::current();
@@ -111,12 +111,17 @@ pub fn init_logging(config: &Config) {
 
     let level_filter = config.verbose().to_level_filter();
     let module_log_filter = format!("{}={}", NODE_MODULE_NAME, level_filter.to_string());
-    let logger = Logger::with_env_or_str(module_log_filter)
+    let logger = Logger::try_with_env_or_str(module_log_filter)
+        .map_err(|e| Error::Configuration(format!("{:?}", e)))?
         .format(do_format)
-        .suppress_timestamp();
+        .rotate(
+            Criterion::Size(1024 * 1024), // 1 mb
+            Naming::Numbers,
+            Cleanup::Never,
+        );
 
     let logger = if let Some(log_dir) = config.log_dir() {
-        logger.log_to_file().directory(log_dir)
+        logger.log_to_file(FileSpec::default().directory(log_dir).suppress_timestamp())
     } else {
         logger
     };
@@ -128,6 +133,8 @@ pub fn init_logging(config: &Config) {
             .start(config.verbose().to_level_filter())
             .unwrap_or(());
     }
+
+    Ok(())
 }
 
 struct LoggerWrapper(Box<dyn Log>);
