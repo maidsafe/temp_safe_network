@@ -72,18 +72,6 @@ impl StoreCost {
     fn max_section_nanos(prefix_len: usize) -> u64 {
         (MAX_SUPPLY as f64 / 2_f64.powf(prefix_len as f64)).floor() as u64
     }
-
-    // Returns `XorName`s of the Elders.
-    // Used to pay Elders for storage of metadata.
-    pub async fn get_elders(&self) -> BTreeSet<XorName> {
-        self.network.our_elder_names().await
-    }
-
-    // Returns `XorName`s of the target holders for an Blob chunk.
-    // Used to pay adults for storing a new chunk.
-    pub async fn get_chunk_holder_adults(&self, target: &XorName) -> BTreeSet<XorName> {
-        self.capacity.get_chunk_holder_adults(target).await
-    }
 }
 
 #[cfg(test)]

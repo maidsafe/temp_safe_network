@@ -431,68 +431,6 @@ pub enum QueryResponse {
     GetStoreCost(Result<PaymentQuote>),
 }
 
-/// A given piece of data, which must match the name and bytes specified,
-/// is guaranteed to be accepted, if payment matching this quote
-/// is provided together with the quote.
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub struct PaymentQuote {
-    ///
-    pub bytes: u64,
-    ///
-    pub data: BTreeSet<XorName>,
-    ///
-    pub payable: BTreeMap<PublicKey, Token>,
-}
-
-///
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub struct GuaranteedQuoteShare {
-    ///
-    pub quote: PaymentQuote,
-    ///
-    pub sig: SignatureShare,
-}
-
-///
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub struct GuaranteedQuote {
-    ///
-    pub quote: PaymentQuote,
-    ///
-    pub sig: Signature,
-}
-
-/// The provided data must match the name and bytes specified
-/// in the quote.
-/// Also the quote must be signed by a known section key (this is at DbcSection).
-/// It is then guaranteed to be accepted (at DataSection), if payment provided
-/// matches the quote, and the dbcs are valid.
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub struct NetworkCmd {
-    ///
-    pub op: DebitableOp,
-    ///
-    pub quote: GuaranteedQuote,
-    ///
-    pub payment: BTreeMap<PublicKey, sn_dbc::Dbc>,
-}
-
-impl NetworkCmd {
-    ///
-    pub fn dst_address(&self) -> XorName {
-        match &self.op {
-            DebitableOp::Data(cmd) => cmd.dst_address(),
-        }
-    }
-}
-
-///
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub enum DebitableOp {
-    ///
-    Data(DataCmd),
-}
-
 impl QueryResponse {
     /// Returns true if the result returned is a success or not
     pub fn is_success(&self) -> bool {

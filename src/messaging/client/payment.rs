@@ -17,40 +17,101 @@ use xor_name::XorName;
 /// Token cmd that is sent to network.
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum TransferCmd {
-    #[cfg(feature = "simulated-payouts")]
-    /// Cmd to simulate a farming payotu
-    SimulatePayout(Transfer),
-    /// The cmd to validate a transfer.
-    ValidateTransfer(SignedTransfer),
+pub enum PaymentCmd {
     /// The cmd to register the consensused transfer.
-    RegisterTransfer(TransferAgreementProof),
+    RegisterPayment(RegisterPayment),
 }
 
 /// Token query that is sent to network.
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum TransferQuery {
-    /// Get key balance.
-    GetBalance(PublicKey),
-    /// Get key transfers since specified version.
-    GetHistory {
-        /// The balance key.
-        at: PublicKey,
-        /// The last version of transfers we know of.
-        since_version: usize,
-    },
-    /// Get the latest cost for writing given number of bytes to network.
-    GetStoreCost {
-        /// The requester's key.
-        requester: PublicKey,
-        /// Number of bytes to write.
-        /// The sender is responsible for specifying correct
-        /// number of bytes.
-        bytes: u64,
-        /// The hash of the data.
-        name: XorName,
-    },
+pub enum PaymentQuery {
+    /// Get a quote for storing a set of chunks to the network.
+    GetQuote(BTreeSet<XorName>),
+}
+
+// 1. GetQuote(data)
+// 2. Aggregate responses
+// 3. RegisterPayment(quote, payment)
+// 4. PaymentRegistered(receipt)
+
+/// The quote must be signed by a known section key (this is at DbcSection).
+/// The DBCs must be valid.
+/// The provided payment must match the payees and amounts specified in the quote.
+/// The set of chunk names (specified in the quote) are then guaranteed to be signed as paid for.
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct RegisterPayment {
+    ///
+    pub quote: GuaranteedQuote,
+    ///
+    pub payment: BTreeMap<PublicKey, sn_dbc::Dbc>,
+}
+
+/// A given piece of data, which must match the name and bytes specified,
+/// is guaranteed to be accepted, if payment matching this quote
+/// is provided together with the quote.
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct PaymentQuote {
+    /// Uploader is responsible for sending 
+    pub data: BTreeMap<XorName, u64>,
+    ///
+    pub payable: BTreeMap<PublicKey, Token>,
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct GuaranteedQuoteShare {
+    ///
+    pub quote: PaymentQuote,
+    ///
+    pub sig: SignatureShare,
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct GuaranteedQuote {
+    ///
+    pub quote: PaymentQuote,
+    ///
+    pub sig: Signature,
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct PaymentReceiptShare {
+    /// The size of each chunk must be specified
+    pub data: BTreeMap<XorName, u64>,
+    ///
+    pub sig: SignatureShare,
+    ///
+    pub signer: bls::PublicKey,
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct PaymentReceipt {
+    ///
+    pub data: BTreeSet<XorName>,
+    ///
+    pub sig: bls::Signature,
+    ///
+    pub signers: bls::PublicKeySet,
+}
+
+/// The provided data must match the name and bytes specified
+/// in the quote.
+/// Also the quote must be signed by a known section key (this is at DbcSection).
+/// It is then guaranteed to be accepted (at DataSection), if payment provided
+/// matches the quote, and the dbcs are valid.
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub enum DebitableCmd {
+    ///
+    Data {
+        cmd: DataCmd,
+        payment: PaymentReceipt,
+    }
 }
 
 impl TransferCmd {

@@ -15,8 +15,8 @@ pub use self::reward_wallets::RewardWallets;
 use crate::{
     messaging::{
         client::{
-            ClientMsg, ClientSig, CmdError, DebitableOp, Error as ErrorMsg, GuaranteedQuote,
-            NetworkCmd, PaymentError, PaymentQuote, ProcessMsg, QueryResponse,
+            ClientMsg, ClientSig, CmdError, DebitableCmd, Error as ErrorMsg, GuaranteedQuote,
+            PaymentError, PaymentQuote, ProcessMsg, QueryResponse,
         },
         Aggregation, EndUser, MessageId, SrcLocation,
     },
@@ -87,11 +87,13 @@ impl<K: KeyManager> Payments<K> {
         self.wallets.keep_wallets_of(prefix)
     }
 
+
+
     /// Get latest StoreCost for the given number of bytes.
     #[allow(unused)]
     pub async fn get_store_cost(
         &mut self,
-        data: BTreeMap<XorName, u64>,
+        data: BTreeMap<bls::PublicKey, BTreeMap<XorName, u64>>,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> NodeDuty {
@@ -112,47 +114,29 @@ impl<K: KeyManager> Payments<K> {
     }
 
     #[allow(unused)]
-    async fn store_cost(&self, data: BTreeMap<XorName, u64>) -> Result<PaymentQuote> {
-        let bytes = data.values().sum();
+    async fn store_cost(
+        &self,
+        data: BTreeMap<bls::PublicKey, BTreeMap<XorName, u64>>,
+    ) -> Result<PaymentQuote> {
+        let bytes = data.values().map(|c| c.values().sum()).sum();
+
         if data.is_empty() || bytes == 0 {
             Err(Error::InvalidOperation("Cannot store 0 bytes".to_string()))
         } else {
             let store_cost = self.store_cost.from(bytes).await?;
-            let mut adults = BTreeSet::new();
-            // let tasks: Vec<JoinHandle<BTreeSet<_>>> = data
-            //     .keys()
-            //     .map(|data_name| tokio::spawn(self.store_cost.get_chunk_holder_adults(data_name)))
-            //     .collect();
-            // join_all(tasks)
-            //     .await
-            //     .iter()
-            //     .flatten()
-            //     .for_each(|set| adults.extend(set));
-            for data_name in data.keys() {
-                adults.extend(self.store_cost.get_chunk_holder_adults(&data_name).await);
-            }
-            let elders = self.store_cost.get_elders().await;
-            let nodes: BTreeSet<_> = adults.union(&elders).collect();
-
             info!("Store cost for {:?} bytes: {}", bytes, store_cost);
-
-            let wallets = self
-                .node_wallets()
-                .iter()
-                .filter_map(|(key, value)| {
-                    if nodes.contains(key) {
-                        Some((*key, *value))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            let payable: BTreeMap<_, _> = distribute_rewards(store_cost, wallets)
+            let payable: BTreeMap<_, _> = distribute_rewards(store_cost, self.node_wallets())
                 .iter()
                 .map(|(_, (_, key, amount))| (*key, *amount))
                 .collect();
 
+            data.iter().map(|(section_key, data)| {
+                PaymentQuote {
+                    bytes: data.values().sum(),
+                    data: data.keys().copied().collect(),
+                    payable,
+                }
+            })
             Ok(PaymentQuote {
                 bytes,
                 data: data.keys().copied().collect(),
@@ -267,7 +251,7 @@ impl<K: KeyManager> Payments<K> {
         &self,
         cmd: NetworkCmd,
         _client_sig: ClientSig,
-    ) -> Result<(DebitableOp, BTreeMap<PublicKey, sn_dbc::Dbc>)> {
+    ) -> Result<(DebitableCmd, BTreeMap<PublicKey, sn_dbc::Dbc>)> {
         if cmd.payment.amount() > cmd.quote.amount() {
             Ok((cmd.op, cmd.payment))
         } else {
@@ -287,7 +271,7 @@ impl<K: KeyManager> Payments<K> {
     //         ProcessMsg::Cmd {
     //             cmd:
     //                 Cmd::Debitable(NetworkCmd {
-    //                     op: DebitableOp::Data(cmd),
+    //                     op: DebitableCmd::Data(cmd),
     //                     quote,
     //                     payment,
     //                 }),

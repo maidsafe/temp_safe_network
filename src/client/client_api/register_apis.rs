@@ -9,7 +9,7 @@
 use super::Client;
 use crate::client::Error;
 use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, DebitableOp, NetworkCmd, Query, QueryResponse, RegisterRead,
+    Cmd, DataCmd, DataQuery, DebitableCmd, NetworkCmd, Query, QueryResponse, RegisterRead,
     RegisterWrite,
 };
 use crate::types::{
@@ -92,7 +92,7 @@ impl Client {
 
         // The _actual_ message
         let cmd = Cmd::Debitable(NetworkCmd {
-            op: DebitableOp::Data(cmd),
+            op: DebitableCmd::Data(cmd),
             quote,
             payment,
         });

@@ -16,7 +16,7 @@ mod sequence_apis;
 mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{Cmd, CmdError, DataCmd, DebitableOp, NetworkCmd};
+use crate::messaging::client::{Cmd, CmdError, DataCmd, DebitableCmd, NetworkCmd};
 use crate::transfers::TransferActor;
 use crate::types::{Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
@@ -207,7 +207,7 @@ impl Client {
 
         // The _actual_ message
         let cmd = Cmd::Debitable(NetworkCmd {
-            op: DebitableOp::Data(cmd),
+            op: DebitableCmd::Data(cmd),
             quote,
             payment,
         });
