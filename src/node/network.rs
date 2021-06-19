@@ -76,24 +76,20 @@ impl Network {
             .await
             .map_err(|_| Error::NoSectionPublicKey)?
             .public_key();
-        let share = self
+        let (index, share) = self
             .routing
             .sign_as_elder(&utils::serialise(data)?, &bls_pk)
             .await
             .map_err(Error::Routing)?;
-        Ok(SignatureShare {
-            share,
-            index: self
-                .routing
-                .our_index()
-                .await
-                .map_err(|_| Error::NoSectionPublicKey)?,
-        })
+        Ok(SignatureShare { index, share })
     }
 
     /// Sign with our BLS PK Share
     #[allow(unused)]
-    pub async fn sign_as_elder_raw<T: Serialize>(&self, data: &T) -> Result<bls::SignatureShare> {
+    pub async fn sign_as_elder_raw<T: Serialize>(
+        &self,
+        data: &T,
+    ) -> Result<(usize, bls::SignatureShare)> {
         let bls_pk = self
             .routing
             .public_key_set()
@@ -109,7 +105,10 @@ impl Network {
         Ok(share)
     }
 
-    pub async fn sign_bytes_as_elder_raw(&self, msg: &[u8]) -> Result<bls::SignatureShare> {
+    pub async fn sign_bytes_as_elder_raw(
+        &self,
+        msg: &[u8],
+    ) -> Result<(usize, bls::SignatureShare)> {
         let bls_pk = self
             .routing
             .public_key_set()

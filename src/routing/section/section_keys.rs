@@ -68,7 +68,7 @@ impl SectionKeysProvider {
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
-    ) -> Result<bls::SignatureShare> {
+    ) -> Result<(usize, bls::SignatureShare)> {
         self.cache.sign_with(data, public_key)
     }
 
@@ -124,10 +124,13 @@ impl MiniKeyCache {
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
-    ) -> Result<bls::SignatureShare> {
+    ) -> Result<(usize, bls::SignatureShare)> {
         for (cached_public, section_key_share) in &self.list {
             if public_key == cached_public {
-                return Ok(section_key_share.secret_key_share.sign(data));
+                return Ok((
+                    section_key_share.index,
+                    section_key_share.secret_key_share.sign(data),
+                ));
             }
         }
         Err(Error::MissingSecretKeyShare)

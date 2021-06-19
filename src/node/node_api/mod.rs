@@ -81,9 +81,8 @@ impl KeyManager for BlsKeyManager {
     type Error = Error;
 
     async fn sign(&self, msg_hash: &Hash) -> Result<NodeSignature> {
-        let index = self.network.our_index().await? as u64;
-        let sig = self.network.sign_bytes_as_elder_raw(&(*msg_hash)).await?;
-        Ok(NodeSignature::new(index, sig))
+        let (index, sig) = self.network.sign_bytes_as_elder_raw(&(*msg_hash)).await?;
+        Ok(NodeSignature::new(index as u64, sig))
     }
 
     async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
