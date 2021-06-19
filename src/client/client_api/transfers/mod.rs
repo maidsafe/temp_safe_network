@@ -179,7 +179,7 @@ impl Client {
         let current_nano = cost_of_put.as_nano();
         let buffered_cost = Token::from_nano(
             current_nano
-                .checked_add(current_nano / 5)
+                .checked_add(current_nano / 2)
                 .unwrap_or(current_nano),
         );
         trace!(
