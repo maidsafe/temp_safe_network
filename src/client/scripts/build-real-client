@@ -1,6 +1,0 @@
-#!/bin/bash
-
-set -e -x
-
-cargo build --release
-cargo build --features=simulated-payouts --release --lib --tests 
