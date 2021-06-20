@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod adult_storage_info;
-mod store_cost;
+mod op_cost;
 
 use std::collections::BTreeSet;
 
 use crate::routing::{Prefix, XorName};
 pub use adult_storage_info::AdultsStorageInfo;
-pub use store_cost::StoreCost;
+pub use op_cost::OpCost;
 
 use crate::node::metadata::adult_reader::AdultReader;
 

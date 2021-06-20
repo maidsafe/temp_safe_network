@@ -24,7 +24,7 @@ mod transfer;
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
     cmd::Cmd,
-    data::{DataCmd, DataQuery, PointerShuffle},
+    data::{DataCmd, DataQuery, PointerEdit, PointerEditKind},
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
         SequenceDataExchange,
@@ -33,7 +33,7 @@ pub use self::{
     errors::{Error, Result},
     map::{MapRead, MapWrite},
     payment::{
-        DebitableOp, GuaranteedQuote, GuaranteedQuoteShare, PaymentCmd, PaymentQuote,
+        CostInquiry, DebitableOp, GuaranteedQuote, GuaranteedQuoteShare, PaymentCmd, PaymentQuote,
         PaymentReceipt, PaymentReceiptShare, RegisterPayment,
     },
     query::Query,

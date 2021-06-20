@@ -15,14 +15,14 @@ use log::debug;
 
 /// Calculation of rate limit for writes.
 #[derive(Clone)]
-pub struct StoreCost {
+pub struct OpCost {
     capacity: CapacityReader,
     network: Network,
 }
 
-impl StoreCost {
+impl OpCost {
     /// gets a new instance of rate limit
-    pub fn new(network: Network, capacity: CapacityReader) -> StoreCost {
+    pub fn new(network: Network, capacity: CapacityReader) -> OpCost {
         Self { capacity, network }
     }
 
@@ -42,17 +42,12 @@ impl StoreCost {
             return Err(Error::NetworkFull);
         }
 
-        Ok(StoreCost::store_cost(
-            bytes,
-            full_adults,
-            all_adults,
-            prefix_len,
-        ))
+        Ok(OpCost::op_cost(bytes, full_adults, all_adults, prefix_len))
     }
 
-    fn store_cost(bytes: u64, full_adults: u8, all_adults: u8, prefix_len: usize) -> Token {
+    fn op_cost(bytes: u64, full_adults: u8, all_adults: u8, prefix_len: usize) -> Token {
         debug!(
-            "StoreCost input values; bytes: {}, full_adults: {}, all_adults: {}, prefix_len: {}",
+            "OpCost input values; bytes: {}, full_adults: {}, all_adults: {}, prefix_len: {}",
             bytes, full_adults, all_adults, prefix_len
         );
         let available_nodes = (all_adults - full_adults) as f64;
@@ -62,10 +57,10 @@ impl StoreCost {
         let data_size_factor = (bytes as f64 / MAX_CHUNK_SIZE as f64).powf(2_f64)
             + (bytes as f64 / MAX_CHUNK_SIZE as f64);
         let steepness_reductor = prefix_len as f64 + 1_f64;
-        let section_supply_share = StoreCost::max_section_nanos(prefix_len) as f64;
+        let section_supply_share = OpCost::max_section_nanos(prefix_len) as f64;
         let token_source = steepness_reductor * section_supply_share.powf(0.5_f64);
-        let store_cost = (token_source * data_size_factor * supply_demand_factor).round() as u64;
-        Token::from_nano(u64::max(1, store_cost)) // always return > 0
+        let op_cost = (token_source * data_size_factor * supply_demand_factor).round() as u64;
+        Token::from_nano(u64::max(1, op_cost)) // always return > 0
     }
 
     fn max_section_nanos(prefix_len: usize) -> u64 {
@@ -80,50 +75,48 @@ mod test {
     use std::mem;
 
     #[test]
-    fn calculates_store_cost() {
+    fn calculates_op_cost() {
         let bytes = 1_000_000;
         let prefix_len = 4;
         let all_adults = 24;
         let full_adults = 3;
-        let store_cost =
-            StoreCost::store_cost(bytes, full_adults, all_adults, prefix_len).as_nano();
-        assert_eq!(store_cost, 15300364);
+        let op_cost = OpCost::op_cost(bytes, full_adults, all_adults, prefix_len).as_nano();
+        assert_eq!(op_cost, 15300364);
     }
 
     #[test]
     fn calculates_max_section_nanos() {
         // prefix zero is one section so is responsible for all tokens
-        let first_section_nanos = StoreCost::max_section_nanos(0);
+        let first_section_nanos = OpCost::max_section_nanos(0);
         assert_eq!(MAX_SUPPLY, first_section_nanos);
         // first split leads to each section having half the tokens
-        let first_split_nanos = StoreCost::max_section_nanos(1);
+        let first_split_nanos = OpCost::max_section_nanos(1);
         assert_eq!(MAX_SUPPLY / 2, first_split_nanos);
         // some tokens remain in section up to 2.6 * 10^18 sections, (which is more than one billion times one billion sections).
-        let last_split_nanos = StoreCost::max_section_nanos(61);
+        let last_split_nanos = OpCost::max_section_nanos(61);
         assert!(last_split_nanos > 0);
     }
 
     // -------------------------------------------------------------
     // --------------- Rate Limit Common Sense ---------------------
     // -------------------------------------------------------------
-    // Test various different comparisons of the storecost.
+    // Test various different comparisons of the OpCost.
     // These tests are of the type 'all things being equal, then ...'
 
     #[test]
-    fn store_cost_smaller_chunks_cost_less() {
+    fn op_cost_smaller_chunks_cost_less() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 0;
         let all_adults = 8;
         let full_adults = 7;
         let standard_rl =
-            StoreCost::store_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
+            OpCost::op_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
 
         // smaller chunks cost less
         let one_mb_less_one_byte = one_mb_bytes - 1;
         let small =
-            StoreCost::store_cost(one_mb_less_one_byte, full_adults, all_adults, prefix_len)
-                .as_nano();
+            OpCost::op_cost(one_mb_less_one_byte, full_adults, all_adults, prefix_len).as_nano();
         assert!(
             small <= standard_rl,
             "small chunks don't cost less, expect {} <= {}",
@@ -133,18 +126,17 @@ mod test {
     }
 
     #[test]
-    fn store_cost_larger_net_is_cheaper() {
+    fn op_cost_larger_net_is_cheaper() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 2; // first couple of sections see an increase in cost, whereafter it is strictly decreasing
         let all_adults = 8;
         let full_adults = 7;
         let standard_rl =
-            StoreCost::store_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
+            OpCost::op_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
         // large network is cheaper to store than smaller network
         let big_prefix_len = prefix_len + 1;
-        let big =
-            StoreCost::store_cost(one_mb_bytes, full_adults, all_adults, big_prefix_len).as_nano();
+        let big = OpCost::op_cost(one_mb_bytes, full_adults, all_adults, big_prefix_len).as_nano();
         assert!(
             big <= standard_rl,
             "larger network is not cheaper, expect {} <= {}",
@@ -154,18 +146,18 @@ mod test {
     }
 
     #[test]
-    fn store_cost_emptier_section_is_cheaper() {
+    fn op_cost_emptier_section_is_cheaper() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 0;
         let all_adults = 8;
         let full_adults = 7;
         let standard_rl =
-            StoreCost::store_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
+            OpCost::op_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
         // less full section is cheaper than more full section
         let less_full_adults = full_adults - 1;
         let empty =
-            StoreCost::store_cost(one_mb_bytes, less_full_adults, all_adults, prefix_len).as_nano();
+            OpCost::op_cost(one_mb_bytes, less_full_adults, all_adults, prefix_len).as_nano();
         assert!(
             empty <= standard_rl,
             "less full section is not cheaper, expect {} <= {}",
@@ -175,7 +167,7 @@ mod test {
     }
 
     #[test]
-    fn store_cost_splitting_into_multiple_store_is_cheaper_than_same_bytes_in_single_store() {
+    fn op_cost_splitting_into_multiple_store_is_cheaper_than_same_bytes_in_single_store() {
         // we encourage more granularity in data chunking
         // setup
         let one_mb_bytes = 1024 * 1024;
@@ -183,11 +175,10 @@ mod test {
         let all_adults = 8;
         let full_adults = 7;
         let standard_rl =
-            StoreCost::store_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
+            OpCost::op_cost(one_mb_bytes, full_adults, all_adults, prefix_len).as_nano();
         // many tiny chunks is cheaper than the same bytes in one big chunk
         let one_kb_bytes = 1024;
-        let reduced =
-            StoreCost::store_cost(one_kb_bytes, full_adults, all_adults, prefix_len).as_nano();
+        let reduced = OpCost::op_cost(one_kb_bytes, full_adults, all_adults, prefix_len).as_nano();
         let combined = 1024 * reduced;
         assert!(
             combined <= standard_rl,
@@ -198,10 +189,10 @@ mod test {
     }
 
     #[test]
-    fn store_cost_is_applied_up_to_85_billion_nodes() {
+    fn op_cost_is_applied_up_to_85_billion_nodes() {
         // setup
         // The size of the actual DataCmd
-        // is used for storecost calc,
+        // is used for OpCost calc,
         // (currently at least 928 bytes).
         // In general, the size of a type is not stable across compilations,
         // but it is close enough for our purposes here.
@@ -210,7 +201,7 @@ mod test {
         let big_section_node_count = 20;
         let big_prefix_len = 32;
         // storage rate limit is applied up to 85 billion nodes
-        let endcost = StoreCost::store_cost(
+        let endcost = OpCost::op_cost(
             minimum_storage_bytes,
             half_full_adults,
             big_section_node_count,
@@ -225,10 +216,10 @@ mod test {
 
     #[test]
     #[ignore] // this test fails under the current assumptions (max network size is not realistic)
-    fn store_cost_is_applied_up_to_max_network_size() {
+    fn op_cost_is_applied_up_to_max_network_size() {
         // setup
         // The size of the actual DataCmd
-        // is used for storecost calc,
+        // is used for OpCost calc,
         // (currently at least 928 bytes);
         // In general, the size of a type is not stable across compilations,
         // but it is close enough for our purposes here.
@@ -237,7 +228,7 @@ mod test {
         let big_section_node_count = 20;
         let big_prefix_len = 256;
         // storage rate limit is applied up to 2.3 * 10^78 nodes.
-        let endcost = StoreCost::store_cost(
+        let endcost = OpCost::op_cost(
             minimum_storage_bytes,
             half_full_adults,
             big_section_node_count,
@@ -252,7 +243,7 @@ mod test {
     }
 
     #[test]
-    fn store_cost_first_chunk_has_a_reasonable_cost() {
+    fn op_cost_first_chunk_has_a_reasonable_cost() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let max_initial_cost = 1_000_000_000; // 1 token
@@ -260,7 +251,7 @@ mod test {
         let minimum_section_nodes = 5;
         let first_section_prefix = 0;
         // the first chunk is a reasonable cost
-        let startcost = StoreCost::store_cost(
+        let startcost = OpCost::op_cost(
             one_mb_bytes,
             zero_full_adults,
             minimum_section_nodes,

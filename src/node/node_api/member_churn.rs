@@ -10,7 +10,7 @@ use super::role::{ElderRole, Role};
 use crate::{
     messaging::client::DataExchange,
     node::{
-        capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter, StoreCost},
+        capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter, OpCost},
         metadata::{adult_reader::AdultReader, Metadata},
         network::Network,
         node_api::BlsKeyManager,
@@ -57,7 +57,7 @@ impl Node {
 
         //
         // start handling transfers
-        let store_cost = StoreCost::new(self.network_api.clone(), capacity_reader.clone());
+        let store_cost = OpCost::new(self.network_api.clone(), capacity_reader.clone());
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, store_cost);
@@ -71,7 +71,7 @@ impl Node {
 
         //
         // start handling payments
-        let store_cost = StoreCost::new(self.network_api.clone(), capacity_reader.clone());
+        let store_cost = OpCost::new(self.network_api.clone(), capacity_reader.clone());
         let reward_wallets = crate::node::payments::RewardWallets::new(BTreeMap::<
             XorName,
             (NodeAge, PublicKey),

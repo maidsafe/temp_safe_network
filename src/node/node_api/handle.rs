@@ -421,7 +421,7 @@ impl Node {
                             .transfers
                             .read()
                             .await
-                            .get_store_cost(bytes, msg_id, origin)
+                            .get_op_cost(bytes, msg_id, origin)
                             .await,
                     ))
                 });

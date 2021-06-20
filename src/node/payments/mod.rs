@@ -15,13 +15,13 @@ pub use self::reward_wallets::RewardWallets;
 use crate::{
     messaging::{
         client::{
-            ClientMsg, ClientSig, CmdError, DebitableOp, Error as ErrorMsg, GuaranteedQuote,
-            PaymentError, PaymentQuote, ProcessMsg, QueryResponse,
+            ClientMsg, ClientSig, CmdError, CostInquiry, DebitableOp, Error as ErrorMsg,
+            GuaranteedQuote, PaymentError, PaymentQuote, ProcessMsg, QueryResponse,
         },
         Aggregation, EndUser, MessageId, SrcLocation,
     },
     node::{
-        capacity::StoreCost as StoreCostCalc,
+        capacity::OpCost as OpCostCalc,
         node_ops::{MsgType, NodeDuty, OutgoingMsg},
         Error, Result,
     },
@@ -29,7 +29,7 @@ use crate::{
 };
 use log::info;
 use sn_dbc::{KeyManager, Mint, ReissueRequest};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use xor_name::{Prefix, XorName};
 
 type Payment = BTreeMap<PublicKey, sn_dbc::Dbc>;
@@ -39,16 +39,16 @@ type Payment = BTreeMap<PublicKey, sn_dbc::Dbc>;
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub struct Payments<K: KeyManager> {
-    store_cost: StoreCostCalc,
+    cost: OpCostCalc,
     wallets: RewardWallets,
     mint: Mint<K>,
 }
 
 impl<K: KeyManager> Payments<K> {
     ///
-    pub fn new(store_cost: StoreCostCalc, wallets: RewardWallets, mint: Mint<K>) -> Self {
+    pub fn new(cost: OpCostCalc, wallets: RewardWallets, mint: Mint<K>) -> Self {
         Self {
-            store_cost,
+            cost,
             wallets,
             mint,
         }
@@ -87,16 +87,16 @@ impl<K: KeyManager> Payments<K> {
         self.wallets.keep_wallets_of(prefix)
     }
 
-    /// Get latest StoreCost for the given number of bytes.
+    /// Get latest Cost for the given operations.
     #[allow(unused)]
-    pub async fn get_store_cost(
+    pub async fn inquire(
         &mut self,
-        data: BTreeSet<XorName>,
+        inquiry: CostInquiry,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> NodeDuty {
         let result = self
-            .store_cost(data)
+            .cost(inquiry)
             .await
             .map_err(|e| crate::messaging::client::Error::InvalidOperation(e.to_string()));
         NodeDuty::Send(OutgoingMsg {
@@ -112,19 +112,26 @@ impl<K: KeyManager> Payments<K> {
     }
 
     #[allow(unused)]
-    async fn store_cost(&self, chunks: BTreeSet<XorName>) -> Result<PaymentQuote> {
-        if chunks.is_empty() {
-            Err(Error::InvalidOperation("No data provided".to_string()))
-        } else {
-            let bytes = chunks.len() as u64 * MAX_CHUNK_SIZE_IN_BYTES;
-            let store_cost = self.store_cost.from(bytes).await?;
-            info!("Store cost for {:?} bytes: {}", bytes, store_cost);
-            let payable: BTreeMap<_, _> = distribute_rewards(store_cost, self.node_wallets())
-                .iter()
-                .map(|(_, (_, key, amount))| (*key, *amount))
-                .collect();
-            Ok(PaymentQuote { chunks, payable })
-        }
+    async fn cost(&self, inquiry: CostInquiry) -> Result<PaymentQuote> {
+        let units = match &inquiry {
+            CostInquiry::Upload(chunks) => {
+                if chunks.is_empty() {
+                    return Err(Error::InvalidOperation("No data provided".to_string()));
+                } else {
+                    chunks.len() as u64 * MAX_CHUNK_SIZE_IN_BYTES
+                }
+            }
+            CostInquiry::PointerEdit(edits) => edits.len() as u64 * MAX_CHUNK_SIZE_IN_BYTES / 10,
+        };
+
+        let cost = self.cost.from(units).await?;
+        info!("Cost for {:?} units: {}", units, cost);
+        let payable: BTreeMap<_, _> = distribute_rewards(cost, self.node_wallets())
+            .iter()
+            .map(|(_, (_, key, amount))| (*key, *amount))
+            .collect();
+
+        Ok(PaymentQuote { inquiry, payable })
     }
 
     // pub async fn reissue(&self, req: ReissueRequest) -> Result<NodeDuty> {
@@ -185,9 +192,7 @@ impl<K: KeyManager> Payments<K> {
     //     }
     // }
 
-    /// Makes sure the payment contained
-    /// within a data write, is credited
-    /// to the nodes.
+    /// Verifies that the debitable op, has been paid for.
     pub async fn process_op(
         &mut self,
         cmd: DebitableOp,

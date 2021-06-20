@@ -8,8 +8,8 @@
 
 use crate::messaging::{
     client::{
-        ChunkRead, ChunkWrite, ClientMsg, ClientSig, DataCmd, DataExchange, DataQuery,
-        DebitableOp, ProcessingError, QueryResponse, SupportingInfo,
+        ChunkRead, ChunkWrite, ClientMsg, ClientSig, DataCmd, DataExchange, DataQuery, DebitableOp,
+        ProcessingError, QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, PointerShuffle, QueryResponse, TransferError};
+use super::{CmdError, Error, PointerEdit, PointerEditKind, QueryResponse, TransferError};
 use crate::types::{Chunk, PublicKey, SignatureShare, Token};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -54,7 +54,7 @@ pub struct RegisterPayment {
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PaymentQuote {
     ///
-    pub chunks: BTreeSet<XorName>,
+    pub inquiry: CostInquiry,
     ///
     pub payable: BTreeMap<PublicKey, Token>,
 }
@@ -120,12 +120,21 @@ pub enum DebitableOp {
         payment: PaymentReceipt,
     },
     ///
-    Shuffle {
+    PointerEdit {
         ///
-        ops: BTreeSet<PointerShuffle>,
+        ops: BTreeSet<PointerEdit>,
         ///
         payment: PaymentReceipt,
     },
+}
+
+///
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub enum CostInquiry {
+    ///
+    Upload(BTreeSet<XorName>),
+    ///
+    PointerEdit(BTreeSet<PointerEditKind>),
 }
 
 impl PaymentCmd {

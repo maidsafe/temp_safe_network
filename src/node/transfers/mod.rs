@@ -18,8 +18,8 @@ use crate::types::Transfer;
 use crate::{
     messaging::{
         client::{
-            ClientMsg, ClientSig, CmdError, DataCmd, Error as ErrorMessage, Event, PaymentQuote,
-            ProcessMsg, QueryResponse, TransferError,
+            ClientMsg, ClientSig, CmdError, CostInquiry, DataCmd, Error as ErrorMessage, Event,
+            PaymentQuote, ProcessMsg, QueryResponse, TransferError,
         },
         node::{
             NodeCmd, NodeCmdError, NodeMsg, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
@@ -28,7 +28,7 @@ use crate::{
         Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
     },
     node::{
-        capacity::StoreCost,
+        capacity::OpCost,
         error::{convert_dt_error_to_error_message, convert_to_error_message},
         node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
         utils, Error, Result,
@@ -77,16 +77,16 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 #[derive(Clone)]
 pub struct Transfers {
     replicas: Replicas<ReplicaSigningImpl>,
-    store_cost: StoreCost,
+    op_cost: OpCost,
     // TODO: limit this? where do we store it
     recently_validated_transfers: Arc<Mutex<HashSet<DebitId>>>,
 }
 
 impl Transfers {
-    pub fn new(replicas: Replicas<ReplicaSigningImpl>, store_cost: StoreCost) -> Self {
+    pub fn new(replicas: Replicas<ReplicaSigningImpl>, op_cost: OpCost) -> Self {
         Self {
             replicas,
-            store_cost,
+            op_cost,
             recently_validated_transfers: Arc::default(),
         }
     }
@@ -119,9 +119,9 @@ impl Transfers {
         self.replicas.balance(self.section_wallet_id()).await
     }
 
-    /// Get latest StoreCost for the given number of bytes.
+    /// Get a quote for the given operation.
     /// Also check for Section storage capacity and report accordingly.
-    pub async fn get_store_cost(
+    pub async fn get_op_cost(
         &self,
         bytes: u64,
         msg_id: MessageId,
@@ -132,11 +132,11 @@ impl Transfers {
                 "Cannot store 0 bytes".to_string(),
             ))
         } else {
-            match self.store_cost.from(bytes).await {
-                Ok(store_cost) => {
-                    info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
+            match self.op_cost.from(bytes).await {
+                Ok(op_cost) => {
+                    info!("StoreCost for {:?} bytes: {}", bytes, op_cost);
                     Ok(PaymentQuote {
-                        chunks: BTreeSet::new(),
+                        inquiry: CostInquiry::Upload(BTreeSet::new()),
                         payable: BTreeMap::new(),
                     })
                 }
@@ -214,7 +214,7 @@ impl Transfers {
 
         match result {
             Ok(_) => {
-                let (total_cost, error) = match self.store_cost.from(num_bytes).await {
+                let (total_cost, error) = match self.op_cost.from(num_bytes).await {
                     Ok(total_cost) => {
                         if total_cost > payment.amount() {
                             // Paying too little will see the amount be forfeited.
