@@ -657,7 +657,7 @@ impl Node {
                             .payments
                             .write()
                             .await
-                            .process_payment(cmd, client_sig, id, origin)
+                            .process_op(cmd, client_sig, id, origin)
                             .await?,
                     ]))
                 });

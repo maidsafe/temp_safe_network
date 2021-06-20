@@ -136,8 +136,7 @@ impl Transfers {
                 Ok(store_cost) => {
                     info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
                     Ok(PaymentQuote {
-                        bytes,
-                        data: BTreeSet::new(),
+                        chunks: BTreeSet::new(),
                         payable: BTreeMap::new(),
                     })
                 }

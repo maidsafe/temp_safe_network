@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, QueryResponse, TransferError};
-#[cfg(feature = "simulated-payouts")]
-use crate::types::Transfer;
-use crate::types::{PublicKey, SignedTransfer, TransferAgreementProof};
+use super::{CmdError, Error, PointerShuffle, QueryResponse, TransferError};
+use crate::types::{Chunk, PublicKey, SignatureShare, Token};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 use xor_name::XorName;
 
 /// Token cmd that is sent to network.
@@ -52,8 +53,8 @@ pub struct RegisterPayment {
 /// is provided together with the quote.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PaymentQuote {
-    /// Uploader is responsible for sending 
-    pub data: BTreeMap<XorName, u64>,
+    ///
+    pub chunks: BTreeSet<XorName>,
     ///
     pub payable: BTreeMap<PublicKey, Token>,
 }
@@ -65,6 +66,8 @@ pub struct GuaranteedQuoteShare {
     pub quote: PaymentQuote,
     ///
     pub sig: SignatureShare,
+    ///
+    pub key: bls::PublicKey,
 }
 
 ///
@@ -73,18 +76,20 @@ pub struct GuaranteedQuote {
     ///
     pub quote: PaymentQuote,
     ///
-    pub sig: Signature,
+    pub sig: bls::Signature,
+    ///
+    pub key_set: bls::PublicKeySet,
 }
 
 ///
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PaymentReceiptShare {
-    /// The size of each chunk must be specified
-    pub data: BTreeMap<XorName, u64>,
+    ///
+    pub data: BTreeSet<XorName>,
     ///
     pub sig: SignatureShare,
     ///
-    pub signer: bls::PublicKey,
+    pub key: bls::PublicKey,
 }
 
 ///
@@ -95,7 +100,7 @@ pub struct PaymentReceipt {
     ///
     pub sig: bls::Signature,
     ///
-    pub signers: bls::PublicKeySet,
+    pub key_set: bls::PublicKeySet,
 }
 
 /// The provided data must match the name and bytes specified
@@ -106,89 +111,83 @@ pub struct PaymentReceipt {
 
 ///
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub enum DebitableCmd {
+pub enum DebitableOp {
     ///
-    Data {
-        cmd: DataCmd,
+    Upload {
+        ///
+        data: BTreeSet<Chunk>,
+        ///
         payment: PaymentReceipt,
-    }
+    },
+    ///
+    Shuffle {
+        ///
+        ops: BTreeSet<PointerShuffle>,
+        ///
+        payment: PaymentReceipt,
+    },
 }
 
-impl TransferCmd {
+impl PaymentCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> CmdError {
         use CmdError::*;
-        use TransferCmd::*;
+        use PaymentCmd::*;
         use TransferError::*;
         match *self {
-            ValidateTransfer(_) => Transfer(TransferValidation(error)),
-            RegisterTransfer(_) => Transfer(TransferRegistration(error)),
-            #[cfg(feature = "simulated-payouts")]
-            SimulatePayout(_) => Transfer(TransferRegistration(error)),
+            RegisterPayment(_) => Transfer(TransferRegistration(error)),
         }
     }
 
     /// Returns the address of the destination for `request`.
     pub fn dst_address(&self) -> XorName {
-        use TransferCmd::*;
+        use PaymentCmd::*;
         match self {
-            RegisterTransfer(ref proof) => XorName::from(proof.sender()), // this is handled where the debit is made
-            ValidateTransfer(ref signed_transfer) => XorName::from(signed_transfer.sender()), // this is handled where the debit is made
-            #[cfg(feature = "simulated-payouts")]
-            SimulatePayout(ref transfer) => XorName::from(transfer.debit().sender()), // this is handled where the debit is made
+            RegisterPayment(ref _reg) => XorName::random(), //XorName::from(reg.quote.signers.public_key()), // this is handled where the debit is made
         }
     }
 }
 
-impl fmt::Debug for TransferCmd {
+impl fmt::Debug for PaymentCmd {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use TransferCmd::*;
+        use PaymentCmd::*;
         write!(
             formatter,
-            "TransferCmd::{}",
+            "PaymentCmd::{}",
             match *self {
-                RegisterTransfer { .. } => "RegisterTransfer",
-                ValidateTransfer { .. } => "ValidateTransfer",
-                #[cfg(feature = "simulated-payouts")]
-                SimulatePayout { .. } => "SimulatePayout",
+                RegisterPayment { .. } => "RegisterPayment",
             }
         )
     }
 }
 
-impl TransferQuery {
+impl PaymentQuery {
     /// Creates a QueryResponse containing an error, with the QueryResponse variant corresponding to the
     /// Request variant.
+    #[allow(unused)]
     pub fn error(&self, error: Error) -> QueryResponse {
-        use TransferQuery::*;
+        use PaymentQuery::*;
         match *self {
-            GetBalance(_) => QueryResponse::GetBalance(Err(error)),
-            GetHistory { .. } => QueryResponse::GetHistory(Err(error)),
-            GetStoreCost { .. } => QueryResponse::GetStoreCost(Err(error)),
+            GetQuote { .. } => QueryResponse::GetStoreCost(Err(error)),
         }
     }
 
     /// Returns the address of the destination for the query.
+    #[allow(unused)]
     pub fn dst_address(&self) -> XorName {
-        use TransferQuery::*;
+        use PaymentQuery::*;
         match self {
-            GetBalance(at) | GetHistory { at, .. } | GetStoreCost { requester: at, .. } => {
-                XorName::from(*at)
-            }
+            GetQuote { .. } => XorName::random(), // XorName::from(*at),
         }
     }
 }
 
-impl fmt::Debug for TransferQuery {
+impl fmt::Debug for PaymentQuery {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        use TransferQuery::*;
+        use PaymentQuery::*;
         match *self {
-            GetBalance(_) => write!(formatter, "TransferQuery::GetBalance"),
-            GetHistory { .. } => write!(formatter, "TransferQuery::GetHistory"),
-            GetStoreCost { bytes, .. } => {
-                write!(formatter, "TransferQuery::GetStoreCost of {:?}", bytes)
-            }
+            GetQuote { .. } => write!(formatter, "PaymentQuery::GetQuote"),
         }
     }
 }

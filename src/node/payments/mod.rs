@@ -15,7 +15,7 @@ pub use self::reward_wallets::RewardWallets;
 use crate::{
     messaging::{
         client::{
-            ClientMsg, ClientSig, CmdError, DebitableCmd, Error as ErrorMsg, GuaranteedQuote,
+            ClientMsg, ClientSig, CmdError, DebitableOp, Error as ErrorMsg, GuaranteedQuote,
             PaymentError, PaymentQuote, ProcessMsg, QueryResponse,
         },
         Aggregation, EndUser, MessageId, SrcLocation,
@@ -25,7 +25,7 @@ use crate::{
         node_ops::{MsgType, NodeDuty, OutgoingMsg},
         Error, Result,
     },
-    types::{NodeAge, PublicKey, Token},
+    types::{NodeAge, PublicKey, Token, MAX_CHUNK_SIZE_IN_BYTES},
 };
 use log::info;
 use sn_dbc::{KeyManager, Mint, ReissueRequest};
@@ -87,13 +87,11 @@ impl<K: KeyManager> Payments<K> {
         self.wallets.keep_wallets_of(prefix)
     }
 
-
-
     /// Get latest StoreCost for the given number of bytes.
     #[allow(unused)]
     pub async fn get_store_cost(
         &mut self,
-        data: BTreeMap<bls::PublicKey, BTreeMap<XorName, u64>>,
+        data: BTreeSet<XorName>,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> NodeDuty {
@@ -114,34 +112,18 @@ impl<K: KeyManager> Payments<K> {
     }
 
     #[allow(unused)]
-    async fn store_cost(
-        &self,
-        data: BTreeMap<bls::PublicKey, BTreeMap<XorName, u64>>,
-    ) -> Result<PaymentQuote> {
-        let bytes = data.values().map(|c| c.values().sum()).sum();
-
-        if data.is_empty() || bytes == 0 {
-            Err(Error::InvalidOperation("Cannot store 0 bytes".to_string()))
+    async fn store_cost(&self, chunks: BTreeSet<XorName>) -> Result<PaymentQuote> {
+        if chunks.is_empty() {
+            Err(Error::InvalidOperation("No data provided".to_string()))
         } else {
+            let bytes = chunks.len() as u64 * MAX_CHUNK_SIZE_IN_BYTES;
             let store_cost = self.store_cost.from(bytes).await?;
             info!("Store cost for {:?} bytes: {}", bytes, store_cost);
             let payable: BTreeMap<_, _> = distribute_rewards(store_cost, self.node_wallets())
                 .iter()
                 .map(|(_, (_, key, amount))| (*key, *amount))
                 .collect();
-
-            data.iter().map(|(section_key, data)| {
-                PaymentQuote {
-                    bytes: data.values().sum(),
-                    data: data.keys().copied().collect(),
-                    payable,
-                }
-            })
-            Ok(PaymentQuote {
-                bytes,
-                data: data.keys().copied().collect(),
-                payable,
-            })
+            Ok(PaymentQuote { chunks, payable })
         }
     }
 
@@ -206,14 +188,14 @@ impl<K: KeyManager> Payments<K> {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the nodes.
-    pub async fn process_payment(
+    pub async fn process_op(
         &mut self,
-        cmd: NetworkCmd,
-        client_sig: ClientSig,
+        cmd: DebitableOp,
+        _client_sig: ClientSig,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let (_data_cmd, _payment) = match self.validate_payment(cmd, client_sig).await {
+        let () = match self.validate(cmd).await {
             Ok(result) => result,
             Err(e) => {
                 return Ok(NodeDuty::Send(OutgoingMsg {
@@ -247,21 +229,25 @@ impl<K: KeyManager> Payments<K> {
         Ok(NodeDuty::NoOp)
     }
 
-    async fn validate_payment(
-        &self,
-        cmd: NetworkCmd,
-        _client_sig: ClientSig,
-    ) -> Result<(DebitableCmd, BTreeMap<PublicKey, sn_dbc::Dbc>)> {
-        if cmd.payment.amount() > cmd.quote.amount() {
-            Ok((cmd.op, cmd.payment))
-        } else {
-            return Err(Error::InvalidOperation(format!(
-                "Too low payment: {}, expected: {}",
-                cmd.payment.amount(),
-                cmd.quote.amount(),
-            )));
-        }
+    async fn validate(&self, _cmd: DebitableOp) -> Result<()> {
+        Ok(())
     }
+
+    // async fn validate_payment(
+    //     &self,
+    //     cmd: DebitableOp,
+    //     _client_sig: ClientSig,
+    // ) -> Result<(DebitableOp, BTreeMap<PublicKey, sn_dbc::Dbc>)> {
+    //     if cmd.payment.amount() > cmd.quote.amount() {
+    //         Ok((cmd.op, cmd.payment))
+    //     } else {
+    //         return Err(Error::InvalidOperation(format!(
+    //             "Too low payment: {}, expected: {}",
+    //             cmd.payment.amount(),
+    //             cmd.quote.amount(),
+    //         )));
+    //     }
+    // }
 
     // async fn validate_payment(
     //     &self,
@@ -271,7 +257,7 @@ impl<K: KeyManager> Payments<K> {
     //         ProcessMsg::Cmd {
     //             cmd:
     //                 Cmd::Debitable(NetworkCmd {
-    //                     op: DebitableCmd::Data(cmd),
+    //                     op: DebitableOp::Data(cmd),
     //                     quote,
     //                     payment,
     //                 }),

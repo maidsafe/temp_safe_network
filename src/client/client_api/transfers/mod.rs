@@ -13,18 +13,14 @@ mod simulated_payouts;
 // Module containing all PUT apis
 mod write_apis;
 
-use std::collections::BTreeMap;
-
 use crate::client::{Client, Error};
 use crate::messaging::client::{
-    ClientSig, Cmd, GuaranteedQuote, Query, QueryResponse, TransferQuery,
+    ClientSig, Cmd, GuaranteedQuote, PaymentReceipt, Query, QueryResponse, TransferQuery,
 };
 use crate::transfers::ActorEvent;
 use crate::types::{DebitId, PublicKey, Token, TransferAgreementProof, TransferValidated};
 use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::channel;
-
-type Payment = BTreeMap<PublicKey, sn_dbc::Dbc>;
 
 impl Client {
     /// Get the client's current coin balance from the network
@@ -172,8 +168,13 @@ impl Client {
     }
 
     ///
-    pub async fn generate_payment(&self) -> Result<Payment, Error> {
-        Ok(BTreeMap::new())
+    pub async fn generate_payment(&self, _quote: GuaranteedQuote) -> Result<PaymentReceipt, Error> {
+        unimplemented!()
+        // Ok(PaymentReceipt {
+        //     data: BTreeSet::new(),
+        //     sig,
+        //     key_set,
+        // })
     }
 
     /// Send message and await validation and constructing of TransferAgreementProof

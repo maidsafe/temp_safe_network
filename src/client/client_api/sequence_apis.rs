@@ -9,8 +9,7 @@
 use super::Client;
 use crate::client::Error;
 use crate::messaging::client::{
-    Cmd, DataCmd, DataQuery, DebitableCmd, NetworkCmd, Query, QueryResponse, SequenceRead,
-    SequenceWrite,
+    Cmd, DataCmd, DataQuery, DebitableOp, Query, QueryResponse, SequenceRead, SequenceWrite,
 };
 use crate::types::{
     PublicKey, Sequence, SequenceAddress, SequenceEntries, SequenceEntry, SequenceIndex,
@@ -18,7 +17,7 @@ use crate::types::{
     SequencePublicPermissions, SequencePublicPolicy, SequenceUser,
 };
 use log::{debug, trace};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 fn wrap_seq_read(read: SequenceRead) -> Query {
@@ -213,18 +212,16 @@ impl Client {
     /// # let balance_after_write = client.get_local_balance().await; assert_ne!(initial_balance, balance_after_write); Ok(()) } ); }
     /// ```
     pub async fn delete_sequence(&self, address: SequenceAddress) -> Result<(), Error> {
-        let cmd = DataCmd::Sequence(SequenceWrite::Delete(address));
+        let _cmd = DataCmd::Sequence(SequenceWrite::Delete(address));
 
         // Get quote for write
         let quote = self.get_quote().await?;
-
         // Generate payment matching the quote
-        let payment = self.generate_payment().await?;
+        let payment = self.generate_payment(quote).await?;
 
         // The _actual_ message
-        let cmd = Cmd::Debitable(NetworkCmd {
-            op: DebitableCmd::Data(cmd),
-            quote,
+        let cmd = Cmd::Debitable(DebitableOp::Upload {
+            data: BTreeSet::new(),
             payment,
         });
 

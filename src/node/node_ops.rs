@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::client::{ClientMsg, NetworkCmd};
 use crate::messaging::{
     client::{
-        ChunkRead, ChunkWrite, ClientSig, DataCmd, DataExchange, DataQuery, ProcessingError,
-        QueryResponse, SupportingInfo,
+        ChunkRead, ChunkWrite, ClientMsg, ClientSig, DataCmd, DataExchange, DataQuery,
+        DebitableOp, ProcessingError, QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
@@ -223,7 +222,7 @@ pub enum NodeDuty {
     /// Process Payment for a DataCmd
     ProcessDataPayment {
         id: MessageId,
-        cmd: NetworkCmd,
+        cmd: DebitableOp,
         client_sig: ClientSig,
         origin: EndUser,
     },

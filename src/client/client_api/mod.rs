@@ -16,12 +16,13 @@ mod sequence_apis;
 mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{Cmd, CmdError, DataCmd, DebitableCmd, NetworkCmd};
+use crate::messaging::client::{Cmd, CmdError, DataCmd, DebitableOp};
 use crate::transfers::TransferActor;
 use crate::types::{Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
 use log::{debug, info, trace, warn};
 use rand::rngs::OsRng;
+use std::collections::BTreeSet;
 use std::{
     path::Path,
     str::FromStr,
@@ -198,17 +199,15 @@ impl Client {
 
     // Private helper to obtain payment proof for a data command, send it to the network,
     // and also apply the payment to local replica actor.
-    async fn pay_and_send_data_command(&self, cmd: DataCmd) -> Result<(), Error> {
+    async fn pay_and_send_data_command(&self, _cmd: DataCmd) -> Result<(), Error> {
         // Get quote for write
         let quote = self.get_quote().await?;
-
         // Generate payment matching the quote
-        let payment = self.generate_payment().await?;
+        let payment = self.generate_payment(quote).await?;
 
         // The _actual_ message
-        let cmd = Cmd::Debitable(NetworkCmd {
-            op: DebitableCmd::Data(cmd),
-            quote,
+        let cmd = Cmd::Debitable(DebitableOp::Upload {
+            data: BTreeSet::new(),
             payment,
         });
 

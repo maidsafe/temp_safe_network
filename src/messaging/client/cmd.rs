@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{DebitableCmd, transfer::TransferCmd};
+use super::{payment::DebitableOp, transfer::TransferCmd};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -15,7 +15,7 @@ use xor_name::XorName;
 #[derive(Eq, PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum Cmd {
     /// Commands for manipulating data
-    Debitable(DebitableCmd),
+    Debitable(DebitableOp),
     /// Command for transferring safe network tokens
     Transfer(TransferCmd),
 }
@@ -25,7 +25,7 @@ impl Cmd {
     pub fn dst_address(&self) -> XorName {
         use Cmd::*;
         match self {
-            Debitable(cmd) => cmd.dst_address(),
+            Debitable(_cmd) => XorName::random(), // cmd.dst_address(),
             Transfer(c) => c.dst_address(),
         }
     }

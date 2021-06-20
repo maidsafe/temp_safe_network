@@ -10,9 +10,8 @@ use super::{
     super::{network::Network, Error, Result},
     CapacityReader, CHUNK_COPY_COUNT, MAX_CHUNK_SIZE, MAX_SUPPLY,
 };
-use crate::{routing::XorName, types::Token};
+use crate::types::Token;
 use log::debug;
-use std::collections::BTreeSet;
 
 /// Calculation of rate limit for writes.
 #[derive(Clone)]

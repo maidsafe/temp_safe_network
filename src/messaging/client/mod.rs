@@ -15,6 +15,7 @@ mod data_exchange;
 mod duty;
 mod errors;
 mod map;
+mod payment;
 mod query;
 mod register;
 mod sequence;
@@ -23,7 +24,7 @@ mod transfer;
 pub use self::{
     chunk::{ChunkRead, ChunkWrite},
     cmd::Cmd,
-    data::{DataCmd, DataQuery},
+    data::{DataCmd, DataQuery, PointerShuffle},
     data_exchange::{
         ChunkDataExchange, ChunkMetadata, DataExchange, HolderMetadata, MapDataExchange,
         SequenceDataExchange,
@@ -31,21 +32,22 @@ pub use self::{
     duty::{AdultDuties, Duty, ElderDuties, NodeDuties},
     errors::{Error, Result},
     map::{MapRead, MapWrite},
+    payment::{
+        DebitableOp, GuaranteedQuote, GuaranteedQuoteShare, PaymentCmd, PaymentQuote,
+        PaymentReceipt, PaymentReceiptShare, RegisterPayment,
+    },
     query::Query,
     register::{RegisterRead, RegisterWrite},
     sequence::{SequenceRead, SequenceWrite},
     transfer::{TransferCmd, TransferQuery},
 };
 
+use crate::messaging::{MessageId, MessageType, WireMsg};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register},
     ActorHistory, Chunk, Map, MapEntries, MapPermissionSet, MapValue, MapValues, PublicKey,
     Sequence, SequenceEntries, SequenceEntry, SequencePermissions, SequencePrivatePolicy,
     SequencePublicPolicy, Signature, Token, TransferAgreementProof, TransferValidated,
-};
-use crate::{
-    messaging::{MessageId, MessageType, WireMsg},
-    types::SignatureShare,
 };
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

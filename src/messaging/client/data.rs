@@ -32,6 +32,18 @@ pub enum DataCmd {
     Register(RegisterWrite),
 }
 
+/// Data command operations. Creating, updating or removing data
+#[allow(clippy::large_enum_variant)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
+pub enum PointerShuffle {
+    /// Map write operation
+    Map,
+    /// Sequence write operation
+    Sequence,
+    /// Register write operation
+    Register,
+}
+
 impl DataCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// cuest variant.
