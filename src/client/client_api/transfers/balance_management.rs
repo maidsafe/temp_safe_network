@@ -309,9 +309,6 @@ mod tests {
             )),
         }?;
 
-        // Unchanged balances - local and network.
-        assert_eq!(client.get_local_balance().await, Token::from_str("10")?);
-
         let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == Token::from_str("10")?);
 
         Ok(())
