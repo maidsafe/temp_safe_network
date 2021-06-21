@@ -25,7 +25,7 @@ use crate::routing::{
     },
     ed25519,
     event::Event,
-    messages::{PlainMessageUtils, RoutingMsgUtils, SrcAuthorityUtils, VerifyStatus},
+    messages::{PlainMessageUtils, RoutingMsgUtils, SrcAuthorityUtils},
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -1585,7 +1585,8 @@ async fn handle_elders_update() -> Result<()> {
         assert_eq!(section.chain().last_key(), &pk1);
 
         // The message is trusted even by peers who don't yet know the new section key.
-        assert_matches!(message.verify(iter::once(&pk0)), Ok(VerifyStatus::Full));
+        assert!(message.check_signature().is_ok());
+        assert!(message.verify_src_section_chain(&[pk0]));
 
         // Merging the section contained in the message with the original section succeeds.
         assert_matches!(section0.clone().merge(section.clone()), Ok(()));

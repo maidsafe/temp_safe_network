@@ -12,6 +12,7 @@ use crate::messaging::node::{
     JoinResponse, Peer, Variant,
 };
 use crate::routing::{
+    core::RoutingMsgUtils,
     error::Result,
     peer::PeerUtils,
     relocation::{RelocatePayloadUtils, SignedRelocateDetailsUtils},
@@ -21,6 +22,7 @@ use crate::routing::{
         MIN_ADULT_AGE,
     },
 };
+use bls::PublicKey as BlsPublicKey;
 
 // Message handling
 impl Core {
@@ -31,9 +33,21 @@ impl Core {
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
 
-        if !self.section.prefix().matches(peer.name())
-            || join_request.section_key != *self.section.chain().last_key()
-        {
+        let section_key_matches = join_request.section_key == *self.section.chain().last_key();
+
+        // Ignore `JoinRequest` if we are not elder unless the join request
+        // is outdated in which case we reply with `BootstrapResponse::Join`
+        // with the up-to-date info (see `handle_join_request`).
+        if self.is_not_elder() && section_key_matches {
+            // Note: We don't bounce this message because the current bounce-resend
+            // mechanism wouldn't preserve the original SocketAddr which is needed for
+            // properly handling this message.
+            // This is OK because in the worst case the join request just timeouts and the
+            // joining node sends it again.
+            return Ok(vec![]);
+        }
+
+        if !section_key_matches || !self.section.prefix().matches(peer.name()) {
             debug!(
                 "JoinRequest from {} - name doesn't match our prefix {:?}.",
                 peer,
@@ -139,6 +153,7 @@ impl Core {
         &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
+        known_keys: &[BlsPublicKey],
     ) -> Result<Vec<Command>> {
         debug!("Received {:?} from {}", join_request, peer);
         let payload = if let Some(payload) = join_request.relocate_payload {
@@ -205,11 +220,15 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !self
-            .verify_message(payload.details.signed_msg())
-            .unwrap_or(false)
+        // Check for signatures and trust of the payload msg
+        let payload_msg = payload.details.signed_msg();
+        if payload_msg.check_signature().is_err()
+            || !payload_msg.verify_src_section_chain(&known_keys)
         {
-            debug!("Ignoring JoinAsRelocatedRequest from {} - untrusted.", peer);
+            debug!(
+                "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
+                peer
+            );
             return Ok(vec![]);
         }
 

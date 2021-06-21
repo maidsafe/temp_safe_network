@@ -8,10 +8,13 @@
 
 use super::super::Core;
 use crate::messaging::{
+    node::{RoutingMsg, Variant},
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstInfo, MessageType, SectionAuthorityProvider,
+    DstInfo, DstLocation, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{
+    error::Result,
+    messages::RoutingMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
@@ -85,5 +88,43 @@ impl Core {
                 vec![]
             }
         }
+    }
+
+    pub(crate) fn handle_section_knowledge_query(
+        &self,
+        given_key: Option<bls::PublicKey>,
+        msg: Box<RoutingMsg>,
+        sender: SocketAddr,
+        src_name: XorName,
+        dst_location: DstLocation,
+    ) -> Result<Command> {
+        let chain = self.section.chain();
+        let given_key = if let Some(key) = given_key {
+            key
+        } else {
+            *self.section_chain().root_key()
+        };
+        let truncated_chain = chain.get_proof_chain_to_current(&given_key)?;
+        let section_auth = self.section.section_signed_authority_provider();
+        let variant = Variant::SectionKnowledge {
+            src_info: (section_auth.clone(), truncated_chain),
+            msg: Some(msg),
+        };
+
+        let msg = RoutingMsg::single_src(
+            self.node(),
+            dst_location,
+            variant,
+            self.section.authority_provider().section_key(),
+        )?;
+        let key = self.section_key_by_name(&src_name);
+        Ok(Command::send_message_to_node(
+            (src_name, sender),
+            msg,
+            DstInfo {
+                dst: src_name,
+                dst_section_pk: key,
+            },
+        ))
     }
 }

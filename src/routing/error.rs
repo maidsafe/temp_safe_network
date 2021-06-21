@@ -6,10 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::{
-    dkg::ProposalError,
-    messages::{CreateError, ExtendSignedChainError},
-};
+use crate::routing::{dkg::ProposalError, messages::ExtendSignedChainError};
 use qp2p::Error as Qp2pError;
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::net::SocketAddr;
@@ -66,8 +63,6 @@ pub enum Error {
     Messaging(#[from] crate::messaging::Error),
     #[error("proposal error: {0}")]
     ProposalError(#[from] ProposalError),
-    #[error("create error: {0}")]
-    CreateError(#[from] CreateError),
     #[error("extend signed chain error: {0}")]
     ExtendSignedChainError(#[from] ExtendSignedChainError),
     #[error("invalid payload")]
