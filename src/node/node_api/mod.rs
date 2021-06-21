@@ -116,6 +116,21 @@ impl Node {
         )
         .await?;
 
+        let our_pid = std::process::id();
+        let node_prefix = node.our_prefix().await;
+        let node_name = node.our_name().await;
+        let our_conn_info = node.our_connection_info();
+        let our_conn_info_json = serde_json::to_string(&our_conn_info)
+            .unwrap_or_else(|_| "Failed to serialize connection info".into());
+        println!(
+            "Node PID: {:?}, prefix: {:?}, name: {}, connection info:\n{}",
+            our_pid, node_prefix, node_name, our_conn_info_json,
+        );
+        info!(
+            "Node PID: {:?}, prefix: {:?}, name: {}, connection info: {}",
+            our_pid, node_prefix, node_name, our_conn_info_json,
+        );
+
         Ok((node, network_events))
     }
 

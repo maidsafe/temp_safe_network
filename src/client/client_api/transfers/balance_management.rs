@@ -171,7 +171,7 @@ impl Client {
             transfer_proof
         );
 
-        self.send_cmd(cmd).await?;
+        self.send_cmd(cmd, None).await?;
 
         let mut actor = self.transfer_actor.write().await;
         // First register with local actor, then reply.

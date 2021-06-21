@@ -9,7 +9,10 @@
 use super::Session;
 use crate::client::Error;
 use crate::messaging::{
-    client::{ClientMsg, Event, ProcessMsg},
+    client::{
+        ClientMsg, CmdError, Event, ProcessMsg,
+        TransferError,
+    },
     section_info::{Error as SectionInfoError, GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
@@ -229,14 +232,12 @@ impl Session {
 
     // Handle messages intended for client consumption (re: queries + commands)
     async fn handle_client_msg(&self, msg: ProcessMsg, src: SocketAddr) {
-        debug!(
-            "===> ClientMsg with id {:?} received from {:?}",
-            msg.id(),
-            src
-        );
+        debug!("ClientMsg with id {:?} received from {:?}", msg.id(), src);
         let queries = self.pending_queries.clone();
         let transfers = self.pending_transfers.clone();
         let error_sender = self.incoming_err_sender.clone();
+        let transfer_err_sender = self.transfer_err_sender.clone();
+
         let _ = tokio::spawn(async move {
             debug!("Thread spawned to handle this client message");
             match msg {
@@ -292,11 +293,29 @@ impl Session {
                     ..
                 } => {
                     debug!(
-                        "Cmd Error was received for Message w/ID: {:?}, sending on error channel",
+                        "CmdError was received for Message w/ID: {:?}, sending on error channel",
                         correlation_id
                     );
-                    trace!("Error received is: {:?}", error);
-                    let _ = error_sender.send(error).await;
+                    warn!("CmdError received is: {:?}", error);
+                    let _ = error_sender.send(error.clone()).await;
+
+                    match error {
+                        CmdError::Transfer(transfer_error) => {
+                            if let TransferError::TransferRegistration(the_transfer_error) =
+                                transfer_error
+                            {
+                                match transfer_err_sender.send((src, the_transfer_error)).await {
+                                    Ok(_) => {}
+                                    Err(error) => {
+                                        error!("Error handling transfer error. ErrorMessage could not be sent to handler: {:?}", error);
+                                    }
+                                }
+                            }
+                        }
+                        CmdError::Data(_data_error) => {
+                            // do nothing just yet
+                        }
+                    }
                 }
                 msg => {
                     warn!("Ignoring unexpected message type received: {:?}", msg);

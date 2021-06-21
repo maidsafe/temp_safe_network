@@ -16,7 +16,7 @@ mod sequence_apis;
 mod transfers;
 
 use crate::client::{config_handler::Config, connections::Session, errors::Error};
-use crate::messaging::client::{Cmd, CmdError, DataCmd};
+use crate::messaging::client::{Cmd, CmdError, DataCmd, Error as ErrorMessage, TransferCmd};
 use crate::transfers::TransferActor;
 use crate::types::{Keypair, PublicKey, SectionElders, Token};
 use crdts::Dot;
@@ -97,9 +97,13 @@ impl Client {
 
         // Incoming error notifiers
         let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
+        // Listener for transfer errors
+        let (trasfer_err_sender, transfer_err_receiver) =
+            tokio::sync::mpsc::channel::<(SocketAddr, ErrorMessage)>(10);
 
         // Create the session with the network
-        let mut session = Session::new(qp2p_config, err_sender)?;
+        let mut session = Session::new(qp2p_config, err_sender, trasfer_err_sender)?;
+
         let client_pk = keypair.public_key();
 
         // Bootstrap to the network, connecting to the section responsible
@@ -133,6 +137,8 @@ impl Client {
 
         let transfer_actor = Arc::new(RwLock::new(TransferActor::new(keypair.clone(), elders)));
 
+        let _transfer_actor_for_error_handling = transfer_actor.clone();
+
         let mut client = Self {
             keypair,
             transfer_actor,
@@ -140,6 +146,8 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
         };
+
+        Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver );
 
         if cfg!(feature = "simulated-payouts") {
             // only trigger simulated payouts on new _random_ clients
@@ -160,6 +168,36 @@ impl Client {
         }
 
         Ok(client)
+    }
+
+    /// Sets up a listener for Cmd Errors that may need transfer debits to be resent to elders
+    pub fn handle_anti_entropy_errors(client: Self, mut transfer_err_receiver: Receiver<(SocketAddr, ErrorMessage)> ) {
+
+        let _ = tokio::spawn(async move {
+            let transfer_actor = client.clone().transfer_actor;
+            while let Some((src, ErrorMessage::MissingTransferHistory(received, expected))) =
+                transfer_err_receiver.recv().await
+            {
+                trace!("An elder received a transfer out of order");
+                
+                if expected < received {
+                    info!("An Elder is missing transfer history, updating if we have newer");
+                    // TODO: target specific elder by src
+                    // refactor send_cmd to allow optional src
+                    let our_history = transfer_actor.read().await.history();
+                    for (i, debit) in our_history.debits.iter().enumerate() {
+                        if i >= expected as usize {
+                            trace!("Sending transfer #${:?} to elder@{:?}", i, src);
+                            let _ = client
+                                .send_cmd(Cmd::Transfer(TransferCmd::RegisterTransfer(
+                                    debit.clone(),
+                                )), Some(src))
+                                .await;
+                        }
+                    }
+                }
+            }
+        });
     }
 
     /// Return the client's FullId.
@@ -213,7 +251,7 @@ impl Client {
             payment: payment_proof.clone(),
         };
 
-        self.send_cmd(cmd).await?;
+        self.send_cmd(cmd, None).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }

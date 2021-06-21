@@ -11,6 +11,7 @@ use crate::client::Error;
 use crate::messaging::client::{ClientSig, Cmd};
 use crate::types::{PublicKey, Signature};
 use log::debug;
+use std::net::SocketAddr;
 
 impl Client {
     /// Send a signed Cmd to the network
@@ -19,6 +20,7 @@ impl Client {
         cmd: Cmd,
         client_pk: PublicKey,
         signature: Signature,
+        target: Option<SocketAddr>
     ) -> Result<(), Error> {
         debug!("Sending Cmd: {:?}", cmd);
         let client_sig = ClientSig {
@@ -26,15 +28,15 @@ impl Client {
             signature,
         };
 
-        self.session.send_cmd(cmd, client_sig).await
+        self.session.send_cmd(cmd, client_sig, target).await
     }
 
     // Send a Cmd to the network without awaiting for a response.
     // This function is a helper private to this module.
-    pub(crate) async fn send_cmd(&self, cmd: Cmd) -> Result<(), Error> {
+    pub(crate) async fn send_cmd(&self, cmd: Cmd, target: Option<SocketAddr>) -> Result<(), Error> {
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
 
-        self.send_signed_command(cmd, client_pk, signature).await
+        self.send_signed_command(cmd, client_pk, signature, target).await
     }
 }

@@ -222,7 +222,7 @@ impl Client {
             payment: payment_proof.clone(),
         };
 
-        self.send_cmd(cmd).await?;
+        self.send_cmd(cmd, None).await?;
 
         self.apply_write_payment_to_local_actor(payment_proof).await
     }

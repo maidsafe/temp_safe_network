@@ -72,7 +72,7 @@ impl Client {
         let simluated_farming_cmd =
             Cmd::Transfer(TransferCmd::SimulatePayout(simulated_transfer.clone()));
 
-        self.send_cmd(simluated_farming_cmd).await?;
+        self.send_cmd(simluated_farming_cmd, None).await?;
 
         // If we're getting the payout for our own actor, update it here
         info!("Applying simulated payout locally, via query for history...");

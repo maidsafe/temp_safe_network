@@ -113,11 +113,19 @@ impl Session {
     }
 
     /// Send a `ClientMsg` to the network without awaiting for a response.
-    pub async fn send_cmd(&self, cmd: Cmd, client_sig: ClientSig) -> Result<(), Error> {
+    pub async fn send_cmd(&self, cmd: Cmd, client_sig: ClientSig, send_to_specific_elder: Option<SocketAddr>) -> Result<(), Error> {
         let msg_id = MessageId::new();
         let endpoint = self.endpoint()?.clone();
 
-        let elders: Vec<SocketAddr> = self.connected_elders.read().await.keys().cloned().collect();
+        let mut elders:  Vec<SocketAddr> = vec![];
+        if let Some(socket) = send_to_specific_elder {
+            elders.push(socket)
+        }
+        else {
+            elders = self.connected_elders.read().await.keys().cloned().collect();
+        }
+
+
         debug!(
             "Sending command w/id {:?}, to {} Elders",
             msg_id,

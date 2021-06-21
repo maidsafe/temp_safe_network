@@ -11,7 +11,7 @@ mod messaging;
 
 use crate::client::Error;
 use crate::messaging::client::CmdError;
-use crate::messaging::{client::QueryResponse, MessageId};
+use crate::messaging::{client::Error as ErrorMessage, client::QueryResponse, MessageId};
 use crate::types::{PublicKey, TransferValidated};
 use bls::PublicKeySet;
 use log::{debug, trace};
@@ -44,6 +44,8 @@ pub struct Session {
     pending_queries: PendingQueryResponses,
     pending_transfers: PendingTransferValidations,
     incoming_err_sender: Arc<Sender<CmdError>>,
+    /// Internal client err listener to handle tx/data issues and AE flows
+    transfer_err_sender: Arc<Sender<(SocketAddr, ErrorMessage)>>,
     endpoint: Option<Endpoint>,
     /// elders we've managed to connect to
     connected_elders: Arc<RwLock<BTreeMap<SocketAddr, XorName>>>,
@@ -55,7 +57,11 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(qp2p_config: QuicP2pConfig, err_sender: Sender<CmdError>) -> Result<Self, Error> {
+    pub fn new(
+        qp2p_config: QuicP2pConfig,
+        err_sender: Sender<CmdError>,
+        transfer_err_sender: Sender<(SocketAddr, ErrorMessage)>,
+    ) -> Result<Self, Error> {
         debug!("QP2p config: {:?}", qp2p_config);
 
         let qp2p = qp2p::QuicP2p::with_config(Some(qp2p_config), Default::default(), true)?;
@@ -64,6 +70,7 @@ impl Session {
             pending_queries: Arc::new(RwLock::new(HashMap::default())),
             pending_transfers: Arc::new(RwLock::new(HashMap::default())),
             incoming_err_sender: Arc::new(err_sender),
+            transfer_err_sender: Arc::new(transfer_err_sender),
             endpoint: None,
             section_key_set: Arc::new(RwLock::new(None)),
             connected_elders: Arc::new(RwLock::new(Default::default())),
