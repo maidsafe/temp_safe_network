@@ -63,7 +63,6 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
                 src_section_pk,
                 dst_info,
             }
-            // msg.serialize(dst_name, dst_section_pk, src_section_pk)?
         }
     };
 

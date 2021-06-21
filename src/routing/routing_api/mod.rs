@@ -412,14 +412,7 @@ impl Routing {
         let command = Command::SendMessage {
             recipients: vec![(user_xorname, recipient)],
             delivery_group_size: 1,
-            message
-            // message: MessageType::Client {
-            //     msg: message,
-            //     dst_info: DstInfo {
-            //         dst: user_xorname,
-            //         dst_section_pk: *self.section_chain().await.last_key(),
-            //     },
-            // },
+            message,
         };
         self.dispatcher.clone().handle_commands(command).await
     }
