@@ -79,5 +79,5 @@ jobs:
       - name: Node Logs
         run: |
           ls $HOME/.safe/node/local-test-network
-          cat $HOME/.safe/node/local-test-network/sn-node-genesis/sn_node.log
+          cat $HOME/.safe/node/local-test-network/sn-node-genesis/sn_node_rCURRENT.log
         if: failure()
