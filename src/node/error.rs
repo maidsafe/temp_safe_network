@@ -8,6 +8,7 @@
 
 use crate::messaging::{client::Error as ErrorMessage, MessageId, MessageType};
 use crate::routing::Prefix;
+use crate::transfers::Error as TransferError;
 use crate::types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
 use thiserror::Error;
@@ -186,6 +187,9 @@ pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
         Error::InvalidOwner(key) => ErrorMessage::InvalidOwners(key),
         Error::InvalidSignedTransfer(_) => ErrorMessage::InvalidSignature,
         Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
+        Error::Transfer(TransferError::OperationOutOfOrder(received, expected)) => {
+            ErrorMessage::MissingTransferHistory(received, expected)
+        }
         Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
         Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
         Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,

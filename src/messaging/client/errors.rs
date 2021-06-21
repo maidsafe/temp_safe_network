@@ -109,6 +109,9 @@ pub enum Error {
     /// Transaction ID already exists.
     #[error("Transaction Id already exists")]
     TransactionIdExists,
+    /// Transfer hsitory missing, operation out of order. <received, expected>
+    #[error("Transfer received out of order. Requested transfer operation index was {0}, but {1} was expected" )]
+    MissingTransferHistory(u64, u64),
     /// Insufficient tokens provided to pay for this operation.
     #[error("Insufficient payment provided to complete this operation")]
     InsufficientPayment,
