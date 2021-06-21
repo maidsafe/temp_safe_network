@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.5](https://github.com/maidsafe/safe_network/compare/v0.2.4...v0.2.5) (2021-06-21)
+
+
+### Bug Fixes
+
+* dont double serialise every single message ([2204eea](https://github.com/maidsafe/safe_network/commit/2204eea265acd2d07c15bbba08c1ec705c50a5c1))
+
 ### [0.2.4](https://github.com/maidsafe/safe_network/compare/v0.2.3...v0.2.4) (2021-06-21)
 
 ### [0.2.3](https://github.com/maidsafe/safe_network/compare/v0.2.2...v0.2.3) (2021-06-21)
