@@ -18,21 +18,16 @@ use rand::{
     distributions::{Distribution, WeightedIndex},
     Rng,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fs::File,
     io::BufWriter,
     net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
 use tokio::{
-    sync::{
-        mpsc::{self, Sender},
-        Mutex,
-    },
+    sync::mpsc::{self, Sender},
     task, time,
 };
 use tokio_util::time::delay_queue::DelayQueue;
@@ -438,7 +433,7 @@ impl Network {
             let nodes_section_pk = node
                 .section_key(prefix)
                 .await
-                .ok_or(anyhow!("No pk found for our node's section"))?;
+                .ok_or_else(|| anyhow!("No pk found for our node's section"))?;
             if self.try_send_probe(node, dst).await? {
                 self.probe_tracker
                     .send(*prefix, dst, nodes_section_pk)
@@ -758,11 +753,6 @@ struct Stats {
     relocation_successes: usize,
     promotions: usize,
     demotions: usize,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ProbeMessage {
-    sig_share: SigShare,
 }
 
 #[derive(Clone)]
