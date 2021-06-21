@@ -12,6 +12,7 @@ use crate::messaging::{
     DstInfo, EndUser, Itinerary, MessageId, SectionAuthorityProvider, SrcLocation, WireMsg,
 };
 use crate::routing::{
+    dkg::commands::DkgCommands,
     error::Result,
     messages::RoutingMsgUtils,
     network::NetworkUtils,
@@ -66,6 +67,10 @@ impl Core {
     /// Is this node an elder?
     pub fn is_elder(&self) -> bool {
         self.section.is_elder(&self.node.name())
+    }
+
+    pub fn is_not_elder(&self) -> bool {
+        !self.is_elder()
     }
 
     /// Tries to sign with the secret corresponding to the provided BLS public key
@@ -129,6 +134,12 @@ impl Core {
     // ----------------------------------------------------------------------------------------
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
+
+    pub(crate) fn handle_timeout(&mut self, token: u64) -> Result<Vec<Command>> {
+        self.dkg_voter
+            .handle_timeout(&self.node.keypair, token)
+            .into_commands(&self.node, *self.section_chain().last_key())
+    }
 
     pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
         if let Ok(true) = wire_msg.is_join_request() {

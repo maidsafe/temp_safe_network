@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::verify_message;
 use crate::messaging::{
     node::{
         JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, RoutingMsg, Section,
@@ -15,6 +14,7 @@ use crate::messaging::{
     DstInfo, DstLocation, MessageType, WireMsg,
 };
 use crate::routing::{
+    dkg::SectionSignedUtils,
     ed25519,
     error::{Error, Result},
     messages::RoutingMsgUtils,
@@ -321,15 +321,14 @@ impl<'a> Join<'a> {
 
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
-            let (routing_msg, dst_info, join_response, sender) = match event {
+            let (dst_info, join_response, sender) = match event {
                 ConnectionEvent::Received((sender, bytes)) => match WireMsg::deserialize(bytes) {
                     Ok(MessageType::Node { .. })
                     | Ok(MessageType::Client { .. })
                     | Ok(MessageType::SectionInfo { .. }) => continue,
                     Ok(MessageType::Routing { msg, dst_info }) => {
-                        if let Variant::JoinResponse(resp) = &msg.variant {
-                            let join_response = resp.clone();
-                            (msg, dst_info, *join_response, sender)
+                        if let Variant::JoinResponse(resp) = msg.variant {
+                            (dst_info, *resp, sender)
                         } else {
                             self.backlog_message(msg, sender, dst_info);
                             continue;
@@ -344,7 +343,8 @@ impl<'a> Join<'a> {
             };
 
             match join_response {
-                JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
+                JoinResponse::ResourceChallenge { .. }
+                | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     return Ok((join_response, sender, dst_info));
                 }
@@ -365,10 +365,6 @@ impl<'a> Join<'a> {
                         continue;
                     }
 
-                    if !verify_message(&routing_msg, None) {
-                        continue;
-                    }
-
                     return Ok((join_response, sender, dst_info));
                 }
                 JoinResponse::Redirect(ref section_auth) => {
@@ -380,22 +376,12 @@ impl<'a> Join<'a> {
                         continue;
                     }
 
-                    if !verify_message(&routing_msg, None) {
-                        continue;
-                    }
-
-                    return Ok((join_response, sender, dst_info));
-                }
-                JoinResponse::ResourceChallenge { .. } => {
-                    if !verify_message(&routing_msg, None) {
-                        continue;
-                    }
-
                     return Ok((join_response, sender, dst_info));
                 }
                 JoinResponse::Approval {
                     ref section_auth,
                     ref node_state,
+                    ref section_chain,
                     ..
                 } => {
                     if node_state.value.peer.name() != &self.node.name() {
@@ -403,7 +389,16 @@ impl<'a> Join<'a> {
                         continue;
                     }
 
-                    if !verify_message(&routing_msg, None) {
+                    if !section_auth.verify(section_chain) {
+                        error!(
+                            "Verification of section authority failed: {:?}",
+                            join_response
+                        );
+                        continue;
+                    }
+
+                    if !node_state.verify(section_chain) {
+                        error!("Verification of node state failed: {:?}", join_response);
                         continue;
                     }
 

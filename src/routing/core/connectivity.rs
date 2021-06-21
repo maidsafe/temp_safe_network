@@ -44,7 +44,7 @@ impl Core {
             return Ok(vec![]);
         };
 
-        if !self.is_elder() {
+        if self.is_not_elder() {
             // Adults cannot complain about connectivity.
             return Ok(vec![]);
         }

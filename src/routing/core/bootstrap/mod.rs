@@ -11,22 +11,3 @@ mod relocate;
 
 pub(crate) use join::join_network;
 pub(crate) use relocate::JoiningAsRelocated;
-
-use crate::messaging::node::RoutingMsg;
-use crate::routing::messages::{RoutingMsgUtils, VerifyStatus};
-
-fn verify_message(message: &RoutingMsg, trusted_key: Option<&bls::PublicKey>) -> bool {
-    match message.verify(trusted_key) {
-        Ok(VerifyStatus::Full) => true,
-        Ok(VerifyStatus::Unknown) if trusted_key.is_none() => true,
-        Ok(VerifyStatus::Unknown) => {
-            // TODO: bounce
-            error!("Verification failed - untrusted message: {:?}", message);
-            false
-        }
-        Err(error) => {
-            error!("Verification failed - {}: {:?}", error, message);
-            false
-        }
-    }
-}

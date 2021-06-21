@@ -26,7 +26,7 @@ impl Core {
         msg: &RoutingMsg,
         dst_info: DstInfo,
     ) -> Result<(Option<Command>, bool)> {
-        if !self.is_elder() {
+        if self.is_not_elder() {
             // Adult nodes do need to carry out entropy checking, however the message shall always
             // be handled.
             return Ok((None, true));

@@ -22,9 +22,8 @@ use self::{
     dispatcher::Dispatcher,
 };
 use crate::messaging::{
-    client::ClientMsg,
-    node::{Peer, RoutingMsg},
-    DstInfo, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+    client::ClientMsg, node::Peer, DstInfo, DstLocation, EndUser, Itinerary, MessageType,
+    SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::core::{join_network, Core};
 use crate::routing::{
@@ -516,7 +515,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             let _ = task::spawn(dispatcher.handle_commands(command));
         }
         MessageType::Routing { msg, dst_info } => {
-            if let Err(err) = RoutingMsg::check_signature(&msg) {
+            if let Err(err) = msg.check_signature() {
                 error!(
                     "Discarding message received ({:?}) due to invalid signature: {:?}",
                     msg.id, err

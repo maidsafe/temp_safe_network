@@ -138,6 +138,23 @@ impl Core {
         promise: RelocatePromise,
         msg: RoutingMsg,
     ) -> Result<Vec<Command>> {
+        // Check if we need to filter out the `RelocatePromise`.
+        if promise.name == self.node.name() {
+            // Promise to relocate us.
+            if self.relocate_state.is_some() {
+                // Already received a promise or already relocating. discard.
+                return Ok(vec![]);
+            }
+        } else {
+            // Promise returned from a node to be relocated, to be exchanged for the actual
+            // `Relocate` message.
+            if self.is_not_elder() || self.section.is_elder(&promise.name) {
+                // If we are not elder, maybe we just haven't processed our promotion yet.
+                // If otherwise they are still elder, maybe we just haven't processed their demotion yet.
+                return Ok(vec![]);
+            }
+        }
+
         let mut commands = vec![];
 
         if promise.name == self.node.name() {
@@ -161,7 +178,7 @@ impl Core {
             }
 
             // We are no longer elder. Send the promise back already.
-            if !self.is_elder() {
+            if self.is_not_elder() {
                 commands.push(self.send_message_to_our_elders(msg));
             }
 
