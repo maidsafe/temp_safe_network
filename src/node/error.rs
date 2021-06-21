@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{client::Error as ErrorMessage, MessageId};
-use crate::node::node_ops::MsgType;
+use crate::messaging::{client::Error as ErrorMessage, MessageId, MessageType};
 use crate::routing::Prefix;
 use crate::types::{DataAddress, Error as DtError, PublicKey};
 use std::io;
@@ -177,7 +176,7 @@ pub enum Error {
     Configuration(String),
     /// Failed to send message to connection.
     #[error("Failed to send message to connection: {{0.0}}")]
-    UnableToSend(MsgType),
+    UnableToSend(MessageType),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {

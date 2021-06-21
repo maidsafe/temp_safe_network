@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{Itinerary, MessageId};
+use crate::messaging::{Itinerary, MessageId, MessageType};
 use crate::node::{
     state_db::{get_network_keypair, store_network_keypair},
     utils, Config as NodeConfig, Error, Result,
@@ -208,7 +208,7 @@ impl Network {
     pub async fn send_message(
         &self,
         itinerary: Itinerary,
-        content: Bytes,
+        content: MessageType,
     ) -> Result<(), RoutingError> {
         self.routing.send_message(itinerary, content, None).await
     }
