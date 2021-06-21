@@ -122,16 +122,16 @@ impl Session {
         let msg_id = MessageId::new();
         let endpoint = self.endpoint()?.clone();
 
-        let mut elders: Vec<SocketAddr> = vec![];
-   let elders = if let Some(socket) = send_to_specific_elder {
-           vec![socket]
-      } else {
-            elders = self.connected_elders.read().await.keys().cloned().collect::<Vec<SocketAddr>>()
-        }
-            elders.push(socket)
+        let elders = if let Some(socket) = send_to_specific_elder {
+            vec![socket]
         } else {
-            elders = self.connected_elders.read().await.keys().cloned().collect();
-        }
+            self.connected_elders
+                .read()
+                .await
+                .keys()
+                .cloned()
+                .collect::<Vec<SocketAddr>>()
+        };
 
         debug!(
             "Sending command w/id {:?}, to {} Elders",
