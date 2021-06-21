@@ -12,8 +12,6 @@ use crate::messaging::{
     DstInfo, Itinerary, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{node::Node, routing_api::Peer, section::SectionKeyShare, XorName};
-use bytes::Bytes;
-use hex_fmt::HexFmt;
 use std::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
