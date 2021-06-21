@@ -357,7 +357,7 @@ impl Routing {
     pub async fn send_message(
         &self,
         itinerary: Itinerary,
-        content: Bytes,
+        content: MessageType,
         additional_proof_chain_key: Option<bls::PublicKey>,
     ) -> Result<()> {
         if let DstLocation::EndUser(EndUser { socket_id, xorname }) = itinerary.dst {
@@ -373,7 +373,7 @@ impl Routing {
                 if let Some(socket_addr) = addr {
                     debug!("Sending client msg to {:?}", socket_addr);
                     return self
-                        .send_message_to_client(socket_addr, xorname, ClientMsg::from(content)?)
+                        .send_message_to_client(socket_addr, xorname, content)
                         .await;
                 } else {
                     debug!(
@@ -402,18 +402,24 @@ impl Routing {
         &self,
         recipient: SocketAddr,
         user_xorname: XorName,
-        message: ClientMsg,
+        mut message: MessageType,
     ) -> Result<()> {
+        message.update_dst_info(
+            Some(*self.section_chain().await.last_key()),
+            Some(user_xorname),
+        );
+
         let command = Command::SendMessage {
             recipients: vec![(user_xorname, recipient)],
             delivery_group_size: 1,
-            message: MessageType::Client {
-                msg: message,
-                dst_info: DstInfo {
-                    dst: user_xorname,
-                    dst_section_pk: *self.section_chain().await.last_key(),
-                },
-            },
+            message
+            // message: MessageType::Client {
+            //     msg: message,
+            //     dst_info: DstInfo {
+            //         dst: user_xorname,
+            //         dst_section_pk: *self.section_chain().await.last_key(),
+            //     },
+            // },
         };
         self.dispatcher.clone().handle_commands(command).await
     }
