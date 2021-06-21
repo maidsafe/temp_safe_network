@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.3](https://github.com/maidsafe/safe_network/compare/v0.2.2...v0.2.3) (2021-06-21)
+
+
+### Bug Fixes
+
+* **node-bin:** log the node's addr the network failed to connect to as part of the connectivity test ([4c8ab3f](https://github.com/maidsafe/safe_network/commit/4c8ab3f71293fff723e45470b679d3adf353f16d))
+
 ### [0.2.2](https://github.com/maidsafe/safe_network/compare/v0.2.1...v0.2.2) (2021-06-21)
 
 ### [0.2.1](https://github.com/maidsafe/safe_network/compare/v0.2.0...v0.2.1) (2021-06-21)
