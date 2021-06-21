@@ -22,7 +22,6 @@ jobs:
   build_win_mac:
     if: github.repository_owner == 'maidsafe'
     name: Build Windows & macOS
-    needs: deps-and-publish
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
