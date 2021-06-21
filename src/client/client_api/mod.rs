@@ -147,7 +147,7 @@ impl Client {
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
         };
 
-        Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver );
+        Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver);
 
         if cfg!(feature = "simulated-payouts") {
             // only trigger simulated payouts on new _random_ clients
@@ -171,15 +171,17 @@ impl Client {
     }
 
     /// Sets up a listener for Cmd Errors that may need transfer debits to be resent to elders
-    pub fn handle_anti_entropy_errors(client: Self, mut transfer_err_receiver: Receiver<(SocketAddr, ErrorMessage)> ) {
-
+    pub fn handle_anti_entropy_errors(
+        client: Self,
+        mut transfer_err_receiver: Receiver<(SocketAddr, ErrorMessage)>,
+    ) {
         let _ = tokio::spawn(async move {
             let transfer_actor = client.clone().transfer_actor;
             while let Some((src, ErrorMessage::MissingTransferHistory(received, expected))) =
                 transfer_err_receiver.recv().await
             {
                 trace!("An elder received a transfer out of order");
-                
+
                 if expected < received {
                     info!("An Elder is missing transfer history, updating if we have newer");
                     // TODO: target specific elder by src
@@ -189,9 +191,10 @@ impl Client {
                         if i >= expected as usize {
                             trace!("Sending transfer #${:?} to elder@{:?}", i, src);
                             let _ = client
-                                .send_cmd(Cmd::Transfer(TransferCmd::RegisterTransfer(
-                                    debit.clone(),
-                                )), Some(src))
+                                .send_cmd(
+                                    Cmd::Transfer(TransferCmd::RegisterTransfer(debit.clone())),
+                                    Some(src),
+                                )
                                 .await;
                         }
                     }

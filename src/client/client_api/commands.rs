@@ -20,7 +20,7 @@ impl Client {
         cmd: Cmd,
         client_pk: PublicKey,
         signature: Signature,
-        target: Option<SocketAddr>
+        target: Option<SocketAddr>,
     ) -> Result<(), Error> {
         debug!("Sending Cmd: {:?}", cmd);
         let client_sig = ClientSig {
@@ -37,6 +37,7 @@ impl Client {
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
 
-        self.send_signed_command(cmd, client_pk, signature, target).await
+        self.send_signed_command(cmd, client_pk, signature, target)
+            .await
     }
 }

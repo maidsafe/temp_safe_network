@@ -9,10 +9,7 @@
 use super::Session;
 use crate::client::Error;
 use crate::messaging::{
-    client::{
-        ClientMsg, CmdError, Event, ProcessMsg,
-        TransferError,
-    },
+    client::{ClientMsg, CmdError, Event, ProcessMsg, TransferError},
     section_info::{Error as SectionInfoError, GetSectionResponse, SectionInfoMsg},
     MessageId, MessageType, SectionAuthorityProvider, WireMsg,
 };
