@@ -471,8 +471,6 @@ impl Network {
             },
         };
 
-        // let bytes = bincode::serialize(&message)?.into();
-
         let itinerary = Itinerary {
             src: SrcLocation::Node(src),
             dst: DstLocation::Section(dst),
