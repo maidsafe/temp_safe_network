@@ -137,8 +137,6 @@ impl Client {
 
         let transfer_actor = Arc::new(RwLock::new(TransferActor::new(keypair.clone(), elders)));
 
-        let _transfer_actor_for_error_handling = transfer_actor.clone();
-
         let mut client = Self {
             keypair,
             transfer_actor,
@@ -190,12 +188,15 @@ impl Client {
                     for (i, debit) in our_history.debits.iter().enumerate() {
                         if i >= expected as usize {
                             trace!("Sending transfer #${:?} to elder@{:?}", i, src);
-                            let _ = client
+                            if let Err(error) = client
                                 .send_cmd(
                                     Cmd::Transfer(TransferCmd::RegisterTransfer(debit.clone())),
                                     Some(src),
                                 )
-                                .await;
+                                .await
+                            {
+                                error!("Error sending command to update elder with missing debits. {:?}", error)
+                            }
                         }
                     }
                 }
