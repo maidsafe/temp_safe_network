@@ -123,7 +123,11 @@ impl Session {
         let endpoint = self.endpoint()?.clone();
 
         let mut elders: Vec<SocketAddr> = vec![];
-        if let Some(socket) = send_to_specific_elder {
+   let elders = if let Some(socket) = send_to_specific_elder {
+           vec![socket]
+      } else {
+            elders = self.connected_elders.read().await.keys().cloned().collect::<Vec<SocketAddr>>()
+        }
             elders.push(socket)
         } else {
             elders = self.connected_elders.read().await.keys().cloned().collect();
