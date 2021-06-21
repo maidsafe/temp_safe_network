@@ -22,8 +22,7 @@ use self::{
     dispatcher::Dispatcher,
 };
 use crate::messaging::{
-    node::{Peer, RoutingMsg},
-    DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
+    node::Peer, DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
 };
 use crate::routing::core::{join_network, Core};
 use crate::routing::{

@@ -45,10 +45,6 @@ use safe_network::routing::{
     Cache, Config, Error as RoutingError, Event as RoutingEvent, NodeElderChange, Routing,
     TransportConfig,
 };
-use safe_network::{
-    client::Client,
-    messaging::node::{SigShare, SignatureAggregator},
-};
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
