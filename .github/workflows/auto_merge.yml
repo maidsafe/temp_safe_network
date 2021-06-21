@@ -34,7 +34,7 @@ jobs:
         MERGE_METHOD: REBASE
 
     - name: Dependabot Merge
-      uses: ridedott/merge-me-action@master
+      uses: ridedott/merge-me-action@81667e6ae186ddbe6d3c3186d27d91afa7475e2c
       with:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         MERGE_METHOD: REBASE
