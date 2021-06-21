@@ -8,8 +8,8 @@
 
 use super::read_network_conn_info;
 use crate::client::Client;
-use crate::retry_loop_for_pattern;
 use crate::types::{Keypair, Token};
+use crate::{retry_loop, retry_loop_for_pattern};
 use anyhow::Result;
 use std::str::FromStr;
 use std::sync::Once;
@@ -43,6 +43,8 @@ pub async fn create_test_client_with(optional_keypair: Option<Keypair>) -> Resul
     let client = Client::new(optional_keypair.clone(), None, Some(contact_info)).await?;
 
     if optional_keypair.is_none() {
+        // get history, will only be Ok when we have _some_ history, aka test tokens
+        retry_loop!(client.get_history());
         // check we have some balance, 10 test coins
         let _ = retry_loop_for_pattern!(client.get_balance(),
             Ok(balance) if *balance == Token::from_str("10")?)?;
