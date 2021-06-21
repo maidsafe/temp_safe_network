@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::{format_err, Context, Error, Result};
+use anyhow::{anyhow, format_err, Error, Result};
+use bls::PublicKey;
 use futures::{
     future,
     stream::{self, StreamExt},
@@ -39,14 +40,19 @@ use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
-use safe_network::messaging::node::{SigShare, SignatureAggregator};
 use safe_network::messaging::{
+    client::ClientMsg,
+    client::ProcessingError,
     location::{Aggregation, Itinerary},
-    DstLocation, SrcLocation,
+    DstInfo, DstLocation, MessageId, MessageType, SrcLocation, WireMsg,
 };
 use safe_network::routing::{
     Cache, Config, Error as RoutingError, Event as RoutingEvent, NodeElderChange, Routing,
     TransportConfig,
+};
+use safe_network::{
+    client::Client,
+    messaging::node::{SigShare, SignatureAggregator},
 };
 
 // Minimal delay between two consecutive prints of the network status.
@@ -361,7 +367,7 @@ impl Network {
                     }
                 }
                 RoutingEvent::MessageReceived { content, dst, .. } => {
-                    let message: ProbeMessage = bincode::deserialize(&content)?;
+                    let message = WireMsg::from(content)?;
                     let dst = match dst {
                         DstLocation::Section(name) => name,
                         DstLocation::Node(name) => name,
@@ -370,7 +376,8 @@ impl Network {
                         }
                     };
 
-                    self.probe_tracker.receive(&dst, message.sig_share).await;
+                    let dest_section_pk = message.dst_section_pk();
+                    self.probe_tracker.receive(&dst, &dest_section_pk).await;
                 }
                 _ => {
                     // Currently ignore the other event variants. This might change in the future,
@@ -428,8 +435,14 @@ impl Network {
                 .entry(prefix)
                 .or_insert_with(|| prefix.substituted_in(rand::random()));
 
+            let nodes_section_pk = node
+                .section_key(prefix)
+                .await
+                .ok_or(anyhow!("No pk found for our node's section"))?;
             if self.try_send_probe(node, dst).await? {
-                self.probe_tracker.send(*prefix, dst).await;
+                self.probe_tracker
+                    .send(*prefix, dst, nodes_section_pk)
+                    .await;
             }
         }
 
@@ -454,21 +467,16 @@ impl Network {
         // section health to appear lower than it actually is.
         let src = node.name().await;
 
-        // The message dst is unique so we use it also as its indentifier.
-        let bytes = bincode::serialize(&dst)?;
-        let (index, signature_share) = node
-            .sign_as_elder(&bytes, &public_key_set.public_key())
-            .await
-            .with_context(|| format!("failed to sign probe by {}", src))?;
-
-        let message = ProbeMessage {
-            sig_share: SigShare {
-                public_key_set,
-                index,
-                signature_share,
+        // just some valid message
+        let message = MessageType::Client {
+            msg: ClientMsg::ProcessingError(ProcessingError::new(None, None, MessageId::new())),
+            dst_info: DstInfo {
+                dst,
+                dst_section_pk: public_key_set.public_key(),
             },
         };
-        let bytes = bincode::serialize(&message)?.into();
+
+        // let bytes = bincode::serialize(&message)?.into();
 
         let itinerary = Itinerary {
             src: SrcLocation::Node(src),
@@ -476,7 +484,7 @@ impl Network {
             aggregation: Aggregation::None,
         };
 
-        match node.send_message(itinerary, bytes, None).await {
+        match node.send_message(itinerary, message, None).await {
             Ok(()) => Ok(true),
             Err(RoutingError::InvalidSrcLocation) => Ok(false), // node name changed
             Err(error) => {
@@ -759,7 +767,7 @@ struct ProbeMessage {
 
 #[derive(Clone)]
 enum ProbeState {
-    Pending(Arc<Mutex<SignatureAggregator>>),
+    Pending(PublicKey),
     Success,
 }
 
@@ -771,38 +779,32 @@ struct ProbeTracker {
 use futures::executor::block_on as block;
 
 impl ProbeTracker {
-    async fn send(&mut self, src: Prefix, dst: XorName) {
+    async fn send(&mut self, src: Prefix, dst: XorName, current_public_key: PublicKey) {
         let cache = self
             .sections
             .entry(src)
             .or_insert_with(|| Cache::with_expiry_duration(PROBE_WINDOW));
         if cache.get(&dst).await.is_none() {
             cache
-                .set(
-                    dst,
-                    ProbeState::Pending(Arc::new(Mutex::new(SignatureAggregator::new()))),
-                    None,
-                )
+                .set(dst, ProbeState::Pending(current_public_key), None)
                 .await;
         }
     }
 
-    async fn receive(&mut self, dst: &XorName, sig_share: SigShare) {
+    async fn receive(&mut self, dst: &XorName, received_public_key: &PublicKey) {
         let result = &self
             .sections
             .iter()
-            .find_map(|(prefix, cache)| block(cache.get(dst)).map(|state| (prefix, state, cache)));
-        let (_prefix, state, cache) = match result {
+            .find_map(|(prefix, cache)| block(cache.get(dst)).map(|pk| (prefix, pk, cache)));
+        let (_prefix, probe_state, cache) = match result {
             None => return,
             Some(state) => state,
         };
-        let aggregator = match state {
-            ProbeState::Pending(aggregator) => aggregator,
-            ProbeState::Success => return,
-        };
 
-        if aggregator.lock().await.add(dst, sig_share).is_ok() {
-            cache.set(*dst, ProbeState::Success, None).await;
+        if let ProbeState::Pending(pk) = probe_state {
+            if received_public_key == pk {
+                cache.set(*dst, ProbeState::Success, None).await;
+            }
         }
     }
 

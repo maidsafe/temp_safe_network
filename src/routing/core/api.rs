@@ -23,7 +23,6 @@ use crate::routing::{
     section::{NodeStateUtils, SectionAuthorityProviderUtils, SectionUtils},
     Error, Event,
 };
-use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tokio::sync::mpsc;

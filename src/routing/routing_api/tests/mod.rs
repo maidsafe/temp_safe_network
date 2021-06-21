@@ -8,6 +8,7 @@
 
 use super::{Comm, Command, Core, Dispatcher};
 use crate::messaging::{
+    client::{ClientMsg, ProcessingError},
     location::{Aggregation, Itinerary},
     node::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
@@ -15,7 +16,7 @@ use crate::messaging::{
         ResourceProofResponse, RoutingMsg, Section, SectionSigned, SignedRelocateDetails, Variant,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
-    DstInfo, DstLocation, MessageType, SectionAuthorityProvider, SrcLocation,
+    DstInfo, DstLocation, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
 };
 use crate::routing::{
     core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
@@ -40,7 +41,6 @@ use crate::routing::{
 use crate::types::{Keypair, PublicKey};
 use anyhow::Result;
 use assert_matches::assert_matches;
-use bytes::Bytes;
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
 use std::{
@@ -1476,7 +1476,18 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         MessageDst::Node => (DstLocation::Node(*peer.name()), *peer.name()),
         MessageDst::Section => (DstLocation::Section(section_name), section_name),
     };
-    let content = Bytes::from_static(b"hello");
+
+    // nonsense pk
+    let sk_set0 = SecretKeySet::random();
+    let pk0 = sk_set0.secret_key().public_key();
+
+    let content = MessageType::Client {
+        msg: ClientMsg::ProcessingError(ProcessingError::new(None, None, MessageId::new())),
+        dst_info: DstInfo {
+            dst: dst_name,
+            dst_section_pk: pk0,
+        },
+    };
 
     let commands = dispatcher
         .handle_command(Command::SendUserMessage {
@@ -1497,7 +1508,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         assert_eq!(dst_info.dst, dst_name);
         assert_matches!(
             &message.variant,
-            Variant::UserMessage(actual_content) if actual_content.clone() == content
+            Variant::UserMessage(actual_content) if actual_content.clone() == content.serialize()?.to_vec()
         );
     });
 

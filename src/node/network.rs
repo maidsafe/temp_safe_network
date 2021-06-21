@@ -17,7 +17,6 @@ use crate::routing::{
 };
 use crate::types::{PublicKey, Signature, SignatureShare};
 use bls::PublicKeySet;
-use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use rand::{seq::SliceRandom, SeedableRng};
 use secured_linked_list::SecuredLinkedList;
