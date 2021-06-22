@@ -39,21 +39,21 @@ impl Chunks {
         })
     }
 
-    pub fn keys(&self) -> Vec<ChunkAddress> {
-        self.chunk_storage.keys()
+    pub async fn keys(&self) -> Result<Vec<ChunkAddress>> {
+        self.chunk_storage.keys().await
     }
 
     pub async fn remove_chunk(&mut self, address: &ChunkAddress) -> Result<()> {
         self.chunk_storage.delete_chunk(address).await
     }
 
-    pub fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        self.chunk_storage.get_chunk(address)
+    pub async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+        self.chunk_storage.get_chunk(address).await
     }
 
-    pub fn read(&self, read: &ChunkRead, msg_id: MessageId) -> NodeDuty {
+    pub async fn read(&self, read: &ChunkRead, msg_id: MessageId) -> NodeDuty {
         let ChunkRead::Get(address) = read;
-        self.chunk_storage.get(address, msg_id)
+        self.chunk_storage.get(address, msg_id).await
     }
 
     pub async fn write(
