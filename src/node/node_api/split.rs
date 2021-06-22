@@ -131,8 +131,7 @@ impl Node {
         // drop transfers state
         elder
             .transfers
-            .write()
-            .await
+            .read().await
             .keep_keys_of(our_prefix)
             .await?;
 

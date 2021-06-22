@@ -360,7 +360,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .credit_without_proof(transfer)
                             .await?,
@@ -638,7 +638,7 @@ impl Node {
                     Ok(NodeTask::from(
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .process_payment(id, payment, cmd, client_sig, origin)
                             .await?,

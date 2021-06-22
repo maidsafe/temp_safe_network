@@ -100,7 +100,7 @@ impl Transfers {
         self.replicas.user_wallets().await
     }
 
-    pub async fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
+    pub async fn merge(&self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
         self.replicas.merge(user_wallets).await
     }
 
@@ -108,7 +108,7 @@ impl Transfers {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub async fn keep_keys_of(&mut self, prefix: Prefix) -> Result<()> {
+    pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         self.replicas.keep_keys_of(prefix).await
     }

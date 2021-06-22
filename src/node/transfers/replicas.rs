@@ -70,7 +70,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         Ok(instance)
     }
 
-    pub async fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
+    pub async fn merge(&self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
         self.setup(user_wallets).await // TODO: fix this!!!! (this duplciates entries in db)
     }
 
@@ -235,7 +235,7 @@ impl<T: ReplicaSigning> Replicas<T> {
 
     /// Removes keys that are no longer our section responsibility.
     /// Uses mut modifier of self, to protect against races.
-    pub async fn keep_keys_of(&mut self, prefix: Prefix) -> Result<()> {
+    pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         let mut to_remove = vec![];
 
         for entry in &self.stores {

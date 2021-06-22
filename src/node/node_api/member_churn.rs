@@ -84,7 +84,7 @@ impl Node {
         }
 
         // --------- merge in provided user wallets ---------
-        elder.transfers.write().await.merge(user_wallets).await?;
+        elder.transfers.read().await.merge(user_wallets).await?;
         // --------- merge in provided node reward stages ---------
         for (key, (age, wallet)) in &node_wallets {
             elder
