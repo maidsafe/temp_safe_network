@@ -161,10 +161,32 @@ async fn delete() -> Result<()> {
             value: data.clone(),
         };
         data_store.put(the_data).await?;
+
+        let mut used_space = data_store.total_used_space().await;
+
+        while used_space != *size {
+            used_space = data_store.total_used_space().await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+
         assert_eq!(data_store.total_used_space().await, *size);
         assert!(data_store.has(&the_data.id).await);
+
         data_store.delete(&the_data.id).await?;
+
+        while data_store.has(&the_data.id).await {
+
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
         assert!(!data_store.has(&the_data.id).await);
+
+        let mut used_space = data_store.total_used_space().await;
+
+        while used_space != 0 {
+            used_space = data_store.total_used_space().await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        
         assert_eq!(data_store.total_used_space().await, 0);
     }
 
@@ -211,6 +233,16 @@ async fn overwrite_value() -> Result<()> {
                 value: data.clone(),
             })
             .await?;
+
+    
+        let mut used_space = data_store.total_used_space().await;
+
+        while used_space != size {
+            used_space = data_store.total_used_space().await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+    
+
         assert_eq!(data_store.total_used_space().await, size);
         let retrieved_data = data_store.get(&Id(0)).await?;
         assert_eq!(data, retrieved_data.value);
