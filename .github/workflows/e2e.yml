@@ -16,6 +16,7 @@ env:
   # I've seen 30 nodes work on CI atm.
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
+  RUST_LOG: "safe_network=debug"
 
 jobs:
   tests:
@@ -59,7 +60,7 @@ jobs:
           command: build
           args: --release
       
-      - run: RUST_LOG=safe_network=debug ./target/release/launch_network
+      - run: ./target/release/launch_network
 
       - name: Client tests against local network
         shell: bash
