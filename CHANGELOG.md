@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.6](https://github.com/maidsafe/safe_network/compare/v0.2.5...v0.2.6) (2021-06-22)
+
+
+### Features
+
+* **client:** AE for transfer updates to elders ([4c548e1](https://github.com/maidsafe/safe_network/commit/4c548e191a5ff1847894b36d3efc0649ddb0fb1f))
+
 ### [0.2.5](https://github.com/maidsafe/safe_network/compare/v0.2.4...v0.2.5) (2021-06-21)
 
 
