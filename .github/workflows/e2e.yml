@@ -5,10 +5,6 @@
 name: E2E
 
 on: pull_request
-# on: '
-#   pull_request:
-#     paths: 
-#       - 'clienttt/*''
 
 env:
   # Run all cargo commands with --verbose.
@@ -63,7 +59,7 @@ jobs:
           command: build
           args: --release
       
-      - run: ./target/release/launch_network
+      - run: RUST_LOG=safe_network=debug ./target/release/launch_network
 
       - name: Client tests against local network
         shell: bash

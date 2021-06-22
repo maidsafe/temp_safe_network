@@ -254,40 +254,32 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == Token::from_str("10")?);
+        let mut count = 0u32;
 
-        let _ = retry_loop!(client.send_tokens(keypair2.public_key(), Token::from_str("1")?));
+        let mut correct_balance = Token::from_str("10")?;
+        let amount_to_send = Token::from_nano(10);
+        // Infinite loop
+        loop {
+            count += 1;
+            let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
 
-        // Initial 10 token on creation from farming simulation minus 1
-        // Assert locally
-        assert_eq!(client.get_local_balance().await, Token::from_str("9")?);
+            let _ = retry_loop!(client.send_tokens(keypair2.public_key(), amount_to_send));
 
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == Token::from_str("9")?);
+            correct_balance = correct_balance.checked_sub(amount_to_send).ok_or_else(|| anyhow!("No more money to send"))?;
 
-        let _ = retry_loop!(client.send_tokens(keypair2.public_key(), Token::from_str("1")?));
+            // Initial 10 token on creation from farming simulation minus 1
+            // Assert locally
+            assert_eq!(client.get_local_balance().await, correct_balance);
 
-        // Initial 10 on creation from farming simulation minus 3
-        assert_eq!(client.get_local_balance().await, Token::from_str("8")?);
+            let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
 
-        // Fetch balance from network and assert the same.
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == Token::from_str("8")?);
+            if count == 50 {
+                break
+            }
+        }
 
-        let _ = retry_loop!(client.send_tokens(keypair2.public_key(), Token::from_str("1")?));
-
-        // Initial 10 on creation from farming simulation minus 3
-        assert_eq!(client.get_local_balance().await, Token::from_str("7")?);
-
-        // Fetch balance from network and assert the same.
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == Token::from_str("7")?);
-
-        let _ = retry_loop!(client.send_tokens(keypair2.public_key(), Token::from_str("1")?));
-
-        // Initial 10 on creation from farming simulation minus 3
-        assert_eq!(client.get_local_balance().await, Token::from_str("6")?);
-
-        // Fetch balance from network and assert the same.
-        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == Token::from_str("6")?);
-
+       
+        
         Ok(())
     }
 
