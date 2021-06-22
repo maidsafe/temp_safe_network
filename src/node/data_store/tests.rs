@@ -175,7 +175,6 @@ async fn delete() -> Result<()> {
         data_store.delete(&the_data.id).await?;
 
         while data_store.has(&the_data.id).await {
-
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
         assert!(!data_store.has(&the_data.id).await);
@@ -186,7 +185,7 @@ async fn delete() -> Result<()> {
             used_space = data_store.total_used_space().await;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
-        
+
         assert_eq!(data_store.total_used_space().await, 0);
     }
 
@@ -234,14 +233,12 @@ async fn overwrite_value() -> Result<()> {
             })
             .await?;
 
-    
         let mut used_space = data_store.total_used_space().await;
 
         while used_space != size {
             used_space = data_store.total_used_space().await;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
-    
 
         assert_eq!(data_store.total_used_space().await, size);
         let retrieved_data = data_store.get(&Id(0)).await?;
