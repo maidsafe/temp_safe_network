@@ -387,10 +387,7 @@ impl Session {
 
         let response = loop {
             let mut error_response = None;
-            match (
-                receiver.recv().await,
-                chunk_addr,
-            ) {
+            match (receiver.recv().await, chunk_addr) {
                 (Some(QueryResponse::GetChunk(Ok(blob))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
