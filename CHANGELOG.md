@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.7](https://github.com/maidsafe/safe_network/compare/v0.2.6...v0.2.7) (2021-06-22)
+
+
+### Bug Fixes
+
+* Commit modified Cargo.lock ([545eaab](https://github.com/maidsafe/safe_network/commit/545eaab36cecdbd283f5502647d6e2cdd3f21cff))
+
 ### [0.2.6](https://github.com/maidsafe/safe_network/compare/v0.2.5...v0.2.6) (2021-06-22)
 
 
