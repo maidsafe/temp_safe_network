@@ -14,6 +14,7 @@ use crate::node::{
     capacity::CHUNK_COPY_COUNT,
     chunks::Chunks,
     node_ops::{NodeDuties, NodeDuty},
+    Result,
 };
 use crate::routing::XorName;
 use crate::types::{Chunk, ChunkAddress};
@@ -36,8 +37,8 @@ impl AdultRole {
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
-    ) -> NodeDuties {
-        let keys = self.chunks.read().await.keys();
+    ) -> Result<NodeDuties> {
+        let keys = self.chunks.read().await.keys().await?;
         let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
             if let Some((data, holders)) = self
@@ -47,7 +48,7 @@ impl AdultRole {
                 let _ = data_for_replication.insert(data, holders);
             }
         }
-        data_for_replication
+        Ok(data_for_replication
             .into_iter()
             .map(|(data, targets)| NodeDuty::SendToNodes {
                 msg: NodeMsg::NodeCmd {
@@ -57,7 +58,7 @@ impl AdultRole {
                 targets,
                 aggregation: Aggregation::None,
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>())
     }
 
     async fn republish_and_cache(
@@ -80,7 +81,7 @@ impl AdultRole {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             info!("Republishing chunk at {:?}", address);
             trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let chunk = self.chunks.read().await.get_chunk(address).ok()?;
+            let chunk = self.chunks.read().await.get_chunk(address).await.ok()?;
             if we_are_not_holder_anymore {
                 if let Err(err) = self.chunks.write().await.remove_chunk(address).await {
                     warn!("Error deleting chunk during republish: {:?}", err);

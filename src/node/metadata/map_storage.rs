@@ -21,6 +21,7 @@ use crate::types::{
 };
 use log::{debug, info};
 use std::{
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
 };
@@ -36,17 +37,18 @@ impl MapStorage {
         Ok(Self { chunks })
     }
 
-    pub(super) fn get_data_of(&self, prefix: Prefix) -> MapDataExchange {
+    pub(super) async fn get_data_of(&self, prefix: Prefix) -> Result<MapDataExchange> {
         let store = &self.chunks;
-        let data = self
-            .chunks
-            .keys()
-            .iter()
-            .filter(|address| prefix.matches(address.name()))
-            .filter_map(|key| store.get(&key).ok())
-            .map(|map| (*map.address(), map))
-            .collect();
-        MapDataExchange(data)
+        let keys = self.chunks.keys().await?;
+
+        let mut the_data = BTreeMap::default();
+
+        for data in keys.iter().filter(|address| prefix.matches(address.name())) {
+            let data = store.get(&data).await?;
+            let _ = the_data.insert(*data.address(), data);
+        }
+
+        Ok(MapDataExchange(the_data))
     }
 
     pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
@@ -133,13 +135,13 @@ impl MapStorage {
     /// Returns `Some(Result<..>)` if the flow should be continued, returns
     /// `None` if there was a logic error encountered and the flow should be
     /// terminated.
-    fn get_chunk(
+    async fn get_chunk(
         &self,
         address: &MapAddress,
         requester: PublicKey,
         action: MapAction,
     ) -> Result<Map> {
-        self.chunks.get(&address).and_then(move |map| {
+        self.chunks.get(&address).await.and_then(move |map| {
             map.check_permissions(action, &requester)
                 .map(move |_| map)
                 .map_err(|error| error.into())
@@ -157,7 +159,7 @@ impl MapStorage {
     where
         F: FnOnce(Map) -> NdResult<Map>,
     {
-        let result = match self.chunks.get(address) {
+        let result = match self.chunks.get(address).await {
             Ok(data) => match mutation_fn(data) {
                 Ok(map) => self.chunks.put(&map).await,
                 Err(error) => Err(error.into()),
@@ -170,7 +172,7 @@ impl MapStorage {
 
     /// Put Map.
     async fn create(&mut self, data: &Map, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        let result = if self.chunks.has(data.address()) {
+        let result = if self.chunks.has(data.address()).await {
             Err(Error::DataExists)
         } else {
             self.chunks.put(&data).await
@@ -185,7 +187,7 @@ impl MapStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.chunks.get(&address) {
+        let result = match self.chunks.get(&address).await {
             Ok(map) => match map.check_is_owner(&requester) {
                 Ok(()) => {
                     info!("Deleting Map");
@@ -244,7 +246,7 @@ impl MapStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.get_chunk(&address, requester, MapAction::Read) {
+        let result = match self.get_chunk(&address, requester, MapAction::Read).await {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)),
         };
@@ -266,6 +268,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(&address, requester, MapAction::Read)
+            .await
             .map(|data| data.shell())
         {
             Ok(res) => Ok(res),
@@ -289,6 +292,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(&address, requester, MapAction::Read)
+            .await
             .map(|data| data.version())
         {
             Ok(res) => Ok(res),
@@ -311,7 +315,7 @@ impl MapStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let res = self.get_chunk(&address, requester, MapAction::Read);
+        let res = self.get_chunk(&address, requester, MapAction::Read).await;
         let result = match res.and_then(|data| match data {
             Map::Seq(map) => map
                 .get(key)
@@ -345,6 +349,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(&address, requester, MapAction::Read)
+            .await
             .map(|data| data.keys())
         {
             Ok(res) => Ok(res),
@@ -366,7 +371,7 @@ impl MapStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let res = self.get_chunk(&address, requester, MapAction::Read);
+        let res = self.get_chunk(&address, requester, MapAction::Read).await;
         let result = match res.map(|data| match data {
             Map::Seq(map) => map.values().into(),
             Map::Unseq(map) => map.values().into(),
@@ -390,7 +395,7 @@ impl MapStorage {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let res = self.get_chunk(&address, requester, MapAction::Read);
+        let res = self.get_chunk(&address, requester, MapAction::Read).await;
         let result = match res.map(|data| match data {
             Map::Seq(map) => map.entries().clone().into(),
             Map::Unseq(map) => map.entries().clone().into(),
@@ -416,6 +421,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(&address, requester, MapAction::Read)
+            .await
             .map(|data| data.permissions())
         {
             Ok(res) => Ok(res),
@@ -440,6 +446,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(&address, requester, MapAction::Read)
+            .await
             .and_then(|data| {
                 data.user_permissions(&user)
                     .map_err(|e| e.into())
