@@ -30,8 +30,6 @@ const NUMBER_OF_RETRIES: usize = 3;
 // Number of Elders subset to send queries to
 const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
-const QUERY_TIMEOUT_SECONDS: u64 = 3 * 60;
-
 impl Session {
     /// Bootstrap to the network maintaining connections to several nodes.
     pub async fn bootstrap(&mut self, client_pk: PublicKey) -> Result<(), Error> {
@@ -390,10 +388,10 @@ impl Session {
         let response = loop {
             let mut error_response = None;
             match (
-                timeout(Duration::from_secs(QUERY_TIMEOUT_SECONDS), receiver.recv()).await,
+                receiver.recv().await,
                 chunk_addr,
             ) {
-                (Ok(Some(QueryResponse::GetChunk(Ok(blob)))), Some(chunk_addr)) => {
+                (Some(QueryResponse::GetChunk(Ok(blob))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
                     debug!("Chunk QueryResponse received is: {:#?}", blob);
@@ -421,39 +419,32 @@ impl Session {
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whicever was last received)
-                (Ok(response @ Some(QueryResponse::GetChunk(Err(_)))), Some(_))
-                | (Ok(response @ Some(QueryResponse::GetBalance(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetMap(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetRegister(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetSequence(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetStoreCost(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetMapShell(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetMapValue(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetMapVersion(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetRegisterPolicy(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetRegisterOwner(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetSequenceLastEntry(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetSequencePrivatePolicy(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetSequencePublicPolicy(Err(_)))), None)
-                | (Ok(response @ Some(QueryResponse::GetSequenceRange(Err(_)))), None) => {
+                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
+                | (response @ Some(QueryResponse::GetBalance(Err(_))), None)
+                | (response @ Some(QueryResponse::GetMap(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegister(Err(_))), None)
+                | (response @ Some(QueryResponse::GetSequence(Err(_))), None)
+                | (response @ Some(QueryResponse::GetStoreCost(Err(_))), None)
+                | (response @ Some(QueryResponse::GetMapShell(Err(_))), None)
+                | (response @ Some(QueryResponse::GetMapValue(Err(_))), None)
+                | (response @ Some(QueryResponse::GetMapVersion(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegisterPolicy(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegisterOwner(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None)
+                | (response @ Some(QueryResponse::GetSequenceLastEntry(Err(_))), None)
+                | (response @ Some(QueryResponse::GetSequencePrivatePolicy(Err(_))), None)
+                | (response @ Some(QueryResponse::GetSequencePublicPolicy(Err(_))), None)
+                | (response @ Some(QueryResponse::GetSequenceRange(Err(_))), None) => {
                     debug!("QueryResponse error received (but may be overridden by a non-error reponse from another elder): {:#?}", &response);
                     error_response = response;
                     responses_discarded += 1;
                 }
-                (Ok(Some(response)), _) => {
+                (Some(response), _) => {
                     debug!("QueryResponse received is: {:#?}", response);
                     break Some(response);
                 }
-                (Ok(None), _) => {
+                (None, _) => {
                     debug!("QueryResponse channel closed.");
-                    break None;
-                }
-                (Err(error), _) => {
-                    error!(
-                        "Timeout while waiting for response to client request w/ id {:?}: {:?}",
-                        &msg_id, &error
-                    );
                     break None;
                 }
             }
