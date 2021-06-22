@@ -791,7 +791,6 @@ mod tests {
         let balance_before_delete = retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("10")?)?;
 
         client.delete_sequence(sequence_address).await?;
-        let mut new_balance = client.get_balance().await?;
 
         // now let's ensure we've paid _something_
         let _ =
@@ -830,8 +829,6 @@ mod tests {
         let address = client
             .store_public_sequence(None, name, tag, owner, perms)
             .await?;
-
-        let mut seq_res = client.get_sequence(address).await;
 
         let sequence = retry_loop!(client.get_sequence(address));
 
@@ -995,15 +992,15 @@ mod tests {
             .await?;
 
         // append to the data the data
-        let seq_res = retry_loop!(client.append_to_sequence(address, b"VALUE1".to_vec()));
+        let _ = retry_loop!(client.append_to_sequence(address, b"VALUE1".to_vec()));
         // now check last entry
-        let (mut index, mut data) = retry_loop!(client.get_sequence_last_entry(address));
+        let (index, data) = retry_loop!(client.get_sequence_last_entry(address));
 
         assert_eq!(0, index);
         assert_eq!(std::str::from_utf8(&data)?, "VALUE1");
 
         // append to the data the data
-        let seq_res = retry_loop!(client.append_to_sequence(address, b"VALUE2".to_vec()));
+        let _ = retry_loop!(client.append_to_sequence(address, b"VALUE2".to_vec()));
 
         // and then lets check last entry
         let (mut index, mut data) = retry_loop!(client.get_sequence_last_entry(address));
