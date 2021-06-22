@@ -94,7 +94,7 @@ impl Node {
                 .set_node_wallet(*key, *wallet, *age)
         }
         // --------- merge in provided metadata ---------
-        elder.meta_data.write().await.update(metadata).await?;
+        elder.meta_data.update(metadata).await?;
 
         *elder.received_initial_sync.write().await = true;
 

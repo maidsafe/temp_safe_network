@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 #[derive(Clone)]
 pub(crate) struct ElderRole {
     // data operations
-    pub meta_data: Arc<RwLock<Metadata>>,
+    pub meta_data: Arc<Metadata>,
     // transfers
     pub transfers: Arc<RwLock<Transfers>>,
     // reward payouts
@@ -30,7 +30,7 @@ impl ElderRole {
         received_initial_sync: bool,
     ) -> Self {
         ElderRole {
-            meta_data: Arc::new(RwLock::new(meta_data)),
+            meta_data: Arc::new(meta_data),
             transfers: Arc::new(RwLock::new(transfers)),
             section_funds: Arc::new(RwLock::new(section_funds)),
             received_initial_sync: Arc::new(RwLock::new(received_initial_sync)),
