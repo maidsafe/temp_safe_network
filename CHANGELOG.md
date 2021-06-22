@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.8](https://github.com/maidsafe/safe_network/compare/v0.2.7...v0.2.8) (2021-06-22)
+
+
+### Bug Fixes
+
+* fmt ([499f7dd](https://github.com/maidsafe/safe_network/commit/499f7dda37151a3ab26d6bca4f44108b89909b97))
+* remove the client timeout ([96b78c5](https://github.com/maidsafe/safe_network/commit/96b78c50f25339c3c974bb28a0247e8f51b9e2e8))
+
 ### [0.2.7](https://github.com/maidsafe/safe_network/compare/v0.2.6...v0.2.7) (2021-06-22)
 
 
