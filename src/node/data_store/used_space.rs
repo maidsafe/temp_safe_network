@@ -8,7 +8,7 @@
 
 use crate::node::{Error, Result};
 use std::{path::Path, sync::Arc};
-use tokio::{io::AsyncSeekExt, sync::Mutex};
+use tokio::{io::AsyncSeekExt, sync::RwLock};
 
 const USED_SPACE_FILENAME: &str = "used_space";
 
@@ -16,7 +16,7 @@ const USED_SPACE_FILENAME: &str = "used_space";
 /// an in-memory record of the total space used by all `DataStore`s.
 #[derive(Debug)]
 pub struct UsedSpace {
-    inner: Arc<Mutex<inner::UsedSpace>>,
+    inner: Arc<RwLock<inner::UsedSpace>>,
 }
 
 /// Identifies a `DataStore` within the larger
@@ -31,20 +31,20 @@ impl UsedSpace {
     /// consistency across local `DataStore`s
     pub fn new(max_capacity: u64) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(inner::UsedSpace::new(max_capacity))),
+            inner: Arc::new(RwLock::new(inner::UsedSpace::new(max_capacity))),
         }
     }
 
     /// Clears the entire storage and sets total_value back to zero
     /// while removing all local stores
     pub async fn reset(&self) -> Result<()> {
-        self.inner.lock().await.reset().await
+        self.inner.write().await.reset().await
     }
 
     /// Returns the maximum capacity (e.g. the maximum
     /// value that total() can return)
     pub async fn max_capacity(&self) -> u64 {
-        self.inner.lock().await.max_capacity()
+        self.inner.read().await.max_capacity()
     }
 
     /// Returns the total used space as a snapshot
@@ -52,7 +52,7 @@ impl UsedSpace {
     /// may be stale by the time it is read if there are multiple
     /// writers
     pub async fn total(&self) -> u64 {
-        self.inner.lock().await.total()
+        self.inner.read().await.total()
     }
 
     /// Returns the used space of a local store as a snapshot
@@ -61,24 +61,24 @@ impl UsedSpace {
     /// writers
     #[allow(dead_code)]
     pub async fn local(&self, id: StoreId) -> u64 {
-        self.inner.lock().await.local(id)
+        self.inner.read().await.local(id)
     }
 
     /// Add an object and file store to track used space of a single
     /// `DataStore`
     #[allow(dead_code)]
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
-        self.inner.lock().await.add_local_store(dir).await
+        self.inner.write().await.add_local_store(dir).await
     }
 
     /// Increase the used amount of a single chunk store and the global used value
     pub async fn increase(&self, id: StoreId, consumed: u64) -> Result<()> {
-        self.inner.lock().await.increase(id, consumed).await
+        self.inner.write().await.increase(id, consumed).await
     }
 
     /// Decrease the used amount of a single chunk store and the global used value
     pub async fn decrease(&self, id: StoreId, released: u64) -> Result<()> {
-        self.inner.lock().await.decrease(id, released).await
+        self.inner.write().await.decrease(id, released).await
     }
 }
 
