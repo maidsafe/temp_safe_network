@@ -261,25 +261,27 @@ mod tests {
         // Infinite loop
         loop {
             count += 1;
-            let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
+            let _ =
+                retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
 
             let _ = retry_loop!(client.send_tokens(keypair2.public_key(), amount_to_send));
 
-            correct_balance = correct_balance.checked_sub(amount_to_send).ok_or_else(|| anyhow!("No more money to send"))?;
+            correct_balance = correct_balance
+                .checked_sub(amount_to_send)
+                .ok_or_else(|| anyhow!("No more money to send"))?;
 
             // Initial 10 token on creation from farming simulation minus 1
             // Assert locally
             assert_eq!(client.get_local_balance().await, correct_balance);
 
-            let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
+            let _ =
+                retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
 
             if count == 50 {
-                break
+                break;
             }
         }
 
-       
-        
         Ok(())
     }
 
