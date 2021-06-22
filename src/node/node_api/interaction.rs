@@ -129,12 +129,7 @@ pub(crate) async fn push_state(
         .filter(|(name, _)| prefix.matches(name))
         .collect();
     // Create an aggregated map of all the metadata of the provided prefix
-    let metadata = elder
-        .meta_data
-        .read()
-        .await
-        .get_data_exchange_packet(prefix)
-        .await?;
+    let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
 
     Ok(NodeDuty::SendToNodes {
         msg: NodeMsg::NodeCmd {
