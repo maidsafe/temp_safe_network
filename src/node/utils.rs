@@ -20,7 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::io::Write;
 use std::{fs, path::Path};
 
-const NODE_MODULE_NAME: &str = "sn_node";
+const MODULE_NAME: &str = "safe_network";
 
 /// Easily create a `BTreeSet`.
 #[macro_export]
@@ -112,7 +112,7 @@ pub fn init_logging(config: &Config) -> Result<LoggerHandle> {
     };
 
     let level_filter = config.verbose().to_level_filter();
-    let module_log_filter = format!("{}={}", NODE_MODULE_NAME, level_filter.to_string());
+    let module_log_filter = format!("{}={}", MODULE_NAME, level_filter.to_string());
     let logger = Logger::try_with_env_or_str(module_log_filter)
         .map_err(|e| Error::Configuration(format!("{:?}", e)))?
         .format(do_format)
