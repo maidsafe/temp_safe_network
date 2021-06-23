@@ -143,6 +143,7 @@ impl Core {
 
     pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
         if wire_msg.is_join_request() {
+            info!("Not filtering JoinRequest");
             return true;
         }
         self.msg_filter.add_to_filter(&wire_msg.msg_id()).await

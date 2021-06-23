@@ -116,7 +116,7 @@ impl Core {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
                 commands.push(self.send_node_approval(old_info.clone())?);
-                commands.extend(self.relocate_rejoining_peer(&old_info.value.peer, new_age)?);
+                commands.extend(self.relocate_rejoining_peer(&new_info.peer, new_age)?);
 
                 return Ok(commands);
             }

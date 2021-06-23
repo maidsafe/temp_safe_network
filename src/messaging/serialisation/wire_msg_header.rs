@@ -327,6 +327,7 @@ const SECTION_INFO_KIND: u8 = 0x00;
 const CLIENT_MSG_KIND: u8 = 0x01;
 const ROUTING_MSG_KIND: u8 = 0x02;
 const NODE_MSG_KIND: u8 = 0x03;
+const JOIN_REQUEST_MSG_KIND: u8 = 0x04;
 
 impl TryFrom<u8> for MessageKind {
     type Error = Error;
@@ -337,6 +338,7 @@ impl TryFrom<u8> for MessageKind {
             CLIENT_MSG_KIND => Ok(Self::Client),
             ROUTING_MSG_KIND => Ok(Self::Routing),
             NODE_MSG_KIND => Ok(Self::Node),
+            JOIN_REQUEST_MSG_KIND => Ok(Self::JoinRequest),
             other => Err(Error::UnsupportedMessageKind(other)),
         }
     }
@@ -347,8 +349,9 @@ impl From<MessageKind> for u8 {
         match kind {
             MessageKind::SectionInfo => SECTION_INFO_KIND,
             MessageKind::Client => CLIENT_MSG_KIND,
-            MessageKind::Routing | MessageKind::JoinRequest => ROUTING_MSG_KIND,
+            MessageKind::Routing => ROUTING_MSG_KIND,
             MessageKind::Node => NODE_MSG_KIND,
+            MessageKind::JoinRequest => JOIN_REQUEST_MSG_KIND,
         }
     }
 }
@@ -365,6 +368,7 @@ mod tests {
             (MessageKind::Client, CLIENT_MSG_KIND),
             (MessageKind::Routing, ROUTING_MSG_KIND),
             (MessageKind::Node, NODE_MSG_KIND),
+            (MessageKind::JoinRequest, JOIN_REQUEST_MSG_KIND),
         ] {
             assert_eq!(kind as u8, byte);
             assert_eq!(MessageKind::try_from(byte)?, kind);
