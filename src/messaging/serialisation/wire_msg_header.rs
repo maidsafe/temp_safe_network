@@ -318,7 +318,7 @@ pub(crate) enum MessageKind {
     Client,
     Routing,
     Node,
-    Joins,
+    JoinRequest,
 }
 
 // Bytes values used for each of the kind of messages
@@ -347,7 +347,7 @@ impl From<MessageKind> for u8 {
         match kind {
             MessageKind::SectionInfo => SECTION_INFO_KIND,
             MessageKind::Client => CLIENT_MSG_KIND,
-            MessageKind::Routing | MessageKind::Joins => ROUTING_MSG_KIND,
+            MessageKind::Routing | MessageKind::JoinRequest => ROUTING_MSG_KIND,
             MessageKind::Node => NODE_MSG_KIND,
         }
     }
