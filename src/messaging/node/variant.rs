@@ -16,7 +16,7 @@ use super::{
     signed::SigShare,
     RoutingMsg,
 };
-use crate::messaging::{DstInfo, SectionAuthorityProvider};
+use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use hex_fmt::HexFmt;
@@ -28,6 +28,17 @@ use std::{
     fmt::{self, Debug, Formatter},
 };
 use xor_name::XorName;
+
+/// Message destination information
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Ord, PartialOrd, Eq)]
+pub struct DstInfo {
+    /// destination xorname
+    pub dst: XorName,
+    /// Destination section pk
+    /// This is used to check we are communicating with the correct section.
+    /// An out of date key here will result in Anti-Entropy updates being received.
+    pub dst_section_pk: BlsPublicKey,
+}
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]

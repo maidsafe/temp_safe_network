@@ -54,6 +54,7 @@ impl SectionInfoMsg {
         dst: XorName,
         dst_section_pk: BlsPublicKey,
     ) -> crate::messaging::Result<Bytes> {
-        WireMsg::serialize_section_info_msg(self, dst, dst_section_pk)
+        unimplemented!();
+        //WireMsg::serialize_section_info_msg(self, dst, dst_section_pk)
     }
 }
