@@ -788,7 +788,7 @@ mod tests {
 
         let _ =
             retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("0")?);
-        let balance_before_delete = retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("10")?)?;
+        let balance_before_delete = retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("10")? && *bal != Token::from_str("0")?)?;
 
         client.delete_sequence(sequence_address).await?;
 
