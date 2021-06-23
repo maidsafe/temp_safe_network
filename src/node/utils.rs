@@ -10,7 +10,9 @@
 
 use crate::node::{config_handler::Config, Error, Result};
 use bytes::Bytes;
-use flexi_logger::{Cleanup, Criterion, DeferredNow, FileSpec, Logger, LoggerHandle, Naming};
+use flexi_logger::{
+    Cleanup, Criterion, DeferredNow, FileSpec, Logger, LoggerHandle, Naming, WriteMode,
+};
 use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -114,6 +116,7 @@ pub fn init_logging(config: &Config) -> Result<LoggerHandle> {
     let logger = Logger::try_with_env_or_str(module_log_filter)
         .map_err(|e| Error::Configuration(format!("{:?}", e)))?
         .format(do_format)
+        .write_mode(WriteMode::Async)
         .rotate(
             Criterion::Size(1024 * 1024), // 1 mb
             Naming::Numbers,
