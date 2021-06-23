@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.11](https://github.com/maidsafe/safe_network/compare/v0.2.10...v0.2.11) (2021-06-23)
+
+
+### Bug Fixes
+
+* **updater:** point self_update to new repo name ([73c52e1](https://github.com/maidsafe/safe_network/commit/73c52e13cd39198620fbab0e3d11fd9ced3688ba))
+
 ### [0.2.10](https://github.com/maidsafe/safe_network/compare/v0.2.9...v0.2.10) (2021-06-23)
 
 
