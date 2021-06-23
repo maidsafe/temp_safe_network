@@ -162,13 +162,19 @@ async fn delete() -> Result<()> {
         };
         data_store.put(the_data).await?;
 
-        let mut used_space = data_store.total_used_space().await;
         while !data_store.has(&the_data.id).await {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        while used_space != *size {
-            used_space = data_store.total_used_space().await;
+        loop {
+            let used_space = data_store.total_used_space().await;
+            println!(
+                "-----looping used : {:?} tesrget size: {:?}",
+                used_space, size
+            );
+            if &used_space == size {
+                break;
+            }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
@@ -182,11 +188,16 @@ async fn delete() -> Result<()> {
         }
         assert!(!data_store.has(&the_data.id).await);
 
-        let mut used_space = data_store.total_used_space().await;
+        loop {
+            let used_space = data_store.total_used_space().await;
+            println!(
+                "--222222222---looping used : {:?} tesrget size: {:?}",
+                used_space, 0
+            );
 
-        while used_space != 0 {
-            used_space = data_store.total_used_space().await;
-
+            if used_space == 0 {
+                break;
+            }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
@@ -241,10 +252,11 @@ async fn overwrite_value() -> Result<()> {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
-        let mut used_space = data_store.total_used_space().await;
-
-        while used_space != size {
-            used_space = data_store.total_used_space().await;
+        loop {
+            let used_space = data_store.total_used_space().await;
+            if used_space == size {
+                break;
+            }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
 
