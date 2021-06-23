@@ -786,8 +786,6 @@ mod tests {
         let sequence_address =
             retry_loop!(client.store_private_sequence(None, name, tag, owner, perms.clone()));
 
-        let _ =
-            retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("0")?);
         let balance_before_delete = retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("10")? && *bal != Token::from_str("0")?)?;
 
         client.delete_sequence(sequence_address).await?;
