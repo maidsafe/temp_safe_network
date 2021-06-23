@@ -11,7 +11,7 @@
 use crate::{Error, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 
-use sn_data_types::{Error as SafeNdError, PublicKey, Token};
+use safe_network::types::{Error as SafeNdError, PublicKey, Token};
 use std::{
     str::{self, FromStr},
     time,

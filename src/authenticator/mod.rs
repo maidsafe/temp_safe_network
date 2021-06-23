@@ -19,12 +19,12 @@ use hmac::Hmac;
 use log::{debug, info, trace};
 use rand::rngs::{OsRng, StdRng};
 use rand_core::SeedableRng;
-use sha3::Sha3_256;
 use safe_network::client::{client_api::Client, Error as ClientError, ErrorMessage::NoSuchEntry};
-use sn_data_types::{
+use safe_network::types::{
     Keypair, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapSeqEntryActions,
     MapValue, Token,
 };
+use sha3::Sha3_256;
 use std::{
     collections::{BTreeMap, HashSet},
     net::SocketAddr,
@@ -534,7 +534,7 @@ mod tests {
     use super::*;
     use anyhow::{Context, Result};
     use proptest::prelude::*;
-    use sn_data_types::PublicKey;
+    use safe_network::types::PublicKey;
 
     #[test]
     fn get_deterministic_pk_from_known_seed() -> Result<()> {

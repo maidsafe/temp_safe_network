@@ -14,9 +14,9 @@ use super::{
 use crate::{Error, Result, Safe};
 use hex::encode;
 use log::debug;
+use safe_network::types::{Keypair, MapValue, Token};
+use safe_network::url::{SafeContentType, SafeDataType, SafeUrl, XorUrl};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Keypair, MapValue, Token};
-use sn_url::{SafeContentType, SafeDataType, SafeUrl, XorUrl};
 use std::collections::BTreeMap;
 use xor_name::XorName;
 

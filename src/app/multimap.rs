@@ -10,7 +10,7 @@
 use super::register::EntryHash;
 use crate::{Error, Result, Safe};
 use log::debug;
-use sn_url::{SafeContentType, SafeUrl, XorUrl};
+use safe_network::url::{SafeContentType, SafeUrl, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 

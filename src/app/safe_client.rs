@@ -12,7 +12,7 @@ use crate::{ipc::BootstrapConfig, Error, Result};
 use hex::encode;
 use log::{debug, info};
 use safe_network::client::{Client, Error as ClientError, ErrorMessage, TransfersError};
-use sn_data_types::{
+use safe_network::types::{
     register::{Address, Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     ChunkAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,

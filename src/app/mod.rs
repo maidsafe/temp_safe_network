@@ -19,7 +19,7 @@ mod test_helpers;
 use super::{common, constants, Result};
 use rand::rngs::OsRng;
 use safe_client::SafeAppClient;
-use sn_data_types::Keypair;
+use safe_network::types::Keypair;
 use std::time::Duration;
 
 static DEFAULT_TIMEOUT_SECS: u64 = 20;
@@ -34,7 +34,7 @@ pub mod register;
 pub mod wallet;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_coins_amount;
-pub use sn_url::*;
+pub use safe_network::url::*;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 #[derive(Clone)]

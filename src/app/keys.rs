@@ -15,7 +15,7 @@ use super::{
 use crate::{Error, Result};
 use hex::encode;
 use rand::rngs::OsRng;
-use sn_data_types::{Keypair, SecretKey, Token};
+use safe_network::types::{Keypair, SecretKey, Token};
 use xor_name::XorName;
 
 impl Safe {

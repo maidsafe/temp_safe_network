@@ -7,11 +7,11 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-pub use sn_data_types::register::{Entry, EntryHash};
+pub use safe_network::types::register::{Entry, EntryHash};
 
 use crate::{Error, Result, Safe};
 use log::debug;
-use sn_url::{SafeContentType, SafeUrl, XorUrl};
+use safe_network::url::{SafeContentType, SafeUrl, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
