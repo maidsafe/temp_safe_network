@@ -10,7 +10,7 @@
 
 use crate::node::{config_handler::Config, Error, Result};
 use bytes::Bytes;
-use flexi_logger::{Cleanup, Criterion, DeferredNow, FileSpec, Logger, Naming};
+use flexi_logger::{Cleanup, Criterion, DeferredNow, FileSpec, Logger, LoggerHandle, Naming};
 use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -91,7 +91,7 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 }
 
 /// Initialize logging
-pub fn init_logging(config: &Config) -> Result<()> {
+pub fn init_logging(config: &Config) -> Result<LoggerHandle> {
     // Custom formatter for logs
     let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
         let handle = std::thread::current();
@@ -126,15 +126,7 @@ pub fn init_logging(config: &Config) -> Result<()> {
         logger
     };
 
-    if let Ok((logger, _)) = logger.build() {
-        let logger = LoggerWrapper(logger);
-
-        async_log::Logger::wrap(logger, || 5433)
-            .start(config.verbose().to_level_filter())
-            .unwrap_or(());
-    }
-
-    Ok(())
+    logger.start().map_err(Error::from)
 }
 
 struct LoggerWrapper(Box<dyn Log>);

@@ -27,7 +27,6 @@ chaos = [ ]
 always-joinable = [ ]
 
 [dependencies]
-async-log = "2.0.0"
 base64 = "~0.10.1"
 flexi_logger = { version = "0.18", features = ["async"] }
 hex = "~0.3.2"
