@@ -11,6 +11,7 @@ use crate::messaging::node::{
     JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
     JoinResponse, Peer, Variant,
 };
+use crate::routing::network::NetworkUtils;
 use crate::routing::{
     core::RoutingMsgUtils,
     error::Result,
@@ -54,9 +55,9 @@ impl Core {
                 self.section.prefix()
             );
 
-            let variant = Variant::JoinResponse(Box::new(JoinResponse::Retry(
-                self.section.authority_provider().clone(),
-            )));
+            let redirect_sap = self.network.section_by_name(peer.name())?;
+
+            let variant = Variant::JoinResponse(Box::new(JoinResponse::Redirect(redirect_sap)));
             trace!("Sending {:?} to {}", variant, peer);
             return Ok(vec![self.send_direct_message(
                 (*peer.name(), *peer.addr()),
