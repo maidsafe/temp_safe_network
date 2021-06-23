@@ -771,9 +771,9 @@ mod tests {
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
     use crate::messaging::client::Error as ErrorMessage;
     use crate::types::{Error as DtError, SequenceAction, SequencePrivatePermissions, Token};
+    use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use std::str::FromStr;
-    use tokio::time::{sleep, Duration};
     use xor_name::XorName;
 
     #[tokio::test]
@@ -783,27 +783,16 @@ mod tests {
         let client = create_test_client().await?;
         let owner = client.public_key();
         let perms = BTreeMap::<PublicKey, SequencePrivatePermissions>::new();
-        let sequence_address = client
-            .store_private_sequence(None, name, tag, owner, perms)
-            .await?;
+        let sequence_address =
+            retry_loop!(client.store_private_sequence(None, name, tag, owner, perms.clone()));
 
-        let mut balance_before_delete = client.get_balance().await?;
-
-        while balance_before_delete == Token::from_str("0")?
-            || balance_before_delete == Token::from_str("10")?
-        {
-            sleep(Duration::from_millis(200)).await;
-            balance_before_delete = client.get_balance().await?;
-        }
+        let balance_before_delete = retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != Token::from_str("10")? && *bal != Token::from_str("0")?)?;
 
         client.delete_sequence(sequence_address).await?;
-        let mut new_balance = client.get_balance().await?;
 
         // now let's ensure we've paid _something_
-        while new_balance == balance_before_delete {
-            sleep(Duration::from_millis(200)).await;
-            new_balance = client.get_balance().await?;
-        }
+        let _ =
+            retry_loop_for_pattern!(client.get_balance(), Ok(bal) if *bal != balance_before_delete);
 
         Ok(())
     }
@@ -825,14 +814,7 @@ mod tests {
             .store_private_sequence(None, name, tag, owner, perms)
             .await?;
 
-        let mut seq_res = client.get_sequence(address).await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.get_sequence(address).await;
-        }
-
-        let sequence = seq_res?;
+        let sequence = retry_loop!(client.get_sequence(address));
 
         assert!(sequence.is_private());
         assert_eq!(*sequence.name(), name);
@@ -846,14 +828,7 @@ mod tests {
             .store_public_sequence(None, name, tag, owner, perms)
             .await?;
 
-        let mut seq_res = client.get_sequence(address).await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.get_sequence(address).await;
-        }
-
-        let sequence = seq_res?;
+        let sequence = retry_loop!(client.get_sequence(address));
 
         assert!(sequence.is_public());
         assert_eq!(*sequence.name(), name);
@@ -875,29 +850,12 @@ mod tests {
             .store_private_sequence(None, name, tag, owner, perms)
             .await?;
 
-        let mut seq_res = client.get_sequence(address).await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.get_sequence(address).await;
-        }
-
-        let data = seq_res?;
+        let data = retry_loop!(client.get_sequence(address));
 
         assert_eq!(data.len(None)?, 0);
 
-        let mut seq_res = client
-            .get_sequence_private_permissions_for_user(address, owner)
-            .await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client
-                .get_sequence_private_permissions_for_user(address, owner)
-                .await;
-        }
-
-        let user_perms = seq_res?;
+        let user_perms =
+            retry_loop!(client.get_sequence_private_permissions_for_user(address, owner));
 
         assert!(user_perms.is_allowed(SequenceAction::Read));
         assert!(user_perms.is_allowed(SequenceAction::Append));
@@ -905,8 +863,9 @@ mod tests {
         let mut seq_res = client
             .get_sequence_permissions(address, SequenceUser::Key(owner))
             .await;
+
         while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             seq_res = client
                 .get_sequence_permissions(address, SequenceUser::Key(owner))
                 .await;
@@ -961,18 +920,8 @@ mod tests {
             .store_public_sequence(None, name, tag, owner, perms)
             .await?;
 
-        let mut seq_res = client
-            .get_sequence_public_permissions_for_user(address, owner)
-            .await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client
-                .get_sequence_public_permissions_for_user(address, owner)
-                .await;
-        }
-
-        let user_perms = seq_res?;
+        let user_perms =
+            retry_loop!(client.get_sequence_public_permissions_for_user(address, owner));
 
         assert_eq!(Some(true), user_perms.is_allowed(SequenceAction::Read));
         assert_eq!(None, user_perms.is_allowed(SequenceAction::Append));
@@ -980,8 +929,9 @@ mod tests {
         let mut seq_res = client
             .get_sequence_permissions(address, SequenceUser::Key(owner))
             .await;
+
         while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             seq_res = client
                 .get_sequence_permissions(address, SequenceUser::Key(owner))
                 .await;
@@ -1040,46 +990,22 @@ mod tests {
             .await?;
 
         // append to the data the data
-        let mut seq_res = client.append_to_sequence(address, b"VALUE1".to_vec()).await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.append_to_sequence(address, b"VALUE1".to_vec()).await;
-        }
-
+        let _ = retry_loop!(client.append_to_sequence(address, b"VALUE1".to_vec()));
         // now check last entry
-        let mut seq_res = client.get_sequence_last_entry(address).await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.get_sequence_last_entry(address).await;
-        }
-
-        let (index, data) = seq_res?;
+        let (index, data) = retry_loop!(client.get_sequence_last_entry(address));
 
         assert_eq!(0, index);
         assert_eq!(std::str::from_utf8(&data)?, "VALUE1");
 
         // append to the data the data
-        let mut seq_res = client.append_to_sequence(address, b"VALUE2".to_vec()).await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.append_to_sequence(address, b"VALUE2".to_vec()).await;
-        }
+        let _ = retry_loop!(client.append_to_sequence(address, b"VALUE2".to_vec()));
 
         // and then lets check last entry
-        let mut seq_res = client.get_sequence_last_entry(address).await;
+        let (mut index, mut data) = retry_loop!(client.get_sequence_last_entry(address));
 
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client.get_sequence_last_entry(address).await;
-        }
-
-        let (mut index, mut data) = seq_res?;
         // we might still be getting old data here
         while index == 0 {
-            sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             let (i, d) = client.get_sequence_last_entry(address).await?;
             index = i;
             data = d;
@@ -1088,24 +1014,10 @@ mod tests {
         assert_eq!(1, index);
         assert_eq!(std::str::from_utf8(&data)?, "VALUE2");
 
-        let mut seq_res = client
-            .get_sequence_range(
-                address,
-                (SequenceIndex::FromStart(0), SequenceIndex::FromEnd(0)),
-            )
-            .await;
-
-        while seq_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            seq_res = client
-                .get_sequence_range(
-                    address,
-                    (SequenceIndex::FromStart(0), SequenceIndex::FromEnd(0)),
-                )
-                .await;
-        }
-
-        let data = seq_res?;
+        let data = retry_loop!(client.get_sequence_range(
+            address,
+            (SequenceIndex::FromStart(0), SequenceIndex::FromEnd(0)),
+        ));
 
         assert_eq!(std::str::from_utf8(&data[0])?, "VALUE1");
         assert_eq!(std::str::from_utf8(&data[1])?, "VALUE2");
@@ -1142,14 +1054,7 @@ mod tests {
             .await?;
 
         // Assert that the data is stored.
-        let mut owner_res = client.get_sequence_owner(address).await;
-
-        while owner_res.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            owner_res = client.get_sequence_owner(address).await;
-        }
-
-        let current_owner = owner_res?;
+        let current_owner = retry_loop!(client.get_sequence_owner(address));
 
         assert_eq!(owner, current_owner);
 
@@ -1170,21 +1075,16 @@ mod tests {
             .store_private_sequence(None, name, tag, owner, perms)
             .await?;
 
-        let mut sequence = client.get_sequence(address).await;
+        let sequence = retry_loop!(client.get_sequence(address));
 
-        while sequence.is_err() {
-            sleep(Duration::from_millis(200)).await;
-            sequence = client.get_sequence(address).await;
-        }
-
-        assert!(sequence?.is_private());
+        assert!(sequence.is_private());
 
         client.delete_sequence(address).await?;
 
         let mut res = client.get_sequence(address).await;
 
         while res.is_ok() {
-            sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             res = client.get_sequence(address).await;
         }
 

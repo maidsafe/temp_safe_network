@@ -668,8 +668,8 @@ mod tests {
     use super::*;
     use crate::client::utils::test_utils::{create_test_client, gen_ed_keypair};
     use crate::messaging::client::{CmdError, Error as ErrorMessage};
-    use crate::retry_loop_for_pattern;
     use crate::types::{MapAction, MapKind, Token};
+    use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use std::str::FromStr;
     use std::time::Duration;
@@ -855,10 +855,10 @@ mod tests {
         let tag = 15001;
         let mapref = MapAddress::Unseq { name, tag };
 
-        let client = create_test_client().await?;
-        let owner = client.public_key();
+        let some_client = create_test_client().await?;
+        let owner = some_client.public_key();
 
-        let _ = client.store_unseq_map(name, tag, owner, None, None).await?;
+        let _ = retry_loop!(some_client.store_unseq_map(name, tag, owner, None, None));
 
         let mut client = create_test_client().await?;
 
@@ -887,16 +887,24 @@ mod tests {
         let _ = permissions.insert(random_user, permission_set);
 
         let test_data_name = XorName(rand::random());
-        let address = client
-            .store_seq_map(test_data_name, 15000u64, random_pk, None, Some(permissions))
-            .await?;
+        let address = retry_loop!(client.store_seq_map(
+            test_data_name,
+            15000u64,
+            random_pk,
+            None,
+            Some(permissions.clone())
+        ));
+
         let res = client.get_map_shell(address).await;
         match res {
             Err(Error::ErrorMessage {
                 source: ErrorMessage::DataNotFound(_),
                 ..
             }) => (),
-            Ok(_) => bail!("Unexpected Success: Validating owners should fail"),
+            Ok(data) => bail!(
+                "Unexpected Success: Validating owners should fail.  Data received : {:?}",
+                data
+            ),
             Err(e) => bail!("Unexpected: {:?}", e),
         };
 

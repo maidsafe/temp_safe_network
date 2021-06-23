@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_network"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.2.11"
+version = "0.2.12"
 
 [[bin]]
 name = "sn_node"
@@ -115,7 +115,7 @@ dashmap = "~4.0.2"
   version = "~0.4.0"
 
   [dependencies.tokio]
-  version = "~1.6.0"
+  version = "1.6.0"
   features = [ "macros", "fs", "sync", "io-util", "rt", "rt-multi-thread" ]
 
 [dev-dependencies]

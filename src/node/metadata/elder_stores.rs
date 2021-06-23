@@ -110,8 +110,8 @@ impl ElderStores {
     pub async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
         // Prepare chunk_records, map and sequence data
         let chunk_data = self.chunk_records.get_data_of(prefix).await;
-        let map_data = self.map_storage.get_data_of(prefix);
-        let seq_data = self.sequence_storage.get_data_of(prefix);
+        let map_data = self.map_storage.get_data_of(prefix).await?;
+        let seq_data = self.sequence_storage.get_data_of(prefix).await?;
 
         Ok(DataExchange {
             chunk_data,

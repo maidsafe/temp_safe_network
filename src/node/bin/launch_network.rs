@@ -58,8 +58,8 @@ async fn main() -> Result<(), String> {
     println!("Building current sn_node");
     let _child = Command::new("cargo")
         .args(args.clone())
-        .env("RUST_LOG", "debug")
-        .env("RUST_BACKTRACE", "1")
+        // .env("RUST_LOG", "debug")
+        // .env("RUST_BACKTRACE", "1")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
@@ -94,7 +94,6 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
 /// Uses SNLT to create a local network of nodes
 pub async fn run_network() -> Result<(), String> {
     info!("Starting local network");
-    let verbosity = 4;
     let node_path = Some(PathBuf::from("./target/release"));
     let node_path = get_node_bin_path(node_path)?;
 
@@ -143,14 +142,6 @@ pub async fn run_network() -> Result<(), String> {
     let interval_as_int = &INTERVAL
         .parse::<u64>()
         .map_err(|_| String::from("Error parsing Interval argument"))?;
-
-    let mut verbosity_arg = String::from("-");
-    if verbosity > 0 {
-        let v = "y".repeat(verbosity);
-        info!("V: {}", v);
-        verbosity_arg.push_str(&v);
-        sn_launch_tool_args.push(&verbosity_arg);
-    }
 
     debug!(
         "Running network launch tool with args: {:?}",
