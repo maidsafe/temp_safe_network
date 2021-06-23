@@ -317,8 +317,6 @@ impl<'a> Join<'a> {
     }
 
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, SocketAddr, DstInfo)> {
-        let dst = self.node.name();
-
         while let Some(event) = self.recv_rx.recv().await {
             // we are interested only in `JoinResponse` type of messages
             let (dst_info, join_response, sender) = match event {
@@ -342,41 +340,24 @@ impl<'a> Join<'a> {
                 ConnectionEvent::Disconnected(_) => continue,
             };
 
-            match join_response {
+            return match join_response {
                 JoinResponse::ResourceChallenge { .. }
                 | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    return Ok((join_response, sender, dst_info));
+                    Ok((join_response, sender, dst_info))
                 }
-                JoinResponse::Retry(ref section_auth) => {
-                    if !section_auth.prefix.matches(&dst) {
-                        error!(
-                            "Invalid JoinResponse::Retry bad prefix: {:?}",
-                            join_response
-                        );
-                        continue;
-                    }
-
+                JoinResponse::Retry(ref section_auth)
+                | JoinResponse::Redirect(ref section_auth) => {
                     if section_auth.elders.is_empty() {
                         error!(
-                            "Invalid JoinResponse::Retry, empty list of Elders: {:?}",
+                            "Invalid JoinResponse::Retry/Redirect, empty list of Elders: {:?}",
                             join_response
                         );
                         continue;
                     }
+                    trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
 
-                    return Ok((join_response, sender, dst_info));
-                }
-                JoinResponse::Redirect(ref section_auth) => {
-                    if section_auth.elders.is_empty() {
-                        error!(
-                            "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
-                            join_response
-                        );
-                        continue;
-                    }
-
-                    return Ok((join_response, sender, dst_info));
+                    Ok((join_response, sender, dst_info))
                 }
                 JoinResponse::Approval {
                     ref section_auth,
@@ -407,9 +388,9 @@ impl<'a> Join<'a> {
                         section_auth.value.prefix,
                     );
 
-                    return Ok((join_response, sender, dst_info));
+                    Ok((join_response, sender, dst_info))
                 }
-            }
+            };
         }
 
         error!("RoutingMsg sender unexpectedly closed");
