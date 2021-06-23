@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::node::{KeyedSig, SigShare};
+use crate::types::{PublicKey, Signature};
 use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::{PublicKey, Signature};
+use ed25519_dalek::{PublicKey as EdPublicKey, Signature as EdSignature};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -36,40 +37,40 @@ pub enum MsgAuthority {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ClientSigned {
     /// Client public key.
-    public_key: PublicKey,
+    pub public_key: PublicKey,
     /// Client signature.
-    signature: Signature,
+    pub signature: Signature,
 }
 
 /// Authority of a single peer.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeSigned {
     /// Section key of the source.
-    section_pk: BlsPublicKey,
+    pub section_pk: BlsPublicKey,
     /// Public key of the source peer.
-    public_key: PublicKey,
+    pub public_key: EdPublicKey,
     /// ed-25519 signature of the message corresponding to the public key of the source peer.
-    signature: Signature,
+    pub signature: EdSignature,
 }
 
 /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BlsShareSigned {
     /// Section key of the source.
-    section_pk: BlsPublicKey,
+    pub section_pk: BlsPublicKey,
     /// Name in the source section
-    src_name: XorName,
+    pub src_name: XorName,
     /// Proof Share signed by the peer's BLS KeyShare
-    sig_share: SigShare,
+    pub sig_share: SigShare,
 }
 
 /// Authority of a whole section.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SectionSigned {
     /// Section key of the source.
-    section_pk: BlsPublicKey,
+    pub section_pk: BlsPublicKey,
     /// Name in the source section.
-    src_name: XorName,
+    pub src_name: XorName,
     /// BLS proof of the message corresponding to the source section.
-    sig: KeyedSig,
+    pub sig: KeyedSig,
 }

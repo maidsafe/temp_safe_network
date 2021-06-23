@@ -29,7 +29,7 @@ mod sap;
 pub use self::{
     errors::{Error, Result},
     location::{Aggregation, DstLocation, EndUser, Itinerary, SrcLocation},
-    msg_authority::MsgAuthority,
+    msg_authority::{BlsShareSigned, ClientSigned, MsgAuthority, NodeSigned, SectionSigned},
     msg_id::{MessageId, MESSAGE_ID_LEN},
     sap::SectionAuthorityProvider,
     serialisation::{MsgEnvelope, WireMsg},

@@ -89,11 +89,12 @@ impl WireMsg {
     }
 
     /// Returns `true` if the message is a JoinRequest.
+    // FIXME: remove this function since this causes an additional deserialisation.
     pub fn is_join_request(&self) -> Result<bool> {
-        unimplemented!()
-        /*        match self.header.src_authority() {
+        unimplemented!();
+        /*match self.header.msg_authority() {
             MsgAuthority::Node(_) | MsgAuthority::BlsShare(_) | MsgAuthority::Section(_) => {
-                if let MessageType::Routing { msg, .. } = self.to_message()? {
+                if let MessageType::Node { msg, .. } = self.to_message()? {
                     if let Variant::JoinRequest(_) = msg.variant {
                         Ok(true)
                     } else {
@@ -115,7 +116,7 @@ impl WireMsg {
         let max_length = WireMsgHeader::max_size() as usize + self.payload.len();
         let mut buffer = vec![0u8; max_length];
 
-        let buf_at_payload = self.header.write(&mut buffer)?;
+        let (buf_at_payload, bytes_written) = self.header.write(&mut buffer)?;
 
         // ...and finally we write the bytes of the serialized payload to the original buffer
         let _ = gen_simple(slice(self.payload.clone()), buf_at_payload).map_err(|err| {
@@ -123,10 +124,11 @@ impl WireMsg {
         })?;
 
         // We can now return the buffer containing the written bytes
+        buffer.truncate(bytes_written as usize + self.payload.len());
         Ok(Bytes::from(buffer))
     }
 
-    /// Deserialize the payload from this WireMsg returning a Message instance.
+    /// Deserialize the payload from this WireMsg returning a MessageType instance.
     pub fn to_message(&self) -> Result<MessageType> {
         let msg_envelope = self.header.msg_envelope().clone();
 
@@ -176,11 +178,14 @@ impl WireMsg {
     }
 
     /// Return the source section PublicKey for this
-    /// message if it's a NodeMsg and it was
-    /// provided in the header of message.
+    /// message if it's a NodeMsg
     pub fn src_section_pk(&self) -> Option<PublicKey> {
-        unimplemented!();
-        //self.header.src_section_pk()
+        match self.header.msg_authority() {
+            MsgAuthority::Node(node_signed) => Some(node_signed.section_pk),
+            MsgAuthority::BlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
+            MsgAuthority::Section(section_signed) => Some(section_signed.section_pk),
+            _ => None,
+        }
     }
 
     // The following functions are just for convenience, which allow users to
@@ -224,17 +229,9 @@ impl WireMsg {
         }
     */
 
-    /// Update dst_pk and or dst in the WireMsg
-    pub fn update_dst_info(&mut self, dst_pk: Option<PublicKey>, dst: Option<XorName>) {
-        unimplemented!();
-        /*
-        if let Some(dst) = dst {
-            self.header.dst = dst
-        }
-        if let Some(dst_pk) = dst_pk {
-            self.header.dst_section_pk = dst_pk
-        }
-        */
+    /// Update dst_location in the WireMsg
+    pub fn update_dst_location(&mut self, dst_location: DstLocation) {
+        self.header.set_dst_location(dst_location)
     }
 }
 
@@ -262,44 +259,48 @@ mod tests {
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst_location(), &dst_location);
         assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
-        /*
-                // test deserialisation of payload
-                assert_eq!(
-                    deserialized.to_message()?,
-                    MessageType::SectionInfo {
-                        msg: query,
-                        msg_envelope: MsgEnvelope {
-                            msg_id: wire_msg.msg_id(),
-                            msg_authority: MsgAuthority::None,
-                            dst_location: dst_location,
-                            dst_section_pk: dst_section_pk
-                        }
-                    }
-                );
-        */
+        assert_eq!(deserialized.src_section_pk(), None);
+
+        // test deserialisation of payload
+        assert_eq!(
+            deserialized.to_message()?,
+            MessageType::SectionInfo {
+                msg_envelope: MsgEnvelope {
+                    msg_id: wire_msg.msg_id(),
+                    msg_authority: MsgAuthority::None,
+                    dst_location: dst_location,
+                    dst_section_pk: dst_section_pk
+                },
+                msg: query,
+            }
+        );
+
         Ok(())
     }
-    /*
+
     #[test]
-    fn serialisation_and_update_dst_for_section_info_msg() -> Result<()> {
-        let dst = XorName::random();
+    fn serialisation_and_update_dst_location_section_info_msg() -> Result<()> {
+        let dst_name = XorName::random();
         let dst_section_pk = SecretKey::random().public_key();
+        let dst_location = DstLocation::Node(dst_name);
 
         let query = section_info::SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
-        let mut wire_msg = WireMsg::new_section_info_msg(&query, dst, dst_section_pk)?;
+
+        let mut wire_msg = WireMsg::new_section_info_msg(&query, dst_location, dst_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
-        let wire_msg2 = wire_msg.clone();
-        let dst_new = XorName::random();
-        wire_msg.update_dst_info(None, Some(dst_new));
-        let serialised_second_msg = wire_msg.serialize()?;
+        let new_wire_msg = wire_msg.clone();
+        let new_dst_location = DstLocation::Section(XorName::random());
+        wire_msg.update_dst_location(new_dst_location);
+        let serialised_new_dst_location = wire_msg.serialize()?;
 
         // test deserialisation of header
-        let deserialized = WireMsg::from(serialised_second_msg.clone())?;
+        let deserialized = WireMsg::from(serialised_new_dst_location.clone())?;
 
-        assert_ne!(serialized, serialised_second_msg);
-        assert_ne!(wire_msg2, wire_msg);
-        assert_eq!(deserialized.dst(), dst_new);
+        assert_ne!(serialized, serialised_new_dst_location);
+        assert_ne!(new_wire_msg, wire_msg);
+        assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
+        assert_eq!(deserialized.dst_location(), &new_dst_location);
         assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
         assert_eq!(deserialized.src_section_pk(), None);
 
@@ -307,11 +308,13 @@ mod tests {
         assert_eq!(
             deserialized.to_message()?,
             MessageType::SectionInfo {
+                msg_envelope: MsgEnvelope {
+                    msg_id: wire_msg.msg_id(),
+                    msg_authority: MsgAuthority::None,
+                    dst_location: new_dst_location,
+                    dst_section_pk: dst_section_pk
+                },
                 msg: query,
-                dst_info: DstInfo {
-                    dst: dst_new,
-                    dst_section_pk
-                }
             }
         );
 
@@ -320,12 +323,20 @@ mod tests {
 
     #[test]
     fn serialisation_node_msg() -> Result<()> {
-        use crate::messaging::MessageId;
+        use crate::messaging::{MessageId, NodeSigned};
+        use ed25519_dalek::Signer;
         use node::{NodeCmd, NodeMsg, NodeSystemCmd};
+        use rand::rngs::OsRng;
 
-        let dst = XorName::random();
         let src_section_pk = SecretKey::random().public_key();
+        let mut rng = OsRng;
+        let src_node_keypair = ed25519_dalek::Keypair::generate(&mut rng);
+
+        let dst_name = XorName::random();
         let dst_section_pk = SecretKey::random().public_key();
+        let dst_location = DstLocation::Node(dst_name);
+
+        let msg_id = MessageId::new();
 
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
@@ -334,44 +345,27 @@ mod tests {
                 node_id: pk,
                 section: pk.into(),
             }),
-            id: MessageId::new(),
+            id: msg_id,
         };
 
-        // first test without including a source section public key in the header
-        let wire_msg = WireMsg::new_node_msg(&node_cmd, dst, dst_section_pk, None)?;
+        let payload = WireMsg::serialize_msg_payload(&node_msg)?;
+        let node_signed = NodeSigned {
+            section_pk: src_section_pk,
+            public_key: src_node_keypair.public,
+            signature: src_node_keypair.sign(&payload),
+        };
+
+        let msg_authority = MsgAuthority::Node(node_signed);
+
+        let wire_msg =
+            WireMsg::new_msg(payload, msg_authority.clone(), dst_location, dst_section_pk)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dst(), dst);
-        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
-        assert_eq!(deserialized.src_section_pk(), None);
-
-        // test deserialisation of payload
-        assert_eq!(
-            deserialized.to_message()?,
-            MessageType::Node {
-                msg: node_cmd.clone(),
-                dst_info: DstInfo {
-                    dst,
-                    dst_section_pk
-                },
-                src_section_pk: None
-            }
-        );
-
-        // let's now test including a source section public key in the header
-        let wire_msg_with_src_pk =
-            WireMsg::new_node_msg(&node_cmd, dst, dst_section_pk, Some(src_section_pk))?;
-        let serialized = wire_msg_with_src_pk.serialize()?;
-
-        // test deserialisation of header
-        let deserialized = WireMsg::from(serialized)?;
-        assert_eq!(deserialized, wire_msg_with_src_pk);
-        assert_eq!(deserialized.msg_id(), wire_msg_with_src_pk.msg_id());
-        assert_eq!(deserialized.dst(), dst);
+        assert_eq!(deserialized.dst_location(), &dst_location);
         assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
         assert_eq!(deserialized.src_section_pk(), Some(src_section_pk));
 
@@ -379,16 +373,77 @@ mod tests {
         assert_eq!(
             deserialized.to_message()?,
             MessageType::Node {
-                msg: node_cmd,
-                dst_info: DstInfo {
-                    dst,
-                    dst_section_pk
+                msg_envelope: MsgEnvelope {
+                    msg_id: wire_msg.msg_id(),
+                    msg_authority,
+                    dst_location: dst_location,
+                    dst_section_pk: dst_section_pk
                 },
-                src_section_pk: Some(src_section_pk)
+                msg: node_msg.clone(),
             }
         );
 
         Ok(())
     }
-    */
+
+    #[test]
+    fn serialisation_client_msg() -> Result<()> {
+        use crate::{
+            messaging::{ClientSigned, MessageId},
+            types::Keypair,
+        };
+        use client::{ClientMsg, ProcessMsg, Query, TransferQuery};
+        use ed25519_dalek::Signer;
+        use rand::rngs::OsRng;
+
+        let mut rng = OsRng;
+        let src_client_keypair = Keypair::new_ed25519(&mut rng);
+
+        let dst_name = XorName::random();
+        let dst_section_pk = SecretKey::random().public_key();
+        let dst_location = DstLocation::Node(dst_name);
+
+        let msg_id = MessageId::new();
+
+        let client_msg = ClientMsg::Process(ProcessMsg::Query {
+            id: msg_id,
+            query: Query::Transfer(TransferQuery::GetBalance(src_client_keypair.public_key())),
+        });
+
+        let payload = WireMsg::serialize_msg_payload(&client_msg)?;
+        let client_signed = ClientSigned {
+            public_key: src_client_keypair.public_key(),
+            signature: src_client_keypair.sign(&payload),
+        };
+
+        let msg_authority = MsgAuthority::Client(client_signed);
+
+        let wire_msg =
+            WireMsg::new_msg(payload, msg_authority.clone(), dst_location, dst_section_pk)?;
+        let serialized = wire_msg.serialize()?;
+
+        // test deserialisation of header
+        let deserialized = WireMsg::from(serialized)?;
+        assert_eq!(deserialized, wire_msg);
+        assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
+        assert_eq!(deserialized.dst_location(), &dst_location);
+        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
+        assert_eq!(deserialized.src_section_pk(), None);
+
+        // test deserialisation of payload
+        assert_eq!(
+            deserialized.to_message()?,
+            MessageType::Client {
+                msg_envelope: MsgEnvelope {
+                    msg_id: wire_msg.msg_id(),
+                    msg_authority,
+                    dst_location: dst_location,
+                    dst_section_pk: dst_section_pk
+                },
+                msg: client_msg.clone(),
+            }
+        );
+
+        Ok(())
+    }
 }
