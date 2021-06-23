@@ -175,7 +175,7 @@ impl WireMsgHeader {
         dst_pk_bytes[0..].copy_from_slice(&bytes[HDR_DEST_PK_BYTES_START..HDR_DEST_PK_BYTES_END]);
         let dst_section_pk = PublicKey::from_bytes(&dst_pk_bytes).map_err(|err| {
             Error::FailedToParse(format!(
-                "destination section PublicKey couldn't be deserialized from header: {}",
+                "destination section PublicKey couldn't be deserialized from header: {:?}",
                 err
             ))
         })?;
@@ -190,7 +190,7 @@ impl WireMsgHeader {
             src_pk_bytes[0..].copy_from_slice(&bytes[HDR_SRC_PK_BYTES_START..HDR_SRC_PK_BYTES_END]);
             let src_section_pk = PublicKey::from_bytes(&src_pk_bytes).map_err(|err| {
                 Error::FailedToParse(format!(
-                    "source section PublicKey couldn't be deserialized from header: {}",
+                    "source section PublicKey couldn't be deserialized from header: {:?}",
                     err
                 ))
             })?;
@@ -318,6 +318,7 @@ pub(crate) enum MessageKind {
     Client,
     Routing,
     Node,
+    Joins,
 }
 
 // Bytes values used for each of the kind of messages
@@ -346,7 +347,7 @@ impl From<MessageKind> for u8 {
         match kind {
             MessageKind::SectionInfo => SECTION_INFO_KIND,
             MessageKind::Client => CLIENT_MSG_KIND,
-            MessageKind::Routing => ROUTING_MSG_KIND,
+            MessageKind::Routing | MessageKind::Joins => ROUTING_MSG_KIND,
             MessageKind::Node => NODE_MSG_KIND,
         }
     }

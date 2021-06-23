@@ -11,8 +11,9 @@ pub mod wire_msg_header;
 
 use self::wire_msg_header::{MessageKind, WireMsgHeader};
 #[cfg(not(feature = "client-only"))]
-use super::node::{self, Variant};
+use super::node;
 use super::{client, section_info, DstInfo, Error, MessageId, MessageType, Result};
+use crate::messaging::node::Variant;
 use bls::PublicKey;
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen_simple};
@@ -81,6 +82,7 @@ impl WireMsg {
         msg: &node::RoutingMsg,
         dst: XorName,
         dst_section_pk: PublicKey,
+        is_join_request: bool,
     ) -> Result<Self> {
         let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
             Error::Serialisation(format!(
@@ -89,10 +91,22 @@ impl WireMsg {
             ))
         })?;
 
+        let kind = if is_join_request {
+            MessageKind::Joins
+        } else {
+            MessageKind::Routing
+        };
+
         Ok(Self {
-            header: WireMsgHeader::new(msg.id, MessageKind::Routing, dst, dst_section_pk, None),
+            header: WireMsgHeader::new(msg.id, kind, dst, dst_section_pk, None),
             payload: Bytes::from(payload_vec),
         })
+    }
+
+    /// Returns 'true' if kind is `MessageKind::Joins`
+    #[cfg(not(feature = "client-only"))]
+    pub fn is_join_request(&self) -> bool {
+        matches!(self.header.kind(), MessageKind::Joins)
     }
 
     /// Creates a new instance keeping a (serialized) copy of the node 'Message' message provided.
@@ -130,24 +144,6 @@ impl WireMsg {
 
         // We can now create a deserialized WireMsg using the read bytes
         Ok(Self { header, payload })
-    }
-
-    /// Returns `true` if the message is a JoinRequest.
-    #[cfg(not(feature = "client-only"))]
-    pub fn is_join_request(&self) -> Result<bool> {
-        if let MessageKind::Routing = self.header.kind() {
-            if let MessageType::Routing { msg, .. } = self.to_message()? {
-                if let Variant::JoinRequest(_) = msg.variant {
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            } else {
-                Ok(false)
-            }
-        } else {
-            Ok(false)
-        }
     }
 
     /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
@@ -199,11 +195,13 @@ impl WireMsg {
                 Ok(MessageType::Client{msg, dst_info})
             }
             #[cfg(feature = "client-only")]
-            MessageKind::Routing => {
+            MessageKind::Routing
+            | MessageKind::Joins => {
                 Err(Error::FailedToParse("Message payload is a Node message which is not supported when feature 'client-only' is set".to_string()))
             }
             #[cfg(not(feature = "client-only"))]
-            MessageKind::Routing => {
+            MessageKind::Routing
+            | MessageKind::Joins => {
                 let msg: node::RoutingMsg =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("Node message payload as Msgpack: {}", err))
@@ -290,7 +288,13 @@ impl WireMsg {
         dst: XorName,
         dst_section_pk: PublicKey,
     ) -> Result<Bytes> {
-        Self::new_routing_msg(msg, dst, dst_section_pk)?.serialize()
+        Self::new_routing_msg(
+            msg,
+            dst,
+            dst_section_pk,
+            matches!(msg.variant, Variant::JoinRequest(_)),
+        )?
+        .serialize()
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
