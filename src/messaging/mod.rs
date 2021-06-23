@@ -30,6 +30,7 @@ pub use self::{
     sap::SectionAuthorityProvider,
     serialisation::WireMsg,
 };
+use crate::messaging::node::Variant;
 use bls::PublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -125,9 +126,12 @@ impl MessageType {
                 WireMsg::new_client_msg(msg, dst_info.dst, dst_info.dst_section_pk)
             }
             #[cfg(not(feature = "client-only"))]
-            Self::Routing { msg, dst_info } => {
-                WireMsg::new_routing_msg(msg, dst_info.dst, dst_info.dst_section_pk)
-            }
+            Self::Routing { msg, dst_info } => WireMsg::new_routing_msg(
+                msg,
+                dst_info.dst,
+                dst_info.dst_section_pk,
+                matches!(msg.variant, Variant::JoinRequest(_)),
+            ),
             #[cfg(not(feature = "client-only"))]
             Self::Node {
                 msg,
