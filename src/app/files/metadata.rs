@@ -42,12 +42,12 @@ impl FileMeta {
 
         // created and modified may not be available on all platforms/filesystems.
         let original_created = if let Ok(time) = metadata.created() {
-            Some(systemtime_to_rfc3339(&time))
+            Some(systemtime_to_rfc3339(time))
         } else {
             None
         };
         let original_modified = if let Ok(time) = metadata.modified() {
-            Some(systemtime_to_rfc3339(&time))
+            Some(systemtime_to_rfc3339(time))
         } else {
             None
         };

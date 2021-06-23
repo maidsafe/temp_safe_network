@@ -577,14 +577,14 @@ mod tests {
             .await?;
 
         let wallet_balances = retry_loop_for_pattern!(safe.wallet_get(&wallet_xorurl), Ok(balances) if balances.len() == 2)?;
-        assert_eq!(wallet_balances["my-first-balance"].0, true);
+        assert!(wallet_balances["my-first-balance"].0);
         assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
         assert_eq!(
             wallet_balances["my-first-balance"].1.sk,
             sk_to_hex(keypair1.secret_key()?)
         );
 
-        assert_eq!(wallet_balances["my-second-balance"].0, false);
+        assert!(!wallet_balances["my-second-balance"].0);
         assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
         assert_eq!(
             wallet_balances["my-second-balance"].1.sk,
@@ -618,14 +618,14 @@ mod tests {
         let _ = retry_loop_for_pattern!(safe.wallet_get(&wallet_xorurl), Ok(balances) if balances.len() == 2)?;
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
-        assert_eq!(wallet_balances["my-first-balance"].0, false);
+        assert!(!wallet_balances["my-first-balance"].0);
         assert_eq!(wallet_balances["my-first-balance"].1.xorurl, key1_xorurl);
         assert_eq!(
             wallet_balances["my-first-balance"].1.sk,
             sk_to_hex(keypair1.secret_key()?)
         );
 
-        assert_eq!(wallet_balances["my-second-balance"].0, true);
+        assert!(wallet_balances["my-second-balance"].0);
         assert_eq!(wallet_balances["my-second-balance"].1.xorurl, key2_xorurl);
         assert_eq!(
             wallet_balances["my-second-balance"].1.sk,

@@ -51,8 +51,8 @@ pub fn parse_coins_amount(amount_str: &str) -> Result<Token> {
     })
 }
 
-pub fn systemtime_to_rfc3339(t: &time::SystemTime) -> String {
-    let datetime: DateTime<Utc> = t.clone().into();
+pub fn systemtime_to_rfc3339(t: time::SystemTime) -> String {
+    let datetime: DateTime<Utc> = t.into();
     datetime.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
