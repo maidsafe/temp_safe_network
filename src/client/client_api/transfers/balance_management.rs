@@ -270,7 +270,6 @@ mod tests {
                 .checked_sub(amount_to_send)
                 .ok_or_else(|| anyhow!("No more money to send"))?;
 
-            // Initial 10 token on creation from farming simulation minus 1
             // Assert locally
             assert_eq!(client.get_local_balance().await, correct_balance);
 
@@ -355,10 +354,6 @@ mod tests {
             let _ = receiving_client.get_history().await;
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             receiving_bal = receiving_client.get_balance().await?;
-
-            if receiving_bal > target_tokens {
-                continue;
-            }
         }
 
         assert_eq!(receiving_bal, target_tokens);
