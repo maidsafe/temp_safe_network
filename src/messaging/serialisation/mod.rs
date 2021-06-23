@@ -92,7 +92,7 @@ impl WireMsg {
         })?;
 
         let kind = if is_join_request {
-            MessageKind::Joins
+            MessageKind::JoinRequest
         } else {
             MessageKind::Routing
         };
@@ -103,10 +103,10 @@ impl WireMsg {
         })
     }
 
-    /// Returns 'true' if kind is `MessageKind::Joins`
+    /// Returns 'true' if kind is `MessageKind::JoinsRequest`
     #[cfg(not(feature = "client-only"))]
     pub fn is_join_request(&self) -> bool {
-        matches!(self.header.kind(), MessageKind::Joins)
+        matches!(self.header.kind(), MessageKind::JoinRequest)
     }
 
     /// Creates a new instance keeping a (serialized) copy of the node 'Message' message provided.
@@ -196,12 +196,12 @@ impl WireMsg {
             }
             #[cfg(feature = "client-only")]
             MessageKind::Routing
-            | MessageKind::Joins => {
+            | MessageKind::JoinRequest => {
                 Err(Error::FailedToParse("Message payload is a Node message which is not supported when feature 'client-only' is set".to_string()))
             }
             #[cfg(not(feature = "client-only"))]
             MessageKind::Routing
-            | MessageKind::Joins => {
+            | MessageKind::JoinRequest => {
                 let msg: node::RoutingMsg =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("Node message payload as Msgpack: {}", err))
