@@ -276,7 +276,7 @@ mod tests {
             let _ =
                 retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
 
-            if count == 50 {
+            if count == 7 {
                 break;
             }
         }

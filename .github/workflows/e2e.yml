@@ -16,7 +16,6 @@ env:
   # I've seen 30 nodes work on CI atm.
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
-  RUST_LOG: "safe_network=debug"
 
 jobs:
   tests:
@@ -62,9 +61,26 @@ jobs:
       
       - run: ./target/release/launch_network
 
-      - name: Client tests against local network
+      - name: Client blob tests against local network
         shell: bash
-        run: timeout 45m cargo test --release -- client && sleep 5
+        run: timeout 25m cargo test --release -- client_api::blob && sleep 5
+      
+      - name: Client transfer tests against local network
+        shell: bash
+        run: timeout 15m cargo test --release -- client_api::transfer && sleep 5
+      
+      - name: Client map tests against local network
+        shell: bash
+        run: timeout 15m cargo test --release -- client_api::map && sleep 5
+      
+      - name: Client reg tests against local network
+        shell: bash
+        run: timeout 15m cargo test --release -- client_api::reg && sleep 5
+      
+      - name: Client sequence tests against local network
+        shell: bash
+        run: timeout 15m cargo test --release -- client_api::seq && sleep 5
+      
 
 
       - name: Run example app for Blob API against local network
