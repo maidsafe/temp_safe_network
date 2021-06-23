@@ -17,7 +17,6 @@ mod relocation;
 mod section;
 mod signature_aggregator;
 mod signed;
-mod src_authority;
 mod variant;
 
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgKey, Proposal, SectionSigned};
@@ -34,10 +33,9 @@ pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise, SignedRe
 pub use section::{ElderCandidates, MembershipState, NodeState, Peer, Section, SectionPeers};
 pub use signature_aggregator::{Error, SignatureAggregator};
 pub use signed::{KeyedSig, SigShare};
-pub use src_authority::SrcAuthority;
 pub use variant::Variant;
 
-use crate::messaging::{Aggregation, DstLocation, MessageId, MessageType, WireMsg};
+use crate::messaging::{Aggregation, MessageId, MessageType, WireMsg};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -49,19 +47,10 @@ use xor_name::XorName;
 pub struct RoutingMsg {
     /// Message ID.
     pub id: MessageId,
-    /// Source authority.
-    /// Messages do not need to sign this field as it is all verifiable (i.e. if the sig validates
-    /// agains the public key and we know the pub key then we are good. If the proof is not recognised we
-    /// ask for a longer chain that can be recognised). Therefore we don't need to sign this field.
-    pub src: SrcAuthority,
-    /// Destination location.
-    pub dst: DstLocation,
     /// The aggregation scheme to be used.
     pub aggregation: Aggregation,
     /// The body of the message.
     pub variant: Variant,
-    /// Section key of the sender.
-    pub section_pk: BlsPublicKey,
 }
 
 impl RoutingMsg {
@@ -69,13 +58,14 @@ impl RoutingMsg {
     /// It returns an error if the bytes don't correspond to a node message.
     pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
         let deserialized = WireMsg::deserialize(bytes)?;
-        if let MessageType::Routing { msg, .. } = deserialized {
-            Ok(msg)
-        } else {
-            Err(crate::messaging::Error::FailedToParse(
-                "bytes as a node message".to_string(),
-            ))
-        }
+        // FIXME
+        //if let MessageType::Routing { msg, .. } = deserialized {
+        //    Ok(msg)
+        //} else {
+        Err(crate::messaging::Error::FailedToParse(
+            "bytes as a node message".to_string(),
+        ))
+        //}
     }
 
     /// serialize this RoutingMsg into bytes ready to be sent over the wire.
@@ -84,17 +74,19 @@ impl RoutingMsg {
         dst: XorName,
         dst_section_pk: BlsPublicKey,
     ) -> crate::messaging::Result<Bytes> {
-        WireMsg::serialize_routing_msg(self, dst, dst_section_pk)
+        unimplemented!();
+        //WireMsg::serialize_routing_msg(self, dst, dst_section_pk)
     }
 }
 
 impl PartialEq for RoutingMsg {
     fn eq(&self, other: &RoutingMsg) -> bool {
-        self.src == other.src
-            && self.dst == other.dst
-            && self.id == other.id
-            && self.variant == other.variant
-            && self.section_pk == other.section_pk
+        unimplemented!();
+        /*self.src == other.src
+        && self.dst == other.dst
+        && self.id == other.id
+        && self.variant == other.variant
+        && self.section_pk == other.section_pk*/
     }
 }
 
@@ -103,8 +95,6 @@ impl Debug for RoutingMsg {
         formatter
             .debug_struct("RoutingMsg")
             .field("id", &self.id)
-            .field("src", &self.src)
-            .field("dst", &self.dst)
             .field("variant", &self.variant)
             .finish()
     }

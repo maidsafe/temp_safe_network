@@ -117,7 +117,8 @@ impl NodeMsg {
         dst_section_pk: BlsPublicKey,
         src_section_pk: Option<BlsPublicKey>,
     ) -> crate::messaging::Result<Bytes> {
-        WireMsg::serialize_node_msg(self, dst, dst_section_pk, src_section_pk)
+        unimplemented!();
+        //WireMsg::serialize_node_msg(self, dst, dst_section_pk, src_section_pk)
     }
 }
 
