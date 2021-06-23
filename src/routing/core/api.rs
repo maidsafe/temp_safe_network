@@ -142,7 +142,7 @@ impl Core {
     }
 
     pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
-        if let Ok(true) = wire_msg.is_join_request() {
+        if wire_msg.is_join_request() {
             return true;
         }
         self.msg_filter.add_to_filter(&wire_msg.msg_id()).await
