@@ -21,7 +21,8 @@ const MESSAGING_PROTO_VERSION: u16 = 1u16;
 // This header contains the information needed to deserialize the payload.
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct WireMsgHeader {
-    header_size: u16,
+    // We serialise a header size field, but we don't know it up front until we serialise it.
+    // header_size: u16,
     version: u16,
     msg_envelope: MsgEnvelope,
 }
@@ -47,11 +48,6 @@ const HDR_VERSION_BYTES_START: usize = HDR_SIZE_BYTES_LEN;
 const HDR_VERSION_BYTES_LEN: usize = size_of::<u16>();
 const HDR_VERSION_BYTES_END: usize = HDR_VERSION_BYTES_START + HDR_VERSION_BYTES_LEN;
 
-// Bytes index in the header for the 'msg_envelope'
-const HDR_MSG_ENVELOPE_BYTES_START: usize = HDR_VERSION_BYTES_END;
-const HDR_MSG_ENVELOPE_BYTES_LEN: usize = size_of::<MsgEnvelope>();
-const HDR_MSG_ENVELOPE_BYTES_END: usize = HDR_MSG_ENVELOPE_BYTES_START + HDR_MSG_ENVELOPE_BYTES_LEN;
-
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
     pub fn new(
@@ -61,7 +57,7 @@ impl WireMsgHeader {
         dst_section_pk: PublicKey,
     ) -> Self {
         Self {
-            header_size: Self::max_size(),
+            //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,
             msg_envelope: MsgEnvelope {
                 msg_id,
@@ -97,12 +93,16 @@ impl WireMsgHeader {
         &self.msg_envelope.msg_authority
     }
 
+    // Set a new dst_location in the message envelope
+    pub fn set_dst_location(&mut self, dst_location: DstLocation) {
+        self.msg_envelope.dst_location = dst_location;
+    }
+
     // Parses the provided bytes to deserialize a WireMsgHeader,
     // returning the created WireMsgHeader, as well as the remaining bytes which
     // correspond to the message payload. The caller shall then take care of
     // deserializing the payload using the information provided in the `WireMsgHeader`.
     pub fn from(mut bytes: Bytes) -> Result<(Self, Bytes)> {
-        println!("FROM BYTES: {:?}", bytes);
         // Let's make sure there is a minimum number of bytes to parse the header size part.
         let length = bytes.len();
         if length < HDR_SIZE_BYTES_LEN {
@@ -136,7 +136,7 @@ impl WireMsgHeader {
         }
 
         // ...finally, we read the message envelope bytes
-        let msg_envelope_bytes = &bytes[HDR_MSG_ENVELOPE_BYTES_START..HDR_MSG_ENVELOPE_BYTES_END];
+        let msg_envelope_bytes = &bytes[HDR_VERSION_BYTES_END..header_size.into()];
         let msg_envelope: MsgEnvelope =
             rmp_serde::from_slice(msg_envelope_bytes).map_err(|err| {
                 Error::FailedToParse(format!(
@@ -146,19 +146,18 @@ impl WireMsgHeader {
             })?;
 
         let header = Self {
-            header_size,
+            //header_size,
             version,
             msg_envelope,
         };
 
         // Get a slice for the payload bytes, i.e. the bytes after the header bytes
         let payload_bytes = bytes.split_off(header_size.into());
-        println!("PAYLOAD FROM BYTES {}: {:?}", header_size, payload_bytes);
 
         Ok((header, payload_bytes))
     }
 
-    pub fn write<'a>(&self, buffer: &'a mut [u8]) -> Result<&'a mut [u8]> {
+    pub fn write<'a>(&self, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
         // first serialise the msg envelope so we can figure out the total header size
         let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
             Error::Serialisation(format!(
@@ -197,13 +196,13 @@ impl WireMsgHeader {
                 ))
             })?;
 
-        Ok(buf_at_payload)
+        Ok((buf_at_payload, header_size))
     }
 
     // Maximum size in bytes a WireMsgHeader can occupied when serialized.
     pub fn max_size() -> u16 {
         // We don't use 'std::mem::size_of' since we don't necesserally
         // serialise them in the same way as they are represented in this struct.
-        (HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + HDR_MSG_ENVELOPE_BYTES_LEN) as u16
+        (HDR_SIZE_BYTES_LEN + HDR_VERSION_BYTES_LEN + size_of::<MsgEnvelope>()) as u16
     }
 }
