@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.9](https://github.com/maidsafe/safe_network/compare/v0.2.8...v0.2.9) (2021-06-23)
+
+
+### Bug Fixes
+
+* **logs:** use new module name for default logging ([3de6338](https://github.com/maidsafe/safe_network/commit/3de6338a3f12ca6a7edcb1ce7db2ce20f5a8b7ba))
+
 ### [0.2.8](https://github.com/maidsafe/safe_network/compare/v0.2.7...v0.2.8) (2021-06-22)
 
 
