@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use xor_name::{Prefix, XorName};
 
@@ -105,14 +106,14 @@ impl SrcLocation {
         }
     }
 
-    /// Returns this location as `DstLocation`
+    /* /// Returns this location as `DstLocation`
     pub fn to_dst(self) -> DstLocation {
         match self {
             Self::EndUser(user) => DstLocation::EndUser(user),
             Self::Node(name) => DstLocation::Node(name),
             Self::Section(name) => DstLocation::Section(name),
         }
-    }
+    }*/
 }
 
 /// Message destination location.
@@ -121,22 +122,38 @@ pub enum DstLocation {
     /// An EndUser.
     EndUser(EndUser),
     /// Destination is a single node with the given name.
-    Node(XorName),
+    Node {
+        name: XorName,
+        section_pk: BlsPublicKey,
+    },
     /// Destination are the nodes of the section whose prefix matches the given name.
-    Section(XorName),
+    Section {
+        name: XorName,
+        section_pk: BlsPublicKey,
+    },
     /// Destination is a specific node. To be directly connected to, and so the message is unrouted. `ConnectionInfo` is used to determine the target SocketAdrr for the message.
-    DirectAndUnrouted,
+    DirectAndUnrouted(BlsPublicKey),
 }
 
 impl DstLocation {
     /// Returns whether this location is a section.
     pub fn is_section(&self) -> bool {
-        matches!(self, Self::Section(_))
+        matches!(self, Self::Section { .. })
     }
 
     /// Returns whether this location is an end user.
     pub fn is_user(&self) -> bool {
         matches!(self, Self::EndUser(_))
+    }
+
+    /// Returns the section pk if it's not EndUser.
+    pub fn section_pk(&self) -> Option<BlsPublicKey> {
+        match self {
+            Self::EndUser(_) => None,
+            Self::Node { section_pk, .. } => Some(*section_pk),
+            Self::Section { section_pk, .. } => Some(*section_pk),
+            Self::DirectAndUnrouted(section_pk) => Some(*section_pk),
+        }
     }
 
     /// Returns whether the given name of the given prefix is part of this location.
@@ -149,9 +166,13 @@ impl DstLocation {
 
         match self {
             Self::EndUser(user) => prefix.matches(&user.xorname),
-            Self::Node(self_name) => name == self_name,
-            Self::Section(self_name) => prefix.matches(self_name),
-            Self::DirectAndUnrouted => true,
+            Self::Node {
+                name: self_name, ..
+            } => name == self_name,
+            Self::Section {
+                name: self_name, ..
+            } => prefix.matches(self_name),
+            Self::DirectAndUnrouted(_) => true,
         }
     }
 
@@ -159,9 +180,9 @@ impl DstLocation {
     pub fn name(&self) -> Option<XorName> {
         match self {
             Self::EndUser(user) => Some(user.xorname),
-            Self::Node(name) => Some(*name),
-            Self::Section(name) => Some(*name),
-            Self::DirectAndUnrouted => None,
+            Self::Node { name, .. } => Some(*name),
+            Self::Section { name, .. } => Some(*name),
+            Self::DirectAndUnrouted(_) => None,
         }
     }
 }

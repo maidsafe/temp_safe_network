@@ -15,7 +15,7 @@ use super::node::{self, Variant};
 use super::{
     client, section_info, DstLocation, Error, MessageId, MessageType, MsgAuthority, Result,
 };
-use bls::PublicKey;
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use cookie_factory::{combinator::slice, gen_simple};
 use serde::Serialize;
@@ -53,15 +53,9 @@ impl WireMsg {
         payload: Bytes,
         msg_authority: MsgAuthority,
         dst_location: DstLocation,
-        dst_section_pk: PublicKey,
     ) -> Result<Self> {
         Ok(Self {
-            header: WireMsgHeader::new(
-                MessageId::new(),
-                msg_authority,
-                dst_location,
-                dst_section_pk,
-            ),
+            header: WireMsgHeader::new(MessageId::new(), msg_authority, dst_location),
             payload,
         })
     }
@@ -71,11 +65,10 @@ impl WireMsg {
     pub fn new_section_info_msg(
         query: &section_info::SectionInfoMsg,
         dst_location: DstLocation,
-        dst_section_pk: PublicKey,
     ) -> Result<Self> {
         let payload = Self::serialize_msg_payload(query)?;
 
-        Self::new_msg(payload, MsgAuthority::None, dst_location, dst_section_pk)
+        Self::new_msg(payload, MsgAuthority::None, dst_location)
     }
 
     /// Attempts to create an instance of WireMsg by deserialising the bytes provided.
@@ -89,23 +82,9 @@ impl WireMsg {
     }
 
     /// Returns `true` if the message is a JoinRequest.
-    // FIXME: remove this function since this causes an additional deserialisation.
+    // FIXME: remove this function
     pub fn is_join_request(&self) -> Result<bool> {
         unimplemented!();
-        /*match self.header.msg_authority() {
-            MsgAuthority::Node(_) | MsgAuthority::BlsShare(_) | MsgAuthority::Section(_) => {
-                if let MessageType::Node { msg, .. } = self.to_message()? {
-                    if let Variant::JoinRequest(_) = msg.variant {
-                        Ok(true)
-                    } else {
-                        Ok(false)
-                    }
-                } else {
-                    Ok(false)
-                }
-            }
-            _ => Ok(false),
-        }*/
     }
 
     /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
@@ -168,8 +147,8 @@ impl WireMsg {
     }
 
     /// Return the destination section PublicKey for this message
-    pub fn dst_section_pk(&self) -> PublicKey {
-        self.header.dst_section_pk()
+    pub fn dst_section_pk(&self) -> Option<BlsPublicKey> {
+        self.header.dst_location().section_pk()
     }
 
     /// Return the destination for this message
@@ -179,7 +158,7 @@ impl WireMsg {
 
     /// Return the source section PublicKey for this
     /// message if it's a NodeMsg
-    pub fn src_section_pk(&self) -> Option<PublicKey> {
+    pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
         match self.header.msg_authority() {
             MsgAuthority::Node(node_signed) => Some(node_signed.section_pk),
             MsgAuthority::BlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
@@ -246,11 +225,14 @@ mod tests {
     fn serialisation_section_info_msg() -> Result<()> {
         let dst_name = XorName::random();
         let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node(dst_name);
+        let dst_location = DstLocation::Node {
+            name: dst_name,
+            section_pk: dst_section_pk,
+        };
 
         let query = section_info::SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
 
-        let wire_msg = WireMsg::new_section_info_msg(&query, dst_location, dst_section_pk)?;
+        let wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -258,7 +240,7 @@ mod tests {
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst_location(), &dst_location);
-        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
+        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -268,8 +250,7 @@ mod tests {
                 msg_envelope: MsgEnvelope {
                     msg_id: wire_msg.msg_id(),
                     msg_authority: MsgAuthority::None,
-                    dst_location: dst_location,
-                    dst_section_pk: dst_section_pk
+                    dst_location,
                 },
                 msg: query,
             }
@@ -282,15 +263,21 @@ mod tests {
     fn serialisation_and_update_dst_location_section_info_msg() -> Result<()> {
         let dst_name = XorName::random();
         let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node(dst_name);
+        let dst_location = DstLocation::Node {
+            name: dst_name,
+            section_pk: dst_section_pk,
+        };
 
         let query = section_info::SectionInfoMsg::GetSectionQuery(dst_section_pk.into());
 
-        let mut wire_msg = WireMsg::new_section_info_msg(&query, dst_location, dst_section_pk)?;
+        let mut wire_msg = WireMsg::new_section_info_msg(&query, dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         let new_wire_msg = wire_msg.clone();
-        let new_dst_location = DstLocation::Section(XorName::random());
+        let new_dst_location = DstLocation::Section {
+            name: XorName::random(),
+            section_pk: dst_section_pk,
+        };
         wire_msg.update_dst_location(new_dst_location);
         let serialised_new_dst_location = wire_msg.serialize()?;
 
@@ -301,7 +288,7 @@ mod tests {
         assert_ne!(new_wire_msg, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst_location(), &new_dst_location);
-        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
+        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -312,7 +299,6 @@ mod tests {
                     msg_id: wire_msg.msg_id(),
                     msg_authority: MsgAuthority::None,
                     dst_location: new_dst_location,
-                    dst_section_pk: dst_section_pk
                 },
                 msg: query,
             }
@@ -334,7 +320,10 @@ mod tests {
 
         let dst_name = XorName::random();
         let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node(dst_name);
+        let dst_location = DstLocation::Node {
+            name: dst_name,
+            section_pk: dst_section_pk,
+        };
 
         let msg_id = MessageId::new();
 
@@ -357,8 +346,7 @@ mod tests {
 
         let msg_authority = MsgAuthority::Node(node_signed);
 
-        let wire_msg =
-            WireMsg::new_msg(payload, msg_authority.clone(), dst_location, dst_section_pk)?;
+        let wire_msg = WireMsg::new_msg(payload, msg_authority.clone(), dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -366,7 +354,7 @@ mod tests {
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst_location(), &dst_location);
-        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
+        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
         assert_eq!(deserialized.src_section_pk(), Some(src_section_pk));
 
         // test deserialisation of payload
@@ -376,8 +364,7 @@ mod tests {
                 msg_envelope: MsgEnvelope {
                     msg_id: wire_msg.msg_id(),
                     msg_authority,
-                    dst_location: dst_location,
-                    dst_section_pk: dst_section_pk
+                    dst_location,
                 },
                 msg: node_msg.clone(),
             }
@@ -401,7 +388,10 @@ mod tests {
 
         let dst_name = XorName::random();
         let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node(dst_name);
+        let dst_location = DstLocation::Node {
+            name: dst_name,
+            section_pk: dst_section_pk,
+        };
 
         let msg_id = MessageId::new();
 
@@ -418,8 +408,7 @@ mod tests {
 
         let msg_authority = MsgAuthority::Client(client_signed);
 
-        let wire_msg =
-            WireMsg::new_msg(payload, msg_authority.clone(), dst_location, dst_section_pk)?;
+        let wire_msg = WireMsg::new_msg(payload, msg_authority.clone(), dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -427,7 +416,7 @@ mod tests {
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst_location(), &dst_location);
-        assert_eq!(deserialized.dst_section_pk(), dst_section_pk);
+        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -437,8 +426,7 @@ mod tests {
                 msg_envelope: MsgEnvelope {
                     msg_id: wire_msg.msg_id(),
                     msg_authority,
-                    dst_location: dst_location,
-                    dst_section_pk: dst_section_pk
+                    dst_location,
                 },
                 msg: client_msg.clone(),
             }
