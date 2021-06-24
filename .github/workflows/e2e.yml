@@ -60,6 +60,8 @@ jobs:
           args: --release
       
       - run: ./target/release/launch_network
+        env:
+          RUST_LOG: "safe_network=debug"
 
       - name: Client blob tests against local network
         shell: bash
