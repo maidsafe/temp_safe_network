@@ -257,6 +257,10 @@ mod tests {
         let mut count = 0u32;
 
         let mut correct_balance = Token::from_str("10")?;
+
+        // let's check we have the correct balance before we start
+        let _ = retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
+
         let amount_to_send = Token::from_nano(10);
         // Infinite loop
         loop {
@@ -276,7 +280,7 @@ mod tests {
             let _ =
                 retry_loop_for_pattern!( client.get_balance(), Ok(bal) if *bal == correct_balance);
 
-            if count == 50 {
+            if count == 7 {
                 break;
             }
         }

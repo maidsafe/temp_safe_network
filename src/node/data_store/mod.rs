@@ -23,11 +23,14 @@ use crate::types::{register::Register, Chunk, Map, Sequence};
 use data::{Data, DataId};
 use log::{info, trace};
 use std::{
-    fs::{self, DirEntry, File, Metadata},
-    io::{Read, Write},
+    fs::Metadata,
     marker::PhantomData,
     path::{Path, PathBuf},
 };
+
+use tokio::fs::{self, DirEntry, File};
+use tokio::io::AsyncWriteExt; // for write_all()
+
 use used_space::StoreId;
 pub use used_space::UsedSpace;
 
@@ -66,8 +69,8 @@ where
     pub async fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
-        if fs::read(&dir).is_err() {
-            Self::create_new_root(&dir)?
+        if fs::read(&dir).await.is_err() {
+            Self::create_new_root(&dir).await?
         }
 
         let used_space = UsedSpace::new(max_capacity);
@@ -82,13 +85,13 @@ where
 }
 
 impl<T: Data> DataStore<T> {
-    fn create_new_root(root: &Path) -> Result<()> {
-        fs::create_dir_all(root)?;
+    async fn create_new_root(root: &Path) -> Result<()> {
+        fs::create_dir_all(root).await?;
 
         // Verify that chunk files can be created.
         let temp_file_path = root.join("0".repeat(MAX_CHUNK_FILE_NAME_LENGTH));
-        let _ = File::create(&temp_file_path)?;
-        fs::remove_file(temp_file_path)?;
+        let _ = File::create(&temp_file_path).await?;
+        fs::remove_file(temp_file_path).await?;
 
         Ok(())
     }
@@ -118,10 +121,8 @@ impl<T: Data> DataStore<T> {
             self.used_space.total().await
         );
 
-        let res = File::create(&file_path).and_then(|mut file| {
-            file.write_all(&serialised_chunk)?;
-            file.sync_all()
-        });
+        let mut file = File::create(&file_path).await?;
+        let res = file.write_all(&serialised_chunk).await;
 
         match res {
             Ok(_) => {
@@ -158,11 +159,11 @@ impl<T: Data> DataStore<T> {
     /// Returns a data chunk previously stored under `id`.
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
-    pub fn get(&self, id: &T::Id) -> Result<T> {
-        let mut file = File::open(self.file_path(id)?)
+    pub async fn get(&self, id: &T::Id) -> Result<T> {
+        let contents = fs::read(self.file_path(id)?)
+            .await
             .map_err(|_| Error::NoSuchChunk(id.to_data_address()))?;
-        let mut contents = vec![];
-        let _ = file.read_to_end(&mut contents)?;
+
         let chunk = bincode::deserialize::<T>(&contents)?;
         // Check it's the requested chunk variant.
         if chunk.id() == id {
@@ -177,9 +178,10 @@ impl<T: Data> DataStore<T> {
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
-    pub fn has(&self, id: &T::Id) -> bool {
+    pub async fn has(&self, id: &T::Id) -> bool {
         if let Ok(path) = self.file_path(id) {
             fs::metadata(path)
+                .await
                 .as_ref()
                 .map(Metadata::is_file)
                 .unwrap_or(false)
@@ -190,20 +192,22 @@ impl<T: Data> DataStore<T> {
 
     /// Lists all keys of currently stored data.
     #[cfg_attr(not(test), allow(unused))]
-    pub fn keys(&self) -> Vec<T::Id> {
-        fs::read_dir(&self.dir)
-            .map(|entries| {
-                entries
-                    .filter_map(|entry| to_chunk_id(&entry.ok()?))
-                    .collect()
-            })
-            .unwrap_or_else(|_| Vec::new())
+    pub async fn keys(&self) -> Result<Vec<T::Id>> {
+        let mut read_dir = fs::read_dir(&self.dir).await?;
+        let mut keys = vec![];
+        while let Some(entry) = read_dir.next_entry().await? {
+            let chunk_id = to_chunk_id(&entry);
+            if let Some(id) = chunk_id {
+                keys.push(id);
+            }
+        }
+        Ok(keys)
     }
 
     async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
-        if let Ok(metadata) = fs::metadata(file_path) {
+        if let Ok(metadata) = fs::metadata(file_path).await {
             self.used_space.decrease(self.id, metadata.len()).await?;
-            fs::remove_file(file_path).map_err(From::from)
+            fs::remove_file(file_path).await.map_err(From::from)
         } else {
             Ok(())
         }

@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.13](https://github.com/maidsafe/safe_network/compare/v0.2.12...v0.2.13) (2021-06-23)
+
+### [0.2.12](https://github.com/maidsafe/safe_network/compare/v0.2.11...v0.2.12) (2021-06-23)
+
+### [0.2.11](https://github.com/maidsafe/safe_network/compare/v0.2.10...v0.2.11) (2021-06-23)
+
+
+### Bug Fixes
+
+* **updater:** point self_update to new repo name ([73c52e1](https://github.com/maidsafe/safe_network/commit/73c52e13cd39198620fbab0e3d11fd9ced3688ba))
+
+### [0.2.10](https://github.com/maidsafe/safe_network/compare/v0.2.9...v0.2.10) (2021-06-23)
+
+
+### Bug Fixes
+
+* merge remote section info during Sync ([ba28a37](https://github.com/maidsafe/safe_network/commit/ba28a3786c0b4ee3f5c5f844883e4be800e61e83))
+
 ### [0.2.9](https://github.com/maidsafe/safe_network/compare/v0.2.8...v0.2.9) (2021-06-23)
 
 

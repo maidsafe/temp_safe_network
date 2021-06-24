@@ -162,7 +162,26 @@ impl NetworkUtils for Network {
             key_sig,
         };
 
-        if !info.verify(section_chain) {
+        // With the change of AE, the voting of OtherSection is removed, which means the info of
+        // remote section is no longer being signed by own section.
+        // As this passed in section_chain is just our own chain during sync, which in a high chance
+        // won't contain the section_key of a remote section.
+        // So the handling logic is now changed to:
+        //     1, if section_chain validates, update as it is
+        //     2, if chain not validate but the if is self-validated and we don't have such entry,
+        //        we take that entry in.
+        // In case the entry turned out to be an outdated one, it will got updated via AE flow.
+        //
+        // Note this is just a temp resolvement. It's still being discussed whether shall bring back
+        // the re-vote to improve the security.
+
+        if !info.verify(section_chain)
+            && (!info.self_verify() || self.sections.get(&section_auth.value.prefix).is_some())
+        {
+            trace!(
+                "Failed to update remove section knowledge {:?}",
+                section_auth.value
+            );
             return false;
         }
 
@@ -249,6 +268,8 @@ impl NetworkUtils for Network {
 
 pub trait OtherSectionUtils {
     fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
+
+    fn self_verify(&self) -> bool;
 }
 
 impl OtherSectionUtils for OtherSection {
@@ -260,6 +281,10 @@ impl OtherSectionUtils for OtherSection {
         } else {
             self.section_auth.verify(section_chain)
         }
+    }
+
+    fn self_verify(&self) -> bool {
+        self.section_auth.self_verify()
     }
 }
 

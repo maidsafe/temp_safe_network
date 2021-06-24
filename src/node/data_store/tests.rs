@@ -102,17 +102,17 @@ async fn successful_put() -> Result<()> {
             value: data.clone(),
         };
         let used_space_before = data_store.total_used_space().await;
-        assert!(!data_store.has(&the_data.id));
+        assert!(!data_store.has(&the_data.id).await);
         data_store.put(the_data).await?;
         let used_space_after = data_store.total_used_space().await;
         assert_eq!(used_space_after, used_space_before + size);
-        assert!(data_store.has(&the_data.id));
+        assert!(data_store.has(&the_data.id).await);
         assert!(used_space_after <= chunks.total_size);
     }
 
     assert_eq!(data_store.total_used_space().await, chunks.total_size);
 
-    let mut keys = data_store.keys();
+    let mut keys = data_store.keys().await?;
     keys.sort();
     assert_eq!(
         (0..chunks.data_and_sizes.len())
@@ -161,10 +161,46 @@ async fn delete() -> Result<()> {
             value: data.clone(),
         };
         data_store.put(the_data).await?;
+
+        while !data_store.has(&the_data.id).await {
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+
+        loop {
+            let used_space = data_store.total_used_space().await;
+            println!(
+                "-----looping used : {:?} tesrget size: {:?}",
+                used_space, size
+            );
+            if &used_space == size {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+
         assert_eq!(data_store.total_used_space().await, *size);
-        assert!(data_store.has(&the_data.id));
+        assert!(data_store.has(&the_data.id).await);
+
         data_store.delete(&the_data.id).await?;
-        assert!(!data_store.has(&the_data.id));
+
+        while data_store.has(&the_data.id).await {
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        assert!(!data_store.has(&the_data.id).await);
+
+        loop {
+            let used_space = data_store.total_used_space().await;
+            println!(
+                "--222222222---looping used : {:?} tesrget size: {:?}",
+                used_space, 0
+            );
+
+            if used_space == 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+
         assert_eq!(data_store.total_used_space().await, 0);
     }
 
@@ -189,7 +225,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        let retrieved_value = data_store.get(&Id(index as u64))?;
+        let retrieved_value = data_store.get(&Id(index as u64)).await?;
         assert_eq!(*data, retrieved_value.value);
     }
 
@@ -211,8 +247,21 @@ async fn overwrite_value() -> Result<()> {
                 value: data.clone(),
             })
             .await?;
+
+        while !data_store.has(&Id(0)).await {
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+
+        loop {
+            let used_space = data_store.total_used_space().await;
+            if used_space == size {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+
         assert_eq!(data_store.total_used_space().await, size);
-        let retrieved_data = data_store.get(&Id(0))?;
+        let retrieved_data = data_store.get(&Id(0)).await?;
         assert_eq!(data, retrieved_data.value);
     }
 
@@ -225,7 +274,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let data_store: DataStore<TestData> = DataStore::new(root.path(), u64::MAX).await?;
 
     let id = Id(new_rng().gen());
-    match data_store.get(&id) {
+    match data_store.get(&id).await {
         Err(Error::NoSuchChunk(_)) => (),
         x => return Err(crate::node::Error::Logic(format!("Unexpected {:?}", x))),
     }
@@ -243,7 +292,7 @@ async fn keys() -> Result<()> {
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
-        assert!(!data_store.keys().contains(&id));
+        assert!(!data_store.keys().await?.contains(&id));
         data_store
             .put(&TestData {
                 id,
@@ -251,7 +300,7 @@ async fn keys() -> Result<()> {
             })
             .await?;
 
-        let keys = data_store.keys();
+        let keys = data_store.keys().await?;
         assert!(keys.contains(&id));
         assert_eq!(keys.len(), index + 1);
     }
@@ -259,10 +308,10 @@ async fn keys() -> Result<()> {
     for (index, _) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);
 
-        assert!(data_store.keys().contains(&id));
+        assert!(data_store.keys().await?.contains(&id));
         data_store.delete(&id).await?;
 
-        let keys = data_store.keys();
+        let keys = data_store.keys().await?;
         assert!(!keys.contains(&id));
         assert_eq!(keys.len(), chunks.data_and_sizes.len() - index - 1);
     }

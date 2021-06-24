@@ -36,8 +36,8 @@ impl ChunkStorage {
         Ok(Self { chunks })
     }
 
-    pub fn keys(&self) -> Vec<ChunkAddress> {
-        self.chunks.keys()
+    pub async fn keys(&self) -> Result<Vec<ChunkAddress>> {
+        self.chunks.keys().await
     }
 
     pub(crate) async fn store(&mut self, data: &Chunk) -> Result<NodeDuty> {
@@ -47,7 +47,7 @@ impl ChunkStorage {
     }
 
     async fn try_store(&mut self, data: &Chunk) -> Result<()> {
-        if self.chunks.has(data.address()) {
+        if self.chunks.has(data.address()).await {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -58,17 +58,18 @@ impl ChunkStorage {
         self.chunks.put(&data).await
     }
 
-    pub(crate) fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        self.chunks.get(address)
+    pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+        self.chunks.get(address).await
     }
 
     pub(crate) async fn delete_chunk(&mut self, address: &ChunkAddress) -> Result<()> {
         self.chunks.delete(&address).await
     }
 
-    pub(crate) fn get(&self, address: &ChunkAddress, msg_id: MessageId) -> NodeDuty {
+    pub(crate) async fn get(&self, address: &ChunkAddress, msg_id: MessageId) -> NodeDuty {
         let result = self
             .get_chunk(address)
+            .await
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address)));
 
         NodeDuty::Send(OutgoingMsg {
@@ -85,7 +86,7 @@ impl ChunkStorage {
 
     /// Stores a chunk that Elders sent to it for replication.
     pub async fn store_for_replication(&mut self, chunk: Chunk) -> Result<()> {
-        if self.chunks.has(chunk.address()) {
+        if self.chunks.has(chunk.address()).await {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -109,7 +110,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         requester: PublicKey,
     ) -> Result<NodeDuty> {
-        if !self.chunks.has(&head_address) {
+        if !self.chunks.has(&head_address).await {
             info!(
                 "{}: Immutable chunk doesn't exist: {:?}",
                 self, head_address
@@ -117,7 +118,7 @@ impl ChunkStorage {
             return Ok(NodeDuty::NoOp);
         }
 
-        match self.chunks.get(&head_address) {
+        match self.chunks.get(&head_address).await {
             Ok(Chunk::Private(data)) => {
                 if data.owner() == &requester {
                     self.delete_chunk(&head_address)
@@ -174,7 +175,7 @@ mod tests {
         let value = "immutable data value".to_owned().into_bytes();
         let chunk = Chunk::Public(PublicChunk::new(value));
         assert!(storage.try_store(&chunk).await.is_ok());
-        assert!(storage.chunks.has(chunk.address()));
+        assert!(storage.chunks.has(chunk.address()).await);
 
         Ok(())
     }
@@ -187,7 +188,7 @@ mod tests {
         let key = get_random_pk();
         let chunk = Chunk::Private(PrivateChunk::new(value, key));
         assert!(storage.try_store(&chunk).await.is_ok());
-        assert!(storage.chunks.has(chunk.address()));
+        assert!(storage.chunks.has(chunk.address()).await);
 
         Ok(())
     }

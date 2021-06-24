@@ -106,7 +106,7 @@ impl Node {
                     Ok(NodeTask::from(
                         adult_role
                             .reorganize_chunks(our_name, added, removed, remaining)
-                            .await,
+                            .await?,
                     ))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -451,7 +451,7 @@ impl Node {
             NodeDuty::ReadChunk { read, msg_id } => {
                 let adult = self.role.as_adult()?.clone();
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.read().await.read(&read, msg_id)];
+                    let mut ops = vec![adult.chunks.read().await.read(&read, msg_id).await];
                     ops.extend(adult.chunks.read().await.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
