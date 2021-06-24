@@ -289,7 +289,6 @@ impl WalletReplica {
         signed_debit: &SignedDebit,
         signed_credit: &SignedCredit,
     ) -> Result<()> {
-        println!("Actor signature verification");
         let debit = &signed_debit.debit;
         let credit = &signed_credit.credit;
         let debit_bytes = match bincode::serialize(&debit) {
@@ -306,12 +305,10 @@ impl WalletReplica {
             .verify(&signed_debit.actor_signature, debit_bytes)
             .is_ok();
 
-        println!("Debit is valid?: {:?}", valid_debit);
         let valid_credit = signed_debit
             .sender()
             .verify(&signed_credit.actor_signature, credit_bytes)
             .is_ok();
-        println!("Credit is valid?: {:?}", valid_debit);
 
         if valid_debit && valid_credit && credit.id() == &debit.credit_id()? {
             Ok(())
