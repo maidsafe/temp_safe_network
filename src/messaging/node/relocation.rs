@@ -8,7 +8,7 @@
 
 //! Relocation related types and utilities.
 
-use super::RoutingMsg;
+use super::NodeMsg;
 use bls::PublicKey as BlsPublicKey;
 pub use ed25519_dalek::{Keypair, Signature, Verifier};
 use serde::{Deserialize, Serialize};
@@ -29,11 +29,11 @@ pub struct RelocateDetails {
     pub age: u8,
 }
 
-/// RoutingMsg with Variant::Relocate in a convenient wrapper.
+/// NodeMsg with Variant::Relocate in a convenient wrapper.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct SignedRelocateDetails {
     /// Signed message whose content is Variant::Relocate
-    pub signed_msg: RoutingMsg,
+    pub signed_msg: NodeMsg,
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
