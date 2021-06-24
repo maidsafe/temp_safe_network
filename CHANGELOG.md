@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.15](https://github.com/maidsafe/safe_network/compare/v0.2.14...v0.2.15) (2021-06-24)
+
+
+### Features
+
+* **joins:** add MessageKind::Joins and avoid filtering the same at routing ([e1808e6](https://github.com/maidsafe/safe_network/commit/e1808e6f332ee9195ad78ae27b2777fca14eca02))
+
+
+### Bug Fixes
+
+* **joins:** add bytevalue to MessageKind::JoinRequest ([b04ac76](https://github.com/maidsafe/safe_network/commit/b04ac7645889b7257c11da506286d44a450dffc0))
+* **joins:** do not check prefix on join retries ([e3931cf](https://github.com/maidsafe/safe_network/commit/e3931cfe53fb7bd5ccd134d127e2b2c36f6eee88))
+* **joins:** redirect new node to it's closest section ([4af7086](https://github.com/maidsafe/safe_network/commit/4af70861086ad7eee8923da4a840572626ad14c2))
+* **joins:** use the correct API for fetching redirect SAP ([b2af2cc](https://github.com/maidsafe/safe_network/commit/b2af2cc59a3968d98f6ea45162901b648fd27c9f))
+* **keys:** always use new keys when joining network ([019bd02](https://github.com/maidsafe/safe_network/commit/019bd02ab7f82eccfc5c03c85e45f32607db7210))
+
 ### [0.2.14](https://github.com/maidsafe/safe_network/compare/v0.2.13...v0.2.14) (2021-06-24)
 
 ### [0.2.13](https://github.com/maidsafe/safe_network/compare/v0.2.12...v0.2.13) (2021-06-23)
