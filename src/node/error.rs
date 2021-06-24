@@ -31,8 +31,8 @@ pub enum Error {
     /// Attempted to perform an operation meant only for Elders when we are not one.
     #[error("Attempted Elder operation when not an Elder")]
     NotAnElder,
-    /// No Adults in the section to perform Chunk operation
-    #[error("No Adults available in Section({0:?})")]
+    /// Not enough in the section to perform Chunk operation
+    #[error("Not enough Adults available in Section({0:?}) to perform operation")]
     NoAdults(Prefix),
     /// Not enough space in `DataStore` to perform `put`.
     #[error("Not enough space")]
