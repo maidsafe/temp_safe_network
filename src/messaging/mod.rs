@@ -70,25 +70,6 @@ pub enum MessageType {
 }
 
 impl MessageType {
-    /// serialize the message type into bytes ready to be sent over the wire.
-    pub fn serialize(&self) -> Result<Bytes> {
-        unimplemented!();
-        /*        match self {
-            Self::SectionInfo { msg_envelope, msg } => {
-                WireMsg::serialize_section_info_msg(msg, dst_info.dst, dst_info.dst_section_pk)
-            }
-            Self::Client { msg_envelope, msg } => {
-                WireMsg::serialize_client_msg(msg, dst_info.dst, dst_info.dst_section_pk)
-            }
-            Self::Node { msg_envelope, msg } => WireMsg::serialize_node_msg(
-                msg,
-                dst_info.dst,
-                dst_info.dst_section_pk,
-                *src_section_pk,
-            ),
-        }*/
-    }
-
     /// Returns a WireMsg built from this MessageType
     pub fn to_wire_msg(&self) -> Result<WireMsg> {
         unimplemented!();

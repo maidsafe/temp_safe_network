@@ -340,11 +340,11 @@ impl<'a> Join<'a> {
                 ConnectionEvent::Disconnected(_) => continue,
             };
 
-            return match join_response {
+            match join_response {
                 JoinResponse::ResourceChallenge { .. }
                 | JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(_))
                 | JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    Ok((join_response, sender, dst_info))
+                    return Ok((join_response, sender, dst_info));
                 }
                 JoinResponse::Retry(ref section_auth)
                 | JoinResponse::Redirect(ref section_auth) => {
@@ -357,7 +357,7 @@ impl<'a> Join<'a> {
                     }
                     trace!("Received a redirect/retry JoinResponse. Sending request to the latest contacts");
 
-                    Ok((join_response, sender, dst_info))
+                    return Ok((join_response, sender, dst_info));
                 }
                 JoinResponse::Approval {
                     ref section_auth,
@@ -388,9 +388,9 @@ impl<'a> Join<'a> {
                         section_auth.value.prefix,
                     );
 
-                    Ok((join_response, sender, dst_info))
+                    return Ok((join_response, sender, dst_info));
                 }
-            };
+            }
         }
 
         error!("RoutingMsg sender unexpectedly closed");

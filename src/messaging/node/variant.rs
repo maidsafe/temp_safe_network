@@ -11,12 +11,13 @@ use super::{
     join::{JoinRequest, JoinResponse},
     join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse},
     network::Network,
+    node_msg::{NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse},
     relocation::{RelocateDetails, RelocatePromise},
     section::{ElderCandidates, Section},
     signed::SigShare,
-    RoutingMsg,
+    NodeMsg,
 };
-use crate::messaging::SectionAuthorityProvider;
+use crate::messaging::{MessageId, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use hex_fmt::HexFmt;
@@ -56,7 +57,7 @@ pub enum Variant {
         /// `SectionAuthorityProvider` and `SecuredLinkedList` of the sender's section, with the proof chain.
         src_info: (SectionSigned<SectionAuthorityProvider>, SecuredLinkedList),
         /// Message
-        msg: Option<Box<RoutingMsg>>,
+        msg: Option<Box<NodeMsg>>,
     },
     /// User-facing message
     #[serde(with = "serde_bytes")]
@@ -86,7 +87,7 @@ pub enum Variant {
     /// source in order for them to provide new proof that the node would trust.
     BouncedUntrustedMessage {
         /// Routing message
-        msg: Box<RoutingMsg>,
+        msg: Box<NodeMsg>,
         /// Destination info
         dst_info: DstInfo,
     },
@@ -132,7 +133,40 @@ pub enum Variant {
         /// Last known key by our node, used to get any newer keys
         last_known_key: Option<BlsPublicKey>,
         /// Routing message
-        msg: Box<RoutingMsg>,
+        msg: Box<NodeMsg>,
+    },
+    /// Cmds only sent internally in the network.
+    NodeCmd(NodeCmd),
+    /// An error of a NodeCmd.
+    NodeCmdError {
+        /// The error.
+        error: NodeCmdError,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+    },
+    /// Events only sent internally in the network.
+    NodeEvent {
+        /// Request.
+        event: NodeEvent,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
+    },
+    /// Queries is a read-only operation.
+    NodeQuery(NodeQuery),
+    /// The response to a query, containing the query result.
+    NodeQueryResponse {
+        /// QueryResponse.
+        response: NodeQueryResponse,
+        /// ID of causing query.
+        correlation_id: MessageId,
+    },
+    /// The returned error, from any msg handling on recipient node.
+    NodeMsgError {
+        /// The error.
+        // TODO: return node::Error instead
+        error: crate::messaging::client::Error,
+        /// ID of causing cmd.
+        correlation_id: MessageId,
     },
 }
 
@@ -206,6 +240,40 @@ impl Debug for Variant {
                 .field("sig_share", sig_share)
                 .finish(),
             Self::SectionKnowledgeQuery { .. } => write!(f, "SectionKnowledgeQuery"),
+            Self::NodeCmd(node_cmd) => write!(f, "NodeCmd({:?})", node_cmd),
+            Self::NodeCmdError {
+                error,
+                correlation_id,
+            } => f
+                .debug_struct("NodeCmdError")
+                .field("error", error)
+                .field("correlation_id", correlation_id)
+                .finish(),
+            Self::NodeEvent {
+                event,
+                correlation_id,
+            } => f
+                .debug_struct("NodeEvent")
+                .field("event", event)
+                .field("correlation_id", correlation_id)
+                .finish(),
+            Self::NodeQuery(node_query) => write!(f, "NodeQuery({:?})", node_query),
+            Self::NodeQueryResponse {
+                response,
+                correlation_id,
+            } => f
+                .debug_struct("NodeQueryResponse")
+                .field("response", response)
+                .field("correlation_id", correlation_id)
+                .finish(),
+            Self::NodeMsgError {
+                error,
+                correlation_id,
+            } => f
+                .debug_struct("NodeMsgError")
+                .field("error", error)
+                .field("correlation_id", correlation_id)
+                .finish(),
         }
     }
 }

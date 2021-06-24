@@ -24,7 +24,7 @@ pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResp
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use network::{Network, OtherSection};
 pub use node_msg::{
-    NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery,
+    NodeCmd, NodeCmdError, NodeDataError, NodeDataQueryResponse, NodeEvent, NodeQuery,
     NodeQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
 };
 pub use plain_message::PlainMessage;
@@ -44,7 +44,7 @@ use xor_name::XorName;
 
 /// Routing message sent over the network.
 #[derive(Clone, Eq, Serialize, Deserialize)]
-pub struct RoutingMsg {
+pub struct NodeMsg {
     /// Message ID.
     pub id: MessageId,
     /// The aggregation scheme to be used.
@@ -53,34 +53,8 @@ pub struct RoutingMsg {
     pub variant: Variant,
 }
 
-impl RoutingMsg {
-    /// Convenience function to deserialize a 'RoutingMsg' from bytes received over the wire.
-    /// It returns an error if the bytes don't correspond to a node message.
-    pub fn from(bytes: Bytes) -> crate::messaging::Result<Self> {
-        let deserialized = WireMsg::deserialize(bytes)?;
-        // FIXME
-        //if let MessageType::Routing { msg, .. } = deserialized {
-        //    Ok(msg)
-        //} else {
-        Err(crate::messaging::Error::FailedToParse(
-            "bytes as a node message".to_string(),
-        ))
-        //}
-    }
-
-    /// serialize this RoutingMsg into bytes ready to be sent over the wire.
-    pub fn serialize(
-        &self,
-        dst: XorName,
-        dst_section_pk: BlsPublicKey,
-    ) -> crate::messaging::Result<Bytes> {
-        unimplemented!();
-        //WireMsg::serialize_routing_msg(self, dst, dst_section_pk)
-    }
-}
-
-impl PartialEq for RoutingMsg {
-    fn eq(&self, other: &RoutingMsg) -> bool {
+impl PartialEq for NodeMsg {
+    fn eq(&self, other: &NodeMsg) -> bool {
         unimplemented!();
         /*self.src == other.src
         && self.dst == other.dst
@@ -90,10 +64,10 @@ impl PartialEq for RoutingMsg {
     }
 }
 
-impl Debug for RoutingMsg {
+impl Debug for NodeMsg {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter
-            .debug_struct("RoutingMsg")
+            .debug_struct("NodeMsg")
             .field("id", &self.id)
             .field("variant", &self.variant)
             .finish()

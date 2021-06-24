@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-/// WireMsg Header
 mod wire_msg_header;
 
 pub use self::wire_msg_header::MsgEnvelope;
@@ -175,38 +174,6 @@ impl WireMsg {
     pub fn deserialize(bytes: Bytes) -> Result<MessageType> {
         Self::from(bytes)?.to_message()
     }
-    /*
-        /// Convenience function which creates a temporary WireMsg from the provided
-        /// MsgEnvelope, returning the serialized WireMsg.
-        pub fn serialize_section_info_msg(
-            query: &section_info::SectionInfoMsg,
-            dst: XorName,
-            dst_section_pk: PublicKey,
-        ) -> Result<Bytes> {
-            Self::new_section_info_msg(query, dst, dst_section_pk)?.serialize()
-        }
-
-        /// Convenience function which creates a temporary WireMsg from the provided
-        /// Message, returning the serialized WireMsg.
-        pub fn serialize_client_msg(
-            msg: &client::ClientMsg,
-            dst: XorName,
-            dst_section_pk: PublicKey,
-        ) -> Result<Bytes> {
-            Self::new_client_msg(msg, dst, dst_section_pk)?.serialize()
-        }
-
-        /// Convenience function which creates a temporary WireMsg from the provided
-        /// node::Node, returning the serialized WireMsg.
-        pub fn serialize_node_msg(
-            msg: &node::NodeMsg,
-            dst: XorName,
-            dst_section_pk: PublicKey,
-            src_section_pk: Option<PublicKey>,
-        ) -> Result<Bytes> {
-            Self::new_node_msg(msg, dst, dst_section_pk, src_section_pk)?.serialize()
-        }
-    */
 
     /// Update dst_location in the WireMsg
     pub fn update_dst_location(&mut self, dst_location: DstLocation) {
@@ -217,8 +184,17 @@ impl WireMsg {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::{
+        client::{ChunkRead, DataQuery},
+        Aggregation, ClientSigned, MessageId, NodeSigned,
+    };
+    use crate::types::{ChunkAddress, Keypair};
     use anyhow::Result;
     use bls::SecretKey;
+    use client::{ClientMsg, ProcessMsg, Query};
+    use ed25519_dalek::Signer;
+    use node::{NodeCmd, NodeMsg, NodeSystemCmd};
+    use rand::rngs::OsRng;
     use xor_name::XorName;
 
     #[test]
@@ -309,11 +285,6 @@ mod tests {
 
     #[test]
     fn serialisation_node_msg() -> Result<()> {
-        use crate::messaging::{MessageId, NodeSigned};
-        use ed25519_dalek::Signer;
-        use node::{NodeCmd, NodeMsg, NodeSystemCmd};
-        use rand::rngs::OsRng;
-
         let src_section_pk = SecretKey::random().public_key();
         let mut rng = OsRng;
         let src_node_keypair = ed25519_dalek::Keypair::generate(&mut rng);
@@ -329,12 +300,13 @@ mod tests {
 
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
-        let node_cmd = NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+        let node_msg = NodeMsg {
+            id: msg_id,
+            aggregation: Aggregation::AtDestination,
+            variant: Variant::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
                 node_id: pk,
                 section: pk.into(),
-            }),
-            id: msg_id,
+            })),
         };
 
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;
@@ -375,14 +347,6 @@ mod tests {
 
     #[test]
     fn serialisation_client_msg() -> Result<()> {
-        use crate::{
-            messaging::{ClientSigned, MessageId},
-            types::Keypair,
-        };
-        use client::{ClientMsg, ProcessMsg, Query, TransferQuery};
-        use ed25519_dalek::Signer;
-        use rand::rngs::OsRng;
-
         let mut rng = OsRng;
         let src_client_keypair = Keypair::new_ed25519(&mut rng);
 
@@ -397,7 +361,9 @@ mod tests {
 
         let client_msg = ClientMsg::Process(ProcessMsg::Query {
             id: msg_id,
-            query: Query::Transfer(TransferQuery::GetBalance(src_client_keypair.public_key())),
+            query: Query::Data(DataQuery::Blob(ChunkRead::Get(ChunkAddress::Private(
+                XorName::random(),
+            )))),
         });
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
