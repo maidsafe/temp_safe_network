@@ -151,7 +151,8 @@ jobs:
           override: true
 
       - name: Install semverver
-        run: cargo install semverver
+      # until merged: https://github.com/rust-lang/rust-semverver/pull/200
+        run: cargo install --git https://github.com/JohnTitor/rust-semverver --rev 4a44889b883e9bc712ee7526318b666c6f8000bf
       
       - name: set current version
         run: eval "current_version=$(grep -e '^version = .*$' Cargo.toml | cut -d ' ' -f 3)"
