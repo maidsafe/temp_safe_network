@@ -1880,9 +1880,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "898b82e2e91220935a74c550026c489c24891776c6d05654132e3f71a22522e6"
+checksum = "c2dc3747d01a30d5112520fd74a68b140bb8f3f48f373ad1c54c4cfe9d3745bd"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2330,7 +2330,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe_network"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "anyhow",
  "assert_matches",
