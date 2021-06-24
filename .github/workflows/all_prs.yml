@@ -134,3 +134,30 @@ jobs:
 
       - name: Publish Dry Run
         run: cargo publish --dry-run
+
+  # Test API interface, atm do nothing if broken. TODO: compare to commits
+  test-public-api:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Test For Breaking Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: Install semverver
+        run: cargo install semverver
+      
+      - name: set current version
+        run: eval "current_version=$(grep -e '^version = .*$' Cargo.toml | cut -d ' ' -f 3)"
+      
+      - name: run the semver checks and output them for convenience
+        run: cargo semver | tee semver_out
+
+      - name: fail if required
+        run: (head -n 1 semver_out | grep "\-> $current_version") || (echo "versioning mismatch" && return 1)
