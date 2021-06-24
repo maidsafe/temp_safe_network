@@ -98,7 +98,7 @@ impl Core {
         };
 
         if shall_be_handled {
-            info!("Entropy check passed. Handling useful msg!");
+            trace!("Entropy check passed. Handling useful msg!");
             commands.extend(
                 self.handle_useful_message(sender, routing_msg, dst_info, &known_keys)
                     .await?,
