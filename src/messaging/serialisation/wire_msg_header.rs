@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{DstLocation, Error, MessageId, MsgAuthority, Result};
-use bls::PublicKey;
 use bytes::Bytes;
 use cookie_factory::{bytes::be_u16, combinator::slice, gen, gen_simple};
 use serde::{Deserialize, Serialize};
@@ -37,7 +36,6 @@ pub struct MsgEnvelope {
     pub msg_id: MessageId,
     pub msg_authority: MsgAuthority,
     pub dst_location: DstLocation,
-    pub dst_section_pk: PublicKey,
 }
 
 // Bytes length in the header for the 'header_size' field
@@ -50,12 +48,7 @@ const HDR_VERSION_BYTES_END: usize = HDR_VERSION_BYTES_START + HDR_VERSION_BYTES
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(
-        msg_id: MessageId,
-        msg_authority: MsgAuthority,
-        dst_location: DstLocation,
-        dst_section_pk: PublicKey,
-    ) -> Self {
+    pub fn new(msg_id: MessageId, msg_authority: MsgAuthority, dst_location: DstLocation) -> Self {
         Self {
             //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,
@@ -63,7 +56,6 @@ impl WireMsgHeader {
                 msg_id,
                 msg_authority,
                 dst_location,
-                dst_section_pk,
             },
         }
     }
@@ -76,11 +68,6 @@ impl WireMsgHeader {
     // Return the id of this message
     pub fn msg_id(&self) -> MessageId {
         self.msg_envelope.msg_id
-    }
-
-    // Return the destination section PublicKey for this message
-    pub fn dst_section_pk(&self) -> PublicKey {
-        self.msg_envelope.dst_section_pk
     }
 
     // Return the destination for this message
