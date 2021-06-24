@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{Itinerary, MessageId, MessageType};
-use crate::node::{
-    state_db::{get_network_keypair, store_network_keypair},
-    utils, Config as NodeConfig, Error, Result,
-};
+use crate::node::{state_db::store_network_keypair, utils, Config as NodeConfig, Error, Result};
 use crate::routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
     SectionAuthorityProviderUtils,
@@ -39,12 +36,13 @@ pub struct Network {
 #[allow(missing_docs)]
 impl Network {
     pub async fn new(root_dir: &Path, config: &NodeConfig) -> Result<(Self, EventStream)> {
-        let keypair = get_network_keypair(root_dir).await?;
+        // FIXME: Re-enable when we have rejoins working
+        // let keypair = get_network_keypair(root_dir).await?;
 
         let routing_config = RoutingConfig {
             first: config.is_first(),
             transport_config: config.network_config().clone(),
-            keypair,
+            keypair: None,
         };
         let (routing, event_stream) = RoutingNode::new(routing_config).await?;
 

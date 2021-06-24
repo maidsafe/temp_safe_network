@@ -124,10 +124,13 @@ impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent command line args.
     pub fn new() -> Result<Self, Error> {
-        let mut config = match Self::read_from_file() {
-            Ok(Some(config)) => config,
-            Ok(None) | Err(_) => Default::default(),
-        };
+        // FIXME: Re-enable when we have rejoins working
+        // let mut config = match Self::read_from_file() {
+        //     Ok(Some(config)) => config,
+        //     Ok(None) | Err(_) => Default::default(),
+        // };
+
+        let mut config = Config::default();
 
         let mut command_line_args = Config::from_args();
         command_line_args.validate()?;
@@ -338,6 +341,7 @@ impl Config {
     }
 
     /// Reads the default node config file.
+    #[allow(unused)]
     fn read_from_file() -> Result<Option<Config>> {
         let path = project_dirs()?.join(CONFIG_FILE);
 
