@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use safe_network::node::Config;
 use std::{fs::remove_file, io};
 use structopt::StructOpt;
@@ -20,18 +20,16 @@ use structopt::StructOpt;
 
 fn main() -> Result<()> {
     // Create some config and write it to disk
-    let mut file_config = Config {
-        skip_igd: true,
-        ..Default::default()
-    };
+    let file_config = Config::default();
 
-    file_config.network_config.local_ip = Some(
-        "192.168.0.1"
-            .parse()
-            .map_err(|_| anyhow!("Invalid IP address format"))?,
-    );
-    file_config.network_config.local_port = Some(0);
-    file_config.network_config.external_port = Some(12345);
+    // TODO: Uncomment the below lines once we enable reading config from disk
+    // file_config.network_config.local_ip = Some(
+    //     "192.168.0.1"
+    //         .parse()
+    //         .map_err(|_| anyhow!("Invalid IP address format"))?,
+    // );
+    // file_config.network_config.local_port = Some(0);
+    // file_config.network_config.external_port = Some(12345);
     file_config.write_to_disk()?;
 
     // This should load the config from disk and
