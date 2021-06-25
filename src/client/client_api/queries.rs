@@ -11,6 +11,8 @@ use crate::client::{connections::QueryResult, errors::Error};
 use crate::messaging::client::{ClientSig, Query};
 use crate::types::{PublicKey, Signature};
 use log::debug;
+use tokio::time::Duration;
+const QUERY_TIMEOUT: Duration = Duration::from_secs(20); // 20 seconds
 
 impl Client {
     /// Send a Query to the network and await a response
@@ -35,6 +37,11 @@ impl Client {
         let client_pk = self.public_key();
         let signature = self.keypair.sign(b"TODO");
 
-        self.send_signed_query(query, client_pk, signature).await
+        tokio::time::timeout(
+            QUERY_TIMEOUT,
+            self.send_signed_query(query, client_pk, signature),
+        )
+        .await
+        .map_err(|_| Error::NoResponse)?
     }
 }

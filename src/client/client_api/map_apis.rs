@@ -807,10 +807,7 @@ mod tests {
         }
 
         match res {
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::DataNotFound(_),
-                ..
-            }) => (),
+            Err(Error::NoResponse) => (),
             _ => bail!("Unexpected success"),
         }
         Ok(())
@@ -837,10 +834,7 @@ mod tests {
         }
 
         match res {
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::DataNotFound(_),
-                ..
-            }) => (),
+            Err(Error::NoResponse) => (),
             _ => bail!("Unexpected success"),
         }
 
@@ -897,10 +891,7 @@ mod tests {
 
         let res = client.get_map_shell(address).await;
         match res {
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::DataNotFound(_),
-                ..
-            }) => (),
+            Err(Error::NoResponse) => (),
             Ok(data) => bail!(
                 "Unexpected Success: Validating owners should fail.  Data received : {:?}",
                 data
