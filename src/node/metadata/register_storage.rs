@@ -102,6 +102,7 @@ impl RegisterStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, Action::Read, requester).await {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -165,6 +166,7 @@ impl RegisterStorage {
             .and_then(|register| register.read(Some(requester)).map_err(Error::from))
         {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -184,6 +186,7 @@ impl RegisterStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, Action::Read, requester).await {
             Ok(res) => Ok(res.owner()),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -211,6 +214,7 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -238,6 +242,7 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
