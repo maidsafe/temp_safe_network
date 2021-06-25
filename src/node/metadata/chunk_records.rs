@@ -179,8 +179,13 @@ impl ChunkRecords {
             response.is_success(),
         ) {
             // If a full adult responds with error. Drop the response
-            if !response.is_success() && self.capacity.is_full(&src).await {
-                // We've already responded already with a success
+            if (!response.is_success() && self.capacity.is_full(&src).await)
+                || (matches!(
+                    response,
+                    QueryResponse::GetChunk(Err(crate::messaging::client::Error::DataNotFound(_)))
+                ))
+            {
+                // We've already responded already with a success or the returned error is `DataNotFound`
                 // so do nothing
             } else {
                 duties.push(NodeDuty::Send(build_client_query_response(
