@@ -248,6 +248,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(&address, requester, MapAction::Read).await {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -296,6 +297,7 @@ impl MapStorage {
             .map(|data| data.version())
         {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -329,6 +331,7 @@ impl MapStorage {
                 .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
         }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -353,6 +356,7 @@ impl MapStorage {
             .map(|data| data.keys())
         {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -377,6 +381,7 @@ impl MapStorage {
             Map::Unseq(map) => map.values().into(),
         }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -401,6 +406,7 @@ impl MapStorage {
             Map::Unseq(map) => map.entries().clone().into(),
         }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -425,6 +431,7 @@ impl MapStorage {
             .map(|data| data.permissions())
         {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -453,6 +460,7 @@ impl MapStorage {
                     .map(MapPermissionSet::clone)
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 

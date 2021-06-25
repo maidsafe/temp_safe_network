@@ -142,6 +142,7 @@ impl SequenceStorage {
             .await
         {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(build_client_query_response(
@@ -210,6 +211,7 @@ impl SequenceStorage {
                     .ok_or(Error::NetworkData(DtError::NoSuchEntry))
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -235,6 +237,7 @@ impl SequenceStorage {
                 None => Err(Error::NetworkData(DtError::NoSuchEntry)),
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -262,6 +265,7 @@ impl SequenceStorage {
                     .map_err(|e| e.into())
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -292,6 +296,7 @@ impl SequenceStorage {
                 Ok(res)
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
@@ -322,6 +327,7 @@ impl SequenceStorage {
                 Ok(res)
             }) {
             Ok(res) => Ok(res),
+            Err(Error::NoSuchChunk(addr)) => return Err(Error::NoSuchChunk(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 

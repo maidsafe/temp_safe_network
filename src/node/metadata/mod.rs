@@ -20,6 +20,7 @@ use crate::messaging::{
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
+use crate::node::error::Error;
 use crate::node::{
     capacity::Capacity,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
@@ -71,7 +72,10 @@ impl Metadata {
         requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores.read(query, id, requester, origin).await
+        match self.elder_stores.read(query, id, requester, origin).await {
+            Err(Error::NoSuchChunk(_)) => Ok(NodeDuty::NoOp),
+            res => res,
+        }
     }
 
     pub async fn record_adult_read_liveness(
