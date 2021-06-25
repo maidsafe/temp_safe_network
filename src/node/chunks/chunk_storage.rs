@@ -72,20 +72,16 @@ impl ChunkStorage {
             .await
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Chunk(*address)));
 
-        if result.is_ok() {
-            NodeDuty::Send(OutgoingMsg {
-                msg: MsgType::Node(NodeMsg::NodeQueryResponse {
-                    response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                }),
-                section_source: false, // sent as single node
-                dst: DstLocation::Section(*address.name()),
-                aggregation: Aggregation::None,
-            })
-        } else {
-            NodeDuty::NoOp
-        }
+        NodeDuty::Send(OutgoingMsg {
+            msg: MsgType::Node(NodeMsg::NodeQueryResponse {
+                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+            }),
+            section_source: false, // sent as single node
+            dst: DstLocation::Section(*address.name()),
+            aggregation: Aggregation::None,
+        })
     }
 
     /// Stores a chunk that Elders sent to it for replication.
