@@ -1089,10 +1089,7 @@ mod tests {
         }
 
         match res {
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::DataNotFound(_),
-                ..
-            }) => Ok(()),
+            Err(Error::NoResponse) => Ok(()),
             Err(err) => Err(anyhow!(
                 "Unexpected error returned when deleting a nonexisting Private Sequence: {}",
                 err
