@@ -28,7 +28,7 @@ mod sap;
 
 pub use self::{
     errors::{Error, Result},
-    location::{Aggregation, DstLocation, EndUser, Itinerary, SrcLocation},
+    location::{DstLocation, EndUser, Itinerary, SrcLocation},
     msg_authority::{BlsShareSigned, ClientSigned, MsgAuthority, NodeSigned, SectionSigned},
     msg_id::{MessageId, MESSAGE_ID_LEN},
     sap::SectionAuthorityProvider,
@@ -67,54 +67,4 @@ pub enum MessageType {
         /// the message
         msg: node::NodeMsg,
     },
-}
-
-impl MessageType {
-    /// Returns a WireMsg built from this MessageType
-    pub fn to_wire_msg(&self) -> Result<WireMsg> {
-        unimplemented!();
-        /*        match self {
-            Self::SectionInfo { msg_envelope, msg } => {
-                WireMsg::new_section_info_msg(msg, dst_info.dst, dst_info.dst_section_pk)
-            }
-            Self::Client { msg_envelope, msg } => {
-                WireMsg::new_client_msg(msg, dst_info.dst, dst_info.dst_section_pk)
-            }
-            Self::Node { msg_envelope, msg } => {
-                WireMsg::new_node_msg(msg, dst_info.dst, dst_info.dst_section_pk, *src_section_pk)
-            }
-        }*/
-    }
-
-    /// Update the destination info on the contained message
-    pub fn update_dst_info(&mut self, dst_pk: Option<PublicKey>, dst: Option<XorName>) {
-        unimplemented!();
-        /*
-        match self {
-            Self::Client { dst_info, .. } | Self::SectionInfo { dst_info, .. } => {
-                if let Some(dst) = dst {
-                    dst_info.dst = dst
-                }
-                if let Some(dst_pk) = dst_pk {
-                    dst_info.dst_section_pk = dst_pk
-                }
-            }
-            Self::Routing { dst_info, .. } => {
-                if let Some(dst) = dst {
-                    dst_info.dst = dst
-                }
-                if let Some(dst_pk) = dst_pk {
-                    dst_info.dst_section_pk = dst_pk
-                }
-            }
-            Self::Node { dst_info, .. } => {
-                if let Some(dst) = dst {
-                    dst_info.dst = dst
-                }
-                if let Some(dst_pk) = dst_pk {
-                    dst_info.dst_section_pk = dst_pk
-                }
-            }
-        }*/
-    }
 }

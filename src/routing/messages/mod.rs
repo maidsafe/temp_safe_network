@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod msg_authority;
 mod plain_message;
-mod src_authority;
 
-pub use self::{plain_message::PlainMessageUtils, src_authority::SrcAuthorityUtils};
+pub use self::{msg_authority::MsgAuthorityUtils, plain_message::PlainMessageUtils};
 use crate::messaging::{
-    node::{KeyedSig, PlainMessage, RoutingMsg, SigShare, SrcAuthority, Variant},
-    Aggregation, DstLocation, MessageId,
+    node::{KeyedSig, MsgAuthority, NodeMsg, PlainMessage, SigShare, Variant},
+    Aggregation, BlsShareSigned, DstLocation, MessageId, MsgAuthority, NodeSigned, SectionSigned,
+    WireMsg,
 };
 use crate::routing::{
     ed25519::{self, Verifier},
@@ -35,22 +36,21 @@ pub struct SignableView<'a> {
     pub variant: &'a Variant,
 }
 
-/// Message sent over the network.
-pub(crate) trait RoutingMsgUtils {
+// Utilities for WireMsg.
+pub(crate) trait WireMsgUtils {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()>;
 
-    // Verify if the section chain of the SrcAuthority can be trusted
+    // Verify if the section chain of the MsgAuthority can be trusted
     // based on a set of known keys.
     fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool;
 
     /// Creates a signed message where signature is assumed valid.
     fn new_signed(
-        src: SrcAuthority,
+        payload: Bytes,
+        msg_authority: MsgAuthority,
         dst: DstLocation,
-        variant: Variant,
-        section_key: bls::PublicKey,
-    ) -> Result<RoutingMsg, Error>;
+    ) -> Result<WireMsg, Error>;
 
     /// Creates a message signed using a BLS KeyShare for destination accumulation
     fn for_dst_accumulation(
@@ -59,11 +59,11 @@ pub(crate) trait RoutingMsgUtils {
         dst: DstLocation,
         variant: Variant,
         proof_chain: SecuredLinkedList,
-    ) -> Result<RoutingMsg, Error>;
+    ) -> Result<NodeMsg, Error>;
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
-    fn into_dst_accumulated(self, sig: KeyedSig) -> Result<RoutingMsg>;
+    fn into_dst_accumulated(self, sig: KeyedSig) -> Result<NodeMsg>;
 
     fn signable_view(&self) -> SignableView;
 
@@ -72,8 +72,8 @@ pub(crate) trait RoutingMsgUtils {
         node: &Node,
         dst: DstLocation,
         variant: Variant,
-        section_key: bls::PublicKey,
-    ) -> Result<RoutingMsg>;
+        section_key: BlsPublicKey,
+    ) -> Result<NodeMsg>;
 
     /// Creates a signed message from a section.
     /// Note: `signed` isn't verified and is assumed valid.
@@ -81,34 +81,36 @@ pub(crate) trait RoutingMsgUtils {
         plain: PlainMessage,
         sig: KeyedSig,
         section_chain: SecuredLinkedList,
-    ) -> Result<RoutingMsg>;
+    ) -> Result<NodeMsg>;
 
     /// Getter
     fn keyed_sig(&self) -> Option<KeyedSig>;
 
     /// Returns an updated message with the provided Section key i.e. known to be latest.
-    fn updated_with_latest_key(&mut self, section_pk: bls::PublicKey);
+    fn updated_with_latest_key(&mut self, section_pk: BlsPublicKey);
 }
 
-impl RoutingMsgUtils for RoutingMsg {
+impl WireMsgUtils for WireMsg {
     /// Verify this message is properly signed.
     fn check_signature(&self) -> Result<()> {
-        let bytes = bincode::serialize(&self.signable_view()).map_err(|_| Error::InvalidMessage)?;
-
-        match &self.src {
-            SrcAuthority::Node {
+        match self.msg_authority() {
+            MsgAuthority::Node(NodeSigned {
                 public_key,
                 signature,
                 ..
-            } => {
-                if public_key.verify(&bytes, signature).is_err() {
+            }) => {
+                if public_key.verify(&self.payload, signature).is_err() {
                     error!("Failed signature: {:?}", self);
                     return Err(Error::FailedSignature);
                 }
             }
-            SrcAuthority::BlsShare { sig_share, .. } => {
+            MsgAuthority::BlsShare(BlsShareSigned {
+                sig_share,
+                section_pk,
+                ..
+            }) => {
                 // Signed chain is required for accumulation at destination.
-                if sig_share.public_key_set.public_key() != self.section_pk {
+                if sig_share.public_key_set.public_key() != *section_pk {
                     error!(
                         "Signed share public key doesn't match signed chain last key: {:?}",
                         self
@@ -116,17 +118,19 @@ impl RoutingMsgUtils for RoutingMsg {
                     return Err(Error::InvalidMessage);
                 }
 
-                if !sig_share.verify(&bytes) {
+                if !sig_share.verify(&self.payload) {
                     error!("Failed signature: {:?}", self);
                     return Err(Error::FailedSignature);
                 }
             }
-            SrcAuthority::Section { sig, .. } => {
+            MsgAuthority::Section(SectionSigned {
+                sig, section_pk, ..
+            }) => {
                 // Signed chain is required for section-src messages.
-                if !self.section_pk.verify(&sig.signature, &bytes) {
+                if !section_pk.verify(&sig.signature, &self.payload) {
                     error!(
                         "Failed signature: {:?} (Section PK: {:?})",
-                        self, self.section_pk
+                        self, section_pk
                     );
                     return Err(Error::FailedSignature);
                 }
@@ -136,43 +140,42 @@ impl RoutingMsgUtils for RoutingMsg {
         Ok(())
     }
 
-    // Verify if the section chain of the SrcAuthority can be trusted
+    // Verify if the section chain of the MsgAuthority can be trusted
     // based on a set of known keys.
     fn verify_src_section_chain(&self, known_keys: &[BlsPublicKey]) -> bool {
-        match &self.src {
-            SrcAuthority::Node { .. } => true,
-            SrcAuthority::BlsShare { section_chain, .. }
-            | SrcAuthority::Section { section_chain, .. } => {
+        unimplemented!();
+        /*match &self.src {
+            MsgAuthority::Node { .. } => true,
+            MsgAuthority::BlsShare { section_chain, .. }
+            | MsgAuthority::Section { section_chain, .. } => {
                 section_chain.check_trust(known_keys.iter())
             }
-        }
+        }*/
     }
 
     /// Creates a signed message where signature is assumed valid.
     fn new_signed(
-        src: SrcAuthority,
+        payload: Bytes,
+        msg_authority: MsgAuthority,
         dst: DstLocation,
-        variant: Variant,
-        section_pk: bls::PublicKey,
-    ) -> Result<RoutingMsg, Error> {
-        // Create message id from src authority signature
-        let id = match &src {
-            SrcAuthority::Node { signature, .. } => MessageId::from_content(signature),
-            SrcAuthority::BlsShare { sig_share, .. } => {
+    ) -> Result<WireMsg, Error> {
+        // Create message id from msg authority signature
+        let id = match &msg_authority {
+            MsgAuthority::None => MessageId::new(),
+            MsgAuthority::Client(ClientSigned { signature, .. }) => {
+                MessageId::from_content(signature)
+            }
+            MsgAuthority::Node(NodeSigned { signature, .. }) => MessageId::from_content(signature),
+            MsgAuthority::BlsShare(BlsShareSigned { sig_share, .. }) => {
                 MessageId::from_content(&sig_share.signature_share.0)
             }
-            SrcAuthority::Section { sig, .. } => MessageId::from_content(&sig.signature),
+            MsgAuthority::Section(SectionSigned { sig, .. }) => {
+                MessageId::from_content(&sig.signature)
+            }
         }
         .unwrap_or_default();
 
-        let msg = RoutingMsg {
-            id,
-            src,
-            dst,
-            aggregation: Aggregation::None,
-            variant,
-            section_pk,
-        };
+        let msg = WireMsg::new_msg(id, payload, msg_authority, dst)?;
 
         Ok(msg)
     }
@@ -185,6 +188,8 @@ impl RoutingMsgUtils for RoutingMsg {
         variant: Variant,
         section_chain: SecuredLinkedList,
     ) -> Result<Self, Error> {
+        unimplemented!();
+        /*
         let serialized = bincode::serialize(&SignableView {
             dst: &dst,
             variant: &variant,
@@ -198,19 +203,21 @@ impl RoutingMsgUtils for RoutingMsg {
             signature_share,
         };
 
-        let src = SrcAuthority::BlsShare {
+        let src = MsgAuthority::BlsShare {
             src_name,
             sig_share,
             section_chain: section_chain.clone(),
         };
 
         Self::new_signed(src, dst, variant, *section_chain.last_key())
+        */
     }
 
     /// Converts the message src authority from `BlsShare` to `Section` on successful accumulation.
     /// Returns errors if src is not `BlsShare` or if the signed is invalid.
     fn into_dst_accumulated(mut self, sig: KeyedSig) -> Result<Self> {
-        let (sig_share, src_name, section_chain) = if let SrcAuthority::BlsShare {
+        unimplemented!();
+        /*let (sig_share, src_name, section_chain) = if let MsgAuthority::BlsShare {
             sig_share,
             src_name,
             section_chain,
@@ -238,20 +245,21 @@ impl RoutingMsgUtils for RoutingMsg {
             return Err(Error::FailedSignature);
         }
 
-        self.src = SrcAuthority::Section {
+        self.src = MsgAuthority::Section {
             sig,
             src_name,
             section_chain: section_chain.clone(),
         };
 
-        Ok(self)
+        Ok(self)*/
     }
 
     fn signable_view(&self) -> SignableView {
-        SignableView {
+        unimplemented!();
+        /*SignableView {
             dst: &self.dst,
             variant: &self.variant,
-        }
+        }*/
     }
 
     /// Creates a signed message from single node.
@@ -259,21 +267,23 @@ impl RoutingMsgUtils for RoutingMsg {
         node: &Node,
         dst: DstLocation,
         variant: Variant,
-        section_pk: bls::PublicKey,
+        section_pk: BlsPublicKey,
     ) -> Result<Self> {
-        let serialized = bincode::serialize(&SignableView {
+        // TODO: ideally we should get rid of SignableView and sign just the message
+        let msg_payload = WireMsg::serialize_msg_payload(&SignableView {
             dst: &dst,
             variant: &variant,
         })
         .map_err(|_| Error::InvalidMessage)?;
 
-        let signature = ed25519::sign(&serialized, &node.keypair);
-        let src = SrcAuthority::Node {
+        let signature = ed25519::sign(&msg_payload, &node.keypair);
+        let msg_authority = MsgAuthority::Node(NodeSigned {
             public_key: node.keypair.public,
+            section_pk,
             signature,
-        };
+        });
 
-        RoutingMsg::new_signed(src, dst, variant, section_pk)
+        Self::new_signed(msg_payload, msg_authority, dst)
     }
 
     /// Creates a signed message from a section.
@@ -283,33 +293,43 @@ impl RoutingMsgUtils for RoutingMsg {
         sig: KeyedSig,
         section_chain: SecuredLinkedList,
     ) -> Result<Self> {
-        Self::new_signed(
-            SrcAuthority::Section {
-                src_name: plain.src,
-                sig,
-                section_chain: section_chain.clone(),
-            },
-            plain.dst,
-            plain.variant,
-            *section_chain.last_key(),
-        )
+        unimplemented!();
+        /*
+                // TODO: ideally we should get rid of SignableView and sign just the message
+                let msg_payload = WireMsg::serialize_msg_payload(&SignableView {
+                    dst: &plain.dst,
+                    variant: &plain.variant,
+                })
+                .map_err(|_| Error::InvalidMessage)?;
+
+                let msg_authority = MsgAuthority::Section {
+                    src_name: plain.src,
+                    sig,
+                    section_pk: section_chain.last_key(),
+                };
+
+                Self::new_signed(msg_payload, msg_authority, plain.dst)
+        */
     }
 
     /// Getter
     fn keyed_sig(&self) -> Option<KeyedSig> {
-        if let SrcAuthority::Section { sig, .. } = &self.src {
+        unimplemented!();
+        /*        if let MsgAuthority::Section { sig, .. } = &self.src {
             Some(sig.clone())
         } else {
             None
         }
+        */
     }
 
-    fn updated_with_latest_key(&mut self, section_pk: bls::PublicKey) {
-        self.section_pk = section_pk
+    fn updated_with_latest_key(&mut self, section_pk: BlsPublicKey) {
+        unimplemented!();
+        //self.section_pk = section_pk
     }
 }
 
-/// Error returned from `RoutingMsg::extend_proof_chain`.
+/// Error returned from `NodeMsg::extend_proof_chain`.
 #[derive(Debug, Error)]
 pub enum ExtendSignedChainError {
     #[error("message has no signed chain")]

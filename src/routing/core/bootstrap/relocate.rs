@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, RelocatePayload, RoutingMsg, Section,
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, RelocatePayload, Section,
         SignedRelocateDetails, Variant,
     },
     DstInfo, DstLocation, MessageType, SectionAuthorityProvider,
@@ -17,7 +17,7 @@ use crate::routing::{
     dkg::SectionSignedUtils,
     ed25519,
     error::{Error, Result},
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
     relocation::{RelocatePayloadUtils, SignedRelocateDetailsUtils},
@@ -261,7 +261,7 @@ impl JoiningAsRelocated {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let variant = Variant::JoinAsRelocatedRequest(Box::new(join_request));
-        let routing_msg = RoutingMsg::single_src(
+        let routing_msg = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
             variant,

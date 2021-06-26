@@ -8,14 +8,14 @@
 
 use super::{delivery_group, enduser_registry::SocketId, Core};
 use crate::messaging::{
-    node::{Network, NodeState, Peer, Proposal, RoutingMsg, Section, Variant},
+    node::{Network, NodeMsg, NodeState, Peer, Proposal, Section, Variant},
     DstInfo, EndUser, Itinerary, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
     WireMsg,
 };
 use crate::routing::{
     dkg::commands::DkgCommands,
     error::Result,
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -142,15 +142,16 @@ impl Core {
     }
 
     pub async fn add_to_filter(&mut self, wire_msg: &WireMsg) -> bool {
+        /* TODO
         if wire_msg.is_join_request() {
             info!("Not filtering JoinRequest");
             return true;
-        }
-        self.msg_filter.add_to_filter(&wire_msg.msg_id()).await
+        }*/
+        self.msg_filter.add_to_filter(wire_msg.msg_id()).await
     }
 
     // Send message over the network.
-    pub async fn relay_message(&self, msg: &RoutingMsg) -> Result<Option<Command>> {
+    pub async fn relay_message(&self, msg: &NodeMsg) -> Result<Option<Command>> {
         let (presumed_targets, dg_size) = delivery_group::delivery_targets(
             &msg.dst,
             &self.node.name(),
@@ -234,7 +235,7 @@ impl Core {
         // If the msg is to be aggregated at dst, we don't vote among our peers, we simply send the
         // msg as our vote to the dst.
         let msg = if itinerary.aggregate_at_dst() {
-            RoutingMsg::for_dst_accumulation(
+            NodeMsg::for_dst_accumulation(
                 self.section_keys_provider.key_share()?,
                 itinerary.src.name(),
                 itinerary.dst,
@@ -245,7 +246,7 @@ impl Core {
             let proposal = self.create_aggregate_at_src_proposal(itinerary.dst, variant, None)?;
             return self.propose(proposal);
         } else {
-            RoutingMsg::single_src(
+            NodeMsg::single_src(
                 &self.node,
                 itinerary.dst,
                 variant,

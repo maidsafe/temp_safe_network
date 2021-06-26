@@ -23,7 +23,7 @@ pub(crate) struct WireMsgHeader {
     // We serialise a header size field, but we don't know it up front until we serialise it.
     // header_size: u16,
     version: u16,
-    msg_envelope: MsgEnvelope,
+    pub msg_envelope: MsgEnvelope,
 }
 
 // The message envelope contains the ID of the message, the authority
@@ -63,21 +63,6 @@ impl WireMsgHeader {
     // Return the message envelope
     pub fn msg_envelope(&self) -> &MsgEnvelope {
         &self.msg_envelope
-    }
-
-    // Return the id of this message
-    pub fn msg_id(&self) -> MessageId {
-        self.msg_envelope.msg_id
-    }
-
-    // Return the destination for this message
-    pub fn dst_location(&self) -> &DstLocation {
-        &self.msg_envelope.dst_location
-    }
-
-    // Return the message authority
-    pub fn msg_authority(&self) -> &MsgAuthority {
-        &self.msg_envelope.msg_authority
     }
 
     // Set a new dst_location in the message envelope

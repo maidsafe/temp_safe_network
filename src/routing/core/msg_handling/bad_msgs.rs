@@ -8,16 +8,17 @@
 
 use super::Core;
 use crate::messaging::{
-    node::{Peer, RoutingMsg, Variant},
+    node::{NodeMsg, Peer, Variant},
     DstInfo, DstLocation,
 };
 use crate::routing::{
-    messages::{RoutingMsgUtils, SrcAuthorityUtils},
+    messages::{MsgAuthorityUtils, WireMsgUtils},
     peer::PeerUtils,
     routing_api::command::Command,
     section::{SectionAuthorityProviderUtils, SectionUtils},
     Error, Result,
 };
+use bls::PublicKey as BlsPublicKey;
 use std::net::SocketAddr;
 
 // Bad msgs
@@ -27,18 +28,19 @@ impl Core {
     pub(crate) fn handle_untrusted_message(
         &self,
         sender: Option<SocketAddr>,
-        routing_msg: &RoutingMsg,
+        routing_msg: &NodeMsg,
         received_dst_info: DstInfo,
     ) -> Result<Command> {
-        let src_name = routing_msg.src.name();
+        unimplemented!();
+        /*        let src_name = routing_msg.src.name();
         let bounce_dst_key = self.section_key_by_name(&src_name);
         let dst_info = DstInfo {
             dst: src_name,
             dst_section_pk: bounce_dst_key,
         };
-        let bounce_msg = RoutingMsg::single_src(
+        let bounce_msg = NodeMsg::single_src(
             &self.node,
-            DstLocation::DirectAndUnrouted,
+            DstLocation::DirectAndUnrouted(bounce_dst_key),
             Variant::BouncedUntrustedMessage {
                 msg: Box::new(routing_msg.clone()),
                 dst_info: received_dst_info,
@@ -52,14 +54,14 @@ impl Core {
             self.send_message_to_our_elders(bounce_msg)
         };
 
-        Ok(cmd)
+        Ok(cmd)*/
     }
 
     pub(crate) fn handle_bounced_untrusted_message(
         &self,
         sender: Peer,
-        dst_key: bls::PublicKey,
-        mut bounced_msg: RoutingMsg,
+        dst_key: BlsPublicKey,
+        mut bounced_msg: NodeMsg,
     ) -> Result<Command> {
         let span = trace_span!("Received BouncedUntrustedMessage", ?bounced_msg, %sender);
         let _span_guard = span.enter();
@@ -77,9 +79,9 @@ impl Core {
                         Error::InvalidMessage // TODO: more specific error
                     })?;
 
-                RoutingMsg::single_src(
+                NodeMsg::single_src(
                     &self.node,
-                    DstLocation::DirectAndUnrouted,
+                    DstLocation::DirectAndUnrouted(dst_key),
                     Variant::Sync { section, network },
                     self.section.authority_provider().section_key(),
                 )?

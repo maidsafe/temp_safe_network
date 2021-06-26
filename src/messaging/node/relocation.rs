@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Relocation related types and utilities.
+//! Relocation related messages.
 
 use super::NodeMsg;
+use crate::messaging::SectionSigned;
 use bls::PublicKey as BlsPublicKey;
 pub use ed25519_dalek::{Keypair, Signature, Verifier};
 use serde::{Deserialize, Serialize};
@@ -29,18 +30,13 @@ pub struct RelocateDetails {
     pub age: u8,
 }
 
-/// NodeMsg with Variant::Relocate in a convenient wrapper.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct SignedRelocateDetails {
-    /// Signed message whose content is Variant::Relocate
-    pub signed_msg: NodeMsg,
-}
-
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 /// Details of a node relocation and new signed name
 pub struct RelocatePayload {
-    /// The Relocate Signed message.
-    pub details: SignedRelocateDetails,
+    /// Message whose content is Variant::Relocate
+    pub details: NodeMsg,
+    /// Section authority for the details
+    pub section_signed: SectionSigned,
     /// The new name of the node signed using its old public_key, to prove the node identity.
     pub signature_of_new_name_with_old_key: Signature,
 }

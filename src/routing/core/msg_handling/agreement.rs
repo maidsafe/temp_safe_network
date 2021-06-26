@@ -10,7 +10,7 @@ use std::cmp;
 
 use crate::messaging::{
     node::{
-        KeyedSig, MembershipState, NodeState, PlainMessage, Proposal, RoutingMsg, SectionSigned,
+        KeyedSig, MembershipState, NodeMsg, NodeState, PlainMessage, Proposal, SectionSigned,
         Variant,
     },
     DstInfo, DstLocation, SectionAuthorityProvider,
@@ -18,7 +18,7 @@ use crate::messaging::{
 use crate::routing::{
     dkg::SectionSignedUtils,
     error::Result,
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
@@ -224,7 +224,7 @@ impl Core {
                 .map(|peer| (*peer.name(), *peer.addr()))
                 .collect();
             if !sync_recipients.is_empty() {
-                let sync_message = RoutingMsg::single_src(
+                let sync_message = NodeMsg::single_src(
                     &self.node,
                     DstLocation::DirectAndUnrouted,
                     Variant::Sync {
@@ -296,7 +296,7 @@ impl Core {
         sig: KeyedSig,
         dst_info: DstInfo,
     ) -> Result<Command> {
-        let message = RoutingMsg::section_src(message, sig, section_chain)?;
+        let message = NodeMsg::section_src(message, sig, section_chain)?;
 
         Ok(Command::HandleMessage {
             message,
