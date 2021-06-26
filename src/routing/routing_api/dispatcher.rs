@@ -9,15 +9,15 @@
 use super::{Comm, Command};
 use crate::messaging::{
     node::{
-        JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, RoutingMsg, Section,
-        SrcAuthority, Variant,
+        JoinAsRelocatedResponse, JoinRejectionReason, JoinResponse, NodeMsg, Section, SrcAuthority,
+        Variant,
     },
     DstLocation, MessageType,
 };
 use crate::routing::{
-    core::Core, error::Result, event::Event, messages::RoutingMsgUtils, node::Node,
-    peer::PeerUtils, routing_api::comm::SendStatus, section::SectionPeersUtils,
-    section::SectionUtils, Error, XorName,
+    core::Core, error::Result, event::Event, messages::WireMsgUtils, node::Node, peer::PeerUtils,
+    routing_api::comm::SendStatus, section::SectionPeersUtils, section::SectionUtils, Error,
+    XorName,
 };
 use crate::types::PublicKey;
 use itertools::Itertools;
@@ -242,7 +242,7 @@ impl Dispatcher {
                     let core = self.core.read().await;
                     let node = core.node();
                     let section_key = *core.section().chain.last_key();
-                    RoutingMsg::single_src(
+                    NodeMsg::single_src(
                         node,
                         DstLocation::Section(core.node().name()),
                         Variant::StartConnectivityTest(name),

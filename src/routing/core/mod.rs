@@ -21,7 +21,7 @@ use self::{
 };
 use crate::messaging::node::SignatureAggregator;
 use crate::messaging::{
-    node::{Network, Proposal, RoutingMsg, Section, SectionSigned, Variant},
+    node::{Network, NodeMsg, Proposal, Section, SectionSigned, Variant},
     DstInfo, DstLocation, MessageId, SectionAuthorityProvider,
 };
 use crate::routing::routing_api::command::Command;
@@ -29,7 +29,7 @@ use crate::routing::{
     dkg::{DkgVoter, ProposalAggregator},
     error::Result,
     event::{Elders, Event, NodeElderChange},
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -170,7 +170,7 @@ impl Core {
                     msg: None,
                 };
                 for sap in self.network.all() {
-                    let msg = RoutingMsg::single_src(
+                    let msg = NodeMsg::single_src(
                         &self.node,
                         DstLocation::DirectAndUnrouted,
                         variant.clone(),

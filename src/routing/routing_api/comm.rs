@@ -612,9 +612,9 @@ mod tests {
         let random_bls_pk = bls::SecretKey::random().public_key();
         MessageType::SectionInfo {
             msg: SectionInfoMsg::GetSectionQuery(PublicKey::Bls(random_bls_pk)),
-            dst_info: DstInfo {
-                dst: XorName::random(),
-                dst_section_pk: bls::SecretKey::random().public_key(),
+            dst_location: DstLocation::Node {
+                name: XorName::random(),
+                section_pk: bls::SecretKey::random().public_key(),
             },
         }
     }

@@ -8,7 +8,7 @@
 
 use super::Core;
 use crate::messaging::node::{
-    Peer, Proposal, RelocateDetails, RelocatePromise, RoutingMsg, SignedRelocateDetails,
+    NodeMsg, Peer, Proposal, RelocateDetails, RelocatePromise, SignedRelocateDetails,
 };
 use crate::routing::{
     core::bootstrap::JoiningAsRelocated,
@@ -136,7 +136,7 @@ impl Core {
     pub(crate) async fn handle_relocate_promise(
         &mut self,
         promise: RelocatePromise,
-        msg: RoutingMsg,
+        msg: NodeMsg,
     ) -> Result<Vec<Command>> {
         // Check if we need to filter out the `RelocatePromise`.
         if promise.name == self.node.name() {

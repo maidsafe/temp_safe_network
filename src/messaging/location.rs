@@ -19,21 +19,22 @@ pub struct Itinerary {
     pub src: SrcLocation,
     /// Destionation
     pub dst: DstLocation,
-    /// Wether this will be aggregated, and where.
-    pub aggregation: Aggregation,
+    // /// Wether this will be aggregated, and where.
+    // pub aggregation: Aggregation,
 }
 
 impl Itinerary {
-    /// Elders will send their signed message, where recipients aggregate.
-    pub fn aggregate_at_dst(&self) -> bool {
-        matches!(self.aggregation, Aggregation::AtDestination)
-    }
+    /*
+        /// Elders will send their signed message, where recipients aggregate.
+        pub fn aggregate_at_dst(&self) -> bool {
+            matches!(self.aggregation, Aggregation::AtDestination)
+        }
 
-    /// Elders will aggregate a group sig before they each send one copy of it to dst.
-    pub fn aggregate_at_src(&self) -> bool {
-        matches!(self.aggregation, Aggregation::AtSource)
-    }
-
+        /// Elders will aggregate a group sig before they each send one copy of it to dst.
+        pub fn aggregate_at_src(&self) -> bool {
+            matches!(self.aggregation, Aggregation::AtSource)
+        }
+    */
     /// Name of the source
     pub fn src_name(&self) -> XorName {
         self.src.name()
@@ -43,17 +44,6 @@ impl Itinerary {
     pub fn dst_name(&self) -> Option<XorName> {
         self.dst.name()
     }
-}
-
-/// Aggregation scheme
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub enum Aggregation {
-    /// No aggregation is made, eg. when the payload contains full authority.
-    None,
-    /// Elders will aggregate a group sig before they each send one copy of it to dst.
-    AtSource,
-    /// Elders will send their signed message, where recipients aggregate.
-    AtDestination,
 }
 
 /// An EndUser is represented by the name
@@ -131,7 +121,8 @@ pub enum DstLocation {
         name: XorName,
         section_pk: BlsPublicKey,
     },
-    /// Destination is a specific node. To be directly connected to, and so the message is unrouted. `ConnectionInfo` is used to determine the target SocketAdrr for the message.
+    /// Destination is a specific node to be directly connected to,
+    /// and so the message is unrouted. The destination's known section key is provided.
     DirectAndUnrouted(BlsPublicKey),
 }
 

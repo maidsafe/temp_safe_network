@@ -25,12 +25,12 @@ use crate::messaging::{
     node::{Peer, RoutingMsg},
     DstLocation, EndUser, Itinerary, MessageType, SectionAuthorityProvider, WireMsg,
 };
-use crate::routing::core::{join_network, Core};
 use crate::routing::{
+    core::{join_network, Core},
     ed25519,
     error::Result,
     event::{Elders, Event, NodeElderChange},
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -47,7 +47,6 @@ use std::{
     net::SocketAddr,
     sync::Arc,
 };
-
 use tokio::{sync::mpsc, task};
 use xor_name::{Prefix, XorName};
 
@@ -477,6 +476,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             return;
         }
     };
+
     let span = {
         let mut state = dispatcher.core.write().await;
 
@@ -492,6 +492,15 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
     };
     let _span_guard = span.enter();
 
+    if let Err(err) = wire_msg.check_signature() {
+        error!(
+            "Discarding message received ({:?}) due to invalid signature: {:?}",
+            wire_msg.msg_id(),
+            err
+        );
+        return;
+    }
+
     let message_type = match wire_msg.to_message() {
         Ok(message_type) => message_type,
         Err(err) => {
@@ -505,7 +514,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
     };
 
     match message_type {
-        MessageType::SectionInfo { msg, dst_info } => {
+        MessageType::SectionInfo { msg_envelope, msg } => {
             let command = Command::HandleSectionInfoMsg {
                 sender,
                 message: msg,
@@ -513,15 +522,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             };
             let _ = task::spawn(dispatcher.handle_commands(command));
         }
-        MessageType::Routing { msg, dst_info } => {
-            if let Err(err) = msg.check_signature() {
-                error!(
-                    "Discarding message received ({:?}) due to invalid signature: {:?}",
-                    msg.id, err
-                );
-                return;
-            }
-
+        MessageType::Node { msg_envelope, msg } => {
             let command = Command::HandleMessage {
                 message: msg,
                 sender: Some(sender),
@@ -529,12 +530,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
             };
             let _ = task::spawn(dispatcher.handle_commands(command));
         }
-        MessageType::Node {
-            msg: _,
-            dst_info: _,
-            src_section_pk: _,
-        } => unimplemented!(),
-        MessageType::Client { msg, dst_info } => {
+        MessageType::Client { msg_envelope, msg } => {
             let end_user = dispatcher
                 .core
                 .read()
@@ -558,10 +554,10 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                     // this node's keypair and use that as the socket id
                     match dispatcher.core.write().await.try_add(sender) {
                         Ok(end_user) => end_user,
-                        Err(error) => {
+                        Err(err) => {
                             error!(
                                 "Failed to cache client socket address for message {:?}: {:?}",
-                                msg, error
+                                msg, err
                             );
                             return;
                         }
@@ -575,7 +571,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                 .await
                 .section()
                 .prefix()
-                .matches(&dst_info.dst)
+                .matches(msg.dst_location().name())
             {
                 let event = Event::ClientMsgReceived {
                     msg: Box::new(msg),
@@ -584,18 +580,19 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                 dispatcher.send_event(event).await;
             } else {
                 let cmd = {
-                    let state = dispatcher.core.read().await;
-                    let node = state.node();
-                    let section = state.section();
-
-                    let variant = crate::messaging::node::Variant::ForwardClientMsg {
+                    let core = dispatcher.core.read().await;
+                    let node = core.node();
+                    let section = core.section();
+                    let dst_location = msg.dst_location().clone();
+                    
+                    let node_msg = NodeMsg::ForwardClientMsg {
                         msg,
                         user: end_user,
                     };
-                    let to_relay = match RoutingMsg::single_src(
+                    let to_relay = match WireMsg::single_src(
                         node,
-                        DstLocation::Section(dst_info.dst),
-                        variant,
+                        dst_location,
+                        node_msg,
                         section.authority_provider().section_key(),
                     ) {
                         Ok(msg) => msg,
@@ -604,7 +601,7 @@ async fn handle_message(dispatcher: Arc<Dispatcher>, bytes: Bytes, sender: Socke
                             return;
                         }
                     };
-                    match state.relay_message(&to_relay).await {
+                    match core.relay_message(&to_relay).await {
                         Ok(Some(cmd)) => cmd,
                         Ok(None) => {
                             error!("Failed to relay msg, no cmd returned.");

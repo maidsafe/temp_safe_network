@@ -9,8 +9,8 @@
 //! Relocation related types and utilities.
 
 use crate::messaging::node::{
-    Network, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, RoutingMsg,
-    Section, SignedRelocateDetails, Variant,
+    Network, NodeMsg, NodeState, Peer, RelocateDetails, RelocatePayload, RelocatePromise, Section,
+    SignedRelocateDetails, Variant,
 };
 use crate::routing::{
     core::JoiningAsRelocated,
@@ -96,15 +96,15 @@ impl RelocateDetailsUtils for RelocateDetails {
     }
 }
 
-/// RoutingMsg with Variant::Relocate in a convenient wrapper.
+/// NodeMsg with Variant::Relocate in a convenient wrapper.
 pub trait SignedRelocateDetailsUtils {
-    fn new(signed_msg: RoutingMsg) -> Result<Self, Error>
+    fn new(signed_msg: NodeMsg) -> Result<Self, Error>
     where
         Self: Sized;
 
     fn relocate_details(&self) -> Result<&RelocateDetails, Error>;
 
-    fn signed_msg(&self) -> &RoutingMsg;
+    fn signed_msg(&self) -> &NodeMsg;
 
     fn dst(&self) -> Result<&XorName, Error>;
 
@@ -112,7 +112,7 @@ pub trait SignedRelocateDetailsUtils {
 }
 
 impl SignedRelocateDetailsUtils for SignedRelocateDetails {
-    fn new(signed_msg: RoutingMsg) -> Result<Self, Error> {
+    fn new(signed_msg: NodeMsg) -> Result<Self, Error> {
         if let Variant::Relocate(_) = signed_msg.variant {
             Ok(Self { signed_msg })
         } else {
@@ -129,7 +129,7 @@ impl SignedRelocateDetailsUtils for SignedRelocateDetails {
         }
     }
 
-    fn signed_msg(&self) -> &RoutingMsg {
+    fn signed_msg(&self) -> &NodeMsg {
         &self.signed_msg
     }
 
@@ -188,7 +188,7 @@ pub(crate) enum RelocateState {
     // while being an elder. It must keep fulfilling its duties as elder until its demoted, then it
     // can send the bytes (which are serialized `RelocatePromise` message) back to the elders who
     // will exchange it for an actual `Relocate` message.
-    Delayed(RoutingMsg),
+    Delayed(NodeMsg),
     // Relocation in progress.
     InProgress(Box<JoiningAsRelocated>),
 }

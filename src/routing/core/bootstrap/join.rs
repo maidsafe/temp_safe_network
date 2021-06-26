@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     node::{
-        JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, RoutingMsg, Section,
+        JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, ResourceProofResponse, Section,
         Variant,
     },
     DstInfo, DstLocation, MessageType, WireMsg,
@@ -17,7 +17,7 @@ use crate::routing::{
     dkg::SectionSignedUtils,
     ed25519,
     error::{Error, Result},
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     node::Node,
     peer::PeerUtils,
     routing_api::comm::{Comm, ConnectionEvent, SendStatus},
@@ -47,7 +47,7 @@ pub(crate) async fn join_network(
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_addr: SocketAddr,
-) -> Result<(Node, Section, Vec<(RoutingMsg, SocketAddr, DstInfo)>)> {
+) -> Result<(Node, Section, Vec<(NodeMsg, SocketAddr, DstInfo)>)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap", name = %node.name());
@@ -67,7 +67,7 @@ struct Join<'a> {
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: Node,
     // Backlog for unknown messages
-    backlog: VecDeque<(RoutingMsg, SocketAddr, DstInfo)>,
+    backlog: VecDeque<(NodeMsg, SocketAddr, DstInfo)>,
 }
 
 impl<'a> Join<'a> {
@@ -93,7 +93,7 @@ impl<'a> Join<'a> {
     async fn run(
         self,
         bootstrap_addr: SocketAddr,
-    ) -> Result<(Node, Section, Vec<(RoutingMsg, SocketAddr, DstInfo)>)> {
+    ) -> Result<(Node, Section, Vec<(NodeMsg, SocketAddr, DstInfo)>)> {
         // Use our XorName as we do not know their name or section key yet.
         let section_key = bls::SecretKey::random().public_key();
         let dst_xorname = self.node.name();
@@ -107,7 +107,7 @@ impl<'a> Join<'a> {
         mut self,
         mut section_key: bls::PublicKey,
         mut recipients: Vec<(XorName, SocketAddr)>,
-    ) -> Result<(Node, Section, Vec<(RoutingMsg, SocketAddr, DstInfo)>)> {
+    ) -> Result<(Node, Section, Vec<(NodeMsg, SocketAddr, DstInfo)>)> {
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
         // `JoinRequest` again with it.
@@ -292,7 +292,7 @@ impl<'a> Join<'a> {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let variant = Variant::JoinRequest(Box::new(join_request));
-        let message = RoutingMsg::single_src(
+        let message = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
             variant,
@@ -393,12 +393,12 @@ impl<'a> Join<'a> {
             }
         }
 
-        error!("RoutingMsg sender unexpectedly closed");
+        error!("NodeMsg sender unexpectedly closed");
         // TODO: consider more specific error here (e.g. `BootstrapInterrupted`)
         Err(Error::InvalidState)
     }
 
-    fn backlog_message(&mut self, message: RoutingMsg, sender: SocketAddr, dst_info: DstInfo) {
+    fn backlog_message(&mut self, message: NodeMsg, sender: SocketAddr, dst_info: DstInfo) {
         while self.backlog.len() >= BACKLOG_CAPACITY {
             let _ = self.backlog.pop_front();
         }
@@ -439,7 +439,7 @@ mod tests {
     use crate::routing::{
         dkg::test_utils::*,
         error::Error as RoutingError,
-        messages::RoutingMsgUtils,
+        messages::WireMsgUtils,
         section::test_utils::*,
         section::{NodeStateUtils, SectionAuthorityProviderUtils},
         ELDER_SIZE, MIN_ADULT_AGE, MIN_AGE,
@@ -817,7 +817,7 @@ mod tests {
             let (message, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("RoutingMsg was not received"))?;
+                .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
             let message = assert_matches!(message, MessageType::Routing{ msg, .. } => msg);
             assert_matches!(message.variant, Variant::JoinRequest(_));
@@ -848,7 +848,7 @@ mod tests {
             let (message, _) = send_rx
                 .recv()
                 .await
-                .ok_or_else(|| anyhow!("RoutingMsg was not received"))?;
+                .ok_or_else(|| anyhow!("NodeMsg was not received"))?;
 
             let message = assert_matches!(message, MessageType::Routing{ msg, .. } => msg);
             assert_matches!(message.variant, Variant::JoinRequest(_));
@@ -873,7 +873,7 @@ mod tests {
         section_key: bls::PublicKey,
         node_name: XorName,
     ) -> Result<()> {
-        let message = RoutingMsg::single_src(
+        let message = NodeMsg::single_src(
             bootstrap_node,
             DstLocation::DirectAndUnrouted,
             variant,

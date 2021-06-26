@@ -12,8 +12,8 @@ use crate::messaging::{
     location::{Aggregation, Itinerary},
     node::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, Network,
-        NodeState, Peer, PlainMessage, Proposal, RelocateDetails, RelocatePayload,
-        ResourceProofResponse, RoutingMsg, Section, SectionSigned, SignedRelocateDetails, Variant,
+        NodeMsg, NodeState, Peer, PlainMessage, Proposal, RelocateDetails, RelocatePayload,
+        ResourceProofResponse, Section, SectionSigned, SignedRelocateDetails, Variant,
     },
     section_info::{GetSectionResponse, SectionInfoMsg},
     DstInfo, DstLocation, MessageId, MessageType, SectionAuthorityProvider, SrcLocation,
@@ -26,7 +26,7 @@ use crate::routing::{
     },
     ed25519,
     event::Event,
-    messages::{PlainMessageUtils, RoutingMsgUtils, SrcAuthorityUtils},
+    messages::{MsgAuthorityUtils, PlainMessageUtils, WireMsgUtils},
     network::NetworkUtils,
     node::Node,
     peer::PeerUtils,
@@ -184,7 +184,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     );
     let section_key = *dispatcher.core.read().await.section().chain().last_key();
 
-    let message = RoutingMsg::single_src(
+    let message = NodeMsg::single_src(
         &new_node,
         DstLocation::DirectAndUnrouted,
         Variant::JoinRequest(Box::new(JoinRequest {
@@ -209,7 +209,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         commands.next(),
         Some(Command::SendMessage {
             message: MessageType::Routing {
-                msg: RoutingMsg { variant: Variant::JoinResponse(variant), .. },
+                msg: NodeMsg { variant: Variant::JoinResponse(variant), .. },
                 ..
             },
             ..
@@ -246,7 +246,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let mut prover = rp.create_prover(data.clone());
     let solution = prover.solve();
 
-    let message = RoutingMsg::single_src(
+    let message = NodeMsg::single_src(
         &new_node,
         DstLocation::DirectAndUnrouted,
         Variant::JoinRequest(Box::new(JoinRequest {
@@ -340,7 +340,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         .secret_key()
         .sign(&bincode::serialize(&relocate_message.as_signable())?);
     let proof_chain = SecuredLinkedList::new(section_key);
-    let relocate_message = RoutingMsg::section_src(
+    let relocate_message = NodeMsg::section_src(
         relocate_message,
         KeyedSig {
             public_key: section_key,
@@ -355,7 +355,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         &relocated_node_old_keypair,
     );
 
-    let join_request = RoutingMsg::single_src(
+    let join_request = NodeMsg::single_src(
         &relocated_node,
         DstLocation::DirectAndUnrouted,
         Variant::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
@@ -422,7 +422,7 @@ async fn aggregate_proposals() -> Result<()> {
 
     for index in 0..THRESHOLD {
         let sig_share = proposal.prove(pk_set.clone(), index, &sk_set.secret_key_share(index))?;
-        let message = RoutingMsg::single_src(
+        let message = NodeMsg::single_src(
             &nodes[index],
             DstLocation::DirectAndUnrouted,
             Variant::Propose {
@@ -450,7 +450,7 @@ async fn aggregate_proposals() -> Result<()> {
         THRESHOLD,
         &sk_set.secret_key_share(THRESHOLD),
     )?;
-    let message = RoutingMsg::single_src(
+    let message = NodeMsg::single_src(
         &nodes[THRESHOLD],
         DstLocation::DirectAndUnrouted,
         Variant::Propose {
@@ -927,7 +927,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
         variant: Variant::UserMessage(b"hello".to_vec()),
     };
     let signature = sk1.sign(&bincode::serialize(&message.as_signable())?);
-    let original_message = RoutingMsg::section_src(
+    let original_message = NodeMsg::section_src(
         message,
         KeyedSig {
             public_key: pk1,
@@ -1020,7 +1020,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         .secret_key()
         .sign(&bincode::serialize(&original_message.as_signable())?);
     let proof_chain = chain.truncate(1);
-    let original_message = RoutingMsg::section_src(
+    let original_message = NodeMsg::section_src(
         original_message,
         KeyedSig {
             public_key: pk1,
@@ -1043,7 +1043,7 @@ async fn handle_bounced_untrusted_message() -> Result<()> {
         dst_section_pk: pk0,
     };
     // Create the bounced message, indicating the last key the peer knows is `pk0`
-    let bounced_message = RoutingMsg::single_src(
+    let bounced_message = NodeMsg::single_src(
         &other_node,
         DstLocation::DirectAndUnrouted,
         Variant::BouncedUntrustedMessage {
@@ -1139,7 +1139,7 @@ async fn handle_sync() -> Result<()> {
     let new_section = Section::new(pk0, chain, section_signed_new_section_auth)?;
 
     // Create the `Sync` message containing the new `Section`.
-    let message = RoutingMsg::single_src(
+    let message = NodeMsg::single_src(
         &old_node,
         DstLocation::DirectAndUnrouted,
         Variant::Sync {
@@ -1211,7 +1211,7 @@ async fn handle_untrusted_sync() -> Result<()> {
     let dispatcher = Dispatcher::new(state, create_comm().await?);
 
     let sender = create_node(MIN_ADULT_AGE);
-    let orig_message = RoutingMsg::single_src(
+    let orig_message = NodeMsg::single_src(
         &sender,
         DstLocation::DirectAndUnrouted,
         Variant::Sync {
@@ -1296,7 +1296,7 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
     );
     let dispatcher = Dispatcher::new(state, create_comm().await?);
 
-    let orig_message = RoutingMsg::single_src(
+    let orig_message = NodeMsg::single_src(
         &node,
         DstLocation::DirectAndUnrouted,
         Variant::Sync {
@@ -1312,7 +1312,7 @@ async fn handle_bounced_untrusted_sync() -> Result<()> {
     };
 
     let sender = create_node(MIN_ADULT_AGE);
-    let bounced_message = RoutingMsg::single_src(
+    let bounced_message = NodeMsg::single_src(
         &sender,
         DstLocation::Node(node.name()),
         Variant::BouncedUntrustedMessage {

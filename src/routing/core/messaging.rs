@@ -9,15 +9,15 @@
 use super::Core;
 use crate::messaging::{
     node::{
-        DkgKey, ElderCandidates, JoinResponse, Network, NodeState, Peer, PlainMessage, Proposal,
-        RelocateDetails, RelocatePromise, RoutingMsg, Section, SectionSigned, Variant,
+        DkgKey, ElderCandidates, JoinResponse, Network, NodeMsg, NodeState, Peer, PlainMessage,
+        Proposal, RelocateDetails, RelocatePromise, Section, SectionSigned, Variant,
     },
     DstInfo, DstLocation,
 };
 use crate::routing::{
     dkg::{DkgKeyUtils, ProposalUtils, SigShare},
     error::Result,
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     relocation::RelocateState,
@@ -72,7 +72,7 @@ impl Core {
             content: proposal,
             sig_share,
         };
-        let message = RoutingMsg::single_src(
+        let message = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
             variant,
@@ -132,7 +132,7 @@ impl Core {
             section_chain: self.section.chain().clone(),
         }));
 
-        let message = RoutingMsg::single_src(
+        let message = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
             variant,
@@ -153,7 +153,7 @@ impl Core {
         let send = |variant, recipients: Vec<(XorName, SocketAddr)>| -> Result<_> {
             trace!("Send {:?} to {:?}", variant, recipients);
 
-            let message = RoutingMsg::single_src(
+            let message = NodeMsg::single_src(
                 &self.node,
                 DstLocation::DirectAndUnrouted,
                 variant,
@@ -199,7 +199,7 @@ impl Core {
         let send = |variant, recipients: Vec<_>| -> Result<_> {
             trace!("Send {:?} to {:?}", variant, recipients);
 
-            let message = RoutingMsg::single_src(
+            let message = NodeMsg::single_src(
                 &self.node,
                 DstLocation::DirectAndUnrouted,
                 variant,
@@ -353,7 +353,7 @@ impl Core {
             );
             err
         })?;
-        let message = RoutingMsg::for_dst_accumulation(
+        let message = NodeMsg::for_dst_accumulation(
             key_share,
             src,
             dst,
@@ -372,7 +372,7 @@ impl Core {
 
     // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
     // network but handle it directly.
-    pub(crate) fn send_or_handle(&self, message: RoutingMsg, recipients: &[Peer]) -> Vec<Command> {
+    pub(crate) fn send_or_handle(&self, message: NodeMsg, recipients: &[Peer]) -> Vec<Command> {
         let mut commands = vec![];
         let mut others = Vec::new();
         let mut handle = false;
@@ -446,7 +446,7 @@ impl Core {
         variant: Variant,
         dst_pk: bls::PublicKey,
     ) -> Result<Command> {
-        let message = RoutingMsg::single_src(
+        let message = NodeMsg::single_src(
             &self.node,
             DstLocation::DirectAndUnrouted,
             variant,
@@ -464,7 +464,7 @@ impl Core {
 
     // TODO: consider changing this so it sends only to a subset of the elders
     // (say 1/3 of the ones closest to our name or so)
-    pub(crate) fn send_message_to_our_elders(&self, msg: RoutingMsg) -> Command {
+    pub(crate) fn send_message_to_our_elders(&self, msg: NodeMsg) -> Command {
         let targets: Vec<_> = self
             .section
             .authority_provider()

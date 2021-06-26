@@ -10,7 +10,7 @@ mod wire_msg_header;
 
 pub use self::wire_msg_header::MsgEnvelope;
 pub(crate) use self::wire_msg_header::WireMsgHeader;
-use super::node::{self, Variant};
+use super::node::NodeMsg;
 use super::{
     client, section_info, DstLocation, Error, MessageId, MessageType, MsgAuthority, Result,
 };
@@ -28,7 +28,7 @@ use xor_name::XorName;
 #[derive(Debug, PartialEq, Clone)]
 pub struct WireMsg {
     header: WireMsgHeader,
-    payload: Bytes,
+    pub payload: Bytes,
 }
 
 impl WireMsg {
@@ -49,12 +49,13 @@ impl WireMsg {
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgAuthority`.
     pub fn new_msg(
+        msg_id: MessageId,
         payload: Bytes,
         msg_authority: MsgAuthority,
         dst_location: DstLocation,
     ) -> Result<Self> {
         Ok(Self {
-            header: WireMsgHeader::new(MessageId::new(), msg_authority, dst_location),
+            header: WireMsgHeader::new(msg_id, msg_authority, dst_location),
             payload,
         })
     }
@@ -67,7 +68,7 @@ impl WireMsg {
     ) -> Result<Self> {
         let payload = Self::serialize_msg_payload(query)?;
 
-        Self::new_msg(payload, MsgAuthority::None, dst_location)
+        Self::new_msg(MessageId::new(), payload, MsgAuthority::None, dst_location)
     }
 
     /// Attempts to create an instance of WireMsg by deserialising the bytes provided.
@@ -78,12 +79,6 @@ impl WireMsg {
 
         // We can now create a deserialized WireMsg using the read bytes
         Ok(Self { header, payload })
-    }
-
-    /// Returns `true` if the message is a JoinRequest.
-    // FIXME: remove this function
-    pub fn is_join_request(&self) -> Result<bool> {
-        unimplemented!();
     }
 
     /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
@@ -110,7 +105,7 @@ impl WireMsg {
     pub fn to_message(&self) -> Result<MessageType> {
         let msg_envelope = self.header.msg_envelope().clone();
 
-        match self.header.msg_authority() {
+        match self.header.msg_envelope.msg_authority {
             MsgAuthority::None => {
                 let msg: section_info::SectionInfoMsg = rmp_serde::from_slice(&self.payload)
                     .map_err(|err| {
@@ -131,7 +126,7 @@ impl WireMsg {
                 Ok(MessageType::Client { msg_envelope, msg })
             }
             MsgAuthority::Node(_) | MsgAuthority::BlsShare(_) | MsgAuthority::Section(_) => {
-                let msg: node::NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node message payload as Msgpack: {}", err))
                 })?;
 
@@ -142,23 +137,28 @@ impl WireMsg {
 
     /// Return the message id of this message
     pub fn msg_id(&self) -> MessageId {
-        self.header.msg_id()
+        self.header.msg_envelope.msg_id
+    }
+
+    /// Return the message id of this message
+    pub fn msg_authority(&self) -> &MsgAuthority {
+        &self.header.msg_envelope.msg_authority
     }
 
     /// Return the destination section PublicKey for this message
     pub fn dst_section_pk(&self) -> Option<BlsPublicKey> {
-        self.header.dst_location().section_pk()
+        self.header.msg_envelope.dst_location.section_pk()
     }
 
     /// Return the destination for this message
     pub fn dst_location(&self) -> &DstLocation {
-        self.header.dst_location()
+        &self.header.msg_envelope.dst_location
     }
 
     /// Return the source section PublicKey for this
     /// message if it's a NodeMsg
     pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
-        match self.header.msg_authority() {
+        match &self.header.msg_envelope.msg_authority {
             MsgAuthority::Node(node_signed) => Some(node_signed.section_pk),
             MsgAuthority::BlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
             MsgAuthority::Section(section_signed) => Some(section_signed.section_pk),
@@ -186,14 +186,14 @@ mod tests {
     use super::*;
     use crate::messaging::{
         client::{ChunkRead, DataQuery},
-        Aggregation, ClientSigned, MessageId, NodeSigned,
+        node::{NodeCmd, NodeMsg, NodeSystemCmd},
+        ClientSigned, MessageId, NodeSigned,
     };
     use crate::types::{ChunkAddress, Keypair};
     use anyhow::Result;
     use bls::SecretKey;
     use client::{ClientMsg, ProcessMsg, Query};
     use ed25519_dalek::Signer;
-    use node::{NodeCmd, NodeMsg, NodeSystemCmd};
     use rand::rngs::OsRng;
     use xor_name::XorName;
 
@@ -297,17 +297,12 @@ mod tests {
         };
 
         let msg_id = MessageId::new();
-
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
-        let node_msg = NodeMsg {
-            id: msg_id,
-            aggregation: Aggregation::AtDestination,
-            variant: Variant::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
-                node_id: pk,
-                section: pk.into(),
-            })),
-        };
+        let node_msg = NodeMsg::NodeCmd(NodeCmd::System(NodeSystemCmd::StorageFull {
+            node_id: pk,
+            section: pk.into(),
+        }));
 
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;
         let node_signed = NodeSigned {
@@ -318,7 +313,7 @@ mod tests {
 
         let msg_authority = MsgAuthority::Node(node_signed);
 
-        let wire_msg = WireMsg::new_msg(payload, msg_authority.clone(), dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_authority.clone(), dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -374,7 +369,7 @@ mod tests {
 
         let msg_authority = MsgAuthority::Client(client_signed);
 
-        let wire_msg = WireMsg::new_msg(payload, msg_authority.clone(), dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_authority.clone(), dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header

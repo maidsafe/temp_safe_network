@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Variant;
+use super::NodeMsg;
 use crate::messaging::DstLocation;
 use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
@@ -22,5 +22,5 @@ pub struct PlainMessage {
     /// The latest key of the destination section according to the sender's knowledge.
     pub dst_key: BlsPublicKey,
     /// Message body.
-    pub variant: Variant,
+    pub variant: NodeMsg,
 }

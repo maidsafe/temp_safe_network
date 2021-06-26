@@ -12,7 +12,7 @@ use crate::messaging::node::{
     JoinResponse, Peer, Variant,
 };
 use crate::routing::{
-    core::RoutingMsgUtils,
+    core::WireMsgUtils,
     error::Result,
     peer::PeerUtils,
     relocation::{RelocatePayloadUtils, SignedRelocateDetailsUtils},

@@ -8,13 +8,13 @@
 
 use super::super::Core;
 use crate::messaging::{
-    node::{RoutingMsg, Variant},
+    node::{Variant, WireMsg},
     section_info::{GetSectionResponse, SectionInfoMsg},
     DstInfo, DstLocation, MessageType, SectionAuthorityProvider,
 };
 use crate::routing::{
     error::Result,
-    messages::RoutingMsgUtils,
+    messages::WireMsgUtils,
     network::NetworkUtils,
     peer::PeerUtils,
     routing_api::command::Command,
@@ -89,7 +89,7 @@ impl Core {
     pub(crate) fn handle_section_knowledge_query(
         &self,
         given_key: Option<bls::PublicKey>,
-        msg: Box<RoutingMsg>,
+        msg: Box<NodeMsg>,
         sender: SocketAddr,
         src_name: XorName,
         dst_location: DstLocation,
@@ -107,7 +107,7 @@ impl Core {
             msg: Some(msg),
         };
 
-        let msg = RoutingMsg::single_src(
+        let msg = WireMsg::single_src(
             self.node(),
             dst_location,
             variant,
