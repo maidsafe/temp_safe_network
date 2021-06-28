@@ -28,7 +28,8 @@
 //! use safe_network::client::Client;
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
 //! # let bootstrap_contacts = Some(read_network_conn_info()?);
-//! let client = Client::new(None, None, bootstrap_contacts).await?;
+//! # let query_timeout: u64 = 20; // 20 seconds
+//! let client = Client::new(None, None, bootstrap_contacts, query_timeout).await?;
 //! // Now for example you can perform read operations:
 //! let _some_balance = client.get_balance().await?;
 //! # Ok(()) } ); }
@@ -39,14 +40,15 @@
 //! ```no_run
 //! # // The Safe Client is an sync library so will need some kind of runtime. Here we use tokio.
 //! # extern crate tokio; use anyhow::Result;
-//! # use safe_network::client::utils::test_utils::read_network_conn_info;
+//! # use safe_network::client::{utils::test_utils::read_network_conn_info};
 //! use safe_network::client::Client;
 //! use rand::rngs::OsRng;
 //! use safe_network::types::Keypair;
 //! # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
 //! let id = Keypair::new_ed25519(&mut OsRng);
 //! # let bootstrap_contacts = Some(read_network_conn_info()?);
-//! let client = Client::new(Some(id), None, bootstrap_contacts).await?;
+//! # let query_timeout: u64 = 20; // 20 seconds
+//! let client = Client::new(Some(id), None, bootstrap_contacts, query_timeout).await?;
 //! // Now for example you can perform read operations:
 //! let _some_balance = client.get_balance().await?;
 //! # Ok(()) } ); }
@@ -65,6 +67,9 @@ pub use qp2p::Config as QuicP2pConfig;
 pub mod client_api;
 /// Config file handling.
 pub mod config_handler;
+
+/// Default timeout in
+pub const DEFAULT_QUERY_TIMEOUT: u64 = 20; // 20 seconds
 
 /// Utility functions.
 pub mod utils;

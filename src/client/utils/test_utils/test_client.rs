@@ -40,7 +40,14 @@ pub async fn create_test_client() -> Result<Client> {
 pub async fn create_test_client_with(optional_keypair: Option<Keypair>) -> Result<Client> {
     init_logger();
     let contact_info = read_network_conn_info()?;
-    let client = Client::new(optional_keypair.clone(), None, Some(contact_info)).await?;
+    let query_timeout: u64 = 20; // 20 seconds
+    let client = Client::new(
+        optional_keypair.clone(),
+        None,
+        Some(contact_info),
+        query_timeout,
+    )
+    .await?;
 
     if optional_keypair.is_none() {
         // get history, will only be Ok when we have _some_ history, aka test tokens

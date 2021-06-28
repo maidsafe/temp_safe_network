@@ -24,12 +24,13 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio;use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use std::str::FromStr;
     /// use safe_network::types::Token;
     /// # #[tokio::main]async fn main() {let _: Result<()> = futures::executor::block_on( async {
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts).await?;
+    /// # let query_timeout: u64 = 20; // 20 seconds
+    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// // now we check the local balance
     /// let some_balance = client.get_local_balance().await;
     /// assert_eq!(some_balance, Token::from_str("0")?);
@@ -101,7 +102,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio;use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{PublicKey, Token};
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
@@ -110,7 +111,8 @@ impl Client {
     /// let pk = PublicKey::from(sk.public_key());
     /// // Next we create a random client.
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts).await?;
+    /// # let query_timeout: u64 = 20; // 20 seconds
+    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let target_balance = Token::from_str("100")?;
     /// // And trigger a simulated payout to our client's PublicKey, so we have token to send.
     /// let _ = client.trigger_simulated_farming_payout(target_balance).await?;

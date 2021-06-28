@@ -50,7 +50,8 @@ impl Client {
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// let head_chunk = ChunkAddress::Public(XorName::random());
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts).await?;
+    /// # let query_timeout: u64 = 20; // 20 seconds
+    /// let client = Client::new(None, None, bootstrap_contacts, query_timeout).await?;
     ///
     /// // grab the random head of the blob from the network
     /// let _data = client.read_blob(head_chunk, None, None).await?;
@@ -96,13 +97,13 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let data = b"some data".to_vec();
     /// // grab the random head of the blob from the network
@@ -127,13 +128,13 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let data = b"some data".to_vec();
     /// // grab the random head of the blob from the network
@@ -205,14 +206,14 @@ impl Client {
     ///
     /// ```no_run
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::Token;
     /// use std::str::FromStr;
     /// # #[tokio::main] async fn main() { let _: anyhow::Result<()> = futures::executor::block_on( async {
     ///
     /// // Let's use an existing client, with a pre-existing balance to be used for write payments.
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(None, None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let data = b"some private data".to_vec();
     /// let address = client.store_private_blob(&data).await?;
@@ -409,6 +410,7 @@ mod tests {
     use bincode::deserialize;
     use self_encryption::Storage;
     use std::str::FromStr;
+    use tokio::time::Duration;
 
     // Test storing and getting public Blob.
     #[tokio::test]
@@ -444,7 +446,7 @@ mod tests {
     // Test storing, getting, and deleting private chunk.
     #[tokio::test]
     pub async fn private_blob_test() -> Result<()> {
-        let client = create_test_client().await?;
+        let mut client = create_test_client().await?;
 
         let value = generate_random_vector::<u8>(10);
 
@@ -484,6 +486,7 @@ mod tests {
 
         // Make sure Blob was deleted
         let mut attempts = 10u8;
+        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
         while client.read_blob(priv_address, None, None).await.is_ok() {
             tokio::time::sleep(tokio::time::Duration::from_millis(4000)).await;
             if attempts == 0 {
@@ -492,6 +495,8 @@ mod tests {
                 attempts -= 1;
             }
         }
+
+        client.override_timeout = None; // reset override
 
         // Test storing private chunk with the same value again. Should not conflict.
         let new_addr = client.store_private_blob(&value).await?;
@@ -506,7 +511,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn private_delete_large() -> Result<()> {
-        let client = create_test_client().await?;
+        let mut client = create_test_client().await?;
 
         let value = generate_random_vector::<u8>(1024 * 1024);
         let address = client.store_private_blob(&value).await?;
@@ -526,6 +531,7 @@ mod tests {
 
         client.delete_blob(address).await?;
 
+        client.override_timeout = Some(Duration::from_secs(5)); // override timeout
         let mut blob_storage = BlobStorage::new(client, false);
 
         if let DataMap::Chunks(chunks) = root_data_map {

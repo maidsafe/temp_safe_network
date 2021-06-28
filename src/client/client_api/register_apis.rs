@@ -253,6 +253,7 @@ mod tests {
         collections::{BTreeMap, BTreeSet},
         str::FromStr,
     };
+    use tokio::time::Duration;
     use xor_name::XorName;
 
     /**** Register data tests ****/
@@ -450,7 +451,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn register_can_delete_private() -> Result<()> {
-        let client = create_test_client().await?;
+        let mut client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -468,6 +469,7 @@ mod tests {
 
         client.delete_register(address).await?;
 
+        client.override_timeout = Some(Duration::from_secs(5)); // overrride with a short timeout
         let mut res = client.get_register(address).await;
         while res.is_ok() {
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;

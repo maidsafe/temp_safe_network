@@ -29,6 +29,7 @@ use std::{
 };
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::RwLock;
+use tokio::time::Duration;
 
 // Number of attempts to make when trying to bootstrap to the network
 const NUM_OF_BOOTSTRAPPING_ATTEMPTS: u8 = 1;
@@ -41,6 +42,9 @@ pub struct Client {
     simulated_farming_payout_dot: Dot<PublicKey>,
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
+    query_timeout: Duration,
+    #[cfg(test)]
+    pub override_timeout: Option<Duration>,
 }
 
 /// Easily manage connections to/from The Safe Network with the client and its APIs.
@@ -59,12 +63,14 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     ///
-    /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
+    /// # #[tokio::main] async fn main() {
+    /// let _: Result<()> = futures::executor::block_on( async {
     ///
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts).await?;
+    /// # let query_timeout: u64 = 20; // 20 seconds
+    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// // Now for example you can perform read operations:
     /// let _some_balance = client.get_balance().await?;
     /// # Ok(()) } ); }
@@ -73,6 +79,7 @@ impl Client {
         optional_keypair: Option<Keypair>,
         config_file_path: Option<&Path>,
         bootstrap_config: Option<HashSet<SocketAddr>>,
+        query_timeout: u64,
     ) -> Result<Self, Error> {
         let mut rng = OsRng;
 
@@ -143,6 +150,9 @@ impl Client {
             simulated_farming_payout_dot,
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
+            query_timeout: Duration::from_secs(query_timeout),
+            #[cfg(test)]
+            override_timeout: None,
         };
 
         Self::handle_anti_entropy_errors(client.clone(), transfer_err_receiver);
@@ -213,10 +223,10 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts).await?;
+    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let _keypair = client.keypair();
     ///
     /// # Ok(()) } ); }
@@ -232,10 +242,10 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// # #[tokio::main] async fn main() { let _: Result<()> = futures::executor::block_on( async {
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let client = Client::new(None, None, bootstrap_contacts).await?;
+    /// let client = Client::new(None, None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// let _pk = client.public_key();
     /// # Ok(()) } ); }
     /// ```
