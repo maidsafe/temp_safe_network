@@ -115,7 +115,6 @@ impl Wallet {
     /// Test-helper API to simulate Client Transfers.
     #[cfg(feature = "simulated-payouts")]
     pub fn simulated_credit(&mut self, credit: Credit) -> Result<()> {
-
         if self.id.public_key() == credit.recipient() {
             match self.balance.checked_add(credit.amount) {
                 Some(amount) => self.balance = amount,
