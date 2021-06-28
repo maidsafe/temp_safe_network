@@ -32,6 +32,7 @@ use safe_network::node::{add_connection_info, set_connection_info, utils, Config
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
+use tokio::time::{sleep, Duration};
 
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 use safe_network::routing;
@@ -110,8 +111,6 @@ async fn run_node() {
             Err(Error::Routing(routing::Error::TryJoinLater)) => {
                 println!("{}", log);
                 info!("{}", log);
-                tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
-                    .await;
             }
             Err(Error::Routing(routing::Error::NodeNotReachable(addr))) => {
                 let err_msg = format!(
@@ -127,9 +126,9 @@ async fn run_node() {
                 exit(1);
             }
             Err(Error::JoinTimeout) => {
-                println!("Encountered a timeout while trying to join the network. Please try again later.");
-                error!("Encountered a timeout while trying to join the network. Please try again later.");
-                exit(1);
+                let message = format!("Encountered a timeout while trying to join the network. Retrying after {} minutes.", BOOTSTRAP_RETRY_TIME);
+                println!("{}", &message);
+                error!("{}", &message);
             }
             Err(e) => {
                 println!("Cannot start node due to error: {:?}. If this is the first node on the network \
@@ -139,6 +138,7 @@ async fn run_node() {
                 exit(1);
             }
         }
+        sleep(Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60)).await;
     };
 
     let our_conn_info = node.our_connection_info();
