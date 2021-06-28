@@ -27,6 +27,7 @@
     unused_results
 )]
 
+use anyhow::Result;
 use log::{self, error, info};
 use safe_network::node::{add_connection_info, set_connection_info, utils, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
@@ -38,9 +39,14 @@ const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 use safe_network::routing;
 
 /// Runs a Safe Network node.
-#[tokio::main(flavor = "multi_thread")]
-async fn main() {
-    run_node().await
+fn main() -> Result<()> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .thread_name("sn_node")
+        .thread_stack_size(8 * 1024 * 1024)
+        .enable_all()
+        .build()?;
+    rt.block_on(run_node());
+    Ok(())
 }
 
 async fn run_node() {
