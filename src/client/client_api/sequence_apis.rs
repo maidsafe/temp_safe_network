@@ -44,7 +44,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -54,7 +54,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -115,7 +115,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, SequenceUser, Token, SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -125,7 +125,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -182,7 +182,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -192,7 +192,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -235,7 +235,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -245,7 +245,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -308,7 +308,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -318,7 +318,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -357,7 +357,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -367,7 +367,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -415,7 +415,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -425,7 +425,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -474,7 +474,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions, SequenceIndex};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -484,7 +484,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -538,7 +538,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -548,7 +548,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -595,7 +595,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, Token, SequenceUser,SequencePublicPermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -605,7 +605,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -656,7 +656,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -666,7 +666,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -715,7 +715,7 @@ impl Client {
     /// ```no_run
     /// # extern crate tokio; use anyhow::Result; use std::str::FromStr;
     /// # use safe_network::client::utils::test_utils::read_network_conn_info;
-    /// use safe_network::client::Client;
+    /// use safe_network::client::{Client, DEFAULT_QUERY_TIMEOUT};
     /// use safe_network::types::{Keypair, PublicKey, Token, SequencePrivatePermissions};
     /// use std::collections::BTreeMap;
     /// use xor_name::XorName;
@@ -725,7 +725,7 @@ impl Client {
     /// let id = Keypair::new_ed25519(&mut OsRng);
 
     /// # let bootstrap_contacts = Some(read_network_conn_info()?);
-    /// let mut client = Client::new(Some(id), None, bootstrap_contacts).await?;
+    /// let mut client = Client::new(Some(id), None, bootstrap_contacts, DEFAULT_QUERY_TIMEOUT).await?;
     /// # let initial_balance = Token::from_str("100")?; client.trigger_simulated_farming_payout(initial_balance).await?;
     /// let name = XorName::random();
     /// let tag = 10;
@@ -774,6 +774,7 @@ mod tests {
     use crate::{retry_loop, retry_loop_for_pattern};
     use anyhow::{anyhow, bail, Result};
     use std::str::FromStr;
+    use tokio::time::Duration;
     use xor_name::XorName;
 
     #[tokio::test]
@@ -1063,7 +1064,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_can_delete_private() -> Result<()> {
-        let client = create_test_client().await?;
+        let mut client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
         let owner = client.public_key();
@@ -1081,10 +1082,12 @@ mod tests {
 
         client.delete_sequence(address).await?;
 
+        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
+
         let mut res = client.get_sequence(address).await;
 
         while res.is_ok() {
-            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(Duration::from_millis(200)).await;
             res = client.get_sequence(address).await;
         }
 
@@ -1102,7 +1105,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn sequence_cannot_delete_public() -> Result<()> {
-        let client = create_test_client().await?;
+        let mut client = create_test_client().await?;
 
         let name = XorName(rand::random());
         let tag = 15000;
@@ -1124,6 +1127,8 @@ mod tests {
         assert!(sequence?.is_public());
 
         client.delete_sequence(address).await?;
+
+        client.override_timeout = Some(Duration::from_secs(5)); // override with a short timeout
 
         // Check that our data still exists.
         match client.get_sequence(address).await {

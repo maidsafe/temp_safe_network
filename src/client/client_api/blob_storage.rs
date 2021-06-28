@@ -53,7 +53,7 @@ impl Storage for BlobStorage {
 
         match self.client.fetch_blob_from_network(address).await {
             Ok(data) => Ok(data.value().clone()),
-            Err(error) => Err(SelfEncryptionError::Generic(format!("{}", error))),
+            Err(error) => Err(SelfEncryptionError::Generic(format!("{:?}", error))),
         }
     }
 
@@ -81,7 +81,7 @@ impl Storage for BlobStorage {
 
         match self.client.delete_chunk_from_network(address).await {
             Ok(_) => Ok(()),
-            Err(error) => Err(SelfEncryptionError::Generic(format!("{}", error))),
+            Err(error) => Err(SelfEncryptionError::Generic(format!("{:?}", error))),
         }
     }
 
@@ -95,7 +95,7 @@ impl Storage for BlobStorage {
         self.client
             .store_chunk_on_network(chunk)
             .await
-            .map_err(|err| SelfEncryptionError::Generic(format!("{}", err)))
+            .map_err(|err| SelfEncryptionError::Generic(format!("{:?}", err)))
     }
 
     async fn generate_address(&self, data: &[u8]) -> Result<Vec<u8>, SelfEncryptionError> {
